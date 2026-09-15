@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Galactic Library",
+  "version": "0.1.0",
+  "description": "A private, browser-local index of digital media you own.",
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Galactic Library",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}
