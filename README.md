@@ -10,9 +10,10 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 - normalized provider records and reproducible canonical game records;
 - exact, conservative title matching (edition variants are not silently merged);
 - local Chrome storage plus versioned export/restore; and
-- a minimal library browser and an internal batched `MATCH_ITEMS` handler.
+- a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
+- a user-initiated Steam Store importer for the signed-in account's owned-game library.
 
-Steam and GOG are not connected yet. The manifest deliberately requests only `storage`; a connector will add narrowly scoped host permissions only when its signed-in browser flow is implemented and tested.
+To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves only entries that Steam identifies as full games through Steam's batched StoreBrowse title service. It does not use or request a Steam Web API key, password, or cookie. GOG is not connected yet.
 
 ## Development
 
@@ -32,7 +33,6 @@ The internal `MATCH_ITEMS` message uses the same matcher as the UI. It is not ex
 
 ## Near-term sequence
 
-1. Steam signed-in library importer.
-2. GOG importer through the same provider contract.
-3. Provider sync diagnostics and a duplicate-review queue.
-4. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.
+1. GOG importer through the same provider contract.
+2. Provider sync diagnostics and a duplicate-review queue.
+3. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.

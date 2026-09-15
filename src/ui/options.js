@@ -1,4 +1,5 @@
 import { createBackup, clearDatabase, getDatabase, parseBackup, saveDatabase } from '../lib/storage.js';
+import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -76,4 +77,7 @@ document.querySelector('#clear').addEventListener('click', async () => {
   backupStatus.textContent = 'Local library cleared.';
 });
 search.addEventListener('input', render);
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
+});
 refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });
