@@ -7,10 +7,12 @@ await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
 await import('../src/providers/audible.js');
+await import('../src/providers/kindle.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry } = globalThis.GalacticAudible;
+const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -113,6 +115,29 @@ const tests = [
     const canonical = rebuildCanonicalItems({ [audiobook.id]: audiobook, [game.id]: game });
     assert.ok(canonical['audiobook:project hail mary']);
     assert.ok(canonical['game:project hail mary']);
+  }],
+  ['keeps Kindle books and their available Content Library metadata', () => {
+    assert.equal(ownershipFromOriginType('Purchase'), 'owned');
+    assert.equal(ownershipFromOriginType('KindleUnlimited'), 'subscription');
+    assert.deepEqual(kindleItemsFromOwnershipResponse({
+      GetContentOwnershipData: {
+        items: [{
+          asin: 'B012345678', title: '  Sandman &amp; More  ', authors: ['Neil Gaiman'],
+          seriesName: 'The Sandman', collectionNames: ['Comics'], originType: 'Purchase',
+          contentType: 'Ebook', itemStatus: 'Active', publisherName: 'DC Comics',
+          publicationDate: '2024-01-15', fileFormat: 'KFX', acquiredDate: 1704067200
+        }]
+      }
+    }, 'https://www.amazon.com'), [{
+      providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book', ownership: 'owned', acquiredAt: '2024-01-01T00:00:00.000Z',
+      metadata: {
+        source: 'amazon-kindle-content-library', detailUrl: 'https://www.amazon.com/dp/B012345678', libraryCategory: 'books',
+        authors: ['Neil Gaiman'], series: ['The Sandman'], collections: ['Comics'], originType: 'Purchase',
+        contentType: 'Ebook', itemStatus: 'Active', publisher: 'DC Comics', publicationDate: '2024-01-15', format: 'KFX'
+      }
+    }]);
+    const book = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book' });
+    assert.ok(rebuildCanonicalItems({ [book.id]: book })['book:sandman and more']);
   }]
 ];
 

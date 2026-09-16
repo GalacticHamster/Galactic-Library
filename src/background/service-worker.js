@@ -13,7 +13,8 @@ function isProviderImportPage(provider, url) {
     return (provider === 'steam' && page.origin === 'https://store.steampowered.com')
       || (provider === 'gog' && page.origin === 'https://www.gog.com')
       || (provider === 'epic' && page.origin === 'https://store.epicgames.com')
-      || (provider === 'audible' && page.origin === 'https://www.audible.com');
+      || (provider === 'audible' && page.origin === 'https://www.audible.com')
+      || (provider === 'kindle' && page.origin === 'https://www.amazon.com');
   } catch {
     return false;
   }
@@ -28,7 +29,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'audible'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'audible', 'kindle'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -42,13 +43,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? 'gog-account-library'
       : request.provider === 'epic'
         ? 'epic-store-library'
-        : 'audible-library-page';
+    : request.provider === 'audible'
+      ? 'audible-library-page'
+      : 'amazon-kindle-content-library';
   replaceProviderItems(request.provider, request.items, { source })
     .then((database) => sendResponse({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
       audiobookCount: database.providers[request.provider].audiobookCount ?? 0,
+      bookCount: database.providers[request.provider].bookCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       syncedAt: database.providers[request.provider].lastSync
     }))

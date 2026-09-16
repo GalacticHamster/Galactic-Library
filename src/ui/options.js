@@ -38,6 +38,27 @@ function displayRecordProviders(records) {
   }).join(' · ');
 }
 
+function metadataValues(records, key) {
+  return [...new Set(records.flatMap((record) => {
+    const value = record.metadata?.[key];
+    return Array.isArray(value) ? value : value ? [value] : [];
+  }).map(String).filter(Boolean))];
+}
+
+function displayMediaMetadata(records, mediaType) {
+  if (mediaType !== 'book' && mediaType !== 'audiobook') return '';
+  const parts = [];
+  const authors = metadataValues(records, 'authors');
+  const series = metadataValues(records, 'series');
+  if (authors.length) parts.push(`By ${authors.join(', ')}`);
+  if (series.length) parts.push(`Series: ${series.join(', ')}`);
+  if (mediaType === 'audiobook') {
+    const narrators = metadataValues(records, 'narrators');
+    if (narrators.length) parts.push(`Narrated by ${narrators.join(', ')}`);
+  }
+  return parts.join(' · ');
+}
+
 function textElement(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -106,6 +127,7 @@ function render() {
     const providerParts = [];
     if (state.itemCount) providerParts.push(`${state.itemCount} games`);
     if (state.audiobookCount) providerParts.push(`${state.audiobookCount} audiobooks`);
+    if (state.bookCount) providerParts.push(`${state.bookCount} books`);
     if (state.addOnCount) providerParts.push(`${state.addOnCount} DLC`);
     if (!providerParts.length) providerParts.push('0 items');
     if (state.lastSync) providerParts.push(`synced ${new Date(state.lastSync).toLocaleString()}`);
@@ -142,16 +164,20 @@ function render() {
     .sort((left, right) => left.title.localeCompare(right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
+  const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
   const visibleRecords = canonical.flatMap((item) => item.providerItemIds.map((id) => database.providerItems[id]))
     .filter((record) => providerMatches(record, filters.provider));
   const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
   const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
+  const bookRecordCount = visibleRecords.filter((item) => item.mediaType === 'book').length;
   const summaryParts = [];
   const suffix = filtersAreActive(filters, query) ? ' matching filters' : '';
-  if (gameCanonicalCount || !audiobookCanonicalCount) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
+  if (gameCanonicalCount || (!audiobookCanonicalCount && !bookCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
   if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
+  if (bookCanonicalCount) summaryParts.push(`${bookCanonicalCount} unique book${bookCanonicalCount === 1 ? '' : 's'}`);
   if (gameRecordCount) summaryParts.push(`${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`);
   if (audiobookRecordCount) summaryParts.push(`${audiobookRecordCount} audiobook record${audiobookRecordCount === 1 ? '' : 's'}`);
+  if (bookRecordCount) summaryParts.push(`${bookRecordCount} book record${bookRecordCount === 1 ? '' : 's'}`);
   const visibleAddOnCount = addOns.filter((item) => providerMatches(item, filters.provider)).length;
   if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
   summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
@@ -166,8 +192,14 @@ function render() {
     const header = document.createElement('div');
     header.className = 'library-item-header';
     const providerText = displayRecordProviders(records);
-    header.append(textElement('strong', canonicalItem.title), textElement('span', canonicalItem.mediaType === 'audiobook' ? `${displayMediaType(canonicalItem.mediaType)} · ${providerText}` : providerText));
+    header.append(textElement('strong', canonicalItem.title), textElement('span', canonicalItem.mediaType === 'game' ? providerText : `${displayMediaType(canonicalItem.mediaType)} · ${providerText}`));
     node.append(header);
+    const metadataText = displayMediaMetadata(records, canonicalItem.mediaType);
+    if (metadataText) {
+      const metadata = textElement('div', metadataText);
+      metadata.className = 'library-item-metadata';
+      node.append(metadata);
+    }
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;
   }));

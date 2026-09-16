@@ -34,6 +34,11 @@
       "matches": ["https://www.audible.com/*"],
       "js": ["src/providers/audible.js", "src/providers/audible-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.amazon.com/*"],
+      "js": ["src/providers/kindle.js", "src/providers/kindle-content.js"],
+      "run_at": "document_idle"
     }
   ]
 }
