@@ -4,7 +4,7 @@ import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 
 await import('../src/providers/steam-store.js');
-const { ownedAppIdsFromDynamicStore, gamesFromStoreItems } = globalThis.GalacticSteamStore;
+const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -35,14 +35,18 @@ const tests = [
     assert.equal(result.owned, false);
     assert.equal(result.matches.length, 0);
   }],
-  ['keeps owned Steam games and discards DLC while resolving Store data', () => {
+  ['keeps owned Steam games and links DLC while resolving Store data', () => {
     assert.deepEqual(ownedAppIdsFromDynamicStore({ rgOwnedApps: [440, '570', 'not-an-app', 440] }), ['440', '570']);
-    assert.deepEqual(gamesFromStoreItems({ response: { store_items: [
+    assert.deepEqual(libraryItemsFromStoreItems({ response: { store_items: [
       { appid: 440, type: 0, name: 'Team Fortress 2' },
-      { appid: 570, type: 4, name: 'Not a game' }
+      { appid: 570, type: 4, name: 'Mann Co. Supply Crate Key', related_items: { parent_appid: 440 } }
     ] } }, new Set(['440', '570'])), [
-      { providerItemId: '440', title: 'Team Fortress 2', mediaType: 'game', ownership: 'owned', metadata: { source: 'steam-store-browse-items' } }
+      { providerItemId: '440', title: 'Team Fortress 2', mediaType: 'game', ownership: 'owned', metadata: { source: 'steam-store-browse-items' } },
+      { providerItemId: '570', title: 'Mann Co. Supply Crate Key', mediaType: 'game-addon', ownership: 'owned', metadata: { source: 'steam-store-browse-items', parentProviderItemId: '440' } }
     ]);
+    const game = normalizeProviderItem({ provider: 'steam', providerItemId: '440', title: 'Team Fortress 2' });
+    const addOn = normalizeProviderItem({ provider: 'steam', providerItemId: '570', title: 'Mann Co. Supply Crate Key', mediaType: 'game-addon', metadata: { parentProviderItemId: '440' } });
+    assert.equal(Object.keys(rebuildCanonicalItems({ [game.id]: game, [addOn.id]: addOn })).length, 1);
   }]
 ];
 

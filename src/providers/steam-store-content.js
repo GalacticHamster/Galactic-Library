@@ -26,10 +26,11 @@
           : `Reading Steam titles: ${completed}/${total} apps checked; ${games} games found.`;
       });
       const { items, unresolvedApps } = result;
-      status.textContent = `Saving ${items.length} Steam game${items.length === 1 ? '' : 's'} locally...`;
+      status.textContent = 'Saving Steam games and DLC locally...';
       const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', items });
       if (!response?.ok) throw new Error(response?.error ?? 'Steam import did not complete.');
-      status.textContent = `Saved ${response.itemCount} Steam game${response.itemCount === 1 ? '' : 's'} locally.${unresolvedApps.length ? ` ${unresolvedApps.length} app${unresolvedApps.length === 1 ? '' : 's'} could not be resolved and were not imported.` : ''}`;
+      const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
+      status.textContent = `Saved ${response.gameCount} Steam game${response.gameCount === 1 ? '' : 's'} locally.${response.addOnCount ? ` Saved ${response.addOnCount} DLC add-on${response.addOnCount === 1 ? '' : 's'}; ${response.linkedAddOnCount} linked to a game${unlinkedAddOnCount ? ` and ${unlinkedAddOnCount} shown as unlinked` : ''}.` : ''}${unresolvedApps.length ? ` ${unresolvedApps.length} app${unresolvedApps.length === 1 ? '' : 's'} could not be resolved and were not imported.` : ''}`;
     } catch (error) {
       status.textContent = `Steam import failed: ${error.message}`;
     } finally {

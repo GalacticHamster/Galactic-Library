@@ -33,8 +33,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Steam did not provide a valid game list.' });
     return undefined;
   }
-  replaceProviderItems('steam', request.items, { source: 'steam-community-games-page' })
-    .then((database) => sendResponse({ ok: true, itemCount: database.providers.steam.itemCount, syncedAt: database.providers.steam.lastSync }))
+  replaceProviderItems('steam', request.items, { source: 'steam-store-browse-items' })
+    .then((database) => sendResponse({
+      ok: true,
+      gameCount: database.providers.steam.itemCount,
+      addOnCount: database.providers.steam.addOnCount ?? 0,
+      linkedAddOnCount: database.providers.steam.linkedAddOnCount ?? 0,
+      syncedAt: database.providers.steam.lastSync
+    }))
     .catch((error) => sendResponse({ ok: false, error: error.message }));
   return true;
 });

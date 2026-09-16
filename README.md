@@ -13,7 +13,7 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
 - a user-initiated Steam Store importer for the signed-in account's owned-game library.
 
-To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves only entries that Steam identifies as full games through Steam's batched StoreBrowse title service. It does not use or request a Steam Web API key, password, or cookie. GOG is not connected yet.
+To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves full games and DLC through Steam's batched StoreBrowse title service. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie. GOG is not connected yet.
 
 ## Development
 

@@ -1,5 +1,5 @@
 import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY } from './constants.js';
-import { createEmptyDatabase, normalizeProviderItem, rebuildCanonicalItems, validateDatabase } from './models.js';
+import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from './models.js';
 
 export async function getDatabase() {
   const stored = await chrome.storage.local.get({ [DATABASE_STORAGE_KEY]: null });
@@ -18,11 +18,21 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
   const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
   const incoming = values.map((value) => normalizeProviderItem({ ...value, provider }, now));
   const unique = new Map(incoming.map((item) => [item.id, item]));
+  const records = [...unique.values()];
+  const gameCount = records.filter((item) => item.mediaType === 'game').length;
+  const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
+  const linkedAddOnCount = records.filter((item) => {
+    const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
+    return item.mediaType === 'game-addon' && /^\d+$/u.test(parentId) && unique.has(providerItemKey(item.provider, parentId));
+  }).length;
   database.providerItems = { ...retained, ...Object.fromEntries(unique) };
   database.canonicalItems = rebuildCanonicalItems(database.providerItems);
   database.providers[provider] = {
     connected: true,
-    itemCount: unique.size,
+    itemCount: gameCount,
+    addOnCount,
+    linkedAddOnCount,
+    recordCount: unique.size,
     lastSync: now,
     lastError: null,
     ...syncDetails

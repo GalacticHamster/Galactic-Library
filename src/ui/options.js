@@ -5,11 +5,25 @@ const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
 const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
+const unlinkedAddOnsSection = document.querySelector('#unlinked-add-ons-section');
+const unlinkedAddOnsSummary = document.querySelector('#unlinked-add-ons-summary');
+const unlinkedAddOns = document.querySelector('#unlinked-add-ons');
 const backupStatus = document.querySelector('#backup-status');
 let database;
 
 function displayProviderName(provider) {
   return provider === 'gog' ? 'GOG' : provider[0].toUpperCase() + provider.slice(1);
+}
+
+function displayRecordProviders(records) {
+  const counts = new Map();
+  for (const record of records) {
+    counts.set(record.provider, (counts.get(record.provider) ?? 0) + 1);
+  }
+  return [...counts].map(([provider, count]) => {
+    const name = displayProviderName(provider);
+    return count === 1 ? name : `${name} (${count} records)`;
+  }).join(' · ');
 }
 
 function textElement(tag, text) {
@@ -18,28 +32,88 @@ function textElement(tag, text) {
   return node;
 }
 
+function itemMatchesQuery(item, query) {
+  return !query || item.title.toLocaleLowerCase().includes(query) || item.normalizedTitle.includes(query);
+}
+
+function parentRecordKey(addOn) {
+  const parentId = String(addOn.metadata?.parentProviderItemId ?? '').trim();
+  return /^\d+$/u.test(parentId) ? `${addOn.provider}:${parentId}` : null;
+}
+
+function createAddOnList(addOns) {
+  const group = document.createElement('div');
+  const label = textElement('strong', `DLC (${addOns.length})`);
+  label.className = 'add-ons-label';
+  const list = document.createElement('ul');
+  list.className = 'add-ons';
+  list.replaceChildren(...addOns
+    .sort((left, right) => left.title.localeCompare(right.title))
+    .map((addOn) => textElement('li', `${addOn.title} (${displayProviderName(addOn.provider)})`)));
+  group.append(label, list);
+  return group;
+}
+
 function render() {
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
     node.className = 'provider';
-    const providerSummary = `${state.itemCount ?? 0} games${state.lastSync ? ` · synced ${new Date(state.lastSync).toLocaleString()}` : ''}`;
+    const providerSummary = `${state.itemCount ?? 0} games${state.addOnCount ? ` · ${state.addOnCount} DLC` : ''}${state.lastSync ? ` · synced ${new Date(state.lastSync).toLocaleString()}` : ''}`;
     node.append(textElement('strong', displayProviderName(id)), textElement('span', providerSummary));
     return node;
   }) : [Object.assign(document.createElement('p'), { textContent: 'No libraries connected.' })]));
 
+  const allRecords = Object.values(database.providerItems);
+  const addOns = allRecords.filter((item) => item.mediaType === 'game-addon');
+  const addOnsByParent = new Map();
+  for (const addOn of addOns) {
+    const parentKey = parentRecordKey(addOn);
+    if (!parentKey) continue;
+    const existing = addOnsByParent.get(parentKey) ?? [];
+    existing.push(addOn);
+    addOnsByParent.set(parentKey, existing);
+  }
+
   const query = search.value.trim().toLocaleLowerCase();
   const canonical = Object.values(database.canonicalItems)
-    .filter((item) => !query || item.title.toLocaleLowerCase().includes(query) || item.normalizedTitle.includes(query))
+    .filter((item) => itemMatchesQuery(item, query) || item.providerItemIds.some((id) => (addOnsByParent.get(id) ?? []).some((addOn) => itemMatchesQuery(addOn, query))))
     .sort((left, right) => left.title.localeCompare(right.title));
-  const total = Object.keys(database.providerItems).length;
-  summary.textContent = `${canonical.length}${query ? ' matching' : ''} unique game${canonical.length === 1 ? '' : 's'} · ${total} provider record${total === 1 ? '' : 's'}.`;
+  const gameRecordCount = allRecords.filter((item) => item.mediaType === 'game').length;
+  const summaryParts = [
+    `${canonical.length}${query ? ' matching' : ''} unique game${canonical.length === 1 ? '' : 's'}`,
+    `${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`
+  ];
+  if (addOns.length) summaryParts.push(`${addOns.length} DLC add-on${addOns.length === 1 ? '' : 's'}`);
+  summary.textContent = `${summaryParts.join(' · ')}.`;
+
+  const linkedAddOnIds = new Set();
   items.replaceChildren(...canonical.map((canonicalItem) => {
     const node = document.createElement('li');
     const records = canonicalItem.providerItemIds.map((id) => database.providerItems[id]);
-    node.append(textElement('strong', canonicalItem.title), textElement('span', records.map((record) => displayProviderName(record.provider)).join(' · ')));
+    const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
+    for (const addOn of linkedAddOns) linkedAddOnIds.add(addOn.id);
+    node.className = 'library-item';
+    const header = document.createElement('div');
+    header.className = 'library-item-header';
+    header.append(textElement('strong', canonicalItem.title), textElement('span', displayRecordProviders(records)));
+    node.append(header);
+    if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;
   }));
+
+  const unlinked = addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && itemMatchesQuery(addOn, query));
+  unlinkedAddOnsSection.hidden = unlinked.length === 0;
+  if (unlinked.length) {
+    unlinkedAddOnsSummary.textContent = 'Steam did not provide a parent game record for these add-ons.';
+    unlinkedAddOns.replaceChildren(...unlinked.map((addOn) => {
+      const node = document.createElement('li');
+      node.append(textElement('strong', addOn.title), textElement('span', displayProviderName(addOn.provider)));
+      return node;
+    }));
+  } else {
+    unlinkedAddOns.replaceChildren();
+  }
 }
 
 async function refresh() {

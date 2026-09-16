@@ -54,6 +54,9 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
 export function rebuildCanonicalItems(providerItems) {
   const grouped = new Map();
   for (const item of Object.values(providerItems)) {
+    // Add-ons are records of their own, linked directly to a provider game
+    // record. They must not create or inflate a canonical game.
+    if (item.mediaType !== 'game') continue;
     const key = canonicalItemKey(item.mediaType, item.normalizedTitle);
     const existing = grouped.get(key) ?? [];
     existing.push(item);
