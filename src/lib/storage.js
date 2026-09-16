@@ -28,7 +28,7 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
     return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
   }).length;
   database.providerItems = { ...retained, ...Object.fromEntries(unique) };
-  database.canonicalItems = rebuildCanonicalItems(database.providerItems);
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
   database.providers[provider] = {
     connected: true,
     itemCount: gameCount,
@@ -46,6 +46,25 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
 
 export async function clearDatabase() {
   await chrome.storage.local.remove(DATABASE_STORAGE_KEY);
+}
+
+export async function saveManualMatchDecision(candidate, decision) {
+  if (!candidate || !Array.isArray(candidate.itemIds) || candidate.itemIds.length !== 2 || !['same', 'different'].includes(decision)) {
+    throw new Error('Invalid duplicate-review decision.');
+  }
+  const database = await getDatabase();
+  const itemIds = [...candidate.itemIds].sort();
+  if (!itemIds.every((id) => database.providerItems[id])) throw new Error('One of the reviewed library items no longer exists.');
+  database.manualMatchDecisions[candidate.id] = { decision, itemIds, updatedAt: new Date().toISOString() };
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
+}
+
+export async function removeManualMatchDecision(candidateId) {
+  const database = await getDatabase();
+  delete database.manualMatchDecisions[candidateId];
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
 }
 
 export function createBackup(database) {

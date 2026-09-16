@@ -11,6 +11,7 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 - exact, conservative title matching (edition variants are not silently merged);
 - local Chrome storage plus versioned export/restore; and
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
+- a conservative duplicate-review queue for edition variants and provider-added book/series labels; and
 - user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, and Humble importers for signed-in libraries.
 
 To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves full games and DLC through Steam's batched StoreBrowse title service. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
@@ -43,7 +44,11 @@ There is no backend, analytics, account, cloud sync, or password collection. Pro
 
 The internal `MATCH_ITEMS` message uses the same matcher as the UI. It is not externally exposed yet: external messaging will wait until both Chrome Web Store extension IDs are known and the Humble extension can be explicitly allow-listed.
 
+## Duplicate review
+
+The options page lists possible duplicates separately from automatic matches. It includes edition variants such as `Control` and `Control Ultimate Edition`, plus Audible/Kindle provider labels such as `Title: Series, Book 1`. These candidates are never merged automatically. Select **Same work** only when the records represent the same work; the distinct provider entitlements and edition labels remain intact. Select **Different works** to prevent that candidate from being suggested again. Both decisions stay in the local backup and survive provider resyncs.
+
 ## Near-term sequence
 
-1. Provider sync diagnostics and a duplicate-review queue.
+1. Provider sync diagnostics.
 2. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.

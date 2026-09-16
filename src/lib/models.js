@@ -51,25 +51,55 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
   };
 }
 
-export function rebuildCanonicalItems(providerItems) {
-  const grouped = new Map();
-  for (const item of Object.values(providerItems)) {
-    // Add-ons are records of their own, linked directly to a provider game
-    // record. They must not create or inflate a canonical media item.
-    if (item.mediaType === 'game-addon') continue;
+export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}) {
+  const records = Object.values(providerItems).filter((item) => item.mediaType !== 'game-addon');
+  const parent = new Map(records.map((item) => [item.id, item.id]));
+  const find = (id) => {
+    const current = parent.get(id);
+    if (current === id) return id;
+    const root = find(current);
+    parent.set(id, root);
+    return root;
+  };
+  const join = (left, right) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot);
+  };
+  const exactGroups = new Map();
+  for (const item of records) {
     const key = canonicalItemKey(item.mediaType, item.normalizedTitle);
+    const group = exactGroups.get(key) ?? [];
+    group.push(item);
+    exactGroups.set(key, group);
+  }
+  for (const group of exactGroups.values()) {
+    for (const item of group.slice(1)) join(group[0].id, item.id);
+  }
+  for (const decision of Object.values(manualMatchDecisions)) {
+    if (decision?.decision !== 'same' || !Array.isArray(decision.itemIds) || decision.itemIds.length !== 2) continue;
+    const [left, right] = decision.itemIds;
+    const leftItem = providerItems[left];
+    const rightItem = providerItems[right];
+    if (!leftItem || !rightItem || leftItem.mediaType !== rightItem.mediaType || leftItem.mediaType === 'game-addon') continue;
+    join(left, right);
+  }
+  const grouped = new Map();
+  for (const item of records) {
+    const key = find(item.id);
     const existing = grouped.get(key) ?? [];
     existing.push(item);
     grouped.set(key, existing);
   }
-
-  return Object.fromEntries([...grouped.entries()].map(([id, items]) => {
+  return Object.fromEntries([...grouped.values()].map((items) => {
     const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
+    const normalizedTitles = ordered.map((item) => item.normalizedTitle).sort();
+    const id = canonicalItemKey(ordered[0].mediaType, normalizedTitles[0]);
     return [id, {
       id,
       mediaType: ordered[0].mediaType,
       title: ordered[0].title,
-      normalizedTitle: ordered[0].normalizedTitle,
+      normalizedTitle: normalizedTitles[0],
       baseTitle: ordered[0].baseTitle,
       edition: ordered[0].edition,
       providerItemIds: ordered.map((item) => item.id),
@@ -92,7 +122,7 @@ export function validateDatabase(value) {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
     providerItems,
-    canonicalItems: rebuildCanonicalItems(providerItems),
+    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions),
     manualMatchDecisions
   };
 }

@@ -1,5 +1,6 @@
-import { createBackup, clearDatabase, getDatabase, parseBackup, saveDatabase } from '../lib/storage.js';
+import { createBackup, clearDatabase, getDatabase, parseBackup, removeManualMatchDecision, saveDatabase, saveManualMatchDecision } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
+import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -12,6 +13,11 @@ const items = document.querySelector('#library-items');
 const unlinkedAddOnsSection = document.querySelector('#unlinked-add-ons-section');
 const unlinkedAddOnsSummary = document.querySelector('#unlinked-add-ons-summary');
 const unlinkedAddOns = document.querySelector('#unlinked-add-ons');
+const duplicateReviewSummary = document.querySelector('#duplicate-review-summary');
+const duplicateReviewItems = document.querySelector('#duplicate-review-items');
+const reviewedDuplicates = document.querySelector('#reviewed-duplicates');
+const reviewedDuplicatesSummary = document.querySelector('#reviewed-duplicates-summary');
+const reviewedDuplicateItems = document.querySelector('#reviewed-duplicate-items');
 const backupStatus = document.querySelector('#backup-status');
 let database;
 
@@ -118,6 +124,75 @@ function createAddOnList(addOns) {
   return group;
 }
 
+function reviewRecordLabel(record) {
+  return `${record.title} — ${displayProviderName(record.provider)}`;
+}
+
+function reviewButton(label, className, onClick) {
+  const button = textElement('button', label);
+  button.type = 'button';
+  button.className = className;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function createReviewRow(candidate, reviewed = false) {
+  const node = document.createElement('li');
+  const records = candidate.itemIds.map((id) => database.providerItems[id]).filter(Boolean);
+  node.append(textElement('strong', `${displayMediaType(candidate.mediaType)} · ${Math.round(candidate.confidence * 100)}% candidate`));
+  const recordList = document.createElement('div');
+  recordList.className = 'review-records';
+  recordList.replaceChildren(...records.map((record) => textElement('span', reviewRecordLabel(record))));
+  node.append(recordList);
+  node.append(textElement('p', candidate.reasons.map((reason) => reason.text).join(' ')));
+  node.lastElementChild.className = 'review-reasons';
+  const actions = document.createElement('div');
+  actions.className = 'review-actions';
+  if (reviewed) {
+    actions.append(textElement('span', candidate.decision === 'same' ? 'Marked as the same work.' : 'Marked as different works.'));
+    actions.append(reviewButton('Undo decision', 'undo', async () => {
+      try {
+        database = await removeManualMatchDecision(candidate.id);
+        render();
+      } catch (error) {
+        backupStatus.textContent = `Could not undo duplicate decision: ${error.message}`;
+      }
+    }));
+  } else {
+    actions.append(reviewButton('Same work', 'same', async () => {
+      try {
+        database = await saveManualMatchDecision(candidate, 'same');
+        render();
+      } catch (error) {
+        backupStatus.textContent = `Could not save duplicate decision: ${error.message}`;
+      }
+    }));
+    actions.append(reviewButton('Different works', 'different', async () => {
+      try {
+        database = await saveManualMatchDecision(candidate, 'different');
+        render();
+      } catch (error) {
+        backupStatus.textContent = `Could not save duplicate decision: ${error.message}`;
+      }
+    }));
+  }
+  node.append(actions);
+  return node;
+}
+
+function renderDuplicateReview() {
+  const candidates = findDuplicateCandidates(database.providerItems, database.manualMatchDecisions);
+  const unresolved = candidates.filter((candidate) => !candidate.decision);
+  const reviewed = candidates.filter((candidate) => candidate.decision);
+  duplicateReviewSummary.textContent = unresolved.length
+    ? `${unresolved.length} possible duplicate${unresolved.length === 1 ? '' : 's'} need review. They remain separate until you confirm them.`
+    : 'No possible duplicates need review.';
+  duplicateReviewItems.replaceChildren(...unresolved.map((candidate) => createReviewRow(candidate)));
+  reviewedDuplicates.hidden = reviewed.length === 0;
+  reviewedDuplicatesSummary.textContent = `${reviewed.length} saved duplicate decision${reviewed.length === 1 ? '' : 's'}`;
+  reviewedDuplicateItems.replaceChildren(...reviewed.map((candidate) => createReviewRow(candidate, true)));
+}
+
 function render() {
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
@@ -219,6 +294,7 @@ function render() {
   } else {
     unlinkedAddOns.replaceChildren();
   }
+  renderDuplicateReview();
 }
 
 async function refresh() {

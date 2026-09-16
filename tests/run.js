@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { matchItems } from '../src/lib/matcher.js';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
 import { normalizeGameTitle } from '../src/lib/normalization.js';
+import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -172,6 +173,30 @@ const tests = [
         metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'third-party-key', keyType: 'Steam' }
       }
     ]);
+  }],
+  ['queues provider series labels for review and applies a saved same-work decision', () => {
+    const humbleAudio = normalizeProviderItem({
+      provider: 'humble', providerItemId: 'boys-1', title: 'The Boys: Volume 1 [Dramatized Adaptation]', mediaType: 'audiobook'
+    });
+    const audibleAudio = normalizeProviderItem({
+      provider: 'audible', providerItemId: 'B000000001', title: 'The Boys: Volume 1 [Dramatized Adaptation]: The Boys, Book 1', mediaType: 'audiobook',
+      metadata: { authors: ['Garth Ennis'] }
+    });
+    const humbleBook = normalizeProviderItem({
+      provider: 'humble', providerItemId: 'example-1', title: 'Example: Volume 1', mediaType: 'book'
+    });
+    const kindleBook = normalizeProviderItem({
+      provider: 'kindle', providerItemId: 'B000000002', title: 'Example: Volume 1: Example Series, Book 1', mediaType: 'book', metadata: { authors: ['Example Author'] }
+    });
+    const providerItems = Object.fromEntries([humbleAudio, audibleAudio, humbleBook, kindleBook].map((item) => [item.id, item]));
+    const candidates = findDuplicateCandidates(providerItems);
+    assert.equal(candidates.length, 2);
+    assert.ok(candidates.every((candidate) => candidate.reasons.some((reason) => reason.code === 'provider-series-label')));
+    const boysCandidate = candidates.find((candidate) => candidate.itemIds.includes(humbleAudio.id));
+    assert.equal(boysCandidate.confidence, 0.98);
+    assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 4);
+    const decisions = { [boysCandidate.id]: { decision: 'same', itemIds: boysCandidate.itemIds } };
+    assert.equal(Object.keys(rebuildCanonicalItems(providerItems, decisions)).length, 3);
   }]
 ];
 
