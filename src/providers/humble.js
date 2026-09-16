@@ -77,6 +77,10 @@
       || /"(?:platform|platform_name|key_type|storefront)"\s*:\s*"[^"\\]*(?:steam|gog|epic|origin|uplay|ubisoft|ea(?:\s+app)?|itch(?:\.io)?|windows|mac|linux|android|ios)[^"\\]*"/iu.test(serialized)
       || /"(?:platforms|platforms_and_oses)"\s*:\s*(?:\[[^\]]*"(?:steam|gog|epic|windows|mac|linux|android|ios)|\{)/iu.test(serialized)
       || /\.(?:exe|dmg|apk|appimage|x86_64)(?:["?\\]|$)/iu.test(serialized)) return 'game';
+    // Audio-book bundles occasionally include a PDF booklet too, so check
+    // their audio delivery before the generic ebook/comic formats below.
+    if (/\.(?:mp3|m4a|m4b|aac|flac|ogg|opus|wav)(?:["?\\]|$)/iu.test(serialized)
+      || /"(?:category|content_type|item_content_type|product_type|format|filetype|extension|platform|platform_name)"\s*:\s*"(?:audio|audiobook|audio[ _-]?book|mp3|m4a|m4b|aac|flac|ogg|opus|wav)"/iu.test(serialized)) return 'audiobook';
     if (/\.(?:pdf|epub|cbz|cbr|mobi)(?:["?\\]|$)/iu.test(serialized)
       || /"(?:format|filetype|extension)"\s*:\s*"(?:pdf|epub|cbz|cbr|mobi)"/iu.test(serialized)) return 'book';
     return null;
@@ -158,7 +162,7 @@
     // Leave the existing Humble provider records intact until a whole scan is
     // readable and can replace them atomically.
     if (failures.length) throw new Error(`${failures.length} Humble purchase${failures.length === 1 ? '' : 's'} could not be read; no library changes were saved. Please try again.`);
-    if (!itemsById.size) throw new Error('Humble purchases contained no supported game or book entitlements.');
+    if (!itemsById.size) throw new Error('Humble purchases contained no supported game, audiobook, or book entitlements.');
     return { items: [...itemsById.values()], purchasesRead: keyedOrders.length };
   }
 
