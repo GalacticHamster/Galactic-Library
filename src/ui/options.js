@@ -3,6 +3,10 @@ import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
+const providerFilter = document.querySelector('#provider-filter');
+const mediaTypeFilter = document.querySelector('#media-type-filter');
+const dlcFilter = document.querySelector('#dlc-filter');
+const clearFilters = document.querySelector('#clear-filters');
 const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
 const unlinkedAddOnsSection = document.querySelector('#unlinked-add-ons-section');
@@ -16,7 +20,11 @@ function displayProviderName(provider) {
 }
 
 function displayMediaType(mediaType) {
-  return mediaType === 'audiobook' ? 'Audiobook' : 'Game';
+  if (mediaType === 'audiobook') return 'Audiobook';
+  if (mediaType === 'book') return 'Book';
+  if (mediaType === 'movie') return 'Movie';
+  if (mediaType === 'tv') return 'TV show';
+  return 'Game';
 }
 
 function displayRecordProviders(records) {
@@ -40,6 +48,37 @@ function itemMatchesQuery(item, query) {
   return !query || item.title.toLocaleLowerCase().includes(query) || item.normalizedTitle.includes(query);
 }
 
+function selectedFilters() {
+  return {
+    provider: providerFilter.value,
+    mediaType: mediaTypeFilter.value,
+    dlc: dlcFilter.value
+  };
+}
+
+function providerMatches(record, provider) {
+  return provider === 'all' || record.provider === provider;
+}
+
+function filtersAreActive(filters, query) {
+  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.dlc !== 'all';
+}
+
+function populateProviderFilter(providerEntries) {
+  const selected = providerFilter.value;
+  const options = [
+    ['all', 'All providers'],
+    ...providerEntries.map(([id]) => [id, displayProviderName(id)])
+  ];
+  providerFilter.replaceChildren(...options.map(([value, label]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    return option;
+  }));
+  providerFilter.value = options.some(([value]) => value === selected) ? selected : 'all';
+}
+
 function parentRecordKey(addOn) {
   const parentId = String(addOn.metadata?.parentProviderItemId ?? '').trim();
   return parentId ? `${addOn.provider}:${parentId}` : null;
@@ -60,6 +99,7 @@ function createAddOnList(addOns) {
 
 function render() {
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
+  populateProviderFilter(providerEntries);
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
     node.className = 'provider';
@@ -86,20 +126,35 @@ function render() {
   }
 
   const query = search.value.trim().toLocaleLowerCase();
+  const filters = selectedFilters();
   const canonical = Object.values(database.canonicalItems)
-    .filter((item) => itemMatchesQuery(item, query) || item.providerItemIds.some((id) => (addOnsByParent.get(id) ?? []).some((addOn) => itemMatchesQuery(addOn, query))))
+    .filter((item) => {
+      const records = item.providerItemIds.map((id) => database.providerItems[id]);
+      const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
+      const matchesProvider = records.some((record) => providerMatches(record, filters.provider));
+      const matchesMediaType = filters.mediaType === 'all' || item.mediaType === filters.mediaType;
+      const hasDlc = linkedAddOns.length > 0;
+      const matchesDlc = filters.dlc === 'all' || (item.mediaType === 'game' && (filters.dlc === 'with' ? hasDlc : !hasDlc));
+      const matchesSearch = itemMatchesQuery(item, query)
+        || linkedAddOns.some((addOn) => providerMatches(addOn, filters.provider) && itemMatchesQuery(addOn, query));
+      return matchesProvider && matchesMediaType && matchesDlc && matchesSearch;
+    })
     .sort((left, right) => left.title.localeCompare(right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
-  const gameRecordCount = allRecords.filter((item) => item.mediaType === 'game').length;
-  const audiobookRecordCount = allRecords.filter((item) => item.mediaType === 'audiobook').length;
+  const visibleRecords = canonical.flatMap((item) => item.providerItemIds.map((id) => database.providerItems[id]))
+    .filter((record) => providerMatches(record, filters.provider));
+  const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
+  const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
   const summaryParts = [];
-  if (gameCanonicalCount || !audiobookCanonicalCount) summaryParts.push(`${gameCanonicalCount}${query ? ' matching' : ''} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
-  if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount}${query ? ' matching' : ''} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
+  const suffix = filtersAreActive(filters, query) ? ' matching filters' : '';
+  if (gameCanonicalCount || !audiobookCanonicalCount) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
+  if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
   if (gameRecordCount) summaryParts.push(`${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`);
   if (audiobookRecordCount) summaryParts.push(`${audiobookRecordCount} audiobook record${audiobookRecordCount === 1 ? '' : 's'}`);
-  if (addOns.length) summaryParts.push(`${addOns.length} DLC add-on${addOns.length === 1 ? '' : 's'}`);
-  summary.textContent = `${summaryParts.join(' · ')}.`;
+  const visibleAddOnCount = addOns.filter((item) => providerMatches(item, filters.provider)).length;
+  if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
+  summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
 
   const linkedAddOnIds = new Set();
   items.replaceChildren(...canonical.map((canonicalItem) => {
@@ -117,7 +172,10 @@ function render() {
     return node;
   }));
 
-  const unlinked = addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && itemMatchesQuery(addOn, query));
+  const canShowUnlinkedAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc === 'all';
+  const unlinked = canShowUnlinkedAddOns
+    ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && itemMatchesQuery(addOn, query))
+    : [];
   unlinkedAddOnsSection.hidden = unlinked.length === 0;
   if (unlinked.length) {
     unlinkedAddOnsSummary.textContent = 'The provider did not return a parent game record for these add-ons.';
@@ -166,6 +224,16 @@ document.querySelector('#clear').addEventListener('click', async () => {
   backupStatus.textContent = 'Local library cleared.';
 });
 search.addEventListener('input', render);
+providerFilter.addEventListener('change', render);
+mediaTypeFilter.addEventListener('change', render);
+dlcFilter.addEventListener('change', render);
+clearFilters.addEventListener('click', () => {
+  search.value = '';
+  providerFilter.value = 'all';
+  mediaTypeFilter.value = 'all';
+  dlcFilter.value = 'all';
+  render();
+});
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
 });
