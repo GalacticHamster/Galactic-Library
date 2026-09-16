@@ -14,7 +14,8 @@ function isProviderImportPage(provider, url) {
       || (provider === 'gog' && page.origin === 'https://www.gog.com')
       || (provider === 'epic' && page.origin === 'https://store.epicgames.com')
       || (provider === 'audible' && page.origin === 'https://www.audible.com')
-      || (provider === 'kindle' && page.origin === 'https://www.amazon.com');
+      || (provider === 'kindle' && page.origin === 'https://www.amazon.com')
+      || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
     return false;
   }
@@ -29,7 +30,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'audible', 'kindle'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -45,7 +46,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? 'epic-store-library'
     : request.provider === 'audible'
       ? 'audible-library-page'
-      : 'amazon-kindle-content-library';
+      : request.provider === 'kindle'
+        ? 'amazon-kindle-content-library'
+        : 'humble-purchase-library';
   replaceProviderItems(request.provider, request.items, { source })
     .then((database) => sendResponse({
       ok: true,

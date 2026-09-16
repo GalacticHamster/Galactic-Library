@@ -8,11 +8,13 @@ await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
 await import('../src/providers/audible.js');
 await import('../src/providers/kindle.js');
+await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
+const { redactRedemptionValues, humbleItemsFromOrder } = globalThis.GalacticHumble;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -143,6 +145,29 @@ const tests = [
     }]);
     const book = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book' });
     assert.ok(rebuildCanonicalItems({ [book.id]: book })['book:sandman and more']);
+  }],
+  ['imports Humble books and game entitlements without retaining redemption values', () => {
+    const rawDetail = '{"subproducts":[{"machine_name":"ebook-one","human_name":"Book One","downloads":[{"url":"https://cdn.example.test/book-one.pdf"}]},{"id":"game-two","human_name":"Game Two","platform":"steam"}],"tpkd_dict":{"all_tpks":[{"machine_name":"steam-key","keyindex":2,"human_name":"Third Party Game","key_type":"Steam","redeemed_key_val":"never-store-this"}]}}';
+    const redacted = redactRedemptionValues(rawDetail);
+    assert.equal(redacted.includes('never-store-this'), false);
+    assert.equal(redacted.includes('__GALACTIC_REDACTED_REDEMPTION_VALUE__'), true);
+    const items = humbleItemsFromOrder(JSON.parse(redacted), {
+      gamekey: 'purchase-123', product: { human_name: 'Example Bundle' }, purchased_at: '2026-09-01T00:00:00.000Z'
+    }, 'purchase-123');
+    assert.deepEqual(items, [
+      {
+        providerItemId: 'purchase-123:product:ebook-one', title: 'Book One', mediaType: 'book', ownership: 'owned', acquiredAt: '2026-09-01T00:00:00.000Z',
+        metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'direct-download' }
+      },
+      {
+        providerItemId: 'purchase-123:product:game-two', title: 'Game Two', mediaType: 'game', ownership: 'owned', acquiredAt: '2026-09-01T00:00:00.000Z',
+        metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'direct-download' }
+      },
+      {
+        providerItemId: 'purchase-123:entitlement:steam-key:2', title: 'Third Party Game', mediaType: 'game', ownership: 'owned', acquiredAt: '2026-09-01T00:00:00.000Z',
+        metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'third-party-key', keyType: 'Steam' }
+      }
+    ]);
   }]
 ];
 

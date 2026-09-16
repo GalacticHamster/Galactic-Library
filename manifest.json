@@ -3,7 +3,7 @@
   "name": "Galactic Library",
   "version": "0.1.0",
   "description": "A private, browser-local index of digital media you own.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["https://api.steampowered.com/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",
@@ -38,6 +38,11 @@
     {
       "matches": ["https://www.amazon.com/*"],
       "js": ["src/providers/kindle.js", "src/providers/kindle-content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.humblebundle.com/home/purchases*"],
+      "js": ["src/providers/humble.js", "src/providers/humble-content.js"],
       "run_at": "document_idle"
     }
   ]
