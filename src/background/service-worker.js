@@ -11,7 +11,8 @@ function isProviderImportPage(provider, url) {
   try {
     const page = new URL(url);
     return (provider === 'steam' && page.origin === 'https://store.steampowered.com')
-      || (provider === 'gog' && page.origin === 'https://www.gog.com');
+      || (provider === 'gog' && page.origin === 'https://www.gog.com')
+      || (provider === 'epic' && page.origin === 'https://store.epicgames.com');
   } catch {
     return false;
   }
@@ -26,7 +27,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -34,7 +35,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
   }
-  const source = request.provider === 'steam' ? 'steam-store-browse-items' : 'gog-account-library';
+  const source = request.provider === 'steam'
+    ? 'steam-store-browse-items'
+    : request.provider === 'gog'
+      ? 'gog-account-library'
+      : 'epic-store-library';
   replaceProviderItems(request.provider, request.items, { source })
     .then((database) => sendResponse({
       ok: true,

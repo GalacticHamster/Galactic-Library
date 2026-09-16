@@ -23,7 +23,7 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
   const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
   const linkedAddOnCount = records.filter((item) => {
     const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
-    return item.mediaType === 'game-addon' && /^\d+$/u.test(parentId) && unique.has(providerItemKey(item.provider, parentId));
+    return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
   }).length;
   database.providerItems = { ...retained, ...Object.fromEntries(unique) };
   database.canonicalItems = rebuildCanonicalItems(database.providerItems);

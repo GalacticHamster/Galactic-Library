@@ -24,6 +24,11 @@
       "matches": ["https://www.gog.com/*"],
       "js": ["src/providers/gog.js", "src/providers/gog-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://store.epicgames.com/*"],
+      "js": ["src/providers/epic.js", "src/providers/epic-content.js"],
+      "run_at": "document_idle"
     }
   ]
 }

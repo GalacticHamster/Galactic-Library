@@ -5,8 +5,10 @@ import { normalizeGameTitle } from '../src/lib/normalization.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
+await import('../src/providers/epic.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
+const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -64,6 +66,23 @@ const tests = [
       platform: ['windows'],
       metadata: { source: 'gog-account-library' }
     }]);
+  }],
+  ['keeps Epic games and links Epic add-ons from library pages', () => {
+    const page = { data: { Library: { libraryItems: { records: [
+      { catalogItemId: 'game-id', namespace: 'store', sandboxType: 'PUBLICGAME', product: { supportedTypes: ['GAME'] }, catalogItem: { id: 'game-id', title: 'Alan Wake 2', releaseInfo: [{ platform: 'Windows' }] } },
+      { catalogItemId: 'dlc-id', namespace: 'store', sandboxType: 'PUBLICGAME', product: { supportedTypes: ['DLC'] }, catalogItem: { id: 'dlc-id', title: 'Alan Wake 2: Night Springs', mainGameItem: { id: 'game-id' }, releaseInfo: [{ platform: 'Windows' }] } },
+      { catalogItemId: 'untyped-game-id', namespace: 'store', sandboxType: 'PUBLICGAME', catalogItem: { id: 'untyped-game-id', title: 'A current Epic game' } },
+      { catalogItemId: 'asset-id', namespace: 'ue', sandboxType: 'PUBLICGAME', product: { supportedTypes: ['GAME'] }, catalogItem: { id: 'asset-id', title: 'Unreal asset' } }
+    ], responseMetadata: { nextCursor: 'next-page' } } } } };
+    assert.deepEqual(epicItemsFromLibraryPage(page), {
+      items: [
+        { providerItemId: 'game-id', title: 'Alan Wake 2', mediaType: 'game', ownership: 'owned', platform: ['windows'], metadata: { source: 'epic-store-library' } },
+        { providerItemId: 'dlc-id', title: 'Alan Wake 2: Night Springs', mediaType: 'game-addon', ownership: 'owned', platform: ['windows'], metadata: { source: 'epic-store-library', parentProviderItemId: 'game-id' } },
+        { providerItemId: 'untyped-game-id', title: 'A current Epic game', mediaType: 'game', ownership: 'owned', platform: [], metadata: { source: 'epic-store-library' } }
+      ],
+      skipped: ['asset-id']
+    });
+    assert.equal(nextCursorFromPage(page), 'next-page');
   }]
 ];
 

@@ -38,7 +38,7 @@ function itemMatchesQuery(item, query) {
 
 function parentRecordKey(addOn) {
   const parentId = String(addOn.metadata?.parentProviderItemId ?? '').trim();
-  return /^\d+$/u.test(parentId) ? `${addOn.provider}:${parentId}` : null;
+  return parentId ? `${addOn.provider}:${parentId}` : null;
 }
 
 function createAddOnList(addOns) {
@@ -105,7 +105,7 @@ function render() {
   const unlinked = addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && itemMatchesQuery(addOn, query));
   unlinkedAddOnsSection.hidden = unlinked.length === 0;
   if (unlinked.length) {
-    unlinkedAddOnsSummary.textContent = 'Steam did not provide a parent game record for these add-ons.';
+    unlinkedAddOnsSummary.textContent = 'The provider did not return a parent game record for these add-ons.';
     unlinkedAddOns.replaceChildren(...unlinked.map((addOn) => {
       const node = document.createElement('li');
       node.append(textElement('strong', addOn.title), textElement('span', displayProviderName(addOn.provider)));
