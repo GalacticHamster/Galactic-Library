@@ -22,10 +22,11 @@
       const { items } = await globalThis.GalacticAudible.fetchAudibleAudiobooks(({ pagesRead, audiobooks }) => {
         status.textContent = `Reading Audible library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${audiobooks} audiobooks found.`;
       });
+      const subscriptionCount = items.filter((item) => item.ownership === 'subscription').length;
       status.textContent = `Saving ${items.length} Audible audiobook${items.length === 1 ? '' : 's'} locally...`;
       const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'audible', items });
       if (!response?.ok) throw new Error(response?.error ?? 'Audible import did not complete.');
-      status.textContent = `Saved ${response.audiobookCount} Audible audiobook${response.audiobookCount === 1 ? '' : 's'} locally.`;
+      status.textContent = `Saved ${response.audiobookCount} Audible audiobook${response.audiobookCount === 1 ? '' : 's'} locally; ${subscriptionCount} cards exposed a membership-remove action.`;
     } catch (error) {
       status.textContent = `Audible import failed: ${error.message}`;
     } finally {

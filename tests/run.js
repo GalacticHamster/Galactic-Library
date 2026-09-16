@@ -11,7 +11,7 @@ await import('../src/providers/kindle.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
-const { audibleItemIdFromUrl, audibleItemFromLibraryEntry } = globalThis.GalacticAudible;
+const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 
 const tests = [
@@ -91,23 +91,28 @@ const tests = [
   ['keeps Audible audiobook identity and available library metadata', () => {
     const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';
     assert.equal(audibleItemIdFromUrl(url), 'B08G9PRS1K');
+    assert.equal(ownershipFromLibraryAction('Remove'), 'subscription');
+    assert.equal(ownershipFromLibraryAction('Listen now'), 'unknown');
     assert.deepEqual(audibleItemFromLibraryEntry({
       url,
       title: '  Project Hail Mary  ',
       authors: ['Andy Weir'],
       narrators: ['Ray Porter'],
-      series: []
+      series: [],
+      ownership: 'subscription',
+      libraryAction: 'Remove from your library'
     }), {
       providerItemId: 'B08G9PRS1K',
       title: 'Project Hail Mary',
       mediaType: 'audiobook',
-      ownership: 'unknown',
+      ownership: 'subscription',
       metadata: {
         source: 'audible-library-page',
         detailUrl: 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K',
         authors: ['Andy Weir'],
         narrators: ['Ray Porter'],
-        series: []
+        series: [],
+        libraryAction: 'Remove from your library'
       }
     });
     const audiobook = normalizeProviderItem({ provider: 'audible', providerItemId: 'B08G9PRS1K', title: 'Project Hail Mary', mediaType: 'audiobook', ownership: 'unknown' });

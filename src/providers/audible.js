@@ -37,15 +37,26 @@
       providerItemId,
       title,
       mediaType: 'audiobook',
-      ownership: 'unknown',
+      ownership: entry?.ownership === 'subscription' ? 'subscription' : 'unknown',
       metadata: {
         source: 'audible-library-page',
         detailUrl,
         authors: Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : [],
         narrators: Array.isArray(entry.narrators) ? entry.narrators.filter(Boolean) : [],
-        series: Array.isArray(entry.series) ? entry.series.filter(Boolean) : []
+        series: Array.isArray(entry.series) ? entry.series.filter(Boolean) : [],
+        libraryAction: String(entry?.libraryAction ?? '')
       }
     };
+  }
+
+  function ownershipFromLibraryAction(actionText) {
+    return /\bremove\b/iu.test(String(actionText ?? '')) ? 'subscription' : 'unknown';
+  }
+
+  function libraryActionFromContainer(container) {
+    return [...container.querySelectorAll('button, [role="button"], a')]
+      .map((element) => textOf(element))
+      .find((text) => /\bremove\b/iu.test(text)) ?? '';
   }
 
   function namedLinks(container, selector) {
@@ -61,9 +72,12 @@
       const url = new URL(link.getAttribute('href') ?? '', global.location?.origin ?? 'https://www.audible.com').toString();
       const title = textOf(link);
       const container = link.closest('li, [data-testid*="library"], [class*="library"], [class*="tile"], [class*="item"]') ?? link.parentElement ?? link;
+      const libraryAction = libraryActionFromContainer(container);
       const item = audibleItemFromLibraryEntry({
         url,
         title,
+        ownership: ownershipFromLibraryAction(libraryAction),
+        libraryAction,
         authors: namedLinks(container, 'a[href^="/author/"], a[href*="searchAuthor="], a[href*="libItem_author"]'),
         narrators: namedLinks(container, 'a[href*="searchNarrator="], a[href*="libItem_narrator"]'),
         series: namedLinks(container, 'a[href^="/series/"], a[href*="libItem_series"]')
@@ -102,12 +116,12 @@
         itemsById.set(item.providerItemId, item);
       }
       reportProgress({ pagesRead: page, audiobooks: itemsById.size });
-      if (pageItems.length < PAGE_SIZE || added === 0) break;
+      if (added === 0) break;
       await wait(BETWEEN_PAGES_MS);
     }
     if (!itemsById.size) throw new Error('Audible returned no readable library titles. Please try again later.');
     return { items: [...itemsById.values()] };
   }
 
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, fetchAudibleAudiobooks };
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, fetchAudibleAudiobooks };
 }(globalThis));
