@@ -4,7 +4,9 @@ import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 
 await import('../src/providers/steam-store.js');
+await import('../src/providers/gog.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
+const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -47,6 +49,21 @@ const tests = [
     const game = normalizeProviderItem({ provider: 'steam', providerItemId: '440', title: 'Team Fortress 2' });
     const addOn = normalizeProviderItem({ provider: 'steam', providerItemId: '570', title: 'Mann Co. Supply Crate Key', mediaType: 'game-addon', metadata: { parentProviderItemId: '440' } });
     assert.equal(Object.keys(rebuildCanonicalItems({ [game.id]: game, [addOn.id]: addOn })).length, 1);
+  }],
+  ['keeps GOG game records across library pages and ignores movies', () => {
+    assert.equal(pageCount({ totalPages: 3 }), 3);
+    assert.equal(pageCount({ totalPages: 'not-a-number' }), 1);
+    assert.deepEqual(gogItemsFromProducts({ products: [
+      { id: 1207658691, title: 'The Witcher 3: Wild Hunt', isGame: true, worksOn: { Windows: true, Mac: false } },
+      { id: 1207658692, title: 'A movie', isMovie: true, isGame: false }
+    ] }), [{
+      providerItemId: '1207658691',
+      title: 'The Witcher 3: Wild Hunt',
+      mediaType: 'game',
+      ownership: 'owned',
+      platform: ['windows'],
+      metadata: { source: 'gog-account-library' }
+    }]);
   }]
 ];
 

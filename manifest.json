@@ -19,6 +19,11 @@
       "matches": ["https://store.steampowered.com/*"],
       "js": ["src/providers/steam-store.js", "src/providers/steam-store-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.gog.com/*"],
+      "js": ["src/providers/gog.js", "src/providers/gog-content.js"],
+      "run_at": "document_idle"
     }
   ]
 }
