@@ -7,17 +7,19 @@ Galactic Library is a Manifest V3 Chrome extension for a browser-local index of 
 Version 0.1.0 establishes the parts that must not be provider-specific:
 
 - a stable identity of `provider + providerItemId`, never a title;
-- normalized provider records and reproducible canonical game records;
+- normalized provider records and reproducible canonical game and audiobook records;
 - exact, conservative title matching (edition variants are not silently merged);
 - local Chrome storage plus versioned export/restore; and
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
-- user-initiated Steam Store, GOG, and Epic Games Store importers for signed-in game libraries.
+- user-initiated Steam Store, GOG, Epic Games Store, and Audible importers for signed-in libraries.
 
 To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves full games and DLC through Steam's batched StoreBrowse title service. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
 
 To import GOG, select **Open signed-in GOG** and then **Sync GOG library**. The importer reads GOG's paginated owned-games library on the signed-in site, including hidden games when GOG reports that the account has them. It never asks for, copies, or stores a GOG password, cookie, or OAuth token.
 
 To import Epic Games Store, select **Open signed-in Epic Store** and then **Sync Epic library**. The importer reads the signed-in Epic library with its catalog titles and add-on parent links. Unreal Engine assets, private/test entries, and items Epic does not identify as games or add-ons are excluded. It never asks for, copies, or stores an Epic password, cookie, or OAuth token.
+
+To import Audible, select **Open signed-in Audible** and then **Sync Audible library**. The importer reads the paginated Audible Library pages available in that signed-in tab, recording audiobook IDs, titles, and any displayed author, narrator, and series metadata. Audible library pages do not reliably distinguish purchased titles from membership-included titles, so their ownership state is recorded as unknown. It never asks for, copies, or stores an Audible password, cookie, token, or device authorization.
 
 ## Development
 
@@ -37,6 +39,5 @@ The internal `MATCH_ITEMS` message uses the same matcher as the UI. It is not ex
 
 ## Near-term sequence
 
-1. GOG importer through the same provider contract.
-2. Provider sync diagnostics and a duplicate-review queue.
-3. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.
+1. Provider sync diagnostics and a duplicate-review queue.
+2. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.

@@ -21,6 +21,7 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
   const records = [...unique.values()];
   const gameCount = records.filter((item) => item.mediaType === 'game').length;
   const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
+  const audiobookCount = records.filter((item) => item.mediaType === 'audiobook').length;
   const linkedAddOnCount = records.filter((item) => {
     const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
     return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
@@ -31,6 +32,7 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
     connected: true,
     itemCount: gameCount,
     addOnCount,
+    audiobookCount,
     linkedAddOnCount,
     recordCount: unique.size,
     lastSync: now,

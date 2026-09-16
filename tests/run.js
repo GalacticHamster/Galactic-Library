@@ -6,9 +6,11 @@ import { normalizeGameTitle } from '../src/lib/normalization.js';
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
+await import('../src/providers/audible.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
+const { audibleItemIdFromUrl, audibleItemFromLibraryEntry } = globalThis.GalacticAudible;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -83,6 +85,34 @@ const tests = [
       skipped: ['asset-id']
     });
     assert.equal(nextCursorFromPage(page), 'next-page');
+  }],
+  ['keeps Audible audiobook identity and available library metadata', () => {
+    const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';
+    assert.equal(audibleItemIdFromUrl(url), 'B08G9PRS1K');
+    assert.deepEqual(audibleItemFromLibraryEntry({
+      url,
+      title: '  Project Hail Mary  ',
+      authors: ['Andy Weir'],
+      narrators: ['Ray Porter'],
+      series: []
+    }), {
+      providerItemId: 'B08G9PRS1K',
+      title: 'Project Hail Mary',
+      mediaType: 'audiobook',
+      ownership: 'unknown',
+      metadata: {
+        source: 'audible-library-page',
+        detailUrl: 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K',
+        authors: ['Andy Weir'],
+        narrators: ['Ray Porter'],
+        series: []
+      }
+    });
+    const audiobook = normalizeProviderItem({ provider: 'audible', providerItemId: 'B08G9PRS1K', title: 'Project Hail Mary', mediaType: 'audiobook', ownership: 'unknown' });
+    const game = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Project Hail Mary' });
+    const canonical = rebuildCanonicalItems({ [audiobook.id]: audiobook, [game.id]: game });
+    assert.ok(canonical['audiobook:project hail mary']);
+    assert.ok(canonical['game:project hail mary']);
   }]
 ];
 

@@ -12,7 +12,8 @@ function isProviderImportPage(provider, url) {
     const page = new URL(url);
     return (provider === 'steam' && page.origin === 'https://store.steampowered.com')
       || (provider === 'gog' && page.origin === 'https://www.gog.com')
-      || (provider === 'epic' && page.origin === 'https://store.epicgames.com');
+      || (provider === 'epic' && page.origin === 'https://store.epicgames.com')
+      || (provider === 'audible' && page.origin === 'https://www.audible.com');
   } catch {
     return false;
   }
@@ -27,7 +28,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'audible'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -39,12 +40,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     ? 'steam-store-browse-items'
     : request.provider === 'gog'
       ? 'gog-account-library'
-      : 'epic-store-library';
+      : request.provider === 'epic'
+        ? 'epic-store-library'
+        : 'audible-library-page';
   replaceProviderItems(request.provider, request.items, { source })
     .then((database) => sendResponse({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
+      audiobookCount: database.providers[request.provider].audiobookCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       syncedAt: database.providers[request.provider].lastSync
     }))

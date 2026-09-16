@@ -15,6 +15,10 @@ function displayProviderName(provider) {
   return provider === 'gog' ? 'GOG' : provider[0].toUpperCase() + provider.slice(1);
 }
 
+function displayMediaType(mediaType) {
+  return mediaType === 'audiobook' ? 'Audiobook' : 'Game';
+}
+
 function displayRecordProviders(records) {
   const counts = new Map();
   for (const record of records) {
@@ -59,7 +63,13 @@ function render() {
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
     node.className = 'provider';
-    const providerSummary = `${state.itemCount ?? 0} games${state.addOnCount ? ` · ${state.addOnCount} DLC` : ''}${state.lastSync ? ` · synced ${new Date(state.lastSync).toLocaleString()}` : ''}`;
+    const providerParts = [];
+    if (state.itemCount) providerParts.push(`${state.itemCount} games`);
+    if (state.audiobookCount) providerParts.push(`${state.audiobookCount} audiobooks`);
+    if (state.addOnCount) providerParts.push(`${state.addOnCount} DLC`);
+    if (!providerParts.length) providerParts.push('0 items');
+    if (state.lastSync) providerParts.push(`synced ${new Date(state.lastSync).toLocaleString()}`);
+    const providerSummary = providerParts.join(' · ');
     node.append(textElement('strong', displayProviderName(id)), textElement('span', providerSummary));
     return node;
   }) : [Object.assign(document.createElement('p'), { textContent: 'No libraries connected.' })]));
@@ -79,11 +89,15 @@ function render() {
   const canonical = Object.values(database.canonicalItems)
     .filter((item) => itemMatchesQuery(item, query) || item.providerItemIds.some((id) => (addOnsByParent.get(id) ?? []).some((addOn) => itemMatchesQuery(addOn, query))))
     .sort((left, right) => left.title.localeCompare(right.title));
+  const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
+  const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const gameRecordCount = allRecords.filter((item) => item.mediaType === 'game').length;
-  const summaryParts = [
-    `${canonical.length}${query ? ' matching' : ''} unique game${canonical.length === 1 ? '' : 's'}`,
-    `${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`
-  ];
+  const audiobookRecordCount = allRecords.filter((item) => item.mediaType === 'audiobook').length;
+  const summaryParts = [];
+  if (gameCanonicalCount || !audiobookCanonicalCount) summaryParts.push(`${gameCanonicalCount}${query ? ' matching' : ''} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
+  if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount}${query ? ' matching' : ''} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
+  if (gameRecordCount) summaryParts.push(`${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`);
+  if (audiobookRecordCount) summaryParts.push(`${audiobookRecordCount} audiobook record${audiobookRecordCount === 1 ? '' : 's'}`);
   if (addOns.length) summaryParts.push(`${addOns.length} DLC add-on${addOns.length === 1 ? '' : 's'}`);
   summary.textContent = `${summaryParts.join(' · ')}.`;
 
@@ -96,7 +110,8 @@ function render() {
     node.className = 'library-item';
     const header = document.createElement('div');
     header.className = 'library-item-header';
-    header.append(textElement('strong', canonicalItem.title), textElement('span', displayRecordProviders(records)));
+    const providerText = displayRecordProviders(records);
+    header.append(textElement('strong', canonicalItem.title), textElement('span', canonicalItem.mediaType === 'audiobook' ? `${displayMediaType(canonicalItem.mediaType)} · ${providerText}` : providerText));
     node.append(header);
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;

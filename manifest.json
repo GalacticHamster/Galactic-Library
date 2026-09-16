@@ -29,6 +29,11 @@
       "matches": ["https://store.epicgames.com/*"],
       "js": ["src/providers/epic.js", "src/providers/epic-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.audible.com/*"],
+      "js": ["src/providers/audible.js", "src/providers/audible-content.js"],
+      "run_at": "document_idle"
     }
   ]
 }
