@@ -40,7 +40,7 @@ function displayMediaType(mediaType) {
   return 'Game';
 }
 
-function displayRecordProviders(records) {
+function providerSourceDetails(records) {
   const byProvider = new Map();
   for (const record of records) {
     const providerRecords = byProvider.get(record.provider) ?? [];
@@ -61,9 +61,8 @@ function displayRecordProviders(records) {
           : ownership === 'claimed'
             ? 'claimed'
             : '';
-    const ownershipSuffix = ownershipLabel ? ` (${ownershipLabel})` : '';
-    return `${count === 1 ? name : `${name} (${count} records)`}${ownershipSuffix}`;
-  }).join(' · ');
+    return { label: count === 1 ? name : `${name} (${count} records)`, ownershipLabel };
+  }).sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function metadataValues(records, key) {
@@ -307,8 +306,7 @@ function render() {
     node.className = 'library-item';
     const header = document.createElement('div');
     header.className = 'library-item-header';
-    const providerText = displayRecordProviders(records);
-    header.append(textElement('strong', canonicalItem.title), textElement('span', canonicalItem.mediaType === 'game' ? providerText : `${displayMediaType(canonicalItem.mediaType)} · ${providerText}`));
+    header.append(textElement('strong', canonicalItem.title), textElement('span', displayMediaType(canonicalItem.mediaType)));
     node.append(header);
     const metadataText = displayMediaMetadata(records, canonicalItem.mediaType);
     if (metadataText) {
@@ -316,6 +314,16 @@ function render() {
       metadata.className = 'library-item-metadata';
       node.append(metadata);
     }
+    const providerSources = document.createElement('div');
+    providerSources.className = 'library-item-providers';
+    providerSources.replaceChildren(...providerSourceDetails(records).map(({ label, ownershipLabel }) => {
+      const source = document.createElement('span');
+      source.className = 'library-item-provider';
+      source.append(textElement('strong', label));
+      if (ownershipLabel) source.append(textElement('small', ownershipLabel));
+      return source;
+    }));
+    node.append(providerSources);
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;
   }));
