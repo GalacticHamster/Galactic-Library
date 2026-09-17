@@ -1,4 +1,5 @@
-import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY } from './constants.js';
+import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY } from './constants.js';
+import { normaliseExternalClientIds } from './external-api.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from './models.js';
 
 export async function getDatabase() {
@@ -45,7 +46,18 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
 }
 
 export async function clearDatabase() {
-  await chrome.storage.local.remove(DATABASE_STORAGE_KEY);
+  await chrome.storage.local.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+}
+
+export async function getAllowedExternalClientIds() {
+  const stored = await chrome.storage.local.get({ [EXTERNAL_CLIENT_IDS_STORAGE_KEY]: [] });
+  return normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+}
+
+export async function saveAllowedExternalClientIds(ids) {
+  const normalised = normaliseExternalClientIds(ids);
+  await chrome.storage.local.set({ [EXTERNAL_CLIENT_IDS_STORAGE_KEY]: normalised });
+  return normalised;
 }
 
 export async function saveManualMatchDecision(candidate, decision) {

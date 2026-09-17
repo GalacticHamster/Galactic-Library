@@ -1,12 +1,11 @@
 import { matchItems } from '../lib/matcher.js';
-import { getDatabase, replaceProviderItems } from '../lib/storage.js';
+import { handleExternalApiRequest } from '../lib/external-api.js';
+import { getAllowedExternalClientIds, getDatabase, replaceProviderItems } from '../lib/storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});
 });
 
-// This is intentionally internal for now. The later external API will use the
-// same handler, after both published extension IDs are fixed and allow-listed.
 function isProviderImportPage(provider, url) {
   try {
     const page = new URL(url);
@@ -59,6 +58,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       syncedAt: database.providers[request.provider].lastSync
     }))
+    .catch((error) => sendResponse({ ok: false, error: error.message }));
+  return true;
+});
+
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  getAllowedExternalClientIds()
+    .then((allowedIds) => {
+      if (!sender.id || !allowedIds.includes(sender.id)) {
+        sendResponse({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
+        return null;
+      }
+      return getDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
+    })
     .catch((error) => sendResponse({ ok: false, error: error.message }));
   return true;
 });

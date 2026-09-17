@@ -3,6 +3,7 @@ import { matchItems } from '../src/lib/matcher.js';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
+import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -39,6 +40,13 @@ const tests = [
     assert.equal(result.confidence, 1);
     assert.equal(result.matches.length, 2);
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 1);
+  }],
+  ['returns named game editions as possible matches, never exact ownership', () => {
+    const steelrising = normalizeProviderItem({ provider: 'steam', providerItemId: '99', title: 'Steelrising' });
+    const results = matchItems({ [steelrising.id]: steelrising }, [{ requestId: 'steelrising', mediaType: 'game', title: 'Steelrising - Bastille Edition' }]);
+    assert.equal(results[0].owned, false);
+    assert.deepEqual(results[0].matches, []);
+    assert.deepEqual(results[0].possibleMatches.map((item) => item.title), ['Steelrising']);
   }],
   ['does not claim a separate edition as owned', () => {
     const item = normalizeProviderItem({ provider: 'steam', providerItemId: '870780', title: 'Control' });
@@ -197,6 +205,17 @@ const tests = [
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 4);
     const decisions = { [boysCandidate.id]: { decision: 'same', itemIds: boysCandidate.itemIds } };
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems, decisions)).length, 3);
+  }],
+  ['serves only narrow, validated external ownership results', () => {
+    const steam = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Deathloop' });
+    const database = { providerItems: { [steam.id]: steam }, providers: { steam: { connected: true, itemCount: 1 } } };
+    assert.equal(isExtensionId('abcdefghijklmnopabcdefghijklmnop'), true);
+    assert.deepEqual(normaliseExternalClientIds(['abcdefghijklmnopabcdefghijklmnop', 'bad', 'abcdefghijklmnopabcdefghijklmnop']), ['abcdefghijklmnopabcdefghijklmnop']);
+    assert.deepEqual(handleExternalApiRequest(database, { type: 'PING' }), { ok: true, apiVersion: 1, appVersion: '0.1.0' });
+    const response = handleExternalApiRequest(database, { type: 'MATCH_ITEMS', apiVersion: 1, items: [{ requestId: 'deathloop', mediaType: 'game', title: 'Deathloop' }] });
+    assert.equal(response.ok, true);
+    assert.equal(response.results[0].owned, true);
+    assert.match(handleExternalApiRequest(database, { type: 'MATCH_ITEMS', apiVersion: 1, items: [{ mediaType: 'movie', title: 'Deathloop' }] }).error, /valid game/u);
   }]
 ];
 

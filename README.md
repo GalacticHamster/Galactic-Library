@@ -42,7 +42,7 @@ To load in Chrome, open `chrome://extensions`, enable **Developer mode**, choose
 
 There is no backend, analytics, account, cloud sync, or password collection. Provider data will remain in `chrome.storage.local` until the user clears it, restores a backup, or uninstalls the extension. Galactic Library requests Chrome's `unlimitedStorage` permission because a complete multi-provider libraryâ€”especially a long Humble purchase history with local provenanceâ€”can exceed Chrome's default 10 MB local-storage quota. This permission expands only the browser-local storage available to this extension; it does not transmit data or grant access to other sites. The implementation will access provider sites only through a tab where the user is already signed in.
 
-The internal `MATCH_ITEMS` message uses the same matcher as the UI. It is not externally exposed yet: external messaging will wait until both Chrome Web Store extension IDs are known and the Humble extension can be explicitly allow-listed.
+Galactic Library has a deliberately narrow companion API for Humble Comic Library: `PING`, aggregate provider status, and batched exact-title `MATCH_ITEMS`. It never exposes raw library records. To pair unpacked or published extensions, enter Humble Comic Library's 32-character extension ID under **Humble Comic Library link**; Galactic then accepts requests only from that exact ID. Humble's settings separately require Galactic Library's extension ID.
 
 ## Duplicate review
 

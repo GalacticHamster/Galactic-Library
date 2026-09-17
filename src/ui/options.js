@@ -1,6 +1,7 @@
-import { createBackup, clearDatabase, getDatabase, parseBackup, removeManualMatchDecision, saveDatabase, saveManualMatchDecision } from '../lib/storage.js';
+import { createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveManualMatchDecision } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
+import { isExtensionId } from '../lib/external-api.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -19,6 +20,9 @@ const reviewedDuplicates = document.querySelector('#reviewed-duplicates');
 const reviewedDuplicatesSummary = document.querySelector('#reviewed-duplicates-summary');
 const reviewedDuplicateItems = document.querySelector('#reviewed-duplicate-items');
 const backupStatus = document.querySelector('#backup-status');
+const humbleExtensionId = document.querySelector('#humble-extension-id');
+const humbleExtensionLinkStatus = document.querySelector('#humble-extension-link-status');
+const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
 
 function displayProviderName(provider) {
@@ -193,6 +197,15 @@ function renderDuplicateReview() {
   reviewedDuplicateItems.replaceChildren(...reviewed.map((candidate) => createReviewRow(candidate, true)));
 }
 
+async function renderHumbleExtensionLink() {
+  const ids = await getAllowedExternalClientIds();
+  galacticExtensionId.textContent = chrome.runtime.id;
+  humbleExtensionId.value = ids[0] ?? '';
+  humbleExtensionLinkStatus.textContent = ids.length
+    ? `Allowed extension ID: ${ids[0]}.`
+    : 'No companion extension is allowed yet.';
+}
+
 function render() {
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
@@ -300,6 +313,7 @@ function render() {
 async function refresh() {
   database = await getDatabase();
   render();
+  await renderHumbleExtensionLink();
 }
 
 document.querySelector('#export').addEventListener('click', () => {
@@ -330,6 +344,28 @@ document.querySelector('#clear').addEventListener('click', async () => {
   await clearDatabase();
   await refresh();
   backupStatus.textContent = 'Local library cleared.';
+});
+document.querySelector('#save-humble-extension-id').addEventListener('click', async () => {
+  const id = humbleExtensionId.value.trim();
+  if (!isExtensionId(id)) {
+    humbleExtensionLinkStatus.textContent = 'Enter a valid 32-character Chrome extension ID.';
+    return;
+  }
+  try {
+    await saveAllowedExternalClientIds([id]);
+    humbleExtensionLinkStatus.textContent = `Allowed extension ID: ${id}.`;
+  } catch (error) {
+    humbleExtensionLinkStatus.textContent = `Could not save the allowed extension: ${error.message}`;
+  }
+});
+document.querySelector('#clear-humble-extension-id').addEventListener('click', async () => {
+  try {
+    await saveAllowedExternalClientIds([]);
+    humbleExtensionId.value = '';
+    humbleExtensionLinkStatus.textContent = 'Companion extension link removed.';
+  } catch (error) {
+    humbleExtensionLinkStatus.textContent = `Could not remove the companion extension: ${error.message}`;
+  }
 });
 search.addEventListener('input', render);
 providerFilter.addEventListener('change', render);
