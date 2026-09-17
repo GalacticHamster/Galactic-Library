@@ -52,7 +52,16 @@ function displayRecordProviders(records) {
     const name = displayProviderName(provider);
     const ownerships = [...new Set(providerRecords.map((record) => record.ownership))];
     const ownership = ownerships.length === 1 ? ownerships[0] : '';
-    const ownershipSuffix = ownership && ownership !== 'owned' ? ` · ${ownership}` : '';
+    const ownershipLabel = ownership === 'unknown'
+      ? 'ownership unconfirmed'
+      : ownership === 'subscription'
+        ? 'subscription access'
+        : ownership === 'rental'
+          ? 'rental'
+          : ownership === 'claimed'
+            ? 'claimed'
+            : '';
+    const ownershipSuffix = ownershipLabel ? ` (${ownershipLabel})` : '';
     return `${count === 1 ? name : `${name} (${count} records)`}${ownershipSuffix}`;
   }).join(' · ');
 }
