@@ -41,6 +41,11 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://www.kobo.com/*"],
+      "js": ["src/providers/kobo.js", "src/providers/kobo-content.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://www.humblebundle.com/home/purchases*"],
       "js": ["src/providers/humble.js", "src/providers/humble-content.js"],
       "run_at": "document_idle"

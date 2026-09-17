@@ -11,6 +11,7 @@ await import('../src/providers/epic.js');
 await import('../src/providers/audible.js');
 await import('../src/providers/kindle.js');
 await import('../src/providers/amazon-video.js');
+await import('../src/providers/kobo.js');
 await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
@@ -18,6 +19,7 @@ const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
+const { koboItemIdFromValue, koboItemFromCardData } = globalThis.GalacticKobo;
 const { redactRedemptionValues, humbleItemsFromOrder } = globalThis.GalacticHumble;
 
 const tests = [
@@ -174,6 +176,39 @@ const tests = [
     });
     const movie = normalizeProviderItem({ provider: 'amazon-video', providerItemId: 'B012345678', title: 'Arrival', mediaType: 'movie' });
     assert.ok(rebuildCanonicalItems({ [movie.id]: movie })['movie:arrival']);
+  }],
+  ['keeps Kobo book and audiobook identities from signed-in My Books cards', () => {
+    assert.equal(koboItemIdFromValue('https://www.kobo.com/us/en/ebook/the-left-hand-of-darkness'), 'the-left-hand-of-darkness');
+    assert.equal(koboItemIdFromValue('bookId=1f2e3d4c-1234-5678-9abc-def012345678'), '1f2e3d4c-1234-5678-9abc-def012345678');
+    assert.deepEqual(koboItemFromCardData({
+      providerItemId: 'https://readingservices.kobo.com/ReadNow/1f2e3d4c-1234-5678-9abc-def012345678', title: 'Web Reader Book',
+      detailUrl: 'https://readingservices.kobo.com/ReadNow/1f2e3d4c-1234-5678-9abc-def012345678', typeText: ''
+    })?.mediaType, 'book');
+    assert.deepEqual(koboItemFromCardData({
+      providerItemId: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', title: 'Kobo Read Now Book',
+      detailUrl: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', typeText: ''
+    }), {
+      providerItemId: 'ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', title: 'Kobo Read Now Book', mediaType: 'book', ownership: 'owned',
+      metadata: {
+        source: 'kobo-my-books-library', detailUrl: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', imageUrl: '', authors: [], series: [], format: 'ebook'
+      }
+    });
+    assert.deepEqual(koboItemFromCardData({
+      providerItemId: 'bookId=1f2e3d4c-1234-5678-9abc-def012345678', title: '  A Memory Called Empire ',
+      detailUrl: 'https://www.kobo.com/us/en/ebook/a-memory-called-empire?utm_source=library', imageUrl: 'https://cdn.kobo.com/cover.jpg',
+      typeText: 'eBook', authors: ['Arkady Martine'], series: ['Teixcalaan']
+    }), {
+      providerItemId: '1f2e3d4c-1234-5678-9abc-def012345678', title: 'A Memory Called Empire', mediaType: 'book', ownership: 'owned',
+      metadata: {
+        source: 'kobo-my-books-library', detailUrl: 'https://www.kobo.com/us/en/ebook/a-memory-called-empire', imageUrl: 'https://cdn.kobo.com/cover.jpg',
+        authors: ['Arkady Martine'], series: ['Teixcalaan'], format: 'ebook'
+      }
+    });
+    assert.deepEqual(koboItemFromCardData({
+      providerItemId: 'book-2', title: 'Kobo Card Attribute Title', detailUrl: 'https://www.kobo.com/us/en/ebook/kobo-card-attribute-title', typeText: 'eBook'
+    })?.title, 'Kobo Card Attribute Title');
+    const audiobook = normalizeProviderItem({ provider: 'kobo', providerItemId: 'audio-1', title: 'Kobo Audio', mediaType: 'audiobook' });
+    assert.ok(rebuildCanonicalItems({ [audiobook.id]: audiobook })['audiobook:kobo audio']);
   }],
   ['imports Humble books and game entitlements without retaining redemption values', () => {
     const rawDetail = '{"subproducts":[{"machine_name":"ebook-one","human_name":"Book One","downloads":[{"url":"https://cdn.example.test/book-one.pdf"}]},{"machine_name":"audio-two","human_name":"Audio Two","downloads":[{"platform":"audio","download_struct":[{"name":"MP3"}]}]},{"id":"game-three","human_name":"Game Three","platform":"steam"}],"tpkd_dict":{"all_tpks":[{"machine_name":"steam-key","keyindex":2,"human_name":"Third Party Game","key_type":"Steam","redeemed_key_val":"never-store-this"}]}}';
