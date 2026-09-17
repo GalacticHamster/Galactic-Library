@@ -37,7 +37,7 @@
     },
     {
       "matches": ["https://www.amazon.com/*"],
-      "js": ["src/providers/kindle.js", "src/providers/kindle-content.js"],
+      "js": ["src/providers/kindle.js", "src/providers/kindle-content.js", "src/providers/amazon-video.js", "src/providers/amazon-video-content.js"],
       "run_at": "document_idle"
     },
     {

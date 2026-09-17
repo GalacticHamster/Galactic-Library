@@ -10,12 +10,14 @@ await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
 await import('../src/providers/audible.js');
 await import('../src/providers/kindle.js');
+await import('../src/providers/amazon-video.js');
 await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
+const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
 const { redactRedemptionValues, humbleItemsFromOrder } = globalThis.GalacticHumble;
 
 const tests = [
@@ -154,6 +156,24 @@ const tests = [
     }]);
     const book = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book' });
     assert.ok(rebuildCanonicalItems({ [book.id]: book })['book:sandman and more']);
+  }],
+  ['keeps Amazon Video movie and TV entitlement identities without guessing ambiguous ownership', () => {
+    assert.equal(ownershipFromCardText('Purchased in HD'), 'owned');
+    assert.equal(ownershipFromCardText('Rental expires in 12 days'), 'rental');
+    assert.equal(ownershipFromCardText('Watch now'), 'unknown');
+    assert.deepEqual(amazonVideoItemFromCardData({
+      providerItemId: 'amzn1.dv.gti.1234-abcd', title: '  The Expanse: Season 1 ', entityType: 'TV_SHOW',
+      detailUrl: 'https://www.amazon.com/gp/video/detail/amzn1.dv.gti.1234-abcd?ref=library',
+      imageUrl: 'https://m.media-amazon.com/images/example.jpg', ownershipEvidence: 'Purchased'
+    }), {
+      providerItemId: 'amzn1.dv.gti.1234-abcd', title: 'The Expanse: Season 1', mediaType: 'tv', ownership: 'owned',
+      metadata: {
+        source: 'amazon-prime-video-purchases-library', detailUrl: 'https://www.amazon.com/gp/video/detail/amzn1.dv.gti.1234-abcd', entityType: 'TV_SHOW',
+        imageUrl: 'https://m.media-amazon.com/images/example.jpg', libraryView: 'purchases-and-rentals', ownershipEvidence: 'Purchased'
+      }
+    });
+    const movie = normalizeProviderItem({ provider: 'amazon-video', providerItemId: 'B012345678', title: 'Arrival', mediaType: 'movie' });
+    assert.ok(rebuildCanonicalItems({ [movie.id]: movie })['movie:arrival']);
   }],
   ['imports Humble books and game entitlements without retaining redemption values', () => {
     const rawDetail = '{"subproducts":[{"machine_name":"ebook-one","human_name":"Book One","downloads":[{"url":"https://cdn.example.test/book-one.pdf"}]},{"machine_name":"audio-two","human_name":"Audio Two","downloads":[{"platform":"audio","download_struct":[{"name":"MP3"}]}]},{"id":"game-three","human_name":"Game Three","platform":"steam"}],"tpkd_dict":{"all_tpks":[{"machine_name":"steam-key","keyindex":2,"human_name":"Third Party Game","key_type":"Steam","redeemed_key_val":"never-store-this"}]}}';

@@ -7,12 +7,12 @@ Galactic Library is a Manifest V3 Chrome extension for a browser-local index of 
 Version 0.1.0 establishes the parts that must not be provider-specific:
 
 - a stable identity of `provider + providerItemId`, never a title;
-- normalized provider records and reproducible canonical game, audiobook, and book records;
+- normalized provider records and reproducible canonical game, audiobook, book, movie, and TV records;
 - exact, conservative title matching (edition variants are not silently merged);
 - local Chrome storage plus versioned export/restore; and
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
 - a conservative duplicate-review queue for edition variants and provider-added book/series labels; and
-- user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, and Humble importers for signed-in libraries.
+- user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, Amazon Video, and Humble importers for signed-in libraries.
 
 To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves full games and DLC through Steam's batched StoreBrowse title service. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
 
@@ -23,6 +23,8 @@ To import Epic Games Store, select **Open signed-in Epic Store** and then **Sync
 To import Audible, select **Open signed-in Audible** and then **Sync Audible library**. The importer reads the paginated Audible Library pages available in that signed-in tab, recording audiobook IDs, titles, and any displayed author, narrator, and series metadata. When an Audible library card explicitly offers **Remove from your library**, the title is recorded as membership-linked; all other Audible entries remain unknown rather than being assumed to be purchases. It never asks for, copies, or stores an Audible password, cookie, token, or device authorization.
 
 To import Kindle content, select **Open signed-in Kindle library** and then **Sync Kindle library**. The importer reads Amazon's signed-in Content & Devices book library and Personal Documents category, recording each item's ID, title, available author, series, collection, acquisition date, entitlement source, and available publisher, publication date, and format metadata. Kindle Unlimited, Prime, rental, and trial titles are stored as subscription records; purchases are stored as owned. Personal documents are marked as such and retain an unknown ownership state. It never asks for, copies, or stores an Amazon password, cookie, or token.
+
+To import Amazon Video, select **Open signed-in Amazon Video library** and then **Sync Amazon Video library** on the Purchases & Rentals page. The importer reads the rendered movie and TV title cards in that page, scrolling through the library as needed. It records the stable Amazon title ID, title, card type, detail-page URL, and available artwork URL. Cards explicitly labelled as purchased are stored as owned, cards explicitly labelled as rentals are stored as rentals, and ambiguous cards remain unknown. It does not import Watchlist or Prime-included titles, request individual detail pages, or ask for, copy, or store an Amazon password, cookie, or token.
 
 To import Humble purchases, select **Open signed-in Humble purchases** and then **Sync Humble purchases**. The importer reads Humble's purchase list and the necessary purchase-detail records in that signed-in tab. It records supported DRM-free books/comics, audiobook deliveries (MP3, M4A/M4B, AAC, FLAC, OGG/Opus, or WAV), direct games, and third-party game entitlements with their Humble purchase origin and purchase date when available. Redemption-key values are redacted from each detail response *before* it is parsed, and are never stored, exported, or logged. The importer does not ask for, copy, or store a Humble password, cookie, or redemption key. A sync replaces the Humble provider snapshot only after every purchase detail has been read successfully, so a temporary Humble error cannot erase a prior Humble import.
 

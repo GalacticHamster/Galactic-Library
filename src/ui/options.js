@@ -26,7 +26,9 @@ const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
 
 function displayProviderName(provider) {
-  return provider === 'gog' ? 'GOG' : provider[0].toUpperCase() + provider.slice(1);
+  if (provider === 'gog') return 'GOG';
+  if (provider === 'amazon-video') return 'Amazon Video';
+  return provider[0].toUpperCase() + provider.slice(1);
 }
 
 function displayMediaType(mediaType) {
@@ -38,13 +40,19 @@ function displayMediaType(mediaType) {
 }
 
 function displayRecordProviders(records) {
-  const counts = new Map();
+  const byProvider = new Map();
   for (const record of records) {
-    counts.set(record.provider, (counts.get(record.provider) ?? 0) + 1);
+    const providerRecords = byProvider.get(record.provider) ?? [];
+    providerRecords.push(record);
+    byProvider.set(record.provider, providerRecords);
   }
-  return [...counts].map(([provider, count]) => {
+  return [...byProvider].map(([provider, providerRecords]) => {
+    const count = providerRecords.length;
     const name = displayProviderName(provider);
-    return count === 1 ? name : `${name} (${count} records)`;
+    const ownerships = [...new Set(providerRecords.map((record) => record.ownership))];
+    const ownership = ownerships.length === 1 ? ownerships[0] : '';
+    const ownershipSuffix = ownership && ownership !== 'owned' ? ` · ${ownership}` : '';
+    return `${count === 1 ? name : `${name} (${count} records)`}${ownershipSuffix}`;
   }).join(' · ');
 }
 
@@ -216,6 +224,8 @@ function render() {
     if (state.itemCount) providerParts.push(`${state.itemCount} games`);
     if (state.audiobookCount) providerParts.push(`${state.audiobookCount} audiobooks`);
     if (state.bookCount) providerParts.push(`${state.bookCount} books`);
+    if (state.movieCount) providerParts.push(`${state.movieCount} movies`);
+    if (state.tvCount) providerParts.push(`${state.tvCount} TV titles`);
     if (state.addOnCount) providerParts.push(`${state.addOnCount} DLC`);
     if (!providerParts.length) providerParts.push('0 items');
     if (state.lastSync) providerParts.push(`synced ${new Date(state.lastSync).toLocaleString()}`);
@@ -253,19 +263,27 @@ function render() {
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
+  const movieCanonicalCount = canonical.filter((item) => item.mediaType === 'movie').length;
+  const tvCanonicalCount = canonical.filter((item) => item.mediaType === 'tv').length;
   const visibleRecords = canonical.flatMap((item) => item.providerItemIds.map((id) => database.providerItems[id]))
     .filter((record) => providerMatches(record, filters.provider));
   const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
   const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
   const bookRecordCount = visibleRecords.filter((item) => item.mediaType === 'book').length;
+  const movieRecordCount = visibleRecords.filter((item) => item.mediaType === 'movie').length;
+  const tvRecordCount = visibleRecords.filter((item) => item.mediaType === 'tv').length;
   const summaryParts = [];
   const suffix = filtersAreActive(filters, query) ? ' matching filters' : '';
-  if (gameCanonicalCount || (!audiobookCanonicalCount && !bookCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
+  if (gameCanonicalCount || (!audiobookCanonicalCount && !bookCanonicalCount && !movieCanonicalCount && !tvCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
   if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
   if (bookCanonicalCount) summaryParts.push(`${bookCanonicalCount} unique book${bookCanonicalCount === 1 ? '' : 's'}`);
+  if (movieCanonicalCount) summaryParts.push(`${movieCanonicalCount} unique movie${movieCanonicalCount === 1 ? '' : 's'}`);
+  if (tvCanonicalCount) summaryParts.push(`${tvCanonicalCount} unique TV title${tvCanonicalCount === 1 ? '' : 's'}`);
   if (gameRecordCount) summaryParts.push(`${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`);
   if (audiobookRecordCount) summaryParts.push(`${audiobookRecordCount} audiobook record${audiobookRecordCount === 1 ? '' : 's'}`);
   if (bookRecordCount) summaryParts.push(`${bookRecordCount} book record${bookRecordCount === 1 ? '' : 's'}`);
+  if (movieRecordCount) summaryParts.push(`${movieRecordCount} movie record${movieRecordCount === 1 ? '' : 's'}`);
+  if (tvRecordCount) summaryParts.push(`${tvRecordCount} TV record${tvRecordCount === 1 ? '' : 's'}`);
   const visibleAddOnCount = addOns.filter((item) => providerMatches(item, filters.provider)).length;
   if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
   summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;

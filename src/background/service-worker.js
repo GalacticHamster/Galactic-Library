@@ -14,6 +14,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'epic' && page.origin === 'https://store.epicgames.com')
       || (provider === 'audible' && page.origin === 'https://www.audible.com')
       || (provider === 'kindle' && page.origin === 'https://www.amazon.com')
+      || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
       || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
     return false;
@@ -29,7 +30,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'amazon-video', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -45,8 +46,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? 'epic-store-library'
     : request.provider === 'audible'
       ? 'audible-library-page'
-      : request.provider === 'kindle'
-        ? 'amazon-kindle-content-library'
+        : request.provider === 'kindle'
+          ? 'amazon-kindle-content-library'
+          : request.provider === 'amazon-video'
+            ? 'amazon-prime-video-purchases-library'
         : 'humble-purchase-library';
   replaceProviderItems(request.provider, request.items, { source })
     .then((database) => sendResponse({
@@ -55,6 +58,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
       audiobookCount: database.providers[request.provider].audiobookCount ?? 0,
       bookCount: database.providers[request.provider].bookCount ?? 0,
+      movieCount: database.providers[request.provider].movieCount ?? 0,
+      tvCount: database.providers[request.provider].tvCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       syncedAt: database.providers[request.provider].lastSync
     }))
