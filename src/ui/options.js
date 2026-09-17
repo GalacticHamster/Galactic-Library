@@ -28,6 +28,7 @@ let database;
 function displayProviderName(provider) {
   if (provider === 'gog') return 'GOG';
   if (provider === 'amazon-video') return 'Amazon Video';
+  if (provider === 'fandango-at-home') return 'Fandango at Home';
   return provider[0].toUpperCase() + provider.slice(1);
 }
 

@@ -46,6 +46,11 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://athome.fandango.com/*"],
+      "js": ["src/providers/fandango-at-home.js", "src/providers/fandango-at-home-content.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://www.humblebundle.com/home/purchases*"],
       "js": ["src/providers/humble.js", "src/providers/humble-content.js"],
       "run_at": "document_idle"

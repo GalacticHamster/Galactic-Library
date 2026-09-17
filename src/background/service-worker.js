@@ -15,6 +15,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'audible' && page.origin === 'https://www.audible.com')
       || (provider === 'kindle' && page.origin === 'https://www.amazon.com')
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
+      || (provider === 'fandango-at-home' && page.origin === 'https://athome.fandango.com')
       || (provider === 'kobo' && page.origin === 'https://www.kobo.com' && page.pathname.includes('/library'))
       || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
@@ -22,7 +23,47 @@ function isProviderImportPage(provider, url) {
   }
 }
 
+function isFandangoPage(url) {
+  try {
+    return new URL(url).origin === 'https://athome.fandango.com';
+  } catch {
+    return false;
+  }
+}
+
+function fandangoImportKey(sender) {
+  return sender.tab?.id === undefined ? '' : `fandango-import-${sender.tab.id}`;
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.type === 'FANDANGO_IMPORT_STATE') {
+    const key = fandangoImportKey(sender);
+    if (!key || !isFandangoPage(sender.url)) {
+      sendResponse({ ok: false, error: 'Fandango import state is available only in the signed-in Fandango tab.' });
+      return undefined;
+    }
+    if (request.action === 'get') {
+      chrome.storage.session.get(key)
+        .then((values) => sendResponse({ ok: true, state: values[key] ?? null }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+    if (request.action === 'set' && request.state && typeof request.state === 'object') {
+      chrome.storage.session.set({ [key]: request.state })
+        .then(() => sendResponse({ ok: true }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+    if (request.action === 'clear') {
+      chrome.storage.session.remove(key)
+        .then(() => sendResponse({ ok: true }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+    sendResponse({ ok: false, error: 'Invalid Fandango import-state request.' });
+    return undefined;
+  }
+
   if (request?.type === 'MATCH_ITEMS') {
     getDatabase()
       .then((database) => sendResponse({ ok: true, results: matchItems(database.providerItems, request.items ?? []) }))
@@ -31,7 +72,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'amazon-video', 'kobo', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -51,6 +92,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ? 'amazon-kindle-content-library'
           : request.provider === 'amazon-video'
             ? 'amazon-prime-video-purchases-library'
+            : request.provider === 'fandango-at-home'
+              ? 'fandango-at-home-library'
             : request.provider === 'kobo'
               ? 'kobo-my-books-library'
         : 'humble-purchase-library';

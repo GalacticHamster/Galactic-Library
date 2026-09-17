@@ -11,6 +11,7 @@ await import('../src/providers/epic.js');
 await import('../src/providers/audible.js');
 await import('../src/providers/kindle.js');
 await import('../src/providers/amazon-video.js');
+await import('../src/providers/fandango-at-home.js');
 await import('../src/providers/kobo.js');
 await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
@@ -19,6 +20,7 @@ const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
+const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData } = globalThis.GalacticKobo;
 const { redactRedemptionValues, humbleItemsFromOrder } = globalThis.GalacticHumble;
 
@@ -176,6 +178,23 @@ const tests = [
     });
     const movie = normalizeProviderItem({ provider: 'amazon-video', providerItemId: 'B012345678', title: 'Arrival', mediaType: 'movie' });
     assert.ok(rebuildCanonicalItems({ [movie.id]: movie })['movie:arrival']);
+  }],
+  ['keeps Fandango at Home movie and TV library identities', () => {
+    assert.equal(contentIdFromValue('https://athome.fandango.com/content/detail/ABCD-1234?ref=library'), 'ABCD-1234');
+    assert.equal(contentIdFromValue('https://athome.fandango.com/content/browse/details/Warm-Bodies/410824'), '410824');
+    assert.deepEqual(fandangoItemFromCardData({
+      providerItemId: 'programId=series-123', title: 'Star Trek: Strange New Worlds, Season 1',
+      detailUrl: 'https://athome.fandango.com/content/detail/series-123', imageUrl: 'https://images.fandango.com/cover.jpg',
+      typeText: 'TV Season', ownershipText: 'Purchased'
+    }), {
+      providerItemId: 'series-123', title: 'Star Trek: Strange New Worlds, Season 1', mediaType: 'tv', ownership: 'owned',
+      metadata: {
+        source: 'fandango-at-home-library', detailUrl: 'https://athome.fandango.com/content/detail/series-123', imageUrl: 'https://images.fandango.com/cover.jpg', cardType: 'TV Season'
+      }
+    });
+    assert.equal(fandangoItemFromCardData({ providerItemId: '410824', title: 'Warm Bodies', detailUrl: 'https://athome.fandango.com/content/browse/details/Warm-Bodies/410824', typeText: 'My Movies (346)' })?.mediaType, 'movie');
+    assert.equal(fandangoItemFromCardData({ providerItemId: 'tv-123', title: 'Example Show', detailUrl: 'https://athome.fandango.com/content/browse/details/Example-Show/tv-123', typeText: 'My TV Shows (39)' })?.mediaType, 'tv');
+    assert.deepEqual(expectedFandangoCountsFromDocument({ querySelectorAll: () => [{ textContent: 'My Library' }, { textContent: 'My Movies (346)' }, { textContent: 'My TV Shows (39)' }] }), { movies: 346, tv: 39 });
   }],
   ['keeps Kobo book and audiobook identities from signed-in My Books cards', () => {
     assert.equal(koboItemIdFromValue('https://www.kobo.com/us/en/ebook/the-left-hand-of-darkness'), 'the-left-hand-of-darkness');
