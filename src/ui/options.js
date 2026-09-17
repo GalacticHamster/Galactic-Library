@@ -7,6 +7,7 @@ const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
 const providerFilter = document.querySelector('#provider-filter');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
+const ownershipFilter = document.querySelector('#ownership-filter');
 const dlcFilter = document.querySelector('#dlc-filter');
 const clearFilters = document.querySelector('#clear-filters');
 const summary = document.querySelector('#library-summary');
@@ -100,6 +101,7 @@ function selectedFilters() {
   return {
     provider: providerFilter.value,
     mediaType: mediaTypeFilter.value,
+    ownership: ownershipFilter.value,
     dlc: dlcFilter.value
   };
 }
@@ -108,8 +110,12 @@ function providerMatches(record, provider) {
   return provider === 'all' || record.provider === provider;
 }
 
+function ownershipMatches(record, ownership) {
+  return ownership === 'all' || record.ownership === ownership;
+}
+
 function filtersAreActive(filters, query) {
-  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.dlc !== 'all';
+  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.ownership !== 'all' || filters.dlc !== 'all';
 }
 
 function populateProviderFilter(providerEntries) {
@@ -246,12 +252,14 @@ function render() {
   const allRecords = Object.values(database.providerItems);
   const addOns = allRecords.filter((item) => item.mediaType === 'game-addon');
   const addOnsByParent = new Map();
+  const linkedAddOnIds = new Set();
   for (const addOn of addOns) {
     const parentKey = parentRecordKey(addOn);
     if (!parentKey) continue;
     const existing = addOnsByParent.get(parentKey) ?? [];
     existing.push(addOn);
     addOnsByParent.set(parentKey, existing);
+    if (database.providerItems[parentKey]?.mediaType === 'game') linkedAddOnIds.add(addOn.id);
   }
 
   const query = search.value.trim().toLocaleLowerCase();
@@ -260,13 +268,14 @@ function render() {
     .filter((item) => {
       const records = item.providerItemIds.map((id) => database.providerItems[id]);
       const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
-      const matchesProvider = records.some((record) => providerMatches(record, filters.provider));
+      const matchesProviderAndOwnership = records.some((record) => providerMatches(record, filters.provider) && ownershipMatches(record, filters.ownership));
       const matchesMediaType = filters.mediaType === 'all' || item.mediaType === filters.mediaType;
-      const hasDlc = linkedAddOns.length > 0;
+      const matchingLinkedAddOns = linkedAddOns.filter((addOn) => providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership));
+      const hasDlc = matchingLinkedAddOns.length > 0;
       const matchesDlc = filters.dlc === 'all' || (item.mediaType === 'game' && (filters.dlc === 'with' ? hasDlc : !hasDlc));
       const matchesSearch = itemMatchesQuery(item, query)
-        || linkedAddOns.some((addOn) => providerMatches(addOn, filters.provider) && itemMatchesQuery(addOn, query));
-      return matchesProvider && matchesMediaType && matchesDlc && matchesSearch;
+        || matchingLinkedAddOns.some((addOn) => itemMatchesQuery(addOn, query));
+      return matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesSearch;
     })
     .sort((left, right) => left.title.localeCompare(right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
@@ -275,7 +284,7 @@ function render() {
   const movieCanonicalCount = canonical.filter((item) => item.mediaType === 'movie').length;
   const tvCanonicalCount = canonical.filter((item) => item.mediaType === 'tv').length;
   const visibleRecords = canonical.flatMap((item) => item.providerItemIds.map((id) => database.providerItems[id]))
-    .filter((record) => providerMatches(record, filters.provider));
+    .filter((record) => providerMatches(record, filters.provider) && ownershipMatches(record, filters.ownership));
   const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
   const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
   const bookRecordCount = visibleRecords.filter((item) => item.mediaType === 'book').length;
@@ -293,16 +302,21 @@ function render() {
   if (bookRecordCount) summaryParts.push(`${bookRecordCount} book record${bookRecordCount === 1 ? '' : 's'}`);
   if (movieRecordCount) summaryParts.push(`${movieRecordCount} movie record${movieRecordCount === 1 ? '' : 's'}`);
   if (tvRecordCount) summaryParts.push(`${tvRecordCount} TV record${tvRecordCount === 1 ? '' : 's'}`);
-  const visibleAddOnCount = addOns.filter((item) => providerMatches(item, filters.provider)).length;
+  const canShowAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc !== 'without';
+  const visibleAddOnCount = canShowAddOns ? addOns.filter((addOn) => {
+    const parentKey = parentRecordKey(addOn);
+    const parent = parentKey ? database.providerItems[parentKey] : null;
+    return providerMatches(addOn, filters.provider)
+      && ownershipMatches(addOn, filters.ownership)
+      && (itemMatchesQuery(addOn, query) || (parent && itemMatchesQuery(parent, query)));
+  }).length : 0;
   if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
   summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
 
-  const linkedAddOnIds = new Set();
   items.replaceChildren(...canonical.map((canonicalItem) => {
     const node = document.createElement('li');
     const records = canonicalItem.providerItemIds.map((id) => database.providerItems[id]);
     const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
-    for (const addOn of linkedAddOns) linkedAddOnIds.add(addOn.id);
     node.className = 'library-item';
     const header = document.createElement('div');
     header.className = 'library-item-header';
@@ -330,7 +344,7 @@ function render() {
 
   const canShowUnlinkedAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc === 'all';
   const unlinked = canShowUnlinkedAddOns
-    ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && itemMatchesQuery(addOn, query))
+    ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership) && itemMatchesQuery(addOn, query))
     : [];
   unlinkedAddOnsSection.hidden = unlinked.length === 0;
   if (unlinked.length) {
@@ -406,11 +420,13 @@ document.querySelector('#clear-humble-extension-id').addEventListener('click', a
 search.addEventListener('input', render);
 providerFilter.addEventListener('change', render);
 mediaTypeFilter.addEventListener('change', render);
+ownershipFilter.addEventListener('change', render);
 dlcFilter.addEventListener('change', render);
 clearFilters.addEventListener('click', () => {
   search.value = '';
   providerFilter.value = 'all';
   mediaTypeFilter.value = 'all';
+  ownershipFilter.value = 'all';
   dlcFilter.value = 'all';
   render();
 });
