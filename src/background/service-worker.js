@@ -1,5 +1,6 @@
 import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
+import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
 import { getAllowedExternalClientIds, getDatabase, replaceProviderItems } from '../lib/storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -35,7 +36,30 @@ function fandangoImportKey(sender) {
   return sender.tab?.id === undefined ? '' : `fandango-import-${sender.tab.id}`;
 }
 
+function isOwnExtensionPage(url) {
+  return typeof url === 'string' && url.startsWith(chrome.runtime.getURL(''));
+}
+
+async function searchOpenLibrary(query) {
+  const title = String(query?.title ?? '').trim();
+  if (!title) throw new Error('Choose a book with a title before searching Open Library.');
+  const response = await fetch(openLibrarySearchUrl({ title, authors: query?.authors }), { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Open Library returned ${response.status}.`);
+  return openLibraryCandidatesFromSearch(await response.json());
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.type === 'SEARCH_OPEN_LIBRARY') {
+    if (!isOwnExtensionPage(sender.url)) {
+      sendResponse({ ok: false, error: 'Open Library searches are accepted only from Galactic Library.' });
+      return undefined;
+    }
+    searchOpenLibrary(request.query)
+      .then((candidates) => sendResponse({ ok: true, candidates }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (request?.type === 'FANDANGO_IMPORT_STATE') {
     const key = fandangoImportKey(sender);
     if (!key || !isFandangoPage(sender.url)) {

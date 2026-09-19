@@ -76,6 +76,31 @@ export async function saveManualMatchDecision(candidate, decision) {
   return saveDatabase(database);
 }
 
+export async function saveOpenLibraryEnrichment(itemIds, enrichment) {
+  if (!Array.isArray(itemIds) || !itemIds.length || !enrichment || enrichment.source !== 'open-library') {
+    throw new Error('Invalid Open Library enrichment.');
+  }
+  const database = await getDatabase();
+  const ids = [...new Set(itemIds.map(String))];
+  if (!ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
+    throw new Error('Open Library enrichment can be applied only to current book records.');
+  }
+  const updatedAt = new Date().toISOString();
+  for (const id of ids) {
+    const item = database.providerItems[id];
+    database.providerItems[id] = {
+      ...item,
+      metadata: {
+        ...item.metadata,
+        enrichment: { ...item.metadata?.enrichment, openLibrary: { ...enrichment, appliedAt: updatedAt } }
+      },
+      updatedAt
+    };
+  }
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
+}
+
 export async function removeManualMatchDecision(candidateId) {
   const database = await getDatabase();
   delete database.manualMatchDecisions[candidateId];

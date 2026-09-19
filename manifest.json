@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "A private, browser-local index of digital media you own.",
   "permissions": ["storage", "unlimitedStorage"],
-  "host_permissions": ["https://api.steampowered.com/*"],
+  "host_permissions": ["https://api.steampowered.com/*", "https://openlibrary.org/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"

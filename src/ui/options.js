@@ -1,7 +1,8 @@
-import { createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveManualMatchDecision } from '../lib/storage.js';
+import { createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveManualMatchDecision, saveOpenLibraryEnrichment } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
+import { openLibraryEnrichment } from '../lib/open-library.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -25,6 +26,7 @@ const humbleExtensionId = document.querySelector('#humble-extension-id');
 const humbleExtensionLinkStatus = document.querySelector('#humble-extension-link-status');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
+const openLibrarySearches = new Map();
 
 function displayProviderName(provider) {
   if (provider === 'gog') return 'GOG';
@@ -84,6 +86,8 @@ function displayMediaMetadata(records, mediaType) {
     const narrators = metadataValues(records, 'narrators');
     if (narrators.length) parts.push(`Narrated by ${narrators.join(', ')}`);
   }
+  const subjects = [...new Set(records.flatMap((record) => record.metadata?.enrichment?.openLibrary?.subjects ?? []).map(String).filter(Boolean))];
+  if (subjects.length) parts.push(`Subjects: ${subjects.slice(0, 6).join(', ')}${subjects.length > 6 ? ` +${subjects.length - 6}` : ''}`);
   return parts.join(' · ');
 }
 
@@ -161,6 +165,83 @@ function reviewButton(label, className, onClick) {
   button.className = className;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function openLibraryCandidateLabel(candidate) {
+  const parts = [candidate.title];
+  if (candidate.authors?.length) parts.push(`by ${candidate.authors.join(', ')}`);
+  if (candidate.firstPublishYear) parts.push(String(candidate.firstPublishYear));
+  return parts.join(' — ');
+}
+
+async function searchOpenLibrary(canonicalItem, records) {
+  const state = openLibrarySearches.get(canonicalItem.id) ?? {};
+  openLibrarySearches.set(canonicalItem.id, { ...state, loading: true, error: '', candidates: [] });
+  render();
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'SEARCH_OPEN_LIBRARY',
+      query: { title: canonicalItem.title, authors: metadataValues(records, 'authors') }
+    });
+    if (!response?.ok) throw new Error(response?.error ?? 'Open Library search did not complete.');
+    openLibrarySearches.set(canonicalItem.id, { loading: false, error: '', candidates: response.candidates ?? [] });
+  } catch (error) {
+    openLibrarySearches.set(canonicalItem.id, { loading: false, error: error.message, candidates: [] });
+  }
+  render();
+}
+
+function createOpenLibraryTools(canonicalItem, records) {
+  const container = document.createElement('div');
+  container.className = 'open-library-tools';
+  const enrichment = records.map((record) => record.metadata?.enrichment?.openLibrary).find(Boolean);
+  const searchState = openLibrarySearches.get(canonicalItem.id);
+  const button = reviewButton(enrichment ? 'Update Open Library metadata' : 'Find Open Library metadata', 'open-library-search', () => {
+    searchOpenLibrary(canonicalItem, records).catch(() => {});
+  });
+  button.disabled = Boolean(searchState?.loading);
+  container.append(button);
+  if (enrichment?.workKey) {
+    const source = document.createElement('a');
+    source.href = `https://openlibrary.org${enrichment.workKey}`;
+    source.target = '_blank';
+    source.rel = 'noreferrer';
+    source.textContent = 'View Open Library record';
+    container.append(source);
+  }
+  if (!searchState) return container;
+  if (searchState.loading) {
+    container.append(textElement('span', 'Searching Open Library…'));
+    return container;
+  }
+  if (searchState.error) {
+    container.append(textElement('span', `Open Library search failed: ${searchState.error}`));
+    return container;
+  }
+  if (!searchState.candidates.length) {
+    container.append(textElement('span', 'No Open Library candidates found.'));
+    return container;
+  }
+  const results = document.createElement('ul');
+  results.className = 'open-library-results';
+  for (const candidate of searchState.candidates) {
+    const result = document.createElement('li');
+    result.append(textElement('span', openLibraryCandidateLabel(candidate)));
+    const apply = reviewButton('Apply', 'open-library-apply', async () => {
+      try {
+        database = await saveOpenLibraryEnrichment(canonicalItem.providerItemIds, openLibraryEnrichment(candidate));
+        openLibrarySearches.delete(canonicalItem.id);
+        render();
+      } catch (error) {
+        openLibrarySearches.set(canonicalItem.id, { loading: false, error: error.message, candidates: searchState.candidates });
+        render();
+      }
+    });
+    result.append(apply);
+    results.append(result);
+  }
+  container.append(results);
+  return container;
 }
 
 function createReviewRow(candidate, reviewed = false) {
@@ -338,6 +419,7 @@ function render() {
       return source;
     }));
     node.append(providerSources);
+    if (canonicalItem.mediaType === 'book') node.append(createOpenLibraryTools(canonicalItem, records));
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;
   }));

@@ -4,6 +4,7 @@ import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
+import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -160,6 +161,22 @@ const tests = [
     }]);
     const book = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book' });
     assert.ok(rebuildCanonicalItems({ [book.id]: book })['book:sandman and more']);
+  }],
+  ['keeps a user-selected Open Library work and subjects as attributed enrichment', () => {
+    const url = new URL(openLibrarySearchUrl({ title: 'Watchmen', authors: ['Alan Moore'] }));
+    assert.equal(url.origin, 'https://openlibrary.org');
+    assert.equal(url.searchParams.get('title'), 'Watchmen');
+    assert.equal(url.searchParams.get('author'), 'Alan Moore');
+    const [candidate] = openLibraryCandidatesFromSearch({ docs: [{
+      key: '/works/OL123W', title: 'Watchmen', author_name: ['Alan Moore', 'Dave Gibbons'],
+      subject: ['Comics & Graphic Novels', 'Superheroes'], first_publish_year: 1987,
+      isbn: ['9780930289232'], edition_key: ['OL123M']
+    }] });
+    assert.deepEqual(openLibraryEnrichment(candidate, '2026-09-18T00:00:00.000Z'), {
+      source: 'open-library', workKey: '/works/OL123W', sourceUrl: 'https://openlibrary.org/works/OL123W', title: 'Watchmen',
+      authors: ['Alan Moore', 'Dave Gibbons'], subjects: ['Comics & Graphic Novels', 'Superheroes'], firstPublishYear: 1987,
+      isbn: ['9780930289232'], editionKeys: ['OL123M'], appliedAt: '2026-09-18T00:00:00.000Z'
+    });
   }],
   ['keeps Amazon Video movie and TV entitlement identities without guessing ambiguous ownership', () => {
     assert.equal(ownershipFromCardText('Purchased in HD'), 'owned');
