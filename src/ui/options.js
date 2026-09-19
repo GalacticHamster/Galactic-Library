@@ -1,7 +1,9 @@
-import { createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveManualMatchDecision, saveOpenLibraryEnrichment } from '../lib/storage.js';
-import { DATABASE_STORAGE_KEY } from '../lib/constants.js';
+import { clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
+import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
+import { libraryBroadGenreValues } from '../lib/genre-hints.js';
+import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 
 const providers = document.querySelector('#providers');
@@ -10,6 +12,7 @@ const providerFilter = document.querySelector('#provider-filter');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
 const ownershipFilter = document.querySelector('#ownership-filter');
 const dlcFilter = document.querySelector('#dlc-filter');
+const genreFilter = document.querySelector('#genre-filter');
 const clearFilters = document.querySelector('#clear-filters');
 const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
@@ -22,11 +25,23 @@ const reviewedDuplicates = document.querySelector('#reviewed-duplicates');
 const reviewedDuplicatesSummary = document.querySelector('#reviewed-duplicates-summary');
 const reviewedDuplicateItems = document.querySelector('#reviewed-duplicate-items');
 const backupStatus = document.querySelector('#backup-status');
+const googleBooksApiKey = document.querySelector('#google-books-api-key');
+const saveGoogleBooksApiKeyButton = document.querySelector('#save-google-books-api-key');
+const clearGoogleBooksApiKeyButton = document.querySelector('#clear-google-books-api-key');
+const startGoogleBooksEnrichmentButton = document.querySelector('#start-google-books-enrichment');
+const pauseGoogleBooksEnrichmentButton = document.querySelector('#pause-google-books-enrichment');
+const resetGoogleBooksEnrichmentButton = document.querySelector('#reset-google-books-enrichment');
+const googleBooksEnrichmentStatus = document.querySelector('#google-books-enrichment-status');
+const googleBooksEnrichmentDiagnostics = document.querySelector('#google-books-enrichment-diagnostics');
+const googleBooksEnrichmentDiagnosticsSummary = document.querySelector('#google-books-enrichment-diagnostics-summary');
+const googleBooksEnrichmentDiagnosticsItems = document.querySelector('#google-books-enrichment-diagnostics-items');
 const humbleExtensionId = document.querySelector('#humble-extension-id');
 const humbleExtensionLinkStatus = document.querySelector('#humble-extension-link-status');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
 const openLibrarySearches = new Map();
+let googleBooksRunning = false;
+let googleBooksPauseRequested = false;
 
 function displayProviderName(provider) {
   if (provider === 'gog') return 'GOG';
@@ -86,9 +101,23 @@ function displayMediaMetadata(records, mediaType) {
     const narrators = metadataValues(records, 'narrators');
     if (narrators.length) parts.push(`Narrated by ${narrators.join(', ')}`);
   }
-  const subjects = [...new Set(records.flatMap((record) => record.metadata?.enrichment?.openLibrary?.subjects ?? []).map(String).filter(Boolean))];
-  if (subjects.length) parts.push(`Subjects: ${subjects.slice(0, 6).join(', ')}${subjects.length > 6 ? ` +${subjects.length - 6}` : ''}`);
   return parts.join(' · ');
+}
+
+function genreTagLabels(records) {
+  const values = records.flatMap(libraryBroadGenreValues).map((genre) => `Genre: ${genre}`);
+  return [...new Set(values)];
+}
+
+function createGenreTags(records) {
+  const labels = genreTagLabels(records);
+  if (!labels.length) return null;
+  const node = document.createElement('div');
+  node.className = 'genre-tags';
+  const visible = labels.slice(0, 8);
+  node.replaceChildren(...visible.map((label) => textElement('span', label)));
+  if (labels.length > visible.length) node.append(textElement('span', `+${labels.length - visible.length} more`));
+  return node;
 }
 
 function textElement(tag, text) {
@@ -106,7 +135,8 @@ function selectedFilters() {
     provider: providerFilter.value,
     mediaType: mediaTypeFilter.value,
     ownership: ownershipFilter.value,
-    dlc: dlcFilter.value
+    dlc: dlcFilter.value,
+    genre: genreFilter.value
   };
 }
 
@@ -119,7 +149,7 @@ function ownershipMatches(record, ownership) {
 }
 
 function filtersAreActive(filters, query) {
-  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.ownership !== 'all' || filters.dlc !== 'all';
+  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.ownership !== 'all' || filters.dlc !== 'all' || filters.genre !== 'all';
 }
 
 function populateProviderFilter(providerEntries) {
@@ -165,6 +195,32 @@ function reviewButton(label, className, onClick) {
   button.className = className;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function populateGenreFilter(records) {
+  const selected = genreFilter.value;
+  const byKey = new Map();
+  for (const value of records.flatMap(libraryBroadGenreValues)) {
+    const key = value.toLocaleLowerCase();
+    if (!byKey.has(key)) byKey.set(key, value);
+  }
+  const options = [
+    ['all', 'Any genre'],
+    ...[...byKey.values()].sort((left, right) => left.localeCompare(right)).map((value) => [value, value])
+  ];
+  genreFilter.replaceChildren(...options.map(([value, label]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    return option;
+  }));
+  genreFilter.value = options.some(([value]) => value === selected) ? selected : 'all';
+}
+
+function genreMatches(records, genre) {
+  if (genre === 'all') return true;
+  const key = genre.toLocaleLowerCase();
+  return records.some((record) => libraryBroadGenreValues(record).some((value) => value.toLocaleLowerCase() === key));
 }
 
 function openLibraryCandidateLabel(candidate) {
@@ -310,9 +366,165 @@ async function renderHumbleExtensionLink() {
     : 'No companion extension is allowed yet.';
 }
 
+function googleBooksStatusText(job, prefix = '') {
+  const total = job.queue.length;
+  const remaining = Math.max(0, total - job.cursor);
+  const outcomes = [`${job.processed}/${total} checked`, `${job.matched} matched`, `${job.genreHints ?? 0} genre hints`, `${job.noMatch} no exact match`, `${job.zeroResults} no results`, `${job.titleVariant} title variants`, `${job.authorVariant} author variants`, `${job.skipped} skipped`, `${job.errors} errors`];
+  return `${prefix}${outcomes.join(' · ')}; ${remaining} remaining.`;
+}
+
+function renderGoogleBooksDiagnostics(job) {
+  const samples = job?.samples ?? [];
+  googleBooksEnrichmentDiagnostics.hidden = samples.length === 0;
+  if (!samples.length) {
+    googleBooksEnrichmentDiagnosticsItems.replaceChildren();
+    return;
+  }
+  googleBooksEnrichmentDiagnosticsSummary.textContent = `${samples.length} recent declined Google Books result${samples.length === 1 ? '' : 's'}`;
+  googleBooksEnrichmentDiagnosticsItems.replaceChildren(...samples.map((sample) => {
+    const item = document.createElement('li');
+    const reason = sample.reason === 'title-variant'
+      ? 'Title variant'
+      : sample.reason === 'author-variant'
+        ? 'Author variant'
+        : 'No results';
+    item.append(textElement('strong', reason), textElement('span', sample.title));
+    if (sample.candidateTitle) item.append(textElement('small', `Top Google result: ${sample.candidateTitle}`));
+    return item;
+  }));
+}
+
+async function renderGoogleBooksEnrichment() {
+  const [key, job] = await Promise.all([getGoogleBooksApiKey(), getGoogleBooksEnrichmentJob()]);
+  clearGoogleBooksApiKeyButton.disabled = !key || googleBooksRunning;
+  saveGoogleBooksApiKeyButton.disabled = googleBooksRunning;
+  startGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !key;
+  startGoogleBooksEnrichmentButton.textContent = job && job.cursor < job.queue.length ? 'Resume enrichment' : 'Start enrichment';
+  pauseGoogleBooksEnrichmentButton.hidden = !googleBooksRunning;
+  resetGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !job;
+  renderGoogleBooksDiagnostics(job);
+  if (googleBooksRunning) return;
+  if (!key) {
+    googleBooksEnrichmentStatus.textContent = 'Save a private Google Books API key to enable automated enrichment.';
+  } else if (job?.lastError) {
+    googleBooksEnrichmentStatus.textContent = `Google Books stopped: ${job.lastError} Progress is saved. If this is a quota limit, wait for Google to reset it, then Resume enrichment.`;
+  } else if (job) {
+    googleBooksEnrichmentStatus.textContent = googleBooksStatusText(job, job.cursor >= job.queue.length ? 'Completed: ' : 'Paused: ');
+  } else {
+    googleBooksEnrichmentStatus.textContent = 'Key saved locally. The first run will queue only book records that have an author and no Google Books enrichment.';
+  }
+}
+
+function authorsForRecords(records) {
+  return [...new Set(records.flatMap((record) => Array.isArray(record.metadata?.authors) ? record.metadata.authors : []).map(String).filter(Boolean))];
+}
+
+function pause(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function stopsGoogleBooksEnrichment(message) {
+  return /\b(?:401|403|429)\b|quota|rate limit|daily limit|api key|permission denied/iu.test(String(message ?? ''));
+}
+
+async function runGoogleBooksEnrichment() {
+  if (googleBooksRunning) return;
+  googleBooksRunning = true;
+  googleBooksPauseRequested = false;
+  await renderGoogleBooksEnrichment();
+  try {
+    const key = await getGoogleBooksApiKey();
+    if (!key) throw new Error('Save a Google Books API key before starting enrichment.');
+    let job = await getGoogleBooksEnrichmentJob();
+    if (!job || job.cursor >= job.queue.length) job = await startGoogleBooksEnrichmentJob();
+    if (!job.queue.length) {
+      googleBooksEnrichmentStatus.textContent = 'No author-backed books without Google Books metadata need enrichment.';
+      return;
+    }
+    while (job.cursor < job.queue.length && !googleBooksPauseRequested) {
+      database = await getDatabase();
+      const canonical = database.canonicalItems[job.queue[job.cursor]];
+      const records = canonical?.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean) ?? [];
+      if (!canonical || !records.length || canonical.mediaType !== 'book') {
+        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, skipped: job.skipped + 1 };
+        job = await saveGoogleBooksEnrichmentJob(job);
+        continue;
+      }
+      const authors = authorsForRecords(records);
+      if (!authors.length) {
+        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, skipped: job.skipped + 1 };
+        job = await saveGoogleBooksEnrichmentJob(job);
+        continue;
+      }
+      googleBooksEnrichmentStatus.textContent = `${googleBooksStatusText(job)} Looking up “${canonical.title}”…`;
+      let candidates;
+      try {
+        const response = await chrome.runtime.sendMessage({ type: 'SEARCH_GOOGLE_BOOKS', query: { title: canonical.title, authors } });
+        if (!response?.ok) throw new Error(response?.error ?? 'Google Books search did not complete.');
+        candidates = response.candidates ?? [];
+      } catch (error) {
+        if (stopsGoogleBooksEnrichment(error.message)) {
+          const lastError = String(error.message).trim();
+          job = await saveGoogleBooksEnrichmentJob({ ...job, lastError, lastErrorAt: new Date().toISOString() });
+          throw new Error(lastError);
+        }
+        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, errors: job.errors + 1 };
+        job = await saveGoogleBooksEnrichmentJob(job);
+        await pause(1200);
+        continue;
+      }
+      if (job.lastError) job = { ...job, lastError: '', lastErrorAt: '' };
+      const candidate = highConfidenceGoogleBooksCandidate({ title: canonical.title, authors }, candidates);
+      if (candidate) {
+        database = await saveGoogleBooksEnrichments([{ itemIds: canonical.providerItemIds, enrichment: googleBooksEnrichment(candidate) }]);
+        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, matched: job.matched + 1 };
+      } else {
+        const genreHint = googleBooksGenreHintCandidate({ title: canonical.title, authors }, candidates);
+        if (genreHint) {
+          database = await saveGoogleBooksGenreHints([{ itemIds: canonical.providerItemIds, hint: googleBooksGenreHint(genreHint) }]);
+          job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, genreHints: (job.genreHints ?? 0) + 1 };
+        } else {
+        const classification = googleBooksMatchClassification({ title: canonical.title, authors }, candidates);
+        const diagnosticKey = classification === 'no-results'
+          ? 'zeroResults'
+          : classification === 'title-variant'
+            ? 'titleVariant'
+            : classification === 'author-variant'
+              ? 'authorVariant'
+              : '';
+        const sample = diagnosticKey ? {
+          reason: classification,
+          title: canonical.title,
+          candidateTitle: candidates[0]?.title ?? ''
+        } : null;
+        job = {
+          ...job,
+          cursor: job.cursor + 1,
+          processed: job.processed + 1,
+          noMatch: job.noMatch + 1,
+          ...(diagnosticKey ? { [diagnosticKey]: job[diagnosticKey] + 1 } : {}),
+          ...(sample ? { samples: [...(job.samples ?? []), sample].slice(-50) } : {})
+        };
+        }
+      }
+      job = await saveGoogleBooksEnrichmentJob(job);
+      renderGoogleBooksDiagnostics(job);
+      await pause(1200);
+    }
+    googleBooksEnrichmentStatus.textContent = googleBooksStatusText(job, googleBooksPauseRequested ? 'Paused: ' : 'Completed: ');
+  } catch (error) {
+    googleBooksEnrichmentStatus.textContent = `Google Books enrichment paused: ${error.message}`;
+  } finally {
+    googleBooksRunning = false;
+    pauseGoogleBooksEnrichmentButton.hidden = true;
+    await renderGoogleBooksEnrichment();
+  }
+}
+
 function render() {
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
+  populateGenreFilter(Object.values(database.providerItems));
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
     node.className = 'provider';
@@ -354,9 +566,10 @@ function render() {
       const matchingLinkedAddOns = linkedAddOns.filter((addOn) => providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership));
       const hasDlc = matchingLinkedAddOns.length > 0;
       const matchesDlc = filters.dlc === 'all' || (item.mediaType === 'game' && (filters.dlc === 'with' ? hasDlc : !hasDlc));
+      const matchesGenre = genreMatches(records, filters.genre);
       const matchesSearch = itemMatchesQuery(item, query)
         || matchingLinkedAddOns.some((addOn) => itemMatchesQuery(addOn, query));
-      return matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesSearch;
+      return matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesGenre && matchesSearch;
     })
     .sort((left, right) => left.title.localeCompare(right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
@@ -409,6 +622,8 @@ function render() {
       metadata.className = 'library-item-metadata';
       node.append(metadata);
     }
+    const genreTags = createGenreTags(records);
+    if (genreTags) node.append(genreTags);
     const providerSources = document.createElement('div');
     providerSources.className = 'library-item-providers';
     providerSources.replaceChildren(...providerSourceDetails(records).map(({ label, ownershipLabel }) => {
@@ -445,7 +660,7 @@ function render() {
 async function refresh() {
   database = await getDatabase();
   render();
-  await renderHumbleExtensionLink();
+  await Promise.all([renderHumbleExtensionLink(), renderGoogleBooksEnrichment()]);
 }
 
 document.querySelector('#export').addEventListener('click', () => {
@@ -477,6 +692,40 @@ document.querySelector('#clear').addEventListener('click', async () => {
   await refresh();
   backupStatus.textContent = 'Local library cleared.';
 });
+saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
+  try {
+    await saveGoogleBooksApiKey(googleBooksApiKey.value);
+    googleBooksApiKey.value = '';
+    await renderGoogleBooksEnrichment();
+  } catch (error) {
+    googleBooksEnrichmentStatus.textContent = `Could not save Google Books key: ${error.message}`;
+  }
+});
+clearGoogleBooksApiKeyButton.addEventListener('click', async () => {
+  try {
+    googleBooksPauseRequested = true;
+    await saveGoogleBooksApiKey('');
+    googleBooksApiKey.value = '';
+    await renderGoogleBooksEnrichment();
+  } catch (error) {
+    googleBooksEnrichmentStatus.textContent = `Could not remove Google Books key: ${error.message}`;
+  }
+});
+startGoogleBooksEnrichmentButton.addEventListener('click', () => {
+  runGoogleBooksEnrichment().catch(() => {});
+});
+pauseGoogleBooksEnrichmentButton.addEventListener('click', () => {
+  googleBooksPauseRequested = true;
+  googleBooksEnrichmentStatus.textContent = 'Pausing after the current book…';
+});
+resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
+  try {
+    await clearGoogleBooksEnrichmentJob();
+    await renderGoogleBooksEnrichment();
+  } catch (error) {
+    googleBooksEnrichmentStatus.textContent = `Could not reset enrichment progress: ${error.message}`;
+  }
+});
 document.querySelector('#save-humble-extension-id').addEventListener('click', async () => {
   const id = humbleExtensionId.value.trim();
   if (!isExtensionId(id)) {
@@ -504,15 +753,20 @@ providerFilter.addEventListener('change', render);
 mediaTypeFilter.addEventListener('change', render);
 ownershipFilter.addEventListener('change', render);
 dlcFilter.addEventListener('change', render);
+genreFilter.addEventListener('change', render);
 clearFilters.addEventListener('click', () => {
   search.value = '';
   providerFilter.value = 'all';
   mediaTypeFilter.value = 'all';
   ownershipFilter.value = 'all';
   dlcFilter.value = 'all';
+  genreFilter.value = 'all';
   render();
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
+  if (areaName === 'local' && !googleBooksRunning && (changes[GOOGLE_BOOKS_API_KEY_STORAGE_KEY] || changes[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])) {
+    renderGoogleBooksEnrichment().catch(() => {});
+  }
 });
 refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });

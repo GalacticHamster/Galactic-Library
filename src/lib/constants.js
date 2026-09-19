@@ -4,6 +4,8 @@ export const EXTERNAL_CLIENT_IDS_STORAGE_KEY = 'galacticLibraryAllowedExternalCl
 export const EXTERNAL_API_VERSION = 1;
 export const BACKUP_FORMAT = 'galactic-library-backup';
 export const BACKUP_VERSION = 1;
+export const GOOGLE_BOOKS_API_KEY_STORAGE_KEY = 'googleBooksApiKey';
+export const GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY = 'googleBooksEnrichmentJob';
 
 export const PROVIDERS = Object.freeze(['steam', 'gog', 'epic', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble']);
 export const MEDIA_TYPES = Object.freeze(['game', 'game-addon', 'audiobook', 'book', 'movie', 'tv']);

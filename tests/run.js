@@ -4,6 +4,8 @@ import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
+import { googleBooksCandidatesFromSearch, googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, googleBooksSearchUrl, highConfidenceGoogleBooksCandidate } from '../src/lib/google-books.js';
+import { humbleBundleGenreHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
 import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
 
 await import('../src/providers/steam-store.js');
@@ -178,6 +180,39 @@ const tests = [
       isbn: ['9780930289232'], editionKeys: ['OL123M'], appliedAt: '2026-09-18T00:00:00.000Z'
     });
   }],
+  ['auto-selects only a high-confidence title-and-author Google Books result', () => {
+    const url = new URL(googleBooksSearchUrl({ title: 'Little Brother', authors: ['Doctorow, Cory'], apiKey: 'AIzaExampleKeyThatIsLongEnough' }));
+    assert.equal(url.origin, 'https://www.googleapis.com');
+    assert.match(url.searchParams.get('q'), /intitle:Little Brother/u);
+    const candidates = googleBooksCandidatesFromSearch({ items: [{
+      id: 'volume-123', volumeInfo: { title: 'Little Brother', authors: ['Cory Doctorow'], categories: ['Young Adult Fiction'],
+        industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780765319852' }], publisher: 'Tor Teen', publishedDate: '2008-04-29', pageCount: 382, language: 'en' }
+    }, { id: 'volume-456', volumeInfo: { title: 'Little Brother: A Study Guide', authors: ['Other Author'] } }] });
+    const candidate = highConfidenceGoogleBooksCandidate({ title: 'Little Brother', authors: ['Doctorow, Cory'] }, candidates);
+    assert.equal(candidate.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother (Tenth Anniversary Edition)', authors: ['Cory Doctorow, Neil Gaiman'] }, candidates)?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother: A Novel About Hacking', authors: ['Cory Doctorow'] }, candidates)?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'I Am Number Four: A #1 New York Times Bestselling YA Sci-Fi Thriller about an Alien Teen with Powers Fighting to Save Earth (Lorien Legacies)', authors: ['Pittacus Lore'] }, [{ ...candidate, title: 'I Am Number Four', authors: ['Pittacus Lore'] }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Amazing Spider-Man by J.M.S. Ultimate Collection Book One (Amazing Spider-Man (1999-2013))', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Amazing Spider-Man By JMS Ultimate Collection Book 1' }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother #1', authors: ['Cory Doctorow'] }, candidates), null);
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Advanced Reading, Writing, and Grammar for Test Prep', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Advanced Reading, Writing, and Grammar' }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Action Comics, Vol. 3: At the End of Days (The New 52)', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Superman - Action Comics Vol. 3: At the End of Days' }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Alias Ultimate Collection Vol. 1', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Alias' }]), null);
+    const aliasHint = googleBooksGenreHintCandidate({ title: 'Alias Ultimate Collection Vol. 1', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Alias', categories: ['Comics & Graphic Novels'] }]);
+    assert.equal(aliasHint?.volumeId, 'volume-123');
+    assert.deepEqual(googleBooksGenreHint(aliasHint, '2026-09-18T00:00:00.000Z'), {
+      source: 'google-books', confidence: 'author-and-title-stem', candidateVolumeId: 'volume-123', candidateTitle: 'Alias', sourceUrl: 'https://books.google.com/books?id=volume-123', categories: ['Comics & Graphic Novels'], appliedAt: '2026-09-18T00:00:00.000Z'
+    });
+    assert.equal(googleBooksGenreHintCandidate({ title: 'Alias Ultimate Collection Vol. 1', authors: ['Someone Else'] }, [{ ...candidate, title: 'Alias', categories: ['Comics & Graphic Novels'] }]), null);
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother', authors: ['Someone Else'] }, candidates), null);
+    assert.equal(googleBooksMatchClassification({ title: 'Little Brother', authors: ['Someone Else'] }, candidates), 'author-variant');
+    assert.equal(googleBooksMatchClassification({ title: 'Not This Book', authors: ['Someone Else'] }, candidates), 'title-variant');
+    assert.equal(googleBooksMatchClassification({ title: 'Little Brother', authors: ['Cory Doctorow'] }, []), 'no-results');
+    assert.deepEqual(googleBooksEnrichment(candidate, '2026-09-18T00:00:00.000Z'), {
+      source: 'google-books', volumeId: 'volume-123', sourceUrl: 'https://books.google.com/books?id=volume-123', title: 'Little Brother', subtitle: '',
+      authors: ['Cory Doctorow'], categories: ['Young Adult Fiction'], isbn: ['9780765319852'], publisher: 'Tor Teen', publishedDate: '2008-04-29', pageCount: 382, language: 'en', appliedAt: '2026-09-18T00:00:00.000Z'
+    });
+  }],
   ['keeps Amazon Video movie and TV entitlement identities without guessing ambiguous ownership', () => {
     assert.equal(ownershipFromCardText('Purchased in HD'), 'owned');
     assert.equal(ownershipFromCardText('Rental expires in 12 days'), 'rental');
@@ -272,6 +307,22 @@ const tests = [
         metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'third-party-key', keyType: 'Steam' }
       }
     ]);
+    assert.deepEqual(humbleBundleGenreHints(normalizeProviderItem({
+      provider: 'humble', providerItemId: 'comic-1', title: 'A Comic Title', mediaType: 'book', metadata: { sourceBundle: 'Humble Manga Bundle: Kodansha Comics' }
+    })), [{
+      source: 'humble-bundle-name', confidence: 'explicit-bundle-name', category: 'Comics & Graphic Novels', evidence: 'Humble Manga Bundle: Kodansha Comics'
+    }]);
+    assert.deepEqual(humbleBundleGenreHints(normalizeProviderItem({
+      provider: 'humble', providerItemId: 'audio-1', title: 'Comic Audio', mediaType: 'audiobook', metadata: { sourceBundle: 'Humble Comics Bundle' }
+    })), []);
+    assert.deepEqual(libraryGenreSubjectValues(normalizeProviderItem({
+      provider: 'humble', providerItemId: 'comic-2', title: 'Another Comic', mediaType: 'book',
+      metadata: { sourceBundle: 'Humble Manga Bundle', enrichment: { openLibrary: { subjects: ['Manga', 'Comics'] }, googleBooks: { categories: ['Comics & Graphic Novels'] }, googleBooksGenreHint: { categories: ['Comics & Graphic Novels'] } } }
+    })), ['Manga', 'Comics', 'Comics & Graphic Novels']);
+    assert.deepEqual(libraryBroadGenreValues(normalizeProviderItem({
+      provider: 'humble', providerItemId: 'comic-3', title: 'Batman', mediaType: 'book',
+      metadata: { enrichment: { openLibrary: { subjects: ['Batman', 'Science fiction', 'History'] } } }
+    })), ['Comics & Graphic Novels', 'Science Fiction & Fantasy', 'History']);
   }],
   ['queues provider series labels for review and applies a saved same-work decision', () => {
     const humbleAudio = normalizeProviderItem({

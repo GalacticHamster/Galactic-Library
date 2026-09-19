@@ -1,4 +1,4 @@
-import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY } from './constants.js';
+import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY } from './constants.js';
 import { normaliseExternalClientIds } from './external-api.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from './models.js';
 
@@ -50,7 +50,86 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
 }
 
 export async function clearDatabase() {
-  await chrome.storage.local.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+  await chrome.storage.local.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]);
+}
+
+function normaliseGoogleBooksApiKey(value) {
+  const key = String(value ?? '').trim();
+  if (!key) return '';
+  if (key.length < 20 || /\s/u.test(key)) throw new Error('Enter a valid Google Books API key.');
+  return key;
+}
+
+export async function getGoogleBooksApiKey() {
+  const stored = await chrome.storage.local.get({ [GOOGLE_BOOKS_API_KEY_STORAGE_KEY]: '' });
+  return normaliseGoogleBooksApiKey(stored[GOOGLE_BOOKS_API_KEY_STORAGE_KEY]);
+}
+
+export async function saveGoogleBooksApiKey(value) {
+  const key = normaliseGoogleBooksApiKey(value);
+  if (key) await chrome.storage.local.set({ [GOOGLE_BOOKS_API_KEY_STORAGE_KEY]: key });
+  else await chrome.storage.local.remove(GOOGLE_BOOKS_API_KEY_STORAGE_KEY);
+  return key;
+}
+
+function normaliseGoogleBooksJob(value) {
+  if (!value || typeof value !== 'object' || !Array.isArray(value.queue)) return null;
+  const queue = [...new Set(value.queue.map(String).filter(Boolean))];
+  const cursor = Math.max(0, Math.min(Number.isInteger(value.cursor) ? value.cursor : 0, queue.length));
+  const count = (key) => Math.max(0, Number.isInteger(value[key]) ? value[key] : 0);
+  const samples = (Array.isArray(value.samples) ? value.samples : []).slice(-50).flatMap((sample) => {
+    const title = String(sample?.title ?? '').trim();
+    const reason = String(sample?.reason ?? '').trim();
+    if (!title || !reason) return [];
+    return [{ title, reason, candidateTitle: String(sample?.candidateTitle ?? '').trim() }];
+  });
+  return {
+    queue,
+    cursor,
+    processed: count('processed'),
+    matched: count('matched'),
+    genreHints: count('genreHints'),
+    noMatch: count('noMatch'),
+    zeroResults: count('zeroResults'),
+    titleVariant: count('titleVariant'),
+    authorVariant: count('authorVariant'),
+    samples,
+    skipped: count('skipped'),
+    errors: count('errors'),
+    lastError: String(value.lastError ?? '').trim().slice(0, 600),
+    lastErrorAt: typeof value.lastErrorAt === 'string' ? value.lastErrorAt : '',
+    startedAt: typeof value.startedAt === 'string' ? value.startedAt : new Date().toISOString(),
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString()
+  };
+}
+
+export async function getGoogleBooksEnrichmentJob() {
+  const stored = await chrome.storage.local.get({ [GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null });
+  return normaliseGoogleBooksJob(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]);
+}
+
+export async function saveGoogleBooksEnrichmentJob(value) {
+  const job = normaliseGoogleBooksJob(value);
+  if (!job) throw new Error('Invalid Google Books enrichment job.');
+  job.updatedAt = new Date().toISOString();
+  await chrome.storage.local.set({ [GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: job });
+  return job;
+}
+
+export async function clearGoogleBooksEnrichmentJob() {
+  await chrome.storage.local.remove(GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY);
+}
+
+export async function startGoogleBooksEnrichmentJob() {
+  const database = await getDatabase();
+  const queue = Object.values(database.canonicalItems).filter((canonical) => {
+    if (canonical.mediaType !== 'book') return false;
+    const records = canonical.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean);
+    const hasGoogleBooks = records.some((record) => record.metadata?.enrichment?.googleBooks?.volumeId || record.metadata?.enrichment?.googleBooksGenreHint?.categories?.length);
+    const hasAuthors = records.some((record) => Array.isArray(record.metadata?.authors) && record.metadata.authors.length > 0);
+    return !hasGoogleBooks && hasAuthors;
+  }).map((canonical) => canonical.id).sort();
+  return saveGoogleBooksEnrichmentJob({ queue, cursor: 0, processed: 0, matched: 0, genreHints: 0, noMatch: 0, zeroResults: 0, titleVariant: 0, authorVariant: 0, samples: [], skipped: 0, errors: 0, startedAt: new Date().toISOString() });
 }
 
 export async function getAllowedExternalClientIds() {
@@ -96,6 +175,57 @@ export async function saveOpenLibraryEnrichment(itemIds, enrichment) {
       },
       updatedAt
     };
+  }
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
+}
+
+export async function saveGoogleBooksEnrichments(entries) {
+  if (!Array.isArray(entries) || !entries.length) throw new Error('No Google Books enrichments were provided.');
+  const database = await getDatabase();
+  const updatedAt = new Date().toISOString();
+  for (const entry of entries) {
+    const ids = [...new Set((entry?.itemIds ?? []).map(String))];
+    if (!ids.length || !entry?.enrichment || entry.enrichment.source !== 'google-books' || !ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
+      throw new Error('Invalid Google Books enrichment.');
+    }
+    for (const id of ids) {
+      const item = database.providerItems[id];
+      database.providerItems[id] = {
+        ...item,
+        metadata: {
+          ...item.metadata,
+          enrichment: { ...item.metadata?.enrichment, googleBooks: { ...entry.enrichment, appliedAt: updatedAt } }
+        },
+        updatedAt
+      };
+    }
+  }
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
+}
+
+export async function saveGoogleBooksGenreHints(entries) {
+  if (!Array.isArray(entries) || !entries.length) throw new Error('No Google Books genre hints were provided.');
+  const database = await getDatabase();
+  const updatedAt = new Date().toISOString();
+  for (const entry of entries) {
+    const ids = [...new Set((entry?.itemIds ?? []).map(String))];
+    const categories = entry?.hint?.categories;
+    if (!ids.length || entry?.hint?.source !== 'google-books' || entry.hint.confidence !== 'author-and-title-stem' || !Array.isArray(categories) || !categories.length || !ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
+      throw new Error('Invalid Google Books genre hint.');
+    }
+    for (const id of ids) {
+      const item = database.providerItems[id];
+      database.providerItems[id] = {
+        ...item,
+        metadata: {
+          ...item.metadata,
+          enrichment: { ...item.metadata?.enrichment, googleBooksGenreHint: { ...entry.hint, appliedAt: updatedAt } }
+        },
+        updatedAt
+      };
+    }
   }
   database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
   return saveDatabase(database);

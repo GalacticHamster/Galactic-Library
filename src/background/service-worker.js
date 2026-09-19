@@ -1,7 +1,8 @@
 import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
+import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
-import { getAllowedExternalClientIds, getDatabase, replaceProviderItems } from '../lib/storage.js';
+import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, replaceProviderItems } from '../lib/storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});
@@ -48,7 +49,32 @@ async function searchOpenLibrary(query) {
   return openLibraryCandidatesFromSearch(await response.json());
 }
 
+async function searchGoogleBooks(query) {
+  const title = String(query?.title ?? '').trim();
+  const apiKey = await getGoogleBooksApiKey();
+  if (!title) throw new Error('Choose a book with a title before searching Google Books.');
+  if (!apiKey) throw new Error('Save your Google Books API key before starting enrichment.');
+  const response = await fetch(googleBooksSearchUrl({ title, authors: query?.authors, apiKey }), { cache: 'no-store' });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = String(body?.error?.message ?? '').replace(/\s+/gu, ' ').trim();
+    throw new Error(`Google Books returned ${response.status}${detail ? `: ${detail}` : '.'}`);
+  }
+  return googleBooksCandidatesFromSearch(body);
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
+    if (!isOwnExtensionPage(sender.url)) {
+      sendResponse({ ok: false, error: 'Google Books searches are accepted only from Galactic Library.' });
+      return undefined;
+    }
+    searchGoogleBooks(request.query)
+      .then((candidates) => sendResponse({ ok: true, candidates }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (request?.type === 'SEARCH_OPEN_LIBRARY') {
     if (!isOwnExtensionPage(sender.url)) {
       sendResponse({ ok: false, error: 'Open Library searches are accepted only from Galactic Library.' });
