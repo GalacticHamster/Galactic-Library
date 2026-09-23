@@ -36,6 +36,11 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://gaming.amazon.com/*", "https://luna.amazon.com/claims/*"],
+      "js": ["src/providers/amazon-games.js", "src/providers/amazon-games-content.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://www.amazon.com/*"],
       "js": ["src/providers/kindle.js", "src/providers/kindle-content.js", "src/providers/amazon-video.js", "src/providers/amazon-video-content.js"],
       "run_at": "document_idle"

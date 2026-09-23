@@ -11,6 +11,7 @@ import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySear
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
+await import('../src/providers/amazon-games.js');
 await import('../src/providers/audible.js');
 await import('../src/providers/kindle.js');
 await import('../src/providers/amazon-video.js');
@@ -20,6 +21,7 @@ await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
+const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText } = globalThis.GalacticAmazonGames;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
@@ -107,6 +109,23 @@ const tests = [
       skipped: ['asset-id']
     });
     assert.equal(nextCursorFromPage(page), 'next-page');
+  }],
+  ['keeps delivered Amazon Games claims from the Luna collection', () => {
+    assert.deepEqual(amazonGamesItemFromCardData({
+      providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1-body', title: 'Wall World 2',
+      imageUrl: 'https://images.example.test/wall-world.jpg?size=large', deliveryText: 'Delivered', deliveryTarget: 'Amazon Games library'
+    }), {
+      providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1', title: 'Wall World 2', mediaType: 'game', ownership: 'claimed',
+      metadata: { source: 'amazon-games-collection', detailUrl: '', imageUrl: 'https://images.example.test/wall-world.jpg', delivery: 'Amazon Games library' }
+    });
+    assert.equal(amazonGamesItemFromCardData({
+      providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1-body', title: 'Wall World 2', deliveryText: 'Delivered', deliveryTarget: 'Epic Games Store'
+    }), null);
+    assert.equal(isLoadMoreText('See 10 more'), true);
+    assert.equal(isLoadMoreText('See more'), true);
+    assert.equal(isLoadMoreText('Load 10 more'), false);
+    assert.equal(deliveryTargetFromText('Collected on\n\nSep 18, 2026\n\nSent to\n\nAmazon Games library\n\nAmazon account\nSean'), 'Amazon Games library');
+    assert.equal(amazonGamesTitleKey('  Wall World 2! '), amazonGamesTitleKey('Wall World 2'));
   }],
   ['keeps Audible audiobook identity and available library metadata', () => {
     const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';

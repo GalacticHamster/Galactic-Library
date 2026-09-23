@@ -14,6 +14,7 @@ function isProviderImportPage(provider, url) {
     return (provider === 'steam' && page.origin === 'https://store.steampowered.com')
       || (provider === 'gog' && page.origin === 'https://www.gog.com')
       || (provider === 'epic' && page.origin === 'https://store.epicgames.com')
+      || (provider === 'amazon-games' && ((page.origin === 'https://gaming.amazon.com' && page.pathname.startsWith('/my-collection')) || (page.origin === 'https://luna.amazon.com' && page.pathname.startsWith('/claims/my-collection'))))
       || (provider === 'audible' && page.origin === 'https://www.audible.com')
       || (provider === 'kindle' && page.origin === 'https://www.amazon.com')
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
@@ -122,7 +123,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
@@ -136,6 +137,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? 'gog-account-library'
       : request.provider === 'epic'
         ? 'epic-store-library'
+        : request.provider === 'amazon-games'
+          ? 'amazon-games-collection'
     : request.provider === 'audible'
       ? 'audible-library-page'
         : request.provider === 'kindle'
