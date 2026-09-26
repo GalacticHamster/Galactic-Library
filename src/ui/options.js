@@ -35,8 +35,9 @@ const googleBooksEnrichmentStatus = document.querySelector('#google-books-enrich
 const googleBooksEnrichmentDiagnostics = document.querySelector('#google-books-enrichment-diagnostics');
 const googleBooksEnrichmentDiagnosticsSummary = document.querySelector('#google-books-enrichment-diagnostics-summary');
 const googleBooksEnrichmentDiagnosticsItems = document.querySelector('#google-books-enrichment-diagnostics-items');
-const humbleExtensionId = document.querySelector('#humble-extension-id');
-const humbleExtensionLinkStatus = document.querySelector('#humble-extension-link-status');
+const companionExtensionId = document.querySelector('#companion-extension-id');
+const companionExtensionLinkStatus = document.querySelector('#companion-extension-link-status');
+const allowedCompanionExtensions = document.querySelector('#allowed-companion-extensions');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
 const openLibrarySearches = new Map();
@@ -358,13 +359,24 @@ function renderDuplicateReview() {
   reviewedDuplicateItems.replaceChildren(...reviewed.map((candidate) => createReviewRow(candidate, true)));
 }
 
-async function renderHumbleExtensionLink() {
+async function renderCompanionExtensionLinks() {
   const ids = await getAllowedExternalClientIds();
   galacticExtensionId.textContent = chrome.runtime.id;
-  humbleExtensionId.value = ids[0] ?? '';
-  humbleExtensionLinkStatus.textContent = ids.length
-    ? `Allowed extension ID: ${ids[0]}.`
-    : 'No companion extension is allowed yet.';
+  companionExtensionId.value = '';
+  companionExtensionLinkStatus.textContent = ids.length
+    ? `${ids.length} companion extension${ids.length === 1 ? '' : 's'} allowed.`
+    : 'No companion extensions are allowed yet.';
+  allowedCompanionExtensions.replaceChildren(...ids.map((id) => {
+    const row = document.createElement('li');
+    const code = document.createElement('code'); code.textContent = id;
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remove';
+    remove.addEventListener('click', async () => {
+      await saveAllowedExternalClientIds(ids.filter((candidate) => candidate !== id));
+      await renderCompanionExtensionLinks();
+    });
+    row.append(code, ' ', remove);
+    return row;
+  }));
 }
 
 function googleBooksStatusText(job, prefix = '') {
@@ -661,7 +673,7 @@ function render() {
 async function refresh() {
   database = await getDatabase();
   render();
-  await Promise.all([renderHumbleExtensionLink(), renderGoogleBooksEnrichment()]);
+  await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
 }
 
 document.querySelector('#export').addEventListener('click', () => {
@@ -727,26 +739,27 @@ resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
     googleBooksEnrichmentStatus.textContent = `Could not reset enrichment progress: ${error.message}`;
   }
 });
-document.querySelector('#save-humble-extension-id').addEventListener('click', async () => {
-  const id = humbleExtensionId.value.trim();
+document.querySelector('#add-companion-extension-id').addEventListener('click', async () => {
+  const id = companionExtensionId.value.trim();
   if (!isExtensionId(id)) {
-    humbleExtensionLinkStatus.textContent = 'Enter a valid 32-character Chrome extension ID.';
+    companionExtensionLinkStatus.textContent = 'Enter a valid 32-character Chrome extension ID.';
     return;
   }
   try {
-    await saveAllowedExternalClientIds([id]);
-    humbleExtensionLinkStatus.textContent = `Allowed extension ID: ${id}.`;
+    const ids = await getAllowedExternalClientIds();
+    await saveAllowedExternalClientIds([...ids, id]);
+    await renderCompanionExtensionLinks();
   } catch (error) {
-    humbleExtensionLinkStatus.textContent = `Could not save the allowed extension: ${error.message}`;
+    companionExtensionLinkStatus.textContent = `Could not save the allowed extension: ${error.message}`;
   }
 });
-document.querySelector('#clear-humble-extension-id').addEventListener('click', async () => {
+document.querySelector('#clear-companion-extension-ids').addEventListener('click', async () => {
   try {
     await saveAllowedExternalClientIds([]);
-    humbleExtensionId.value = '';
-    humbleExtensionLinkStatus.textContent = 'Companion extension link removed.';
+    await renderCompanionExtensionLinks();
+    companionExtensionLinkStatus.textContent = 'Companion extension links removed.';
   } catch (error) {
-    humbleExtensionLinkStatus.textContent = `Could not remove the companion extension: ${error.message}`;
+    companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }
 });
 search.addEventListener('input', render);
