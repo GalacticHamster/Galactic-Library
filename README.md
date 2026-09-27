@@ -16,7 +16,7 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 
 To import Steam, select **Open signed-in Steam Store** on the options page. **Quick update** reads the signed-in Store account's owned App IDs, then resolves only newly seen App IDs through Steam's batched StoreBrowse title service. **Full rescan** resolves every owned app again. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
 
-To import GOG, select **Open signed-in GOG** and then **Sync GOG library**. The importer reads GOG's paginated owned-games library on the signed-in site, including hidden games when GOG reports that the account has them. It never asks for, copies, or stores a GOG password, cookie, or OAuth token.
+To import GOG, select **Open signed-in GOG**. **Quick update** reads GOG's newest-first purchase-date pages until reaching a complete page already stored locally, including a separate hidden-games pass when GOG reports one. **Full rescan** reads every page. The importer records GOG's available game IDs, titles, and supported platforms. It never asks for, copies, or stores a GOG password, cookie, or OAuth token.
 
 To import Epic Games Store, select **Open signed-in Epic Store** and then **Sync Epic library**. The importer reads the signed-in Epic library with its catalog titles and add-on parent links. Unreal Engine assets, private/test entries, and items Epic does not identify as games or add-ons are excluded. It never asks for, copies, or stores an Epic password, cookie, or OAuth token.
 
@@ -49,7 +49,7 @@ Quick updates merge newly discovered records and therefore do not infer that an 
 | Kindle | Available | Reads newest-first pages until reaching a full page already in the local baseline. |
 | Amazon Games | Available | Uses Amazon's past-three-month claims window after a full baseline; falls back to a full scan after 70 days. |
 | Audible | Available | Uses Audible's explicit newest-first Date added order until reaching a known page. |
-| GOG | Full rescan only | The current endpoint is title-sorted and supplies no recorded acquisition/update marker. |
+| GOG | Available | Uses GOG's purchase-date order until reaching a complete known page, including hidden games. |
 | Epic Games Store | Full rescan only | The current library cursor has no acquisition/update marker. |
 | Kobo | Available | Uses Kobo's explicit Date Added descending My Books order; Full rescan also checks Archive and Audiobooks. |
 | Amazon Video | Full rescan only | The rendered library supplies no reliable recency marker. |

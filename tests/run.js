@@ -19,7 +19,7 @@ await import('../src/providers/fandango-at-home.js');
 await import('../src/providers/kobo.js');
 await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
-const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
+const { gogItemsFromProducts, newGogItems, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems } = globalThis.GalacticAudible;
@@ -82,6 +82,7 @@ const tests = [
   ['keeps GOG game records across library pages and ignores movies', () => {
     assert.equal(pageCount({ totalPages: 3 }), 3);
     assert.equal(pageCount({ totalPages: 'not-a-number' }), 1);
+    assert.deepEqual(newGogItems([{ providerItemId: '1' }, { providerItemId: '2' }], ['1']).map((item) => item.providerItemId), ['2']);
     assert.deepEqual(gogItemsFromProducts({ products: [
       { id: 1207658691, title: 'The Witcher 3: Wild Hunt', isGame: true, worksOn: { Windows: true, Mac: false } },
       { id: 1207658692, title: 'A movie', isMovie: true, isGame: false }
