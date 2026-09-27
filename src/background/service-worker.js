@@ -20,6 +20,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
       || (provider === 'fandango-at-home' && page.origin === 'https://athome.fandango.com')
       || (provider === 'kobo' && page.origin === 'https://www.kobo.com' && page.pathname.includes('/library'))
+      || (provider === 'fanatical' && page.origin === 'https://www.fanatical.com')
       || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
     return false;
@@ -43,7 +44,7 @@ function isOwnExtensionPage(url) {
 }
 
 function isKnownProvider(provider) {
-  return ['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(provider);
+  return ['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'fanatical', 'humble'].includes(provider);
 }
 
 function humbleSyncState(value) {
@@ -51,6 +52,106 @@ function humbleSyncState(value) {
     .map((id) => String(id ?? '').trim())
     .filter((id) => id.length > 0 && id.length <= 256))].slice(0, 50000);
   return { knownPurchaseIds };
+}
+
+function fanaticalSyncState(value) {
+  const knownOrderFingerprints = [...new Set((Array.isArray(value?.knownOrderFingerprints) ? value.knownOrderFingerprints : [])
+    .map((fingerprint) => String(fingerprint ?? '').toLocaleLowerCase())
+    .filter((fingerprint) => /^[a-f0-9]{64}$/u.test(fingerprint)))].slice(0, 50000);
+  return { knownOrderFingerprints };
+}
+
+// This function is serialized into Fanatical's MAIN world. It is the only
+// code allowed to read the signed-in page's session token, and returns a
+// strict ownership projection rather than a token or raw order response.
+async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [] } = {}) {
+  const text = (value, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+  const id = (value) => /^[a-zA-Z0-9_-]{6,128}$/u.test(String(value ?? '')) ? String(value) : '';
+  const list = (value, max = 30) => [...new Set((Array.isArray(value) ? value : []).map((entry) => text(entry, 40)).filter(Boolean))].slice(0, max);
+  const mediaType = (value) => {
+    const type = text(value).toLocaleLowerCase();
+    if (type === 'game') return 'game';
+    if (type.includes('comic') || type === 'book') return 'book';
+    if (type === 'audiobook' || (type.includes('audio') && type.includes('book'))) return 'audiobook';
+    return 'other';
+  };
+  const fingerprint = async (orderId) => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(orderId)));
+    return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
+  };
+  let token = '';
+  try { token = String(JSON.parse(localStorage.getItem('bsauth') || '{}')?.token || ''); } catch { /* signed-out or changed page state */ }
+  if (!token) throw new Error('Sign in to Fanatical before importing purchases.');
+  const request = async (path) => {
+    const response = await fetch(path, { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json', authorization: token } });
+    if (!response.ok) throw new Error(response.status === 401 ? 'Fanatical session expired. Sign in and try again.' : `Fanatical returned ${response.status} while reading your orders.`);
+    return response.json();
+  };
+  const summaries = await request('/api/user/orders');
+  const completed = (Array.isArray(summaries) ? summaries : []).filter((order) => order?.status === 'COMPLETE' && id(order?._id));
+  const orders = await Promise.all(completed.map(async (order) => ({ order, fingerprint: await fingerprint(order._id) })));
+  const known = new Set((Array.isArray(knownOrderFingerprints) ? knownOrderFingerprints : [])
+    .map((value) => String(value ?? '').toLocaleLowerCase()).filter((value) => /^[a-f0-9]{64}$/u.test(value)));
+  const selected = fullScan ? orders : orders.filter((entry) => !known.has(entry.fingerprint));
+  const details = await Promise.all(selected.map(async ({ order }) => request(`/api/user/orders/${encodeURIComponent(order._id)}`)));
+  const itemsById = new Map();
+  for (const order of details) {
+    if (order?.status !== 'COMPLETE') continue;
+    for (const parent of Array.isArray(order?.items) ? order.items : []) {
+      for (const group of Array.isArray(parent?.bundles) ? parent.bundles : []) {
+        for (const leaf of Array.isArray(group?.games) ? group.games : []) {
+          const sourceItemId = id(leaf?._id);
+          const title = text(leaf?.name);
+          const kind = mediaType(leaf?.display_type ?? leaf?.type);
+          if (!sourceItemId || !title || kind === 'other') continue;
+          const steamAppId = /^\d{1,16}$/u.test(String(leaf?.steam?.id ?? '')) ? String(leaf.steam.id) : '';
+          const isbn = text(leaf?.isbn, 32).replace(/[^0-9X]/giu, '');
+          const purchaseDate = typeof order?.date === 'string' && !Number.isNaN(Date.parse(order.date)) ? order.date : null;
+          itemsById.set(sourceItemId, {
+            sourceItemId, title, mediaType: kind,
+            slug: text(leaf?.slug, 300),
+            externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
+            drm: list(Object.entries(leaf?.drm && typeof leaf.drm === 'object' ? leaf.drm : {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
+            platforms: list(Object.entries(leaf?.platforms ?? leaf?.os ?? {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
+            formats: list((Array.isArray(leaf?.downloads) ? leaf.downloads : []).flatMap((download) => (Array.isArray(download?.files) ? download.files : []).map((file) => text(file?.format, 32).toLocaleLowerCase()))),
+            bundle: { sourceItemId: id(parent?._id), title: text(parent?.name), slug: text(parent?.slug, 300) },
+            purchaseDate
+          });
+        }
+      }
+    }
+  }
+  // Raw order records and `token` never cross this MAIN-world boundary.
+  return { ordersScanned: selected.length, ordersAvailable: orders.length, orderFingerprints: orders.map((entry) => entry.fingerprint), items: [...itemsById.values()] };
+}
+
+function sanitizeFanaticalProjection(value) {
+  const input = value && typeof value === 'object' ? value : {};
+  const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
+  const items = [];
+  for (const candidate of Array.isArray(input.items) ? input.items : []) {
+    const sourceItemId = String(candidate?.sourceItemId ?? '').trim();
+    const title = String(candidate?.title ?? '').trim().slice(0, 500);
+    const mediaType = ['game', 'book', 'audiobook'].includes(candidate?.mediaType) ? candidate.mediaType : '';
+    if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title || !mediaType) continue;
+    const safeList = (entries) => [...new Set((Array.isArray(entries) ? entries : []).map((entry) => String(entry ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
+    const safeText = (entry, max = 300) => String(entry ?? '').trim().slice(0, max);
+    const steamAppId = /^\d{1,16}$/u.test(String(candidate?.externalIds?.steamAppId ?? '')) ? String(candidate.externalIds.steamAppId) : '';
+    const isbn = /^[0-9X]{10,17}$/iu.test(String(candidate?.externalIds?.isbn ?? '')) ? String(candidate.externalIds.isbn).toUpperCase() : '';
+    items.push({
+      sourceItemId, title, mediaType, slug: safeText(candidate?.slug),
+      externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
+      drm: safeList(candidate?.drm), platforms: safeList(candidate?.platforms), formats: safeList(candidate?.formats),
+      bundle: { sourceItemId: /^[a-zA-Z0-9_-]{6,128}$/u.test(String(candidate?.bundle?.sourceItemId ?? '')) ? String(candidate.bundle.sourceItemId) : '', title: safeText(candidate?.bundle?.title, 500), slug: safeText(candidate?.bundle?.slug) },
+      purchaseDate: typeof candidate?.purchaseDate === 'string' && !Number.isNaN(Date.parse(candidate.purchaseDate)) ? candidate.purchaseDate : null
+    });
+  }
+  return {
+    ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
+    ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
+    orderFingerprints: knownOrderFingerprints,
+    items: [...new Map(items.map((item) => [item.sourceItemId, item])).values()]
+  };
 }
 
 async function searchOpenLibrary(query) {
@@ -94,6 +195,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     searchOpenLibrary(request.query)
       .then((candidates) => sendResponse({ ok: true, candidates }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (request?.type === 'FETCH_FANATICAL_ORDERS') {
+    if (!isProviderImportPage('fanatical', sender.url) || !sender.tab?.id) {
+      sendResponse({ ok: false, error: 'Fanatical orders can be read only from a signed-in Fanatical tab.' });
+      return undefined;
+    }
+    chrome.scripting.executeScript({
+      target: { tabId: sender.tab.id },
+      world: 'MAIN',
+      func: readFanaticalOrdersInPage,
+      args: [{ fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
+    })
+      .then((results) => sendResponse({ ok: true, result: sanitizeFanaticalProjection(results?.[0]?.result) }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
@@ -152,6 +269,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: request.provider === 'humble'
             ? humbleSyncState(state.syncState)
+            : request.provider === 'fanatical'
+              ? fanaticalSyncState(state.syncState)
             : { knownProviderItemIds }
         });
       })
@@ -164,7 +283,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
-  const incrementalProvider = request.mode === 'incremental' && ['humble', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home'].includes(request.provider);
+  const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home'].includes(request.provider);
   if (!Array.isArray(request.items) || request.items.length > 50000 || (!request.items.length && !incrementalProvider)) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
@@ -187,7 +306,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               ? 'fandango-at-home-library'
             : request.provider === 'kobo'
               ? 'kobo-my-books-library'
-        : 'humble-purchase-library';
+              : request.provider === 'fanatical'
+                ? 'fanatical-order-history'
+                : 'humble-purchase-library';
   const now = new Date().toISOString();
   const syncDetails = request.provider === 'humble'
     ? {
@@ -195,6 +316,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         syncMode: incrementalProvider ? 'incremental' : 'full',
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now }),
         syncState: humbleSyncState(request.syncState)
+      }
+    : request.provider === 'fanatical'
+      ? {
+        source,
+        syncMode: incrementalProvider ? 'incremental' : 'full',
+        ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now }),
+        syncState: fanaticalSyncState(request.syncState)
       }
     : {
         source,

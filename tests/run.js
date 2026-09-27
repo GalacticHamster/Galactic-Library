@@ -17,6 +17,7 @@ await import('../src/providers/kindle.js');
 await import('../src/providers/amazon-video.js');
 await import('../src/providers/fandango-at-home.js');
 await import('../src/providers/kobo.js');
+await import('../src/providers/fanatical.js');
 await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, newGogItems, pageCount } = globalThis.GalacticGog;
@@ -27,6 +28,7 @@ const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItem
 const { amazonVideoItemFromCardData, ownershipFromCardText, newAmazonVideoItems } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, newFandangoItems, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData, newKoboItems } = globalThis.GalacticKobo;
+const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.GalacticFanatical;
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
@@ -324,6 +326,18 @@ const tests = [
     ], ['Known-Book', 'another-book']).map((item) => item.providerItemId), ['NEW-BOOK']);
     const audiobook = normalizeProviderItem({ provider: 'kobo', providerItemId: 'audio-1', title: 'Kobo Audio', mediaType: 'audiobook' });
     assert.ok(rebuildCanonicalItems({ [audiobook.id]: audiobook })['audiobook:kobo audio']);
+  }],
+  ['keeps Fanatical game, book, and audiobook order items without order secrets', () => {
+    assert.equal(fanaticalMediaType('comic'), 'book');
+    assert.equal(fanaticalMediaType('software'), null);
+    assert.deepEqual(fanaticalItemsFromProjection({ items: [
+      { sourceItemId: 'game-leaf-123', title: 'Example Game', mediaType: 'game', platforms: ['windows'], externalIds: { steamAppId: '12345' }, bundle: { sourceItemId: 'bundle-123', title: 'Example Bundle' }, purchaseDate: '2026-09-26T00:00:00.000Z' },
+      { sourceItemId: 'comic-leaf-123', title: 'Example Comic', mediaType: 'comic', externalIds: { isbn: '9781234567890' }, bundle: { sourceItemId: 'bundle-123', title: 'Example Bundle' } },
+      { sourceItemId: 'asset-leaf-123', title: 'Ignore Asset', mediaType: 'software' }
+    ] }), [
+      { providerItemId: 'game-leaf-123', title: 'Example Game', mediaType: 'game', ownership: 'owned', platform: ['windows'], acquiredAt: '2026-09-26T00:00:00.000Z', metadata: { source: 'fanatical-order-history', bundleId: 'bundle-123', bundleTitle: 'Example Bundle', bundleSlug: '', slug: '', drm: [], formats: [], steamAppId: '12345' } },
+      { providerItemId: 'comic-leaf-123', title: 'Example Comic', mediaType: 'book', ownership: 'owned', platform: [], acquiredAt: null, metadata: { source: 'fanatical-order-history', bundleId: 'bundle-123', bundleTitle: 'Example Bundle', bundleSlug: '', slug: '', drm: [], formats: [], isbn: '9781234567890' } }
+    ]);
   }],
   ['imports Humble books and game entitlements without retaining redemption values', () => {
     const purchaseSync = purchaseIdsForSync([{ gamekey: 'old' }, { key: 'new' }, { gamekey: 'new' }], ['old']);

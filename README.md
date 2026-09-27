@@ -36,6 +36,8 @@ To import Fandango at Home, select **Open signed-in Fandango at Home** and open 
 
 To import Kobo content, select **Open signed-in Kobo library**. **Quick update** explicitly requests Kobo's newest-first **Date Added** My Books pages and stops at a complete page already stored locally. **Full rescan** follows every My Books page, and also checks Archive and Audiobooks when Kobo exposes those views. The importer records Kobo's available item ID, title, author, series, cover URL, detail-page URL, and format. The signed-in web library is treated as an owned library. It does not emulate a Kobo device, request product-detail pages, or ask for, copy, or store a Kobo password, cookie, or token.
 
+To import Fanatical purchases, select **Open signed-in Fanatical**. **Quick update** lists completed orders and reads details only for orders not already checked; **Full rescan** rebuilds the provider snapshot. Fanatical's session token is read only in the signed-in page's MAIN world to call Fanatical's two fixed, read-only order endpoints. The token, order IDs, activation keys, download URLs, payment details, addresses, and raw responses are never stored, exported, logged, or messaged outside that page execution. Galactic Library retains only supported game, book/comic, and audiobook product identity and available non-sensitive metadata, together with bundle provenance and purchase date.
+
 To import Humble purchases, select **Open signed-in Humble purchases**. **Quick update** loads Humble's lightweight purchase list, then reads details only for previously unrecorded purchases. **Full rescan** rebuilds the provider snapshot and is useful after an importer upgrade. It records supported DRM-free books/comics, audiobook deliveries (MP3, M4A/M4B, AAC, FLAC, OGG/Opus, or WAV), direct games, and third-party game entitlements with their Humble purchase origin and purchase date when available. Redemption-key values are redacted from each detail response *before* it is parsed, and are never stored, exported, or logged. The importer does not ask for, copy, or store a Humble password, cookie, or redemption key. A full rescan replaces the Humble provider snapshot only after every purchase detail has been read successfully, so a temporary Humble error cannot erase a prior Humble import.
 
 ## Quick updates
@@ -52,6 +54,7 @@ Quick updates merge newly discovered records and therefore do not infer that an 
 | GOG | Available | Uses GOG's purchase-date order until reaching a complete known page, including hidden games. |
 | Epic Games Store | Full rescan only | The current library cursor has no acquisition/update marker. |
 | Kobo | Available | Uses Kobo's explicit Date Added descending My Books order; Full rescan also checks Archive and Audiobooks. |
+| Fanatical | Available | Lists completed orders and reads details only for unseen opaque order fingerprints. |
 | Amazon Video | Available | Uses the Most recent addition order and stops at a complete known rendered group. |
 | Fandango at Home | Available | Uses the Recently Purchased View All grids until reaching known titles; Full rescan validates Fandango's counts. |
 
