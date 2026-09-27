@@ -26,7 +26,7 @@ const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryA
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
-const { koboItemIdFromValue, koboItemFromCardData } = globalThis.GalacticKobo;
+const { koboItemIdFromValue, koboItemFromCardData, newKoboItems } = globalThis.GalacticKobo;
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
@@ -311,6 +311,9 @@ const tests = [
     assert.deepEqual(koboItemFromCardData({
       providerItemId: 'book-2', title: 'Kobo Card Attribute Title', detailUrl: 'https://www.kobo.com/us/en/ebook/kobo-card-attribute-title', typeText: 'eBook'
     })?.title, 'Kobo Card Attribute Title');
+    assert.deepEqual(newKoboItems([
+      { providerItemId: 'known-book' }, { providerItemId: 'NEW-BOOK' }, { providerItemId: 'another-book' }
+    ], ['Known-Book', 'another-book']).map((item) => item.providerItemId), ['NEW-BOOK']);
     const audiobook = normalizeProviderItem({ provider: 'kobo', providerItemId: 'audio-1', title: 'Kobo Audio', mediaType: 'audiobook' });
     assert.ok(rebuildCanonicalItems({ [audiobook.id]: audiobook })['audiobook:kobo audio']);
   }],

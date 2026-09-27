@@ -115,6 +115,11 @@
     return [...itemsById.values()];
   }
 
+  function newKoboItems(items, knownItemIds = []) {
+    const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => compactText(id).toLocaleLowerCase()).filter(Boolean));
+    return (Array.isArray(items) ? items : []).filter((item) => !known.has(compactText(item?.providerItemId).toLocaleLowerCase()));
+  }
+
   function nextPageControl(document) {
     const controls = [...document.querySelectorAll('button, a')];
     const enabled = (element) => !element.hasAttribute('disabled')
@@ -203,22 +208,31 @@
     return { pagesRead, available: true, document: firstDocument };
   }
 
-  async function fetchKoboLibrary(reportProgress = () => {}) {
+  async function fetchKoboLibrary(reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
+    const incremental = Array.isArray(knownItemIds);
     const initialUrl = new URL(global.location.href);
     initialUrl.searchParams.set('pageNumber', '1');
+    initialUrl.searchParams.set('sort', 'DateAddedDesc');
     const firstDocument = await fetchLibraryDocument(initialUrl.toString());
     const totalPages = Math.min(MAX_PAGES, pageCountFromDocument(firstDocument));
     for (let page = 1; page <= totalPages; page += 1) {
       const pageUrl = new URL(initialUrl);
       pageUrl.searchParams.set('pageNumber', String(page));
       const document = page === 1 ? firstDocument : await fetchLibraryDocument(pageUrl.toString());
-      addItems(itemsById, koboItemsFromDocument(document), 'my-books');
+      const pageItems = koboItemsFromDocument(document);
+      const itemsToSave = incremental ? newKoboItems(pageItems, knownItemIds) : pageItems;
+      addItems(itemsById, itemsToSave, 'my-books');
       reportCounts(itemsById, reportProgress, { pagesRead: page, archivePagesRead: 0, section: 'My Books' });
+      // Kobo explicitly orders this view Date Added descending. A complete
+      // known page is therefore a safe quick-update stopping point.
+      if (incremental && itemsToSave.length === 0) break;
     }
     if (!itemsById.size) {
+      if (incremental) return { items: [], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
       throw new Error('Kobo showed no readable book or audiobook cards. Open My Books, wait for the library to load, then try again.');
     }
+    if (incremental) return { items: [...itemsById.values()], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
     const myBooksArchive = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Archive', 'archive');
     const audiobooks = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Audiobooks', 'audiobooks');
     const audiobookArchive = audiobooks.document
@@ -233,5 +247,5 @@
     };
   }
 
-  global.GalacticKobo = { koboItemIdFromValue, koboItemFromCardData, koboItemsFromDocument, fetchKoboLibrary };
+  global.GalacticKobo = { koboItemIdFromValue, koboItemFromCardData, koboItemsFromDocument, newKoboItems, fetchKoboLibrary };
 }(globalThis));
