@@ -24,7 +24,7 @@ const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic
 const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems } = globalThis.GalacticKindle;
-const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
+const { amazonVideoItemFromCardData, ownershipFromCardText, newAmazonVideoItems } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData, newKoboItems } = globalThis.GalacticKobo;
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
@@ -251,6 +251,7 @@ const tests = [
     assert.equal(ownershipFromCardText('Purchased in HD'), 'owned');
     assert.equal(ownershipFromCardText('Rental expires in 12 days'), 'rental');
     assert.equal(ownershipFromCardText('Watch now'), 'unknown');
+    assert.deepEqual(newAmazonVideoItems([{ providerItemId: 'known' }, { providerItemId: 'new' }], ['known']).map((item) => item.providerItemId), ['new']);
     assert.deepEqual(amazonVideoItemFromCardData({
       providerItemId: 'amzn1.dv.gti.1234-abcd', title: '  The Expanse: Season 1 ', entityType: 'TV_SHOW',
       detailUrl: 'https://www.amazon.com/gp/video/detail/amzn1.dv.gti.1234-abcd?ref=library',

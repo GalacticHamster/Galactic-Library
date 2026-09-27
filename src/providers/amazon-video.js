@@ -99,28 +99,48 @@
     return [...itemsById.values()];
   }
 
+  function newAmazonVideoItems(items, knownItemIds = []) {
+    const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => String(id ?? '').trim()).filter(Boolean));
+    return (Array.isArray(items) ? items : []).filter((item) => !known.has(String(item?.providerItemId ?? '').trim()));
+  }
+
   function wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function fetchAmazonVideoLibrary(reportProgress = () => {}) {
+  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
+    const incremental = Array.isArray(knownItemIds);
+    const renderedItemIds = new Set();
     let unchangedPasses = 0;
+    const scrollingElement = global.document.scrollingElement ?? global.document.documentElement;
+    // The signed-in library's Most recent addition order is only useful if
+    // the scan starts at its first rendered group, not the user's scroll spot.
+    if (incremental) {
+      global.scrollTo({ top: 0, behavior: 'auto' });
+      await wait(SCROLL_PAUSE_MS);
+    }
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 3; pass += 1) {
       const before = itemsById.size;
-      for (const item of amazonVideoItemsFromDocument(global.document)) itemsById.set(item.providerItemId, item);
+      const newlyRenderedItems = amazonVideoItemsFromDocument(global.document)
+        .filter((item) => !renderedItemIds.has(item.providerItemId));
+      for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
+      const itemsToSave = incremental ? newAmazonVideoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
+      for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
       const movies = [...itemsById.values()].filter((item) => item.mediaType === 'movie').length;
       const tv = itemsById.size - movies;
       reportProgress({ passes: pass, movies, tv });
+      // Cards are rendered newest first. A complete newly rendered group with
+      // no unknown title is a safe stopping point for a quick update.
+      if (incremental && newlyRenderedItems.length && !itemsToSave.length) break;
       unchangedPasses = itemsById.size === before ? unchangedPasses + 1 : 0;
-      const scrollingElement = global.document.scrollingElement ?? global.document.documentElement;
       const beforeScroll = scrollingElement.scrollTop;
       global.scrollTo({ top: scrollingElement.scrollHeight, behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
       const atEnd = scrollingElement.scrollTop === beforeScroll || scrollingElement.scrollTop + global.innerHeight >= scrollingElement.scrollHeight - 4;
       if (atEnd && unchangedPasses >= 2) break;
     }
-    if (!itemsById.size) {
+    if (!itemsById.size && !incremental) {
       throw new Error('Amazon Video showed no readable movie or TV cards. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.');
     }
     return { items: [...itemsById.values()] };
@@ -129,6 +149,7 @@
   global.GalacticAmazonVideo = {
     amazonVideoItemFromCardData,
     amazonVideoItemsFromDocument,
+    newAmazonVideoItems,
     ownershipFromCardText,
     fetchAmazonVideoLibrary
   };
