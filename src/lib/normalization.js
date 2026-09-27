@@ -27,6 +27,11 @@ export function normalizeGameTitle(value) {
     .replace(/[®™©]/gu, ' ')
     .replace(/[’'`]/gu, '')
     .replace(/&/gu, ' and ')
+    // These are provider presentation/format labels, not a different comic.
+    // Keep substantive editions (for example Deluxe Edition) distinct.
+    .replace(/\(\s*plus\s+extra\s+content\s*\)\s*$/giu, ' ')
+    .replace(/\b(?:tpb|trade\s+paperback)\s*$/giu, ' ')
+    .replace(/\bvolume\b/giu, 'vol')
     .replace(/\b(?:the|a|an)\s+/u, '')
     .replace(/\b(i|ii|iii|iv|v|vi|vii|viii|ix|x)\b/gu, (match) => ROMAN_NUMERALS.get(match) ?? match)
     .replace(/[^a-z0-9]+/gu, ' ')

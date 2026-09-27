@@ -41,6 +41,11 @@ const tests = [
     });
     assert.notEqual(normalizeGameTitle('Control').normalizedTitle, normalizeGameTitle('Control Ultimate Edition').normalizedTitle);
   }],
+  ['normalizes book format labels but keeps substantive editions distinct', () => {
+    assert.equal(normalizeGameTitle('4001 A.D. TPB').normalizedTitle, '4001 a d');
+    assert.equal(normalizeGameTitle('Archer & Armstrong, Vol. 3: Far Faraway (plus extra content)').normalizedTitle, 'archer and armstrong vol 3 far faraway');
+    assert.equal(normalizeGameTitle('The Valiant Deluxe Edition').normalizedTitle, 'valiant deluxe');
+  }],
   ['matches an exact normalized title across providers', () => {
     const providerItems = Object.fromEntries([
       normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'SOMA' }),
