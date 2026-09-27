@@ -149,6 +149,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({
           ok: true,
           hasFullBaseline: Boolean(state.fullSyncAt),
+          lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: request.provider === 'humble'
             ? humbleSyncState(state.syncState)
             : { knownProviderItemIds }
@@ -163,7 +164,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
-  const incrementalProvider = request.mode === 'incremental' && ['humble', 'steam'].includes(request.provider);
+  const incrementalProvider = request.mode === 'incremental' && ['humble', 'steam', 'kindle', 'amazon-games'].includes(request.provider);
   if (!Array.isArray(request.items) || request.items.length > 50000 || (!request.items.length && !incrementalProvider)) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;

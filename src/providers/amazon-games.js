@@ -133,10 +133,14 @@
     return { item, reason: deliveryTarget ? 'other-library' : 'unreadable' };
   }
 
-  function timeWindowOptionsFromDocument(document) {
-    const options = [...document.querySelectorAll('[data-a-target="time-window-filter-flyout"] button[data-type]')]
+  function allTimeWindowOptionsFromDocument(document) {
+    return [...document.querySelectorAll('[data-a-target="time-window-filter-flyout"] button[data-type]')]
       .map((button) => ({ id: compactText(button.getAttribute('data-type')), label: compactText(button.textContent) }))
       .filter((option) => option.id && option.label);
+  }
+
+  function timeWindowOptionsFromDocument(document) {
+    const options = allTimeWindowOptionsFromDocument(document);
     const years = options.filter((option) => /^\d{4}$/u.test(option.id));
     return years.length ? years : options;
   }
@@ -146,15 +150,15 @@
       .find((button) => button.querySelector('[data-a-target="time-window-filter-dropdown"]')) ?? null;
   }
 
-  async function openTimeWindowMenu(document) {
-    let options = timeWindowOptionsFromDocument(document);
-    if (options.length) return options;
+  async function openTimeWindowMenu(document, includeRecent = false) {
+    let options = allTimeWindowOptionsFromDocument(document);
+    if (options.length) return includeRecent ? options : timeWindowOptionsFromDocument(document);
     const header = timeWindowHeaderFromDocument(document);
     if (!header) return [];
     header.click();
     await wait(150);
-    options = timeWindowOptionsFromDocument(document);
-    return options;
+    options = allTimeWindowOptionsFromDocument(document);
+    return includeRecent ? options : timeWindowOptionsFromDocument(document);
   }
 
   async function selectTimeWindow(document, option) {
@@ -229,9 +233,10 @@
     return { items: [...itemsById.values()], diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, loadMoreActivations } };
   }
 
-  async function fetchAmazonGames(reportProgress = () => {}) {
-    const windows = await openTimeWindowMenu(global.document);
-    const selectedWindows = windows.length ? windows : [{ id: '', label: 'current selection' }];
+  async function fetchAmazonGames(reportProgress = () => {}, quickUpdate = false) {
+    const windows = await openTimeWindowMenu(global.document, quickUpdate);
+    const recentWindow = windows.find((window) => window.id === 'past-3-months');
+    const selectedWindows = quickUpdate && recentWindow ? [recentWindow] : windows.length ? windows : [{ id: '', label: 'current selection' }];
     const itemsByTitle = new Map();
     const totals = { cardsRead: 0, otherLibraryClaims: 0, productKeyClaims: 0, duplicateAmazonClaims: 0, unreadableCards: 0, loadMoreActivations: 0, crossWindowDuplicates: 0 };
     let rangesWithClaims = 0;
@@ -262,5 +267,5 @@
     };
   }
 
-  global.GalacticAmazonGames = { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument, claimCardsFromDocument, fetchAmazonGames };
+  global.GalacticAmazonGames = { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, allTimeWindowOptionsFromDocument, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument, claimCardsFromDocument, fetchAmazonGames };
 }(globalThis));

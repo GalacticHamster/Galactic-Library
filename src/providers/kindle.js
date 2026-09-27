@@ -105,6 +105,11 @@
     return [...itemsById.values()];
   }
 
+  function newKindleItems(items, knownItemIds = []) {
+    const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => compactText(id).toUpperCase()).filter(Boolean));
+    return (Array.isArray(items) ? items : []).filter((item) => !known.has(compactText(item?.providerItemId).toUpperCase()));
+  }
+
   function ownershipItemsFromResponse(response) {
     const items = response?.GetContentOwnershipData?.items ?? response?.items ?? [];
     return Array.isArray(items) ? items : [];
@@ -152,10 +157,11 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function fetchKindleBooks(reportProgress = () => {}) {
+  async function fetchKindleBooks(reportProgress = () => {}, knownItemIds = null) {
     const csrfToken = csrfTokenFromDocument(global.document);
     if (!csrfToken) throw new Error('Amazon did not expose the library page token. Open Manage Your Content and Devices, wait for it to finish loading, then try again.');
     const booksById = new Map();
+    const incremental = Array.isArray(knownItemIds);
     const categoryCounts = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, 0]));
     const diagnostics = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, {
       reportedCount: null, rawCount: 0, readableCount: 0, duplicateCount: 0
@@ -175,7 +181,8 @@
         diagnostic.readableCount += readableItems.length;
         diagnostic.duplicateCount += readableItems.length - pageBooks.length;
         if (!pageBooks.length) break;
-        for (const book of pageBooks) {
+        const booksToSave = incremental ? newKindleItems(pageBooks, knownItemIds) : pageBooks;
+        for (const book of booksToSave) {
           if (!booksById.has(book.providerItemId)) {
             categoryCounts[category.id] += 1;
           }
@@ -184,15 +191,19 @@
         }
         pagesRead += 1;
         reportProgress({ pagesRead, books: booksById.size, categoryCounts });
+        // Amazon returns this endpoint newest first. Once a whole page is
+        // already in the local full baseline, older pages cannot add a new
+        // entitlement. Full rescan remains available for reconciliation.
+        if (incremental && booksToSave.length === 0) break;
         const reachedReportedEnd = Number.isFinite(reportedCount) && (page + 1) * PAGE_SIZE >= reportedCount;
         const reachedUnreportedEnd = !Number.isFinite(reportedCount) && rawItems.length < PAGE_SIZE;
         if (rawItems.length === 0 || reachedReportedEnd || reachedUnreportedEnd) break;
         await wait(BETWEEN_PAGES_MS);
       }
     }
-    if (!booksById.size) throw new Error('Amazon returned no readable Kindle books. Please try again later.');
+    if (!booksById.size && !incremental) throw new Error('Amazon returned no readable Kindle books. Please try again later.');
     return { items: [...booksById.values()], diagnostics };
   }
 
-  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, fetchKindleBooks };
+  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, fetchKindleBooks };
 }(globalThis));
