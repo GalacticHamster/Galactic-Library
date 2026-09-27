@@ -22,7 +22,7 @@ const { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems 
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
-const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
+const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
@@ -140,6 +140,7 @@ const tests = [
     assert.equal(timeWindowHeaderFromDocument({ querySelectorAll: () => [otherDropdown, timeWindowDropdown] }), timeWindowDropdown);
   }],
   ['keeps Audible audiobook identity and available library metadata', () => {
+    assert.deepEqual(newAudibleItems([{ providerItemId: 'B000000001' }, { providerItemId: 'B000000002' }], ['B000000001']).map((item) => item.providerItemId), ['B000000002']);
     const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';
     assert.equal(audibleItemIdFromUrl(url), 'B08G9PRS1K');
     assert.equal(ownershipFromLibraryAction('Remove'), 'subscription');

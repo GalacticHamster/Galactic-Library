@@ -53,6 +53,11 @@
     return /\bremove\b/iu.test(String(actionText ?? '')) ? 'subscription' : 'unknown';
   }
 
+  function newAudibleItems(items, knownItemIds = []) {
+    const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => String(id).trim().toUpperCase()).filter(Boolean));
+    return (Array.isArray(items) ? items : []).filter((item) => !known.has(String(item?.providerItemId ?? '').trim().toUpperCase()));
+  }
+
   function libraryActionFromContainer(container) {
     return [...container.querySelectorAll('button, [role="button"], a')]
       .map((element) => textOf(element))
@@ -95,14 +100,16 @@
     const url = new URL('/library/titles', location.origin);
     url.searchParams.set('pageSize', String(PAGE_SIZE));
     url.searchParams.set('page', String(page));
+    url.searchParams.set('sortBy', 'PURCHASE_DATE.dsc');
     const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) throw new Error(`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
     return entriesFromLibraryDocument(document);
   }
 
-  async function fetchAudibleAudiobooks(reportProgress = () => {}) {
+  async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
+    const incremental = Array.isArray(knownItemIds);
     for (let page = 1; page <= MAX_PAGES; page += 1) {
       reportProgress({ pagesRead: page - 1, audiobooks: itemsById.size });
       const pageItems = await fetchAudibleLibraryPage(page);
@@ -110,8 +117,9 @@
         if (page === 1) throw new Error('Audible returned no readable library titles. Open your Audible Library while signed in, then try again.');
         break;
       }
+      const itemsToSave = incremental ? newAudibleItems(pageItems, knownItemIds) : pageItems;
       let added = 0;
-      for (const item of pageItems) {
+      for (const item of itemsToSave) {
         if (!itemsById.has(item.providerItemId)) added += 1;
         itemsById.set(item.providerItemId, item);
       }
@@ -119,9 +127,9 @@
       if (added === 0) break;
       await wait(BETWEEN_PAGES_MS);
     }
-    if (!itemsById.size) throw new Error('Audible returned no readable library titles. Please try again later.');
+    if (!itemsById.size && !incremental) throw new Error('Audible returned no readable library titles. Please try again later.');
     return { items: [...itemsById.values()] };
   }
 
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, fetchAudibleAudiobooks };
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks };
 }(globalThis));
