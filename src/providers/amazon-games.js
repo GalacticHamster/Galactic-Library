@@ -133,7 +133,49 @@
     return { item, reason: deliveryTarget ? 'other-library' : 'unreadable' };
   }
 
-  async function fetchAmazonGames(reportProgress = () => {}) {
+  function timeWindowOptionsFromDocument(document) {
+    const options = [...document.querySelectorAll('[data-a-target="time-window-filter-flyout"] button[data-type]')]
+      .map((button) => ({ id: compactText(button.getAttribute('data-type')), label: compactText(button.textContent) }))
+      .filter((option) => option.id && option.label);
+    const years = options.filter((option) => /^\d{4}$/u.test(option.id));
+    return years.length ? years : options;
+  }
+
+  function timeWindowHeaderFromDocument(document) {
+    return [...document.querySelectorAll('button[data-a-target="amazon-dropdown-header-interactable"]')]
+      .find((button) => button.querySelector('[data-a-target="time-window-filter-dropdown"]')) ?? null;
+  }
+
+  async function openTimeWindowMenu(document) {
+    let options = timeWindowOptionsFromDocument(document);
+    if (options.length) return options;
+    const header = timeWindowHeaderFromDocument(document);
+    if (!header) return [];
+    header.click();
+    await wait(150);
+    options = timeWindowOptionsFromDocument(document);
+    return options;
+  }
+
+  async function selectTimeWindow(document, option) {
+    const options = await openTimeWindowMenu(document);
+    const control = [...document.querySelectorAll('[data-a-target="time-window-filter-flyout"] button[data-type]')]
+      .find((button) => compactText(button.getAttribute('data-type')) === option.id);
+    if (!options.length || !control) throw new Error(`Amazon's collection date range “${option.label}” could not be selected.`);
+    control.click();
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await wait(250);
+      const selected = compactText(document.querySelector('[data-a-target="time-window-filter-dropdown"] p')?.getAttribute('title')
+        ?? document.querySelector('[data-a-target="time-window-filter-dropdown"]')?.textContent);
+      if (selected.toLocaleLowerCase() === option.label.toLocaleLowerCase()) {
+        await wait(650);
+        return;
+      }
+    }
+    throw new Error(`Amazon's collection did not finish opening the ${option.label} date range.`);
+  }
+
+  async function fetchAmazonGamesInCurrentWindow(reportProgress = () => {}, timeWindow = '') {
     const itemsById = new Map();
     const itemIdsByTitle = new Map();
     const processedCardIds = new Set();
@@ -170,7 +212,7 @@
       unchangedPasses = signature === priorSignature ? unchangedPasses + 1 : 0;
       priorSignature = signature;
       const loadMore = loadMoreControl(global.document);
-      reportProgress({ passes: pass + 1, games: itemsById.size, cardsRead, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, loadMoreActivations });
+      reportProgress({ timeWindow, passes: pass + 1, games: itemsById.size, cardsRead, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, loadMoreActivations });
       if (loadMore) {
         loadMore.scrollIntoView?.({ block: 'center', behavior: 'auto' });
         loadMore.click();
@@ -184,9 +226,41 @@
       global.scrollTo({ top: Math.min(maximum, global.scrollY + Math.max(360, Math.floor(global.innerHeight * 0.82))), behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
     }
-    if (!sawCards) throw new Error('No readable claim cards were found. Open My Collection, select Games, and wait for it to load.');
-    return { items: [...itemsById.values()], diagnostics: { cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, loadMoreActivations } };
+    return { items: [...itemsById.values()], diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, loadMoreActivations } };
   }
 
-  global.GalacticAmazonGames = { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, claimCardsFromDocument, fetchAmazonGames };
+  async function fetchAmazonGames(reportProgress = () => {}) {
+    const windows = await openTimeWindowMenu(global.document);
+    const selectedWindows = windows.length ? windows : [{ id: '', label: 'current selection' }];
+    const itemsByTitle = new Map();
+    const totals = { cardsRead: 0, otherLibraryClaims: 0, productKeyClaims: 0, duplicateAmazonClaims: 0, unreadableCards: 0, loadMoreActivations: 0, crossWindowDuplicates: 0 };
+    let rangesWithClaims = 0;
+    for (let index = 0; index < selectedWindows.length; index += 1) {
+      const timeWindow = selectedWindows[index];
+      if (timeWindow.id) await selectTimeWindow(global.document, timeWindow);
+      global.scrollTo({ top: 0, behavior: 'auto' });
+      const result = await fetchAmazonGamesInCurrentWindow((progress) => reportProgress({
+        ...progress,
+        windowsRead: index + 1,
+        windowsTotal: selectedWindows.length,
+        totalGames: itemsByTitle.size + progress.games
+      }), timeWindow.label);
+      if (result.diagnostics.sawCards) rangesWithClaims += 1;
+      for (const item of result.items) {
+        const titleKey = amazonGamesTitleKey(item.title);
+        if (itemsByTitle.has(titleKey)) totals.crossWindowDuplicates += 1;
+        else itemsByTitle.set(titleKey, item);
+      }
+      for (const key of ['cardsRead', 'otherLibraryClaims', 'productKeyClaims', 'duplicateAmazonClaims', 'unreadableCards', 'loadMoreActivations']) {
+        totals[key] += result.diagnostics[key];
+      }
+    }
+    if (!rangesWithClaims) throw new Error('No readable claim cards were found in any selected date range. Open My Collection, select Games, and wait for it to load.');
+    return {
+      items: [...itemsByTitle.values()],
+      diagnostics: { ...totals, windowsRead: selectedWindows.length, windowsTotal: selectedWindows.length, rangesWithClaims, emptyRanges: selectedWindows.length - rangesWithClaims, timeWindows: selectedWindows.map((window) => window.label) }
+    };
+  }
+
+  global.GalacticAmazonGames = { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument, claimCardsFromDocument, fetchAmazonGames };
 }(globalThis));

@@ -21,7 +21,7 @@ await import('../src/providers/humble.js');
 const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
-const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText } = globalThis.GalacticAmazonGames;
+const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
@@ -126,6 +126,17 @@ const tests = [
     assert.equal(isLoadMoreText('Load 10 more'), false);
     assert.equal(deliveryTargetFromText('Collected on\n\nSep 18, 2026\n\nSent to\n\nAmazon Games library\n\nAmazon account\nSean'), 'Amazon Games library');
     assert.equal(amazonGamesTitleKey('  Wall World 2! '), amazonGamesTitleKey('Wall World 2'));
+    const timeWindowDocument = {
+      querySelectorAll: () => [
+        { textContent: 'Past 3 months', getAttribute: () => 'past-3-months' },
+        { textContent: '2026', getAttribute: () => '2026' },
+        { textContent: '2025', getAttribute: () => '2025' }
+      ]
+    };
+    assert.deepEqual(timeWindowOptionsFromDocument(timeWindowDocument), [{ id: '2026', label: '2026' }, { id: '2025', label: '2025' }]);
+    const otherDropdown = { querySelector: () => null };
+    const timeWindowDropdown = { querySelector: (selector) => selector === '[data-a-target="time-window-filter-dropdown"]' ? {} : null };
+    assert.equal(timeWindowHeaderFromDocument({ querySelectorAll: () => [otherDropdown, timeWindowDropdown] }), timeWindowDropdown);
   }],
   ['keeps Audible audiobook identity and available library metadata', () => {
     const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';
