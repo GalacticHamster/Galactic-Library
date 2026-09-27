@@ -18,7 +18,7 @@ await import('../src/providers/amazon-video.js');
 await import('../src/providers/fandango-at-home.js');
 await import('../src/providers/kobo.js');
 await import('../src/providers/humble.js');
-const { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
+const { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems } = globalThis.GalacticSteamStore;
 const { gogItemsFromProducts, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
@@ -27,7 +27,7 @@ const { kindleItemsFromOwnershipResponse, ownershipFromOriginType } = globalThis
 const { amazonVideoItemFromCardData, ownershipFromCardText } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData } = globalThis.GalacticKobo;
-const { redactRedemptionValues, humbleItemsFromOrder } = globalThis.GalacticHumble;
+const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
@@ -67,6 +67,7 @@ const tests = [
   }],
   ['keeps owned Steam games and links DLC while resolving Store data', () => {
     assert.deepEqual(ownedAppIdsFromDynamicStore({ rgOwnedApps: [440, '570', 'not-an-app', 440] }), ['440', '570']);
+    assert.deepEqual(newOwnedAppIds(['440', '570', '620'], ['440', '570']), ['620']);
     assert.deepEqual(libraryItemsFromStoreItems({ response: { store_items: [
       { appid: 440, type: 0, name: 'Team Fortress 2' },
       { appid: 570, type: 4, name: 'Mann Co. Supply Crate Key', related_items: { parent_appid: 440 } }
@@ -312,6 +313,10 @@ const tests = [
     assert.ok(rebuildCanonicalItems({ [audiobook.id]: audiobook })['audiobook:kobo audio']);
   }],
   ['imports Humble books and game entitlements without retaining redemption values', () => {
+    const purchaseSync = purchaseIdsForSync([{ gamekey: 'old' }, { key: 'new' }, { gamekey: 'new' }], ['old']);
+    assert.deepEqual(purchaseSync.purchaseIds, ['old', 'new']);
+    assert.deepEqual(purchaseSync.newPurchaseIds, ['new']);
+    assert.deepEqual([...purchaseSync.knownPurchaseIds], ['old']);
     const rawDetail = '{"subproducts":[{"machine_name":"ebook-one","human_name":"Book One","downloads":[{"url":"https://cdn.example.test/book-one.pdf"}]},{"machine_name":"audio-two","human_name":"Audio Two","downloads":[{"platform":"audio","download_struct":[{"name":"MP3"}]}]},{"id":"game-three","human_name":"Game Three","platform":"steam"}],"tpkd_dict":{"all_tpks":[{"machine_name":"steam-key","keyindex":2,"human_name":"Third Party Game","key_type":"Steam","redeemed_key_val":"never-store-this"}]}}';
     const redacted = redactRedemptionValues(rawDetail);
     assert.equal(redacted.includes('never-store-this'), false);

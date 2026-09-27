@@ -15,6 +15,16 @@
     return compactText(order?.gamekey ?? order?.key ?? order?.order_key);
   }
 
+  function purchaseIdsForSync(orders, knownPurchaseIds = []) {
+    const known = new Set((Array.isArray(knownPurchaseIds) ? knownPurchaseIds : []).map(compactText).filter(Boolean));
+    const purchaseIds = [...new Set((Array.isArray(orders) ? orders : []).map(orderKey).filter(Boolean))];
+    return {
+      purchaseIds,
+      newPurchaseIds: purchaseIds.filter((purchaseId) => !known.has(purchaseId)),
+      knownPurchaseIds: known
+    };
+  }
+
   function redactRedemptionValues(serialized) {
     return String(serialized ?? '').replace(/("(?:redeemed_)?key(?:_val|_value)?"\s*:\s*)"((?:[^"\\]|\\.)*)"/giu, (match, prefix, encodedValue) => `${prefix}${encodedValue.length ? `"${REDACTED_REDEMPTION_VALUE}"` : '""'}`);
   }
@@ -137,34 +147,46 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function fetchHumblePurchases(reportProgress = () => {}) {
+  async function fetchHumblePurchases(reportProgress = () => {}, knownPurchaseIds = null) {
     reportProgress({ purchasesRead: 0, purchasesTotal: 0, items: 0 });
     const response = await fetchJson('/api/v1/user/order?all=true');
     const orders = Array.isArray(response) ? response : response?.data ?? response?.orders;
     if (!Array.isArray(orders)) throw new Error('Humble returned an unexpected purchase list. Please report this page format.');
     const keyedOrders = orders.map((order) => ({ order, purchaseId: orderKey(order) })).filter(({ purchaseId }) => purchaseId);
     if (!keyedOrders.length) throw new Error('Humble returned no readable purchases. Confirm that you are signed in to an account with purchases.');
+    const sync = purchaseIdsForSync(orders, knownPurchaseIds ?? []);
+    const incremental = Array.isArray(knownPurchaseIds);
+    const selectedPurchaseIds = incremental ? new Set(sync.newPurchaseIds) : new Set(sync.purchaseIds);
+    const selectedOrders = keyedOrders.filter(({ purchaseId }) => selectedPurchaseIds.has(purchaseId));
     const itemsById = new Map();
     const failures = [];
-    for (let index = 0; index < keyedOrders.length; index += 1) {
-      const { order, purchaseId } = keyedOrders[index];
-      reportProgress({ purchasesRead: index, purchasesTotal: keyedOrders.length, items: itemsById.size });
+    const completedPurchaseIds = new Set(incremental ? sync.knownPurchaseIds : []);
+    for (let index = 0; index < selectedOrders.length; index += 1) {
+      const { order, purchaseId } = selectedOrders[index];
+      reportProgress({ purchasesRead: index, purchasesTotal: selectedOrders.length, items: itemsById.size, skippedKnown: keyedOrders.length - selectedOrders.length });
       try {
         const detail = await fetchOrderDetail(purchaseId);
         for (const item of humbleItemsFromOrder(detail, order, purchaseId)) itemsById.set(item.providerItemId, item);
+        completedPurchaseIds.add(purchaseId);
       } catch {
         failures.push(purchaseId);
       }
-      reportProgress({ purchasesRead: index + 1, purchasesTotal: keyedOrders.length, items: itemsById.size });
-      if (index + 1 < keyedOrders.length) await wait(BETWEEN_PURCHASES_MS);
+      reportProgress({ purchasesRead: index + 1, purchasesTotal: selectedOrders.length, items: itemsById.size, skippedKnown: keyedOrders.length - selectedOrders.length });
+      if (index + 1 < selectedOrders.length) await wait(BETWEEN_PURCHASES_MS);
     }
     // A partial replacement would silently discard previously imported items.
     // Leave the existing Humble provider records intact until a whole scan is
     // readable and can replace them atomically.
-    if (failures.length) throw new Error(`${failures.length} Humble purchase${failures.length === 1 ? '' : 's'} could not be read; no library changes were saved. Please try again.`);
-    if (!itemsById.size) throw new Error('Humble purchases contained no supported game, audiobook, or book entitlements.');
-    return { items: [...itemsById.values()], purchasesRead: keyedOrders.length };
+    if (failures.length && !incremental) throw new Error(`${failures.length} Humble purchase${failures.length === 1 ? '' : 's'} could not be read; no library changes were saved. Please try again.`);
+    if (!itemsById.size && !incremental) throw new Error('Humble purchases contained no supported game, audiobook, or book entitlements.');
+    return {
+      items: [...itemsById.values()],
+      purchasesRead: selectedOrders.length,
+      skippedKnown: keyedOrders.length - selectedOrders.length,
+      failures,
+      knownPurchaseIds: [...completedPurchaseIds]
+    };
   }
 
-  global.GalacticHumble = { redactRedemptionValues, humbleItemsFromOrder, fetchHumblePurchases };
+  global.GalacticHumble = { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync, fetchHumblePurchases };
 }(globalThis));

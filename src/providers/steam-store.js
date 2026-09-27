@@ -12,6 +12,11 @@
     return [...new Set(values.map((value) => String(value).trim()).filter((value) => /^\d+$/u.test(value)))];
   }
 
+  function newOwnedAppIds(appIds, knownAppIds = []) {
+    const known = new Set((Array.isArray(knownAppIds) ? knownAppIds : []).map((id) => String(id).trim()).filter(Boolean));
+    return (Array.isArray(appIds) ? appIds : []).filter((appId) => !known.has(String(appId)));
+  }
+
   function libraryItemsFromStoreItems(value, allowedIds) {
     const libraryItems = [];
     for (const item of value?.response?.store_items ?? []) {
@@ -49,17 +54,19 @@
     return response.json();
   }
 
-  async function fetchOwnedSteamGames(reportProgress = () => {}) {
+  async function fetchOwnedSteamGames(reportProgress = () => {}, knownAppIds = null) {
     const ownedResponse = await fetch('/dynamicstore/userdata/', { credentials: 'same-origin', cache: 'no-store' });
     if (!ownedResponse.ok) throw new Error(`Steam Store returned ${ownedResponse.status} while loading your library. Please wait before retrying; Steam temporarily limits rapid requests.`);
     const appIds = ownedAppIdsFromDynamicStore(await ownedResponse.json());
     if (!appIds.length) throw new Error('Steam Store did not return owned apps. Confirm you are signed in to Steam Store in this tab.');
+    const incremental = Array.isArray(knownAppIds);
+    const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
 
     const itemsById = new Map();
     const unresolvedApps = [];
-    for (let offset = 0; offset < appIds.length; offset += STORE_ITEMS_BATCH_SIZE) {
-      const batch = appIds.slice(offset, offset + STORE_ITEMS_BATCH_SIZE);
-      reportProgress({ completed: offset, total: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
+    for (let offset = 0; offset < appIdsToResolve.length; offset += STORE_ITEMS_BATCH_SIZE) {
+      const batch = appIdsToResolve.slice(offset, offset + STORE_ITEMS_BATCH_SIZE);
+      reportProgress({ completed: offset, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       try {
         const items = await fetchStoreItems(batch);
         const returnedIds = new Set((items?.response?.store_items ?? []).map((item) => String(item?.appid ?? '')).filter(Boolean));
@@ -68,12 +75,12 @@
       } catch (error) {
         unresolvedApps.push(...batch.map((appId) => ({ appId, status: error.message })));
       }
-      reportProgress({ completed: offset + batch.length, total: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
-      if (offset + STORE_ITEMS_BATCH_SIZE < appIds.length) await wait(BETWEEN_BATCHES_MS);
+      reportProgress({ completed: offset + batch.length, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
+      if (offset + STORE_ITEMS_BATCH_SIZE < appIdsToResolve.length) await wait(BETWEEN_BATCHES_MS);
     }
-    if (![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Steam returned owned apps but no game titles. Please try again later.');
-    return { items: [...itemsById.values()], unresolvedApps };
+    if (!incremental && ![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Steam returned owned apps but no game titles. Please try again later.');
+    return { items: [...itemsById.values()], unresolvedApps, ownedAppIds: appIds, newAppCount: appIdsToResolve.length };
   }
 
-  global.GalacticSteamStore = { ownedAppIdsFromDynamicStore, libraryItemsFromStoreItems, fetchOwnedSteamGames };
+  global.GalacticSteamStore = { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems, fetchOwnedSteamGames };
 }(globalThis));

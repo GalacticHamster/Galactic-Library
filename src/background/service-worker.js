@@ -2,7 +2,7 @@ import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
-import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, replaceProviderItems } from '../lib/storage.js';
+import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems } from '../lib/storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});
@@ -40,6 +40,17 @@ function fandangoImportKey(sender) {
 
 function isOwnExtensionPage(url) {
   return typeof url === 'string' && url.startsWith(chrome.runtime.getURL(''));
+}
+
+function isKnownProvider(provider) {
+  return ['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(provider);
+}
+
+function humbleSyncState(value) {
+  const knownPurchaseIds = [...new Set((Array.isArray(value?.knownPurchaseIds) ? value.knownPurchaseIds : [])
+    .map((id) => String(id ?? '').trim())
+    .filter((id) => id.length > 0 && id.length <= 256))].slice(0, 50000);
+  return { knownPurchaseIds };
 }
 
 async function searchOpenLibrary(query) {
@@ -122,12 +133,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request?.type === 'GET_PROVIDER_SYNC_STATE') {
+    if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+      sendResponse({ ok: false, error: 'Sync state is available only from the matching signed-in provider site.' });
+      return undefined;
+    }
+    getDatabase()
+      .then((database) => {
+        const state = database.providers?.[request.provider] ?? {};
+        const knownProviderItemIds = Object.values(database.providerItems)
+          .filter((item) => item.provider === request.provider)
+          .map((item) => item.providerItemId)
+          .filter(Boolean)
+          .slice(0, 50000);
+        sendResponse({
+          ok: true,
+          hasFullBaseline: Boolean(state.fullSyncAt),
+          syncState: request.provider === 'humble'
+            ? humbleSyncState(state.syncState)
+            : { knownProviderItemIds }
+        });
+      })
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
-  if (!['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'humble'].includes(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
+  if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
-  if (!Array.isArray(request.items) || request.items.length === 0 || request.items.length > 50000) {
+  const incrementalProvider = request.mode === 'incremental' && ['humble', 'steam'].includes(request.provider);
+  if (!Array.isArray(request.items) || request.items.length > 50000 || (!request.items.length && !incrementalProvider)) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
   }
@@ -150,7 +187,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             : request.provider === 'kobo'
               ? 'kobo-my-books-library'
         : 'humble-purchase-library';
-  replaceProviderItems(request.provider, request.items, { source })
+  const now = new Date().toISOString();
+  const syncDetails = request.provider === 'humble'
+    ? {
+        source,
+        syncMode: incrementalProvider ? 'incremental' : 'full',
+        ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now }),
+        syncState: humbleSyncState(request.syncState)
+      }
+    : {
+        source,
+        syncMode: incrementalProvider ? 'incremental' : 'full',
+        ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
+      };
+  (incrementalProvider ? mergeProviderItems : replaceProviderItems)(request.provider, request.items, syncDetails)
     .then((database) => sendResponse({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,

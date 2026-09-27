@@ -49,6 +49,46 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
   return saveDatabase(database);
 }
 
+// Incremental syncs must never make an entitlement disappear merely because
+// the provider returned only its recent additions. Full syncs use the
+// replacement function above; quick syncs add or refresh records here.
+export async function mergeProviderItems(provider, values, syncDetails = {}) {
+  const database = await getDatabase();
+  const now = new Date().toISOString();
+  const incoming = values.map((value) => normalizeProviderItem({ ...value, provider }, now));
+  const unique = new Map(incoming.map((item) => [item.id, item]));
+  database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
+  const records = Object.values(database.providerItems).filter((item) => item.provider === provider);
+  const gameCount = records.filter((item) => item.mediaType === 'game').length;
+  const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
+  const audiobookCount = records.filter((item) => item.mediaType === 'audiobook').length;
+  const bookCount = records.filter((item) => item.mediaType === 'book').length;
+  const movieCount = records.filter((item) => item.mediaType === 'movie').length;
+  const tvCount = records.filter((item) => item.mediaType === 'tv').length;
+  const providerRecords = new Map(records.map((item) => [item.id, item]));
+  const linkedAddOnCount = records.filter((item) => {
+    const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
+    return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId));
+  }).length;
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  database.providers[provider] = {
+    ...database.providers[provider],
+    connected: true,
+    itemCount: gameCount,
+    addOnCount,
+    audiobookCount,
+    bookCount,
+    movieCount,
+    tvCount,
+    linkedAddOnCount,
+    recordCount: records.length,
+    lastSync: now,
+    lastError: null,
+    ...syncDetails
+  };
+  return saveDatabase(database);
+}
+
 export async function clearDatabase() {
   await chrome.storage.local.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]);
 }

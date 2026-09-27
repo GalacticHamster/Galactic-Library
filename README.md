@@ -14,7 +14,7 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 - a conservative duplicate-review queue for edition variants and provider-added book/series labels; and
 - user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, Amazon Video, Fandango at Home, Kobo, and Humble importers for signed-in libraries.
 
-To import Steam, select **Open signed-in Steam Store** on the options page and select **Sync Steam library**. The importer reads the signed-in Store account's owned App IDs, then resolves full games and DLC through Steam's batched StoreBrowse title service. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
+To import Steam, select **Open signed-in Steam Store** on the options page. **Quick update** reads the signed-in Store account's owned App IDs, then resolves only newly seen App IDs through Steam's batched StoreBrowse title service. **Full rescan** resolves every owned app again. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.
 
 To import GOG, select **Open signed-in GOG** and then **Sync GOG library**. The importer reads GOG's paginated owned-games library on the signed-in site, including hidden games when GOG reports that the account has them. It never asks for, copies, or stores a GOG password, cookie, or OAuth token.
 
@@ -36,7 +36,24 @@ To import Fandango at Home, select **Open signed-in Fandango at Home**, open **M
 
 To import Kobo content, select **Open signed-in Kobo library** and then **Sync Kobo library**. The importer reads the rendered cards in Kobo's signed-in My Books page and follows its visible pagination. It records Kobo's available item ID, title, author, series, cover URL, detail-page URL, and format. The signed-in web library is treated as an owned library; Kobo Web Reader does not support audiobooks, so audiobooks will be included only if Kobo exposes audiobook cards in that page. It does not emulate a Kobo device, request product-detail pages, or ask for, copy, or store a Kobo password, cookie, or token.
 
-To import Humble purchases, select **Open signed-in Humble purchases** and then **Sync Humble purchases**. The importer reads Humble's purchase list and the necessary purchase-detail records in that signed-in tab. It records supported DRM-free books/comics, audiobook deliveries (MP3, M4A/M4B, AAC, FLAC, OGG/Opus, or WAV), direct games, and third-party game entitlements with their Humble purchase origin and purchase date when available. Redemption-key values are redacted from each detail response *before* it is parsed, and are never stored, exported, or logged. The importer does not ask for, copy, or store a Humble password, cookie, or redemption key. A sync replaces the Humble provider snapshot only after every purchase detail has been read successfully, so a temporary Humble error cannot erase a prior Humble import.
+To import Humble purchases, select **Open signed-in Humble purchases**. **Quick update** loads Humble's lightweight purchase list, then reads details only for previously unrecorded purchases. **Full rescan** rebuilds the provider snapshot and is useful after an importer upgrade. It records supported DRM-free books/comics, audiobook deliveries (MP3, M4A/M4B, AAC, FLAC, OGG/Opus, or WAV), direct games, and third-party game entitlements with their Humble purchase origin and purchase date when available. Redemption-key values are redacted from each detail response *before* it is parsed, and are never stored, exported, or logged. The importer does not ask for, copy, or store a Humble password, cookie, or redemption key. A full rescan replaces the Humble provider snapshot only after every purchase detail has been read successfully, so a temporary Humble error cannot erase a prior Humble import.
+
+## Quick updates
+
+Quick updates merge newly discovered records and therefore do not infer that an old entitlement has disappeared. Use a provider's **Full rescan** when you need removals reconciled or after an importer upgrade.
+
+| Provider | Quick update status | Basis |
+| --- | --- | --- |
+| Humble | Available | Fetches the purchase index, then requests details only for new purchase IDs. |
+| Steam | Available | Compares Steam's fast owned-App-ID response before resolving only new Store titles. |
+| Kindle | Planned | Its library API is date-descending and includes acquisition dates. |
+| Amazon Games | Planned | Recent claims can be scanned through the recent collection window after a full baseline. |
+| Audible | Needs discovery | The current page has no verified acquisition-date or newest-first contract. |
+| GOG | Full rescan only | The current endpoint is title-sorted and supplies no recorded acquisition/update marker. |
+| Epic Games Store | Full rescan only | The current library cursor has no acquisition/update marker. |
+| Kobo | Full rescan only | The current library pages expose no reliable recency marker. |
+| Amazon Video | Full rescan only | The rendered library supplies no reliable recency marker. |
+| Fandango at Home | Full rescan only | Its full-grid count validation is required for a trustworthy result. |
 
 For Humble book records, an explicit `comic`, `manga`, or `graphic novel` label in the preserved bundle name is displayed as the local **Humble bundle genre: Comics & Graphic Novels** hint. It does not use an external request or guess from individual titles.
 
