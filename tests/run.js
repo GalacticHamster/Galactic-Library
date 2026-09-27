@@ -25,7 +25,7 @@ const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, delive
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems } = globalThis.GalacticAudible;
 const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText, newAmazonVideoItems } = globalThis.GalacticAmazonVideo;
-const { contentIdFromValue, fandangoItemFromCardData, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
+const { contentIdFromValue, fandangoItemFromCardData, newFandangoItems, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData, newKoboItems } = globalThis.GalacticKobo;
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
@@ -269,6 +269,7 @@ const tests = [
   ['keeps Fandango at Home movie and TV library identities', () => {
     assert.equal(contentIdFromValue('https://athome.fandango.com/content/detail/ABCD-1234?ref=library'), 'ABCD-1234');
     assert.equal(contentIdFromValue('https://athome.fandango.com/content/browse/details/Warm-Bodies/410824'), '410824');
+    assert.deepEqual(newFandangoItems([{ providerItemId: 'known' }, { providerItemId: 'new' }], ['known']).map((item) => item.providerItemId), ['new']);
     assert.deepEqual(fandangoItemFromCardData({
       providerItemId: 'programId=series-123', title: 'Star Trek: Strange New Worlds, Season 1',
       detailUrl: 'https://athome.fandango.com/content/detail/series-123', imageUrl: 'https://images.fandango.com/cover.jpg',

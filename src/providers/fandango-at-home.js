@@ -139,6 +139,11 @@
     return [...itemsById.values()];
   }
 
+  function newFandangoItems(items, knownItemIds = []) {
+    const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => compactText(id)).filter(Boolean));
+    return (Array.isArray(items) ? items : []).filter((item) => !known.has(compactText(item?.providerItemId)));
+  }
+
   function expectedFandangoCountsFromDocument(document) {
     const headings = [...document.querySelectorAll('h1, h2, h3, [role="heading"]')].map((element) => compactText(element.textContent));
     const countFor = (pattern) => Number(headings.find((heading) => pattern.test(heading))?.match(/\((\d+)\)/u)?.[1]);
@@ -255,14 +260,23 @@
     }
   }
 
-  async function readFandangoGrid(mediaType, expectedCount = null, reportProgress = () => {}) {
+  async function readFandangoGrid(mediaType, expectedCount = null, reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
+    const incremental = Array.isArray(knownItemIds);
+    const renderedItemIds = new Set();
     let unchangedPasses = 0;
     let emptyPasses = 0;
     let previousSignature = '';
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 10; pass += 1) {
-      for (const item of fandangoItemsFromDocument(global.document, mediaType)) itemsById.set(item.providerItemId, item);
+      const newlyRenderedItems = fandangoItemsFromDocument(global.document, mediaType)
+        .filter((item) => !renderedItemIds.has(item.providerItemId));
+      for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
+      const itemsToSave = incremental ? newFandangoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
+      for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
       reportProgress({ phase: 'grid', section: mediaType, passes: pass + 1, count: itemsById.size, expectedCount });
+      // The View All grids default to Recently Purchased. A fully known newly
+      // rendered group means every later group is older than the local baseline.
+      if (incremental && newlyRenderedItems.length && !itemsToSave.length) break;
       if (expectedCount !== null && itemsById.size >= expectedCount) break;
       emptyPasses = itemsById.size === 0 ? emptyPasses + 1 : 0;
       if (emptyPasses >= 20) break;
@@ -324,5 +338,5 @@
     return { items: [...itemsById.values()], expected };
   }
 
-  global.GalacticFandangoAtHome = { contentIdFromValue, fandangoItemFromCardData, fandangoItemsFromDocument, expectedFandangoCountsFromDocument, viewAllLibraryLinksFromDocument, readFandangoGrid, fetchFandangoLibrary };
+  global.GalacticFandangoAtHome = { contentIdFromValue, fandangoItemFromCardData, fandangoItemsFromDocument, newFandangoItems, expectedFandangoCountsFromDocument, viewAllLibraryLinksFromDocument, readFandangoGrid, fetchFandangoLibrary };
 }(globalThis));
