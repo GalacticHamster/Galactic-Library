@@ -1,5 +1,5 @@
 import { clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
-import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY } from '../lib/constants.js';
+import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
 import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.js';
@@ -9,6 +9,7 @@ import { compareTitles } from '../lib/title-sort.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
+const showEnrichmentActions = document.querySelector('#show-enrichment-actions');
 const providerFilter = document.querySelector('#provider-filter');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
 const ownershipFilter = document.querySelector('#ownership-filter');
@@ -275,15 +276,18 @@ async function searchOpenLibrary(canonicalItem, records) {
 }
 
 function createOpenLibraryTools(canonicalItem, records) {
+  const enrichment = records.map((record) => record.metadata?.enrichment?.openLibrary).find(Boolean);
+  if (!showEnrichmentActions.checked && !enrichment?.workKey) return null;
   const container = document.createElement('div');
   container.className = 'open-library-tools';
-  const enrichment = records.map((record) => record.metadata?.enrichment?.openLibrary).find(Boolean);
   const searchState = openLibrarySearches.get(canonicalItem.id);
-  const button = reviewButton(enrichment ? 'Update Open Library metadata' : 'Find Open Library metadata', 'open-library-search', () => {
-    searchOpenLibrary(canonicalItem, records).catch(() => {});
-  });
-  button.disabled = Boolean(searchState?.loading);
-  container.append(button);
+  if (showEnrichmentActions.checked) {
+    const button = reviewButton(enrichment ? 'Update Open Library metadata' : 'Find Open Library metadata', 'open-library-search', () => {
+      searchOpenLibrary(canonicalItem, records).catch(() => {});
+    });
+    button.disabled = Boolean(searchState?.loading);
+    container.append(button);
+  }
   if (enrichment?.workKey) {
     const source = document.createElement('a');
     source.href = `https://openlibrary.org${enrichment.workKey}`;
@@ -292,7 +296,7 @@ function createOpenLibraryTools(canonicalItem, records) {
     source.textContent = 'View Open Library record';
     container.append(source);
   }
-  if (!searchState) return container;
+  if (!showEnrichmentActions.checked || !searchState) return container;
   if (searchState.loading) {
     container.append(textElement('span', 'Searching Open Library…'));
     return container;
@@ -676,7 +680,10 @@ function render() {
       return source;
     }));
     node.append(providerSources);
-    if (canonicalItem.mediaType === 'book') node.append(createOpenLibraryTools(canonicalItem, records));
+    if (canonicalItem.mediaType === 'book') {
+      const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
+      if (openLibraryTools) node.append(openLibraryTools);
+    }
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;
   }));
@@ -701,7 +708,12 @@ function render() {
 }
 
 async function refresh() {
-  database = await getDatabase();
+  const [loadedDatabase, settings] = await Promise.all([
+    getDatabase(),
+    chrome.storage.local.get({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: true })
+  ]);
+  database = loadedDatabase;
+  showEnrichmentActions.checked = settings[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY] !== false;
   render();
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
 }
@@ -793,6 +805,17 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
   }
 });
 search.addEventListener('input', render);
+showEnrichmentActions.addEventListener('change', async () => {
+  const checked = showEnrichmentActions.checked;
+  render();
+  try {
+    await chrome.storage.local.set({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: checked });
+  } catch (error) {
+    showEnrichmentActions.checked = !checked;
+    render();
+    backupStatus.textContent = `Could not save the enrichment action setting: ${error.message}`;
+  }
+});
 providerFilter.addEventListener('change', render);
 mediaTypeFilter.addEventListener('change', render);
 ownershipFilter.addEventListener('change', render);
@@ -809,6 +832,10 @@ clearFilters.addEventListener('click', () => {
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
+  if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
+    showEnrichmentActions.checked = changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY].newValue !== false;
+    if (database) render();
+  }
   if (areaName === 'local' && !googleBooksRunning && (changes[GOOGLE_BOOKS_API_KEY_STORAGE_KEY] || changes[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])) {
     renderGoogleBooksEnrichment().catch(() => {});
   }
