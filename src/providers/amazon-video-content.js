@@ -37,5 +37,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+  globalThis.GalacticFloatingPanel?.attach(shadow);
   document.documentElement.append(host);
 }());

@@ -1,5 +1,9 @@
 (function attachFanaticalSync() {
   'use strict';
+  // The order-history API is the sync source. Do not place an inert Galactic
+  // Library panel over Fanatical's bundle pages, where Fanatical Library's
+  // ownership summary is the relevant UI.
+  if (!/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?orders\/?$/iu.test(location.pathname)) return;
   if (document.querySelector('#galactic-library-fanatical-importer') || !globalThis.GalacticFanatical) return;
 
   const host = document.createElement('div');
@@ -9,7 +13,7 @@
   shadow.innerHTML = `
     <style>.panel { background:#202438; border:1px solid #fb923c; border-radius:8px; box-shadow:0 8px 30px #0008; padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:#fb923c; color:#431407; cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:#fed7aa; margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }</style>
     <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads details only for Fanatical orders not previously checked. <strong>Full rescan</strong> rebuilds the Fanatical library. Fanatical's session token is used only inside this signed-in page to make its read-only order requests; it is never stored or sent to Galactic Library.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
-  const buttons = [...shadow.querySelectorAll('button')];
+  const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
 
   async function sync(mode) {
@@ -46,5 +50,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+  globalThis.GalacticFloatingPanel?.attach(shadow);
   document.documentElement.append(host);
 }());

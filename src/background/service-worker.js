@@ -21,7 +21,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
       || (provider === 'fandango-at-home' && page.origin === 'https://athome.fandango.com')
       || (provider === 'kobo' && page.origin === 'https://www.kobo.com' && page.pathname.includes('/library'))
-      || (provider === 'fanatical' && page.origin === 'https://www.fanatical.com')
+      || (provider === 'fanatical' && page.origin === 'https://www.fanatical.com' && /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?orders\/?$/iu.test(page.pathname))
       || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
     return false;

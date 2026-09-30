@@ -153,5 +153,6 @@
     pauseComicContentsButton.disabled = true;
     status.textContent = 'Pausing after the current Kindle product page...';
   });
+  globalThis.GalacticFloatingPanel?.attach(shadow);
   document.documentElement.append(host);
 }());

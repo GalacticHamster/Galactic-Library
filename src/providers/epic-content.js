@@ -34,5 +34,6 @@
       delete status.dataset.busy;
     }
   });
+  globalThis.GalacticFloatingPanel?.attach(shadow);
   document.documentElement.append(host);
 }());

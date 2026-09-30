@@ -148,6 +148,7 @@
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
 
+  globalThis.GalacticFloatingPanel?.attach(shadow);
   document.documentElement.append(host);
   importState('get').then((state) => {
     if (!state) return;
