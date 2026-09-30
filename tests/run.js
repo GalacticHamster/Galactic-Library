@@ -7,6 +7,7 @@ import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } f
 import { googleBooksCandidatesFromSearch, googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, googleBooksSearchUrl, highConfidenceGoogleBooksCandidate } from '../src/lib/google-books.js';
 import { comicMangaEvidence, fanaticalBundleGenreHints, humbleBundleGenreHints, isConfirmedComicManga, kindleComicMangaHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
 import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
+import { compareTitles } from '../src/lib/title-sort.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -32,6 +33,13 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ['sorts numbered media titles in reading order', () => {
+    assert.deepEqual(
+      ['Batman Vol. 10', 'Batman Vol. 2', 'Batman Vol. 1', 'Batman #12', 'Batman #3']
+        .sort(compareTitles),
+      ['Batman #3', 'Batman #12', 'Batman Vol. 1', 'Batman Vol. 2', 'Batman Vol. 10']
+    );
+  }],
   ['normalizes punctuation, symbols, articles, and Roman numerals', () => {
     assert.deepEqual(normalizeGameTitle("The Sid Meier’s Civilization® VI"), {
       normalizedTitle: 'sid meiers civilization 6', baseTitle: 'sid meiers civilization 6', edition: null

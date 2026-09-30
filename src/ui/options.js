@@ -5,6 +5,7 @@ import { isExtensionId } from '../lib/external-api.js';
 import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.js';
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
+import { compareTitles } from '../lib/title-sort.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -205,7 +206,7 @@ function createAddOnList(addOns) {
   const list = document.createElement('ul');
   list.className = 'add-ons';
   list.replaceChildren(...addOns
-    .sort((left, right) => left.title.localeCompare(right.title))
+    .sort((left, right) => compareTitles(left.title, right.title))
     .map((addOn) => textElement('li', `${addOn.title} (${displayProviderName(addOn.provider)})`)));
   group.append(label, list);
   return group;
@@ -608,7 +609,7 @@ function render() {
         || matchingLinkedAddOns.some((addOn) => itemMatchesQuery(addOn, query));
       return matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesGenre && matchesSearch;
     })
-    .sort((left, right) => left.title.localeCompare(right.title));
+    .sort((left, right) => compareTitles(left.title, right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
@@ -683,6 +684,7 @@ function render() {
   const canShowUnlinkedAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc === 'all';
   const unlinked = canShowUnlinkedAddOns
     ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership) && itemMatchesQuery(addOn, query))
+      .sort((left, right) => compareTitles(left.title, right.title))
     : [];
   unlinkedAddOnsSection.hidden = unlinked.length === 0;
   if (unlinked.length) {
