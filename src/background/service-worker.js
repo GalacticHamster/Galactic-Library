@@ -2,7 +2,8 @@ import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
-import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems } from '../lib/storage.js';
+import { isConfirmedComicManga } from '../lib/genre-hints.js';
+import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } from '../lib/storage.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});
@@ -211,6 +212,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       args: [{ fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
     })
       .then((results) => sendResponse({ ok: true, result: sanitizeFanaticalProjection(results?.[0]?.result) }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (request?.type === 'GET_KINDLE_COMIC_CONTENT_CANDIDATES') {
+    if (!isProviderImportPage('kindle', sender.url)) {
+      sendResponse({ ok: false, error: 'Kindle comic candidates are available only from the signed-in Kindle library page.' });
+      return undefined;
+    }
+    getDatabase()
+      .then((database) => {
+        const candidates = Object.values(database.providerItems)
+          .filter((item) => item.provider === 'kindle' && item.mediaType === 'book' && isConfirmedComicManga(item) && !item.metadata?.enrichment?.kindleProductComicContents)
+          .flatMap((item) => {
+            const detailUrl = String(item.metadata?.detailUrl ?? '');
+            return /^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(detailUrl) ? [{ id: item.id, title: item.title, detailUrl }] : [];
+          })
+          .sort((left, right) => left.title.localeCompare(right.title));
+        sendResponse({ ok: true, candidates });
+      })
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (request?.type === 'SAVE_KINDLE_COMIC_CONTENTS') {
+    if (!isProviderImportPage('kindle', sender.url)) {
+      sendResponse({ ok: false, error: 'Kindle comic contents can be saved only from the signed-in Kindle library page.' });
+      return undefined;
+    }
+    saveKindleComicContents(request.entries)
+      .then(() => sendResponse({ ok: true }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }

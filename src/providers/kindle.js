@@ -110,6 +110,40 @@
     return (Array.isArray(items) ? items : []).filter((item) => !known.has(compactText(item?.providerItemId).toUpperCase()));
   }
 
+  function explicitCollectsStatement(value) {
+    const text = compactText(value);
+    const match = text.match(/\bcollects?\b\s*(?::|-)?\s*[^.!?]{2,700}(?:[.!?]|$)/iu);
+    return compactText(match?.[0]).replace(/[.!?]+$/u, '');
+  }
+
+  function kindleCollectsStatementFromDocument(document) {
+    const selectors = [
+      '#bookDescription_feature_div', '#productDescription', '#featurebullets_feature_div',
+      '#productOverview_feature_div', '[data-feature-name="bookDescription"]'
+    ];
+    for (const selector of selectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        const statement = explicitCollectsStatement(element.textContent);
+        if (statement) return statement;
+      }
+    }
+    return '';
+  }
+
+  async function fetchKindleProductComicContents(detailUrl) {
+    const url = new URL(detailUrl, global.location?.origin ?? 'https://www.amazon.com');
+    if (url.origin !== (global.location?.origin ?? 'https://www.amazon.com') || !/^\/dp\//u.test(url.pathname)) throw new Error('Kindle did not provide a usable Amazon product-page URL.');
+    const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+    // Older Comixology/Comics Unlimited entitlements can remain in a Kindle
+    // library after Amazon removes their public retail listing. That is a
+    // permanent "no page to inspect" result, not a transient import failure.
+    if (response.status === 404) return { sourceUrl: `${url.origin}${url.pathname}`, statement: '', availability: 'unavailable' };
+    if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading a Kindle product page.`);
+    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+    if (document.querySelector('#captchacharacters, form[action*="validateCaptcha" i]')) throw new Error('Amazon requested a CAPTCHA; wait before continuing the Kindle contents scan.');
+    return { sourceUrl: `${url.origin}${url.pathname}`, statement: kindleCollectsStatementFromDocument(document), availability: 'available' };
+  }
+
   function ownershipItemsFromResponse(response) {
     const items = response?.GetContentOwnershipData?.items ?? response?.items ?? [];
     return Array.isArray(items) ? items : [];
@@ -205,5 +239,5 @@
     return { items: [...booksById.values()], diagnostics };
   }
 
-  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, fetchKindleBooks };
+  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, fetchKindleProductComicContents, fetchKindleBooks };
 }(globalThis));

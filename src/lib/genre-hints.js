@@ -20,9 +20,60 @@ export function humbleBundleGenreHints(record) {
   }];
 }
 
-function distinctText(values) {
+function explicitBundleComicHint(record, provider, field, source) {
+  if (record?.provider !== provider || record?.mediaType !== 'book') return [];
+  const bundle = compactText(record.metadata?.[field]);
+  if (!bundle || !/\b(?:comic(?:s| books?)?|manga|graphic novels?)\b/iu.test(bundle)) return [];
+  return [{ source, confidence: 'explicit-bundle-name', category: 'Comics & Graphic Novels', evidence: bundle }];
+}
+
+export function fanaticalBundleGenreHints(record) {
+  return explicitBundleComicHint(record, 'fanatical', 'bundleTitle', 'fanatical-bundle-name');
+}
+
+export function kindleComicMangaHints(record) {
+  if (record?.provider !== 'kindle' || record?.mediaType !== 'book') return [];
+  const originType = compactText(record.metadata?.originType);
+  const contentType = compactText(record.metadata?.contentType);
+  if (!/\b(?:comixology|comicsunlimited)\b/iu.test(originType) && !/\b(?:comic(?:s| books?)?|manga|graphic novels?)\b/iu.test(contentType)) return [];
+  return [{
+    source: 'kindle-library-type',
+    confidence: 'provider-explicit',
+    category: 'Comics & Graphic Novels',
+    evidence: originType || contentType
+  }];
+}
+
+function catalogueComicMangaHints(record) {
+  if (record?.mediaType !== 'book') return [];
+  const sources = [
+    ['open-library-subject', record.metadata?.enrichment?.openLibrary?.subjects],
+    ['google-books-category', record.metadata?.enrichment?.googleBooks?.categories],
+    ['google-books-genre-hint', record.metadata?.enrichment?.googleBooksGenreHint?.categories]
+  ];
+  return sources.flatMap(([source, values]) => distinctText(values)
+    .filter((value) => /\b(?:comic(?:s| books?)?|manga|graphic novels?)\b/iu.test(value))
+    .map((evidence) => ({ source, confidence: 'catalogue-explicit-category', category: 'Comics & Graphic Novels', evidence })));
+}
+
+// This deliberately excludes title/character-name guesses. It is the strict
+// gate for future product-page issue-contents enrichment.
+export function comicMangaEvidence(record) {
+  return [
+    ...kindleComicMangaHints(record),
+    ...humbleBundleGenreHints(record),
+    ...fanaticalBundleGenreHints(record),
+    ...catalogueComicMangaHints(record)
+  ];
+}
+
+export function isConfirmedComicManga(record) {
+  return comicMangaEvidence(record).length > 0;
+}
+
+function distinctText(values = []) {
   const seen = new Set();
-  return values.flatMap((value) => Array.isArray(value) ? value : [value]).flatMap((value) => {
+  return (Array.isArray(values) ? values : [values]).flatMap((value) => Array.isArray(value) ? value : [value]).flatMap((value) => {
     const text = compactText(value);
     const key = text.toLocaleLowerCase();
     if (!text || seen.has(key)) return [];
@@ -36,7 +87,7 @@ export function libraryGenreSubjectValues(record) {
     record?.metadata?.enrichment?.openLibrary?.subjects,
     record?.metadata?.enrichment?.googleBooks?.categories,
     record?.metadata?.enrichment?.googleBooksGenreHint?.categories,
-    humbleBundleGenreHints(record).map((hint) => hint.category)
+    comicMangaEvidence(record).map((hint) => hint.category)
   ]);
 }
 

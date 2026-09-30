@@ -5,7 +5,7 @@ import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
 import { googleBooksCandidatesFromSearch, googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, googleBooksSearchUrl, highConfidenceGoogleBooksCandidate } from '../src/lib/google-books.js';
-import { humbleBundleGenreHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
+import { comicMangaEvidence, fanaticalBundleGenreHints, humbleBundleGenreHints, isConfirmedComicManga, kindleComicMangaHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
 import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
 
 await import('../src/providers/steam-store.js');
@@ -24,7 +24,7 @@ const { gogItemsFromProducts, newGogItems, pageCount } = globalThis.GalacticGog;
 const { epicItemsFromLibraryPage, nextCursorFromPage } = globalThis.GalacticEpic;
 const { amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument } = globalThis.GalacticAmazonGames;
 const { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems } = globalThis.GalacticAudible;
-const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems } = globalThis.GalacticKindle;
+const { kindleItemsFromOwnershipResponse, ownershipFromOriginType, newKindleItems, explicitCollectsStatement } = globalThis.GalacticKindle;
 const { amazonVideoItemFromCardData, ownershipFromCardText, newAmazonVideoItems } = globalThis.GalacticAmazonVideo;
 const { contentIdFromValue, fandangoItemFromCardData, newFandangoItems, expectedFandangoCountsFromDocument } = globalThis.GalacticFandangoAtHome;
 const { koboItemIdFromValue, koboItemFromCardData, newKoboItems } = globalThis.GalacticKobo;
@@ -185,6 +185,8 @@ const tests = [
     assert.deepEqual(newKindleItems([{ providerItemId: 'B000000001' }, { providerItemId: 'B000000002' }], ['B000000001']).map((item) => item.providerItemId), ['B000000002']);
     assert.equal(ownershipFromOriginType('Purchase'), 'owned');
     assert.equal(ownershipFromOriginType('KindleUnlimited'), 'subscription');
+    assert.equal(explicitCollectsStatement('An acclaimed edition. Collects Batman #1–6 and Detective Comics #27. More details.'), 'Collects Batman #1–6 and Detective Comics #27');
+    assert.equal(explicitCollectsStatement('A book about collecting stamps.'), '');
     assert.deepEqual(kindleItemsFromOwnershipResponse({
       GetContentOwnershipData: {
         items: [{
@@ -377,6 +379,12 @@ const tests = [
     assert.deepEqual(humbleBundleGenreHints(normalizeProviderItem({
       provider: 'humble', providerItemId: 'audio-1', title: 'Comic Audio', mediaType: 'audiobook', metadata: { sourceBundle: 'Humble Comics Bundle' }
     })), []);
+    const kindleComic = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'A Graphic Story', mediaType: 'book', metadata: { originType: 'Comixology' } });
+    assert.deepEqual(kindleComicMangaHints(kindleComic), [{ source: 'kindle-library-type', confidence: 'provider-explicit', category: 'Comics & Graphic Novels', evidence: 'Comixology' }]);
+    const fanaticalComic = normalizeProviderItem({ provider: 'fanatical', providerItemId: 'fanatical-comic-1', title: 'A Comic Story', mediaType: 'book', metadata: { bundleTitle: 'Fantastic Manga & Comics Bundle' } });
+    assert.deepEqual(fanaticalBundleGenreHints(fanaticalComic), [{ source: 'fanatical-bundle-name', confidence: 'explicit-bundle-name', category: 'Comics & Graphic Novels', evidence: 'Fantastic Manga & Comics Bundle' }]);
+    assert.equal(isConfirmedComicManga(normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345679', title: 'Batman: Guessing Is Not Enough', mediaType: 'book' })), false);
+    assert.ok(comicMangaEvidence(normalizeProviderItem({ provider: 'gog', providerItemId: 'comic-category-1', title: 'Explicit Category', mediaType: 'book', metadata: { enrichment: { googleBooks: { categories: ['Manga'] } } } })).length);
     assert.deepEqual(libraryGenreSubjectValues(normalizeProviderItem({
       provider: 'humble', providerItemId: 'comic-2', title: 'Another Comic', mediaType: 'book',
       metadata: { sourceBundle: 'Humble Manga Bundle', enrichment: { openLibrary: { subjects: ['Manga', 'Comics'] }, googleBooks: { categories: ['Comics & Graphic Novels'] }, googleBooksGenreHint: { categories: ['Comics & Graphic Novels'] } } }

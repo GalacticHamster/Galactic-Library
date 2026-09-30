@@ -62,6 +62,10 @@ For Humble book records, an explicit `comic`, `manga`, or `graphic novel` label 
 
 The Library **Genre** filter groups detailed catalogue subjects into broad genres such as Comics & Graphic Novels, Science Fiction & Fantasy, and History. The source-specific subjects and categories remain stored locally as enrichment evidence; they are not presented as an unwieldy filter list.
 
+For future issue-contents enrichment, a book is a **confirmed comic/manga candidate** only when a provider explicitly identifies it as Comixology or ComicsUnlimited, its Humble or Fanatical bundle name explicitly says comic/manga/graphic novel, or an already-confirmed catalogue category explicitly says comic/manga/graphic novel. Character names and title patterns alone never qualify. These candidates are shown on library cards and can be filtered through **Genre: Comics & Graphic Novels**.
+
+On the signed-in Kindle library page, **Find contained issues** visits only unscanned confirmed Kindle comic/manga candidates. It reads Amazon product-description fields and stores the exact sentence beginning **Collects** when present; no issue list is inferred from a title, author, or description that lacks that explicit wording. Each successfully read page is recorded locally even when it has no Collects statement, so later runs continue with unscanned candidates. A product page that Amazon returns as 404—common for retired Comixology listings—is marked unavailable so it is not retried. The user can pause between pages; temporary Amazon 429/5xx/network failures are retried with backoff and summarized at the end, while CAPTCHA responses stop the scan without marking later candidates as read.
+
 Graphic-novel issue contents are normally product-page metadata rather than library/purchase metadata. The Kindle importer deliberately does not issue a request for every product page during sync; that would be slow and fragile for a large library. A later, user-initiated enrichment step can inspect a selected product page and record a verified contents list.
 
 ## Development

@@ -1,5 +1,6 @@
 import { BACKUP_FORMAT, BACKUP_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY } from './constants.js';
 import { normaliseExternalClientIds } from './external-api.js';
+import { isConfirmedComicManga } from './genre-hints.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from './models.js';
 
 export async function getDatabase() {
@@ -266,6 +267,45 @@ export async function saveGoogleBooksGenreHints(entries) {
         updatedAt
       };
     }
+  }
+  database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+  return saveDatabase(database);
+}
+
+export async function saveKindleComicContents(entries) {
+  if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('No valid Kindle comic contents were provided.');
+  const database = await getDatabase();
+  const updatedAt = new Date().toISOString();
+  for (const entry of entries) {
+    const itemId = String(entry?.itemId ?? '').trim();
+    const item = database.providerItems[itemId];
+    const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim().replace(/[.!?]+$/u, '');
+    const availability = entry?.availability === 'unavailable' ? 'unavailable' : 'available';
+    let sourceUrl = '';
+    try {
+      const url = new URL(String(entry?.sourceUrl ?? ''));
+      if (url.origin === 'https://www.amazon.com' && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
+    } catch { /* invalid source URL remains unusable */ }
+    if (!item || item.provider !== 'kindle' || item.mediaType !== 'book' || !isConfirmedComicManga(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 700 || (statement && !/^collects?\b/iu.test(statement)) || (availability === 'unavailable' && statement)) {
+      throw new Error('Invalid Kindle comic contents entry.');
+    }
+    database.providerItems[itemId] = {
+      ...item,
+      metadata: {
+        ...item.metadata,
+        enrichment: {
+          ...item.metadata?.enrichment,
+          kindleProductComicContents: {
+            source: 'amazon-product-page',
+            sourceUrl,
+            statement,
+            availability,
+            checkedAt: updatedAt
+          }
+        }
+      },
+      updatedAt
+    };
   }
   database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
   return saveDatabase(database);

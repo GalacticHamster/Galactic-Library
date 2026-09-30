@@ -2,7 +2,7 @@ import { clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getAllowedE
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
-import { libraryBroadGenreValues } from '../lib/genre-hints.js';
+import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.js';
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 
@@ -119,6 +119,30 @@ function createGenreTags(records) {
   const visible = labels.slice(0, 8);
   node.replaceChildren(...visible.map((label) => textElement('span', label)));
   if (labels.length > visible.length) node.append(textElement('span', `+${labels.length - visible.length} more`));
+  return node;
+}
+
+function createComicMangaCandidateTag(records) {
+  const evidence = records.flatMap(comicMangaEvidence);
+  if (!evidence.length) return null;
+  const sources = [...new Set(evidence.map((hint) => hint.source.replace(/-/gu, ' ')))];
+  const node = document.createElement('div');
+  node.className = 'genre-tags';
+  const tag = textElement('span', 'Confirmed comic/manga candidate');
+  tag.className = 'genre-tag';
+  tag.title = `Evidence: ${sources.join(', ')}`;
+  node.append(tag);
+  return node;
+}
+
+function createComicContents(records) {
+  const statements = [...new Set(records
+    .map((record) => String(record.metadata?.enrichment?.kindleProductComicContents?.statement ?? '').trim())
+    .filter(Boolean))];
+  if (!statements.length) return null;
+  const node = document.createElement('div');
+  node.className = 'library-item-metadata';
+  node.textContent = statements.map((statement) => `Collects: ${statement.replace(/^collects?\s*:?\s*/iu, '')}`).join(' · ');
   return node;
 }
 
@@ -637,6 +661,10 @@ function render() {
     }
     const genreTags = createGenreTags(records);
     if (genreTags) node.append(genreTags);
+    const comicMangaCandidateTag = createComicMangaCandidateTag(records);
+    if (comicMangaCandidateTag) node.append(comicMangaCandidateTag);
+    const comicContents = createComicContents(records);
+    if (comicContents) node.append(comicContents);
     const providerSources = document.createElement('div');
     providerSources.className = 'library-item-providers';
     providerSources.replaceChildren(...providerSourceDetails(records).map(({ label, ownershipLabel }) => {
