@@ -1,16 +1,87 @@
 import assert from 'node:assert/strict';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createEmptyDatabase, normalizeProviderItem, rebuildCanonicalItems, validateDatabase } from '../src/lib/models.js';
-import { identityEvidence, validIsbn } from '../src/lib/identity.js';
+import { identityEvidence, titleIdentity, validIsbn } from '../src/lib/identity.js';
 import { contentCoverage, contentKey, proposeContents, seriesCoverage, validateContents } from '../src/lib/contents.js';
 import { matchItems } from '../src/lib/matcher.js';
 import { handleExternalApiRequest } from '../src/lib/external-api.js';
+import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
+import { googleBooksSearchUrl, highConfidenceGoogleBooksCandidate } from '../src/lib/google-books.js';
+import { openLibrarySearchUrl } from '../src/lib/open-library.js';
 
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['title-only books stay candidates and contradictory identifier scopes require disambiguation', () => {
+    const a=book('a',{authors:['Author'],isbn:'9780306406157',language:'en'});
+    let [result]=matchItems(records(a),[{title:a.title,mediaType:'book'}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,1);
+    [result]=matchItems(records(a),[{title:a.title,mediaType:'book',authors:['Author']}]);assert.equal(result.owned,true);
+    const b=book('b',{isbn:'9780306406157',language:'ja'});
+    [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,2);
+    [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',language:'en',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,true);assert.equal(result.matches.length,1);
+  }],
+  ['splitting an edition preserves every record even when canonical and input orders differ', () => {
+    const a=book('a',{authors:['Author']});const b=book('b',{authors:['Author']});
+    const providerItems=records(b,a);const previous=rebuildCanonicalItems(providerItems);
+    const decisions={pair:{decision:'different',itemIds:[a.id,b.id]}};
+    const split=rebuildCanonicalItems(providerItems,decisions,previous);
+    assert.equal(Object.keys(split).length,2);assert.deepEqual(Object.values(split).flatMap(group=>group.providerItemIds).sort(),[a.id,b.id]);
+    assert.deepEqual(Object.keys(rebuildCanonicalItems(providerItems,decisions,split)),Object.keys(split));
+  }],
+  ['writer rejects a Same edition review that would cross an existing Different works decision', async () => {
+    const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    await writer.mergeProviderItems('humble',['a','b','c'].map(providerItemId=>({providerItemId,title:'Same title',mediaType:'book',metadata:{authors:['Author']}})));
+    await writer.saveManualMatchDecision({itemIds:['humble:a','humble:c']},'different');
+    const database=await writer.getDatabase();const groups=Object.values(database.canonicalItems);
+    const left=groups.find(group=>group.providerItemIds.includes('humble:a'));const right=groups.find(group=>group.providerItemIds.includes('humble:c'));
+    assert.ok(left.providerItemIds.includes('humble:b')||right.providerItemIds.includes('humble:b'));
+    const other=left.providerItemIds.includes('humble:b')?'humble:c':'humble:a';
+    await assert.rejects(writer.saveManualMatchDecision({itemIds:['humble:b',other]},'same-edition'),/indirect identity conflict/u);
+    assert.deepEqual((await writer.getDatabase()).manualMatchDecisions,database.manualMatchDecisions);
+  }],
+  ['ordinary words ending in ed stay meaningful and anniversary editions retain their full label', () => {
+    for(const title of ['Red','United','Beloved'])assert.equal(titleIdentity(title).edition,'');
+    const identity=titleIdentity('Little Brother (Tenth Anniversary Edition)');assert.equal(identity.base,'little brother');assert.equal(identity.edition,'tenth anniversary edition');
+  }],
+  ['enrichment prefers validated ISBNs and identifier-only books can enter the queue', async () => {
+    const query={title:'Provider collection title',authors:[],isbn:['0-306-40615-2'],language:'en'};
+    assert.equal(new URL(googleBooksSearchUrl({...query,apiKey:'test'})).searchParams.get('q'),'isbn:9780306406157');
+    const open=new URL(openLibrarySearchUrl(query));assert.equal(open.searchParams.get('q'),'isbn:9780306406157');assert.equal(open.searchParams.has('title'),false);
+    const candidate={title:'Catalog title',isbn:['9780306406157'],authors:['Writer'],language:'en',volumeId:'v'};
+    assert.equal(highConfidenceGoogleBooksCandidate(query,[candidate]),candidate);
+    assert.equal(highConfidenceGoogleBooksCandidate(query,[{...candidate,language:'ja'}]),null);
+    assert.equal(highConfidenceGoogleBooksCandidate({...query,authors:['Another Writer']},[candidate]),null);
+    assert.equal(highConfidenceGoogleBooksCandidate(query,[{...candidate,isbn:['9780140328721']}]),null);
+    const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    await writer.mergeProviderItems('humble',[{providerItemId:'isbn',title:'Book',mediaType:'book',metadata:{isbn:'9780306406157'}},{providerItemId:'invalid',title:'Another',mediaType:'book',metadata:{isbn:'9780306406158'}}]);
+    assert.equal((await writer.startGoogleBooksEnrichmentJob()).queue.length,1);
+  }],
+  ['series scopes report union, overlaps and bounded gaps without claiming a series endpoint', () => {
+    const a=book('a');const b=book('b');const c={...book('c'),ownership:'subscription'};
+    const entry=(number,patch={})=>({series:'Batman',run:'2011',language:'en',unitType:'issue',number,completeness:'full',...patch});
+    const database={providerItems:records(a,b,c),contentReviews:{[a.id]:{entries:[entry('1'),entry('3'),entry('1/2'),entry('1',{unitType:'annual'})]},[b.id]:{entries:[entry('3'),entry('5'),entry('2',{language:'ja'}),entry('2',{run:'1986'}),entry('4',{completeness:'excerpt'})]},[c.id]:{entries:[entry('2')]}}};
+    const groups=seriesCoverage(database);const issues=groups.find(group=>group.unitType==='issue'&&group.run==='2011'&&group.language==='en');
+    assert.deepEqual(issues.gaps,['2','4']);assert.equal(issues.entries.length,4);assert.deepEqual(issues.overlap.map(entry=>entry.number),['3']);assert.equal(groups.length,4);
+    assert.equal(contentCoverage(database,[entry('1')],{excludeItemIds:[a.id]}).owned,0);
+  }],
+  ['review queue includes same-title homonyms, same-provider editions and previously reviewed aliases', () => {
+    const a=book('a',{authors:['A']});const b=book('b',{authors:['B']});const c=book('c',{},'Other title');
+    const candidates=findDuplicateCandidates(records(a,b,c),{[`${a.id}\u0000${c.id}`]:{itemIds:[a.id,c.id],decision:'same-work'}});
+    assert.equal(candidates.length,2);assert.ok(candidates.some(candidate=>candidate.itemIds.includes(b.id)));assert.ok(candidates.some(candidate=>candidate.decision==='same-work'));
+    const d=book('d',{},'Shared Title, 2nd Edition');assert.equal(findDuplicateCandidates(records(a,d)).length,1);
+  }],
+  ['provider observation dates stay distinct from enrichment and survive backup validation', async () => {
+    const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    let database=await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Book',mediaType:'book',ownership:'owned'}]);
+    const observed=database.providerItems['humble:a'].observedAt;
+    database=await writer.saveOpenLibraryEnrichment(['humble:a'],{source:'open-library',workKey:'/works/OL1W',title:'Book'});
+    assert.equal(database.providerItems['humble:a'].observedAt,observed);
+    assert.equal(validateDatabase(database).providerItems['humble:a'].observedAt,observed);
+    const legacy=structuredClone(database);delete legacy.providerItems['humble:a'].observedAt;legacy.schemaVersion=1;
+    assert.equal(validateDatabase(legacy).providerItems['humble:a'].observedAt,null);
+  }],
   ['book editions and game packages remain Possible in both comparison directions', () => {
-    for(const titles of [['Calculus, First Edition','Calculus, 5th Edition'],['Control','Control Deluxe Edition'],['Control Gold Edition','Control Platinum Edition']]){
+    for(const titles of [['Calculus, First Edition','Calculus, 5th Edition'],['Control','Control Deluxe Edition'],['Control Gold Edition','Control Platinum Edition'],['Control','Control Game of the Year Edition'],['Control','Control Digital Deluxe Edition']]){
       for(const [a,b] of [titles,[...titles].reverse()]){
         const item=normalizeProviderItem({provider:'humble',providerItemId:'a',title:a,mediaType:a.startsWith('Calculus')?'book':'game',ownership:'owned'});
         const [result]=matchItems(records(item),[{title:b,mediaType:item.mediaType}]);
@@ -33,7 +104,7 @@ export const relationshipTests = [
     const candidate={id:'ignored',itemIds:['humble:a','humble:b']};
     let database=await writer.saveManualMatchDecision(candidate,'same-work');
     let [result]=matchItems(database.providerItems,[{title:'Alternate title',mediaType:'book'}],database);
-    assert.equal(result.owned,false);assert.equal(result.possibleMatches[0].title,'Owned title');
+    assert.equal(result.owned,false);assert.ok(result.possibleMatches.some(item=>item.title==='Owned title'));
     database=await writer.saveManualMatchDecision(candidate,'same-edition');
     [result]=matchItems(database.providerItems,[{title:'Alternate title',mediaType:'book'}],database);assert.equal(result.owned,true);
     database=await writer.removeManualMatchDecision(candidate.itemIds.join('\u0000'));
@@ -45,7 +116,7 @@ export const relationshipTests = [
     const a=book('a',{},'Story');const b=book('b',{},'Story Deluxe Edition');const c=book('c',{},'Alias');
     const manualMatchDecisions={ab:{decision:'different',itemIds:[a.id,b.id]},ac:{decision:'same-work',itemIds:[a.id,c.id]},bc:{decision:'same-work',itemIds:[c.id,b.id]}};
     const [result]=matchItems(records(a,b,c),[{title:a.title,mediaType:'book'}],{manualMatchDecisions});
-    assert.deepEqual(result.possibleMatches.map(item=>item.title),['Alias']);
+    assert.deepEqual(result.possibleMatches.map(item=>item.title),['Story','Alias']);
   }],
   ['API distinguishes partial union, complete explicitly enumerated contents and unknown scope', () => {
     const a=book('a',{},'Collection A');const b=book('b',{},'Collection B');
@@ -123,6 +194,7 @@ export const relationshipTests = [
     const a=book('a',{isbn:'9780306406157',language:'en'});
     assert.equal(Object.keys(rebuildCanonicalItems(records(a,book('b',{isbn:'9780306406157',language:'fr'})))).length,2);
     assert.equal(Object.keys(rebuildCanonicalItems(records(a,book('c',{isbn:'9780306406157'},'Shared Title, 2nd Edition')))).length,2);
+    assert.equal(Object.keys(rebuildCanonicalItems(records(book('d',{asin:'B000000001',authors:['A']}),book('e',{asin:'B000000002',authors:['A']})))).length,2);
   }],
   ['persistent edition IDs survive rename, sync, validation and legacy migration', async () => {
     const values={}; const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});

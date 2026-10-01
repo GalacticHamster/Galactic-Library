@@ -177,7 +177,7 @@ function sanitizeFanaticalProjection(value) {
 async function searchOpenLibrary(query) {
   const title = String(query?.title ?? '').trim();
   if (!title) throw new Error('Choose a book with a title before searching Open Library.');
-  const response = await fetch(openLibrarySearchUrl({ title, authors: query?.authors }), { cache: 'no-store' });
+  const response = await fetch(openLibrarySearchUrl({ title, authors: query?.authors, isbn: query?.isbn }), { cache: 'no-store' });
   if (!response.ok) throw new Error(`Open Library returned ${response.status}.`);
   return openLibraryCandidatesFromSearch(await response.json());
 }
@@ -187,7 +187,7 @@ async function searchGoogleBooks(query) {
   const apiKey = await getGoogleBooksApiKey();
   if (!title) throw new Error('Choose a book with a title before searching Google Books.');
   if (!apiKey) throw new Error('Save your Google Books API key before starting enrichment.');
-  const response = await fetch(googleBooksSearchUrl({ title, authors: query?.authors, apiKey }), { cache: 'no-store' });
+  const response = await fetch(googleBooksSearchUrl({ title, authors: query?.authors, isbn: query?.isbn, apiKey }), { cache: 'no-store' });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = String(body?.error?.message ?? '').replace(/\s+/gu, ' ').trim();

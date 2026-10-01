@@ -21,9 +21,9 @@ export function titleIdentity(title, mediaType = 'book') {
   // Provider presentation labels are candidates, never edition identity.
   base = base.replace(/\s*:\s*[^:]*\b(?:book|volume|vol\.?)\s*\d+\s*$/iu, (suffix, offset) => /\b(?:vol(?:ume)?\.?|book)\s*\d+/iu.test(base.slice(0, offset)) ? '' : suffix);
   let edition = '';
-  const bookEdition = /(?:\s*[,;:\u2013\u2014-]?\s*|\s*\()((?:(?:\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+(?:revised\s+|updated\s+)?|revised\s+|updated\s+|expanded\s+|annotated\s+)?(?:edition|ed\.?))\)?\s*$/iu;
+  const bookEdition = /(?:\s*[,;:\u2013\u2014-]\s*|\s+\(?|\s*\()((?:(?:\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+(?:(?:revised|updated|anniversary)\s+)?|(?:revised|updated|expanded|annotated|deluxe|definitive|anniversary|limited)\s+)?(?:edition|ed\.?))\)?\s*$/iu;
   if (mediaType === 'game') {
-    const suffix = /(?:\s*[:\u2013\u2014-]?\s+)((?:(?:[\p{L}\p{N}]+\s+)?edition)|deluxe|gold|platinum|ultimate|complete|standard|premium|definitive|remastered|remake|goty|game of the year)\s*$/iu.exec(base);
+    const suffix = /(?:\s*[:\u2013\u2014-]?\s+)((?:game of the year|digital deluxe|deluxe|gold|platinum|ultimate|complete|standard|premium|definitive|legendary|anniversary|collector['’]?s|enhanced)(?:\s+edition)?|(?:[\p{L}\p{N}]+\s+)?edition|remastered|remake|goty)\s*$/iu.exec(base);
     if (suffix) { edition = identityKey(suffix[1]).replace(/\s+edition$/u, ''); base = base.slice(0, suffix.index); }
   } else {
     const suffix = bookEdition.exec(base);
@@ -73,6 +73,7 @@ export function identityConflicts(left, right, { edition = true } = {}) {
   for (const key of ['language', 'run', 'unitType', 'unit']) if (a[key] && b[key] && identityKey(a[key]) !== identityKey(b[key])) conflicts.push(key);
   if (edition && a.edition !== b.edition && (a.edition || b.edition)) conflicts.push('edition');
   if (edition && a.isbn.length && b.isbn.length && !overlap(a.isbn, b.isbn)) conflicts.push('ISBN');
+  if (edition && a.asin && b.asin && a.asin!==b.asin) conflicts.push('ASIN');
   return conflicts;
 }
 

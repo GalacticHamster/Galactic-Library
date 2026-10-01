@@ -51,6 +51,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
     platform: Array.isArray(value.platform) ? [...new Set(value.platform.map(String).filter(Boolean))] : [],
     metadata: value.metadata && typeof value.metadata === 'object' && !Array.isArray(value.metadata) ? value.metadata : {},
     acquiredAt: typeof value.acquiredAt === 'string' ? value.acquiredAt : null,
+    observedAt: value.observedAt===null?null:typeof value.observedAt==='string'?value.observedAt:now,
     updatedAt: now
   };
 }
@@ -115,7 +116,10 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
     const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
     const normalizedTitles = ordered.map((item) => item.normalizedTitle).sort();
     const previous = ordered.map((item) => previousByRecord.get(item.id)).find((entry) => entry && !usedIds.has(entry.id));
-    const id = previous?.id ?? `edition:${ordered[0].recordRef}`;
+    let id = previous?.id ?? `edition:${ordered[0].recordRef}`;
+    // A split can leave another group using this record's original ID.
+    // Never overwrite that group when input/provider order changes.
+    if(usedIds.has(id))id=ordered.map(item=>`edition:${item.recordRef}`).find(candidate=>!usedIds.has(candidate))??`edition:${crypto.randomUUID()}`;
     usedIds.add(id);
     return [id, {
       id,
@@ -135,7 +139,7 @@ export function validateDatabase(value) {
   if (![1, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   const providerItems = Object.fromEntries(Object.values(value.providerItems).map((item) => {
-    const normalized = normalizeProviderItem(item, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
+    const normalized = normalizeProviderItem({...item,observedAt:item?.observedAt??null}, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
     return [normalized.id, normalized];
   }));
   const providers = value.providers && typeof value.providers === 'object' && !Array.isArray(value.providers) ? value.providers : {};

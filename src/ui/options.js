@@ -8,6 +8,9 @@ import { openLibraryEnrichment } from '../lib/open-library.js';
 import { compareTitles } from '../lib/title-sort.js';
 import { saveContentReview, removeContentReview } from '../lib/storage.js';
 import { createContentsEditor } from './contents-editor.js';
+import { createEvidenceInspector } from './evidence-inspector.js';
+import { createSeriesCoverageView } from './series-coverage.js';
+import { identityEvidence } from '../lib/identity.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -291,7 +294,7 @@ async function searchOpenLibrary(canonicalItem, records) {
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'SEARCH_OPEN_LIBRARY',
-      query: { title: canonicalItem.title, authors: metadataValues(records, 'authors') }
+      query: bibliographicQuery(canonicalItem,records)
     });
     if (!response?.ok) throw new Error(response?.error ?? 'Open Library search did not complete.');
     openLibrarySearches.set(canonicalItem.id, { loading: false, error: '', candidates: response.candidates ?? [] });
@@ -370,7 +373,7 @@ function createReviewRow(candidate, reviewed = false) {
   const actions = document.createElement('div');
   actions.className = 'review-actions';
   if (reviewed) {
-    actions.append(textElement('span', candidate.decision === 'same' ? 'Marked as the same work.' : 'Marked as different works.'));
+    actions.append(textElement('span', candidate.decision === 'different' ? 'Marked as different works.' : candidate.decision==='same-edition'?'Marked as the same edition.':'Marked as the same work; editions stay separate.'));
     actions.append(reviewButton('Undo decision', 'undo', async () => {
       try {
         database = await removeManualMatchDecision(candidate.id);
@@ -382,10 +385,18 @@ function createReviewRow(candidate, reviewed = false) {
   } else {
     actions.append(reviewButton('Same work', 'same', async () => {
       try {
-        database = await saveManualMatchDecision(candidate, 'same');
+        database = await saveManualMatchDecision(candidate, 'same-work');
         render();
       } catch (error) {
         backupStatus.textContent = `Could not save duplicate decision: ${error.message}`;
+      }
+    }));
+    actions.append(reviewButton('Same edition', 'same-edition', async () => {
+      try {
+        database = await saveManualMatchDecision(candidate, 'same-edition');
+        render();
+      } catch (error) {
+        backupStatus.textContent = `Could not save edition decision: ${error.message}`;
       }
     }));
     actions.append(reviewButton('Different works', 'different', async () => {
@@ -479,12 +490,13 @@ async function renderGoogleBooksEnrichment() {
   } else if (job) {
     googleBooksEnrichmentStatus.textContent = googleBooksStatusText(job, job.cursor >= job.queue.length ? 'Completed: ' : 'Paused: ');
   } else {
-    googleBooksEnrichmentStatus.textContent = 'Key saved locally. The first run will queue only book records that have an author and no Google Books enrichment.';
+    googleBooksEnrichmentStatus.textContent = 'Key saved locally. The first run will queue books with a validated ISBN or author and no Google Books enrichment.';
   }
 }
 
-function authorsForRecords(records) {
-  return [...new Set(records.flatMap((record) => Array.isArray(record.metadata?.authors) ? record.metadata.authors : []).map(String).filter(Boolean))];
+function bibliographicQuery(canonical,records) {
+  const evidence=records.map(identityEvidence);const first=evidence[0]??{};
+  return {title:canonical.title,authors:[...new Set(evidence.flatMap(record=>record.authors))],isbn:[...new Set(evidence.flatMap(record=>record.isbn))],language:first.language,edition:first.edition,run:first.run};
 }
 
 function pause(milliseconds) {
@@ -506,7 +518,7 @@ async function runGoogleBooksEnrichment() {
     let job = await getGoogleBooksEnrichmentJob();
     if (!job || job.cursor >= job.queue.length) job = await startGoogleBooksEnrichmentJob();
     if (!job.queue.length) {
-      googleBooksEnrichmentStatus.textContent = 'No author-backed books without Google Books metadata need enrichment.';
+      googleBooksEnrichmentStatus.textContent = 'No books with an ISBN or author need Google Books enrichment.';
       return;
     }
     while (job.cursor < job.queue.length && !googleBooksPauseRequested) {
@@ -518,8 +530,9 @@ async function runGoogleBooksEnrichment() {
         job = await saveGoogleBooksEnrichmentJob(job);
         continue;
       }
-      const authors = authorsForRecords(records);
-      if (!authors.length) {
+      const query=bibliographicQuery(canonical,records);
+      const authors = query.authors;
+      if (!authors.length&&!query.isbn.length) {
         job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, skipped: job.skipped + 1 };
         job = await saveGoogleBooksEnrichmentJob(job);
         continue;
@@ -527,7 +540,7 @@ async function runGoogleBooksEnrichment() {
       googleBooksEnrichmentStatus.textContent = `${googleBooksStatusText(job)} Looking up “${canonical.title}”…`;
       let candidates;
       try {
-        const response = await chrome.runtime.sendMessage({ type: 'SEARCH_GOOGLE_BOOKS', query: { title: canonical.title, authors } });
+        const response = await chrome.runtime.sendMessage({ type: 'SEARCH_GOOGLE_BOOKS', query });
         if (!response?.ok) throw new Error(response?.error ?? 'Google Books search did not complete.');
         candidates = response.candidates ?? [];
       } catch (error) {
@@ -542,7 +555,7 @@ async function runGoogleBooksEnrichment() {
         continue;
       }
       if (job.lastError) job = { ...job, lastError: '', lastErrorAt: '' };
-      const candidate = highConfidenceGoogleBooksCandidate({ title: canonical.title, authors }, candidates);
+      const candidate = highConfidenceGoogleBooksCandidate(query, candidates);
       if (candidate) {
         database = await saveGoogleBooksEnrichments([{ itemIds: canonical.providerItemIds, enrichment: googleBooksEnrichment(candidate) }]);
         job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, matched: job.matched + 1 };
@@ -706,6 +719,11 @@ function render() {
       return source;
     }));
     node.append(providerSources);
+    node.append(createEvidenceInspector(canonicalItem,records,database,{
+      save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},
+      remove:async(id)=>{database=await removeManualMatchDecision(id);},
+      refresh:render
+    }));
     if (canonicalItem.mediaType === 'book') {
       const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
       if (openLibraryTools) node.append(openLibraryTools);
@@ -738,6 +756,7 @@ function render() {
     unlinkedAddOns.replaceChildren();
   }
   renderDuplicateReview();
+  document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));
 }
 
 async function refresh() {

@@ -1,13 +1,13 @@
 import { titleKey } from './normalization.js';
-import { identityConflicts, identityEvidence, relationshipReason } from './identity.js';
+import { identityConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
 import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
   const identity=identityEvidence(item);
-  return {provider:item.provider,itemRef:item.recordRef,title:item.title,ownership:item.ownership,confidence,relationship,reason,
-    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.updatedAt}};
+  return {provider:item.provider,itemRef:item.recordRef,title:String(item.title).slice(0,500),ownership:item.ownership,confidence,relationship,reason,
+    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null}};
 }
 
 function requestRecord(request) {
@@ -33,7 +33,7 @@ export function matchItems(items, requestedItems, context = {}) {
     const [a,b]=decision.itemIds??[];if(!items[a]||!items[b]||items[a].mediaType!==items[b].mediaType)continue;
     if(decision.decision==='different'){negative.add([a,b].sort().join('\u0000'));continue;}
     if(!['same','same-work','same-edition'].includes(decision.decision))continue;
-    for(const [left,right]of[[a,b],[b,a]]){const edges=graph.get(left)??[];edges.push({id:right,decision});graph.set(left,edges);}
+    for(const [left,right]of[[a,b],[b,a]]){const edges=graph.get(left)??[];edges.push({id:right,decision:decision.decision});graph.set(left,edges);}
   }
   return requestedItems.map(request=>{
     const query=requestRecord(request);const evidence=identityEvidence(query);const exclude=new Set(request.excludeProviders??[]);
@@ -43,14 +43,19 @@ export function matchItems(items, requestedItems, context = {}) {
     const anchors=[...new Set(identifierRequired?identified:titled)];
     const compatible=anchors.filter(item=>!identityConflicts(query,item).length);
     const editionGroups=new Set(compatible.map(item=>editionByRecord.get(item.id)?.id??item.id));
-    const ambiguous=!identifierRequired&&editionGroups.size>1;
+    const ambiguous=editionGroups.size>1;
     const exact=new Map();const possible=new Map();
     const candidate=(item,reason,relationship='same-work')=>{
       if(compatible.length && compatible.every(anchor=>negative.has([anchor.id,item.id].sort().join('\u0000'))))return;
       if(!exclude.has(item.provider)&&!exact.has(item.id))possible.set(item.id,publicMatch(item,relationship,reason,0.8));
     };
     for(const item of compatible){
-      if(ambiguous){candidate(item,'The same title belongs to multiple distinct editions or works.');continue;}
+      if(ambiguous){candidate(item,'Matching signals refer to multiple distinct editions or works.');continue;}
+      const editionGroup=editionByRecord.get(item.id);
+      const reviewedEdition=(graph.get(item.id)??[]).some(edge=>edge.decision==='same-edition'&&editionGroup?.providerItemIds.includes(edge.id));
+      if(query.mediaType!=='game'&&!identifierRequired&&!sameEditionEvidence(query,item)&&!reviewedEdition){
+        candidate(item,'Title-only book identity needs an identifier, compatible author evidence, or a reviewed same-edition relationship.');continue;
+      }
       if(!exclude.has(item.provider))exact.set(item.id,publicMatch(item,'same-edition',identifierRequired?'Matching validated edition identifier.':'Exact normalized title with no conflicting edition evidence.'));
       for(const id of editionByRecord.get(item.id)?.providerItemIds??[])if(items[id]&&!exclude.has(items[id].provider))exact.set(id,publicMatch(items[id],'same-edition','Verified same-edition relationship.'));
     }

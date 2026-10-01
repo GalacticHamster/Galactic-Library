@@ -5,7 +5,7 @@ import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCan
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview } from '../lib/contents.js';
-import { identityConflicts } from '../lib/identity.js';
+import { identityConflicts, identityEvidence } from '../lib/identity.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -17,7 +17,7 @@ export function createStorageWriter(storageArea) {
     const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
     const database = validateDatabase(stored[DATABASE_STORAGE_KEY]);
-    if (stored[DATABASE_STORAGE_KEY].schemaVersion !== database.schemaVersion) {
+    if (stored[DATABASE_STORAGE_KEY].schemaVersion !== database.schemaVersion || Object.values(database.providerItems).some(item=>stored[DATABASE_STORAGE_KEY].providerItems[item.id]?.recordRef!==item.recordRef)) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
@@ -214,8 +214,8 @@ export function createStorageWriter(storageArea) {
       if (canonical.mediaType !== 'book') return false;
       const records = canonical.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean);
       const hasGoogleBooks = records.some((record) => record.metadata?.enrichment?.googleBooks?.volumeId || record.metadata?.enrichment?.googleBooksGenreHint?.categories?.length);
-      const hasAuthors = records.some((record) => Array.isArray(record.metadata?.authors) && record.metadata.authors.length > 0);
-      return !hasGoogleBooks && hasAuthors;
+      const hasSearchEvidence = records.some((record) => {const evidence=identityEvidence(record);return evidence.authors.length||evidence.isbn.length;});
+      return !hasGoogleBooks && hasSearchEvidence;
     }).map((canonical) => canonical.id).sort();
     return saveGoogleBooksEnrichmentJob({ queue, cursor: 0, processed: 0, matched: 0, genreHints: 0, noMatch: 0, zeroResults: 0, titleVariant: 0, authorVariant: 0, samples: [], skipped: 0, errors: 0, startedAt: new Date().toISOString() });
   }
@@ -242,6 +242,7 @@ export function createStorageWriter(storageArea) {
     if(decision==='same-edition'&&identityConflicts(...itemIds.map(id=>database.providerItems[id])).length)throw new Error('These records have conflicting edition evidence. Use Same work instead.');
     database.manualMatchDecisions[itemIds.join('\u0000')] = { decision, itemIds, updatedAt: new Date().toISOString() };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    if(decision==='same-edition'&&!Object.values(database.canonicalItems).some(group=>itemIds.every(id=>group.providerItemIds.includes(id))))throw new Error('An indirect identity conflict or Different works decision prevents this edition merge. Review those relationships first.');
     return persistDatabase(database);
   }
 

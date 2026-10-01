@@ -1,3 +1,5 @@
+import { names, validIsbn } from './identity.js';
+
 function compactText(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
 }
@@ -17,11 +19,13 @@ function workKey(value) {
   return /^\/works\/OL\d+W$/iu.test(key) ? key : '';
 }
 
-export function openLibrarySearchUrl({ title, authors = [] }) {
+export function openLibrarySearchUrl({ title, authors = [], isbn = [] }) {
   const url = new URL('https://openlibrary.org/search.json');
-  url.searchParams.set('title', compactText(title));
+  const identifier=names(isbn).map(validIsbn).find(Boolean);
+  if(identifier)url.searchParams.set('q',`isbn:${identifier}`);
+  else url.searchParams.set('title', compactText(title));
   const author = stringValues(authors, 1)[0];
-  if (author) url.searchParams.set('author', author);
+  if (author&&!identifier) url.searchParams.set('author', author);
   url.searchParams.set('fields', 'key,title,author_name,subject,first_publish_year,isbn,edition_key');
   url.searchParams.set('limit', '5');
   return url.toString();

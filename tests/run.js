@@ -274,7 +274,7 @@ const tests = [
     }, { id: 'volume-456', volumeInfo: { title: 'Little Brother: A Study Guide', authors: ['Other Author'] } }] });
     const candidate = highConfidenceGoogleBooksCandidate({ title: 'Little Brother', authors: ['Doctorow, Cory'] }, candidates);
     assert.equal(candidate.volumeId, 'volume-123');
-    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother (Tenth Anniversary Edition)', authors: ['Cory Doctorow, Neil Gaiman'] }, candidates)?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother (Tenth Anniversary Edition)', authors: ['Cory Doctorow, Neil Gaiman'] }, candidates), null); // A related work cannot supply another edition's ISBN/page count.
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother: A Novel About Hacking', authors: ['Cory Doctorow'] }, candidates)?.volumeId, 'volume-123');
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'I Am Number Four: A #1 New York Times Bestselling YA Sci-Fi Thriller about an Alien Teen with Powers Fighting to Save Earth (Lorien Legacies)', authors: ['Pittacus Lore'] }, [{ ...candidate, title: 'I Am Number Four', authors: ['Pittacus Lore'] }])?.volumeId, 'volume-123');
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Amazing Spider-Man by J.M.S. Ultimate Collection Book One (Amazing Spider-Man (1999-2013))', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Amazing Spider-Man By JMS Ultimate Collection Book 1' }])?.volumeId, 'volume-123');

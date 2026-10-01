@@ -26,7 +26,8 @@ function providerStatus(providers) {
 
 function validMatchRequest(item) {
   if (!item || typeof item !== 'object') return false;
-  const mediaType = String(item.mediaType ?? 'game').trim().toLowerCase();
+  if(item.mediaType!==undefined&&typeof item.mediaType!=='string')return false;
+  const mediaType = (item.mediaType ?? 'game').trim().toLowerCase();
   if(item.requestId!==undefined&&item.requestId!==null&&(typeof item.requestId!=='string'||item.requestId.length>500))return false;
   if(item.identifiers!==undefined){
     if(!item.identifiers||typeof item.identifiers!=='object'||Array.isArray(item.identifiers))return false;

@@ -1,4 +1,5 @@
 import { normalizeGameTitle } from './normalization.js';
+import { identityConflicts, identityEvidence, validIsbn } from './identity.js';
 
 function compactText(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
@@ -93,20 +94,21 @@ function titleMatchKind(queryTitle, candidateTitle) {
 function isbnValues(value) {
   const seen = new Set();
   for (const entry of Array.isArray(value) ? value : [value]) {
-    const isbn = compactText(entry?.identifier ?? entry);
-    if (/^[0-9X-]{10,17}$/iu.test(isbn)) seen.add(isbn);
+    const isbn = validIsbn(entry?.identifier ?? entry);
+    if (isbn) seen.add(isbn);
     if (seen.size >= 20) break;
   }
   return [...seen];
 }
 
-export function googleBooksSearchUrl({ title, authors = [], apiKey }) {
+export function googleBooksSearchUrl({ title, authors = [], isbn = [], apiKey }) {
   const bookTitle = compactText(title);
   const key = compactText(apiKey);
   if (!bookTitle || !key) throw new Error('Google Books needs a book title and API key.');
   const url = new URL('https://www.googleapis.com/books/v1/volumes');
   const author = stringValues(authors, 1)[0];
-  url.searchParams.set('q', [`intitle:${bookTitle}`, author ? `inauthor:${author}` : ''].filter(Boolean).join(' '));
+  const identifier=isbnValues(isbn)[0];
+  url.searchParams.set('q', identifier?`isbn:${identifier}`:[`intitle:${bookTitle}`, author ? `inauthor:${author}` : ''].filter(Boolean).join(' '));
   url.searchParams.set('printType', 'books');
   url.searchParams.set('maxResults', '5');
   url.searchParams.set('projection', 'full');
@@ -142,6 +144,16 @@ export function googleBooksCandidatesFromSearch(value) {
 }
 
 export function isHighConfidenceGoogleBooksMatch(query, candidate) {
+  const identifiers=isbnValues(query?.isbn);
+  const matchingIdentifier=identifiers.some(isbn=>isbnValues(candidate?.isbn).includes(isbn));
+  const left={title:query?.title,mediaType:'book',metadata:query};
+  const right={title:candidate?.title,mediaType:'book',metadata:candidate};
+  const conflicts=identityConflicts(left,right).filter(key=>key!=='authors'&&!(key==='edition'&&matchingIdentifier&&!identityEvidence(left).edition));
+  if(conflicts.length)return false;
+  if(identifiers.length){
+    if(!matchingIdentifier)return false;
+    return !query.authors?.length||!candidate.authors?.length||isGoogleBooksAuthorMatch(query,candidate);
+  }
   if (!titleMatchKind(query?.title, candidate?.title)) return false;
   return isGoogleBooksAuthorMatch(query, candidate);
 }

@@ -42,9 +42,9 @@
         ...(global.GalacticProviderMetadata?.extract(entry) ?? {}),
         source: 'audible-library-page',
         detailUrl,
-        authors: Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : [],
+        authors: global.GalacticProviderMetadata?.extract(entry).authors ?? (Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : []),
         narrators: Array.isArray(entry.narrators) ? entry.narrators.filter(Boolean) : [],
-        series: Array.isArray(entry.series) ? entry.series.filter(Boolean) : [],
+        series: global.GalacticProviderMetadata?.extract(entry).series ?? (Array.isArray(entry.series) ? entry.series.filter(Boolean) : []),
         libraryAction: String(entry?.libraryAction ?? '')
       }
     };

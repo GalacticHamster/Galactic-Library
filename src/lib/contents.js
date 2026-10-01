@@ -82,13 +82,18 @@ export function ownedContentIndex(database, {excludeProviders = [], excludeItemI
 export function contentCoverage(database, requested, options = {}) {
   const entries=validateContents(requested).filter((entry)=>entry.completeness==='full');
   const index=ownedContentIndex(database, options);
+  const byUnit=new Map();
+  for(const evidence of index.values()){
+    const [series,,type,number]=JSON.parse(contentKey(evidence[0].entry));const key=JSON.stringify([series,type,number]);
+    const matches=byUnit.get(key)??[];matches.push(...evidence);byUnit.set(key,matches);
+  }
   const covered=[]; const missing=[]; const possibleCovered=[];
   for (const entry of entries) {
     const evidence=index.get(contentKey(entry))??[];
     (evidence.length?covered:missing).push({...entry, ...(evidence.length?{evidence}: {})});
     if (!evidence.length) {
-      const possible=[...index.values()].flat().filter(({entry:owned}) => {
-        const [series,run,type,number,language]=JSON.parse(contentKey(entry));
+      const [series,run,type,number,language]=JSON.parse(contentKey(entry));
+      const possible=(byUnit.get(JSON.stringify([series,type,number]))??[]).filter(({entry:owned}) => {
         const other=JSON.parse(contentKey(owned));
         return series===other[0] && type===other[2] && number===other[3] && (!run||!other[1]||run===other[1]) && (!language||!other[4]||language===other[4]);
       });

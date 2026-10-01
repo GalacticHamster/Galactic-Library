@@ -1,4 +1,5 @@
 import { titleKey } from './normalization.js';
+import { identityEvidence, sameEditionEvidence } from './identity.js';
 
 function compactText(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
@@ -48,11 +49,12 @@ function candidateForPair(left, right, reasons) {
 }
 
 function addCandidate(candidates, left, right, reason) {
-  if (left.id === right.id || left.provider === right.provider || left.mediaType !== right.mediaType || left.normalizedTitle === right.normalizedTitle) return;
+  if (left.id === right.id || left.mediaType !== right.mediaType || sameEditionEvidence(left,right)) return;
   const id = candidateId(left, right);
   const existing = candidates.get(id);
   if (existing) {
     if (!existing.reasons.some((item) => item.code === reason.code)) existing.reasons.push(reason);
+    if(reason.code==='provider-series-label')existing.confidence=sharedAuthors(left,right).length?0.99:0.98;
     return;
   }
   candidates.set(id, candidateForPair(left, right, [reason]));
@@ -72,7 +74,7 @@ export function findDuplicateCandidates(providerItems, manualMatchDecisions = {}
   const byBaseTitle = new Map();
   const byPresentationTitle = new Map();
   for (const item of records) {
-    const baseKey = `${item.mediaType}\u0000${item.baseTitle}`;
+    const baseKey = `${item.mediaType}\u0000${identityEvidence(item).candidateKey || item.baseTitle}`;
     // A plain title can still be compared with another provider's edition.
     const group = byBaseTitle.get(baseKey) ?? [];
     group.push(item);
@@ -85,9 +87,7 @@ export function findDuplicateCandidates(providerItems, manualMatchDecisions = {}
     }
   }
   for (const group of byBaseTitle.values()) {
-    if (new Set(group.map((item) => item.normalizedTitle)).size > 1) {
-      pairsInGroup(group, candidates, { code: 'base-title', text: 'Same base title with a different edition or presentation.' });
-    }
+    pairsInGroup(group, candidates, { code: 'base-title', text: 'Same base title; edition or work identity needs review.' });
   }
   // Compare a provider-stripped title to all records with that same normal
   // title, including the unadorned Humble title.
@@ -104,6 +104,12 @@ export function findDuplicateCandidates(providerItems, manualMatchDecisions = {}
         addCandidate(candidates, item, match, { code: 'provider-series-label', text: 'A provider-added series or book-number label differs.' });
       }
     }
+  }
+  for(const decision of Object.values(manualMatchDecisions)){
+    const [left,right]=(decision.itemIds??[]).map(id=>providerItems[id]);
+    if(!left||!right||left.mediaType!==right.mediaType)continue;
+    const id=candidateId(left,right);
+    if(!candidates.has(id))candidates.set(id,candidateForPair(left,right,[{code:'reviewed',text:'Previously reviewed relationship.'}]));
   }
   return [...candidates.values()]
     .map((candidate) => ({ ...candidate, decision: manualMatchDecisions[candidate.id]?.decision ?? null }))

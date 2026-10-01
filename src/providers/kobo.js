@@ -38,6 +38,7 @@
 
   function stringValues(value) {
     if (Array.isArray(value)) return value.flatMap(stringValues).filter(Boolean);
+    if (value && typeof value === 'object') return stringValues(value.name ?? value.title);
     const text = compactText(value);
     return text ? [text] : [];
   }
