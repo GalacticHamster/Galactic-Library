@@ -2,6 +2,7 @@ import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createBackup } from '../src/lib/storage.js';
 import { matchItems } from '../src/lib/matcher.js';
 import '../src/providers/kobo.js';
+import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
 
 const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
@@ -124,5 +125,11 @@ try{
   checks.push('target collection comparison reports missing units and respects language');
   const filter=document.querySelector('[aria-label="Filter reviewed series"]');filter.value='missing series';filter.dispatchEvent(new Event('input'));assert(group.hidden,'Series filter did not hide unmatched scope.');
   checks.push('series search filters reviewed scopes');
+  await writer.replaceProviderItems('humble',[],{},completeProviderSnapshot('humble',[],[completedScope('library',0,0,'reported-count',1)]));
+  const historyTransfer=new DataTransfer();historyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'history.json',{type:'application/json'}));
+  document.querySelector('#backup-status').textContent='';input.files=historyTransfer.files;input.dispatchEvent(new Event('change'));
+  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','History backup restore failed.');
+  assert(document.querySelector('#provider-history').textContent.includes('Collection A')&&document.querySelector('#provider-history').textContent.includes('not observed in complete scan'),'Archived purchase evidence is missing from history.');
+  checks.push('complete scan history survives backup restore and is displayed separately from current ownership');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

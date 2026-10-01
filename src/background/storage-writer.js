@@ -60,12 +60,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const database = await getDatabase();
     const now = new Date().toISOString();
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
+    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===(database.providers[provider]?.profileLabel??'')).map(entry=>[entry.item.id,entry.item]));
     const incoming = values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
       item.metadata.source = PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item, database.providerItems[item.id]);
+      return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
+    const profileLabel=database.providers[provider]?.profileLabel??'';
+    for(const item of Object.values(database.providerItems))if(item.provider===provider&&!unique.has(item.id))database.providerHistory[item.recordRef]={item,profileLabel,reason:'missing-from-complete-scan',missingSince:now};
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===profileLabel&&unique.has(entry.item.id))delete database.providerHistory[ref];
     const records = [...unique.values()];
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
@@ -104,14 +108,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = await getDatabase();
+    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===(database.providers[provider]?.profileLabel??'')).map(entry=>[entry.item.id,entry.item]));
     const now = new Date().toISOString();
     const incoming = values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
       item.metadata.source = PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item, database.providerItems[item.id]);
+      return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===(database.providers[provider]?.profileLabel??'')&&unique.has(entry.item.id))delete database.providerHistory[ref];
     const records = Object.values(database.providerItems).filter((item) => item.provider === provider);
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;

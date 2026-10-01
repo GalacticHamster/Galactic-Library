@@ -23,6 +23,7 @@ export function companionMatch(value) {
       language: compact(evidence.language, 80), edition: compact(evidence.edition), series: names(evidence.series),
       run: compact(evidence.run, 100), unit: compact(evidence.unit, 80),
       source: SOURCES.has(evidence.source) ? evidence.source : provider, checkedAt: publicDate(evidence.checkedAt),
+      ...(evidence.availability==='not-observed-in-last-full-scan'?{availability:evidence.availability}:{}),
       ...(['humble','fanatical'].includes(provider)?{
         purchaseEvidence:evidence.purchaseEvidence==='confirmed'?'confirmed':'unknown',
         activationStatus:evidence.activationStatus==='not-applicable'?'not-applicable':'unknown',

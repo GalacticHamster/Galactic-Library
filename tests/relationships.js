@@ -13,6 +13,21 @@ import { DATABASE_SCHEMA_VERSION } from '../src/lib/constants.js';
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['complete scans archive missing records while partial failures and quick scans never infer absence',async()=>{
+    const values={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    const item={providerItemId:'history',title:'History Game',mediaType:'game',ownership:'owned'};
+    await writer.mergeProviderItems('steam',[item]);let database=await writer.getDatabase();const ref=database.providerItems['steam:history'].recordRef;
+    await writer.restoreDatabase({...database,providerItems:{...database.providerItems,'steam:history':{...database.providerItems['steam:history'],metadata:{enrichment:{googleBooks:{source:'google-books',volumeId:'example',title:'History Game'}}}}}});
+    await assert.rejects(writer.replaceProviderItems('steam',[],{},{}),/snapshot/);assert.equal(Object.keys((await writer.getDatabase()).providerHistory).length,0);
+    await writer.mergeProviderItems('steam',[]);assert.equal(Object.keys((await writer.getDatabase()).providerHistory).length,0);
+    const snapshot={version:1,provider:'steam',complete:true,itemCount:0,scopes:[{id:'library',readCount:0,expectedCount:0,end:'reported-count',pagesRead:1,complete:true,limitReached:false}]};
+    database=await writer.replaceProviderItems('steam',[],{},snapshot);assert.equal(Object.keys(database.providerItems).length,0);assert.equal(Object.keys(database.providerHistory).length,1);
+    const response=handleExternalApiRequest(database,{type:'MATCH_ITEMS',apiVersion:1,items:[{title:'History Game',mediaType:'game'}]}).results[0];
+    assert.equal(response.owned,false);assert.equal(response.possibleMatches.length,1);assert.equal(response.possibleMatches[0].ownership,'unknown');assert.equal(response.possibleMatches[0].evidence.availability,'not-observed-in-last-full-scan');
+    const restored=validateDatabase(JSON.parse(JSON.stringify(database)));assert.equal(restored.providerHistory[ref].item.recordRef,ref);
+    database=await writer.mergeProviderItems('steam',[item]);assert.equal(database.providerItems['steam:history'].recordRef,ref);assert.equal(Object.keys(database.providerHistory).length,0);
+    assert.equal(database.providerItems['steam:history'].metadata.enrichment.googleBooks.volumeId,'example');
+  }],
   ['reseller key evidence is separate from activation and expired keys do not override Steam ownership', () => {
     const parse=globalThis.GalacticHumble.humbleItemsFromOrder;
     const details={subproducts:[{human_name:'Game',platform:'steam'}],all_tpks:[{human_name:'Game',machine_name:'game',is_expired:true,redeemed_key_val:'__GALACTIC_REDACTED_REDEMPTION_VALUE__',expiration_date:'2026-09-01'}]};

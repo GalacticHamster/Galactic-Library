@@ -16,7 +16,8 @@ export function createEmptyDatabase() {
     canonicalItems: {},
     manualMatchDecisions: {},
     contentReviews: {},
-    editionSeparations: {}
+    editionSeparations: {},
+    providerHistory: {}
   };
 }
 
@@ -143,7 +144,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, 2, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, 3, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   const normalizedItems = Object.values(value.providerItems).map((item) => {
@@ -162,6 +163,14 @@ export function validateDatabase(value) {
   for(const item of Object.values(providerItems))if(item.provider==='humble'&&item.mediaType==='game'
     &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
   const providers = validateProviderStates(value.providers ?? {});
+  object(value.providerHistory??{},'Provider history');
+  if(Object.keys(value.providerHistory??{}).length>500000)throw new Error('Provider history exceeds its limit.');
+  const providerHistory=Object.fromEntries(Object.entries(value.providerHistory??{}).map(([ref,entry])=>{
+    object(entry,'Historical record');
+    if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref)||!['missing-from-complete-scan','profile-switch'].includes(entry.reason))throw new Error('Invalid historical record.');
+    const item=normalizeProviderItem({...entry.item,observedAt:entry.item?.observedAt??null},entry.item?.updatedAt);
+    return [ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason}];
+  }));
   const refs=new Set();
   for(const item of Object.values(providerItems)){
     if(refs.has(item.recordRef))throw new Error('Backup contains duplicate persistent record references.');
@@ -188,6 +197,7 @@ export function validateDatabase(value) {
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
+    providerHistory,
     providerItems,
     canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems,editionSeparations),
     manualMatchDecisions,

@@ -42,7 +42,10 @@ export function matchItems(items, requestedItems, context = {}) {
     if(!items[separation.itemId]||!items[other])continue;
     for(const [left,right]of[[separation.itemId,other],[other,separation.itemId]]){const edges=graph.get(left)??[];edges.push({id:right,decision:'same-work'});graph.set(left,edges);}
   }
-  return requestedItems.map(request=>{
+  const history=Object.values(context.providerHistory??{}).filter(entry=>entry.reason==='missing-from-complete-scan'
+    &&entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??'')&&!items[entry.item.id]);
+  const historicalResults=history.length?matchItems(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
+  return requestedItems.map((request,index)=>{
     const query=requestRecord(request);const evidence=identityEvidence(query);const exclude=new Set(request.excludeProviders??[]);
     const titled=byTitle.get(`${query.mediaType}:${query.normalizedTitle}`)??[];
     const identified=[...evidence.isbn.flatMap(isbn=>byIdentifier.get(`${query.mediaType}:isbn:${isbn}`)??[]),...(evidence.asin?byIdentifier.get(`${query.mediaType}:asin:${evidence.asin}`)??[]:[])];
@@ -95,6 +98,9 @@ export function matchItems(items, requestedItems, context = {}) {
       if(result.complete&&request.contentsComplete===true)for(const [id,item]of partialMatches)exact.set(id,{...item,reason:'All explicitly enumerated requested contents are verified owned.'});
     }
     for(const id of exact.keys())possible.delete(id);
+    for(const match of [...(historicalResults[index]?.matches??[]),...(historicalResults[index]?.possibleMatches??[])])possible.set(`history:${match.itemRef}`,{
+      ...match,reason:'Previously recorded; not observed in the last complete scan. Current access needs review.',
+      evidence:{...match.evidence,availability:'not-observed-in-last-full-scan'}});
     return {requestId:request.requestId??null,owned:[...exact.keys()].some(id=>owned(items[id])),confidence:exact.size?1:0,
       matches:[...exact.values()],possibleMatches:[...possible.values()],partialMatches:[...partialMatches.values()],coverage};
   });
