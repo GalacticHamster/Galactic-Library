@@ -2,6 +2,9 @@ import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } fro
 import { normalizeGameTitle } from './normalization.js';
 import { identityConflicts, identityEvidence, sameEditionEvidence } from './identity.js';
 import { validateContentReview } from './contents.js';
+import { validateMetadata } from './metadata-validation.js';
+import { validateProviderStates } from './provider-state.js';
+import { object, text, strings, date } from './validation.js';
 
 export function createEmptyDatabase() {
   return {
@@ -22,13 +25,13 @@ export function canonicalItemKey(mediaType, normalizedTitle) {
   return `${mediaType}:${normalizedTitle}`;
 }
 
-export function normalizeProviderItem(value, now = new Date().toISOString()) {
-  if (!value || typeof value !== 'object') throw new Error('Provider item must be an object.');
-  const provider = String(value.provider ?? '').trim().toLowerCase();
-  const providerItemId = String(value.providerItemId ?? '').trim();
-  const title = String(value.title ?? '').trim();
-  const mediaType = String(value.mediaType ?? 'game').trim().toLowerCase();
-  const ownership = String(value.ownership ?? 'unknown').trim().toLowerCase();
+export function normalizeProviderItem(value, now = new Date().toISOString(), options = {}) {
+  object(value,'Provider item');
+  const provider = text(value.provider,40,'Provider').toLowerCase();
+  const providerItemId = text(value.providerItemId,500,'Provider item ID');
+  const title = text(value.title,500,'Title');
+  const mediaType = text(value.mediaType ?? 'game',40,'Media type').toLowerCase();
+  const ownership = text(value.ownership ?? 'unknown',40,'Ownership').toLowerCase();
   if (!PROVIDERS.includes(provider)) throw new Error(`Unsupported provider: ${provider || '(missing)'}.`);
   if (!providerItemId) throw new Error('Provider item needs a providerItemId.');
   if (!title) throw new Error('Provider item needs a title.');
@@ -39,7 +42,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
 
   return {
     id: providerItemKey(provider, providerItemId),
-    recordRef: /^[a-f0-9-]{36}$/iu.test(value.recordRef ?? '') ? value.recordRef : crypto.randomUUID(),
+    recordRef: /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(value.recordRef ?? '') ? value.recordRef : crypto.randomUUID(),
     provider,
     providerItemId,
     title,
@@ -48,11 +51,11 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
     edition: titleParts.edition,
     mediaType,
     ownership,
-    platform: Array.isArray(value.platform) ? [...new Set(value.platform.map(String).filter(Boolean))] : [],
-    metadata: value.metadata && typeof value.metadata === 'object' && !Array.isArray(value.metadata) ? value.metadata : {},
-    acquiredAt: typeof value.acquiredAt === 'string' ? value.acquiredAt : null,
-    observedAt: value.observedAt===null?null:typeof value.observedAt==='string'?value.observedAt:now,
-    updatedAt: now
+    platform: strings(value.platform,30,80,'Platforms'),
+    metadata: validateMetadata(provider,value.metadata,options),
+    acquiredAt: date(value.acquiredAt,'Acquisition date'),
+    observedAt: value.observedAt===null?null:date(value.observedAt??now,'Observation date'),
+    updatedAt: date(now,'Update date')
   };
 }
 
@@ -110,7 +113,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
   const usedIds = new Set();
   const previousByRecord = new Map();
   for (const entry of Object.values(previousCanonicalItems ?? {})) {
-    if (/^edition:/u.test(entry.id)) for (const itemId of entry.providerItemIds ?? []) previousByRecord.set(itemId, entry);
+    if (/^edition:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(entry?.id??'') && Array.isArray(entry.providerItemIds) && entry.providerItemIds.length<=500000) for (const itemId of entry.providerItemIds) if(typeof itemId==='string'&&providerItems[itemId]) previousByRecord.set(itemId, entry);
   }
   return Object.fromEntries([...grouped.values()].map((items) => {
     const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
@@ -138,30 +141,38 @@ export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
   if (![1, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
-  const providerItems = Object.fromEntries(Object.values(value.providerItems).map((item) => {
+  if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
+  const normalizedItems = Object.values(value.providerItems).map((item) => {
     const normalized = normalizeProviderItem({...item,observedAt:item?.observedAt??null}, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
     return [normalized.id, normalized];
-  }));
-  const providers = value.providers && typeof value.providers === 'object' && !Array.isArray(value.providers) ? value.providers : {};
+  });
+  if(new Set(normalizedItems.map(([id])=>id)).size!==normalizedItems.length)throw new Error('Backup contains duplicate provider identities.');
+  const providerItems = Object.fromEntries(normalizedItems);
+  const providers = validateProviderStates(value.providers ?? {});
   const refs=new Set();
   for(const item of Object.values(providerItems)){
     if(refs.has(item.recordRef))throw new Error('Backup contains duplicate persistent record references.');
     refs.add(item.recordRef);
   }
   const manualMatchDecisions = {};
+  object(value.manualMatchDecisions??{},'Saved relationships');
+  if (Object.keys(value.manualMatchDecisions??{}).length>100000) throw new Error('Too many saved relationships.');
   for(const decision of Object.values(value.manualMatchDecisions??{})){
     if(!['same','same-work','same-edition','different'].includes(decision?.decision)||!Array.isArray(decision.itemIds)||decision.itemIds.length!==2||decision.itemIds.some(id=>typeof id!=='string')||decision.itemIds[0]===decision.itemIds[1])throw new Error('Invalid saved relationship.');
     const itemIds=[...decision.itemIds].sort();
     const [left,right]=itemIds.map(id=>providerItems[id]);
     if(left&&right&&left.mediaType!==right.mediaType)throw new Error('A saved relationship crosses media types.');
-    manualMatchDecisions[itemIds.join('\u0000')]={decision:decision.decision,itemIds,updatedAt:typeof decision.updatedAt==='string'?decision.updatedAt:null};
+    if(itemIds.some(id=>id.length>550))throw new Error('Saved relationship IDs exceed their bounds.');
+    manualMatchDecisions[itemIds.join('\u0000')]={decision:decision.decision,itemIds,updatedAt:date(decision.updatedAt)};
   }
+  object(value.contentReviews??{},'Contents reviews');
+  if(Object.keys(value.contentReviews??{}).length>500000)throw new Error('Too many contents reviews.');
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
     providerItems,
     canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems),
     manualMatchDecisions,
-    contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => [id, validateContentReview(review)]))
+    contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => {if(id.length>550)throw new Error('Contents review ID exceeds its bounds.');return [id, validateContentReview(review)];}))
   };
 }

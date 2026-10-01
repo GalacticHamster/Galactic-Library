@@ -1,4 +1,5 @@
 import { compact, identityKey } from './identity.js';
+import { object, text, date, url } from './validation.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
 export function seriesDescriptor(series, run = '') {
@@ -9,12 +10,13 @@ export function seriesDescriptor(series, run = '') {
 export function validateContents(entries) {
   if (!Array.isArray(entries) || !entries.length || entries.length > 2000) throw new Error('Contents must contain 1–2,000 entries.');
   const result = entries.map((entry) => {
-    const {series, run} = seriesDescriptor(entry?.series, entry?.run);
-    const unitType = compact(entry?.unitType, 20); const number = compact(entry?.number, 80);
+    object(entry,'Contents entry');
+    const {series, run} = seriesDescriptor(text(entry.series,500,'Series'), text(entry.run,100,'Run'));
+    const unitType = text(entry.unitType,20,'Unit type'); const number = text(entry.number,80,'Unit number');
     const completeness = entry?.completeness ?? 'full';
     if (!series || !UNIT_TYPES.has(unitType) || !number || !['full','excerpt'].includes(completeness)) throw new Error('Each contents entry needs a series, unit type, number, and full/excerpt scope.');
     if (['issue','volume','annual'].includes(unitType) && (!/^(?:\d{1,6}\/\d{1,6}|\d{1,6}(?:\.\d{1,6})?)$/u.test(number) || /\/0+$/u.test(number))) throw new Error('Issue/volume/annual numbers must be numeric, decimal, or fractional.');
-    return {series,run,unitType,number,language:compact(entry?.language,80).toLowerCase(),completeness};
+    return {series,run,unitType,number,language:text(entry.language,80,'Language').toLowerCase(),completeness};
   });
   return [...new Map(result.map((entry) => [`${contentKey(entry)}:${entry.completeness}`, entry])).values()];
 }
@@ -55,14 +57,10 @@ export function contentsStatement(item) {
 }
 
 export function validateContentReview(value) {
-  if (!value || typeof value !== 'object') throw new Error('Invalid contents review.');
-  let sourceUrl='';
-  if (value.sourceUrl) {
-    const url=new URL(value.sourceUrl);
-    if (!['https:','http:'].includes(url.protocol)) throw new Error('Contents source must be an HTTP(S) page.');
-    sourceUrl=`${url.origin}${url.pathname}`;
-  }
-  return {entries:validateContents(value.entries),statement:compact(value.statement,10000),sourceUrl,source:compact(value.source || 'manual-review',100),verifiedAt:typeof value.verifiedAt==='string'?value.verifiedAt:null};
+  object(value,'Contents review');
+  const sourceUrl=url(value.sourceUrl);
+  if(value.sourceUrl && !sourceUrl)throw new Error('Contents source must be an HTTP(S) page without credentials.');
+  return {entries:validateContents(value.entries),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date')};
 }
 
 export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {

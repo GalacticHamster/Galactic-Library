@@ -6,6 +6,7 @@ import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview } from '../lib/contents.js';
 import { identityConflicts, identityEvidence } from '../lib/identity.js';
+import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -17,7 +18,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
     const database = validateDatabase(stored[DATABASE_STORAGE_KEY]);
-    if (stored[DATABASE_STORAGE_KEY].schemaVersion !== database.schemaVersion || Object.values(database.providerItems).some(item=>stored[DATABASE_STORAGE_KEY].providerItems[item.id]?.recordRef!==item.recordRef)) {
+    if (JSON.stringify(stored[DATABASE_STORAGE_KEY]) !== JSON.stringify(database)) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
@@ -54,12 +55,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
 
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
+    if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
     const database = await getDatabase();
     const now = new Date().toISOString();
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
     const incoming = values.map((value) => {
-      const item = normalizeProviderItem({ ...value, provider }, now);
+      const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
+      item.metadata.source = PROVIDER_SOURCES[provider];
       return preserveEnrichment(item, database.providerItems[item.id]);
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
@@ -98,10 +101,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   // the provider returned only its recent additions. Full syncs use the
   // replacement function above; quick syncs add or refresh records here.
   async function mergeProviderItems(provider, values, syncDetails = {}) {
+    if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
+    if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = await getDatabase();
     const now = new Date().toISOString();
     const incoming = values.map((value) => {
-      const item = normalizeProviderItem({ ...value, provider }, now);
+      const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
+      item.metadata.source = PROVIDER_SOURCES[provider];
       return preserveEnrichment(item, database.providerItems[item.id]);
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));

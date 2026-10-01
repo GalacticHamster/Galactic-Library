@@ -1,9 +1,10 @@
 import { PROVIDERS, OWNERSHIP_STATES } from './constants.js';
 import { compact, names, validIsbn } from './identity.js';
+import { date } from './validation.js';
 
 const SOURCES = new Set(['steam-store-browse-items', 'gog-account-library', 'epic-store-library', 'amazon-games-collection', 'audible-library-page', 'amazon-kindle-content-library', 'amazon-prime-video-purchases-library', 'fandango-at-home-library', 'kobo-my-books-library', 'fanatical-order-history', 'humble-purchase-library']);
 export const recordReference = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(value) ? value : null;
-export const publicDate = value => typeof value === 'string' && value.length <= 40 && /^\d{4}-\d{2}-\d{2}T/u.test(value) && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+export const publicDate = value => {try{return date(value);}catch{return null;}};
 const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
 
 // One explicit output projection for every match path, including contents.

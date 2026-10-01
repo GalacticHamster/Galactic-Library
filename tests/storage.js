@@ -101,6 +101,7 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
   const previousChrome = globalThis.chrome;
   const memory = memoryStorage();
   const listeners = [];
+  const externalListeners = [];
   const accessLevels = [];
   memory.area.setAccessLevel = async value => {accessLevels.push(['local',value.accessLevel]); await accessGate; if(accessError) throw accessError;};
   const sessionValues = {};
@@ -110,10 +111,10 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
     id: extensionId,
     getURL: (path) => root + path,
     onMessage: { addListener: (listener) => listeners.push(listener) },
-    onMessageExternal: { addListener: () => {} },
+    onMessageExternal: { addListener: listener => externalListeners.push(listener) },
     onInstalled: { addListener: () => {} }
   };
-  const dispatch = (request, sender) => new Promise((resolve, reject) => {
+  const dispatchTo = handlers => (request, sender) => new Promise((resolve, reject) => {
     let handled = false;
     let replied = false;
     const respond = (response) => {
@@ -122,12 +123,14 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
       resolve(JSON.parse(JSON.stringify(response)));
     };
     try {
-      for (const listener of listeners) {
+      for (const listener of handlers) {
         if (listener(JSON.parse(JSON.stringify(request)), sender, respond) === true) handled = true;
       }
       if (!handled && !replied) reject(new Error('No message handler responded.'));
     } catch (error) { reject(error); }
   });
+  const dispatch = dispatchTo(listeners);
+  const dispatchExternal = dispatchTo(externalListeners);
   globalThis.chrome = { runtime, storage: { local: memory.area, session } };
   try {
     // Load the real worker: provider handlers and page clients must share its
@@ -141,7 +144,7 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
       if (!response.ok) throw new Error(response.error);
       return response;
     });
-    await run({ memory, dispatch, pageA: page('a'), pageB: page('b'), importItems, accessLevels });
+    await run({ memory, dispatch, dispatchExternal, pageA: page('a'), pageB: page('b'), importItems, accessLevels });
     assert.ok(memory.highWater <= 1, 'Storage operations overlapped instead of sharing the writer.');
   } finally {
     if (previousChrome === undefined) delete globalThis.chrome;

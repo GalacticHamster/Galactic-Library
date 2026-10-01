@@ -69,13 +69,14 @@ const tests = [
   }],
   ['preserves saved Kindle enrichment through full and quick syncs', async () => {
     const stored = {};
-    const { replaceProviderItems, mergeProviderItems } = createStorageWriter({
+    const { replaceProviderItems, mergeProviderItems, saveKindleComicContents } = createStorageWriter({
       get: async (defaults) => ({ ...defaults, ...stored }),
       set: async (values) => Object.assign(stored, structuredClone(values))
     });
     const base = { providerItemId: 'B000000001', title: 'Test Comic', mediaType: 'book', ownership: 'unknown' };
-    const initial = [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }];
+    const initial = [{ ...base, metadata: { originType: 'Comixology', detailUrl:'https://www.amazon.com/dp/B000000001' } }];
     await replaceProviderItems('kindle', initial, {}, snapshotFixture('kindle', initial));
+    await saveKindleComicContents([{itemId:'kindle:B000000001',sourceUrl:initial[0].metadata.detailUrl,statement:'Collects Test Comic #1-4'}]);
     const rescanned = [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }];
     let database = await replaceProviderItems('kindle', rescanned, {}, snapshotFixture('kindle', rescanned));
     assert.equal(database.providerItems['kindle:B000000001'].ownership, 'owned');

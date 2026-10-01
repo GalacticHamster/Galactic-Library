@@ -8,6 +8,7 @@ import { createStorageWriter } from './storage-writer.js';
 import { createStorageMessageHandler } from './storage-messages.js';
 import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
 import { restrictStorageAccess } from './storage-access.js';
+import { validateFandangoState } from './import-state.js';
 
 const storageReady = restrictStorageAccess(chrome.storage);
 // Operations report initialization errors through their normal response channel.
@@ -287,7 +288,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
     if (request.action === 'set' && request.state && typeof request.state === 'object') {
-      storageReady.then(() => chrome.storage.session.set({ [key]: request.state }))
+      storageReady.then(() => chrome.storage.session.set({ [key]: validateFandangoState(request.state) }))
         .then(() => sendResponse({ ok: true }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;

@@ -4,6 +4,12 @@ import { handleExternalApiRequest } from '../src/lib/external-api.js';
 import { withWorker, snapshotFixture } from './storage.js';
 import { PROVIDERS } from '../src/lib/constants.js';
 import { restrictStorageAccess } from '../src/background/storage-access.js';
+import { createStorageWriter } from '../src/background/storage-writer.js';
+import { validateDatabase } from '../src/lib/models.js';
+import { validateMetadata } from '../src/lib/metadata-validation.js';
+import { validateContentReview } from '../src/lib/contents.js';
+import { validateFandangoState } from '../src/background/import-state.js';
+import { DATABASE_STORAGE_KEY } from '../src/lib/constants.js';
 
 export const securityTests = [
   ['companion output strips private fields from exact, possible, partial and contents evidence', () => {
@@ -61,5 +67,87 @@ export const securityTests = [
     assert.equal((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'get'},{...sender,tab:{id:4}})).state,null);
     await dispatch({type:'FANDANGO_IMPORT_STATE',action:'clear'},sender);
     assert.equal((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'get'},sender)).state,null);
+  })],
+  ['actual external listener checks allowlisting and never leaks storage errors', () => withWorker(async({pageA,dispatchExternal,memory})=>{
+    const id='ponmlkjihgfedcbaponmlkjihgfedcba';
+    assert.equal((await dispatchExternal({type:'PING'},{id})).ok,false);
+    await pageA.addAllowedExternalClientId(id);
+    assert.equal((await dispatchExternal({type:'PING'},{id})).ok,true);
+    memory.values[DATABASE_STORAGE_KEY]={schemaVersion:'secret-schema'};
+    const response=await dispatchExternal({type:'MATCH_ITEMS',apiVersion:1,items:[{title:'Book'}]},{id});
+    assert.equal(response.ok,false);assert.ok(!JSON.stringify(response).includes('secret-schema'));
+  })],
+  ['central provider allowlists preserve useful metadata and remove secrets and foreign fields', () => {
+    const value=JSON.parse('{"authors":["著者"],"contributors":[{"name":"Artist","role":"illustrator","token":"secret"}],"volume":2,"language":"ja","purchaseId":"secret-purchase","bundleTitle":"Bundle","token":"secret","nested":{"download":"secret"},"__proto__":{"polluted":true},"detailUrl":"https://www.amazon.com/dp/B000000001?token=secret#secret","imageUrl":"javascript:alert(1)"}');
+    const metadata=validateMetadata('kindle',value);
+    assert.deepEqual(metadata.authors,['著者']);assert.equal(metadata.volume,'2');assert.equal(metadata.detailUrl,'https://www.amazon.com/dp/B000000001');assert.equal(metadata.imageUrl,'');
+    assert.deepEqual(metadata.contributors,[{name:'Artist',role:'illustrator'}]);assert.ok(!JSON.stringify(metadata).includes('secret'));assert.equal({}.polluted,undefined);
+    assert.equal(validateMetadata('humble',{purchaseId:'purchase-1',originType:'Purchase'}).purchaseId,'purchase-1');assert.equal(validateMetadata('humble',{originType:'Purchase'}).originType,undefined);
+  }],
+  ['known metadata fields reject malformed and excessive shapes without truncating identity', () => {
+    for(const metadata of [[], 'raw', {authors:[{}]}, {authors:Array(51).fill('A')}, {series:'s'.repeat(501)}, {contributors:[null]}, {contributors:Array(51).fill({name:'A'})}, {language:{}}, {volume:'1'.repeat(81)}, {isbn:'9'.repeat(33)}, {contentsStatement:'x'.repeat(10001)}, {detailUrl:'x'.repeat(2049)}, {enrichment:{googleBooks:[]}}, {enrichment:{googleBooks:{authors:[{}]}}}])assert.throws(()=>validateMetadata('kindle',metadata));
+    assert.throws(()=>normalizeProviderItem({provider:'humble',providerItemId:'a',title:'x'.repeat(501)}),/bounds/u);
+    assert.throws(()=>normalizeProviderItem({provider:'humble',providerItemId:'a'.repeat(501),title:'Book'}),/bounds/u);
+    assert.throws(()=>normalizeProviderItem({provider:'humble',providerItemId:'a',title:'Book',platform:[{}]}),/text/u);
+    assert.throws(()=>normalizeProviderItem({provider:'humble',providerItemId:'a',title:'Book',observedAt:'not-a-date'}),/ISO/u);
+    assert.throws(()=>normalizeProviderItem({provider:'humble',providerItemId:'a',title:'Book',observedAt:'2026-02-30T00:00:00Z'}),/ISO/u);
+    const legacy='2024-01-01T00:00:00.123456';
+    assert.equal(normalizeProviderItem({provider:'humble',providerItemId:'a',title:'Book',acquiredAt:legacy}).acquiredAt,new Date(legacy).toISOString());
+  }],
+  ['full imports, incremental imports and restore reject malformed later records atomically', () => withWorker(async({pageA,importItems})=>{
+    const valid={providerItemId:'a',title:'Book',mediaType:'book',ownership:'owned',metadata:{authors:['Author']}};
+    await importItems('kindle',[valid]);const before=await pageA.getDatabase();
+    const invalid={...valid,providerItemId:'b',metadata:{authors:Array(51).fill('Author')}};
+    await assert.rejects(importItems('kindle',[{...valid,title:'Changed'},invalid]),/too many/u);
+    assert.deepEqual(await pageA.getDatabase(),before);
+    await assert.rejects(importItems('kindle',[{...valid,title:'Changed'},invalid],'incremental'),/too many/u);
+    assert.deepEqual(await pageA.getDatabase(),before);
+    const backup=structuredClone(before);backup.providerItems['kindle:b']={...invalid,provider:'kindle'};
+    await assert.rejects(pageA.restoreDatabase(backup),/too many/u);assert.deepEqual(await pageA.getDatabase(),before);
+  })],
+  ['provider imports cannot inject enrichment, persistent references or observation dates', () => withWorker(async({pageA,importItems})=>{
+    const injected={providerItemId:'a',title:'Book',mediaType:'book',ownership:'owned',recordRef:'00000000-0000-0000-0000-000000000000',observedAt:'2099-01-01T00:00:00Z',metadata:{authors:['Author'],source:'secret-source',enrichment:{googleBooks:{source:'google-books',volumeId:'forged',isbn:['9780306406157'],token:'secret'}}}};
+    await importItems('kindle',[injected]);let item=(await pageA.getDatabase()).providerItems['kindle:a'];
+    assert.notEqual(item.recordRef,injected.recordRef);assert.notEqual(item.observedAt,injected.observedAt);assert.equal(item.metadata.source,'amazon-kindle-content-library');assert.equal(item.metadata.enrichment,undefined);
+    const ref=item.recordRef;await pageA.saveGoogleBooksEnrichments([{itemIds:[item.id],enrichment:{source:'google-books',volumeId:'approved',title:'Book',authors:['Author'],token:'secret'}}]);
+    await importItems('kindle',[injected],'incremental');item=(await pageA.getDatabase()).providerItems['kindle:a'];assert.equal(item.recordRef,ref);assert.equal(item.metadata.enrichment.googleBooks.volumeId,'approved');assert.equal(item.metadata.enrichment.googleBooks.token,undefined);
+  })],
+  ['backup validation sanitizes provider state, enrichment URLs and untrusted canonical data', () => {
+    const database=createEmptyDatabase();
+    const item=normalizeProviderItem({provider:'humble',providerItemId:'a',title:'Book',mediaType:'book',metadata:{authors:['Author']}});database.providerItems[item.id]=item;
+    item.metadata.enrichment={googleBooks:{source:'google-books',volumeId:'volume',sourceUrl:'https://books.google.com/books?id=volume&token=secret#secret',authors:['Author'],token:'secret'},unknown:{token:'secret'}};
+    database.providers.humble={connected:true,bookCount:1,token:'secret',syncState:{knownPurchaseIds:['purchase-1'],token:'secret'}};
+    database.providers['secret-provider']={token:'secret'};
+    database.canonicalItems={secret:{id:'edition:secret',providerItemIds:[item.id],token:'secret'}};
+    const validated=validateDatabase(database);const json=JSON.stringify(validated);assert.ok(!json.includes('secret'));
+    assert.equal(validated.providerItems[item.id].metadata.enrichment.googleBooks.sourceUrl,'https://books.google.com/books?id=volume');
+    assert.deepEqual(validated.providers.humble.syncState,{knownPurchaseIds:['purchase-1']});
+    const duplicate=structuredClone(database);duplicate.providerItems.duplicate={...item};assert.throws(()=>validateDatabase(duplicate),/duplicate provider identities/u);
+    const bad=structuredClone(database);bad.providers.humble.bookCount=-1;assert.throws(()=>validateDatabase(bad),/nonnegative/u);
+  }],
+  ['legacy storage is sanitized once without rewriting an unchanged database on every read', async () => {
+    const database=createEmptyDatabase();const item=normalizeProviderItem({provider:'kindle',providerItemId:'a',title:'Book',mediaType:'book'});database.providerItems[item.id]=item;item.metadata.token='secret';
+    const values={[DATABASE_STORAGE_KEY]:database};let writes=0;
+    const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>{writes++;Object.assign(values,structuredClone(updates));}});
+    await writer.getDatabase();assert.ok(!JSON.stringify(values[DATABASE_STORAGE_KEY]).includes('secret'));assert.equal(writes,1);
+    await writer.getDatabase();assert.equal(writes,1);
+  }],
+  ['contents validation rejects oversized scope and credential URLs while retaining reviewed full evidence', () => {
+    const entry={series:'Series',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'};
+    assert.throws(()=>validateContentReview({entries:[{...entry,series:'s'.repeat(501)}]}),/bounds/u);
+    assert.throws(()=>validateContentReview({entries:[entry],sourceUrl:'https://user:secret@example.test/page'}),/without credentials/u);
+    assert.throws(()=>validateContentReview({entries:[entry],verifiedAt:'secret-date'}),/ISO/u);
+    const review=validateContentReview({entries:[{...entry,token:'secret'}],sourceUrl:'https://publisher.test/collection?token=secret#secret',token:'secret'});
+    assert.equal(review.entries.length,1);assert.ok(!JSON.stringify(review).includes('secret'));
+  }],
+  ['Fandango session state is bounded, projected and remains unchanged after an invalid write', () => withWorker(async({dispatch})=>{
+    const sender={id:'abcdefghijklmnopabcdefghijklmnop',url:'https://athome.fandango.com/content/browse/mylibrary',tab:{id:1}};
+    const state={phase:'tv',fullRescan:true,expected:{movies:1,tv:0},urls:{movie:'https://athome.fandango.com/movie-grid?token=secret',tv:'https://athome.fandango.com/tv-grid'},items:[{providerItemId:'1',title:'Movie',mediaType:'movie',ownership:'owned',metadata:{token:'secret'}}],knownItemIds:['1'],token:'secret'};
+    assert.ok(!JSON.stringify(validateFandangoState(state)).includes('secret'));
+    assert.equal((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'set',state},sender)).ok,true);
+    const before=(await dispatch({type:'FANDANGO_IMPORT_STATE',action:'get'},sender)).state;
+    const invalid={...state,urls:{...state.urls,tv:'https://evil.test/tv-grid'}};
+    assert.equal((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'set',state:invalid},sender)).ok,false);
+    assert.deepEqual((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'get'},sender)).state,before);
   })]
 ];
