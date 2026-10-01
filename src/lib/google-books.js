@@ -161,6 +161,7 @@ export function isHighConfidenceGoogleBooksMatch(query, candidate) {
   const conflicts=identityConflicts(left,right).filter(key=>key!=='authors'&&!(key==='edition'&&matchingIdentifier&&!identityEvidence(left).edition));
   if(conflicts.length)return false;
   const a=titleUnits(query?.title);const b=titleUnits(candidateTitle);
+  if(!a.length&&query?.volume)a.push(`volume:${query.volume}`);if(!a.length&&query?.issue)a.push(`issue:${query.issue}`);
   if(a.length&&b.length&&JSON.stringify(a)!==JSON.stringify(b))return false;
   if(!matchingIdentifier&&(JSON.stringify(a)!==JSON.stringify(b)||JSON.stringify(editionQualifiers(query?.title))!==JSON.stringify(editionQualifiers(candidateTitle))))return false;
   if(identifiers.length){

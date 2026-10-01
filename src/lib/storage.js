@@ -19,6 +19,7 @@ export const {
   getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase,
   getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
   saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
+  acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
   getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
   saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
   saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,

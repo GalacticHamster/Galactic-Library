@@ -68,6 +68,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const validated = validateDatabase(database);
     const updates={[DATABASE_STORAGE_KEY]:validated};
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
+    if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
     await storageArea.set(updates);
     return validated;
   }
@@ -222,6 +223,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     });
     return {
       queue,
+      jobId:typeof value.jobId==='string'?value.jobId:crypto.randomUUID(),
+      runId:typeof value.runId==='string'?value.runId:null,
+      leaseUntil:Number.isFinite(value.leaseUntil)?value.leaseUntil:0,
+      targets:Object.fromEntries(queue.map(id=>[id,(Array.isArray(value.targets?.[id])?value.targets[id]:[]).filter(ref=>typeof ref==='string'&&/^[a-f0-9-]{36}$/iu.test(ref)).slice(0,50)])),
       cursor,
       processed: count('processed'),
       matched: count('matched'),
@@ -254,17 +259,55 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function clearGoogleBooksEnrichmentJob() {
+    const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Pause the active enrichment run before resetting it.');
     await storageArea.remove(GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY);
   }
 
   async function startGoogleBooksEnrichmentJob() {
+    const existing=await getGoogleBooksEnrichmentJob();if(existing?.runId&&existing.leaseUntil>Date.now())throw new Error('Another options page is running enrichment. Pause it or wait for its lease to expire.');
     const database = await getDatabase();
     const queue = Object.values(database.canonicalItems).filter((canonical) => {
       if (canonical.mediaType !== 'book') return false;
       const records = canonical.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean);
       return needsGoogleBooksEnrichment(records);
     }).map((canonical) => canonical.id).sort();
-    return saveGoogleBooksEnrichmentJob({ queue, cursor: 0, processed: 0, matched: 0, genreHints: 0, noMatch: 0, zeroResults: 0, titleVariant: 0, authorVariant: 0, samples: [], skipped: 0, errors: 0, startedAt: new Date().toISOString() });
+    const targets=Object.fromEntries(queue.map(id=>[id,database.canonicalItems[id].providerItemIds.map(id=>database.providerItems[id].recordRef)]));
+    return saveGoogleBooksEnrichmentJob({ queue,targets,jobId:crypto.randomUUID(),cursor: 0, processed: 0, matched: 0, genreHints: 0, noMatch: 0, zeroResults: 0, titleVariant: 0, authorVariant: 0, samples: [], skipped: 0, errors: 0, startedAt: new Date().toISOString() });
+  }
+
+  async function acquireEnrichmentRun(jobId,runId=null){
+    let job=await getGoogleBooksEnrichmentJob();if(!job||job.jobId!==jobId)throw new Error('Enrichment progress was replaced or cleared.');
+    if(job.runId&&job.runId!==runId&&job.leaseUntil>Date.now())throw new Error('Another options page is running enrichment.');
+    if(runId&&job.runId!==runId)throw new Error('This enrichment run was superseded.');
+    job={...job,runId:runId??crypto.randomUUID(),leaseUntil:Date.now()+120000};return saveGoogleBooksEnrichmentJob(job);
+  }
+  async function activeEnrichmentRun(jobId,runId){
+    const job=await getGoogleBooksEnrichmentJob();if(!job||job.jobId!==jobId||job.runId!==runId||job.leaseUntil<=Date.now())throw new Error('Enrichment run expired, cleared, restored, or superseded. Resume from the current progress.');return job;
+  }
+  async function commitEnrichmentBatch(jobId,runId,cursor,outcomes){
+    let job=await activeEnrichmentRun(jobId,runId);if(job.cursor!==cursor||!Array.isArray(outcomes)||outcomes.length>5)throw new Error('Invalid or stale enrichment checkpoint.');
+    const database=await getDatabase();const byRef=new Map(Object.values(database.providerItems).map(item=>[item.recordRef,item]));const now=new Date().toISOString();
+    for(let index=0;index<outcomes.length;index++){
+      const outcome=outcomes[index];const id=job.queue[cursor+index];if(!id||outcome.canonicalId!==id)throw new Error('Enrichment batch does not match its queue.');
+      const records=(job.targets[id]??[]).map(ref=>byRef.get(ref));
+      const observations=outcome.recordObservations;
+      const changed=outcome.status!=='skipped'&&(!Array.isArray(observations)||observations.length!==records.length||records.some((item,index)=>item&&(observations[index]?.ref!==item.recordRef||observations[index]?.observedAt!==item.observedAt||observations[index]?.title!==item.title)));
+      if(!records.length||changed||records.some(item=>!item||item.mediaType!=='book'||item.metadata.enrichment?.googleBooks?.volumeId)||outcome.status==='skipped'){job.skipped++;}
+      else if(outcome.enrichment){for(const record of records)selectEnrichment(database,record.id,'googleBooks',outcome.enrichment,now);job.matched++;}
+      else{
+        if(outcome.hint){for(const record of records)selectEnrichment(database,record.id,'googleBooksGenreHint',outcome.hint,now);job.genreHints++;}
+        else if(outcome.status==='failed')job.errors++;else{job.noMatch++;if(outcome.status==='no-results')job.zeroResults++;else if(outcome.status==='title-variant')job.titleVariant++;else if(outcome.status==='author-variant')job.authorVariant++;}
+        const ref=crypto.randomUUID();const review=validateEnrichmentReviews({[ref]:{recordRefs:records.map(record=>record.recordRef),source:'googleBooks',status:outcome.status==='failed'?'failed':outcome.candidates?.length?'ambiguous':'no-results',title:records[0].title,reason:outcome.reason??'Automatic selection was insufficient.',checkedAt:now,candidates:outcome.candidates??[]}})[ref];
+        for(const [oldRef,old]of Object.entries(database.enrichmentReviews))if(old.source==='googleBooks'&&old.recordRefs.some(ref=>review.recordRefs.includes(ref)))delete database.enrichmentReviews[oldRef];database.enrichmentReviews[ref]=review;
+      }
+      job.cursor++;job.processed++;
+    }
+    database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);
+    job={...job,leaseUntil:Date.now()+120000,updatedAt:now};
+    await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:normaliseGoogleBooksJob(job)});return {database,job};
+  }
+  async function finishEnrichmentRun(jobId,runId,lastError=''){
+    const job=await activeEnrichmentRun(jobId,runId);return saveGoogleBooksEnrichmentJob({...job,runId:null,leaseUntil:0,lastError:text(lastError,600,'Enrichment error'),lastErrorAt:lastError?new Date().toISOString():''});
   }
 
   async function getAllowedExternalClientIds() {
@@ -451,7 +494,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   const operations = {
     getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
-    saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
+    saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,

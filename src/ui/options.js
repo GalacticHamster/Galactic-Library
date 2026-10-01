@@ -1,3 +1,4 @@
+import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
@@ -510,13 +511,14 @@ async function renderGoogleBooksEnrichment() {
   const [key, job] = await Promise.all([getGoogleBooksApiKey(), getGoogleBooksEnrichmentJob()]);
   clearGoogleBooksApiKeyButton.disabled = !key || googleBooksRunning;
   saveGoogleBooksApiKeyButton.disabled = googleBooksRunning;
-  startGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !key;
+  const otherRun=Boolean(job?.runId&&job.leaseUntil>Date.now()&&!googleBooksRunning);
+  startGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !key || otherRun;
   startGoogleBooksEnrichmentButton.textContent = job && job.cursor < job.queue.length ? 'Resume enrichment' : 'Start enrichment';
   pauseGoogleBooksEnrichmentButton.hidden = !googleBooksRunning;
   resetGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !job;
   renderGoogleBooksDiagnostics(job);
   if (googleBooksRunning) return;
-  if (!key) {
+  if(otherRun){googleBooksEnrichmentStatus.textContent='Another options page is running enrichment. Pause it or wait for its lease to expire.';} else if (!key) {
     googleBooksEnrichmentStatus.textContent = 'Save a private Google Books API key to enable automated enrichment.';
   } else if (job?.lastError) {
     googleBooksEnrichmentStatus.textContent = `Google Books stopped: ${job.lastError} Progress is saved. If this is a quota limit, wait for Google to reset it, then Resume enrichment.`;
@@ -538,94 +540,42 @@ function stopsGoogleBooksEnrichment(message) {
 }
 
 async function runGoogleBooksEnrichment() {
-  if (googleBooksRunning) return;
-  googleBooksRunning = true;
-  googleBooksPauseRequested = false;
-  await renderGoogleBooksEnrichment();
-  try {
-    const key = await getGoogleBooksApiKey();
-    if (!key) throw new Error('Save a Google Books API key before starting enrichment.');
-    let job = await getGoogleBooksEnrichmentJob();
-    if (!job || job.cursor >= job.queue.length) job = await startGoogleBooksEnrichmentJob();
-    if (!job.queue.length) {
-      googleBooksEnrichmentStatus.textContent = 'No books need Google Books edition enrichment.';
-      return;
-    }
-    while (job.cursor < job.queue.length && !googleBooksPauseRequested) {
-      database = await getDatabase();
-      const canonical = database.canonicalItems[job.queue[job.cursor]];
-      const records = canonical?.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean) ?? [];
-      if (!canonical || !records.length || canonical.mediaType !== 'book') {
-        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, skipped: job.skipped + 1 };
-        job = await saveGoogleBooksEnrichmentJob(job);
-        continue;
-      }
-      const query=bibliographicQuery(canonical,records);
-      const authors = query.authors;
-      googleBooksEnrichmentStatus.textContent = `${googleBooksStatusText(job)} Looking up “${canonical.title}”…`;
-      let candidates;
-      try {
-        const response = await chrome.runtime.sendMessage({ type: 'SEARCH_GOOGLE_BOOKS', query });
-        if (!response?.ok) throw new Error(response?.error ?? 'Google Books search did not complete.');
-        candidates = response.candidates ?? [];
-      } catch (error) {
-        if (stopsGoogleBooksEnrichment(error.message)) {
-          const lastError = String(error.message).trim();
-          job = await saveGoogleBooksEnrichmentJob({ ...job, lastError, lastErrorAt: new Date().toISOString() });
-          throw new Error(lastError);
-        }
-        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, errors: job.errors + 1 };
-        job = await saveGoogleBooksEnrichmentJob(job);
-        await pause(1200);
-        continue;
-      }
-      if (job.lastError) job = { ...job, lastError: '', lastErrorAt: '' };
-      googleBooksSearches.set(canonical.id,{candidates,error:'',loading:false});
-      const candidate = highConfidenceGoogleBooksCandidate(query, candidates);
-      if(!candidate)database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'googleBooks',status:candidates.length?(query.authors.length||query.isbn.length?'ambiguous':'candidates'):'no-results',title:canonical.title,reason:'Automatic identity confidence was insufficient. Review the actual edition.',candidates:candidates.map(candidate=>googleBooksEnrichment(candidate))});
-      if (candidate) {
-        database = await saveGoogleBooksEnrichments([{ itemIds: canonical.providerItemIds, recordRefs:records.map(record=>record.recordRef),enrichment: googleBooksEnrichment(candidate) }]);
-        job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, matched: job.matched + 1 };
-      } else {
-        const genreHint = googleBooksGenreHintCandidate({ title: canonical.title, authors }, candidates);
-        if (genreHint) {
-          database = await saveGoogleBooksGenreHints([{ itemIds: canonical.providerItemIds, hint: googleBooksGenreHint(genreHint) }]);
-          job = { ...job, cursor: job.cursor + 1, processed: job.processed + 1, genreHints: (job.genreHints ?? 0) + 1 };
-        } else {
-        const classification = googleBooksMatchClassification({ title: canonical.title, authors }, candidates);
-        const diagnosticKey = classification === 'no-results'
-          ? 'zeroResults'
-          : classification === 'title-variant'
-            ? 'titleVariant'
-            : classification === 'author-variant'
-              ? 'authorVariant'
-              : '';
-        const sample = diagnosticKey ? {
-          reason: classification,
-          title: canonical.title,
-          candidateTitle: candidates[0]?.title ?? ''
-        } : null;
-        job = {
-          ...job,
-          cursor: job.cursor + 1,
-          processed: job.processed + 1,
-          noMatch: job.noMatch + 1,
-          ...(diagnosticKey ? { [diagnosticKey]: job[diagnosticKey] + 1 } : {}),
-          ...(sample ? { samples: [...(job.samples ?? []), sample].slice(-50) } : {})
-        };
-        }
-      }
-      job = await saveGoogleBooksEnrichmentJob(job);
-      renderGoogleBooksDiagnostics(job);
-      await pause(1200);
-    }
-    googleBooksEnrichmentStatus.textContent = googleBooksStatusText(job, googleBooksPauseRequested ? 'Paused: ' : 'Completed: ');
-  } catch (error) {
-    googleBooksEnrichmentStatus.textContent = `Google Books enrichment paused: ${error.message}`;
-  } finally {
-    googleBooksRunning = false;
-    pauseGoogleBooksEnrichmentButton.hidden = true;
+  if(googleBooksRunning)return;googleBooksRunning=true;googleBooksPauseRequested=false;
+  let job;let lastError='';
+  try{
+    if(!await getGoogleBooksApiKey())throw new Error('Save a Google Books API key before starting enrichment.');
+    job=await getGoogleBooksEnrichmentJob();
+    if(!job||job.cursor>=job.queue.length||!Object.values(job.targets??{}).some(refs=>refs.length))job=await startGoogleBooksEnrichmentJob();
+    job=await acquireEnrichmentRun(job.jobId);
     await renderGoogleBooksEnrichment();
+    while(job.cursor<job.queue.length&&!googleBooksPauseRequested){
+      database=await getDatabase();const byRef=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));
+      const outcomes=[];const cursor=job.cursor;
+      for(let count=0;count<5&&cursor+count<job.queue.length&&!googleBooksPauseRequested;count++){
+        job=await acquireEnrichmentRun(job.jobId,job.runId);
+        const canonicalId=job.queue[cursor+count];const records=(job.targets[canonicalId]??[]).map(ref=>byRef.get(ref));
+        if(!records.length||records.some(record=>!record||record.mediaType!=='book'||record.metadata.enrichment?.googleBooks?.volumeId)){outcomes.push({canonicalId,status:'skipped'});continue;}
+        const canonical=database.canonicalItems[canonicalId]??{title:records[0].title};const query=enrichmentQuery(canonical,records);
+        googleBooksEnrichmentStatus.textContent=googleBooksStatusText(job)+' Looking up ?'+canonical.title+'??';
+        try{
+          const response=await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query});if(!response?.ok)throw new Error(response?.error??'Google Books lookup failed.');
+          const candidates=response.candidates??[];const candidate=highConfidenceGoogleBooksCandidate(query,candidates);
+          if(candidate)outcomes.push({canonicalId,enrichment:{...googleBooksEnrichment(candidate),matchBasis:query.isbn.length?'validated-isbn':'unambiguous-title-and-author'}});
+          else{const hint=googleBooksGenreHintCandidate(query,candidates);outcomes.push({canonicalId,status:googleBooksMatchClassification(query,candidates),candidates:candidates.map(candidate=>googleBooksEnrichment(candidate)),...(hint?{hint:googleBooksGenreHint(hint)}:{})});}
+        }catch(error){
+          if(stopsGoogleBooksEnrichment(error.message)){lastError=error.message;googleBooksPauseRequested=true;break;}
+          outcomes.push({canonicalId,status:'failed',reason:error.message,candidates:[]});
+        }
+        outcomes.at(-1).recordObservations=records.map(record=>({ref:record.recordRef,observedAt:record.observedAt,title:record.title}));
+        await pause(1200);
+      }
+      if(outcomes.length){const committed=await commitEnrichmentBatch(job.jobId,job.runId,cursor,outcomes);job=committed.job;database=committed.database;render();}
+    }
+  }catch(error){lastError=error.message;}
+  finally{
+    if(job?.runId)try{job=await finishEnrichmentRun(job.jobId,job.runId,lastError);}catch(error){lastError=error.message;}
+    googleBooksRunning=false;pauseGoogleBooksEnrichmentButton.hidden=true;await renderGoogleBooksEnrichment();
+    if(lastError)googleBooksEnrichmentStatus.textContent='Google Books enrichment paused: '+lastError;
   }
 }
 

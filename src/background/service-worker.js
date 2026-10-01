@@ -126,9 +126,18 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
 async function searchOpenLibrary(query) {
   const title = String(query?.title ?? '').trim();
   if (!title) throw new Error('Choose a book with a title before searching Open Library.');
-  const response = await fetch(openLibrarySearchUrl({ title, authors: query?.authors, isbn: query?.isbn }), { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Open Library returned ${response.status}.`);
-  return openLibraryCandidatesFromSearch(await response.json());
+  return openLibraryCandidatesFromSearch(await enrichmentJson(openLibrarySearchUrl({ title, authors: query?.authors, isbn: query?.isbn }), 'Open Library'));
+}
+
+let enrichmentRequests=Promise.resolve();let lastEnrichmentRequest=0;
+function enrichmentJson(url,label){
+  const result=enrichmentRequests.then(async()=>{
+    await new Promise(resolve=>setTimeout(resolve,Math.max(0,1200-(Date.now()-lastEnrichmentRequest))));lastEnrichmentRequest=Date.now();
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
+    try{const response=await fetch(url,{cache:'no-store',signal:controller.signal});if(!response.ok)throw new Error(`${label} returned ${response.status}.`);return await response.json();}
+    catch(error){if(controller.signal.aborted)throw new Error(`${label} lookup timed out. Try again later.`);throw error;}
+    finally{clearTimeout(timer);}
+  });enrichmentRequests=result.catch(()=>{});return result;
 }
 
 async function searchGoogleBooks(query) {
@@ -136,12 +145,7 @@ async function searchGoogleBooks(query) {
   const apiKey = await getGoogleBooksApiKey();
   if (!title) throw new Error('Choose a book with a title before searching Google Books.');
   if (!apiKey) throw new Error('Save your Google Books API key before starting enrichment.');
-  const response = await fetch(googleBooksSearchUrl({ title, authors: query?.authors, isbn: query?.isbn, apiKey }), { cache: 'no-store' });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = String(body?.error?.message ?? '').replace(/\s+/gu, ' ').trim();
-    throw new Error(`Google Books returned ${response.status}${detail ? `: ${detail}` : '.'}`);
-  }
+  const body=await enrichmentJson(googleBooksSearchUrl({...query,title,apiKey}), 'Google Books');
   return googleBooksCandidatesFromSearch(body);
 }
 

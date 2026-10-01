@@ -39,4 +39,14 @@ export const enrichmentTests=[['Google Books rejects different, missing and ambi
   assert.equal((await writer.getDatabase()).providerItems[record.id].metadata.enrichment.googleBooks.publisher,undefined);
   await writer.undoEnrichmentSelection(first);assert.equal((await writer.getDatabase()).providerItems[record.id].metadata.enrichment?.googleBooks,undefined);
   await assert.rejects(writer.saveGoogleBooksEnrichments([{itemIds:[record.id],recordRefs:[crypto.randomUUID()],enrichment:candidate}]),/changed during enrichment/);
+}],['enrichment leases isolate options pages and batch five selections into one atomic checkpoint',async()=>{
+  const stored={};const writes=[];const area={get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));}};
+  let writer=createStorageWriter(area);await writer.mergeProviderItems('humble',Array.from({length:6},(_,index)=>({providerItemId:`book-${index}`,title:`Manga Vol. ${index+1}`,mediaType:'book',metadata:{authors:['Writer']}})));
+  let job=await writer.startGoogleBooksEnrichmentJob();job=await writer.acquireEnrichmentRun(job.jobId);await assert.rejects(writer.acquireEnrichmentRun(job.jobId),/Another options page/);
+  await assert.rejects(writer.startGoogleBooksEnrichmentJob(),/Another options page/);await assert.rejects(writer.clearGoogleBooksEnrichmentJob(),/Pause/);
+  writer=createStorageWriter(area);const database=await writer.getDatabase();const byRef=new Map(Object.values(database.providerItems).map(item=>[item.recordRef,item]));
+  const outcomes=job.queue.slice(0,5).map(id=>{const records=job.targets[id].map(ref=>byRef.get(ref));return {canonicalId:id,enrichment:{source:'google-books',volumeId:`volume-${id}`,title:records[0].title,authors:['Writer']},recordObservations:records.map(record=>({ref:record.recordRef,observedAt:record.observedAt,title:record.title}))};});
+  const before=writes.length;const committed=await writer.commitEnrichmentBatch(job.jobId,job.runId,0,outcomes);assert.equal(writes.length-before,1);assert.equal(committed.job.cursor,5);assert.equal(committed.job.matched,5);
+  await assert.rejects(writer.commitEnrichmentBatch(job.jobId,job.runId,0,outcomes),/stale enrichment checkpoint/);
+  const restored=await writer.getDatabase();await writer.restoreDatabase(restored);await assert.rejects(writer.commitEnrichmentBatch(job.jobId,job.runId,5,[]),/cleared, restored/);
 }]];

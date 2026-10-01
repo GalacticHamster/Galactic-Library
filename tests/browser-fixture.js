@@ -143,6 +143,16 @@ try{
   button(card('Review manga Vol. 1'),'Undo googleBooks selection').click();
   await wait(()=>!values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks,'Enrichment undo failed.');
   checks.push('actual enrichment undo removes the selection and preserves provider ownership');
+  const queuedDatabase=await writer.getDatabase();const queuedRecord=queuedDatabase.providerItems['humble:review-manga'];const queuedCanonical=Object.values(queuedDatabase.canonicalItems).find(item=>item.providerItemIds.includes(queuedRecord.id));
+  await writer.saveGoogleBooksEnrichmentJob({queue:[queuedCanonical.id],targets:{[queuedCanonical.id]:[queuedRecord.recordRef]},cursor:0});
+  document.querySelector('#google-books-api-key').value='AIzaSyntheticKeyForLocalFixturesOnly';document.querySelector('#save-google-books-api-key').click();
+  await wait(()=>!document.querySelector('#start-google-books-enrichment').disabled,'Synthetic key did not enable enrichment.');
+  document.querySelector('#start-google-books-enrichment').click();
+  await wait(()=>values.googleBooksEnrichmentJob.cursor===1&&!values.googleBooksEnrichmentJob.runId,'Batched authorless job did not finish.');
+  assert(Object.values(values.galacticLibraryDatabase.enrichmentReviews).some(review=>review.recordRefs.includes(queuedRecord.recordRef)),'Batched lookup did not retain its review.');
+  assert(!values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment?.googleBooks,'Authorless batch silently approved an edition.');
+  checks.push('actual batch runner checkpoints authorless candidates for review and releases its worker lease');
+
   await writer.replaceProviderItems('humble',[],{},completeProviderSnapshot('humble',[],[completedScope('library',0,0,'reported-count',1)]));
   const historyTransfer=new DataTransfer();historyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'history.json',{type:'application/json'}));
   document.querySelector('#backup-status').textContent='';input.files=historyTransfer.files;input.dispatchEvent(new Event('change'));
