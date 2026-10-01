@@ -411,7 +411,7 @@ const tests = [
       },
       {
         providerItemId: 'purchase-123:entitlement:steam-key:2', title: 'Third Party Game', mediaType: 'game', ownership: 'owned', acquiredAt: '2026-09-01T00:00:00.000Z',
-        metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'third-party-key', keyType: 'Steam' }
+        metadata: { source: 'humble-purchase-library', sourceBundle: 'Example Bundle', purchaseId: 'purchase-123', entitlement: 'third-party-key', keyType: 'Steam', keyStatus:'revealed',expiresAt:null }
       }
     ]);
     assert.deepEqual(humbleBundleGenreHints(normalizeProviderItem({

@@ -56,6 +56,8 @@ try{
   assert(inspector.textContent.includes('9780306406157')&&inspector.textContent.includes('Account / profileUnknown')&&inspector.textContent.includes('Last observed at provider'),'Evidence fields missing.');
   assert(!inspector.querySelector('a[href^="javascript:"]'),'Unsafe provider source link.');
   checks.push('evidence inspector exposes dates, identities and unknown account scope safely');
+  assert(inspector.textContent.includes('Reseller purchase evidenceconfirmed')&&inspector.textContent.includes('Destination activationnot-applicable'),'Direct purchase evidence missing.');
+  checks.push('reseller purchase evidence is displayed separately from destination activation');
   inspector.querySelector('[aria-label="Compare with library record"]').value='humble:c';
   inspector.querySelector('[aria-label="Compare with library record"]').dispatchEvent(new Event('change'));
   assert(inspector.querySelector('.identity-conflicts').textContent.includes('edition'),'Edition conflict not shown.');

@@ -22,7 +22,12 @@ export function companionMatch(value) {
       isbn: [...new Set(names(evidence.isbn).map(validIsbn).filter(Boolean))], authors: names(evidence.authors),
       language: compact(evidence.language, 80), edition: compact(evidence.edition), series: names(evidence.series),
       run: compact(evidence.run, 100), unit: compact(evidence.unit, 80),
-      source: SOURCES.has(evidence.source) ? evidence.source : provider, checkedAt: publicDate(evidence.checkedAt)
+      source: SOURCES.has(evidence.source) ? evidence.source : provider, checkedAt: publicDate(evidence.checkedAt),
+      ...(['humble','fanatical'].includes(provider)?{
+        purchaseEvidence:evidence.purchaseEvidence==='confirmed'?'confirmed':'unknown',
+        activationStatus:evidence.activationStatus==='not-applicable'?'not-applicable':'unknown',
+        ...(Object.hasOwn(evidence,'keyStatus')?{keyStatus:['unrevealed','revealed','expired','unavailable'].includes(evidence.keyStatus)?evidence.keyStatus:'unknown',expiresAt:publicDate(evidence.expiresAt)}:{})
+      }:{})
     },
     ...(Object.hasOwn(value, 'verifiedAt') ? { verifiedAt: publicDate(value.verifiedAt) } : {})
   };

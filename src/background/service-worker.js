@@ -332,7 +332,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           hasFullBaseline: Boolean(state.fullSyncAt),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: request.provider === 'humble'
-            ? humbleSyncState(state.syncState)
+            ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set(Object.values(database.providerItems)
+              .filter(item=>item.provider==='humble'&&item.metadata?.entitlement==='third-party-key'
+                &&(item.metadata.keyStatus!=='revealed'||item.metadata.expiresAt&&Date.parse(item.metadata.expiresAt)<=Date.now()))
+              .map(item=>item.metadata.purchaseId).filter(Boolean))].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
             : { knownProviderItemIds }

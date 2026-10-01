@@ -17,7 +17,7 @@ Common metadata fields are authors, contributors with name/role, series, ISBN/AS
 | Fandango at Home | Card type |
 | Kobo | Library section, validated ownership basis; library presence alone cannot establish ownership |
 | Fanatical | Bundle ID/title/slug, product slug, DRM, formats, Steam App ID |
-| Humble | Purchase ID, bundle label, entitlement type, key type; no redemption values |
+| Humble | Purchase ID, bundle label, entitlement type, key type, allowlisted key status and validated ISO expiry; no redemption values |
 
 Supported nested enrichment is limited to Open Library work metadata, Google Books edition metadata, Google Books genre hints and Kindle product-page contents. Each has its own field allowlist. Arbitrary nested objects, raw responses, credentials, download links and unsupported enrichment adapters are discarded.
 

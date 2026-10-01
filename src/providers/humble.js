@@ -143,17 +143,27 @@
         mediaType: 'game',
         ownership: 'owned',
         acquiredAt,
-        metadata: { ...baseMetadata, entitlement: 'third-party-key', keyType: compactText(record?.key_type_human_name ?? record?.key_type) }
+        metadata: { ...baseMetadata, entitlement: 'third-party-key', keyType: compactText(record?.key_type_human_name ?? record?.key_type), ...keyEvidence(record) }
       }];
     });
-    return [...directItems, ...thirdPartyItems];
+    const keyedTitles=new Set(thirdPartyItems.map(item=>item.title.toLowerCase()));
+    return [...directItems.filter(item=>item.mediaType!=='game'||!keyedTitles.has(item.title.toLowerCase())), ...thirdPartyItems];
+  }
+
+  function keyEvidence(record) {
+    const status=record.is_expired===true?'expired':record.is_available===false||record.key_status==='unavailable'?'unavailable':
+      ['redeemed_key_val','redeemed_key_value','key_val','key_value','key'].some(field=>record[field]===REDACTED_REDEMPTION_VALUE)?'revealed':
+      !Object.hasOwn(record,'redeemed_key_val')?'unrevealed':'unknown';
+    const raw=record.expiration_date??record.expiry_date;
+    const timestamp=typeof raw==='number'?raw*(raw<1e12?1000:1):typeof raw==='string'&&raw.trim()?Date.parse(raw):NaN;
+    return {keyStatus:status,expiresAt:Number.isFinite(timestamp)&&Math.abs(timestamp)<8.64e15?new Date(timestamp).toISOString():null};
   }
 
   function wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function fetchHumblePurchases(reportProgress = () => {}, knownPurchaseIds = null) {
+  async function fetchHumblePurchases(reportProgress = () => {}, knownPurchaseIds = null, refreshPurchaseIds = []) {
     reportProgress({ purchasesRead: 0, purchasesTotal: 0, items: 0 });
     const response = await fetchJson('/api/v1/user/order?all=true');
     const orders = Array.isArray(response) ? response : response?.data ?? response?.orders;
@@ -163,7 +173,7 @@
     if (!keyedOrders.length) throw new Error('Humble returned no readable purchases. Confirm that you are signed in to an account with purchases.');
     const sync = purchaseIdsForSync(orders, knownPurchaseIds ?? []);
     const incremental = Array.isArray(knownPurchaseIds);
-    const selectedPurchaseIds = incremental ? new Set(sync.newPurchaseIds) : new Set(sync.purchaseIds);
+    const selectedPurchaseIds = incremental ? new Set([...sync.newPurchaseIds,...refreshPurchaseIds]) : new Set(sync.purchaseIds);
     const selectedOrders = keyedOrders.filter(({ purchaseId }) => selectedPurchaseIds.has(purchaseId));
     const itemsById = new Map();
     const failures = [];

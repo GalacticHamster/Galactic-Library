@@ -26,7 +26,7 @@
         status.textContent = purchasesTotal
           ? `Reading Humble purchase ${read}/${purchasesTotal}; ${found} supported entitlements found${skippedKnown ? `; ${skippedKnown} already known` : ''}.`
           : 'Loading your Humble purchases…';
-      }, fullRescan ? null : state.syncState?.knownPurchaseIds ?? []);
+      }, fullRescan ? null : state.syncState?.knownPurchaseIds ?? [], state.syncState?.refreshPurchaseIds ?? []);
       status.textContent = result.items.length ? `Saving ${result.items.length} Humble entitlement${result.items.length === 1 ? '' : 's'} locally…` : 'No new supported Humble entitlements; recording the completed purchase check…';
       const response = await chrome.runtime.sendMessage({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'humble', mode: fullRescan ? 'full' : 'incremental', items: result.items,

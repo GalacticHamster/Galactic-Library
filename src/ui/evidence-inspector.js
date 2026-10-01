@@ -1,5 +1,6 @@
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
 import { contentCoverage } from '../lib/contents.js';
+import { entitlementEvidence } from '../lib/ownership.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 const display=value=>Array.isArray(value)?value.join(', ')||'Unknown':value||'Unknown';
@@ -29,6 +30,9 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));
       field('Record reference',record.recordRef);field('Ownership evidence',record.ownership);field('Evidence source',identity.source);
       if(record.provider==='kobo')field('Kobo ownership basis',record.metadata.ownershipBasis||'Library presence only; durable ownership unconfirmed');
+      const entitlement=entitlementEvidence(record);
+      if(entitlement.purchaseEvidence){field('Reseller purchase evidence',entitlement.purchaseEvidence);field('Destination activation',entitlement.activationStatus);}
+      if(entitlement.keyStatus){field('Key status at last observation',entitlement.keyStatus);field('Reported key expiry',entitlement.expiresAt);section.append(element('p','Purchase and key revelation do not establish destination-platform activation. An expired or unavailable key needs review; it does not revoke a separate destination-library record.'));}
       field('Account / profile',compact(provider.accountLabel||provider.profileLabel));
       field('Last observed at provider',record.observedAt);field('Last provider sync (may be incremental)',provider.lastSync);
       field('Record last updated (includes enrichment)',record.updatedAt);field('Acquired / added',record.acquiredAt);

@@ -12,6 +12,15 @@ import { validateFandangoState } from '../src/background/import-state.js';
 import { DATABASE_STORAGE_KEY } from '../src/lib/constants.js';
 
 export const securityTests = [
+  ['Humble quick state refreshes unresolved and due key purchases without revealing foreign records', () => withWorker(async({dispatch,pageA})=>{
+    await pageA.mergeProviderItems('humble',[
+      {providerItemId:'pending',title:'Pending',mediaType:'game',ownership:'owned',metadata:{purchaseId:'pending-order',entitlement:'third-party-key',keyStatus:'unrevealed'}},
+      {providerItemId:'revealed',title:'Revealed',mediaType:'game',ownership:'owned',metadata:{purchaseId:'revealed-order',entitlement:'third-party-key',keyStatus:'revealed'}},
+      {providerItemId:'due',title:'Due',mediaType:'game',ownership:'owned',metadata:{purchaseId:'due-order',entitlement:'third-party-key',keyStatus:'revealed',expiresAt:'2000-01-01'}}
+    ]);
+    const state=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'humble'},{id:'abcdefghijklmnopabcdefghijklmnop',url:'https://www.humblebundle.com/home/purchases',tab:{id:1}});
+    assert.deepEqual(state.syncState.refreshPurchaseIds.sort(),['due-order','pending-order']);
+  })],
   ['companion output strips private fields from exact, possible, partial and contents evidence', () => {
     const database = createEmptyDatabase();
     const item = normalizeProviderItem({provider:'humble', providerItemId:'private-purchase-id', title:'Comic Collection', mediaType:'book', ownership:'owned', metadata:{authors:['Author'], source:'secret-token', purchaseId:'secret-purchase', detailUrl:'https://example.test/private', token:'secret-token'}});

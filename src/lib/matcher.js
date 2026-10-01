@@ -3,12 +3,13 @@ import { identityConflicts, identityEvidence, relationshipReason, sameEditionEvi
 import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
 import { editionBarriers, pairKey } from './relationships.js';
+import { entitlementEvidence } from './ownership.js';
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
   const identity=identityEvidence(item);
   return {provider:item.provider,itemRef:item.recordRef,title:String(item.title).slice(0,500),ownership:item.ownership,confidence,relationship,reason,
-    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null}};
+    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null,...entitlementEvidence(item)}};
 }
 
 function requestRecord(request) {

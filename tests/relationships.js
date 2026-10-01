@@ -13,6 +13,28 @@ import { DATABASE_SCHEMA_VERSION } from '../src/lib/constants.js';
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['reseller key evidence is separate from activation and expired keys do not override Steam ownership', () => {
+    const parse=globalThis.GalacticHumble.humbleItemsFromOrder;
+    const details={subproducts:[{human_name:'Game',platform:'steam'}],all_tpks:[{human_name:'Game',machine_name:'game',is_expired:true,redeemed_key_val:'__GALACTIC_REDACTED_REDEMPTION_VALUE__',expiration_date:'2026-09-01'}]};
+    const imported=parse(details,{},'order');assert.equal(imported.length,1);
+    const item=normalizeProviderItem({...imported[0],provider:'humble'});assert.equal(item.ownership,'unknown');
+    const query={title:'Game',mediaType:'game'};
+    const result=handleExternalApiRequest({...createEmptyDatabase(),providerItems:records(item)},{type:'MATCH_ITEMS',apiVersion:1,items:[query]}).results[0];
+    assert.equal(result.owned,false);assert.equal(result.matches[0].evidence.keyStatus,'expired');
+    assert.equal(result.matches[0].evidence.activationStatus,'unknown');assert.equal(result.matches[0].evidence.purchaseEvidence,'confirmed');
+    assert.equal(result.matches[0].evidence.expiresAt,'2026-09-01T00:00:00.000Z');
+    assert.equal(JSON.stringify(result).includes('order'),false);
+    const steam=normalizeProviderItem({provider:'steam',providerItemId:'123',title:'Game',ownership:'owned'});
+    assert.equal(matchItems(records(item,steam),[query])[0].owned,true);
+    for(const keyStatus of ['unrevealed','revealed','unknown']){
+      const active=normalizeProviderItem({...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus}});
+      const response=handleExternalApiRequest({...createEmptyDatabase(),providerItems:records(active)},{type:'MATCH_ITEMS',apiVersion:1,items:[query]}).results[0];
+      assert.equal(response.owned,true);assert.equal(response.matches[0].evidence.activationStatus,'unknown');
+    }
+    const invalid={...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus:'activated'}};
+    assert.throws(()=>normalizeProviderItem(invalid),/key status/);
+    const restored=validateDatabase({...createEmptyDatabase(),providerItems:records(item)});assert.equal(restored.providerItems[item.id].ownership,'unknown');
+  }],
   ['Kobo library presence is unknown, subscription evidence is temporary and explicit purchases can be owned', () => {
     const base={providerItemId:'bookId=11111111-1111-1111-1111-111111111111',title:'Kobo Plus Purchased Adventures',detailUrl:'https://www.kobo.com/ebook/adventures',typeText:'eBook',authors:['Author']};
     const parse=globalThis.GalacticKobo.koboItemFromCardData;

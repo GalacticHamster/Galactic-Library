@@ -6,7 +6,7 @@ const FIELDS = {
   steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery'],
   audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis'],
-  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId'],humble:['sourceBundle','purchaseId','entitlement','keyType']
+  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt']
 };
 const COMMON = ['source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
 const LISTS = new Set(['authors','series','narrators','collections','drm','formats']);
@@ -53,9 +53,11 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
       if (!Array.isArray(value[key]) || value[key].length>50) throw new Error('Contributors must be a bounded list.');
       result[key]=value[key].map(entry=>{object(entry,'Contributor');return {name:text(entry.name,500,'Contributor name'),role:text(entry.role,80,'Contributor role')};}).filter(entry=>entry.name);
     } else if (key==='detailUrl'||key==='imageUrl') result[key]=url(value[key],key==='detailUrl'?{hosts:HOSTS[provider]}:{});
+    else if(key==='expiresAt')result[key]=date(value[key]);
     else result[key]=text(value[key],LIMITS[key]??500,key);
   }
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
+  if(result.keyStatus&&!['unknown','unrevealed','revealed','expired','unavailable'].includes(result.keyStatus))throw new Error('Invalid key status.');
   if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');
   if (allowEnrichment && value.enrichment !== undefined && value.enrichment !== null) {
     object(value.enrichment,'Enrichment metadata'); const entries={};
