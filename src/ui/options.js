@@ -9,6 +9,7 @@ import { compareTitles } from '../lib/title-sort.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
+const downloadComixologyListButton = document.querySelector('#download-comixology-list');
 const showEnrichmentActions = document.querySelector('#show-enrichment-actions');
 const providerFilter = document.querySelector('#provider-filter');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
@@ -78,6 +79,8 @@ function providerSourceDetails(records) {
       ? 'ownership unconfirmed'
       : ownership === 'subscription'
         ? 'subscription access'
+        : ownership === 'borrowed'
+          ? 'borrowed'
         : ownership === 'rental'
           ? 'rental'
           : ownership === 'claimed'
@@ -156,6 +159,27 @@ function textElement(tag, text) {
 
 function itemMatchesQuery(item, query) {
   return !query || item.title.toLocaleLowerCase().includes(query) || item.normalizedTitle.includes(query);
+}
+
+function comixologyReviewMarkdown(providerItems, sourceLabel) {
+  const records = Object.values(providerItems)
+    .filter((item) => item.provider === 'kindle' && item.metadata?.originType?.toLocaleLowerCase() === 'comixology')
+    .sort((left, right) => compareTitles(left.title, right.title));
+  const lines = [
+    '# Comixology ownership review',
+    '',
+    `Source: ${sourceLabel}`,
+    `Records: ${records.length}`,
+    '',
+    'Check a title after confirming it was purchased or permanently claimed. Leave borrowed or uncertain titles unchecked.',
+    ''
+  ];
+  for (const item of records) {
+    const title = item.title.replace(/\s+/gu, ' ').replace(/[\\`*_{}\[\]<>]/gu, '\\$&');
+    const date = item.acquiredAt ? ` · added ${item.acquiredAt.slice(0, 10)}` : '';
+    lines.push(`- [ ] ${title} · ASIN ${item.providerItemId}${date}`);
+  }
+  return lines.join('\n') + '\n';
 }
 
 function selectedFilters() {
@@ -713,6 +737,7 @@ async function refresh() {
     chrome.storage.local.get({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: true })
   ]);
   database = loadedDatabase;
+  downloadComixologyListButton.disabled = false;
   showEnrichmentActions.checked = settings[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY] !== false;
   render();
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
@@ -746,6 +771,13 @@ document.querySelector('#clear').addEventListener('click', async () => {
   await clearDatabase();
   await refresh();
   backupStatus.textContent = 'Local library cleared.';
+});
+downloadComixologyListButton.addEventListener('click', () => {
+  const blob = new Blob([comixologyReviewMarkdown(database.providerItems, 'Current Galactic Library')], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement('a'), { href: url, download: 'comixology-ownership-review.md' });
+  link.click();
+  URL.revokeObjectURL(url);
 });
 saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { matchItems } from '../src/lib/matcher.js';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
+import { mergeProviderItems, replaceProviderItems } from '../src/lib/storage.js';
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
@@ -56,10 +57,35 @@ const tests = [
     assert.equal(normalizeGameTitle('Archer & Armstrong, Vol. 3: Far Faraway (plus extra content)').normalizedTitle, 'archer and armstrong vol 3 far faraway');
     assert.equal(normalizeGameTitle('The Valiant Deluxe Edition').normalizedTitle, 'valiant deluxe');
   }],
+  ['treats missing ownership evidence as unknown', () => {
+    const item = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B000000000', title: 'Unverified Book', mediaType: 'book' });
+    assert.equal(item.ownership, 'unknown');
+    assert.equal(matchItems({ [item.id]: item }, [{ mediaType: 'book', title: item.title }])[0].owned, false);
+  }],
+  ['preserves saved Kindle enrichment through full and quick syncs', async () => {
+    const previousChrome = globalThis.chrome;
+    const stored = {};
+    globalThis.chrome = { storage: { local: {
+      get: async (defaults) => ({ ...defaults, ...stored }),
+      set: async (values) => Object.assign(stored, values)
+    } } };
+    try {
+      const base = { providerItemId: 'B000000001', title: 'Test Comic', mediaType: 'book', ownership: 'unknown' };
+      await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }]);
+      let database = await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
+      assert.equal(database.providerItems['kindle:B000000001'].ownership, 'owned');
+      assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
+      database = await mergeProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
+      assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
+    } finally {
+      if (previousChrome === undefined) delete globalThis.chrome;
+      else globalThis.chrome = previousChrome;
+    }
+  }],
   ['matches an exact normalized title across providers', () => {
     const providerItems = Object.fromEntries([
-      normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'SOMA' }),
-      normalizeProviderItem({ provider: 'gog', providerItemId: 'abc', title: 'The SOMA' })
+      normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'SOMA', ownership: 'owned' }),
+      normalizeProviderItem({ provider: 'gog', providerItemId: 'abc', title: 'The SOMA', ownership: 'owned' })
     ].map((item) => [item.id, item]));
     const [result] = matchItems(providerItems, [{ requestId: 'soma', mediaType: 'game', title: 'SOMA' }]);
     assert.equal(result.owned, true);
@@ -68,7 +94,7 @@ const tests = [
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 1);
   }],
   ['returns named game editions as possible matches, never exact ownership', () => {
-    const steelrising = normalizeProviderItem({ provider: 'steam', providerItemId: '99', title: 'Steelrising' });
+    const steelrising = normalizeProviderItem({ provider: 'steam', providerItemId: '99', title: 'Steelrising', ownership: 'owned' });
     const results = matchItems({ [steelrising.id]: steelrising }, [{ requestId: 'steelrising', mediaType: 'game', title: 'Steelrising - Bastille Edition' }]);
     assert.equal(results[0].owned, false);
     assert.deepEqual(results[0].matches, []);
@@ -193,6 +219,13 @@ const tests = [
     assert.deepEqual(newKindleItems([{ providerItemId: 'B000000001' }, { providerItemId: 'B000000002' }], ['B000000001']).map((item) => item.providerItemId), ['B000000002']);
     assert.equal(ownershipFromOriginType('Purchase'), 'owned');
     assert.equal(ownershipFromOriginType('KindleUnlimited'), 'subscription');
+    assert.equal(ownershipFromOriginType('ComicsUnlimited'), 'subscription');
+    assert.equal(ownershipFromOriginType('Comixology'), 'unknown');
+    assert.equal(ownershipFromOriginType('Pottermore'), 'unknown');
+    assert.equal(ownershipFromOriginType('PublicLibraryLending'), 'borrowed');
+    assert.equal(ownershipFromOriginType('PersonalLending'), 'borrowed');
+    assert.equal(ownershipFromOriginType('Rental'), 'rental');
+    assert.equal(ownershipFromOriginType('Sample'), 'unknown');
     assert.equal(explicitCollectsStatement('An acclaimed edition. Collects Batman #1–6 and Detective Comics #27. More details.'), 'Collects Batman #1–6 and Detective Comics #27');
     assert.equal(explicitCollectsStatement('A book about collecting stamps.'), '');
     assert.deepEqual(kindleItemsFromOwnershipResponse({
@@ -427,7 +460,7 @@ const tests = [
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems, decisions)).length, 3);
   }],
   ['serves only narrow, validated external ownership results', () => {
-    const steam = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Deathloop' });
+    const steam = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Deathloop', ownership: 'owned' });
     const database = { providerItems: { [steam.id]: steam }, providers: { steam: { connected: true, itemCount: 1 } } };
     assert.equal(isExtensionId('abcdefghijklmnopabcdefghijklmnop'), true);
     assert.deepEqual(normaliseExternalClientIds(['abcdefghijklmnopabcdefghijklmnop', 'bad', 'ponmlkjihgfedcbaponmlkjihgfedcba', 'abcdefghijklmnopabcdefghijklmnop']), ['abcdefghijklmnopabcdefghijklmnop', 'ponmlkjihgfedcbaponmlkjihgfedcba']);
@@ -442,7 +475,7 @@ const tests = [
 let failures = 0;
 for (const [name, run] of tests) {
   try {
-    run();
+    await run();
     console.log(`PASS ${name}`);
   } catch (error) {
     failures += 1;

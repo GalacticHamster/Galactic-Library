@@ -55,8 +55,11 @@
 
   function ownershipFromOriginType(originType) {
     const origin = compactText(originType).toLocaleLowerCase();
-    if (origin.includes('purchase') || origin === 'pottermore') return 'owned';
-    if (/(kindleunlimited|comicsunlimited|prime|koll|rental|freetrial)/u.test(origin)) return 'subscription';
+    if (origin === 'purchase') return 'owned';
+    if (origin === 'rental') return 'rental';
+    if (/(publiclibrarylending|personallending|rfflending)/u.test(origin)) return 'borrowed';
+    if (/(kindleunlimited|comicsunlimited|prime|koll|freetrial)/u.test(origin)) return 'subscription';
+    // Comixology records need purchase evidence before they can be treated as owned.
     return 'unknown';
   }
 
@@ -159,7 +162,8 @@
 
   async function fetchKindleLibraryPage(startIndex, csrfToken, category) {
     const activityInput = {
-      showSharedContent: true,
+      // Household-shared content is readable access, not proof of purchase.
+      showSharedContent: false,
       fetchCriteria: { sortOrder: 'DESCENDING', sortIndex: 'DATE', startIndex, batchSize: PAGE_SIZE, totalContentCount: -1 },
       surfaceType: 'LargeDesktop',
       contentType: category.contentType,

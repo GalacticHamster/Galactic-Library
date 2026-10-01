@@ -14,11 +14,26 @@ export async function saveDatabase(database) {
   return validated;
 }
 
+function preserveEnrichment(incoming, previous) {
+  const existing = previous?.metadata?.enrichment;
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return incoming;
+  return {
+    ...incoming,
+    metadata: {
+      ...incoming.metadata,
+      enrichment: { ...existing, ...(incoming.metadata?.enrichment ?? {}) }
+    }
+  };
+}
+
 export async function replaceProviderItems(provider, values, syncDetails = {}) {
   const database = await getDatabase();
   const now = new Date().toISOString();
   const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
-  const incoming = values.map((value) => normalizeProviderItem({ ...value, provider }, now));
+  const incoming = values.map((value) => {
+    const item = normalizeProviderItem({ ...value, provider }, now);
+    return preserveEnrichment(item, database.providerItems[item.id]);
+  });
   const unique = new Map(incoming.map((item) => [item.id, item]));
   const records = [...unique.values()];
   const gameCount = records.filter((item) => item.mediaType === 'game').length;
@@ -56,7 +71,10 @@ export async function replaceProviderItems(provider, values, syncDetails = {}) {
 export async function mergeProviderItems(provider, values, syncDetails = {}) {
   const database = await getDatabase();
   const now = new Date().toISOString();
-  const incoming = values.map((value) => normalizeProviderItem({ ...value, provider }, now));
+  const incoming = values.map((value) => {
+    const item = normalizeProviderItem({ ...value, provider }, now);
+    return preserveEnrichment(item, database.providerItems[item.id]);
+  });
   const unique = new Map(incoming.map((item) => [item.id, item]));
   database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
   const records = Object.values(database.providerItems).filter((item) => item.provider === provider);

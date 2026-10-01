@@ -25,7 +25,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
   const providerItemId = String(value.providerItemId ?? '').trim();
   const title = String(value.title ?? '').trim();
   const mediaType = String(value.mediaType ?? 'game').trim().toLowerCase();
-  const ownership = String(value.ownership ?? 'owned').trim().toLowerCase();
+  const ownership = String(value.ownership ?? 'unknown').trim().toLowerCase();
   if (!PROVIDERS.includes(provider)) throw new Error(`Unsupported provider: ${provider || '(missing)'}.`);
   if (!providerItemId) throw new Error('Provider item needs a providerItemId.');
   if (!title) throw new Error('Provider item needs a title.');
