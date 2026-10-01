@@ -1,3 +1,4 @@
+import { enrichmentTests } from './enrichment.js';
 import { fanaticalSyncTests } from './fanatical-sync.js';
 import assert from 'node:assert/strict';
 import { matchItems } from '../src/lib/matcher.js';
@@ -280,10 +281,10 @@ const tests = [
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother (Tenth Anniversary Edition)', authors: ['Cory Doctorow, Neil Gaiman'] }, candidates), null); // A related work cannot supply another edition's ISBN/page count.
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother: A Novel About Hacking', authors: ['Cory Doctorow'] }, candidates)?.volumeId, 'volume-123');
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'I Am Number Four: A #1 New York Times Bestselling YA Sci-Fi Thriller about an Alien Teen with Powers Fighting to Save Earth (Lorien Legacies)', authors: ['Pittacus Lore'] }, [{ ...candidate, title: 'I Am Number Four', authors: ['Pittacus Lore'] }])?.volumeId, 'volume-123');
-    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Amazing Spider-Man by J.M.S. Ultimate Collection Book One (Amazing Spider-Man (1999-2013))', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Amazing Spider-Man By JMS Ultimate Collection Book 1' }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Amazing Spider-Man by J.M.S. Ultimate Collection Book One (Amazing Spider-Man (1999-2013))', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Amazing Spider-Man By JMS Ultimate Collection Book 1' }]), null);
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Little Brother #1', authors: ['Cory Doctorow'] }, candidates), null);
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Advanced Reading, Writing, and Grammar for Test Prep', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Advanced Reading, Writing, and Grammar' }])?.volumeId, 'volume-123');
-    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Action Comics, Vol. 3: At the End of Days (The New 52)', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Superman - Action Comics Vol. 3: At the End of Days' }])?.volumeId, 'volume-123');
+    assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Action Comics, Vol. 3: At the End of Days (The New 52)', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Superman - Action Comics Vol. 3: At the End of Days' }]), null);
     assert.equal(highConfidenceGoogleBooksCandidate({ title: 'Alias Ultimate Collection Vol. 1', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Alias' }]), null);
     const aliasHint = googleBooksGenreHintCandidate({ title: 'Alias Ultimate Collection Vol. 1', authors: ['Cory Doctorow'] }, [{ ...candidate, title: 'Alias', categories: ['Comics & Graphic Novels'] }]);
     assert.equal(aliasHint?.volumeId, 'volume-123');
@@ -476,7 +477,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
+for (const [name, run] of [...tests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -487,4 +488,4 @@ for (const [name, run] of [...tests, ...fanaticalSyncTests, ...storageTests, ...
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
+else console.log(`\n${tests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);

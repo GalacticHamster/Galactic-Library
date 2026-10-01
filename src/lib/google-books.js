@@ -53,14 +53,22 @@ function titleKeys(value) {
   const title = compactText(value);
   const variants = [
     title,
-    title.replace(/\s*\([^)]*\)\s*$/u, ''),
+    title.replace(/\s*\(([^)]*)\)\s*$/u, (suffix,label)=>protectedTitle(label)?suffix:''),
     // Some provider series labels contain parentheses themselves. Retain the
     // original too, but offer a variant with the entire trailing label gone.
-    title.replace(/\s+\(.*\)\s*$/u, ''),
-    title.replace(/\s*\([^)]*\)/gu, ' ')
+    title.replace(/\s+\((.*)\)\s*$/u, (suffix,label)=>protectedTitle(label)?suffix:''),
+    title.replace(/\s*\(([^)]*)\)/gu, (suffix,label)=>protectedTitle(label)?suffix:' ')
   ];
   return [...new Set(variants.map(bookTitleFormatVariant).map((entry) => normalizeGameTitle(entry).normalizedTitle).filter(Boolean))];
 }
+
+function protectedTitle(value){return /\d|\b(?:edition|ed\.?|vol(?:ume)?|book|issue|annual|special|omnibus|deluxe|ultimate|complete|integral|collector|revised|expanded)\b/iu.test(bookTitleFormatVariant(value));}
+
+function titleUnits(value){
+  const title=bookTitleFormatVariant(value);
+  return [...title.matchAll(/(?:\b(vol(?:ume)?s?\.?|books?|issues?)\s*|(#)\s*)(\d+(?:\.\d+)?|\d+\/\d+)/giu)].filter(match=>!match[2]||!title.slice(0,match.index).includes(':')).map(match=>`${match[2]||/^issue/iu.test(match[1]??'')?'issue':'volume'}:${match[3]}`).sort();
+}
+function editionQualifiers(value){return [...new Set((bookTitleFormatVariant(value).toLowerCase().match(/\b(?:omnibus|deluxe|ultimate|complete|integral|collector|revised|expanded|anniversary)\b/gu)??[]))].sort();}
 
 function hasIssueMarker(value) {
   // A provider subtitle often contains sales copy such as "#1 New York Times
@@ -147,14 +155,18 @@ export function isHighConfidenceGoogleBooksMatch(query, candidate) {
   const identifiers=isbnValues(query?.isbn);
   const matchingIdentifier=identifiers.some(isbn=>isbnValues(candidate?.isbn).includes(isbn));
   const left={title:query?.title,mediaType:'book',metadata:query};
-  const right={title:candidate?.title,mediaType:'book',metadata:candidate};
+  const candidateTitle=[candidate?.title,candidate?.subtitle].filter(Boolean).join(': ');
+  const right={title:candidateTitle,mediaType:'book',metadata:candidate};
   const conflicts=identityConflicts(left,right).filter(key=>key!=='authors'&&!(key==='edition'&&matchingIdentifier&&!identityEvidence(left).edition));
   if(conflicts.length)return false;
+  const a=titleUnits(query?.title);const b=titleUnits(candidateTitle);
+  if(a.length&&b.length&&JSON.stringify(a)!==JSON.stringify(b))return false;
+  if(!matchingIdentifier&&(JSON.stringify(a)!==JSON.stringify(b)||JSON.stringify(editionQualifiers(query?.title))!==JSON.stringify(editionQualifiers(candidateTitle))))return false;
   if(identifiers.length){
     if(!matchingIdentifier)return false;
     return !query.authors?.length||!candidate.authors?.length||isGoogleBooksAuthorMatch(query,candidate);
   }
-  if (!titleMatchKind(query?.title, candidate?.title)) return false;
+  if (!titleMatchKind(query?.title, candidateTitle)&&!titleMatchKind(query?.title,candidate?.title)) return false;
   return isGoogleBooksAuthorMatch(query, candidate);
 }
 
@@ -178,7 +190,9 @@ export function googleBooksMatchClassification(query, candidates) {
 }
 
 export function highConfidenceGoogleBooksCandidate(query, candidates) {
-  return (Array.isArray(candidates) ? candidates : []).find((candidate) => isHighConfidenceGoogleBooksMatch(query, candidate)) ?? null;
+  const matches=(Array.isArray(candidates)?candidates:[]).filter(candidate=>isHighConfidenceGoogleBooksMatch(query,candidate));
+  const distinct=new Map(matches.map(candidate=>[candidate.volumeId,candidate]));
+  return distinct.size===1?[...distinct.values()][0]:null;
 }
 
 function isGoogleBooksTitleStemMatch(queryTitle, candidateTitle) {
