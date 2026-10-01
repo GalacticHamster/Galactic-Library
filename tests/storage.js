@@ -12,7 +12,7 @@ export function snapshotFixture(provider, items) {
   const scopes = provider === 'kindle' ? ['books', 'personal-documents'].map((id) => {
     const size = items.filter((item) => (item.metadata?.libraryCategory ?? 'books') === id).length;
     return { ...completedScope(id, size, size, 'reported-count'), duplicateCount: 0 };
-  }) : [completedScope('library', items.length, items.length, 'reported-count')];
+  }) : provider === 'fandango-at-home' ? ['movie','tv'].map(type => {const size=items.filter(item=>item.mediaType===type).length; return completedScope(type,size,size,'reported-count');}) : [completedScope('library', items.length, items.length, 'reported-count')];
   return completeProviderSnapshot(provider, items, scopes);
 }
 
@@ -97,10 +97,15 @@ const googleHint = { source: 'google-books', confidence: 'author-and-title-stem'
 const comicContents = { itemId: itemIds[0], sourceUrl: kindleBooks[0].metadata.detailUrl, statement: 'Collects Test Comic #1-4' };
 
 let workerNumber = 0;
-export async function withWorker(run) {
+export async function withWorker(run, {accessGate = Promise.resolve(), accessError = null} = {}) {
   const previousChrome = globalThis.chrome;
   const memory = memoryStorage();
   const listeners = [];
+  const accessLevels = [];
+  memory.area.setAccessLevel = async value => {accessLevels.push(['local',value.accessLevel]); await accessGate; if(accessError) throw accessError;};
+  const sessionValues = {};
+  const session = {setAccessLevel:async value => {accessLevels.push(['session',value.accessLevel]); await accessGate; if(accessError) throw accessError;},
+    get:async key => ({[key]:structuredClone(sessionValues[key])}), set:async value => Object.assign(sessionValues,structuredClone(value)), remove:async key => {delete sessionValues[key];}};
   const runtime = {
     id: extensionId,
     getURL: (path) => root + path,
@@ -123,7 +128,7 @@ export async function withWorker(run) {
       if (!handled && !replied) reject(new Error('No message handler responded.'));
     } catch (error) { reject(error); }
   });
-  globalThis.chrome = { runtime, storage: { local: memory.area } };
+  globalThis.chrome = { runtime, storage: { local: memory.area, session } };
   try {
     // Load the real worker: provider handlers and page clients must share its
     // single writer. Separate clients simulate separate Library page contexts.
@@ -136,8 +141,8 @@ export async function withWorker(run) {
       if (!response.ok) throw new Error(response.error);
       return response;
     });
-    await run({ memory, dispatch, pageA: page('a'), pageB: page('b'), importItems });
-    assert.equal(memory.highWater, 1, 'Storage operations overlapped instead of sharing the writer.');
+    await run({ memory, dispatch, pageA: page('a'), pageB: page('b'), importItems, accessLevels });
+    assert.ok(memory.highWater <= 1, 'Storage operations overlapped instead of sharing the writer.');
   } finally {
     if (previousChrome === undefined) delete globalThis.chrome;
     else globalThis.chrome = previousChrome;

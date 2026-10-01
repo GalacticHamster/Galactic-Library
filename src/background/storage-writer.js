@@ -12,7 +12,7 @@ import { identityConflicts, identityEvidence } from '../lib/identity.js';
  * queue, including calls made directly by provider message handlers. No client
  * context owns a writer or writes a cached database snapshot.
  */
-export function createStorageWriter(storageArea) {
+export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   async function getDatabase() {
     const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
@@ -415,7 +415,7 @@ export function createStorageWriter(storageArea) {
     let values;
     try { values = structuredClone(args); }
     catch { return Promise.reject(new Error('Invalid Galactic Library storage arguments.')); }
-    const result = tail.then(() => operations[operation](...values));
+    const result = tail.then(() => ready).then(() => operations[operation](...values));
     // A rejected operation never poisons the queue; later requests still run.
     tail = result.catch(() => {});
     return result;

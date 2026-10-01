@@ -7,8 +7,12 @@ import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createStorageWriter } from './storage-writer.js';
 import { createStorageMessageHandler } from './storage-messages.js';
 import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
+import { restrictStorageAccess } from './storage-access.js';
 
-const storageWriter = createStorageWriter(chrome.storage.local);
+const storageReady = restrictStorageAccess(chrome.storage);
+// Operations report initialization errors through their normal response channel.
+storageReady.catch(() => {});
+const storageWriter = createStorageWriter(chrome.storage.local, storageReady);
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 
@@ -197,6 +201,10 @@ async function searchGoogleBooks(query) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) {
+    sendResponse({ok:false,error:'Library operations are accepted only from Galactic Library.'});
+    return undefined;
+  }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
       sendResponse({ ok: false, error: 'Google Books searches are accepted only from Galactic Library.' });
@@ -273,19 +281,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return undefined;
     }
     if (request.action === 'get') {
-      chrome.storage.session.get(key)
+      storageReady.then(() => chrome.storage.session.get(key))
         .then((values) => sendResponse({ ok: true, state: values[key] ?? null }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
     if (request.action === 'set' && request.state && typeof request.state === 'object') {
-      chrome.storage.session.set({ [key]: request.state })
+      storageReady.then(() => chrome.storage.session.set({ [key]: request.state }))
         .then(() => sendResponse({ ok: true }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
     if (request.action === 'clear') {
-      chrome.storage.session.remove(key)
+      storageReady.then(() => chrome.storage.session.remove(key))
         .then(() => sendResponse({ ok: true }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
@@ -295,6 +303,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type === 'MATCH_ITEMS') {
+    if (!isOwnExtensionPage(sender.url)) {
+      sendResponse({ok:false,error:'Library comparisons are accepted only from Galactic Library pages.'});
+      return undefined;
+    }
     getDatabase()
       .then((database) => sendResponse(handleExternalApiRequest(database, {...request,apiVersion:request.apiVersion??1})))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
@@ -405,6 +417,6 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       }
       return getDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
     })
-    .catch((error) => sendResponse({ ok: false, error: error.message }));
+    .catch(() => sendResponse({ ok: false, error: 'The Galactic Library API is unavailable. Open Galactic Library to check its storage.' }));
   return true;
 });

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 // No personal profile, installed extensions, provider sessions or remote services.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const importerMode=process.argv.includes('--importers');
 const candidates=[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
 let browser;
 for(const candidate of candidates){try{await access(candidate);browser=candidate;break;}catch{}}
@@ -24,7 +25,7 @@ const server=createServer(async(request,response)=>{
     }
     const target=resolve(root,`.${decodeURIComponent(pathname)}`);
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
-    let body=await readFile(target);
+    let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':await readFile(target);
     if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"','src="tests/browser-fixture.js"');
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
@@ -32,7 +33,7 @@ const server=createServer(async(request,response)=>{
 });
 await new Promise(done=>server.listen(0,'127.0.0.1',done));
 try{
-  await promisify(execFile)(browser,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,'--virtual-time-budget=10000','--dump-dom',`http://127.0.0.1:${server.address().port}/options.html`],{windowsHide:true,timeout:30000,maxBuffer:4*1024*1024});
+  await promisify(execFile)(browser,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,'--virtual-time-budget=10000','--dump-dom',`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}`],{windowsHide:true,timeout:30000,maxBuffer:4*1024*1024});
   assert.ok(result,'The browser did not finish the UI fixture.');
   for(const check of result.checks)console.log(`PASS browser: ${check}`);
   assert.equal(result.error,undefined,result.error);
