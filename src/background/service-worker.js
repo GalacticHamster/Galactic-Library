@@ -296,7 +296,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request?.type === 'MATCH_ITEMS') {
     getDatabase()
-      .then((database) => sendResponse({ ok: true, results: matchItems(database.providerItems, request.items ?? []) }))
+      .then((database) => sendResponse(handleExternalApiRequest(database, {...request,apiVersion:request.apiVersion??1})))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }

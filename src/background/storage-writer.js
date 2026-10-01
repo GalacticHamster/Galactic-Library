@@ -5,6 +5,7 @@ import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCan
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview } from '../lib/contents.js';
+import { identityConflicts } from '../lib/identity.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -231,13 +232,15 @@ export function createStorageWriter(storageArea) {
   }
 
   async function saveManualMatchDecision(candidate, decision) {
-    if (!candidate || !Array.isArray(candidate.itemIds) || candidate.itemIds.length !== 2 || !['same', 'different'].includes(decision)) {
+    if (!candidate || !Array.isArray(candidate.itemIds) || candidate.itemIds.length !== 2 || !['same', 'same-work', 'same-edition', 'different'].includes(decision)) {
       throw new Error('Invalid duplicate-review decision.');
     }
     const database = await getDatabase();
     const itemIds = [...candidate.itemIds].sort();
     if (!itemIds.every((id) => database.providerItems[id])) throw new Error('One of the reviewed library items no longer exists.');
-    database.manualMatchDecisions[candidate.id] = { decision, itemIds, updatedAt: new Date().toISOString() };
+    if(itemIds[0]===itemIds[1]||database.providerItems[itemIds[0]].mediaType!==database.providerItems[itemIds[1]].mediaType)throw new Error('Review two different records of the same media type.');
+    if(decision==='same-edition'&&identityConflicts(...itemIds.map(id=>database.providerItems[id])).length)throw new Error('These records have conflicting edition evidence. Use Same work instead.');
+    database.manualMatchDecisions[itemIds.join('\u0000')] = { decision, itemIds, updatedAt: new Date().toISOString() };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }

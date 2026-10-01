@@ -90,7 +90,7 @@ const kindleBooks = [1, 2].map((number) => ({
   }
 }));
 const itemIds = kindleBooks.map((item) => `kindle:${item.providerItemId}`);
-const review = { id: 'review-1', itemIds };
+const review = { id: [...itemIds].sort().join('\u0000'), itemIds };
 const openLibrary = { source: 'open-library', workKey: '/works/OL1W', subjects: ['Comics'] };
 const googleBooks = { source: 'google-books', volumeId: 'volume-1', categories: ['Comics'] };
 const googleHint = { source: 'google-books', confidence: 'author-and-title-stem', categories: ['Comics & Graphic Novels'] };
@@ -222,7 +222,7 @@ export const storageTests = [
     assert.equal(database.providerItems['steam:1'], undefined);
     assert.ok(database.providerItems['gog:2']);
     assert.ok(database.providerItems[itemIds[1]]);
-    assert.equal(database.manualMatchDecisions.saved.decision, 'different');
+    assert.equal(database.manualMatchDecisions.saved, undefined); // Migrated pair key; the subsequent review supersedes it.
     assert.equal(database.manualMatchDecisions[review.id].decision, 'same');
     assert.equal(database.providerItems[itemIds[0]].metadata.enrichment.openLibrary.workKey, openLibrary.workKey);
   })],

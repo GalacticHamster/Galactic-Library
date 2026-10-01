@@ -8,10 +8,10 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 
 - a stable identity of `provider + providerItemId`, never a title;
 - normalized provider records and reproducible canonical game, audiobook, book, movie, and TV records;
-- exact, conservative title matching (edition variants are not silently merged);
+- conservative edition matching with separate Possible candidates and reviewed contents coverage;
 - local Chrome storage plus versioned export/restore; and
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
-- a conservative duplicate-review queue for edition variants and provider-added book/series labels; and
+- a duplicate-review queue for edition variants and provider-added book/series labels; and
 - user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, Amazon Video, Fandango at Home, Kobo, and Humble importers for signed-in libraries.
 
 To import Steam, select **Open signed-in Steam Store** on the options page. **Quick update** reads the signed-in Store account's owned App IDs, then resolves only newly seen App IDs through Steam's batched StoreBrowse title service. **Full rescan** resolves every owned app again. DLC is stored as an add-on linked to Steam's parent App ID and does not count as a game. It does not use or request a Steam Web API key, password, or cookie.

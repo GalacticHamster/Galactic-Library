@@ -3,10 +3,77 @@ import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createEmptyDatabase, normalizeProviderItem, rebuildCanonicalItems, validateDatabase } from '../src/lib/models.js';
 import { identityEvidence, validIsbn } from '../src/lib/identity.js';
 import { contentCoverage, contentKey, proposeContents, seriesCoverage, validateContents } from '../src/lib/contents.js';
+import { matchItems } from '../src/lib/matcher.js';
+import { handleExternalApiRequest } from '../src/lib/external-api.js';
 
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['book editions and game packages remain Possible in both comparison directions', () => {
+    for(const titles of [['Calculus, First Edition','Calculus, 5th Edition'],['Control','Control Deluxe Edition'],['Control Gold Edition','Control Platinum Edition']]){
+      for(const [a,b] of [titles,[...titles].reverse()]){
+        const item=normalizeProviderItem({provider:'humble',providerItemId:'a',title:a,mediaType:a.startsWith('Calculus')?'book':'game',ownership:'owned'});
+        const [result]=matchItems(records(item),[{title:b,mediaType:item.mediaType}]);
+        assert.equal(result.owned,false);assert.equal(result.matches.length,0);assert.equal(result.possibleMatches[0]?.title,a);
+      }
+    }
+  }],
+  ['homonyms, differing identifiers and separate manga volumes do not become exact ownership', () => {
+    const a=book('a',{authors:['A'],isbn:'9780306406157'});const b=book('b',{authors:['B']});
+    let [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book'}]);
+    assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,2);
+    [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',authors:['A'],identifiers:{isbn:'9780140328721'}}]);
+    assert.equal(result.owned,false);assert.deepEqual(result.possibleMatches.map(item=>item.title),[a.title]);
+    [result]=matchItems(records(book('v',{},'Naruto Vol. 1')),[{title:'Naruto Vol. 2',mediaType:'book'}]);
+    assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,0);
+  }],
+  ['reviewed same work is Possible while reviewed same edition is exact and reversible', async () => {
+    const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Alternate title',mediaType:'book',ownership:'unknown'},{providerItemId:'b',title:'Owned title',mediaType:'book',ownership:'owned'}]);
+    const candidate={id:'ignored',itemIds:['humble:a','humble:b']};
+    let database=await writer.saveManualMatchDecision(candidate,'same-work');
+    let [result]=matchItems(database.providerItems,[{title:'Alternate title',mediaType:'book'}],database);
+    assert.equal(result.owned,false);assert.equal(result.possibleMatches[0].title,'Owned title');
+    database=await writer.saveManualMatchDecision(candidate,'same-edition');
+    [result]=matchItems(database.providerItems,[{title:'Alternate title',mediaType:'book'}],database);assert.equal(result.owned,true);
+    database=await writer.removeManualMatchDecision(candidate.itemIds.join('\u0000'));
+    [result]=matchItems(database.providerItems,[{title:'Alternate title',mediaType:'book'}],database);assert.equal(result.owned,false);
+    await writer.mergeProviderItems('humble',[{providerItemId:'c',title:'Owned title, 2nd Edition',mediaType:'book',ownership:'owned'}]);
+    await assert.rejects(writer.saveManualMatchDecision({itemIds:['humble:b','humble:c']},'same-edition'),/conflicting edition/u);
+  }],
+  ['reviewed Different blocks candidates, including indirectly reviewed same-work paths', () => {
+    const a=book('a',{},'Story');const b=book('b',{},'Story Deluxe Edition');const c=book('c',{},'Alias');
+    const manualMatchDecisions={ab:{decision:'different',itemIds:[a.id,b.id]},ac:{decision:'same-work',itemIds:[a.id,c.id]},bc:{decision:'same-work',itemIds:[c.id,b.id]}};
+    const [result]=matchItems(records(a,b,c),[{title:a.title,mediaType:'book'}],{manualMatchDecisions});
+    assert.deepEqual(result.possibleMatches.map(item=>item.title),['Alias']);
+  }],
+  ['API distinguishes partial union, complete explicitly enumerated contents and unknown scope', () => {
+    const a=book('a',{},'Collection A');const b=book('b',{},'Collection B');
+    const entry=number=>({series:'Naruto',run:'1999',language:'en',unitType:'volume',number,completeness:'full'});
+    const database={providerItems:records(a,b),contentReviews:{[a.id]:{entries:[entry('1'),entry('2')]},[b.id]:{entries:[entry('3')]}}};
+    let [result]=matchItems(database.providerItems,[{title:'Naruto Vols. 1-4',mediaType:'book',contents:[entry('1'),entry('2'),entry('3'),entry('4')],contentsComplete:true}],database);
+    assert.equal(result.owned,false);assert.equal(result.coverage.owned,3);assert.equal(result.partialMatches.length,2);assert.equal(result.coverage.missing[0].number,'4');
+    [result]=matchItems(database.providerItems,[{title:'Omnibus',mediaType:'book',contents:[entry('1'),entry('2'),entry('3')],contentsComplete:true}],database);
+    assert.equal(result.owned,true);assert.equal(result.coverage.complete,true);
+    [result]=matchItems(database.providerItems,[{title:'Omnibus',mediaType:'book',contents:[entry('1'),entry('2'),entry('3')]}],database);assert.equal(result.owned,false);
+    [result]=matchItems(database.providerItems,[{title:'Naruto Vols. 1-3',mediaType:'book'}],database);
+    assert.equal(result.owned,false);assert.equal(result.coverage.complete,false);assert.equal(result.possibleMatches.length,2);assert.equal(result.coverage.possibleCovered.length,3);
+    [result]=matchItems(database.providerItems,[{title:'Omnibus',mediaType:'book',contents:[entry('1')],excludeProviders:['humble'],contentsComplete:true}],database);assert.equal(result.owned,false);assert.equal(result.partialMatches.length,0);
+  }],
+  ['external responses use opaque references and reject malformed optional matching fields', () => {
+    const item=book('purchase-secret',{isbn:'9780306406157',token:'credential-secret'},'Example');const database={providerItems:records(item)};
+    const request={type:'MATCH_ITEMS',apiVersion:1,items:[{title:'Example',mediaType:' BOOK ',identifiers:{isbn:'0-306-40615-2'}}]};
+    const response=handleExternalApiRequest(database,request);assert.equal(response.ok,true);assert.equal(response.results[0].owned,true);
+    const json=JSON.stringify(response);assert.equal(json.includes('purchase-secret'),false);assert.equal(json.includes('credential-secret'),false);assert.equal(response.results[0].matches[0].itemRef,item.recordRef);
+    for(const patch of [{identifiers:{isbn:['not-an-isbn']}},{identifiers:[]},{identifiers:{token:'secret'}},{contents:[]},{requestId:{secret:true}},{contentsComplete:'yes'},{authors:'Person'}])assert.equal(handleExternalApiRequest(database,{...request,items:[{title:'Example',...patch}]}).ok,false);
+    assert.equal(handleExternalApiRequest(database,{type:'GET_STATUS'}).capabilities.reviewedContents,true);
+  }],
+  ['backups reject duplicate persistent references and cross-media relationship injection', () => {
+    const a=book('a');const b={...book('b'),recordRef:a.recordRef};
+    assert.throws(()=>validateDatabase({...createEmptyDatabase(),providerItems:records(a,b)}),/duplicate persistent/u);
+    const game=normalizeProviderItem({provider:'steam',providerItemId:'1',title:'Game'});
+    assert.throws(()=>validateDatabase({...createEmptyDatabase(),providerItems:records(a,game),manualMatchDecisions:{unsafe:{decision:'same-work',itemIds:[a.id,game.id]}}}),/crosses media/u);
+  }],
   ['contents proposals retain runs, omnibus volumes, annuals, fractions and unresolved text', () => {
     const proposal=proposeContents('Collects Batman (2011) #1-3 and Batman Annual #1; Naruto Vols. 1-3; Batman #1/2; bonus essays');
     assert.equal(proposal.entries.length,8);

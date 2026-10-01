@@ -65,11 +65,11 @@ export function validateContentReview(value) {
   return {entries:validateContents(value.entries),statement:compact(value.statement,10000),sourceUrl,source:compact(value.source || 'manual-review',100),verifiedAt:typeof value.verifiedAt==='string'?value.verifiedAt:null};
 }
 
-export function ownedContentIndex(database, {excludeProviders = []} = {}) {
+export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {
   const byKey=new Map();
   for (const [itemId,review] of Object.entries(database.contentReviews ?? {})) {
     const item=database.providerItems[itemId];
-    if (!item || !['owned','claimed'].includes(item.ownership) || excludeProviders.includes(item.provider)) continue;
+    if (!item || !['owned','claimed'].includes(item.ownership) || excludeProviders.includes(item.provider) || excludeItemIds.includes(itemId)) continue;
     for (const entry of review.entries) {
       if (entry.completeness!=='full') continue;
       const key=contentKey(entry);const matches=byKey.get(key)??[];
@@ -82,13 +82,21 @@ export function ownedContentIndex(database, {excludeProviders = []} = {}) {
 export function contentCoverage(database, requested, options = {}) {
   const entries=validateContents(requested).filter((entry)=>entry.completeness==='full');
   const index=ownedContentIndex(database, options);
-  const covered=[]; const missing=[];
+  const covered=[]; const missing=[]; const possibleCovered=[];
   for (const entry of entries) {
     const evidence=index.get(contentKey(entry))??[];
     (evidence.length?covered:missing).push({...entry, ...(evidence.length?{evidence}: {})});
+    if (!evidence.length) {
+      const possible=[...index.values()].flat().filter(({entry:owned}) => {
+        const [series,run,type,number,language]=JSON.parse(contentKey(entry));
+        const other=JSON.parse(contentKey(owned));
+        return series===other[0] && type===other[2] && number===other[3] && (!run||!other[1]||run===other[1]) && (!language||!other[4]||language===other[4]);
+      });
+      if(possible.length)possibleCovered.push({...entry,evidence:possible});
+    }
   }
   const scopeUncertain=entries.some((entry)=>!entry.run || !entry.language);
-  return {total:entries.length,owned:covered.length,complete:entries.length>0&&!missing.length&&!scopeUncertain,scopeUncertain,covered,missing};
+  return {total:entries.length,owned:covered.length,complete:entries.length>0&&!missing.length&&!scopeUncertain,scopeUncertain:scopeUncertain||possibleCovered.length>0,covered,possibleCovered,missing};
 }
 
 export function seriesCoverage(database) {

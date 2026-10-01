@@ -124,7 +124,7 @@ export const providerSnapshotTests = [
     const database = await worker.pageA.getDatabase();
     assert.deepEqual(Object.keys(database.providerItems).sort(), ['gog:10', 'kindle:DOC1', 'kindle:NEW1', 'kindle:OLD1']);
     assert.equal(database.providerItems['kindle:OLD1'].metadata.enrichment.openLibrary.workKey, '/works/OL1W');
-    assert.equal(database.manualMatchDecisions['keep-review'].decision, 'different');
+    assert.equal(database.manualMatchDecisions[['kindle:OLD1','kindle:OLD2'].join('\u0000')].decision, 'different');
     assert.equal(database.providers.kindle.snapshotValidation.itemCount, 3);
   })],
   ['quick Kindle update remains non-destructive without full completion evidence', () => withWorker(async (worker) => {

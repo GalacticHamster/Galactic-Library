@@ -139,7 +139,19 @@ export function validateDatabase(value) {
     return [normalized.id, normalized];
   }));
   const providers = value.providers && typeof value.providers === 'object' && !Array.isArray(value.providers) ? value.providers : {};
-  const manualMatchDecisions = value.manualMatchDecisions && typeof value.manualMatchDecisions === 'object' && !Array.isArray(value.manualMatchDecisions) ? value.manualMatchDecisions : {};
+  const refs=new Set();
+  for(const item of Object.values(providerItems)){
+    if(refs.has(item.recordRef))throw new Error('Backup contains duplicate persistent record references.');
+    refs.add(item.recordRef);
+  }
+  const manualMatchDecisions = {};
+  for(const decision of Object.values(value.manualMatchDecisions??{})){
+    if(!['same','same-work','same-edition','different'].includes(decision?.decision)||!Array.isArray(decision.itemIds)||decision.itemIds.length!==2||decision.itemIds.some(id=>typeof id!=='string')||decision.itemIds[0]===decision.itemIds[1])throw new Error('Invalid saved relationship.');
+    const itemIds=[...decision.itemIds].sort();
+    const [left,right]=itemIds.map(id=>providerItems[id]);
+    if(left&&right&&left.mediaType!==right.mediaType)throw new Error('A saved relationship crosses media types.');
+    manualMatchDecisions[itemIds.join('\u0000')]={decision:decision.decision,itemIds,updatedAt:typeof decision.updatedAt==='string'?decision.updatedAt:null};
+  }
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
