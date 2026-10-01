@@ -35,6 +35,19 @@ export const relationshipTests = [
     assert.throws(()=>normalizeProviderItem(invalid),/key status/);
     const restored=validateDatabase({...createEmptyDatabase(),providerItems:records(item)});assert.equal(restored.providerItems[item.id].ownership,'unknown');
   }],
+  ['legacy Humble game product duplicates cannot conceal an expired key on restore or incremental refresh',async()=>{
+    const duplicate=normalizeProviderItem({provider:'humble',providerItemId:'legacy-product',title:'Game',mediaType:'game',ownership:'owned',metadata:{purchaseId:'order',entitlement:'direct-download'}});
+    const expired={providerItemId:'key',title:'Game',mediaType:'game',ownership:'owned',metadata:{purchaseId:'order',entitlement:'third-party-key',keyStatus:'expired'}};
+    const values={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    await writer.restoreDatabase({...createEmptyDatabase(),providerItems:records(duplicate)});
+    const refreshed=await writer.mergeProviderItems('humble',[expired]);
+    assert.equal(Object.keys(refreshed.providerItems).length,2,'incremental refresh must not delete legacy records');
+    assert.equal(refreshed.providerItems[duplicate.id].ownership,'unknown');
+    assert.equal(matchItems(refreshed.providerItems,[{title:'Game',mediaType:'game'}],refreshed)[0].owned,false);
+    const restored=validateDatabase(refreshed);assert.equal(restored.providerItems[duplicate.id].ownership,'unknown');
+    const withSteam=await writer.mergeProviderItems('steam',[{providerItemId:'123',title:'Game',ownership:'owned'}]);
+    assert.equal(matchItems(withSteam.providerItems,[{title:'Game',mediaType:'game'}],withSteam)[0].owned,true);
+  }],
   ['Kobo library presence is unknown, subscription evidence is temporary and explicit purchases can be owned', () => {
     const base={providerItemId:'bookId=11111111-1111-1111-1111-111111111111',title:'Kobo Plus Purchased Adventures',detailUrl:'https://www.kobo.com/ebook/adventures',typeText:'eBook',authors:['Author']};
     const parse=globalThis.GalacticKobo.koboItemFromCardData;

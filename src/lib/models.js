@@ -152,6 +152,15 @@ export function validateDatabase(value) {
   });
   if(new Set(normalizedItems.map(([id])=>id)).size!==normalizedItems.length)throw new Error('Backup contains duplicate provider identities.');
   const providerItems = Object.fromEntries(normalizedItems);
+  // Older Humble imports labelled a game product as a direct download even
+  // when that purchase delivered it through a key. Preserve both records, but
+  // do not let the duplicate product conceal explicit negative key evidence.
+  const unavailablePurchases=new Set(Object.values(providerItems)
+    .filter(item=>item.provider==='humble'&&item.metadata.entitlement==='third-party-key'
+      &&['expired','unavailable'].includes(item.metadata.keyStatus)&&item.metadata.purchaseId)
+    .map(item=>JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])));
+  for(const item of Object.values(providerItems))if(item.provider==='humble'&&item.mediaType==='game'
+    &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
   const providers = validateProviderStates(value.providers ?? {});
   const refs=new Set();
   for(const item of Object.values(providerItems)){
