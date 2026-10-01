@@ -18,7 +18,7 @@ export function validateEnrichment(kind, value) {
     openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
     googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
-    kindleProductComicContents:['source','sourceUrl','statement','availability','checkedAt']
+    kindleProductComicContents:['source','sourceUrl','statement','availability','parseStatus','failureCode','checkedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
   const result = {};
@@ -36,7 +36,9 @@ export function validateEnrichment(kind, value) {
   if (result.workKey && !/^\/works\/OL\d+W$/u.test(result.workKey)) throw new Error('Invalid Open Library work key.');
   if (result.editionKeys?.some(key=>!/^OL\d+M$/u.test(key))) throw new Error('Invalid Open Library edition key.');
   if (kind==='googleBooksGenreHint' && result.confidence && result.confidence!=='author-and-title-stem') throw new Error('Invalid genre hint confidence.');
-  if (kind==='kindleProductComicContents' && result.availability && !['available','unavailable'].includes(result.availability)) throw new Error('Invalid contents availability.');
+  if (kind==='kindleProductComicContents' && result.availability && !['available','statement-found','no-statement','unavailable','temporary-failure'].includes(result.availability)) throw new Error('Invalid contents availability.');
+  if(result.parseStatus&&!['parsed','unparsed','not-attempted'].includes(result.parseStatus))throw new Error('Invalid contents parsing state.');
+  if(result.failureCode&&!['captcha','http','network','unknown'].includes(result.failureCode))throw new Error('Invalid contents failure code.');
   return result;
 }
 

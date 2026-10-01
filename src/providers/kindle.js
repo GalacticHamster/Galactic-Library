@@ -117,7 +117,13 @@
   function explicitCollectsStatement(value) {
     const text = compactText(value);
     const match = text.match(/\bcollects?\b\s*(?::|-)?\s*.{2,700}/iu);
-    return compactText(match?.[0]).split(/[.!?](?=\s+[A-Z])/u)[0].replace(/[.!?]+$/u, '');
+    const statement=compactText(match?.[0]);
+    for(const boundary of statement.matchAll(/[.!?](?=\s+[A-Z])/gu)){
+      const before=statement.slice(0,boundary.index);
+      if(boundary[0]==='.'&&(/\b(?:vols?|no|nos|ed|pt|pts|mr|mrs|dr|st|vs)$/iu.test(before)||/\b(?:[A-Z]\.)*[A-Z]$/u.test(before)))continue;
+      return statement.slice(0,boundary.index).trim();
+    }
+    return statement.replace(/[.!?]+$/u, '');
   }
 
   function kindleCollectsStatementFromDocument(document) {
@@ -145,7 +151,9 @@
     if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading a Kindle product page.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
     if (document.querySelector('#captchacharacters, form[action*="validateCaptcha" i]')) throw new Error('Amazon requested a CAPTCHA; wait before continuing the Kindle contents scan.');
-    return { sourceUrl: `${url.origin}${url.pathname}`, statement: kindleCollectsStatementFromDocument(document), availability: 'available' };
+    if(document.querySelector('#ap_email,form[name="signIn"]'))throw new Error('Sign in again before retrying the Kindle contents lookup.');
+    const statement=kindleCollectsStatementFromDocument(document);
+    return { sourceUrl: `${url.origin}${url.pathname}`, statement, availability: statement?'statement-found':'no-statement' };
   }
 
   function ownershipItemsFromResponse(response) {

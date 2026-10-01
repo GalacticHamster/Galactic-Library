@@ -49,4 +49,17 @@ export const enrichmentTests=[['Google Books rejects different, missing and ambi
   const before=writes.length;const committed=await writer.commitEnrichmentBatch(job.jobId,job.runId,0,outcomes);assert.equal(writes.length-before,1);assert.equal(committed.job.cursor,5);assert.equal(committed.job.matched,5);
   await assert.rejects(writer.commitEnrichmentBatch(job.jobId,job.runId,0,outcomes),/stale enrichment checkpoint/);
   const restored=await writer.getDatabase();await writer.restoreDatabase(restored);await assert.rejects(writer.commitEnrichmentBatch(job.jobId,job.runId,5,[]),/cleared, restored/);
+}],['Collects extraction preserves abbreviations and contents lookups distinguish parsed, absent, unavailable and retryable results',async()=>{
+  const extract=globalThis.GalacticKindle.explicitCollectsStatement;
+  assert.equal(extract('Collects Manga Vol. One and Vol. Two. Includes extras.'),'Collects Manga Vol. One and Vol. Two');
+  assert.equal(extract('Collects J.M.S. Spider-Man #1-3. Also bonus essays.'),'Collects J.M.S. Spider-Man #1-3');
+  const stored={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>Object.assign(stored,structuredClone(updates))});
+  await writer.mergeProviderItems('kindle',[{providerItemId:'B000000001',title:'Test Comic',mediaType:'book',metadata:{contentType:'Comic',detailUrl:'https://www.amazon.com/dp/B000000001'}}]);
+  const entry={itemId:'kindle:B000000001',sourceUrl:'https://www.amazon.com/dp/B000000001',statement:''};
+  for(const availability of ['no-statement','unavailable','temporary-failure']){
+    await writer.saveKindleComicContents([{...entry,availability}]);assert.equal((await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents.availability,availability);
+  }
+  await writer.saveKindleComicContents([{...entry,availability:'statement-found',statement:'Collects Manga Vol. 1-3'}]);let metadata=(await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents;assert.equal(metadata.parseStatus,'parsed');
+  await writer.saveKindleComicContents([{...entry,availability:'statement-found',statement:'Collects Manga Vol. One'}]);metadata=(await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents;assert.equal(metadata.parseStatus,'unparsed');
+  assert.equal((await writer.getDatabase()).contentReviews[entry.itemId],undefined);
 }]];

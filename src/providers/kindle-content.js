@@ -112,7 +112,7 @@
         status.textContent = `Reading Kindle comic product ${attempted}/${candidates.length}: ${candidate.title}`;
         try {
           const contents = await fetchComicContentsWithRetry(candidate, attempted, candidates.length);
-          const saveResponse = await globalThis.GalacticSync.send({ type: 'SAVE_KINDLE_COMIC_CONTENTS', entries: [{ itemId: candidate.id, sourceUrl: contents.sourceUrl, statement: contents.statement, availability: contents.availability }] });
+          const saveResponse = await globalThis.GalacticSync.send({ type: 'SAVE_KINDLE_COMIC_CONTENTS', entries: [{ itemId: candidate.id, recordRef:candidate.recordRef,sourceUrl: contents.sourceUrl, statement: contents.statement, availability: contents.availability }] });
           if (!saveResponse?.ok) throw new Error(saveResponse?.error ?? 'Could not save the Kindle product-page result.');
           if (contents.availability === 'unavailable') unavailable += 1;
           else if (contents.statement) matched += 1;
@@ -120,6 +120,7 @@
           saved += 1;
         } catch (error) {
           errors += 1;
+          await globalThis.GalacticSync.send({type:'SAVE_KINDLE_COMIC_CONTENTS',entries:[{itemId:candidate.id,recordRef:candidate.recordRef,sourceUrl:candidate.detailUrl,statement:'',availability:'temporary-failure',failureCode:/CAPTCHA/iu.test(error.message)?'captcha':/returned \d{3}/iu.test(error.message)?'http':'network'}]}).catch(()=>{});
           const label = errorLabel(error);
           errorCounts.set(label, (errorCounts.get(label) ?? 0) + 1);
           if (/CAPTCHA/iu.test(error.message)) {

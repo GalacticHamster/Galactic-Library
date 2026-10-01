@@ -4,7 +4,7 @@ import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
-import { validateContentReview } from '../lib/contents.js';
+import { validateContentReview,proposeContents } from '../lib/contents.js';
 import { identityConflicts, identityEvidence } from '../lib/identity.js';
 import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 import { text } from '../lib/validation.js';
@@ -427,16 +427,18 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const itemId = String(entry?.itemId ?? '').trim();
       const item = database.providerItems[itemId];
       const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim().replace(/[.!?]+$/u, '');
-      const availability = entry?.availability === 'unavailable' ? 'unavailable' : 'available';
+      const availability = (entry?.availability??'available')==='available'?statement?'statement-found':'no-statement':entry?.availability;
+      const failed=availability==='temporary-failure';
+      const proposal=statement?proposeContents(statement):null;
       let sourceUrl = '';
       try {
         const url = new URL(String(entry?.sourceUrl ?? ''));
         if (url.origin === 'https://www.amazon.com' && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
       } catch { /* invalid source URL remains unusable */ }
-      if (!item || item.provider !== 'kindle' || item.mediaType !== 'book' || !isConfirmedComicManga(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 700 || (statement && !/^collects?\b/iu.test(statement)) || (availability === 'unavailable' && statement)) {
+      if (!item || item.provider !== 'kindle' || item.mediaType !== 'book' || !isConfirmedComicManga(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 700 || (statement && !/^collects?\b/iu.test(statement)) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef)) {
         throw new Error('Invalid Kindle comic contents entry.');
       }
-      selectEnrichment(database,itemId,'kindleProductComicContents',{source:'amazon-product-page',sourceUrl,statement,availability,checkedAt:updatedAt},updatedAt);
+      selectEnrichment(database,itemId,'kindleProductComicContents',{source:'amazon-product-page',sourceUrl,statement,availability,parseStatus:proposal?(proposal.entries.length&&!proposal.unparsed.length?'parsed':'unparsed'):'not-attempted',...(failed?{failureCode:['captcha','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt},updatedAt);
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);

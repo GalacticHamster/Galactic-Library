@@ -200,10 +200,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     getDatabase()
       .then((database) => {
         const candidates = Object.values(database.providerItems)
-          .filter((item) => item.provider === 'kindle' && item.mediaType === 'book' && isConfirmedComicManga(item) && !item.metadata?.enrichment?.kindleProductComicContents)
+          .filter((item) => item.provider === 'kindle' && item.mediaType === 'book' && isConfirmedComicManga(item) && (!item.metadata?.enrichment?.kindleProductComicContents||item.metadata.enrichment.kindleProductComicContents.availability==='temporary-failure'))
           .flatMap((item) => {
             const detailUrl = String(item.metadata?.detailUrl ?? '');
-            return /^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(detailUrl) ? [{ id: item.id, title: item.title, detailUrl }] : [];
+            return /^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(detailUrl) ? [{ id: item.id, recordRef:item.recordRef,title: item.title, detailUrl }] : [];
           })
           .sort((left, right) => left.title.localeCompare(right.title));
         sendResponse({ ok: true, candidates });
