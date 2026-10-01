@@ -5,7 +5,7 @@ const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com']
 const FIELDS = {
   steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery'],
   audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory'],
-  'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection'],
+  'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis'],
   fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId'],humble:['sourceBundle','purchaseId','entitlement','keyType']
 };
 const COMMON = ['source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
@@ -56,6 +56,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
     else result[key]=text(value[key],LIMITS[key]??500,key);
   }
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
+  if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');
   if (allowEnrichment && value.enrichment !== undefined && value.enrichment !== null) {
     object(value.enrichment,'Enrichment metadata'); const entries={};
     for (const kind of ['openLibrary','googleBooks','googleBooksGenreHint','kindleProductComicContents']) {

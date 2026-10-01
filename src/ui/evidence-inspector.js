@@ -28,6 +28,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       const table=element('dl','');table.className='evidence-fields';
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));
       field('Record reference',record.recordRef);field('Ownership evidence',record.ownership);field('Evidence source',identity.source);
+      if(record.provider==='kobo')field('Kobo ownership basis',record.metadata.ownershipBasis||'Library presence only; durable ownership unconfirmed');
       field('Account / profile',compact(provider.accountLabel||provider.profileLabel));
       field('Last observed at provider',record.observedAt);field('Last provider sync (may be incremental)',provider.lastSync);
       field('Record last updated (includes enrichment)',record.updatedAt);field('Acquired / added',record.acquiredAt);

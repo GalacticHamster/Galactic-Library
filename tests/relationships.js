@@ -13,6 +13,29 @@ import { DATABASE_SCHEMA_VERSION } from '../src/lib/constants.js';
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['Kobo library presence is unknown, subscription evidence is temporary and explicit purchases can be owned', () => {
+    const base={providerItemId:'bookId=11111111-1111-1111-1111-111111111111',title:'Kobo Plus Purchased Adventures',detailUrl:'https://www.kobo.com/ebook/adventures',typeText:'eBook',authors:['Author']};
+    const parse=globalThis.GalacticKobo.koboItemFromCardData;
+    assert.equal(parse(base).ownership,'unknown');
+    assert.equal(parse({...base,ownershipLabels:['Kobo Plus']}).ownership,'unknown');
+    assert.equal(parse({...base,isKoboPlus:true}).ownership,'subscription');
+    assert.equal(parse({...base,ownershipLabels:['Read with Kobo Plus']}).ownership,'subscription');
+    assert.equal(parse({...base,isPurchased:true}).ownership,'owned');
+    assert.equal(parse({...base,ownershipLabels:['Purchased','Kobo Plus']}).ownership,'owned');
+    assert.equal(parse({...base,isPurchased:true,isKoboPlus:true}).ownership,'unknown');
+    const item=normalizeProviderItem({...parse(base),provider:'kobo',ownership:'owned'});assert.equal(item.ownership,'unknown');
+    const owned=normalizeProviderItem({...parse({...base,isPurchased:true}),provider:'kobo'});
+    const subscription=normalizeProviderItem({...parse({...base,isKoboPlus:true}),provider:'kobo'});
+    assert.equal(matchItems(records(subscription),[{title:base.title,mediaType:'book',authors:['Author']}])[0].owned,false);
+    assert.equal(matchItems(records(owned),[{title:base.title,mediaType:'book',authors:['Author']}])[0].owned,true);
+  }],
+  ['legacy Kobo owned claims downgrade on storage read and cannot contribute confirmed contents', async () => {
+    const item=book('legacy',{authors:['Author']});item.provider='kobo';item.id='kobo:legacy';item.ownership='owned';
+    const database={...createEmptyDatabase(),providerItems:{[item.id]:item},contentReviews:{[item.id]:{entries:[{series:'Comic',run:'2020',unitType:'issue',number:'1',language:'en'}]}}};
+    const validated=validateDatabase(database);assert.equal(validated.providerItems[item.id].ownership,'unknown');
+    assert.equal(contentCoverage(validated,validated.contentReviews[item.id].entries).owned,0);
+    assert.equal(validateDatabase(validated).providerItems[item.id].ownership,'unknown');
+  }],
   ['separating a falsely merged edition survives imports, backup and enrichment and can be undone', async () => {
     const values={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
     const items=['a','b','c'].map(providerItemId=>({providerItemId,title:'Shared Title',mediaType:'book',ownership:providerItemId==='a'?'unknown':'owned',metadata:{authors:['Author']}}));

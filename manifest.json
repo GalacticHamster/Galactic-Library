@@ -48,7 +48,7 @@
     },
     {
       "matches": ["https://www.kobo.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/kobo.js", "src/providers/kobo-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/kobo-ownership.js", "src/providers/kobo.js", "src/providers/kobo-content.js"],
       "run_at": "document_idle"
     },
     {

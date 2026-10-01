@@ -347,9 +347,9 @@ const tests = [
       providerItemId: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', title: 'Kobo Read Now Book',
       detailUrl: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', typeText: ''
     }), {
-      providerItemId: 'ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', title: 'Kobo Read Now Book', mediaType: 'book', ownership: 'owned',
+      providerItemId: 'ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', title: 'Kobo Read Now Book', mediaType: 'book', ownership: 'unknown',
       metadata: {
-        source: 'kobo-my-books-library', detailUrl: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', imageUrl: '', authors: [], series: [], format: 'ebook'
+        source: 'kobo-my-books-library', ownershipBasis:'library-presence-only', detailUrl: 'https://readnow.kobo.com/ec296889-f3ba-4eb4-bb64-ab0d16e7cbe2', imageUrl: '', authors: [], series: [], format: 'ebook'
       }
     });
     assert.deepEqual(koboItemFromCardData({
@@ -357,9 +357,9 @@ const tests = [
       detailUrl: 'https://www.kobo.com/us/en/ebook/a-memory-called-empire?utm_source=library', imageUrl: 'https://cdn.kobo.com/cover.jpg',
       typeText: 'eBook', authors: ['Arkady Martine'], series: ['Teixcalaan']
     }), {
-      providerItemId: '1f2e3d4c-1234-5678-9abc-def012345678', title: 'A Memory Called Empire', mediaType: 'book', ownership: 'owned',
+      providerItemId: '1f2e3d4c-1234-5678-9abc-def012345678', title: 'A Memory Called Empire', mediaType: 'book', ownership: 'unknown',
       metadata: {
-        source: 'kobo-my-books-library', detailUrl: 'https://www.kobo.com/us/en/ebook/a-memory-called-empire', imageUrl: 'https://cdn.kobo.com/cover.jpg',
+        source: 'kobo-my-books-library', ownershipBasis:'library-presence-only', detailUrl: 'https://www.kobo.com/us/en/ebook/a-memory-called-empire', imageUrl: 'https://cdn.kobo.com/cover.jpg',
         authors: ['Arkady Martine'], series: ['Teixcalaan'], format: 'ebook'
       }
     });

@@ -1,6 +1,7 @@
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createBackup } from '../src/lib/storage.js';
 import { matchItems } from '../src/lib/matcher.js';
+import '../src/providers/kobo.js';
 
 const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
@@ -17,6 +18,21 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:as
 }},storage:{onChanged:{addListener:()=>{}}}};
 
 try{
+  const koboDocument=new DOMParser().parseFromString(`<ul>
+    <li class="book-card" data-is-kobo-plus="true"><h3 class="book-title">Subscription book</h3><a data-book-title="Subscription book" href="https://www.kobo.com/ebook/subscription">Read now</a></li>
+    <li class="book-card"><h3 class="book-title">Purchased</h3><a data-book-title="Purchased" href="https://www.kobo.com/ebook/title-is-purchased">Read now</a></li>
+    <li class="book-card"><h3 class="book-title">Purchase proof</h3><span class="ownership-label">Purchased</span><a data-book-title="Purchase proof" href="https://www.kobo.com/ebook/purchase-proof">Read now</a></li>
+    </ul>`,'text/html');
+  const koboItems=globalThis.GalacticKobo.koboItemsFromDocument(koboDocument);
+  assert(koboItems.length===3&&koboItems[0].ownership==='subscription'&&koboItems[1].ownership==='unknown'&&koboItems[2].ownership==='owned','Kobo ownership leaks between cards or from title text.');
+  checks.push('Kobo actual DOM parser scopes purchase/subscription evidence to each card and ignores title words');
+  const originalFetch=globalThis.fetch;let koboFetches=0;
+  try{
+    globalThis.fetch=async()=>{koboFetches++;return {ok:true,text:async()=>koboDocument.documentElement.outerHTML};};
+    const update=await globalThis.GalacticKobo.fetchKoboLibrary(()=>{},koboItems.map(item=>item.providerItemId));
+    assert(koboFetches===1&&update.items.length===3&&update.items[0].ownership==='subscription','Kobo quick scan discarded current evidence for known cards.');
+  }finally{globalThis.fetch=originalFetch;}
+  checks.push('Kobo quick scan refreshes known cards and still stops at a known page');
   await writer.mergeProviderItems('humble',[
     {providerItemId:'a',title:'Collection A',mediaType:'book',ownership:'owned',metadata:{isbn:'9780306406157',authors:['Author'],language:'en',source:'purchase-library',detailUrl:'javascript:alert(1)'}},
     {providerItemId:'c',title:'Collection A, 2nd Edition',mediaType:'book',ownership:'owned',metadata:{authors:['Author'],language:'en'}},

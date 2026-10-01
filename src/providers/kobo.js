@@ -49,14 +49,16 @@
     const providerItemId = koboItemIdFromValue(card?.providerItemId) || koboItemIdFromValue(detailUrl);
     const mediaType = mediaTypeFromUrlAndText(detailUrl, card?.typeText);
     if (!providerItemId || !title || !mediaType) return null;
+    const evidence=global.GalacticKoboOwnership?.classify(card)??{ownership:'unknown',ownershipBasis:'library-presence-only'};
     return {
       providerItemId,
       title,
       mediaType,
-      ownership: 'owned',
+      ownership: evidence.ownership,
       metadata: {
         ...(global.GalacticProviderMetadata?.extract(card) ?? {}),
         source: 'kobo-my-books-library',
+        ownershipBasis:evidence.ownershipBasis,
         detailUrl,
         imageUrl: absoluteUrl(card?.imageUrl),
         authors: stringValues(card?.authors),
@@ -81,7 +83,9 @@
   }
 
   function cardDataFromLink(link) {
-    const container = link.closest('[data-book-title], article, li, [data-testid*="book" i], [data-testid*="item" i], [class*="book" i], [class*="tile" i], [class*="item" i]') ?? link.parentElement ?? link;
+    let container = link.parentElement?.closest('article, li, [data-book-title], [data-testid*="book" i], [data-testid*="item" i], [class*="book" i], [class*="tile" i], [class*="item" i]') ?? link;
+    // Never borrow ownership labels from a wrapper containing several books.
+    if(container.querySelectorAll('a[data-book-title][href]').length>1)container=link;
     const image = container.querySelector('img');
     const title = firstText([
       container.querySelector('[data-testid*="title" i], [class*="title" i], h1, h2, h3, h4'),
@@ -91,6 +95,10 @@
       { textContent: link.getAttribute('aria-label') }
     ]);
     return {
+      ownershipType:container.getAttribute('data-ownership-type')??container.getAttribute('data-entitlement-type')??link.getAttribute('data-ownership-type'),
+      isPurchased:container.getAttribute('data-is-purchased')==='true'?true:container.getAttribute('data-is-purchased')==='false'?false:undefined,
+      isKoboPlus:container.getAttribute('data-is-kobo-plus')==='true',
+      ownershipLabels:namedTexts(container,'[data-testid*="ownership" i], [class*="ownership" i], [data-testid*="kobo-plus" i], [class*="kobo-plus" i], [data-testid*="subscription" i], [class*="subscription" i], [class*="purchased" i], [class*="badge" i]'),
       providerItemId: container.getAttribute('data-product-id') ?? container.getAttribute('data-content-id') ?? container.getAttribute('data-id') ?? link.getAttribute('data-product-id') ?? link.getAttribute('href'),
       title,
       detailUrl: link.getAttribute('href'),
@@ -259,7 +267,9 @@
       if (pageItems.length && pageSignatures.has(signature)) throw new Error('Kobo repeated a library page before completing the scan.');
       pageSignatures.add(signature);
       const itemsToSave = incremental ? newKoboItems(pageItems, knownItemIds) : pageItems;
-      addItems(itemsById, itemsToSave, 'my-books');
+      // Refresh entitlement evidence for every observed card, including known
+      // subscriptions; the known-page rule still bounds the quick scan.
+      addItems(itemsById, pageItems, 'my-books');
       reportCounts(itemsById, reportProgress, { pagesRead: page, archivePagesRead: 0, section: 'My Books' });
       // Kobo explicitly orders this view Date Added descending. A complete
       // known page is therefore a safe quick-update stopping point.

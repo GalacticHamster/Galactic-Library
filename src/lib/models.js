@@ -6,6 +6,7 @@ import { validateMetadata } from './metadata-validation.js';
 import { validateProviderStates } from './provider-state.js';
 import { object, text, strings, date } from './validation.js';
 import { editionBarriers, validateEditionSeparations } from './relationships.js';
+import { providerOwnership } from './ownership.js';
 
 export function createEmptyDatabase() {
   return {
@@ -41,6 +42,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
   if (!OWNERSHIP_STATES.includes(ownership)) throw new Error(`Unsupported ownership state: ${ownership}.`);
   const titleParts = normalizeGameTitle(title);
   if (!titleParts.normalizedTitle) throw new Error('Provider item title cannot normalize to an empty value.');
+  const metadata=validateMetadata(provider,value.metadata,options);
 
   return {
     id: providerItemKey(provider, providerItemId),
@@ -52,9 +54,9 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
     baseTitle: titleParts.baseTitle,
     edition: titleParts.edition,
     mediaType,
-    ownership,
+    ownership:providerOwnership(provider,ownership,metadata),
     platform: strings(value.platform,30,80,'Platforms'),
-    metadata: validateMetadata(provider,value.metadata,options),
+    metadata,
     acquiredAt: date(value.acquiredAt,'Acquisition date'),
     observedAt: value.observedAt===null?null:date(value.observedAt??now,'Observation date'),
     updatedAt: date(now,'Update date')

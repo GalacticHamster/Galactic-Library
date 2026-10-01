@@ -15,7 +15,7 @@ Common metadata fields are authors, contributors with name/role, series, ISBN/AS
 | Kindle | Collections, origin/content type, item status, library category |
 | Amazon Video | Entity type, library view, ownership evidence |
 | Fandango at Home | Card type |
-| Kobo | Library section |
+| Kobo | Library section, validated ownership basis; library presence alone cannot establish ownership |
 | Fanatical | Bundle ID/title/slug, product slug, DRM, formats, Steam App ID |
 | Humble | Purchase ID, bundle label, entitlement type, key type; no redemption values |
 

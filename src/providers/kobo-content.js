@@ -29,13 +29,14 @@
       status.textContent = items.length ? `Saving ${items.length} Kobo item${items.length === 1 ? '' : 's'} locally...` : 'No new Kobo titles; recording the completed check...';
       const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kobo', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Kobo import did not complete.');
+      const ownershipNote=` ${items.filter(item=>item.ownership==='subscription').length} observed subscription item(s); ${items.filter(item=>item.ownership==='unknown').length} need ownership review. My Books presence alone does not confirm a purchase.`;
       if (!fullRescan) {
-        status.textContent = `Quick update added ${items.length} Kobo item${items.length === 1 ? '' : 's'}. ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally. Use Full rescan to check Archive and Audiobooks.`;
+        status.textContent = `Quick update refreshed ${items.length} observed Kobo item${items.length === 1 ? '' : 's'}. ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally. Use Full rescan to check Archive and Audiobooks.${ownershipNote}`;
         return;
       }
       const archiveText = archiveAvailable ? ` Included ${archivePagesRead} Archive page${archivePagesRead === 1 ? '' : 's'}.` : ' Kobo did not expose an Archive link in this view.';
       const audiobookText = audiobookAvailable ? ` Read ${audiobookPagesRead} Audiobooks page${audiobookPagesRead === 1 ? '' : 's'}.` : ' Kobo did not expose a separate Audiobooks view in this page.';
-      status.textContent = `Saved ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} locally.${archiveText}${audiobookText}`;
+      status.textContent = `Saved ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} locally.${archiveText}${audiobookText}${ownershipNote}`;
     } catch (error) {
       status.textContent = `Kobo import failed: ${error.message}`;
     } finally {
