@@ -17,7 +17,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'amazon-games' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'amazon-games' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Amazon Games sync state.');
       const ageMs = Date.now() - Date.parse(state.lastSuccessfulSyncAt || '');
       const fullRescan = mode === 'full' || !state.hasFullBaseline || !Number.isFinite(ageMs) || ageMs > 70 * 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@
       }, !fullRescan);
       if (!items.length && fullRescan) throw new Error('No delivered Amazon Games claims were found. Open My Collection, select Games, and wait for it to load.');
       status.textContent = items.length ? `Saving ${items.length} Amazon Games claim${items.length === 1 ? '' : 's'} locally...` : 'No new direct Amazon Games titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-games', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-games', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Games import did not complete.');
       const scope = fullRescan ? `Full rescan saved ${response.gameCount} direct Amazon Games title${response.gameCount === 1 ? '' : 's'} from ${diagnostics.windowsRead} date range${diagnostics.windowsRead === 1 ? '' : 's'}` : `Quick update checked Amazon's past-three-month window and found ${items.length} new direct title${items.length === 1 ? '' : 's'}`;
       status.textContent = `${scope}.${diagnostics.emptyRanges ? ` ${diagnostics.emptyRanges} date range${diagnostics.emptyRanges === 1 ? ' had' : 's had'} no claims.` : ''}${diagnostics.otherLibraryClaims ? ` ${diagnostics.otherLibraryClaims} claim${diagnostics.otherLibraryClaims === 1 ? ' was' : 's were'} sent directly to another game library, such as Epic, so ${diagnostics.otherLibraryClaims === 1 ? 'it is' : 'they are'} not Amazon Games titles.` : ''}${diagnostics.productKeyClaims ? ` ${diagnostics.productKeyClaims} claim${diagnostics.productKeyClaims === 1 ? ' used' : 's used'} a product key, such as GOG; sync that store after redemption to track ${diagnostics.productKeyClaims === 1 ? 'it' : 'them'}.` : ''}${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates ? ` ${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates} repeated Amazon claim card${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates === 1 ? ' was' : 's were'} the same title and ${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates === 1 ? 'was' : 'were'} combined.` : ''}${diagnostics.unreadableCards ? ` ${diagnostics.unreadableCards} claim${diagnostics.unreadableCards === 1 ? ' used' : 's used'} another delivery method that Amazon does not identify as a direct Amazon Games library title, so ${diagnostics.unreadableCards === 1 ? 'it was' : 'they were'} left out.` : ''}`;
@@ -39,6 +39,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'amazon-games');
   document.documentElement.append(host);
 }());

@@ -7,6 +7,7 @@ import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview } from '../lib/contents.js';
 import { identityConflicts, identityEvidence } from '../lib/identity.js';
 import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
+import { text } from '../lib/validation.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -14,6 +15,32 @@ import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
  * context owns a writer or writes a cached database snapshot.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve()) {
+  const SCANS='galacticLibraryProviderScans';
+  async function beginProviderScan(provider,profile,mode='full',switchProfile=false,tabId=null) {
+    if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
+    const profileLabel=text(profile,100,'Account/profile label');if(!profileLabel)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
+    const database=await getDatabase();const prior=database.providers[provider]?.profileLabel??'';
+    const changing=Boolean(prior)&&prior!==profileLabel;
+    if(changing&&(mode!=='full'||switchProfile!==true))throw new Error('A different account/profile is active. Choose Full rescan and explicitly switch profiles; the previous library will be archived.');
+    const forceFull=changing||!prior||!database.providers[provider]?.fullSyncAt;
+    const stored=await storageArea.get({[SCANS]:{}});const scans=stored[SCANS]??{};const scanToken=crypto.randomUUID();
+    scans[provider]={scanToken,profileLabel,priorProfileLabel:prior,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
+    await storageArea.set({[SCANS]:scans});
+    return {scanToken,forceFull,profileLabel,database};
+  }
+  async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null) {
+    const stored=await storageArea.get({[SCANS]:{}});const scan=stored[SCANS]?.[provider];
+    if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId)throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
+    if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
+    const details={...syncDetails,profileLabel:scan.profileLabel};
+    return syncDetails.syncMode==='full'?replaceProviderItems(provider,values,details,snapshot):mergeProviderItems(provider,values,details);
+  }
+  async function restoreDatabase(database){return persistDatabase(database,'all');}
+  async function importUnscopedProviderItems(provider,values,details,snapshot){
+    const database=await getDatabase();
+    if(database.providers[provider]?.profileLabel)throw new Error('Reload the provider page and start a confirmed profile scan.');
+    return details.syncMode==='incremental'?mergeProviderItems(provider,values,details):replaceProviderItems(provider,values,details,snapshot);
+  }
   async function getDatabase() {
     const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
@@ -34,9 +61,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return database;
   }
 
-  async function persistDatabase(database) {
+  async function persistDatabase(database,invalidate=null) {
     const validated = validateDatabase(database);
-    await storageArea.set({ [DATABASE_STORAGE_KEY]: validated });
+    const updates={[DATABASE_STORAGE_KEY]:validated};
+    if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
+    await storageArea.set(updates);
     return validated;
   }
 
@@ -60,16 +89,20 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const database = await getDatabase();
     const now = new Date().toISOString();
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
-    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===(database.providers[provider]?.profileLabel??'')).map(entry=>[entry.item.id,entry.item]));
+    const priorProfile=database.providers[provider]?.profileLabel??'';
+    const nextProfile=syncDetails.profileLabel??priorProfile;const changing=Boolean(priorProfile)&&priorProfile!==nextProfile;
+    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===nextProfile).map(entry=>[entry.item.id,entry.item]));
     const incoming = values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
       item.metadata.source = PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
+      return preserveEnrichment(item, (changing?null:database.providerItems[item.id])??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const profileLabel=database.providers[provider]?.profileLabel??'';
-    for(const item of Object.values(database.providerItems))if(item.provider===provider&&!unique.has(item.id))database.providerHistory[item.recordRef]={item,profileLabel,reason:'missing-from-complete-scan',missingSince:now};
-    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===profileLabel&&unique.has(entry.item.id))delete database.providerHistory[ref];
+    const oldIds=new Set(Object.values(database.providerItems).filter(item=>item.provider===provider).map(item=>item.id));
+    for(const item of Object.values(database.providerItems))if(item.provider===provider&&(changing||!unique.has(item.id)))database.providerHistory[item.recordRef]={item,profileLabel,reason:changing?'profile-switch':'missing-from-complete-scan',missingSince:now};
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===nextProfile&&unique.has(entry.item.id))delete database.providerHistory[ref];
+    if(changing){for(const [id,decision]of Object.entries(database.manualMatchDecisions))if(decision.itemIds.some(id=>oldIds.has(id)))delete database.manualMatchDecisions[id];for(const id of oldIds)delete database.contentReviews[id];for(const [id,separation]of Object.entries(database.editionSeparations))if(oldIds.has(separation.itemId)||separation.otherItemIds.some(id=>oldIds.has(id)))delete database.editionSeparations[id];}
     const records = [...unique.values()];
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
@@ -84,6 +117,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
+      ...(changing?{}:database.providers[provider]),
       connected: true,
       itemCount: gameCount,
       addOnCount,
@@ -98,7 +132,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       ...syncDetails,
       snapshotValidation: { ...snapshot, validatedAt: now }
     };
-    return persistDatabase(database);
+    return persistDatabase(database,provider);
   }
 
   // Incremental syncs must never make an entitlement disappear merely because
@@ -146,11 +180,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       lastError: null,
       ...syncDetails
     };
-    return persistDatabase(database);
+    return persistDatabase(database,provider);
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]);
+    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -423,7 +457,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   const operations = {
-    getDatabase, restoreDatabase: persistDatabase, replaceProviderItems, mergeProviderItems, clearDatabase,
+    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,

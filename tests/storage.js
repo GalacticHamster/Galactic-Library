@@ -16,6 +16,29 @@ export function snapshotFixture(provider, items) {
   return completeProviderSnapshot(provider, items, scopes);
 }
 
+async function profileSafetyFixture(){
+  const memory=memoryStorage();let writer=createStorageWriter(memory.area);
+  const items=[game('1','Profile game')];const snapshot=snapshotFixture('steam',items);
+  const begin=()=>writer.beginProviderScan('steam','personal','full',false,1);
+  const commit=scan=>writer.commitProviderScan('steam',items,{syncMode:'full',fullSyncAt:new Date().toISOString()},snapshot,scan.scanToken,1);
+  const old=await begin();const newer=await begin();
+  await assert.rejects(commit(old),/superseded/);
+  writer=createStorageWriter(memory.area);await commit(newer);
+  await assert.rejects(writer.beginProviderScan('steam','other','incremental',true,1),/different account/);
+  await assert.rejects(writer.beginProviderScan('steam','other','full',false,1),/different account/);
+  const stale=await begin();await writer.clearDatabase();await assert.rejects(commit(stale),/superseded/);
+  const staleRestore=await begin();await writer.restoreDatabase(createEmptyDatabase());await assert.rejects(commit(staleRestore),/superseded/);
+  await commit(await begin());
+  const switched=await writer.beginProviderScan('steam','other','full',true,1);
+  await assert.rejects(writer.commitProviderScan('steam',items,{syncMode:'full'},null,switched.scanToken,1));
+  assert.equal((await writer.getDatabase()).providers.steam.profileLabel,'personal');
+  await writer.commitProviderScan('steam',[],{syncMode:'full'},snapshotFixture('steam',[]),switched.scanToken,1);
+  const database=await writer.getDatabase();assert.equal(database.providers.steam.profileLabel,'other');
+  assert.equal(Object.values(database.providerHistory)[0].profileLabel,'personal');
+  assert.equal(Object.values(database.providerHistory)[0].reason,'profile-switch');
+  await assert.rejects(writer.importUnscopedProviderItems('steam',items,{syncMode:'full'},snapshot),/Reload/);
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
@@ -157,6 +180,7 @@ function game(id, title = `Game ${id}`) {
 }
 
 export const storageTests = [
+  ['profile scans reject stale commits across restart, restore, clear and account switches', profileSafetyFixture],
   ['concurrent provider tabs retain both full imports in the actual worker', () => withWorker(async ({ memory, pageA, importItems }) => {
     const responses = await Promise.all([
       importItems('steam', [game('1')]),

@@ -1,3 +1,4 @@
+import '../src/providers/floating-panel.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
 import '../src/providers/metadata.js';
@@ -36,11 +37,13 @@ try{
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full';
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
-      if(request.type==='GET_PROVIDER_SYNC_STATE')return {ok:true,hasFullBaseline:true,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};
+      if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
+      if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
       if(request.type==='FETCH_FANATICAL_ORDERS')return {ok:true,result:{items:[{sourceItemId:'fixture-123',title:items[0].title,mediaType}],snapshot,orderFingerprints:[]}};
+      if(request.type==='FANDANGO_IMPORT_STATE'&&request.action==='get'){const scan=await writer.beginProviderScan(provider,'fixture',mode,false,1);return {ok:true,state:{phase:'tv',fullRescan:scan.forceFull||mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[],scanContext:{profileLabel:'fixture',confirmed:true,mode,scanToken:scan.scanToken}}};}
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
-      if(request.type==='IMPORT_PROVIDER_ITEMS'){
-        const database=await (request.mode==='incremental'?writer.mergeProviderItems(provider,request.items):writer.replaceProviderItems(provider,request.items,{},request.snapshot));
+      if(request.type==='COMMIT_PROVIDER_SCAN'){
+        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString()},request.snapshot,request.scanToken,1);
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state};
       }
       return {ok:false,error:'Unexpected importer request.'};
@@ -55,7 +58,7 @@ try{
         if(mode==='full')await import(`../src/providers/${file}-content.js`);
         const shadow=shadows.at(-1);
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('button');
-        assert(button,`${provider} missing ${mode} button`);button.click();
+        assert(button,`${provider} missing ${mode} button`);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
       }
       const shadow=shadows.at(-1);
       await wait(()=>!shadow.querySelector('.status').dataset.busy&&(imported>before||/failed:/iu.test(shadow.querySelector('.status').textContent)));

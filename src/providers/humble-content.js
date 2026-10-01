@@ -18,7 +18,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'humble' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'humble' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Humble sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Humble baseline yet; scanning every purchase once…';
@@ -28,7 +28,7 @@
           : 'Loading your Humble purchases…';
       }, fullRescan ? null : state.syncState?.knownPurchaseIds ?? [], state.syncState?.refreshPurchaseIds ?? []);
       status.textContent = result.items.length ? `Saving ${result.items.length} Humble entitlement${result.items.length === 1 ? '' : 's'} locally…` : 'No new supported Humble entitlements; recording the completed purchase check…';
-      const response = await chrome.runtime.sendMessage({
+      const response = await globalThis.GalacticSync.send({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'humble', mode: fullRescan ? 'full' : 'incremental', items: result.items,
         syncState: { knownPurchaseIds: result.knownPurchaseIds }, snapshot: result.snapshot
       });
@@ -45,6 +45,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'humble');
   document.documentElement.append(host);
 }());

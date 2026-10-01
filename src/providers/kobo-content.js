@@ -18,7 +18,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kobo' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kobo' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kobo sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Kobo baseline yet; reading every library page once…';
@@ -27,7 +27,7 @@
         status.textContent = `Reading Kobo ${section ?? 'library'}: ${scanText}; ${books} books and ${audiobooks} audiobooks found.`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} Kobo item${items.length === 1 ? '' : 's'} locally...` : 'No new Kobo titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kobo', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kobo', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Kobo import did not complete.');
       const ownershipNote=` ${items.filter(item=>item.ownership==='subscription').length} observed subscription item(s); ${items.filter(item=>item.ownership==='unknown').length} need ownership review. My Books presence alone does not confirm a purchase.`;
       if (!fullRescan) {
@@ -45,6 +45,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'kobo');
   document.documentElement.append(host);
 }());

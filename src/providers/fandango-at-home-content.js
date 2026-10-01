@@ -28,7 +28,7 @@
   }
 
   async function importState(action, state) {
-    const response = await chrome.runtime.sendMessage({ type: 'FANDANGO_IMPORT_STATE', action, state });
+    const response = await globalThis.GalacticSync.send({ type: 'FANDANGO_IMPORT_STATE', action, state });
     if (!response?.ok) throw new Error(response?.error ?? 'Could not keep the Fandango import in this browser tab.');
     return response.state ?? null;
   }
@@ -57,7 +57,7 @@
       globalThis.GalacticProviderSnapshot.completedScope('tv', items.filter((item) => item.mediaType === 'tv').length, expected.tv, 'reported-count')
     ]) : undefined;
     status.textContent = items.length ? `Saving ${items.length} Fandango at Home title${items.length === 1 ? '' : 's'} locally...` : 'No new Fandango at Home titles; recording the completed check...';
-    const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+    const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
     if (!response?.ok) throw new Error(response?.error ?? 'Fandango at Home import did not complete.');
     if (fullRescan) {
       status.textContent = `Saved ${response.movieCount} Fandango at Home movies and ${response.tvCount} TV shows locally. Fandango reported ${expected.movies ?? 'unknown'} movies and ${expected.tv ?? 'unknown'} TV shows.`;
@@ -140,7 +140,7 @@
         globalThis.location.assign('/content/browse/mylibrary');
         return;
       }
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fandango-at-home' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fandango-at-home' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Fandango at Home sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Fandango at Home baseline yet; reading every title once…';
@@ -153,7 +153,7 @@
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
 
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'fandango-at-home');
   document.documentElement.append(host);
   importState('get').then((state) => {
     if (!state) return;

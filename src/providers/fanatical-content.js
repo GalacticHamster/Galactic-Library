@@ -20,11 +20,11 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fanatical' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fanatical' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Fanatical sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       status.textContent = fullRescan ? 'Reading your completed Fanatical order history...' : 'Checking Fanatical for newly completed orders...';
-      const projection = await chrome.runtime.sendMessage({
+      const projection = await globalThis.GalacticSync.send({
         type: 'FETCH_FANATICAL_ORDERS',
         fullScan: fullRescan,
         knownOrderFingerprints: fullRescan ? [] : state.syncState?.knownOrderFingerprints ?? []
@@ -32,7 +32,7 @@
       if (!projection?.ok) throw new Error(projection?.error ?? 'Fanatical orders could not be read.');
       const items = globalThis.GalacticFanatical.fanaticalItemsFromProjection(projection.result);
       status.textContent = items.length ? `Saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally...` : 'No new supported Fanatical items; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({
+      const response = await globalThis.GalacticSync.send({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
         syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [] }, snapshot: projection.result?.snapshot
       });
@@ -51,6 +51,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'fanatical');
   document.documentElement.append(host);
 }());

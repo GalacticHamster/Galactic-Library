@@ -258,14 +258,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request?.type === 'GET_PROVIDER_SYNC_STATE') {
+  if (['GET_PROVIDER_SYNC_STATE','GET_PROVIDER_PROFILE'].includes(request?.type)) {
     if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
       sendResponse({ ok: false, error: 'Sync state is available only from the matching signed-in provider site.' });
       return undefined;
     }
-    getDatabase()
-      .then((database) => {
+    const read = request.beginScan===true
+      ? (request.confirmed===true && Number.isInteger(sender.tab?.id)
+        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id)
+        : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
+      : getDatabase().then(database=>({database}));
+    read.then(({database,scanToken,forceFull,profileLabel}) => {
         const state = database.providers?.[request.provider] ?? {};
+        if(request.type==='GET_PROVIDER_PROFILE'){sendResponse({ok:true,profileLabel:state.profileLabel??''});return;}
         const knownProviderItemIds = Object.values(database.providerItems)
           .filter((item) => item.provider === request.provider)
           .map((item) => item.providerItemId)
@@ -273,9 +278,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           .slice(0, 50000);
         sendResponse({
           ok: true,
-          hasFullBaseline: Boolean(state.fullSyncAt),
+          scanToken,profileLabel,
+          hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
-          syncState: request.provider === 'humble'
+          syncState: forceFull ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set(Object.values(database.providerItems)
               .filter(item=>item.provider==='humble'&&item.metadata?.entitlement==='third-party-key'
                 &&(item.metadata.keyStatus!=='revealed'||item.metadata.expiresAt&&Date.parse(item.metadata.expiresAt)<=Date.now()))
@@ -289,7 +295,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request?.type !== 'IMPORT_PROVIDER_ITEMS') return undefined;
+  if (!['IMPORT_PROVIDER_ITEMS','COMMIT_PROVIDER_SCAN'].includes(request?.type)) return undefined;
   if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
@@ -340,7 +346,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         syncMode: incrementalProvider ? 'incremental' : 'full',
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
       };
-  (incrementalProvider ? mergeProviderItems : replaceProviderItems)(request.provider, request.items, syncDetails, request.snapshot)
+  (request.type==='COMMIT_PROVIDER_SCAN'
+    ? storageWriter.commitProviderScan(request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id)
+    : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))
     .then((database) => sendResponse({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,

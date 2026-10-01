@@ -19,7 +19,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'steam' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'steam' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Steam sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Steam baseline yet; resolving every owned app once…';
@@ -31,7 +31,7 @@
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       const { items, unresolvedApps } = result;
       status.textContent = items.length ? 'Saving Steam games and DLC locally...' : 'No new Steam apps; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items, snapshot: result.snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items, snapshot: result.snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Steam import did not complete.');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       const scope = fullRescan ? `Full rescan checked ${result.newAppCount} apps` : `Quick update checked ${result.newAppCount} new app${result.newAppCount === 1 ? '' : 's'}`;
@@ -44,6 +44,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'steam');
   document.documentElement.append(host);
 }());

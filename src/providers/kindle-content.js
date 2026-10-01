@@ -27,7 +27,7 @@
     comicContentsButton.disabled = true;
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kindle sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Kindle baseline yet; reading every library page once…';
@@ -36,7 +36,7 @@
         status.textContent = `Reading Kindle library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${books} items found (${documents} personal document${documents === 1 ? '' : 's'}).`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} Kindle item${items.length === 1 ? '' : 's'} locally...` : 'No new Kindle items; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kindle', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kindle', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Kindle import did not complete.');
       const categoryDetails = Object.entries(diagnostics).map(([category, detail]) => {
         const name = category === 'books' ? 'Books' : 'Personal Documents';
@@ -91,7 +91,7 @@
     pauseComicContentsButton.hidden = false;
     status.dataset.busy = 'true';
     try {
-      const candidateResponse = await chrome.runtime.sendMessage({ type: 'GET_KINDLE_COMIC_CONTENT_CANDIDATES' });
+      const candidateResponse = await globalThis.GalacticSync.send({ type: 'GET_KINDLE_COMIC_CONTENT_CANDIDATES' });
       if (!candidateResponse?.ok) throw new Error(candidateResponse?.error ?? 'Could not load confirmed Kindle comic candidates.');
       const candidates = candidateResponse.candidates ?? [];
       if (!candidates.length) {
@@ -112,7 +112,7 @@
         status.textContent = `Reading Kindle comic product ${attempted}/${candidates.length}: ${candidate.title}`;
         try {
           const contents = await fetchComicContentsWithRetry(candidate, attempted, candidates.length);
-          const saveResponse = await chrome.runtime.sendMessage({ type: 'SAVE_KINDLE_COMIC_CONTENTS', entries: [{ itemId: candidate.id, sourceUrl: contents.sourceUrl, statement: contents.statement, availability: contents.availability }] });
+          const saveResponse = await globalThis.GalacticSync.send({ type: 'SAVE_KINDLE_COMIC_CONTENTS', entries: [{ itemId: candidate.id, sourceUrl: contents.sourceUrl, statement: contents.statement, availability: contents.availability }] });
           if (!saveResponse?.ok) throw new Error(saveResponse?.error ?? 'Could not save the Kindle product-page result.');
           if (contents.availability === 'unavailable') unavailable += 1;
           else if (contents.statement) matched += 1;
@@ -153,6 +153,6 @@
     pauseComicContentsButton.disabled = true;
     status.textContent = 'Pausing after the current Kindle product page...';
   });
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'kindle');
   document.documentElement.append(host);
 }());

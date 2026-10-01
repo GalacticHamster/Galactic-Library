@@ -19,7 +19,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
-      const state = await chrome.runtime.sendMessage({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'audible' });
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'audible' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Audible sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Audible baseline yet; reading every library page once…';
@@ -28,7 +28,7 @@
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       const subscriptionCount = items.filter((item) => item.ownership === 'subscription').length;
       status.textContent = items.length ? `Saving ${items.length} Audible audiobook${items.length === 1 ? '' : 's'} locally...` : 'No new Audible titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'audible', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'audible', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Audible import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} audiobook${items.length === 1 ? '' : 's'}`}. ${response.audiobookCount} Audible audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally; ${subscriptionCount} new cards exposed a membership-remove action.`;
     } catch (error) {
@@ -39,6 +39,6 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  globalThis.GalacticFloatingPanel?.attach(shadow);
+  globalThis.GalacticFloatingPanel?.attach(shadow, 'audible');
   document.documentElement.append(host);
 }());
