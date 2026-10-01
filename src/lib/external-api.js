@@ -1,4 +1,5 @@
-import { EXTERNAL_API_VERSION } from './constants.js';
+import { EXTERNAL_API_VERSION, PROVIDERS } from './constants.js';
+import { companionResult } from './companion-response.js';
 import { matchItems } from './matcher.js';
 import { validIsbn } from './identity.js';
 import { validateContents } from './contents.js';
@@ -16,12 +17,13 @@ export function normaliseExternalClientIds(values) {
 }
 
 function providerStatus(providers) {
-  return Object.fromEntries(Object.entries(providers ?? {}).map(([id, state]) => [id, {
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  return Object.fromEntries(PROVIDERS.filter(id => Object.hasOwn(providers ?? {}, id)).map(id => { const state = providers[id]; return [id, {
     connected: Boolean(state?.connected),
-    gameCount: Number(state?.itemCount ?? 0),
-    audiobookCount: Number(state?.audiobookCount ?? 0),
-    bookCount: Number(state?.bookCount ?? 0)
-  }]));
+    gameCount: count(state?.itemCount),
+    audiobookCount: count(state?.audiobookCount),
+    bookCount: count(state?.bookCount)
+  }]; }));
 }
 
 function validMatchRequest(item) {
@@ -59,5 +61,5 @@ export function handleExternalApiRequest(database, request) {
     return { ok: false, error: 'MATCH_ITEMS needs 1–500 valid game, book, or audiobook titles.' };
   }
   if(request.items.reduce((sum,item)=>sum+(item.contents?.length??0),0)>20000)return {ok:false,error:'The batch contains too many contents entries.'};
-  return { ok: true, apiVersion: EXTERNAL_API_VERSION, results: matchItems(database.providerItems, request.items, database) };
+  return { ok: true, apiVersion: EXTERNAL_API_VERSION, results: matchItems(database.providerItems, request.items, database).map(companionResult) };
 }

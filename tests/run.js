@@ -12,6 +12,7 @@ import { compareTitles } from '../src/lib/title-sort.js';
 import { storageTests, snapshotFixture } from './storage.js';
 import { providerSnapshotTests } from './provider-snapshots.js';
 import { relationshipTests } from './relationships.js';
+import { securityTests } from './security.js';
 
 await import('../src/providers/metadata.js');
 await import('../src/providers/steam-store.js');
@@ -473,7 +474,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, ...relationshipTests]) {
+for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -484,4 +485,4 @@ for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, 
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length} tests passed.`);
+else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
