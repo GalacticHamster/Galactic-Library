@@ -1,3 +1,4 @@
+import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
 import '../providers/metadata.js';
@@ -77,86 +78,28 @@ function fanaticalSyncState(value) {
 // This function is serialized into Fanatical's MAIN world. It is the only
 // code allowed to read the signed-in page's session token, and returns a
 // strict ownership projection rather than a token or raw order response.
-async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [] } = {}) {
-  const text = (value, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
-  const id = (value) => /^[a-zA-Z0-9_-]{6,128}$/u.test(String(value ?? '')) ? String(value) : '';
-  const list = (value, max = 30) => [...new Set((Array.isArray(value) ? value : []).map((entry) => text(entry, 40)).filter(Boolean))].slice(0, max);
-  const mediaType = (value) => {
-    const type = text(value).toLocaleLowerCase();
-    if (type === 'game') return 'game';
-    if (type.includes('comic') || type === 'book') return 'book';
-    if (type === 'audiobook' || (type.includes('audio') && type.includes('book'))) return 'audiobook';
-    return 'other';
-  };
-  const fingerprint = async (orderId) => {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(orderId)));
-    return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
-  };
-  let token = '';
-  try { token = String(JSON.parse(localStorage.getItem('bsauth') || '{}')?.token || ''); } catch { /* signed-out or changed page state */ }
-  if (!token) throw new Error('Sign in to Fanatical before importing purchases.');
-  const request = async (path) => {
-    const response = await fetch(path, { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json', authorization: token } });
-    if (!response.ok) throw new Error(response.status === 401 ? 'Fanatical session expired. Sign in and try again.' : `Fanatical returned ${response.status} while reading your orders.`);
-    return response.json();
-  };
-  const summaries = await request('/api/user/orders');
-  if (!Array.isArray(summaries) || summaries.some((order) => !order || !id(order._id) || typeof order.status !== 'string')) throw new Error('Fanatical returned a malformed order index.');
-  const completed = (Array.isArray(summaries) ? summaries : []).filter((order) => order?.status === 'COMPLETE' && id(order?._id));
-  const orders = await Promise.all(completed.map(async (order) => ({ order, fingerprint: await fingerprint(order._id) })));
-  const known = new Set((Array.isArray(knownOrderFingerprints) ? knownOrderFingerprints : [])
-    .map((value) => String(value ?? '').toLocaleLowerCase()).filter((value) => /^[a-f0-9]{64}$/u.test(value)));
-  const selected = fullScan ? orders : orders.filter((entry) => !known.has(entry.fingerprint));
-  const details = await Promise.all(selected.map(async ({ order }) => request(`/api/user/orders/${encodeURIComponent(order._id)}`)));
-  const itemsById = new Map();
-  for (const order of details) {
-    if (order?.status !== 'COMPLETE' || !Array.isArray(order.items)) throw new Error('Fanatical returned an incomplete or malformed completed order.');
-    for (const parent of Array.isArray(order?.items) ? order.items : []) {
-      if (!Array.isArray(parent?.bundles)) throw new Error('Fanatical returned malformed order groups.');
-      for (const group of Array.isArray(parent?.bundles) ? parent.bundles : []) {
-        if (!Array.isArray(group?.games)) throw new Error('Fanatical returned a malformed product list.');
-        for (const leaf of Array.isArray(group?.games) ? group.games : []) {
-          const sourceItemId = id(leaf?._id);
-          const title = text(leaf?.name);
-          const kind = mediaType(leaf?.display_type ?? leaf?.type);
-          if (!sourceItemId || !title) throw new Error('Fanatical returned an unreadable order product.');
-          if (kind === 'other') continue;
-          const steamAppId = /^\d{1,16}$/u.test(String(leaf?.steam?.id ?? '')) ? String(leaf.steam.id) : '';
-          const isbn = text(leaf?.isbn, 32).replace(/[^0-9X]/giu, '');
-          const purchaseDate = typeof order?.date === 'string' && !Number.isNaN(Date.parse(order.date)) ? order.date : null;
-          itemsById.set(sourceItemId, {
-            sourceItemId, title, mediaType: kind,
-            slug: text(leaf?.slug, 300),
-            externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
-            bibliographic: {
-              authors: list((Array.isArray(leaf?.authors) ? leaf.authors : [leaf?.author]).map((author) => typeof author === 'object' ? text(author?.name) : text(author))),
-              publisher: text(leaf?.publisher), language: text(leaf?.language, 80), series: list(Array.isArray(leaf?.series) ? leaf.series : [leaf?.series]),
-              edition: text(leaf?.edition, 100), volume: text(leaf?.volume, 40), issue: text(leaf?.issue, 40)
-            },
-            drm: list(Object.entries(leaf?.drm && typeof leaf.drm === 'object' ? leaf.drm : {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
-            platforms: list(Object.entries(leaf?.platforms ?? leaf?.os ?? {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
-            formats: list((Array.isArray(leaf?.downloads) ? leaf.downloads : []).flatMap((download) => (Array.isArray(download?.files) ? download.files : []).map((file) => text(file?.format, 32).toLocaleLowerCase()))),
-            bundle: { sourceItemId: id(parent?._id), title: text(parent?.name), slug: text(parent?.slug, 300) },
-            purchaseDate
-          });
-        }
-      }
-    }
-  }
-  // Raw order records and `token` never cross this MAIN-world boundary.
-  return { ordersScanned: selected.length, ordersAvailable: orders.length, orderFingerprints: orders.map((entry) => entry.fingerprint), items: [...itemsById.values()], fullScan, complete: true };
-}
-
-function sanitizeFanaticalProjection(value) {
+function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprints:known=[]}={}) {
   const input = value && typeof value === 'object' ? value : {};
-  if (!Array.isArray(input.items) || input.complete !== true || !Number.isSafeInteger(input.ordersScanned) || !Number.isSafeInteger(input.ordersAvailable) || input.ordersScanned < 0 || input.ordersScanned > input.ordersAvailable || (input.fullScan === true && input.ordersScanned !== input.ordersAvailable)) throw new Error('Fanatical did not return a complete validated order projection.');
+  const coverage=input.coverage;const count=value=>Number.isSafeInteger(value)&&value>=0;
+  if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||coverage?.complete!==true
+    ||!count(input.ordersScanned)||!count(input.ordersAvailable)||!count(coverage.listedOrders)||coverage.listedOrders>100000
+    ||coverage.listedOrders<input.ordersAvailable||coverage.validatedOrders!==input.ordersScanned
+    ||coverage.emptyAccount!==(coverage.listedOrders===0)||!count(coverage.pagesFetched)||coverage.pagesFetched<1||coverage.pagesFetched>1000
+    ||!count(coverage.retries)||coverage.concurrency!==3||!['array-only','link','count','range'].includes(coverage.paginationEvidence)
+    ||coverage.expectedTotal!==null&&(!count(coverage.expectedTotal)||coverage.expectedTotal!==coverage.listedOrders)
+    ||['count','range'].includes(coverage.paginationEvidence)!==(coverage.expectedTotal!==null)
+    ||coverage.paginationEvidence==='array-only'&&coverage.pagesFetched!==1||coverage.paginationEvidence==='link'&&coverage.pagesFetched<2)throw new Error('Fanatical did not return a complete validated order projection.');
   const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
+  if(!Array.isArray(input.orderFingerprints)||input.orderFingerprints.length!==input.ordersAvailable
+    ||knownOrderFingerprints.length!==input.ordersAvailable
+    ||input.ordersScanned!==(fullScan?input.ordersAvailable:knownOrderFingerprints.filter(id=>!known.includes(id)).length))throw new Error('Fanatical returned inconsistent order coverage.');
   const items = [];
   for (const candidate of Array.isArray(input.items) ? input.items : []) {
     const sourceItemId = String(candidate?.sourceItemId ?? '').trim();
     const title = String(candidate?.title ?? '').trim().slice(0, 500);
     const mediaType = ['game', 'book', 'audiobook'].includes(candidate?.mediaType) ? candidate.mediaType : '';
-    if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title || !mediaType) throw new Error('Fanatical returned an unreadable projected product.');
+    if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title) throw new Error('Fanatical returned an unreadable projected product.');
+    if(!mediaType)continue;
     const safeList = (entries) => [...new Set((Array.isArray(entries) ? entries : []).map((entry) => String(entry ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
     const safeText = (entry, max = 300) => String(entry ?? '').trim().slice(0, max);
     const steamAppId = /^\d{1,16}$/u.test(String(candidate?.externalIds?.steamAppId ?? '')) ? String(candidate.externalIds.steamAppId) : '';
@@ -164,7 +107,7 @@ function sanitizeFanaticalProjection(value) {
     items.push({
       sourceItemId, title, mediaType, slug: safeText(candidate?.slug),
       externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
-      bibliographic: globalThis.GalacticProviderMetadata.extract(candidate?.bibliographic),
+      bibliographic: globalThis.GalacticProviderMetadata.extract(candidate),
       drm: safeList(candidate?.drm), platforms: safeList(candidate?.platforms), formats: safeList(candidate?.formats),
       bundle: { sourceItemId: /^[a-zA-Z0-9_-]{6,128}$/u.test(String(candidate?.bundle?.sourceItemId ?? '')) ? String(candidate.bundle.sourceItemId) : '', title: safeText(candidate?.bundle?.title, 500), slug: safeText(candidate?.bundle?.slug) },
       purchaseDate: typeof candidate?.purchaseDate === 'string' && !Number.isNaN(Date.parse(candidate.purchaseDate)) ? candidate.purchaseDate : null
@@ -174,8 +117,9 @@ function sanitizeFanaticalProjection(value) {
     ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
     orderFingerprints: knownOrderFingerprints,
+    coverage:{complete:true,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
     items: [...new Map(items.map((item) => [item.sourceItemId, item])).values()],
-    snapshot: input.fullScan === true ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', Math.max(1, input.ordersScanned))]) : undefined
+    snapshot: fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined
   };
 }
 
@@ -239,7 +183,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       func: readFanaticalOrdersInPage,
       args: [{ fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
     })
-      .then((results) => sendResponse({ ok: true, result: sanitizeFanaticalProjection(results?.[0]?.result) }))
+      .then((results) => {if(results?.length!==1)throw new Error('Fanatical scan did not return one complete result.');return sendResponse({ ok: true, result: sanitizeFanaticalProjection(results[0]?.result,{fullScan:request.fullScan===true,knownOrderFingerprints:fanaticalSyncState({knownOrderFingerprints:request.knownOrderFingerprints}).knownOrderFingerprints}) });})
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }

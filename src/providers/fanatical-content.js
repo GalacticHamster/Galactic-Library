@@ -38,10 +38,11 @@
       });
       if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
       const stats = projection.result ?? {};
+      const diagnostics=stats.coverage?` Checked ${stats.coverage.pagesFetched} history page(s), ${stats.coverage.retries} retries, at most ${stats.coverage.concurrency} requests at once.${stats.coverage.paginationEvidence==='array-only'?' No pagination metadata was supplied; silent server truncation cannot be independently ruled out.':''}`:'';
       const scope = fullRescan
         ? `Full rescan read ${stats.ordersScanned ?? 0} completed order${stats.ordersScanned === 1 ? '' : 's'}`
         : `Quick update read ${stats.ordersScanned ?? 0} new completed order${stats.ordersScanned === 1 ? '' : 's'} and skipped ${Math.max(0, (stats.ordersAvailable ?? 0) - (stats.ordersScanned ?? 0))} already checked`;
-      status.textContent = `${scope}. ${response.gameCount} Fanatical game${response.gameCount === 1 ? '' : 's'}, ${response.bookCount} book${response.bookCount === 1 ? '' : 's'}, and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally.`;
+      status.textContent = `${scope}.${diagnostics} ${response.gameCount} Fanatical game${response.gameCount === 1 ? '' : 's'}, ${response.bookCount} book${response.bookCount === 1 ? '' : 's'}, and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {
       status.textContent = `Fanatical import failed: ${error.message}`;
     } finally {

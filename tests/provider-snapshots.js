@@ -224,7 +224,7 @@ export const providerSnapshotTests = [
     const before = await seed(worker);
     globalThis.chrome.scripting = { executeScript: async ({ func, args }) => {
       const context = vm.createContext({
-        crypto: webcrypto, TextEncoder,
+        crypto: webcrypto, TextEncoder, AbortController, setTimeout, clearTimeout, URL,
         localStorage: { getItem: () => JSON.stringify({ token: 'fixture-not-a-real-token' }) },
         fetch: async (url) => json(url === '/api/user/orders'
           ? [{ _id: 'order-one', status: 'COMPLETE' }, { _id: 'order-two', status: 'COMPLETE' }]
@@ -239,7 +239,7 @@ export const providerSnapshotTests = [
       id: kindleSender.id, url: 'https://www.fanatical.com/en/orders', tab: { id: 1 }
     });
     assert.equal(response.ok, false);
-    assert.match(response.error, /incomplete or malformed completed order/u);
+    assert.match(response.error, /unreadable or incomplete/u);
     assert.deepEqual(worker.memory.values, before);
   })],
   ['Kobo rejects missing library structure and excessive reported page counts', async () => {

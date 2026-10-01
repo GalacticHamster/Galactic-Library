@@ -1,3 +1,4 @@
+import { fanaticalSyncTests } from './fanatical-sync.js';
 import assert from 'node:assert/strict';
 import { matchItems } from '../src/lib/matcher.js';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
@@ -475,7 +476,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
+for (const [name, run] of [...tests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -486,4 +487,4 @@ for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, 
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
+else console.log(`\n${tests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
