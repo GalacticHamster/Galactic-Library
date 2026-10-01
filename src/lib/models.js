@@ -5,6 +5,7 @@ import { validateContentReview } from './contents.js';
 import { validateMetadata } from './metadata-validation.js';
 import { validateProviderStates } from './provider-state.js';
 import { object, text, strings, date } from './validation.js';
+import { editionBarriers, validateEditionSeparations } from './relationships.js';
 
 export function createEmptyDatabase() {
   return {
@@ -13,7 +14,8 @@ export function createEmptyDatabase() {
     providerItems: {},
     canonicalItems: {},
     manualMatchDecisions: {},
-    contentReviews: {}
+    contentReviews: {},
+    editionSeparations: {}
   };
 }
 
@@ -59,11 +61,11 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
   };
 }
 
-export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, previousCanonicalItems = {}) {
+export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, previousCanonicalItems = {}, editionSeparations = {}) {
   const records = Object.values(providerItems).filter((item) => item.mediaType !== 'game-addon');
   const parent = new Map(records.map((item) => [item.id, item.id]));
   const members = new Map(records.map((item) => [item.id, [item]]));
-  const prohibited = new Set(Object.values(manualMatchDecisions).filter((decision) => decision.decision === 'different').map((decision) => [...(decision.itemIds ?? [])].sort().join('\u0000')));
+  const prohibited = editionBarriers(manualMatchDecisions,editionSeparations);
   const find = (id) => {
     const current = parent.get(id);
     if (current === id) return id;
@@ -139,7 +141,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   const normalizedItems = Object.values(value.providerItems).map((item) => {
@@ -167,12 +169,18 @@ export function validateDatabase(value) {
   }
   object(value.contentReviews??{},'Contents reviews');
   if(Object.keys(value.contentReviews??{}).length>500000)throw new Error('Too many contents reviews.');
+  const editionSeparations=validateEditionSeparations(value.editionSeparations??{});
+  for(const separation of Object.values(editionSeparations)){
+    const item=providerItems[separation.itemId];
+    if(item&&separation.otherItemIds.some(id=>providerItems[id]&&providerItems[id].mediaType!==item.mediaType))throw new Error('An edition separation crosses media types.');
+  }
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
     providerItems,
-    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems),
+    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems,editionSeparations),
     manualMatchDecisions,
+    editionSeparations,
     contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => {if(id.length>550)throw new Error('Contents review ID exceeds its bounds.');return [id, validateContentReview(review)];}))
   };
 }

@@ -8,10 +8,34 @@ import { handleExternalApiRequest } from '../src/lib/external-api.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { googleBooksSearchUrl, highConfidenceGoogleBooksCandidate } from '../src/lib/google-books.js';
 import { openLibrarySearchUrl } from '../src/lib/open-library.js';
+import { DATABASE_SCHEMA_VERSION } from '../src/lib/constants.js';
 
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['separating a falsely merged edition survives imports, backup and enrichment and can be undone', async () => {
+    const values={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    const items=['a','b','c'].map(providerItemId=>({providerItemId,title:'Shared Title',mediaType:'book',ownership:providerItemId==='a'?'unknown':'owned',metadata:{authors:['Author']}}));
+    await writer.mergeProviderItems('humble',items);let database=await writer.getDatabase();assert.equal(Object.keys(database.canonicalItems).length,1);
+    const ref=database.providerItems['humble:a'].recordRef;
+    database=await writer.separateEdition('humble:a');assert.equal(Object.keys(database.canonicalItems).length,2);
+    const separation=Object.keys(database.editionSeparations)[0];
+    assert.deepEqual(database.editionSeparations[separation].otherItemIds,['humble:b','humble:c']);
+    await writer.mergeProviderItems('humble',items);
+    await writer.saveGoogleBooksEnrichments([{itemIds:['humble:a'],enrichment:{source:'google-books',volumeId:'book-a',authors:['Author']}}]);
+    database=await writer.getDatabase();assert.equal(Object.keys(database.canonicalItems).length,2);assert.equal(database.providerItems['humble:a'].recordRef,ref);
+    const request={title:'Shared Title',mediaType:'book',authors:['Author']};let result=matchItems(database.providerItems,[request],database)[0];assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,3);
+    const restored=validateDatabase(JSON.parse(JSON.stringify(database)));await writer.restoreDatabase(restored);assert.equal(Object.keys((await writer.getDatabase()).canonicalItems).length,2);
+    await assert.rejects(writer.saveManualMatchDecision({itemIds:['humble:a','humble:b']},'same-edition'),/prevents this edition merge/u);
+    database=await writer.undoEditionSeparation(separation);assert.equal(Object.keys(database.canonicalItems).length,1);assert.equal(matchItems(database.providerItems,[request],database)[0].owned,true);
+  }],
+  ['Same work blocks automatic and indirect edition merges while preserving Possible', () => {
+    const a=book('a',{authors:['Author']});const b=book('b',{authors:['Author']});const c=book('c',{authors:['Author']});
+    const items=records(a,b,c);const decisions={pair:{itemIds:[a.id,c.id],decision:'same-work'}};
+    const stale=rebuildCanonicalItems(items);const grouped=rebuildCanonicalItems(items,decisions,stale);
+    assert.equal(Object.keys(grouped).length,2);assert.ok(Object.values(grouped).every(group=>!(group.providerItemIds.includes(a.id)&&group.providerItemIds.includes(c.id))));
+    const result=matchItems(items,[{title:a.title,mediaType:'book',authors:['Author']}],{manualMatchDecisions:decisions,canonicalItems:stale})[0];assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,3);
+  }],
   ['title-only books stay candidates and contradictory identifier scopes require disambiguation', () => {
     const a=book('a',{authors:['Author'],isbn:'9780306406157',language:'en'});
     let [result]=matchItems(records(a),[{title:a.title,mediaType:'book'}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,1);
@@ -203,7 +227,7 @@ export const relationshipTests = [
     database=await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Renamed Title',mediaType:'book',ownership:'owned'}]);
     assert.equal(Object.keys(database.canonicalItems)[0],id);
     assert.equal(Object.keys(validateDatabase(database).canonicalItems)[0],id);
-    assert.equal(validateDatabase({...createEmptyDatabase(),schemaVersion:1}).schemaVersion,2);
+    assert.equal(validateDatabase({...createEmptyDatabase(),schemaVersion:1}).schemaVersion,DATABASE_SCHEMA_VERSION);
   }],
   ['different decisions block indirect grouping; same work never merges editions', () => {
     const a=book('a',{authors:['Author']}); const b=book('b',{authors:['Author']}); const c=book('c',{authors:['Author']});

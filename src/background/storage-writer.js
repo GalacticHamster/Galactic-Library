@@ -78,7 +78,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
     }).length;
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
       connected: true,
       itemCount: gameCount,
@@ -124,7 +124,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
       return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId));
     }).length;
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
       ...database.providers[provider],
       connected: true,
@@ -247,7 +247,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if(itemIds[0]===itemIds[1]||database.providerItems[itemIds[0]].mediaType!==database.providerItems[itemIds[1]].mediaType)throw new Error('Review two different records of the same media type.');
     if(decision==='same-edition'&&identityConflicts(...itemIds.map(id=>database.providerItems[id])).length)throw new Error('These records have conflicting edition evidence. Use Same work instead.');
     database.manualMatchDecisions[itemIds.join('\u0000')] = { decision, itemIds, updatedAt: new Date().toISOString() };
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     if(decision==='same-edition'&&!Object.values(database.canonicalItems).some(group=>itemIds.every(id=>group.providerItemIds.includes(id))))throw new Error('An indirect identity conflict or Different works decision prevents this edition merge. Review those relationships first.');
     return persistDatabase(database);
   }
@@ -273,7 +273,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         updatedAt
       };
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
   }
 
@@ -298,7 +298,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         };
       }
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
   }
 
@@ -324,7 +324,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         };
       }
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
   }
 
@@ -363,14 +363,29 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         updatedAt
       };
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
   }
 
   async function removeManualMatchDecision(candidateId) {
     const database = await getDatabase();
     delete database.manualMatchDecisions[candidateId];
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
+    return persistDatabase(database);
+  }
+
+  async function separateEdition(itemId) {
+    const database=await getDatabase();
+    const group=Object.values(database.canonicalItems).find(value=>value.providerItemIds.includes(itemId));
+    if(!group||group.providerItemIds.length<2)throw new Error('This record is already a separate edition.');
+    database.editionSeparations[crypto.randomUUID()]={itemId,otherItemIds:group.providerItemIds.filter(id=>id!==itemId),updatedAt:new Date().toISOString()};
+    return persistDatabase(database);
+  }
+
+  async function undoEditionSeparation(ref) {
+    const database=await getDatabase();
+    if(!Object.hasOwn(database.editionSeparations,ref))throw new Error('This edition separation no longer exists.');
+    delete database.editionSeparations[ref];
     return persistDatabase(database);
   }
 
@@ -409,6 +424,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
+    separateEdition, undoEditionSeparation,
     getShowEnrichmentActions, saveShowEnrichmentActions
   };
   let tail = Promise.resolve();

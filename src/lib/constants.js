@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 2;
+export const DATABASE_SCHEMA_VERSION = 3;
 export const DATABASE_STORAGE_KEY = 'galacticLibraryDatabase';
 export const EXTERNAL_CLIENT_IDS_STORAGE_KEY = 'galacticLibraryAllowedExternalClientIds';
 export const EXTERNAL_API_VERSION = 1;

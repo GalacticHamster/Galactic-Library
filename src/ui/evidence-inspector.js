@@ -64,6 +64,17 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         const evidenceLink=sourceLink(review.sourceUrl,'View contents evidence');if(evidenceLink)section.append(evidenceLink);
       }else section.append(element('p','No confirmed contents. Title or category hints do not establish collected coverage.'));
       const relationships=Object.entries(database.manualMatchDecisions??{}).filter(([,decision])=>decision.itemIds.includes(record.id));
+      if(records.length>1){
+        const split=element('button','Separate this record into its own edition');split.type='button';
+        split.addEventListener('click',async()=>{try{await actions.split(record.id);actions.refresh();}catch(error){status.textContent=error.message;}});
+        section.append(split);
+      }
+      for(const [ref,separation]of Object.entries(database.editionSeparations??{}).filter(([,value])=>value.itemId===record.id)){
+        const row=element('p',`Edition kept separate from ${separation.otherItemIds.length} other record(s) · reviewed ${separation.updatedAt||'date unknown'} `);
+        const undo=element('button','Undo edition separation');undo.type='button';
+        undo.addEventListener('click',async()=>{try{await actions.undoSplit(ref);actions.refresh();}catch(error){status.textContent=error.message;}});
+        row.append(undo);section.append(row);
+      }
       for(const [id,decision]of relationships){
         const other=database.providerItems[decision.itemIds.find(itemId=>itemId!==record.id)];
         const row=element('p',`${decisionLabel(decision.decision)}: ${other?`${other.title} — ${other.provider}`:'record no longer in current library'} · reviewed ${decision.updatedAt||'date unknown'} `);

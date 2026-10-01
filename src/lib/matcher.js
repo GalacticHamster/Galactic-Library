@@ -2,6 +2,7 @@ import { titleKey } from './normalization.js';
 import { identityConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
 import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
+import { editionBarriers, pairKey } from './relationships.js';
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
@@ -26,14 +27,19 @@ export function matchItems(items, requestedItems, context = {}) {
     if(identity.asin)add(byIdentifier,`${item.mediaType}:asin:${identity.asin}`,item);
     for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
   }
-  const canonical=Object.values(context.canonicalItems??rebuildCanonicalItems(items,context.manualMatchDecisions));
+  const barriers=editionBarriers(context.manualMatchDecisions,context.editionSeparations);
+  const canonical=Object.values(barriers.size?rebuildCanonicalItems(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??rebuildCanonicalItems(items,context.manualMatchDecisions));
   const editionByRecord=new Map(canonical.flatMap(group=>group.providerItemIds.map(id=>[id,group])));
   const graph=new Map();const negative=new Set();
   for(const decision of Object.values(context.manualMatchDecisions??{})){
     const [a,b]=decision.itemIds??[];if(!items[a]||!items[b]||items[a].mediaType!==items[b].mediaType)continue;
     if(decision.decision==='different'){negative.add([a,b].sort().join('\u0000'));continue;}
     if(!['same','same-work','same-edition'].includes(decision.decision))continue;
-    for(const [left,right]of[[a,b],[b,a]]){const edges=graph.get(left)??[];edges.push({id:right,decision:decision.decision});graph.set(left,edges);}
+    for(const [left,right]of[[a,b],[b,a]]){const edges=graph.get(left)??[];edges.push({id:right,decision:decision.decision==='same-edition'&&barriers.has(pairKey(a,b))?'same-work':decision.decision});graph.set(left,edges);}
+  }
+  for(const separation of Object.values(context.editionSeparations??{}))for(const other of separation.otherItemIds){
+    if(!items[separation.itemId]||!items[other])continue;
+    for(const [left,right]of[[separation.itemId,other],[other,separation.itemId]]){const edges=graph.get(left)??[];edges.push({id:right,decision:'same-work'});graph.set(left,edges);}
   }
   return requestedItems.map(request=>{
     const query=requestRecord(request);const evidence=identityEvidence(query);const exclude=new Set(request.excludeProviders??[]);

@@ -63,6 +63,21 @@ try{
   inspector=await open(card('Collection A').querySelector('.evidence-inspector'));button(inspector,'Undo relationship').click();
   await wait(()=>document.querySelectorAll('#library-items > li').length===6,'Edition undo did not split aliases.');
   checks.push('reviewed Same edition resolves aliases and undo restores separate records');
+  const extra={providerItemId:'split-test',title:'Collection A',mediaType:'book',ownership:'owned',metadata:{authors:['Author'],isbn:'9780306406157',language:'en'}};
+  await writer.mergeProviderItems('humble',[extra]);
+  // Render from the options page's own storage client, then split a real merged card.
+  const transferSplit=new DataTransfer();transferSplit.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'split.json',{type:'application/json'}));
+  document.querySelector('#import').files=transferSplit.files;document.querySelector('#import').dispatchEvent(new Event('change'));
+  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Split fixture import failed.');
+  inspector=await open(card('Collection A').querySelector('.evidence-inspector'));
+  button(inspector,'Separate this record into its own edition').click();
+  await wait(()=>Object.keys(values.galacticLibraryDatabase.editionSeparations??{}).length===1,'Edition separation did not persist.');
+  await wait(()=>card('Collection A').querySelector('.evidence-inspector')!==inspector,'Edition split did not render.');
+  let separatedInspector;
+  for(const node of document.querySelectorAll('.evidence-inspector')){await open(node);if(button(node,'Undo edition separation')){separatedInspector=node;break;}}
+  assert(separatedInspector,'Separated record has no undo control.');button(separatedInspector,'Undo edition separation').click();
+  await wait(()=>Object.keys(values.galacticLibraryDatabase.editionSeparations??{}).length===0,'Edition separation undo failed.');
+  checks.push('actual evidence controls separate falsely merged editions and undo without deleting records');
   let editor=await open(card('Collection A').querySelector('.contents-editor'));
   editor.querySelector('textarea').value='Collects Batman (2011) #1-3; bonus essays';button(editor,'Parse statement for review').click();
   assert(editor.querySelectorAll('tbody tr').length===3&&editor.textContent.includes('bonus essays'),'Contents proposals lost unparsed evidence.');
@@ -77,7 +92,7 @@ try{
   checks.push('contents confirmation undo removes coverage evidence');
   const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(backup)],'backup.json',{type:'application/json'}));
   const input=document.querySelector('#import');input.files=transfer.files;input.dispatchEvent(new Event('change'));
-  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Backup restore failed.');
+  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.'&&!values.galacticLibraryDatabase.providerItems['humble:split-test'],'Backup restore failed.');
   assert((await writer.getDatabase()).contentReviews['humble:a'].entries.length===2,'Backup lost contents.');
   checks.push('actual backup import restores reviewed evidence and refreshes the UI');
   document.querySelector('#series-coverage-panel').open=true;

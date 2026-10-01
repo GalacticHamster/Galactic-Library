@@ -9,6 +9,7 @@ import { compareTitles } from '../lib/title-sort.js';
 import { saveContentReview, removeContentReview } from '../lib/storage.js';
 import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
+import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
 import { identityEvidence } from '../lib/identity.js';
 
@@ -720,6 +721,8 @@ function render() {
     }));
     node.append(providerSources);
     node.append(createEvidenceInspector(canonicalItem,records,database,{
+      split:async id=>{database=await separateEdition(id);},
+      undoSplit:async ref=>{database=await undoEditionSeparation(ref);},
       save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},
       remove:async(id)=>{database=await removeManualMatchDecision(id);},
       refresh:render

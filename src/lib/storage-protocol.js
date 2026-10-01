@@ -17,6 +17,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'addAllowedExternalClientId',
   'saveManualMatchDecision',
   'removeManualMatchDecision',
+  'separateEdition',
+  'undoEditionSeparation',
   'saveOpenLibraryEnrichment',
   'saveGoogleBooksEnrichments',
   'saveGoogleBooksGenreHints',
