@@ -4,6 +4,7 @@ import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
+import { validateContentReview } from '../lib/contents.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -363,6 +364,17 @@ export function createStorageWriter(storageArea) {
     return persistDatabase(database);
   }
 
+  async function saveContentReview(itemId, value) {
+    const database=await getDatabase();
+    if (!database.providerItems[itemId] || !['book','game'].includes(database.providerItems[itemId].mediaType)) throw new Error('Contents can be reviewed only for a current book or game record.');
+    database.contentReviews[itemId]=validateContentReview({...value,verifiedAt:new Date().toISOString()});
+    return persistDatabase(database);
+  }
+
+  async function removeContentReview(itemId) {
+    const database=await getDatabase();delete database.contentReviews[itemId];return persistDatabase(database);
+  }
+
   async function addAllowedExternalClientId(id) {
     const ids = await getAllowedExternalClientIds();
     return saveAllowedExternalClientIds([...ids, id]);
@@ -386,6 +398,7 @@ export function createStorageWriter(storageArea) {
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
+    saveContentReview, removeContentReview,
     getShowEnrichmentActions, saveShowEnrichmentActions
   };
   let tail = Promise.resolve();

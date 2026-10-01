@@ -21,6 +21,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveGoogleBooksEnrichments',
   'saveGoogleBooksGenreHints',
   'saveKindleComicContents',
+  'saveContentReview',
+  'removeContentReview',
   'getShowEnrichmentActions',
   'saveShowEnrichmentActions',
 ]);

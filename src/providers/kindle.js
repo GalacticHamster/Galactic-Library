@@ -116,8 +116,8 @@
 
   function explicitCollectsStatement(value) {
     const text = compactText(value);
-    const match = text.match(/\bcollects?\b\s*(?::|-)?\s*[^.!?]{2,700}(?:[.!?]|$)/iu);
-    return compactText(match?.[0]).replace(/[.!?]+$/u, '');
+    const match = text.match(/\bcollects?\b\s*(?::|-)?\s*.{2,700}/iu);
+    return compactText(match?.[0]).split(/[.!?](?=\s+[A-Z])/u)[0].replace(/[.!?]+$/u, '');
   }
 
   function kindleCollectsStatementFromDocument(document) {

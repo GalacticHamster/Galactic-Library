@@ -1,6 +1,7 @@
 import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } from './constants.js';
 import { normalizeGameTitle } from './normalization.js';
 import { identityConflicts, identityEvidence, sameEditionEvidence } from './identity.js';
+import { validateContentReview } from './contents.js';
 
 export function createEmptyDatabase() {
   return {
@@ -8,7 +9,8 @@ export function createEmptyDatabase() {
     providers: {},
     providerItems: {},
     canonicalItems: {},
-    manualMatchDecisions: {}
+    manualMatchDecisions: {},
+    contentReviews: {}
   };
 }
 
@@ -143,6 +145,7 @@ export function validateDatabase(value) {
     providers,
     providerItems,
     canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems),
-    manualMatchDecisions
+    manualMatchDecisions,
+    contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => [id, validateContentReview(review)]))
   };
 }

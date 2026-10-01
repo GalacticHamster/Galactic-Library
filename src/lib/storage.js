@@ -22,6 +22,7 @@ export const {
   getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
   saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
+  saveContentReview, removeContentReview,
   getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;
 

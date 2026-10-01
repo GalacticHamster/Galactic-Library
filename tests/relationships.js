@@ -2,10 +2,46 @@ import assert from 'node:assert/strict';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createEmptyDatabase, normalizeProviderItem, rebuildCanonicalItems, validateDatabase } from '../src/lib/models.js';
 import { identityEvidence, validIsbn } from '../src/lib/identity.js';
+import { contentCoverage, contentKey, proposeContents, seriesCoverage, validateContents } from '../src/lib/contents.js';
 
 export const book = (id, metadata = {}, title = 'Shared Title') => normalizeProviderItem({provider:'humble',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata});
 export const records = (...items) => Object.fromEntries(items.map((item) => [item.id,item]));
 export const relationshipTests = [
+  ['contents proposals retain runs, omnibus volumes, annuals, fractions and unresolved text', () => {
+    const proposal=proposeContents('Collects Batman (2011) #1-3 and Batman Annual #1; Naruto Vols. 1-3; Batman #1/2; bonus essays');
+    assert.equal(proposal.entries.length,8);
+    assert.equal(proposal.entries[0].run,'2011');
+    assert.equal(proposal.entries[3].unitType,'annual');
+    assert.equal(proposal.entries[4].unitType,'volume');
+    assert.equal(proposal.entries[7].number,'1/2');
+    assert.deepEqual(proposal.unparsed,['bonus essays']);
+    assert.equal(proposeContents('Collects material from Batman #1-3').entries.every(entry=>entry.completeness==='excerpt'),true);
+    assert.equal(proposeContents('Collects Batman #1-10000').entries.length,0);
+  }],
+  ['verified full contents union across providers; excerpts and temporary access do not count', () => {
+    const a=book('a');const b={...book('b'),provider:'kindle'};const c={...book('c'),ownership:'subscription'};
+    const entry=(number, completeness='full')=>({series:'Batman',run:'2011',unitType:'issue',number,language:'en',completeness});
+    const database={providerItems:records(a,b,c),contentReviews:{[a.id]:{entries:[entry('1'),entry('2')]},[b.id]:{entries:[entry('2'),entry('3'),entry('4','excerpt')]},[c.id]:{entries:[entry('4')]}}};
+    const coverage=contentCoverage(database,[entry('1'),entry('2'),entry('3'),entry('4')]);
+    assert.equal(coverage.owned,3);assert.equal(coverage.total,4);assert.equal(coverage.complete,false);
+    assert.equal(contentCoverage(database,[entry('1'),entry('2'),entry('3')]).complete,true);
+    assert.equal(seriesCoverage(database)[0].overlap[0].number,'2');
+    assert.equal(contentCoverage(database,[{...entry('1'),run:'1986'}]).owned,0);
+    assert.equal(contentCoverage(database,[{...entry('1'),language:'ja'}]).owned,0);
+    assert.equal(contentKey(entry('1/2')),contentKey(entry('0.5')));
+  }],
+  ['contents confirmation survives sync/backup and undo removes its ownership evidence', async () => {
+    const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+    await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Collection',mediaType:'book',ownership:'owned'}]);
+    const entry={series:'Batman',run:'2011',unitType:'issue',number:'1',language:'en',completeness:'full'};
+    let database=await writer.saveContentReview('humble:a',{entries:[entry],statement:'Collects Batman #1',sourceUrl:'https://example.test/book'});
+    assert.equal(contentCoverage(validateDatabase(database),[entry]).complete,true);
+    database=await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Collection',mediaType:'book',ownership:'owned'}]);
+    assert.equal(contentCoverage(database,[entry]).complete,true);
+    await assert.rejects(writer.saveContentReview('humble:a',{entries:[{...entry,unitType:'unknown'}]}));
+    database=await writer.removeContentReview('humble:a');assert.equal(contentCoverage(database,[entry]).owned,0);
+    assert.throws(()=>validateContents([{...entry,number:'1/0'}]));
+  }],
   ['validates ISBN checksums and equivalent ISBN-10/13', () => {
     assert.equal(validIsbn('0-306-40615-2'), '9780306406157');
     assert.equal(validIsbn('9780306406158'), '');

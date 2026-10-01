@@ -6,6 +6,8 @@ import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 import { compareTitles } from '../lib/title-sort.js';
+import { saveContentReview, removeContentReview } from '../lib/storage.js';
+import { createContentsEditor } from './contents-editor.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -707,6 +709,13 @@ function render() {
     if (canonicalItem.mediaType === 'book') {
       const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
       if (openLibraryTools) node.append(openLibraryTools);
+    }
+    if (['book','game'].includes(canonicalItem.mediaType)) {
+      for (const record of records) node.append(createContentsEditor(record,database.contentReviews?.[record.id],{
+        save:async(id,value)=>{database=await saveContentReview(id,value);},
+        remove:async(id)=>{database=await removeContentReview(id);},
+        refresh:render
+      }));
     }
     if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
     return node;

@@ -11,7 +11,7 @@
       contributors: (Array.isArray(value.contributors) ? value.contributors : []).slice(0, 50).map((entry) => ({name:text(entry?.name),role:text(entry?.role, 80)})).filter((entry) => entry.name)
     };
     for (const [key, entries] of Object.entries(fields)) if (entries.length) result[key] = entries;
-    for (const key of ['asin', 'publisher', 'language', 'edition', 'volume', 'issue', 'unitType', 'run', 'seriesYear', 'publicationDate', 'format']) {
+    for (const key of ['asin', 'publisher', 'language', 'edition', 'volume', 'issue', 'unitType', 'run', 'seriesYear', 'publicationDate', 'format', 'collects', 'contentsStatement']) {
       const entry = text(value[key]); if (entry) result[key] = entry;
     }
     return result;
