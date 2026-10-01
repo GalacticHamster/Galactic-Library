@@ -257,6 +257,7 @@
       await wait(SCROLL_PAUSE_MS);
       unchangedPasses = visibleLibrarySignature(global.document) === before ? unchangedPasses + 1 : 0;
       reportProgress({ phase: 'reset', passes: pass + 1 });
+      if (pass === MAX_SCROLLS - 1 && unchangedPasses < 3) throw new Error('Fandango reached its carousel reset limit before reaching the beginning.');
     }
   }
 
@@ -267,6 +268,7 @@
     let unchangedPasses = 0;
     let emptyPasses = 0;
     let previousSignature = '';
+    let finished = false;
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 10; pass += 1) {
       const newlyRenderedItems = fandangoItemsFromDocument(global.document, mediaType)
         .filter((item) => !renderedItemIds.has(item.providerItemId));
@@ -276,8 +278,8 @@
       reportProgress({ phase: 'grid', section: mediaType, passes: pass + 1, count: itemsById.size, expectedCount });
       // The View All grids default to Recently Purchased. A fully known newly
       // rendered group means every later group is older than the local baseline.
-      if (incremental && newlyRenderedItems.length && !itemsToSave.length) break;
-      if (expectedCount !== null && itemsById.size >= expectedCount) break;
+      if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
+      if (expectedCount !== null && itemsById.size >= expectedCount) { finished = true; break; }
       emptyPasses = itemsById.size === 0 ? emptyPasses + 1 : 0;
       if (emptyPasses >= 20) break;
       const signature = [...itemsById.keys()].sort().join('\u0000');
@@ -302,6 +304,8 @@
       unchangedPasses = hasSettled ? unchangedPasses + 1 : 0;
       previousSignature = signature;
     }
+    if (!finished && unchangedPasses < 10) throw new Error(`Fandango did not complete its ${mediaType} grid before the scan limit or loading timeout. No library changes were saved.`);
+    if (!incremental && expectedCount !== null && itemsById.size !== expectedCount) throw new Error(`Fandango reported ${expectedCount} ${mediaType} titles but returned ${itemsById.size}. No library changes were saved.`);
     return [...itemsById.values()];
   }
 
@@ -311,16 +315,19 @@
     }
     const itemsById = new Map();
     const expected = expectedFandangoCountsFromDocument(global.document);
+    if (expected.movies === null || expected.tv === null) throw new Error('Fandango did not expose both library totals. A full replacement cannot be validated.');
     const viewAllLinks = viewAllLibraryLinksFromDocument(global.document);
     if (viewAllLinks.length) throw new Error('Fandango View All grids must be read in their signed-in browser pages. Start sync again.');
     await resetCarouselsToStart(reportProgress);
     let unchangedPasses = 0;
+    let finished = false;
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 3; pass += 1) {
       const before = itemsById.size;
       for (const item of fandangoItemsFromDocument(global.document)) itemsById.set(item.providerItemId, item);
       const movies = [...itemsById.values()].filter((item) => item.mediaType === 'movie').length;
       const tv = itemsById.size - movies;
       reportProgress({ phase: 'scan', passes: pass + 1, movies, tv, expected });
+      if (movies === expected.movies && tv === expected.tv) { finished = true; break; }
       unchangedPasses = itemsById.size === before ? unchangedPasses + 1 : 0;
       const carouselArrows = carouselNextControls(global.document);
       const loadMore = loadMoreControl(global.document);
@@ -329,6 +336,7 @@
       else global.scrollTo({ top: global.document.scrollingElement?.scrollHeight ?? global.document.body.scrollHeight, behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
     }
+    if (!finished && unchangedPasses < 3) throw new Error('Fandango reached its carousel scan limit before completing the library.');
     if (!itemsById.size) throw new Error('No readable Fandango at Home library cards were found. Open My Library, wait for it to load, then try again.');
     const movies = [...itemsById.values()].filter((item) => item.mediaType === 'movie').length;
     const tv = itemsById.size - movies;

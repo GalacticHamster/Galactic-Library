@@ -30,7 +30,7 @@
       status.textContent = result.items.length ? `Saving ${result.items.length} Humble entitlement${result.items.length === 1 ? '' : 's'} locally…` : 'No new supported Humble entitlements; recording the completed purchase check…';
       const response = await chrome.runtime.sendMessage({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'humble', mode: fullRescan ? 'full' : 'incremental', items: result.items,
-        syncState: { knownPurchaseIds: result.knownPurchaseIds }
+        syncState: { knownPurchaseIds: result.knownPurchaseIds }, snapshot: result.snapshot
       });
       if (!response?.ok) throw new Error(response?.error ?? 'Humble import did not complete.');
       const scope = fullRescan

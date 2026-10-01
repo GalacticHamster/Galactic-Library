@@ -1,8 +1,9 @@
-import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
+import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { normaliseExternalClientIds } from '../lib/external-api.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
+import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -33,7 +34,9 @@ export function createStorageWriter(storageArea) {
     };
   }
 
-  async function replaceProviderItems(provider, values, syncDetails = {}) {
+  async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
+    if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
+    validateProviderSnapshot(provider, values, snapshot);
     const database = await getDatabase();
     const now = new Date().toISOString();
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
@@ -67,7 +70,8 @@ export function createStorageWriter(storageArea) {
       recordCount: unique.size,
       lastSync: now,
       lastError: null,
-      ...syncDetails
+      ...syncDetails,
+      snapshotValidation: { ...snapshot, validatedAt: now }
     };
     return persistDatabase(database);
   }

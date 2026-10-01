@@ -5,6 +5,7 @@ import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/op
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createStorageWriter } from './storage-writer.js';
 import { createStorageMessageHandler } from './storage-messages.js';
+import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
 
 const storageWriter = createStorageWriter(chrome.storage.local);
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
@@ -94,6 +95,7 @@ async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerpri
     return response.json();
   };
   const summaries = await request('/api/user/orders');
+  if (!Array.isArray(summaries) || summaries.some((order) => !order || !id(order._id) || typeof order.status !== 'string')) throw new Error('Fanatical returned a malformed order index.');
   const completed = (Array.isArray(summaries) ? summaries : []).filter((order) => order?.status === 'COMPLETE' && id(order?._id));
   const orders = await Promise.all(completed.map(async (order) => ({ order, fingerprint: await fingerprint(order._id) })));
   const known = new Set((Array.isArray(knownOrderFingerprints) ? knownOrderFingerprints : [])
@@ -102,14 +104,17 @@ async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerpri
   const details = await Promise.all(selected.map(async ({ order }) => request(`/api/user/orders/${encodeURIComponent(order._id)}`)));
   const itemsById = new Map();
   for (const order of details) {
-    if (order?.status !== 'COMPLETE') continue;
+    if (order?.status !== 'COMPLETE' || !Array.isArray(order.items)) throw new Error('Fanatical returned an incomplete or malformed completed order.');
     for (const parent of Array.isArray(order?.items) ? order.items : []) {
+      if (!Array.isArray(parent?.bundles)) throw new Error('Fanatical returned malformed order groups.');
       for (const group of Array.isArray(parent?.bundles) ? parent.bundles : []) {
+        if (!Array.isArray(group?.games)) throw new Error('Fanatical returned a malformed product list.');
         for (const leaf of Array.isArray(group?.games) ? group.games : []) {
           const sourceItemId = id(leaf?._id);
           const title = text(leaf?.name);
           const kind = mediaType(leaf?.display_type ?? leaf?.type);
-          if (!sourceItemId || !title || kind === 'other') continue;
+          if (!sourceItemId || !title) throw new Error('Fanatical returned an unreadable order product.');
+          if (kind === 'other') continue;
           const steamAppId = /^\d{1,16}$/u.test(String(leaf?.steam?.id ?? '')) ? String(leaf.steam.id) : '';
           const isbn = text(leaf?.isbn, 32).replace(/[^0-9X]/giu, '');
           const purchaseDate = typeof order?.date === 'string' && !Number.isNaN(Date.parse(order.date)) ? order.date : null;
@@ -128,18 +133,19 @@ async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerpri
     }
   }
   // Raw order records and `token` never cross this MAIN-world boundary.
-  return { ordersScanned: selected.length, ordersAvailable: orders.length, orderFingerprints: orders.map((entry) => entry.fingerprint), items: [...itemsById.values()] };
+  return { ordersScanned: selected.length, ordersAvailable: orders.length, orderFingerprints: orders.map((entry) => entry.fingerprint), items: [...itemsById.values()], fullScan, complete: true };
 }
 
 function sanitizeFanaticalProjection(value) {
   const input = value && typeof value === 'object' ? value : {};
+  if (!Array.isArray(input.items) || input.complete !== true || !Number.isSafeInteger(input.ordersScanned) || !Number.isSafeInteger(input.ordersAvailable) || input.ordersScanned < 0 || input.ordersScanned > input.ordersAvailable || (input.fullScan === true && input.ordersScanned !== input.ordersAvailable)) throw new Error('Fanatical did not return a complete validated order projection.');
   const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
   const items = [];
   for (const candidate of Array.isArray(input.items) ? input.items : []) {
     const sourceItemId = String(candidate?.sourceItemId ?? '').trim();
     const title = String(candidate?.title ?? '').trim().slice(0, 500);
     const mediaType = ['game', 'book', 'audiobook'].includes(candidate?.mediaType) ? candidate.mediaType : '';
-    if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title || !mediaType) continue;
+    if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title || !mediaType) throw new Error('Fanatical returned an unreadable projected product.');
     const safeList = (entries) => [...new Set((Array.isArray(entries) ? entries : []).map((entry) => String(entry ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
     const safeText = (entry, max = 300) => String(entry ?? '').trim().slice(0, max);
     const steamAppId = /^\d{1,16}$/u.test(String(candidate?.externalIds?.steamAppId ?? '')) ? String(candidate.externalIds.steamAppId) : '';
@@ -156,7 +162,8 @@ function sanitizeFanaticalProjection(value) {
     ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
     orderFingerprints: knownOrderFingerprints,
-    items: [...new Map(items.map((item) => [item.sourceItemId, item])).values()]
+    items: [...new Map(items.map((item) => [item.sourceItemId, item])).values()],
+    snapshot: input.fullScan === true ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', Math.max(1, input.ordersScanned))]) : undefined
   };
 }
 
@@ -321,7 +328,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return undefined;
   }
   const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home'].includes(request.provider);
-  if (!Array.isArray(request.items) || request.items.length > 50000 || (!request.items.length && !incrementalProvider)) {
+  if (!Array.isArray(request.items) || request.items.length > 50000) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
   }
@@ -366,7 +373,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         syncMode: incrementalProvider ? 'incremental' : 'full',
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
       };
-  (incrementalProvider ? mergeProviderItems : replaceProviderItems)(request.provider, request.items, syncDetails)
+  (incrementalProvider ? mergeProviderItems : replaceProviderItems)(request.provider, request.items, syncDetails, request.snapshot)
     .then((database) => sendResponse({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,

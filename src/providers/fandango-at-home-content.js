@@ -52,8 +52,12 @@
   }
 
   async function saveItems(items, expected, fullRescan) {
+    const snapshot = fullRescan ? globalThis.GalacticProviderSnapshot.completeProviderSnapshot('fandango-at-home', items, [
+      globalThis.GalacticProviderSnapshot.completedScope('movie', items.filter((item) => item.mediaType === 'movie').length, expected.movies, 'reported-count'),
+      globalThis.GalacticProviderSnapshot.completedScope('tv', items.filter((item) => item.mediaType === 'tv').length, expected.tv, 'reported-count')
+    ]) : undefined;
     status.textContent = items.length ? `Saving ${items.length} Fandango at Home title${items.length === 1 ? '' : 's'} locally...` : 'No new Fandango at Home titles; recording the completed check...';
-    const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items });
+    const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
     if (!response?.ok) throw new Error(response?.error ?? 'Fandango at Home import did not complete.');
     if (fullRescan) {
       status.textContent = `Saved ${response.movieCount} Fandango at Home movies and ${response.tvCount} TV shows locally. Fandango reported ${expected.movies ?? 'unknown'} movies and ${expected.tv ?? 'unknown'} TV shows.`;
@@ -78,6 +82,7 @@
     }
     const movieUrl = grids.find((grid) => grid.mediaType === 'movie')?.url;
     const tvUrl = grids.find((grid) => grid.mediaType === 'tv')?.url;
+    if (fullRescan && (expected.movies === null || expected.tv === null)) throw new Error('Fandango did not expose both library totals. No full replacement was saved.');
     if (movieUrl && tvUrl) {
       await importState('set', { phase: 'movie', expected, urls: { movie: movieUrl, tv: tvUrl }, items: [], fullRescan, knownItemIds: fullRescan ? [] : knownItemIds });
       status.textContent = 'Opening Fandango Movies View All grid...';

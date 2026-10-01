@@ -185,7 +185,7 @@
     });
     if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading your Kindle library. Confirm that you are signed in.`);
     const payload = await response.json().catch(() => null);
-    if (!payload?.success || !payload?.GetContentOwnershipData) {
+    if (payload?.success !== true || !payload?.GetContentOwnershipData || !Array.isArray(payload.GetContentOwnershipData.items)) {
       throw new Error('Amazon returned an unreadable Kindle library response. Open Manage Your Content and Devices, then try again.');
     }
     return payload;
@@ -202,23 +202,29 @@
     const incremental = Array.isArray(knownItemIds);
     const categoryCounts = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, 0]));
     const diagnostics = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, {
-      reportedCount: null, rawCount: 0, readableCount: 0, duplicateCount: 0
+      reportedCount: null, rawCount: 0, readableCount: 0, duplicateCount: 0, pagesRead: 0
     }]));
     let pagesRead = 0;
     for (const category of LIBRARY_CATEGORIES) {
+      let finished = false;
       for (let page = 0; page < MAX_PAGES; page += 1) {
         reportProgress({ pagesRead, books: booksById.size, categoryCounts });
         const payload = await fetchKindleLibraryPage(page * PAGE_SIZE, csrfToken, category);
         const rawItems = ownershipItemsFromResponse(payload);
+        if (rawItems.some((item) => !item || typeof item.title !== 'string' || !['string', 'number'].includes(typeof (item.asin ?? item.contentId ?? item.id)))) throw new Error(`Amazon returned malformed ${category.id} entries. No library changes were saved.`);
         const readableItems = kindleItemEntriesFromOwnershipItems(rawItems, global.location?.origin, category.id);
         const pageBooks = kindleItemsFromOwnershipResponse(payload, global.location?.origin, category.id);
-        const reportedCount = Number(payload.GetContentOwnershipData.numberOfItems);
+        const countValue = payload.GetContentOwnershipData.numberOfItems;
+        const reportedCount = countValue === undefined || countValue === null || countValue === '' ? null : Number(countValue);
+        if (reportedCount !== null && (!Number.isSafeInteger(reportedCount) || reportedCount < 0)) throw new Error(`Amazon returned an invalid ${category.id} item count. No library changes were saved.`);
         const diagnostic = diagnostics[category.id];
-        diagnostic.reportedCount = Number.isFinite(reportedCount) ? reportedCount : diagnostic.reportedCount;
+        if (page > 0 && reportedCount !== diagnostic.reportedCount) throw new Error(`Amazon changed the ${category.id} total during the scan. Please retry; no library changes were saved.`);
+        diagnostic.reportedCount = reportedCount;
+        diagnostic.pagesRead += 1;
+        if (readableItems.length !== rawItems.length) throw new Error(`Amazon returned unreadable ${category.id} entries. No library changes were saved.`);
         diagnostic.rawCount += rawItems.length;
         diagnostic.readableCount += readableItems.length;
         diagnostic.duplicateCount += readableItems.length - pageBooks.length;
-        if (!pageBooks.length) break;
         const booksToSave = incremental ? newKindleItems(pageBooks, knownItemIds) : pageBooks;
         for (const book of booksToSave) {
           if (!booksById.has(book.providerItemId)) {
@@ -232,15 +238,23 @@
         // Amazon returns this endpoint newest first. Once a whole page is
         // already in the local full baseline, older pages cannot add a new
         // entitlement. Full rescan remains available for reconciliation.
-        if (incremental && booksToSave.length === 0) break;
-        const reachedReportedEnd = Number.isFinite(reportedCount) && (page + 1) * PAGE_SIZE >= reportedCount;
-        const reachedUnreportedEnd = !Number.isFinite(reportedCount) && rawItems.length < PAGE_SIZE;
-        if (rawItems.length === 0 || reachedReportedEnd || reachedUnreportedEnd) break;
+        if (incremental && pageBooks.length > 0 && booksToSave.length === 0) { finished = true; break; }
+        const reachedReportedEnd = reportedCount !== null && (page + 1) * PAGE_SIZE >= reportedCount;
+        const reachedUnreportedEnd = reportedCount === null && rawItems.length < PAGE_SIZE;
+        if (rawItems.length === 0 || reachedReportedEnd || reachedUnreportedEnd) {
+          if (!incremental && reportedCount !== null && diagnostic.rawCount !== reportedCount) throw new Error(`Amazon reported ${reportedCount} ${category.id} items but returned ${diagnostic.rawCount}. No library changes were saved.`);
+          finished = true;
+          break;
+        }
         await wait(BETWEEN_PAGES_MS);
       }
+      if (!finished) throw new Error(`Kindle reached its ${MAX_PAGES}-page limit in ${category.id} before completing the scan. No library changes were saved.`);
     }
     if (!booksById.size && !incremental) throw new Error('Amazon returned no readable Kindle books. Please try again later.');
-    return { items: [...booksById.values()], diagnostics };
+    const items = [...booksById.values()];
+    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('kindle', items,
+      Object.entries(diagnostics).map(([id, detail]) => ({ ...global.GalacticProviderSnapshot.completedScope(id, detail.rawCount, detail.reportedCount, detail.reportedCount === null ? 'pagination-end' : 'reported-count', detail.pagesRead), duplicateCount: detail.duplicateCount })));
+    return { items, diagnostics, snapshot };
   }
 
   global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, fetchKindleProductComicContents, fetchKindleBooks };

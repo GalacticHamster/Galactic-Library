@@ -31,7 +31,7 @@
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       const { items, unresolvedApps } = result;
       status.textContent = items.length ? 'Saving Steam games and DLC locally...' : 'No new Steam apps; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items });
+      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items, snapshot: result.snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Steam import did not complete.');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       const scope = fullRescan ? `Full rescan checked ${result.newAppCount} apps` : `Quick update checked ${result.newAppCount} new app${result.newAppCount === 1 ? '' : 's'}`;

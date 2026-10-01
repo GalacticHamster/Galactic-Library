@@ -34,7 +34,7 @@
       status.textContent = items.length ? `Saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally...` : 'No new supported Fanatical items; recording the completed check...';
       const response = await chrome.runtime.sendMessage({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
-        syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [] }
+        syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [] }, snapshot: projection.result?.snapshot
       });
       if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
       const stats = projection.result ?? {};

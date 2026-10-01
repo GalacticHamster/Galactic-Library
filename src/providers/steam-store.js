@@ -57,7 +57,9 @@
   async function fetchOwnedSteamGames(reportProgress = () => {}, knownAppIds = null) {
     const ownedResponse = await fetch('/dynamicstore/userdata/', { credentials: 'same-origin', cache: 'no-store' });
     if (!ownedResponse.ok) throw new Error(`Steam Store returned ${ownedResponse.status} while loading your library. Please wait before retrying; Steam temporarily limits rapid requests.`);
-    const appIds = ownedAppIdsFromDynamicStore(await ownedResponse.json());
+    const account = await ownedResponse.json();
+    if (!Array.isArray(account?.rgOwnedApps) || account.rgOwnedApps.some((id) => !/^\d+$/u.test(String(id)))) throw new Error('Steam returned a malformed owned-App-ID list. No library changes were saved.');
+    const appIds = ownedAppIdsFromDynamicStore(account);
     if (!appIds.length) throw new Error('Steam Store did not return owned apps. Confirm you are signed in to Steam Store in this tab.');
     const incremental = Array.isArray(knownAppIds);
     const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
@@ -69,17 +71,28 @@
       reportProgress({ completed: offset, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       try {
         const items = await fetchStoreItems(batch);
+        if (!Array.isArray(items?.response?.store_items)) throw new Error('Steam returned a malformed title-service response.');
         const returnedIds = new Set((items?.response?.store_items ?? []).map((item) => String(item?.appid ?? '')).filter(Boolean));
         for (const appId of batch) if (!returnedIds.has(appId)) unresolvedApps.push({ appId, status: 'not returned by Steam' });
-        for (const item of libraryItemsFromStoreItems(items, new Set(batch))) itemsById.set(item.providerItemId, item);
+        const parsed = libraryItemsFromStoreItems(items, new Set(batch));
+        const parsedIds = new Set(parsed.map((item) => item.providerItemId));
+        for (const item of items.response.store_items) {
+          const id = String(item?.appid ?? '');
+          if (!/^\d+$/u.test(id) || !Number.isInteger(Number(item.type))) throw new Error('Steam returned a malformed catalog entry.');
+          if (batch.includes(id) && [0, 4].includes(Number(item.type)) && !parsedIds.has(id)) unresolvedApps.push({ appId: id, status: 'unreadable title' });
+        }
+        for (const item of parsed) itemsById.set(item.providerItemId, item);
       } catch (error) {
+        if (!incremental) throw new Error(`${error.message} The full Steam snapshot was not replaced.`);
         unresolvedApps.push(...batch.map((appId) => ({ appId, status: error.message })));
       }
       reportProgress({ completed: offset + batch.length, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       if (offset + STORE_ITEMS_BATCH_SIZE < appIdsToResolve.length) await wait(BETWEEN_BATCHES_MS);
     }
     if (!incremental && ![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Steam returned owned apps but no game titles. Please try again later.');
-    return { items: [...itemsById.values()], unresolvedApps, ownedAppIds: appIds, newAppCount: appIdsToResolve.length };
+    if (!incremental && unresolvedApps.length) throw new Error(`Steam could not resolve ${unresolvedApps.length} owned apps. A complete full replacement is unavailable; previous records were kept. Quick update can still add readable new apps.`);
+    const items = [...itemsById.values()];
+    return { items, unresolvedApps, ownedAppIds: appIds, newAppCount: appIdsToResolve.length, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('steam', items, [global.GalacticProviderSnapshot.completedScope('library', appIds.length, appIds.length, 'index-complete', Math.max(1, Math.ceil(appIds.length / STORE_ITEMS_BATCH_SIZE)))]) };
   }
 
   global.GalacticSteamStore = { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems, fetchOwnedSteamGames };

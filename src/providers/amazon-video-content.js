@@ -22,11 +22,11 @@
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Amazon Video sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Amazon Video baseline yet; reading the complete library once…';
-      const { items } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv }) => {
+      const { items, snapshot } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv }) => {
         status.textContent = `Reading Amazon Video library: ${passes} scroll pass${passes === 1 ? '' : 'es'} checked; ${movies} movies and ${tv} TV titles found.`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} Amazon Video title${items.length === 1 ? '' : 's'} locally...` : 'No new Amazon Video titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-video', mode: fullRescan ? 'full' : 'incremental', items });
+      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-video', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Video import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} Amazon Video title${items.length === 1 ? '' : 's'}`}. ${response.movieCount} Amazon Video movie${response.movieCount === 1 ? '' : 's'} and ${response.tvCount} TV title${response.tvCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {

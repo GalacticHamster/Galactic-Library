@@ -3,6 +3,7 @@
  * read, copied, or stored by this extension. */
 (function attachEpicImporter(global) {
   'use strict';
+  const MAX_PAGES = 500;
 
   const USER_LIBRARY_QUERY = `query getUserLibrary($cursor: String, $locale: String) {
     Library {
@@ -98,6 +99,10 @@
       throw new Error('Epic Games Store returned an unreadable library response. Confirm that you are signed in.');
     }
     if (Array.isArray(body?.errors) && body.errors.length) throw new Error(`Epic Games Store could not read the library: ${body.errors[0]?.message ?? 'unknown error'}`);
+    const library = body?.data?.Library?.libraryItems;
+    if (!Array.isArray(library?.records) || !library.responseMetadata || !Object.hasOwn(library.responseMetadata, 'nextCursor')) throw new Error('Epic Games Store returned a malformed library page; no library changes were saved.');
+    if (library.responseMetadata.nextCursor !== null && typeof library.responseMetadata.nextCursor !== 'string') throw new Error('Epic Games Store returned an invalid library cursor.');
+    if (library.records.some((record) => !record || typeof record !== 'object' || (!(record.namespace === 'ue' || record.sandboxType === 'PRIVATE') && (!String(record.catalogItem?.id ?? record.catalogItemId ?? '').trim() || typeof record.catalogItem?.title !== 'string' || !record.catalogItem.title.trim())))) throw new Error('Epic Games Store returned unreadable catalog entries; no library changes were saved.');
     return body;
   }
 
@@ -107,11 +112,14 @@
     const seenCursors = new Set();
     let cursor = null;
     let pagesRead = 0;
+    let recordsRead = 0;
     do {
+      if (pagesRead >= MAX_PAGES) throw new Error(`Epic Games Store reached the ${MAX_PAGES}-page limit before the end of the library.`);
       if (cursor && seenCursors.has(cursor)) throw new Error('Epic Games Store repeated a library page. Please try again later.');
       if (cursor) seenCursors.add(cursor);
       reportProgress({ pagesRead, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       const page = await fetchLibraryPage(cursor);
+      recordsRead += page.data.Library.libraryItems.records.length;
       const { items, skipped } = epicItemsFromLibraryPage(page);
       for (const item of items) itemsById.set(item.providerItemId, item);
       for (const id of skipped) skippedIds.add(id);
@@ -120,7 +128,8 @@
       cursor = nextCursorFromPage(page);
     } while (cursor);
     if (![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Epic Games Store returned no readable games. Confirm that this signed-in account has games in its library.');
-    return { items: [...itemsById.values()], skippedCount: skippedIds.size };
+    const items = [...itemsById.values()];
+    return { items, skippedCount: skippedIds.size, snapshot: global.GalacticProviderSnapshot.completeProviderSnapshot('epic', items, [global.GalacticProviderSnapshot.completedScope('library', recordsRead, null, 'pagination-end', pagesRead)]) };
   }
 
   global.GalacticEpic = { epicItemsFromLibraryPage, nextCursorFromPage, fetchEpicGames };

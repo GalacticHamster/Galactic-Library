@@ -2,6 +2,7 @@
  * already signed in; no password, cookie copying, or OAuth token is handled. */
 (function attachGogImporter(global) {
   'use strict';
+  const MAX_PAGES = 500;
 
   function gogItemsFromProducts(value) {
     const items = [];
@@ -47,7 +48,10 @@
     const response = await fetch(`/account/getFilteredProducts?${parameters}`, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) throw new Error(`GOG returned ${response.status} while loading your library. Confirm that you are signed in to GOG.`);
     try {
-      return await response.json();
+      const payload = await response.json();
+      if (!Array.isArray(payload?.products) || !Number.isSafeInteger(Number(payload.totalPages)) || Number(payload.totalPages) < 0) throw new Error('Malformed GOG page.');
+      if (payload.products.some((product) => !product || typeof product !== 'object' || (!(product.isMovie || product.isGame === false) && (!/^\d+$/u.test(String(product.id ?? '')) || typeof product.title !== 'string' || !product.title.trim())))) throw new Error('Malformed GOG product.');
+      return payload;
     } catch {
       throw new Error('GOG returned an unreadable library response. Confirm that you are signed in to GOG.');
     }
@@ -58,14 +62,31 @@
     const incremental = Array.isArray(knownItemIds);
     let pagesRead = 0;
     let pagesExpected = 0;
+    const scopes = [];
     const fetchPageSet = async (hiddenFlag) => {
       let page = 1;
       let totalPages = 1;
       let hasHiddenProducts = false;
+      let expectedCount = null;
+      let readCount = 0;
+      const seenPages = new Set();
       do {
         reportProgress({ pagesRead, pagesExpected: Math.max(pagesExpected, pagesRead + 1), games: itemsById.size, hidden: Boolean(hiddenFlag) });
         const response = await fetchLibraryPage(hiddenFlag, page);
-        totalPages = pageCount(response);
+        const reportedPages = Math.max(1, Number(response.totalPages));
+        if (page > 1 && reportedPages !== totalPages) throw new Error('GOG changed its page count during the scan; no library changes were saved.');
+        totalPages = reportedPages;
+        if (!incremental && totalPages > MAX_PAGES) throw new Error(`GOG reported more than ${MAX_PAGES} pages; the full scan cannot be completed.`);
+        const countValue = response.totalProducts;
+        const count = countValue === undefined ? null : Number(countValue);
+        if (count !== null && (!Number.isSafeInteger(count) || count < 0)) throw new Error('GOG returned an invalid product count.');
+        if (page > 1 && count !== expectedCount) throw new Error('GOG changed its product count during the scan.');
+        expectedCount = count;
+        const signature = response.products.map((product) => product.id).join('|');
+        if (response.products.length && seenPages.has(signature)) throw new Error('GOG repeated a library page before finishing the scan.');
+        seenPages.add(signature);
+        if (!response.products.length && page < totalPages) throw new Error('GOG returned an empty page before the reported last page.');
+        readCount += response.products.length;
         if (page === 1) {
           pagesExpected += totalPages;
           hasHiddenProducts = Boolean(response?.hasHiddenProducts);
@@ -79,7 +100,9 @@
         // readable page is known, older pages cannot add a new entitlement.
         if (incremental && pageItems.length && !itemsToSave.length) break;
         page += 1;
+        if (page > MAX_PAGES && page <= totalPages) throw new Error('GOG reached its pagination limit before completing the scan.');
       } while (page <= totalPages);
+      if (!incremental) scopes.push(global.GalacticProviderSnapshot.completedScope(hiddenFlag ? 'hidden' : 'library', readCount, expectedCount, 'pagination-end', page - 1));
       return { hasHiddenProducts };
     };
 
@@ -89,7 +112,8 @@
     const normalLibrary = await fetchPageSet(0);
     if (normalLibrary.hasHiddenProducts) await fetchPageSet(1);
     if (!itemsById.size && !incremental) throw new Error('GOG returned no readable games. Confirm that this signed-in account has games in its library.');
-    return { items: [...itemsById.values()] };
+    const items = [...itemsById.values()];
+    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('gog', items, scopes) };
   }
 
   global.GalacticGog = { gogItemsFromProducts, newGogItems, pageCount, fetchGogGames };

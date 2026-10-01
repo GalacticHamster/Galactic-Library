@@ -126,7 +126,7 @@
   async function amazonGamesItemFromClaimHeader(header, card) {
     if (!claimEntryId(card.providerItemId) || !compactText(card.title) || !/\bdelivered\b/iu.test(compactText(card.deliveryText))) {
       const cardText = compactText(header.textContent);
-      return { item: null, reason: /\bproduct\s+key\b/iu.test(`${card.deliveryText} ${cardText}`) ? 'product-key' : 'unclassified' };
+      return { item: null, reason: /\bproduct\s+key\b/iu.test(`${card.deliveryText} ${cardText}`) ? 'product-key' : /\b(?:pending|not delivered|processing|awaiting delivery)\b/iu.test(compactText(card.deliveryText)) ? 'not-delivered' : 'unclassified' };
     }
     const deliveryTarget = await deliveryTargetFromClaimHeader(header);
     const item = amazonGamesItemFromCardData({ ...card, deliveryTarget });
@@ -179,7 +179,7 @@
     throw new Error(`Amazon's collection did not finish opening the ${option.label} date range.`);
   }
 
-  async function fetchAmazonGamesInCurrentWindow(reportProgress = () => {}, timeWindow = '') {
+  async function fetchAmazonGamesInCurrentWindow(reportProgress = () => {}, timeWindow = '', strict = true) {
     const itemsById = new Map();
     const itemIdsByTitle = new Map();
     const processedCardIds = new Set();
@@ -191,12 +191,15 @@
     let priorSignature = '';
     let sawCards = false;
     let loadMoreActivations = 0;
+    let passesRead = 0;
     for (let pass = 0; pass < MAX_SCROLL_PASSES && unchangedPasses < 4; pass += 1) {
+      passesRead = pass + 1;
       const scan = claimCardsFromDocument(global.document);
       sawCards ||= scan.diagnostics.cardsRead > 0;
       for (const { header, card } of scan.cards) {
         const cardId = claimEntryId(card.providerItemId);
-        if (!cardId || processedCardIds.has(cardId)) continue;
+        if (!cardId || !compactText(card.title)) throw new Error('Amazon Games showed a claim without a readable ID or title. No library changes were saved.');
+        if (processedCardIds.has(cardId)) continue;
         processedCardIds.add(cardId);
         const result = await amazonGamesItemFromClaimHeader(header, card);
         if (result.item) {
@@ -209,11 +212,17 @@
         }
         else if (result.reason === 'other-library') otherLibraryClaims += 1;
         else if (result.reason === 'product-key') productKeyClaims += 1;
-        else unreadableCards += 1;
+        else {
+          if (strict && (result.reason === 'unreadable' || result.reason === 'unclassified')) throw new Error('Amazon Games could not identify a claim delivery method. A full snapshot cannot safely exclude that claim.');
+          unreadableCards += 1;
+        }
       }
       const cardsRead = processedCardIds.size;
       const signature = `${[...itemsById.keys()].sort().join('\u0000')}|${cardsRead}|${otherLibraryClaims}|${productKeyClaims}|${unreadableCards}`;
-      unchangedPasses = signature === priorSignature ? unchangedPasses + 1 : 0;
+      const root = global.document.scrollingElement ?? global.document.documentElement;
+      const atBottom = root.scrollTop + global.innerHeight >= root.scrollHeight - 4;
+      const loading = global.document.querySelector('[aria-busy="true"], [role="progressbar"]');
+      unchangedPasses = atBottom && !loading && signature === priorSignature ? unchangedPasses + 1 : 0;
       priorSignature = signature;
       const loadMore = loadMoreControl(global.document);
       reportProgress({ timeWindow, passes: pass + 1, games: itemsById.size, cardsRead, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, loadMoreActivations });
@@ -225,21 +234,24 @@
         await wait(900);
         continue;
       }
-      const root = global.document.scrollingElement ?? global.document.documentElement;
       const maximum = Math.max(0, root.scrollHeight - global.innerHeight);
       global.scrollTo({ top: Math.min(maximum, global.scrollY + Math.max(360, Math.floor(global.innerHeight * 0.82))), behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
     }
-    return { items: [...itemsById.values()], diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, loadMoreActivations } };
+    if (unchangedPasses < 4 || loadMoreControl(global.document)) throw new Error(`Amazon Games reached its ${MAX_SCROLL_PASSES}-pass limit before finishing ${timeWindow}.`);
+    if (!sawCards && !/\b(?:no (?:games|items|claims|collected)|haven['’]?t collected|have not collected|nothing (?:collected|claimed)|no content)\b/iu.test(global.document.body?.textContent ?? '')) throw new Error(`Amazon Games did not expose claim cards or an explicit empty state for ${timeWindow}.`);
+    return { items: [...itemsById.values()], scope: global.GalacticProviderSnapshot.completedScope(timeWindow || 'collection', processedCardIds.size, sawCards ? null : 0, 'scroll-end', passesRead), diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, loadMoreActivations } };
   }
 
   async function fetchAmazonGames(reportProgress = () => {}, quickUpdate = false) {
     const windows = await openTimeWindowMenu(global.document, quickUpdate);
+    if (!quickUpdate && !windows.some((window) => /^\d{4}$/u.test(window.id))) throw new Error('Amazon Games did not expose the complete collection year list. No full replacement was saved.');
     const recentWindow = windows.find((window) => window.id === 'past-3-months');
     const selectedWindows = quickUpdate && recentWindow ? [recentWindow] : windows.length ? windows : [{ id: '', label: 'current selection' }];
     const itemsByTitle = new Map();
     const totals = { cardsRead: 0, otherLibraryClaims: 0, productKeyClaims: 0, duplicateAmazonClaims: 0, unreadableCards: 0, loadMoreActivations: 0, crossWindowDuplicates: 0 };
     let rangesWithClaims = 0;
+    const scopes = [];
     for (let index = 0; index < selectedWindows.length; index += 1) {
       const timeWindow = selectedWindows[index];
       if (timeWindow.id) await selectTimeWindow(global.document, timeWindow);
@@ -249,8 +261,9 @@
         windowsRead: index + 1,
         windowsTotal: selectedWindows.length,
         totalGames: itemsByTitle.size + progress.games
-      }), timeWindow.label);
+      }), timeWindow.label, !quickUpdate);
       if (result.diagnostics.sawCards) rangesWithClaims += 1;
+      scopes.push({ ...result.scope, id: timeWindow.id || result.scope.id });
       for (const item of result.items) {
         const titleKey = amazonGamesTitleKey(item.title);
         if (itemsByTitle.has(titleKey)) totals.crossWindowDuplicates += 1;
@@ -263,7 +276,8 @@
     if (!rangesWithClaims) throw new Error('No readable claim cards were found in any selected date range. Open My Collection, select Games, and wait for it to load.');
     return {
       items: [...itemsByTitle.values()],
-      diagnostics: { ...totals, windowsRead: selectedWindows.length, windowsTotal: selectedWindows.length, rangesWithClaims, emptyRanges: selectedWindows.length - rangesWithClaims, timeWindows: selectedWindows.map((window) => window.label) }
+      diagnostics: { ...totals, windowsRead: selectedWindows.length, windowsTotal: selectedWindows.length, rangesWithClaims, emptyRanges: selectedWindows.length - rangesWithClaims, timeWindows: selectedWindows.map((window) => window.label) },
+      snapshot: quickUpdate ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-games', [...itemsByTitle.values()], scopes)
     };
   }
 

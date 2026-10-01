@@ -50,7 +50,13 @@
     if (!response.ok) throw new Error(`Humble returned ${response.status} while loading a purchase.`);
     // Do not call response.json(): a Humble detail can contain a third-party
     // redemption value. Redaction must happen before JSON parsing.
-    return JSON.parse(redactRedemptionValues(await response.text()));
+    const detail = JSON.parse(redactRedemptionValues(await response.text()));
+    if (!detail || typeof detail !== 'object' || Array.isArray(detail) || !Array.isArray(detail.subproducts ?? detail.products)) throw new Error('Humble returned a malformed purchase detail.');
+    if ((detail.subproducts ?? detail.products).some((product) => !product || typeof product !== 'object' || !compactText(product.human_name ?? product.product_name ?? product.title ?? product.name))) throw new Error('Humble returned an unreadable purchase product.');
+    for (const value of [detail?.tpkd_dict?.all_tpks, detail?.tpkd_dict?.all_tpkds, detail?.all_tpks, detail?.all_tpkds]) {
+      if (value !== undefined && (!Array.isArray(value) || value.some((record) => !record || !compactText(record.human_name ?? record.product_name ?? record.name)))) throw new Error('Humble returned malformed third-party entitlements.');
+    }
+    return detail;
   }
 
   function normalizeDate(value) {
@@ -153,6 +159,7 @@
     const orders = Array.isArray(response) ? response : response?.data ?? response?.orders;
     if (!Array.isArray(orders)) throw new Error('Humble returned an unexpected purchase list. Please report this page format.');
     const keyedOrders = orders.map((order) => ({ order, purchaseId: orderKey(order) })).filter(({ purchaseId }) => purchaseId);
+    if (keyedOrders.length !== orders.length) throw new Error('Humble returned purchases without readable IDs. No library changes were saved.');
     if (!keyedOrders.length) throw new Error('Humble returned no readable purchases. Confirm that you are signed in to an account with purchases.');
     const sync = purchaseIdsForSync(orders, knownPurchaseIds ?? []);
     const incremental = Array.isArray(knownPurchaseIds);
@@ -184,7 +191,8 @@
       purchasesRead: selectedOrders.length,
       skippedKnown: keyedOrders.length - selectedOrders.length,
       failures,
-      knownPurchaseIds: [...completedPurchaseIds]
+      knownPurchaseIds: [...completedPurchaseIds],
+      snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('humble', [...itemsById.values()], [global.GalacticProviderSnapshot.completedScope('purchases', completedPurchaseIds.size, sync.purchaseIds.length, 'index-complete', Math.max(1, selectedOrders.length))])
     };
   }
 

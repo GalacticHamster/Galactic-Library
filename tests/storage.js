@@ -5,6 +5,16 @@ import { createStorageClient, createBackup, parseBackup } from '../src/lib/stora
 import { createEmptyDatabase, normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../src/lib/constants.js';
 import { STORAGE_MESSAGE_TYPE } from '../src/lib/storage-protocol.js';
+import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
+
+// Fixtures represent an already validated complete source, not a partial scan.
+export function snapshotFixture(provider, items) {
+  const scopes = provider === 'kindle' ? ['books', 'personal-documents'].map((id) => {
+    const size = items.filter((item) => (item.metadata?.libraryCategory ?? 'books') === id).length;
+    return { ...completedScope(id, size, size, 'reported-count'), duplicateCount: 0 };
+  }) : [completedScope('library', items.length, items.length, 'reported-count')];
+  return completeProviderSnapshot(provider, items, scopes);
+}
 
 function deferred() {
   let resolve;
@@ -87,7 +97,7 @@ const googleHint = { source: 'google-books', confidence: 'author-and-title-stem'
 const comicContents = { itemId: itemIds[0], sourceUrl: kindleBooks[0].metadata.detailUrl, statement: 'Collects Test Comic #1-4' };
 
 let workerNumber = 0;
-async function withWorker(run) {
+export async function withWorker(run) {
   const previousChrome = globalThis.chrome;
   const memory = memoryStorage();
   const listeners = [];
@@ -119,7 +129,7 @@ async function withWorker(run) {
     // single writer. Separate clients simulate separate Library page contexts.
     await import(`../src/background/service-worker.js?storage-test=${++workerNumber}`);
     const page = (name) => createStorageClient((request) => dispatch(request, { id: extensionId, url: `${root}options.html#${name}` }));
-    const importItems = (provider, items, mode = 'full') => dispatch({ type: 'IMPORT_PROVIDER_ITEMS', provider, items, mode }, {
+    const importItems = (provider, items, mode = 'full') => dispatch({ type: 'IMPORT_PROVIDER_ITEMS', provider, items, mode, snapshot: mode === 'full' ? snapshotFixture(provider, items) : undefined }, {
       id: extensionId,
       url: { steam: 'https://store.steampowered.com/', gog: 'https://www.gog.com/account', kindle: 'https://www.amazon.com/hz/mycd/' }[provider]
     }).then((response) => {
@@ -324,12 +334,12 @@ export const storageTests = [
     const first = writer.getDatabase();
     await held.started.promise;
     const records = [game('1', 'Original title')];
-    const queued = writer.replaceProviderItems('steam', records);
+    const queued = writer.replaceProviderItems('steam', records, {}, snapshotFixture('steam', records));
     records[0].title = 'Changed after admission';
     held.released.resolve();
     await Promise.all([first, queued]);
     const restarted = createStorageWriter(memory.area);
-    await restarted.replaceProviderItems('gog', [game('2')]);
+    await restarted.replaceProviderItems('gog', [game('2')], {}, snapshotFixture('gog', [game('2')]));
     const database = await restarted.getDatabase();
     assert.equal(database.providerItems['steam:1'].title, 'Original title');
     assert.ok(database.providerItems['gog:2']);

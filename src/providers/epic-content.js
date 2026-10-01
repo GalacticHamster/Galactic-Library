@@ -19,11 +19,11 @@
     button.disabled = true;
     status.dataset.busy = 'true';
     try {
-      const { items, skippedCount } = await globalThis.GalacticEpic.fetchEpicGames(({ pagesRead, games }) => {
+      const { items, skippedCount, snapshot } = await globalThis.GalacticEpic.fetchEpicGames(({ pagesRead, games }) => {
         status.textContent = `Reading Epic library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${games} games found.`;
       });
       status.textContent = 'Saving Epic games and add-ons locally...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items });
+      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Epic import did not complete.');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       status.textContent = `Saved ${response.gameCount} Epic game${response.gameCount === 1 ? '' : 's'} locally.${response.addOnCount ? ` Saved ${response.addOnCount} Epic add-on${response.addOnCount === 1 ? '' : 's'}; ${response.linkedAddOnCount} linked to a game${unlinkedAddOnCount ? ` and ${unlinkedAddOnCount} shown as unlinked` : ''}.` : ''}${skippedCount ? ` ${skippedCount} non-game account item${skippedCount === 1 ? ' was' : 's were'} excluded.` : ''}`;

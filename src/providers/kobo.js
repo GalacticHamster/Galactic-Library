@@ -184,28 +184,55 @@
   async function fetchLibraryDocument(url) {
     const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) throw new Error(`Kobo returned ${response.status} while loading your Archive.`);
-    return new DOMParser().parseFromString(await response.text(), 'text/html');
+    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+    if (!document.querySelector('.filter-btn, [data-kobo-sort], a[data-book-title]') && !/\b(?:no books|no audiobooks|archive is empty|no items)\b/iu.test(document.body?.textContent ?? '')) throw new Error('Kobo returned a page without readable library structure. No library changes were saved.');
+    for (const link of document.querySelectorAll('a[data-book-title][href]')) {
+      if (!koboItemFromCardData(cardDataFromLink(link))) throw new Error('Kobo returned an unreadable library card. No library changes were saved.');
+    }
+    return document;
+  }
+
+  function expectedCountFromDocument(document) {
+    for (const control of document.querySelectorAll('button, a, h1, h2')) {
+      const match = compactText(control.textContent).match(/^All Items\s*\(([\d,]+)\)/iu);
+      if (match) return Number(match[1].replace(/,/gu, ''));
+    }
+    return /\b(?:no books|no audiobooks|archive is empty|no items)\b/iu.test(document.body?.textContent ?? '') ? 0 : null;
   }
 
   async function fetchKoboLinkedSection(itemsById, reportProgress, rootDocument, linkLabel, librarySection) {
     const sectionLink = librarySectionLinkFromDocument(rootDocument, linkLabel);
     if (!sectionLink) return { pagesRead: 0, available: false, document: null };
     let url = absoluteUrl(sectionLink.getAttribute('href'));
-    if (!url) return { pagesRead: 0, available: false, document: null };
+    if (!url) throw new Error(`Kobo exposed an unreadable ${linkLabel} link.`);
     const seenUrls = new Set();
     let pagesRead = 0;
     let firstDocument = null;
-    while (url && !seenUrls.has(url) && pagesRead < MAX_PAGES) {
+    const sectionIds = new Set();
+    let expectedCount;
+    while (url) {
+      if (seenUrls.has(url)) throw new Error(`Kobo repeated a ${linkLabel} page before reaching its end.`);
+      if (pagesRead >= MAX_PAGES) throw new Error(`Kobo reached the ${MAX_PAGES}-page limit in ${linkLabel}.`);
       seenUrls.add(url);
       const document = await fetchLibraryDocument(url);
       if (!firstDocument) firstDocument = document;
-      addItems(itemsById, koboItemsFromDocument(document), librarySection);
+      const count = expectedCountFromDocument(document);
+      if (pagesRead > 0 && count !== expectedCount) throw new Error(`Kobo changed the ${linkLabel} total during the scan.`);
+      expectedCount = count;
+      const pageItems = koboItemsFromDocument(document);
+      if (!pageItems.length && expectedCount !== 0) throw new Error(`Kobo returned an unreadable ${linkLabel} page without an explicit zero count.`);
+      if (pageItems.length && pageItems.every((item) => sectionIds.has(item.providerItemId))) throw new Error(`Kobo repeated ${linkLabel} cards before reaching the end.`);
+      pageItems.forEach((item) => sectionIds.add(item.providerItemId));
+      addItems(itemsById, pageItems, librarySection);
       pagesRead += 1;
       reportCounts(itemsById, reportProgress, { pagesRead: null, sectionPagesRead: pagesRead, section: linkLabel });
       const next = nextPageControl(document);
+      if (next && next.tagName !== 'A') throw new Error(`Kobo exposed unsupported ${linkLabel} pagination; the snapshot was kept.`);
       url = next?.tagName === 'A' ? absoluteUrl(next.getAttribute('href')) : '';
+      if (next && !url) throw new Error(`Kobo exposed an unreadable ${linkLabel} page link.`);
+      if (!next && pagesRead < pageCountFromDocument(document)) throw new Error(`Kobo stopped before the reported last ${linkLabel} page.`);
     }
-    return { pagesRead, available: true, document: firstDocument };
+    return { pagesRead, available: true, document: firstDocument, scope: global.GalacticProviderSnapshot.completedScope(librarySection, sectionIds.size, expectedCount, 'pagination-end', pagesRead) };
   }
 
   async function fetchKoboLibrary(reportProgress = () => {}, knownItemIds = null) {
@@ -215,12 +242,20 @@
     initialUrl.searchParams.set('pageNumber', '1');
     initialUrl.searchParams.set('sort', 'DateAddedDesc');
     const firstDocument = await fetchLibraryDocument(initialUrl.toString());
-    const totalPages = Math.min(MAX_PAGES, pageCountFromDocument(firstDocument));
+    const totalPages = pageCountFromDocument(firstDocument);
+    if (totalPages > MAX_PAGES) throw new Error(`Kobo reported ${totalPages} pages, exceeding the ${MAX_PAGES}-page scan limit.`);
+    const expectedCount = expectedCountFromDocument(firstDocument);
+    const pageSignatures = new Set();
     for (let page = 1; page <= totalPages; page += 1) {
       const pageUrl = new URL(initialUrl);
       pageUrl.searchParams.set('pageNumber', String(page));
       const document = page === 1 ? firstDocument : await fetchLibraryDocument(pageUrl.toString());
       const pageItems = koboItemsFromDocument(document);
+      if (expectedCountFromDocument(document) !== expectedCount || pageCountFromDocument(document) > totalPages) throw new Error('Kobo changed its library totals during the scan. Please retry.');
+      if (!pageItems.length && (page < totalPages || expectedCount !== 0)) throw new Error('Kobo returned an empty or unreadable library page before completing the scan.');
+      const signature = pageItems.map((item) => item.providerItemId).sort().join('|');
+      if (pageItems.length && pageSignatures.has(signature)) throw new Error('Kobo repeated a library page before completing the scan.');
+      pageSignatures.add(signature);
       const itemsToSave = incremental ? newKoboItems(pageItems, knownItemIds) : pageItems;
       addItems(itemsById, itemsToSave, 'my-books');
       reportCounts(itemsById, reportProgress, { pagesRead: page, archivePagesRead: 0, section: 'My Books' });
@@ -233,6 +268,7 @@
       throw new Error('Kobo showed no readable book or audiobook cards. Open My Books, wait for the library to load, then try again.');
     }
     if (incremental) return { items: [...itemsById.values()], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
+    const scopes = [global.GalacticProviderSnapshot.completedScope('my-books', itemsById.size, expectedCount, 'pagination-end', totalPages)];
     const myBooksArchive = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Archive', 'archive');
     const audiobooks = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Audiobooks', 'audiobooks');
     const audiobookArchive = audiobooks.document
@@ -243,7 +279,8 @@
       archivePagesRead: myBooksArchive.pagesRead + audiobookArchive.pagesRead,
       archiveAvailable: myBooksArchive.available || audiobookArchive.available,
       audiobookPagesRead: audiobooks.pagesRead,
-      audiobookAvailable: audiobooks.available
+      audiobookAvailable: audiobooks.available,
+      snapshot: global.GalacticProviderSnapshot.completeProviderSnapshot('kobo', [...itemsById.values()], [...scopes, ...[myBooksArchive, audiobooks, audiobookArchive].flatMap((section) => section.scope ? [section.scope] : [])])
     };
   }
 

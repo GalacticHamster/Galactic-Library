@@ -9,7 +9,8 @@ import { googleBooksCandidatesFromSearch, googleBooksEnrichment, googleBooksGenr
 import { comicMangaEvidence, fanaticalBundleGenreHints, humbleBundleGenreHints, isConfirmedComicManga, kindleComicMangaHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
 import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
 import { compareTitles } from '../src/lib/title-sort.js';
-import { storageTests } from './storage.js';
+import { storageTests, snapshotFixture } from './storage.js';
+import { providerSnapshotTests } from './provider-snapshots.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -70,8 +71,10 @@ const tests = [
       set: async (values) => Object.assign(stored, structuredClone(values))
     });
     const base = { providerItemId: 'B000000001', title: 'Test Comic', mediaType: 'book', ownership: 'unknown' };
-    await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }]);
-    let database = await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
+    const initial = [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }];
+    await replaceProviderItems('kindle', initial, {}, snapshotFixture('kindle', initial));
+    const rescanned = [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }];
+    let database = await replaceProviderItems('kindle', rescanned, {}, snapshotFixture('kindle', rescanned));
     assert.equal(database.providerItems['kindle:B000000001'].ownership, 'owned');
     assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
     database = await mergeProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
@@ -468,7 +471,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...storageTests]) {
+for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -479,4 +482,4 @@ for (const [name, run] of [...tests, ...storageTests]) {
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + storageTests.length} tests passed.`);
+else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length} tests passed.`);

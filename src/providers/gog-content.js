@@ -23,11 +23,11 @@
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local GOG sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full GOG baseline yet; reading every library page once…';
-      const { items } = await globalThis.GalacticGog.fetchGogGames(({ pagesRead, pagesExpected, games, hidden }) => {
+      const { items, snapshot } = await globalThis.GalacticGog.fetchGogGames(({ pagesRead, pagesExpected, games, hidden }) => {
         status.textContent = `Reading ${hidden ? 'hidden ' : ''}GOG library: ${pagesRead}/${pagesExpected} page${pagesExpected === 1 ? '' : 's'} checked; ${games} games found.`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} GOG game${items.length === 1 ? '' : 's'} locally...` : 'No new GOG titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'gog', mode: fullRescan ? 'full' : 'incremental', items });
+      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'gog', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'GOG import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} GOG game${items.length === 1 ? '' : 's'}`}. ${response.gameCount} GOG game${response.gameCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {

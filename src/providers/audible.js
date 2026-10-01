@@ -104,19 +104,39 @@
     const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) throw new Error(`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
-    return entriesFromLibraryDocument(document);
+    if (!document.querySelector('select[name="sortBy"], .adbl-library-content-row, #library-content, [data-testid="library-titles"]')) throw new Error('Audible returned a page without its library structure. No library changes were saved.');
+    const items = entriesFromLibraryDocument(document);
+    const readableIds = new Set(items.map((item) => item.providerItemId));
+    for (const link of document.querySelectorAll('a[href*="/pd/"]')) {
+      const id = audibleItemIdFromUrl(link.getAttribute('href'));
+      if (!id || !readableIds.has(id)) throw new Error('Audible returned unreadable library entries. No library changes were saved.');
+    }
+    const countMatch = String(document.body?.textContent ?? '').match(/\b([\d,]+)\s+(?:titles|audiobooks)\b/iu);
+    const expectedCount = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
+    const next = [...document.querySelectorAll('a, button')].some((control) => {
+      if (control.hasAttribute('disabled') || control.getAttribute('aria-disabled') === 'true' || control.closest('[class*="disabled" i]')) return false;
+      const label = `${control.textContent ?? ''} ${control.getAttribute('aria-label') ?? ''} ${control.className ?? ''}`;
+      const href = control.getAttribute('href');
+      const targetPage = href ? Number(new URL(href, global.location.origin).searchParams.get('page')) : 0;
+      return /\bnext\b|pagingNext|pagination-next/iu.test(label) || targetPage > page;
+    });
+    if (!items.length && expectedCount !== 0) throw new Error('Audible returned an empty or unreadable library page without an explicit zero count. No library changes were saved.');
+    return { items, expectedCount, next };
   }
 
   async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
     const incremental = Array.isArray(knownItemIds);
+    let finished = false;
+    let pagesRead = 0;
+    let expectedCount;
     for (let page = 1; page <= MAX_PAGES; page += 1) {
       reportProgress({ pagesRead: page - 1, audiobooks: itemsById.size });
-      const pageItems = await fetchAudibleLibraryPage(page);
-      if (!pageItems.length) {
-        if (page === 1) throw new Error('Audible returned no readable library titles. Open your Audible Library while signed in, then try again.');
-        break;
-      }
+      const pageData = await fetchAudibleLibraryPage(page);
+      const pageItems = pageData.items;
+      if (page > 1 && pageData.expectedCount !== expectedCount) throw new Error('Audible changed its reported library total during the scan. Please retry.');
+      expectedCount = pageData.expectedCount;
+      pagesRead = page;
       const itemsToSave = incremental ? newAudibleItems(pageItems, knownItemIds) : pageItems;
       let added = 0;
       for (const item of itemsToSave) {
@@ -124,11 +144,15 @@
         itemsById.set(item.providerItemId, item);
       }
       reportProgress({ pagesRead: page, audiobooks: itemsById.size });
-      if (added === 0) break;
+      if (incremental && pageItems.length && !itemsToSave.length) { finished = true; break; }
+      if (!pageData.next) { finished = true; break; }
+      if (added === 0) throw new Error('Audible repeated a page before the library ended; no library changes were saved.');
       await wait(BETWEEN_PAGES_MS);
     }
+    if (!finished) throw new Error(`Audible reached its ${MAX_PAGES}-page limit before the end of the library.`);
     if (!itemsById.size && !incremental) throw new Error('Audible returned no readable library titles. Please try again later.');
-    return { items: [...itemsById.values()] };
+    const items = [...itemsById.values()];
+    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('audible', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expectedCount, 'pagination-end', pagesRead)]) };
   }
 
   global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks };

@@ -22,12 +22,12 @@
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kobo sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Kobo baseline yet; reading every library page once…';
-      const { items, archivePagesRead, archiveAvailable, audiobookPagesRead, audiobookAvailable } = await globalThis.GalacticKobo.fetchKoboLibrary(({ pagesRead, sectionPagesRead, books, audiobooks, section }) => {
+      const { items, archivePagesRead, archiveAvailable, audiobookPagesRead, audiobookAvailable, snapshot } = await globalThis.GalacticKobo.fetchKoboLibrary(({ pagesRead, sectionPagesRead, books, audiobooks, section }) => {
         const scanText = pagesRead === null ? `${sectionPagesRead} page${sectionPagesRead === 1 ? '' : 's'} checked` : `${pagesRead} My Books scan pass${pagesRead === 1 ? '' : 'es'} checked`;
         status.textContent = `Reading Kobo ${section ?? 'library'}: ${scanText}; ${books} books and ${audiobooks} audiobooks found.`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} Kobo item${items.length === 1 ? '' : 's'} locally...` : 'No new Kobo titles; recording the completed check...';
-      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kobo', mode: fullRescan ? 'full' : 'incremental', items });
+      const response = await chrome.runtime.sendMessage({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kobo', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Kobo import did not complete.');
       if (!fullRescan) {
         status.textContent = `Quick update added ${items.length} Kobo item${items.length === 1 ? '' : 's'}. ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally. Use Full rescan to check Archive and Audiobooks.`;

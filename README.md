@@ -82,9 +82,19 @@ A full import replaces only that provider's records and preserves local enrichme
 
 Invalid operations and failed storage writes return an error and leave the queue available for later requests. An enrichment or review save whose target records were cleared or removed fails validation instead of restoring a stale database copy. The writer reloads persisted storage for each operation, including after a service-worker restart. Clients propagate message failures and do not automatically retry an operation whose acknowledgement was lost.
 
+## Full-scan snapshot safety
+
+Every provider full replacement requires a completion receipt, checked again by the single storage writer before any database change. Importers validate response structure and readable entries, scan every exposed required section, reconcile reported totals, and reject repeated pagination, changed totals, and page/scroll limits reached before completion. Successful receipts are stored as `providers[provider].snapshotValidation`. Older tabs without the updated receipt protocol cannot perform destructive replacements; reload the extension and provider tabs after upgrading.
+
+Kindle must finish both Books and Personal Documents. Its returned-entry counts must equal Amazon's reported totals; duplicate IDs are explicitly counted rather than treated as missing books. For example, a response reporting 1,000 books but returning one, followed by a malformed page, fails without changing the saved library. Fandango must reconcile both movie and TV totals. Humble and Fanatical must read every selected purchase/order successfully; Steam must resolve every owned app as readable content or an explicitly unsupported type.
+
+Where a provider exposes no numeric total, completion requires exhausting its validated cursor/pager, purchase index, or rendered scroll/load-more sequence. DOM-based imports require a settled end and reject an outstanding loader or load-more control; they cannot independently reconcile a total the site does not expose. Recognized non-game content, other-store Amazon claims, and explained duplicates can be excluded; unreadable content cannot silently justify dropping records.
+
+A failed full scan does not update provider records, enrichment, review decisions, sync timestamps, or the full-scan baseline. Quick updates remain non-destructive merges and do not require full-snapshot evidence. In particular, Steam's unresolved/de-listed apps can block a full replacement while Quick update can still add readable new titles. Backup restore remains an explicit user-requested replacement, separate from provider scanning.
+
 ## Development
 
-Run the deterministic core and concurrency tests (including the real service-worker message handlers with delayed, copied storage values):
+Run the deterministic core, concurrency, and provider snapshot tests (including malformed responses, count mismatches, pagination limits, and the real service-worker message handlers with delayed, copied storage values):
 
 ```powershell
 npm test

@@ -17,52 +17,52 @@
   "content_scripts": [
     {
       "matches": ["https://store.steampowered.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/steam-store.js", "src/providers/steam-store-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/steam-store.js", "src/providers/steam-store-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.gog.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/gog.js", "src/providers/gog-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/gog.js", "src/providers/gog-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://store.epicgames.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/epic.js", "src/providers/epic-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/epic.js", "src/providers/epic-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.audible.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/audible.js", "src/providers/audible-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/audible.js", "src/providers/audible-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://gaming.amazon.com/*", "https://luna.amazon.com/claims/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/amazon-games.js", "src/providers/amazon-games-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/amazon-games.js", "src/providers/amazon-games-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.amazon.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/kindle.js", "src/providers/kindle-content.js", "src/providers/amazon-video.js", "src/providers/amazon-video-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/kindle.js", "src/providers/kindle-content.js", "src/providers/amazon-video.js", "src/providers/amazon-video-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.kobo.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/kobo.js", "src/providers/kobo-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/kobo.js", "src/providers/kobo-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://athome.fandango.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/fandango-at-home.js", "src/providers/fandango-at-home-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/fandango-at-home.js", "src/providers/fandango-at-home-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.humblebundle.com/home/purchases*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/humble.js", "src/providers/humble-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/humble.js", "src/providers/humble-content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.fanatical.com/orders*", "https://www.fanatical.com/*/orders*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/fanatical.js", "src/providers/fanatical-content.js"],
+      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/fanatical.js", "src/providers/fanatical-content.js"],
       "run_at": "document_idle"
     }
   ]

@@ -112,15 +112,18 @@
     const itemsById = new Map();
     const incremental = Array.isArray(knownItemIds);
     const renderedItemIds = new Set();
+    const observedCards = new Set();
     let unchangedPasses = 0;
+    let finished = false;
+    let passesRead = 0;
     const scrollingElement = global.document.scrollingElement ?? global.document.documentElement;
     // The signed-in library's Most recent addition order is only useful if
     // the scan starts at its first rendered group, not the user's scroll spot.
-    if (incremental) {
-      global.scrollTo({ top: 0, behavior: 'auto' });
-      await wait(SCROLL_PAUSE_MS);
-    }
+    global.scrollTo({ top: 0, behavior: 'auto' });
+    await wait(SCROLL_PAUSE_MS);
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 3; pass += 1) {
+      passesRead = pass + 1;
+      for (const card of global.document.querySelectorAll('[data-card-entity-type], [data-entity-type], [data-testid="card"]')) observedCards.add(card);
       const before = itemsById.size;
       const newlyRenderedItems = amazonVideoItemsFromDocument(global.document)
         .filter((item) => !renderedItemIds.has(item.providerItemId));
@@ -132,18 +135,27 @@
       reportProgress({ passes: pass, movies, tv });
       // Cards are rendered newest first. A complete newly rendered group with
       // no unknown title is a safe stopping point for a quick update.
-      if (incremental && newlyRenderedItems.length && !itemsToSave.length) break;
-      unchangedPasses = itemsById.size === before ? unchangedPasses + 1 : 0;
-      const beforeScroll = scrollingElement.scrollTop;
+      if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
       global.scrollTo({ top: scrollingElement.scrollHeight, behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
-      const atEnd = scrollingElement.scrollTop === beforeScroll || scrollingElement.scrollTop + global.innerHeight >= scrollingElement.scrollHeight - 4;
-      if (atEnd && unchangedPasses >= 2) break;
+      const atEnd = scrollingElement.scrollTop + global.innerHeight >= scrollingElement.scrollHeight - 4;
+      const loading = global.document.querySelector('[aria-busy="true"], [role="progressbar"]');
+      const loadMore = [...global.document.querySelectorAll('button, a')].find((control) => !control.disabled && /^(?:load|show|see)\s+more$/iu.test(compactText(control.textContent)));
+      if (loadMore) loadMore.click();
+      unchangedPasses = atEnd && !loading && !loadMore && itemsById.size === before ? unchangedPasses + 1 : 0;
+      if (unchangedPasses >= 3) { finished = true; break; }
     }
+    if (!finished) throw new Error(`Amazon Video reached its ${MAX_SCROLLS}-pass limit before the library finished loading.`);
     if (!itemsById.size && !incremental) {
       throw new Error('Amazon Video showed no readable movie or TV cards. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.');
     }
-    return { items: [...itemsById.values()] };
+    for (const card of observedCards) {
+      if (!amazonVideoItemFromCardData(cardDataFromElement(card))) throw new Error('Amazon Video showed unreadable library cards. No library changes were saved.');
+    }
+    const items = [...itemsById.values()];
+    const countMatch = compactText(global.document.body?.textContent).match(/(?:purchases|library|all items)\s*\(([\d,]+)\)/iu);
+    const expected = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
+    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expected, 'scroll-end', passesRead)]) };
   }
 
   global.GalacticAmazonVideo = {
