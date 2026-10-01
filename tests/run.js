@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { matchItems } from '../src/lib/matcher.js';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
-import { mergeProviderItems, replaceProviderItems } from '../src/lib/storage.js';
+import { createStorageWriter } from '../src/background/storage-writer.js';
 import { normalizeGameTitle } from '../src/lib/normalization.js';
 import { findDuplicateCandidates } from '../src/lib/duplicate-review.js';
 import { handleExternalApiRequest, isExtensionId, normaliseExternalClientIds } from '../src/lib/external-api.js';
@@ -9,6 +9,7 @@ import { googleBooksCandidatesFromSearch, googleBooksEnrichment, googleBooksGenr
 import { comicMangaEvidence, fanaticalBundleGenreHints, humbleBundleGenreHints, isConfirmedComicManga, kindleComicMangaHints, libraryBroadGenreValues, libraryGenreSubjectValues } from '../src/lib/genre-hints.js';
 import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySearchUrl } from '../src/lib/open-library.js';
 import { compareTitles } from '../src/lib/title-sort.js';
+import { storageTests } from './storage.js';
 
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
@@ -63,24 +64,18 @@ const tests = [
     assert.equal(matchItems({ [item.id]: item }, [{ mediaType: 'book', title: item.title }])[0].owned, false);
   }],
   ['preserves saved Kindle enrichment through full and quick syncs', async () => {
-    const previousChrome = globalThis.chrome;
     const stored = {};
-    globalThis.chrome = { storage: { local: {
+    const { replaceProviderItems, mergeProviderItems } = createStorageWriter({
       get: async (defaults) => ({ ...defaults, ...stored }),
-      set: async (values) => Object.assign(stored, values)
-    } } };
-    try {
-      const base = { providerItemId: 'B000000001', title: 'Test Comic', mediaType: 'book', ownership: 'unknown' };
-      await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }]);
-      let database = await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
-      assert.equal(database.providerItems['kindle:B000000001'].ownership, 'owned');
-      assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
-      database = await mergeProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
-      assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
-    } finally {
-      if (previousChrome === undefined) delete globalThis.chrome;
-      else globalThis.chrome = previousChrome;
-    }
+      set: async (values) => Object.assign(stored, structuredClone(values))
+    });
+    const base = { providerItemId: 'B000000001', title: 'Test Comic', mediaType: 'book', ownership: 'unknown' };
+    await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Comixology', enrichment: { kindleProductComicContents: { statement: 'Collects Test Comic #1-4' } } } }]);
+    let database = await replaceProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
+    assert.equal(database.providerItems['kindle:B000000001'].ownership, 'owned');
+    assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
+    database = await mergeProviderItems('kindle', [{ ...base, metadata: { originType: 'Purchase' }, ownership: 'owned' }]);
+    assert.equal(database.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement, 'Collects Test Comic #1-4');
   }],
   ['matches an exact normalized title across providers', () => {
     const providerItems = Object.fromEntries([
@@ -473,7 +468,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of tests) {
+for (const [name, run] of [...tests, ...storageTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -484,4 +479,4 @@ for (const [name, run] of tests) {
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length} tests passed.`);
+else console.log(`\n${tests.length + storageTests.length} tests passed.`);

@@ -1,4 +1,4 @@
-import { clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, parseBackup, removeManualMatchDecision, saveAllowedExternalClientIds, saveDatabase, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
+import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
@@ -732,31 +732,36 @@ function render() {
 }
 
 async function refresh() {
-  const [loadedDatabase, settings] = await Promise.all([
+  const [loadedDatabase, showActions] = await Promise.all([
     getDatabase(),
-    chrome.storage.local.get({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: true })
+    getShowEnrichmentActions()
   ]);
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
-  showEnrichmentActions.checked = settings[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY] !== false;
+  showEnrichmentActions.checked = showActions;
   render();
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
 }
 
-document.querySelector('#export').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(createBackup(database), null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = Object.assign(document.createElement('a'), { href: url, download: 'galactic-library-backup-v1.json' });
-  link.click();
-  URL.revokeObjectURL(url);
-  backupStatus.textContent = 'Backup downloaded.';
+document.querySelector('#export').addEventListener('click', async () => {
+  try {
+    const snapshot = await getDatabase();
+    const blob = new Blob([JSON.stringify(createBackup(snapshot), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = Object.assign(document.createElement('a'), { href: url, download: 'galactic-library-backup-v1.json' });
+    link.click();
+    URL.revokeObjectURL(url);
+    backupStatus.textContent = 'Backup downloaded.';
+  } catch (error) {
+    backupStatus.textContent = `Export failed: ${error.message}`;
+  }
 });
 
 document.querySelector('#import').addEventListener('change', async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
-    await saveDatabase(parseBackup(JSON.parse(await file.text())));
+    await restoreDatabase(parseBackup(JSON.parse(await file.text())));
     await refresh();
     backupStatus.textContent = 'Backup restored.';
   } catch (error) {
@@ -768,9 +773,13 @@ document.querySelector('#import').addEventListener('change', async (event) => {
 
 document.querySelector('#clear').addEventListener('click', async () => {
   if (!confirm('Clear every locally stored provider record, match, and setting?')) return;
-  await clearDatabase();
-  await refresh();
-  backupStatus.textContent = 'Local library cleared.';
+  try {
+    await clearDatabase();
+    await refresh();
+    backupStatus.textContent = 'Local library cleared.';
+  } catch (error) {
+    backupStatus.textContent = `Clear failed: ${error.message}`;
+  }
 });
 downloadComixologyListButton.addEventListener('click', () => {
   const blob = new Blob([comixologyReviewMarkdown(database.providerItems, 'Current Galactic Library')], { type: 'text/markdown' });
@@ -820,8 +829,7 @@ document.querySelector('#add-companion-extension-id').addEventListener('click', 
     return;
   }
   try {
-    const ids = await getAllowedExternalClientIds();
-    await saveAllowedExternalClientIds([...ids, id]);
+    await addAllowedExternalClientId(id);
     await renderCompanionExtensionLinks();
   } catch (error) {
     companionExtensionLinkStatus.textContent = `Could not save the allowed extension: ${error.message}`;
@@ -841,7 +849,7 @@ showEnrichmentActions.addEventListener('change', async () => {
   const checked = showEnrichmentActions.checked;
   render();
   try {
-    await chrome.storage.local.set({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: checked });
+    await saveShowEnrichmentActions(checked);
   } catch (error) {
     showEnrichmentActions.checked = !checked;
     render();

@@ -1,0 +1,26 @@
+export const STORAGE_MESSAGE_TYPE = 'LIBRARY_STORAGE_OPERATION';
+
+export const STORAGE_OPERATIONS = Object.freeze([
+  'getDatabase',
+  'restoreDatabase',
+  'replaceProviderItems',
+  'mergeProviderItems',
+  'clearDatabase',
+  'getGoogleBooksApiKey',
+  'saveGoogleBooksApiKey',
+  'getGoogleBooksEnrichmentJob',
+  'saveGoogleBooksEnrichmentJob',
+  'clearGoogleBooksEnrichmentJob',
+  'startGoogleBooksEnrichmentJob',
+  'getAllowedExternalClientIds',
+  'saveAllowedExternalClientIds',
+  'addAllowedExternalClientId',
+  'saveManualMatchDecision',
+  'removeManualMatchDecision',
+  'saveOpenLibraryEnrichment',
+  'saveGoogleBooksEnrichments',
+  'saveGoogleBooksGenreHints',
+  'saveKindleComicContents',
+  'getShowEnrichmentActions',
+  'saveShowEnrichmentActions',
+]);

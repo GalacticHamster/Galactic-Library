@@ -3,7 +3,12 @@ import { handleExternalApiRequest } from '../lib/external-api.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
-import { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } from '../lib/storage.js';
+import { createStorageWriter } from './storage-writer.js';
+import { createStorageMessageHandler } from './storage-messages.js';
+
+const storageWriter = createStorageWriter(chrome.storage.local);
+const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
+chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});

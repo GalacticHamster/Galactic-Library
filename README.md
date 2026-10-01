@@ -72,9 +72,19 @@ On the signed-in Kindle library page, **Find contained issues** visits only unsc
 
 Graphic-novel issue contents are normally product-page metadata rather than library/purchase metadata. The Kindle importer deliberately does not issue a request for every product page during sync; that would be slow and fragile for a large library. A later, user-initiated enrichment step can inspect a selected product page and record a verified contents list.
 
+## Storage operation ordering
+
+One writer in the service worker handles every persistent library mutation: full and quick imports, Open Library and Google Books enrichment, genre hints, Kindle comic contents, review decisions, backup restore, and clear. Library pages and the popup submit typed requests through [Chrome extension messaging](https://developer.chrome.com/docs/extensions/develop/concepts/messaging); provider imports use their existing validated messages and enter the same queue. Settings and enrichment-job saves also use this writer so they are ordered with clear. There is no direct database write from an extension page.
+
+Requests run in the order the service worker admits them. Each operation reads the latest committed state inside its turn and finishes its storage write before the next operation begins or success is reported. Reads share the queue, and backup export requests a fresh snapshot. Provider fetching and external metadata searches happen outside the queue; their results enter it when they are ready to save, rather than when the scan or search started.
+
+A full import replaces only that provider's records and preserves local enrichment for retained record IDs; a quick import merges into the latest records. Concurrent imports from different providers retain both providers. Review decisions and enrichment update the latest database. For competing updates to the same field or decision, the later accepted operation wins. Restore replaces the whole database and clear removes library data and settings at their positions in the queue; requests accepted afterward apply to the restored or cleared state. For example, import → clear leaves an empty library, while clear → import saves the later import. Clear and restore do not cancel a provider scan still fetching data; its eventual save follows the same ordering rule.
+
+Invalid operations and failed storage writes return an error and leave the queue available for later requests. An enrichment or review save whose target records were cleared or removed fails validation instead of restoring a stale database copy. The writer reloads persisted storage for each operation, including after a service-worker restart. Clients propagate message failures and do not automatically retry an operation whose acknowledgement was lost.
+
 ## Development
 
-Run the deterministic core tests:
+Run the deterministic core and concurrency tests (including the real service-worker message handlers with delayed, copied storage values):
 
 ```powershell
 npm test
