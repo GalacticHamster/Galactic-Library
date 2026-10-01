@@ -1,5 +1,6 @@
 import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } from './constants.js';
 import { normalizeGameTitle } from './normalization.js';
+import { identityConflicts, identityEvidence, sameEditionEvidence } from './identity.js';
 
 export function createEmptyDatabase() {
   return {
@@ -36,6 +37,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
 
   return {
     id: providerItemKey(provider, providerItemId),
+    recordRef: /^[a-f0-9-]{36}$/iu.test(value.recordRef ?? '') ? value.recordRef : crypto.randomUUID(),
     provider,
     providerItemId,
     title,
@@ -51,9 +53,11 @@ export function normalizeProviderItem(value, now = new Date().toISOString()) {
   };
 }
 
-export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}) {
+export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, previousCanonicalItems = {}) {
   const records = Object.values(providerItems).filter((item) => item.mediaType !== 'game-addon');
   const parent = new Map(records.map((item) => [item.id, item.id]));
+  const members = new Map(records.map((item) => [item.id, [item]]));
+  const prohibited = new Set(Object.values(manualMatchDecisions).filter((decision) => decision.decision === 'different').map((decision) => [...(decision.itemIds ?? [])].sort().join('\u0000')));
   const find = (id) => {
     const current = parent.get(id);
     if (current === id) return id;
@@ -64,20 +68,29 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}) 
   const join = (left, right) => {
     const leftRoot = find(left);
     const rightRoot = find(right);
-    if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot);
+    if (leftRoot === rightRoot) return;
+    const leftGroup = members.get(leftRoot); const rightGroup = members.get(rightRoot);
+    if (leftGroup.some((a) => rightGroup.some((b) => identityConflicts(a, b).length || prohibited.has([a.id, b.id].sort().join('\u0000'))))) return;
+    parent.set(rightRoot, leftRoot);
+    members.set(leftRoot, [...leftGroup, ...rightGroup]); members.delete(rightRoot);
   };
   const exactGroups = new Map();
   for (const item of records) {
-    const key = canonicalItemKey(item.mediaType, item.normalizedTitle);
-    const group = exactGroups.get(key) ?? [];
-    group.push(item);
-    exactGroups.set(key, group);
+    const identity = identityEvidence(item);
+    const keys = [`title:${item.normalizedTitle}`, ...identity.isbn.map((isbn) => `isbn:${isbn}`), ...(identity.asin ? [`asin:${identity.asin}`] : [])];
+    for (const signal of keys) {
+      const key = `${item.mediaType}:${signal}`;
+      const group = exactGroups.get(key) ?? [];
+      group.push(item); exactGroups.set(key, group);
+    }
   }
   for (const group of exactGroups.values()) {
-    for (const item of group.slice(1)) join(group[0].id, item.id);
+    for (let index = 0; index < group.length; index += 1) {
+      for (const item of group.slice(index + 1)) if (sameEditionEvidence(group[index], item)) join(group[index].id, item.id);
+    }
   }
   for (const decision of Object.values(manualMatchDecisions)) {
-    if (decision?.decision !== 'same' || !Array.isArray(decision.itemIds) || decision.itemIds.length !== 2) continue;
+    if (decision?.decision !== 'same-edition' || !Array.isArray(decision.itemIds) || decision.itemIds.length !== 2) continue;
     const [left, right] = decision.itemIds;
     const leftItem = providerItems[left];
     const rightItem = providerItems[right];
@@ -91,10 +104,17 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}) 
     existing.push(item);
     grouped.set(key, existing);
   }
+  const usedIds = new Set();
+  const previousByRecord = new Map();
+  for (const entry of Object.values(previousCanonicalItems ?? {})) {
+    if (/^edition:/u.test(entry.id)) for (const itemId of entry.providerItemIds ?? []) previousByRecord.set(itemId, entry);
+  }
   return Object.fromEntries([...grouped.values()].map((items) => {
     const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
     const normalizedTitles = ordered.map((item) => item.normalizedTitle).sort();
-    const id = canonicalItemKey(ordered[0].mediaType, normalizedTitles[0]);
+    const previous = ordered.map((item) => previousByRecord.get(item.id)).find((entry) => entry && !usedIds.has(entry.id));
+    const id = previous?.id ?? `edition:${ordered[0].recordRef}`;
+    usedIds.add(id);
     return [id, {
       id,
       mediaType: ordered[0].mediaType,
@@ -110,7 +130,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}) 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (value.schemaVersion !== DATABASE_SCHEMA_VERSION) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   const providerItems = Object.fromEntries(Object.values(value.providerItems).map((item) => {
     const normalized = normalizeProviderItem(item, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
@@ -122,7 +142,7 @@ export function validateDatabase(value) {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers,
     providerItems,
-    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions),
+    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems),
     manualMatchDecisions
   };
 }

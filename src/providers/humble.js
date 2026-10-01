@@ -129,7 +129,7 @@
         mediaType,
         ownership: 'owned',
         acquiredAt,
-        metadata: { ...baseMetadata, entitlement: 'direct-download' }
+        metadata: { ...baseMetadata, ...(global.GalacticProviderMetadata?.extract(product) ?? {}), entitlement: 'direct-download' }
       }];
     });
     const thirdPartyItems = thirdPartyKeyRecords(detail).flatMap((record, index) => {

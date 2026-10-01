@@ -34,7 +34,7 @@ export function normalizeGameTitle(value) {
     .replace(/\bvolume\b/giu, 'vol')
     .replace(/\b(?:the|a|an)\s+/u, '')
     .replace(/\b(i|ii|iii|iv|v|vi|vii|viii|ix|x)\b/gu, (match) => ROMAN_NUMERALS.get(match) ?? match)
-    .replace(/[^a-z0-9]+/gu, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
 

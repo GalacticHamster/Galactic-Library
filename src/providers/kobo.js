@@ -54,6 +54,7 @@
       mediaType,
       ownership: 'owned',
       metadata: {
+        ...(global.GalacticProviderMetadata?.extract(card) ?? {}),
         source: 'kobo-my-books-library',
         detailUrl,
         imageUrl: absoluteUrl(card?.imageUrl),

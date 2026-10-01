@@ -11,7 +11,9 @@ import { openLibraryCandidatesFromSearch, openLibraryEnrichment, openLibrarySear
 import { compareTitles } from '../src/lib/title-sort.js';
 import { storageTests, snapshotFixture } from './storage.js';
 import { providerSnapshotTests } from './provider-snapshots.js';
+import { relationshipTests } from './relationships.js';
 
+await import('../src/providers/metadata.js');
 await import('../src/providers/steam-store.js');
 await import('../src/providers/gog.js');
 await import('../src/providers/epic.js');
@@ -210,8 +212,8 @@ const tests = [
     const audiobook = normalizeProviderItem({ provider: 'audible', providerItemId: 'B08G9PRS1K', title: 'Project Hail Mary', mediaType: 'audiobook', ownership: 'unknown' });
     const game = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Project Hail Mary' });
     const canonical = rebuildCanonicalItems({ [audiobook.id]: audiobook, [game.id]: game });
-    assert.ok(canonical['audiobook:project hail mary']);
-    assert.ok(canonical['game:project hail mary']);
+    assert.ok(Object.values(canonical).some(item => item.mediaType === 'audiobook' && item.normalizedTitle === 'project hail mary'));
+    assert.ok(Object.values(canonical).some(item => item.mediaType === 'game' && item.normalizedTitle === 'project hail mary'));
   }],
   ['keeps Kindle books and their available Content Library metadata', () => {
     assert.deepEqual(newKindleItems([{ providerItemId: 'B000000001' }, { providerItemId: 'B000000002' }], ['B000000001']).map((item) => item.providerItemId), ['B000000002']);
@@ -238,13 +240,13 @@ const tests = [
     }, 'https://www.amazon.com'), [{
       providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book', ownership: 'owned', acquiredAt: '2024-01-01T00:00:00.000Z',
       metadata: {
-        source: 'amazon-kindle-content-library', detailUrl: 'https://www.amazon.com/dp/B012345678', libraryCategory: 'books',
+        asin: 'B012345678', source: 'amazon-kindle-content-library', detailUrl: 'https://www.amazon.com/dp/B012345678', libraryCategory: 'books',
         authors: ['Neil Gaiman'], series: ['The Sandman'], collections: ['Comics'], originType: 'Purchase',
         contentType: 'Ebook', itemStatus: 'Active', publisher: 'DC Comics', publicationDate: '2024-01-15', format: 'KFX'
       }
     }]);
     const book = normalizeProviderItem({ provider: 'kindle', providerItemId: 'B012345678', title: 'Sandman & More', mediaType: 'book' });
-    assert.ok(rebuildCanonicalItems({ [book.id]: book })['book:sandman and more']);
+    assert.ok(Object.values(rebuildCanonicalItems({ [book.id]: book })).some(item => item.mediaType === 'book' && item.normalizedTitle === 'sandman and more'));
   }],
   ['keeps a user-selected Open Library work and subjects as attributed enrichment', () => {
     const url = new URL(openLibrarySearchUrl({ title: 'Watchmen', authors: ['Alan Moore'] }));
@@ -312,7 +314,7 @@ const tests = [
       }
     });
     const movie = normalizeProviderItem({ provider: 'amazon-video', providerItemId: 'B012345678', title: 'Arrival', mediaType: 'movie' });
-    assert.ok(rebuildCanonicalItems({ [movie.id]: movie })['movie:arrival']);
+    assert.ok(Object.values(rebuildCanonicalItems({ [movie.id]: movie })).some(item => item.mediaType === 'movie' && item.normalizedTitle === 'arrival'));
   }],
   ['keeps Fandango at Home movie and TV library identities', () => {
     assert.equal(contentIdFromValue('https://athome.fandango.com/content/detail/ABCD-1234?ref=library'), 'ABCD-1234');
@@ -366,7 +368,7 @@ const tests = [
       { providerItemId: 'known-book' }, { providerItemId: 'NEW-BOOK' }, { providerItemId: 'another-book' }
     ], ['Known-Book', 'another-book']).map((item) => item.providerItemId), ['NEW-BOOK']);
     const audiobook = normalizeProviderItem({ provider: 'kobo', providerItemId: 'audio-1', title: 'Kobo Audio', mediaType: 'audiobook' });
-    assert.ok(rebuildCanonicalItems({ [audiobook.id]: audiobook })['audiobook:kobo audio']);
+    assert.ok(Object.values(rebuildCanonicalItems({ [audiobook.id]: audiobook })).some(item => item.mediaType === 'audiobook' && item.normalizedTitle === 'kobo audio'));
   }],
   ['keeps Fanatical game, book, and audiobook order items without order secrets', () => {
     assert.equal(fanaticalMediaType('comic'), 'book');
@@ -455,7 +457,7 @@ const tests = [
     assert.equal(boysCandidate.confidence, 0.98);
     assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 4);
     const decisions = { [boysCandidate.id]: { decision: 'same', itemIds: boysCandidate.itemIds } };
-    assert.equal(Object.keys(rebuildCanonicalItems(providerItems, decisions)).length, 3);
+    assert.equal(Object.keys(rebuildCanonicalItems(providerItems, decisions)).length, 4); // Same work is a relationship, not edition identity.
   }],
   ['serves only narrow, validated external ownership results', () => {
     const steam = normalizeProviderItem({ provider: 'steam', providerItemId: '123', title: 'Deathloop', ownership: 'owned' });
@@ -471,7 +473,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests]) {
+for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests, ...relationshipTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -482,4 +484,4 @@ for (const [name, run] of [...tests, ...storageTests, ...providerSnapshotTests])
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length} tests passed.`);
+else console.log(`\n${tests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length} tests passed.`);

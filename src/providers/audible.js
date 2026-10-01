@@ -39,6 +39,7 @@
       mediaType: 'audiobook',
       ownership: entry?.ownership === 'subscription' ? 'subscription' : 'unknown',
       metadata: {
+        ...(global.GalacticProviderMetadata?.extract(entry) ?? {}),
         source: 'audible-library-page',
         detailUrl,
         authors: Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : [],

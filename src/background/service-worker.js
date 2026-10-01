@@ -1,5 +1,6 @@
 import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
+import '../providers/metadata.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
@@ -122,6 +123,11 @@ async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerpri
             sourceItemId, title, mediaType: kind,
             slug: text(leaf?.slug, 300),
             externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
+            bibliographic: {
+              authors: list((Array.isArray(leaf?.authors) ? leaf.authors : [leaf?.author]).map((author) => typeof author === 'object' ? text(author?.name) : text(author))),
+              publisher: text(leaf?.publisher), language: text(leaf?.language, 80), series: list(Array.isArray(leaf?.series) ? leaf.series : [leaf?.series]),
+              edition: text(leaf?.edition, 100), volume: text(leaf?.volume, 40), issue: text(leaf?.issue, 40)
+            },
             drm: list(Object.entries(leaf?.drm && typeof leaf.drm === 'object' ? leaf.drm : {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
             platforms: list(Object.entries(leaf?.platforms ?? leaf?.os ?? {}).filter(([, enabled]) => enabled === true).map(([name]) => name)),
             formats: list((Array.isArray(leaf?.downloads) ? leaf.downloads : []).flatMap((download) => (Array.isArray(download?.files) ? download.files : []).map((file) => text(file?.format, 32).toLocaleLowerCase()))),
@@ -153,6 +159,7 @@ function sanitizeFanaticalProjection(value) {
     items.push({
       sourceItemId, title, mediaType, slug: safeText(candidate?.slug),
       externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
+      bibliographic: globalThis.GalacticProviderMetadata.extract(candidate?.bibliographic),
       drm: safeList(candidate?.drm), platforms: safeList(candidate?.platforms), formats: safeList(candidate?.formats),
       bundle: { sourceItemId: /^[a-zA-Z0-9_-]{6,128}$/u.test(String(candidate?.bundle?.sourceItemId ?? '')) ? String(candidate.bundle.sourceItemId) : '', title: safeText(candidate?.bundle?.title, 500), slug: safeText(candidate?.bundle?.slug) },
       purchaseDate: typeof candidate?.purchaseDate === 'string' && !Number.isNaN(Date.parse(candidate.purchaseDate)) ? candidate.purchaseDate : null

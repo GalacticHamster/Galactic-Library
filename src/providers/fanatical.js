@@ -36,6 +36,7 @@
         platform: safeList(source?.platforms),
         acquiredAt: typeof source?.purchaseDate === 'string' && !Number.isNaN(Date.parse(source.purchaseDate)) ? source.purchaseDate : null,
         metadata: {
+          ...(global.GalacticProviderMetadata?.extract(source?.bibliographic) ?? {}),
           source: 'fanatical-order-history',
           bundleId: compactText(source?.bundle?.sourceItemId),
           bundleTitle: compactText(source?.bundle?.title),

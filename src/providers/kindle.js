@@ -80,6 +80,7 @@
       ownership: ownershipFromOriginType(originType),
       acquiredAt: acquiredAtFromValue(item?.acquiredDate ?? item?.acquisitionDate ?? item?.dateAcquired ?? item?.purchaseDate),
       metadata: {
+        ...(global.GalacticProviderMetadata?.extract(item) ?? {}),
         source: 'amazon-kindle-content-library',
         detailUrl: libraryCategory === 'books' ? `${origin}/dp/${encodeURIComponent(providerItemId)}` : '',
         libraryCategory,

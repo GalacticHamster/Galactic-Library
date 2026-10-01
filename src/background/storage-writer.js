@@ -13,7 +13,22 @@ import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 export function createStorageWriter(storageArea) {
   async function getDatabase() {
     const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
-    return stored[DATABASE_STORAGE_KEY] ? validateDatabase(stored[DATABASE_STORAGE_KEY]) : createEmptyDatabase();
+    if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
+    const database = validateDatabase(stored[DATABASE_STORAGE_KEY]);
+    if (stored[DATABASE_STORAGE_KEY].schemaVersion !== database.schemaVersion) {
+      const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
+      const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
+      const migrated = {[DATABASE_STORAGE_KEY]: database};
+      if (Array.isArray(job?.queue)) {
+        const byRecord = new Map(Object.values(database.canonicalItems).flatMap((entry) => entry.providerItemIds.map((id) => [id, entry.id])));
+        migrated[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY] = {...job, queue: job.queue.map((id) => {
+          const previous = stored[DATABASE_STORAGE_KEY].canonicalItems?.[id];
+          return previous?.providerItemIds?.map((itemId) => byRecord.get(itemId)).find(Boolean) ?? id;
+        })};
+      }
+      await storageArea.set(migrated);
+    }
+    return database;
   }
 
   async function persistDatabase(database) {
@@ -23,6 +38,7 @@ export function createStorageWriter(storageArea) {
   }
 
   function preserveEnrichment(incoming, previous) {
+    if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     const existing = previous?.metadata?.enrichment;
     if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return incoming;
     return {
@@ -57,7 +73,7 @@ export function createStorageWriter(storageArea) {
       return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
     }).length;
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     database.providers[provider] = {
       connected: true,
       itemCount: gameCount,
@@ -100,7 +116,7 @@ export function createStorageWriter(storageArea) {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
       return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId));
     }).length;
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     database.providers[provider] = {
       ...database.providers[provider],
       connected: true,
@@ -221,7 +237,7 @@ export function createStorageWriter(storageArea) {
     const itemIds = [...candidate.itemIds].sort();
     if (!itemIds.every((id) => database.providerItems[id])) throw new Error('One of the reviewed library items no longer exists.');
     database.manualMatchDecisions[candidate.id] = { decision, itemIds, updatedAt: new Date().toISOString() };
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 
@@ -246,7 +262,7 @@ export function createStorageWriter(storageArea) {
         updatedAt
       };
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 
@@ -271,7 +287,7 @@ export function createStorageWriter(storageArea) {
         };
       }
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 
@@ -297,7 +313,7 @@ export function createStorageWriter(storageArea) {
         };
       }
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 
@@ -336,14 +352,14 @@ export function createStorageWriter(storageArea) {
         updatedAt
       };
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 
   async function removeManualMatchDecision(candidateId) {
     const database = await getDatabase();
     delete database.manualMatchDecisions[candidateId];
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions);
+    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems);
     return persistDatabase(database);
   }
 

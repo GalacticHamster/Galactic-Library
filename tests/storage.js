@@ -185,7 +185,7 @@ export const storageTests = [
     assert.equal(database.providers.kindle.bookCount, 2);
     assert.equal(database.providers.steam.itemCount, 1);
     assert.equal(database.providers.gog.itemCount, 1);
-    assert.equal(Object.values(database.canonicalItems).filter((item) => item.mediaType === 'book').length, 1);
+    assert.equal(Object.values(database.canonicalItems).filter((item) => item.mediaType === 'book').length, 2);
   })],
   ['queued reads and acknowledgements respect admission order while a write is blocked', () => withWorker(async ({ memory, pageA, importItems }) => {
     const held = memory.holdNextRead();

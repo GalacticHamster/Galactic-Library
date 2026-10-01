@@ -116,3 +116,8 @@ The options page lists possible duplicates separately from automatic matches. It
 
 1. Provider sync diagnostics.
 2. An external, allow-listed `MATCH_ITEMS` API for Humble Comic Library.
+# Identity and bibliographic evidence
+
+Database schema 2 uses persistent edition IDs rather than titles as identity. Version-1 databases and backups migrate automatically; saved enrichment queues are remapped. Title changes during a provider sync preserve record and edition identity. Books with conflicting authors, languages, edition labels, or validated ISBNs stay separate. A "Same work" review records a relationship; it no longer merges distinct editions or shares edition metadata.
+
+Available source metadata is retained through a bibliographic allowlist: ISBN/ASIN, creators and contributor roles, series, volume/issue, publisher, language, edition, and format. ISBN checksums are validated and ISBN-10/13 equivalents compare consistently. Open Library's work-level ISBN lists are never treated as identifiers of the owned edition. Missing metadata remains unknown.
