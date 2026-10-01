@@ -11,10 +11,10 @@ export function enrichmentStages(records,database={}){
   const entries=records.map(record=>record.metadata?.enrichment??{});
   const approved=entry=>entry?.approved===true;
   return {
-    genre:entries.some(entry=>entry.googleBooks?.categories?.length||entry.googleBooksGenreHint?.categories?.length||entry.openLibrary?.subjects?.length),
+    genre:entries.some(entry=>entry.googleBooks?.categories?.length||entry.googleBooksGenreHint?.categories?.length||entry.openLibrary?.subjects?.length||(approved(entry.localMetadata)&&entry.localMetadata.categories?.length)),
     work:entries.some(entry=>approved(entry.openLibrary)),
     edition:entries.some(entry=>entry.googleBooks?.volumeId||approved(entry.localMetadata)),
-    creators:records.some(record=>identityEvidence(record).authors.length||record.metadata?.contributors?.length),
+    creators:records.some(record=>identityEvidence(record).authors.length||identityEvidence(record).contributors.length),
     contents:records.some(record=>database.contentReviews?.[record.id]),
     contentsLookup:entries.some(entry=>entry.kindleProductComicContents),
   };

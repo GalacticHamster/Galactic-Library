@@ -23,6 +23,7 @@ export const {
   getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
   saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
   saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
+  applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
   separateEdition, undoEditionSeparation,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
   saveContentReview, removeContentReview,

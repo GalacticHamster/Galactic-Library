@@ -1,3 +1,4 @@
+import { localEnrichmentTests } from './local-enrichment.js';
 import { enrichmentTests } from './enrichment.js';
 import { fanaticalSyncTests } from './fanatical-sync.js';
 import assert from 'node:assert/strict';
@@ -477,7 +478,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
+for (const [name, run] of [...tests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -488,4 +489,4 @@ for (const [name, run] of [...tests, ...enrichmentTests, ...fanaticalSyncTests, 
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
+else console.log(`\n${tests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);

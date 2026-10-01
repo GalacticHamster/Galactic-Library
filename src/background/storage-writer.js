@@ -5,7 +5,7 @@ import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCan
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview,proposeContents } from '../lib/contents.js';
-import { identityConflicts, identityEvidence } from '../lib/identity.js';
+import { identityConflicts, identityEvidence, editionEnrichmentConflicts } from '../lib/identity.js';
 import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 import { text } from '../lib/validation.js';
 import {needsGoogleBooksEnrichment} from '../lib/enrichment.js';
@@ -355,12 +355,51 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     database.enrichmentReviews[ref]=entry;return persistDatabase(database);
   }
   async function dismissEnrichmentReview(ref){const database=await getDatabase();delete database.enrichmentReviews[ref];return persistDatabase(database);}
+  async function applyReviewedEnrichments(selections){
+    if(!Array.isArray(selections)||!selections.length||selections.length>50)throw new Error('Review 1–50 selections at a time.');
+    const database=await getDatabase();const byRef=new Map(Object.values(database.providerItems).map(item=>[item.recordRef,item]));const selected=[];
+    for(const selection of selections){
+      if(selection.confirmed!==true)throw new Error('Confirm each selected source before applying it.');
+      const review=database.enrichmentReviews[selection.reviewId];const candidate=Number.isInteger(selection.candidateIndex)&&review?.candidates[selection.candidateIndex];
+      const records=review?.recordRefs.map(ref=>byRef.get(ref));
+      if(!candidate||!records?.length||records.some(record=>!record||record.mediaType!=='book'))throw new Error('A selected review no longer belongs to the active library.');
+      if(review.source!=='openLibrary'){
+        const conflicts=records.flatMap(record=>editionEnrichmentConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate}));
+        if(conflicts.length)throw new Error(`Review conflicting ${[...new Set(conflicts)].join(', ')} evidence before selecting this edition.`);
+      }
+      selected.push({records,kind:review.source,value:{...candidate,approved:true,matchBasis:review.source==='openLibrary'?'user-selected-work':'user-selected-edition'}});
+    }
+    const editionSelections=selected.filter(entry=>entry.kind!=='openLibrary');
+    for(let i=0;i<editionSelections.length;i++)for(let j=i+1;j<editionSelections.length;j++){
+      const left=editionSelections[i],right=editionSelections[j];
+      if(!left.records.some(record=>right.records.some(other=>other.recordRef===record.recordRef)))continue;
+      if(left.kind===right.kind)throw new Error('Select only one candidate per source and record.');
+      const conflicts=identityConflicts({title:[left.value.title,left.value.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:left.value},{title:[right.value.title,right.value.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:right.value});
+      if(conflicts.length)throw new Error(`Selected sources conflict on ${conflicts.join(', ')}. Review them separately.`);
+    }
+    const now=new Date().toISOString();for(const {records,kind,value}of selected)for(const record of records)selectEnrichment(database,record.id,kind,value,now);
+    database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);return persistDatabase(database);
+  }
   async function undoEnrichmentSelection(ref){
-    const database=await getDatabase();const change=database.enrichmentHistory[ref];
-    const item=change&&Object.values(database.providerItems).find(item=>item.recordRef===change.recordRef);
-    if(!item||item.metadata.enrichment?.[change.kind]?.selectionRef!==change.selectionRef)throw new Error('This selection is no longer current; a newer selection or profile replaced it.');
-    if(change.previous===null)delete item.metadata.enrichment[change.kind];else item.metadata.enrichment[change.kind]=change.previous;
-    delete database.enrichmentHistory[ref];database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);return persistDatabase(database);
+    return undoEnrichmentSelections([ref]);
+  }
+  async function dismissEnrichmentReviews(refs){
+    if(!Array.isArray(refs)||!refs.length||refs.length>50)throw new Error('Select 1–50 reviews.');
+    const database=await getDatabase();for(const ref of refs)delete database.enrichmentReviews[ref];return persistDatabase(database);
+  }
+  async function undoEnrichmentSelections(refs){
+    if(!Array.isArray(refs)||!refs.length||refs.length>50||new Set(refs).size!==refs.length)throw new Error('Select 1–50 distinct current selections.');
+    const database=await getDatabase();const records=new Map(Object.values(database.providerItems).map(item=>[item.recordRef,item]));
+    const changes=refs.map(ref=>{
+      const change=database.enrichmentHistory[ref],item=change&&records.get(change.recordRef);
+      if(!item||item.metadata.enrichment?.[change.kind]?.selectionRef!==change.selectionRef)throw new Error('This selection is no longer current; a newer selection or profile replaced it.');
+      return {ref,change,item};
+    });
+    for(const {ref,change,item}of changes){
+      if(change.previous===null)delete item.metadata.enrichment[change.kind];else item.metadata.enrichment[change.kind]=change.previous;
+      delete database.enrichmentHistory[ref];
+    }
+    database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);return persistDatabase(database);
   }
   async function saveOpenLibraryEnrichment(itemIds, enrichment, recordRefs) {
     if (!Array.isArray(itemIds) || !itemIds.length || !enrichment || enrichment.source !== 'open-library') {
@@ -390,6 +429,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       verifyRecordRefs(database,ids,entry.recordRefs);
       if (!ids.length || !entry?.enrichment || entry.enrichment.source !== 'google-books' || !ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
         throw new Error('Invalid Google Books enrichment.');
+      }
+      if(entry.enrichment.approved===true){
+        const candidate={title:[entry.enrichment.title,entry.enrichment.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:entry.enrichment};
+        const conflicts=[...new Set(ids.flatMap(id=>editionEnrichmentConflicts(database.providerItems[id],candidate)))];
+        if(conflicts.length)throw new Error(`Review conflicting ${conflicts.join(', ')} evidence before selecting this edition.`);
       }
       for (const id of ids) {
         const item = database.providerItems[id];
@@ -498,7 +542,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
-    saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
+    saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
     separateEdition, undoEditionSeparation,

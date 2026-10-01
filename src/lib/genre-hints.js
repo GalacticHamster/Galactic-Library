@@ -49,7 +49,8 @@ function catalogueComicMangaHints(record) {
   const sources = [
     ['open-library-subject', record.metadata?.enrichment?.openLibrary?.subjects],
     ['google-books-category', record.metadata?.enrichment?.googleBooks?.categories],
-    ['google-books-genre-hint', record.metadata?.enrichment?.googleBooksGenreHint?.categories]
+    ['google-books-genre-hint', record.metadata?.enrichment?.googleBooksGenreHint?.categories],
+    ['approved-local-metadata',record.metadata?.enrichment?.localMetadata?.approved?record.metadata.enrichment.localMetadata.categories:[]]
   ];
   return sources.flatMap(([source, values]) => distinctText(values)
     .filter((value) => /\b(?:comic(?:s| books?)?|manga|graphic novels?)\b/iu.test(value))
@@ -87,6 +88,7 @@ export function libraryGenreSubjectValues(record) {
     record?.metadata?.enrichment?.openLibrary?.subjects,
     record?.metadata?.enrichment?.googleBooks?.categories,
     record?.metadata?.enrichment?.googleBooksGenreHint?.categories,
+    record?.metadata?.enrichment?.localMetadata?.approved?record.metadata.enrichment.localMetadata.categories:[],
     comicMangaEvidence(record).map((hint) => hint.category)
   ]);
 }

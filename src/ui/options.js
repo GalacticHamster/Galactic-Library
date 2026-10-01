@@ -2,6 +2,9 @@ import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '..
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
+import {createLocalMetadataTools} from './local-metadata-tools.js';
+import {createEnrichmentWorkbench} from './enrichment-workbench.js';
+import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
@@ -15,7 +18,7 @@ import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
-import { identityEvidence, identityConflicts } from '../lib/identity.js';
+import { identityEvidence, identityConflicts, editionEnrichmentConflicts } from '../lib/identity.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -57,6 +60,26 @@ const openLibrarySearches = new Map();
 const googleBooksSearches = new Map();
 let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
+let enrichmentWorkbench;
+
+async function retryEnrichmentReview(review){
+  const byRef=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));
+  const records=review.recordRefs.map(ref=>byRef.get(ref));if(records.some(record=>!record))throw new Error('These records are no longer current.');
+  const query=enrichmentQuery({title:records[0].title},records);let candidates=[],status='failed',reason='';
+  try{
+    const response=await chrome.runtime.sendMessage({type:review.source==='openLibrary'?'SEARCH_OPEN_LIBRARY':'SEARCH_GOOGLE_BOOKS',query});
+    if(!response?.ok)throw new Error(response?.error||'Lookup unavailable.');
+    candidates=(response.candidates??[]).map(candidate=>({...((review.source==='openLibrary'?openLibraryEnrichment:googleBooksEnrichment)(candidate)),approved:false}));
+    status=candidates.length?'candidates':'no-results';reason='Retried lookup; confirm the source before applying.';
+  }catch(error){reason=error.message;}
+  database=await saveEnrichmentReview({...review,candidates,status,reason});
+}
+
+function inspectEnrichmentRecords(refs){
+  search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
+  const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').some(ref=>refs.includes(ref)));
+  if(card){card.tabIndex=-1;card.scrollIntoView({block:'center'});card.focus();for(const details of card.querySelectorAll('details'))details.open=true;}
+}
 
 function displayProviderName(provider) {
   if (provider === 'gog') return 'GOG';
@@ -304,8 +327,10 @@ async function searchOpenLibrary(canonicalItem, records) {
     });
     if (!response?.ok) throw new Error(response?.error ?? 'Open Library search did not complete.');
     openLibrarySearches.set(canonicalItem.id, { loading: false, error: '', candidates: response.candidates ?? [] });
+    database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'openLibrary',status:response.candidates?.length?'candidates':'no-results',title:canonicalItem.title,reason:'Work discovery; a work does not establish an edition or its contents.',candidates:(response.candidates??[]).map(candidate=>({...openLibraryEnrichment(candidate),approved:false}))});
   } catch (error) {
     openLibrarySearches.set(canonicalItem.id, { loading: false, error: error.message, candidates: [] });
+    database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'openLibrary',status:'failed',title:canonicalItem.title,reason:'Open Library lookup failed. Retry from the enrichment workbench.',candidates:[]});
   }
   render();
 }
@@ -375,7 +400,7 @@ function createGoogleBooksTools(canonical,records){
   const search=reviewButton('Find Google Books candidates','google-books-search',async()=>{
     googleBooksSearches.set(canonical.id,{loading:true,candidates:[]});render();
     try{const response=await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query:bibliographicQuery(canonical,records)});if(!response?.ok)throw new Error(response?.error??'Search unavailable.');googleBooksSearches.set(canonical.id,{loading:false,candidates:response.candidates??[]});database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'googleBooks',status:response.candidates?.length?'candidates':'no-results',title:canonical.title,reason:'Manual candidate discovery; confirm an edition before applying.',candidates:(response.candidates??[]).map(candidate=>googleBooksEnrichment(candidate))});}
-    catch(error){googleBooksSearches.set(canonical.id,{loading:false,candidates:[],error:error.message});}render();
+    catch(error){googleBooksSearches.set(canonical.id,{loading:false,candidates:[],error:error.message});database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'googleBooks',status:'failed',title:canonical.title,reason:'Google Books lookup failed. Retry from the enrichment workbench.',candidates:[]});}render();
   });
   const pending=Object.values(database.enrichmentReviews).find(entry=>entry.source==='googleBooks'&&entry.recordRefs.some(ref=>records.some(record=>record.recordRef===ref)));
   const state=googleBooksSearches.get(canonical.id)??(pending?{loading:false,candidates:pending.candidates,error:pending.status==='failed'?pending.reason:''}:null);search.disabled=Boolean(state?.loading);container.append(search);
@@ -383,7 +408,7 @@ function createGoogleBooksTools(canonical,records){
   if(state&&!state.loading&&!state.candidates.length&&!state.error)container.append(textElement('p','No results. Try another source or add identifiers through local metadata.'));
   for(const candidate of state?.candidates??[]){
     const row=document.createElement('div');row.append(textElement('p',[candidate.title,candidate.subtitle,candidate.authors?.join(', '),candidate.publisher,candidate.language,candidate.isbn?.join(', ')].filter(Boolean).join(' · ')));
-    const conflicts=records.flatMap(record=>identityConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate})).filter(key=>key!=='authors');
+    const conflicts=records.flatMap(record=>editionEnrichmentConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate}));
     if(conflicts.length){row.append(textElement('p',`Edition conflicts: ${[...new Set(conflicts)].join(', ')}. Review the source; this candidate cannot supply this edition's metadata.`));container.append(row);continue;}
     const label=document.createElement('label');const confirm=document.createElement('input');confirm.type='checkbox';label.append(confirm,' I checked the source and this is the edition in my library.');
     const apply=reviewButton('Apply edition metadata','google-books-apply',async()=>{
@@ -580,6 +605,15 @@ async function runGoogleBooksEnrichment() {
 }
 
 function render() {
+  if(!enrichmentWorkbench){
+    enrichmentWorkbench=createEnrichmentWorkbench({
+      apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},
+      dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},
+      undo:async refs=>{database=await undoEnrichmentSelections(refs);},
+      retry:retryEnrichmentReview,inspect:inspectEnrichmentRecords,refresh:render
+    });document.querySelector('.tool-cards').after(enrichmentWorkbench.element);
+  }
+  enrichmentWorkbench.update(database);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));
@@ -668,6 +702,7 @@ function render() {
   items.replaceChildren(...canonical.map((canonicalItem) => {
     const node = document.createElement('li');
     const records = canonicalItem.providerItemIds.map((id) => database.providerItems[id]);
+    node.dataset.recordRefs=JSON.stringify(records.map(record=>record.recordRef));
     const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
     node.className = 'library-item';
     const header = document.createElement('div');
@@ -706,6 +741,7 @@ function render() {
     if (canonicalItem.mediaType === 'book') {
       node.append(createGoogleBooksTools(canonicalItem,records));
       node.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
+      node.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;backupStatus.textContent='Metadata lookup saved in the enrichment workbench for review.';}}));
       const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
       if (openLibraryTools) node.append(openLibraryTools);
     }

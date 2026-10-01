@@ -11,7 +11,7 @@ export function createContentsEditor(record, review, actions) {
   const populate=()=>{
   root.append(element('p','Confirm the actual contents of this edition. Excerpts do not count as owning a full issue or volume. Include the series/run and language to establish complete coverage.'));
   const statement=document.createElement('textarea');statement.value=review?.statement||contentsStatement(record);statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
-  const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
+  const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   root.append(element('label','Original contents statement'),statement,element('label','Evidence source'),source);
   const status=element('p','');status.setAttribute('role','status');
   const table=document.createElement('table');const head=document.createElement('thead');const heading=document.createElement('tr');

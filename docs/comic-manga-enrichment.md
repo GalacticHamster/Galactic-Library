@@ -1,6 +1,6 @@
 # Comic/manga enrichment
 
-Database schema 5 retains candidate reviews and source-selection history in backups. Earlier schemas remain readable. Provider data stays intact; enrichment is separate source evidence.
+Database schema 6 retains candidate reviews, source-selection history and reviewed local/source metadata in backups. Schemas 1–5 remain readable; backup format is still version 1. Provider data stays intact; enrichment is separate source evidence.
 
 Google Books automatic selection requires one unambiguous candidate, compatible identifiers and edition evidence, and a validated ISBN or matching title and author. Numbered volumes cannot automatically use another volume or an unnumbered series; substantive parenthetical numbers and qualifiers are retained. Multiple plausible results require review, even when title and author agree.
 
@@ -15,3 +15,32 @@ Each source selection records its source identity/URL, retrieval date, match bas
 Automated lookups checkpoint up to five outcomes with one database write and one UI refresh per batch. The same write stores progress and source selections, so a failed write does not advance the cursor. A worker-owned two-minute lease prevents competing options pages from running or resetting an active job. Heartbeats renew it while scanning; a closed page can be resumed after expiration. Clear and restore invalidate the job. Each checkpoint also checks the current record references, titles and source observation dates, and skips records changed during the lookup. Public enrichment requests are serialized, spaced by at least 1.2 seconds, and time out after 20 seconds.
 
 Kindle contents extraction preserves abbreviations such as `Vol. One` and `J.M.S.`. Results distinguish a found statement, no statement, an unavailable product page, and a temporary failure. Statements additionally carry parsed/unparsed status; parsing is a proposal, not verified ownership coverage. Temporary failures remain eligible for retry and store only a safe failure category. CAPTCHA/sign-in responses are failures rather than empty contents. Persistent record references bind these results to the original library/profile record.
+
+## Local and identifier sources (GL-25)
+
+Expand **Local metadata and publisher evidence** on a book. Import `ComicInfo.xml`, an EPUB, or extracted OPF metadata. Files stay local. The adapter retains title, writers, contributor roles, series/run/unit, language, publisher, ISBN and an explicit contents statement where available. XML DTDs/entities are rejected. EPUB import reads the ZIP directory, container and package metadata rather than loading chapters or images; directories, compressed/uncompressed metadata, paths and checksums are bounded and checked. Encrypted, multi-disk and ZIP64 archives are unsupported. Browsers without raw-deflate decompression can import extracted OPF instead.
+
+ComicInfo `Volume` describes the comics series run, while `Number` identifies the book. This adapter uses `Number` as an issue, or a volume for explicitly marked manga, and leaves those proposals for review. See the [ComicInfo schema documentation](https://anansi-project.github.io/docs/comicinfo/documentation). EPUB collection positions can represent a hierarchy; decimal positions are retained as no inferred volume rather than guessed issue/volume identity. See [EPUB 3.3 package metadata](https://www.w3.org/TR/epub-33/).
+
+**Find Open Library edition by ISBN** looks up a checksum-valid identifier and fetches bounded author references. The edition key/URL stays distinct from a work key. Existing Google Books discovery also prioritizes validated ISBNs. Work-level aggregate ISBNs remain unsuitable for edition ownership. See [Open Library Books API](https://openlibrary.org/dev/docs/api/books).
+
+For publisher evidence, paste the edition title, source page, relevant bibliographic fields and original contents statement. This is an explicitly cited manual proposal, not a publisher-page scraper. Source URLs are sanitized. Provider fields are never overwritten, and file import or lookup never establishes ownership or verifies collected contents by itself.
+
+## Specialist-source evaluation, October 1, 2026
+
+| Source | Useful scope | Decision |
+|---|---|---|
+| Publisher edition/contents pages | Edition language/ISBN and explicit collection contents | Available now as cited manual proposals; add individual site adapters only with verified field semantics. |
+| ComicInfo/EPUB | Locally held edition metadata and creators | Available now with human review; metadata is not proof of a purchase. |
+| Open Library / Google Books | Identifier-based edition discovery; separate work and genre evidence | Available now. Prefer identifiers and retain uncertain candidates. |
+| Grand Comics Database | Comics issue/story/series discovery | Future adapter candidate. Its official site describes an initial API with stable endpoint URLs but unstable fields/data format. Build a versioned DTO before integrating. [Official API notice](https://www.comics.org/?sort=issue). The site identifies CC BY-SA 4.0 data licensing, with cover-image exceptions; attribution/share-alike handling needs a design before redistributing catalog data. [Official licensing notice](https://my.comics.org/donate/). No GCD network adapter is enabled. |
+| Comic Vine | Comic series/issue discovery | Future optional adapter. Requires a user API key, noncommercial usage, attribution, caching and a request budget; current documentation specifies 200 requests per resource per hour and restricts redistribution. Its series/volume terminology must not become collected-book volume ownership. [Official API terms](https://comicvine.gamespot.com/api/). No Comic Vine network adapter is enabled. |
+| AniList | Manga series discovery rather than a specific translated edition or omnibus | Deferred. Current terms prohibit competing, non-complementary anime/manga list or tracker services and bulk hoarding. Galactic Library's overlap needs clarification from AniList before enabling an adapter; it would still supply series candidates, not edition ownership. [Official terms](https://docs.anilist.co/guide/terms-of-use). |
+
+## Enrichment workbench (GL-31)
+
+Open **Enrichment workbench** under Library tools. Separate queues show missing genre/work/edition/creator stages, candidate or ambiguous matches, edition conflicts, failed/empty lookups, unparsed contents and current undoable source selections. Only active library records appear. Filter by queue and title; fifty entries per page keeps controls bounded and lets you reach every result.
+
+Choose a candidate and explicitly confirm its work or edition before **Apply selected candidates**. Review up to fifty at once; a single worker write applies the entire batch, and any stale record or known conflict rejects all selections. Conflicts between two selected edition sources also reject the batch. Open Library work approval does not establish an edition. **Dismiss selected reviews** removes pending proposals. **Undo selected enrichments** restores previous selections in one write and leaves provider data and ownership intact; stale undo requests fail atomically.
+
+Failed Google Books/Open Library discovery can be retried from the queue. Temporary Kindle contents failures link back to the item and explain that retry belongs in the signed-in Kindle panel. **Review library item** clears library filters, focuses the exact current record's card and opens its evidence/contents controls. Original unparsed contents stay available for correction; only separately saved verified contents enter coverage.

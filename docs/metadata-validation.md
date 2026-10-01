@@ -1,6 +1,6 @@
 # Stored metadata validation
 
-Imports, enrichment writes, database reads, backup creation and backup restore use the same central validators. Backup format remains version 1; database schema 5 preserves separate provider history and edition separations and accepts schema 1/2/3/4 backups. Unknown fields are removed rather than copied recursively. A malformed supported field rejects the whole import, enrichment batch or restore before persistence. Identity and scope fields are rejected when oversized, never silently shortened into another identity.
+Imports, enrichment writes, database reads, backup creation and backup restore use the same central validators. Backup format remains version 1; database schema 6 preserves separate provider history, edition separations and reviewed local/source metadata, and accepts schema 1/2/3/4/5 backups. Unknown fields are removed rather than copied recursively. A malformed supported field rejects the whole import, enrichment batch or restore before persistence. Identity and scope fields are rejected when oversized, never silently shortened into another identity.
 
 Provider pages can submit their provider's records and sync state through sender-checked worker messages. They cannot attach approved enrichment, persistent record references or observation dates. The worker sets the evidence source and observation date, assigns new opaque references, and preserves existing references and enrichment on resync. Only dedicated enrichment/review operations or validated backup restore can supply enrichment. Existing checksum-invalid ISBN strings remain bounded source evidence for diagnostics; matching still ignores them.
 
@@ -19,7 +19,7 @@ Common metadata fields are authors, contributors with name/role, series, ISBN/AS
 | Fanatical | Bundle ID/title/slug, product slug, DRM, formats, Steam App ID |
 | Humble | Purchase ID, bundle label, entitlement type, key type, allowlisted key status and validated ISO expiry; no redemption values |
 
-Supported nested enrichment is limited to Open Library work metadata, Google Books edition metadata, Google Books genre hints and Kindle product-page contents. Each has its own field allowlist. Arbitrary nested objects, raw responses, credentials, download links and unsupported enrichment adapters are discarded.
+Supported nested enrichment is limited to Open Library work metadata, Google Books edition metadata, Google Books genre hints, Kindle product-page contents and bounded local/source edition proposals. Each has its own field allowlist. Arbitrary nested objects, raw responses, credentials, download links and unsupported enrichment adapters are discarded.
 
 Principal bounds:
 

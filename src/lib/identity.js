@@ -43,23 +43,24 @@ export function identityEvidence(item) {
   const metadata = item?.metadata ?? {};
   const google = metadata.enrichment?.googleBooks ?? {};
   const open = metadata.enrichment?.openLibrary ?? {};
+  const local = metadata.enrichment?.localMetadata?.approved===true?metadata.enrichment.localMetadata:{};
   const parts = titleIdentity(item?.title, item?.mediaType);
   // Work-level Open Library ISBN lists must never identify the owned edition.
-  const isbn = names([...(names(metadata.isbn)), ...(names(metadata.isbns)), ...(names(google.isbn))]).map(validIsbn).filter(Boolean);
+  const isbn = names([...(names(metadata.isbn)), ...(names(metadata.isbns)), ...(names(google.isbn)),...names(local.isbn)]).map(validIsbn).filter(Boolean);
   return {
     isbn: [...new Set(isbn)],
     asin: compact(metadata.asin || (item?.provider === 'kindle' ? item.providerItemId : ''), 32),
     steamAppId: /^\d+$/u.test(String(metadata.steamAppId ?? '')) ? String(metadata.steamAppId) : '',
-    workIds: names([metadata.workId, open.workKey]),
-    authors: names(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors : open.approved===true?open.authors:[]),
-    contributors: (Array.isArray(metadata.contributors) ? metadata.contributors : []).slice(0, 50).map((entry) => ({name: compact(entry?.name), role: compact(entry?.role, 80)})).filter((entry) => entry.name),
-    language: compact(metadata.language || google.language, 80).toLowerCase(),
-    publisher: compact(metadata.publisher || google.publisher),
-    series: names(metadata.series?.length ? metadata.series : parts.series),
-    run: compact(metadata.run || metadata.seriesYear, 100),
-    unitType: compact(metadata.unitType || parts.unitType, 20),
-    unit: compact(metadata.volume ?? metadata.issue ?? parts.unit, 40),
-    edition: compact(metadata.edition || parts.edition),
+    workIds: names([metadata.workId, open.workKey,local.workKey]),
+    authors: names(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors :local.authors?.length?local.authors:open.approved===true?open.authors:[]),
+    contributors: (Array.isArray(metadata.contributors)&&metadata.contributors.length ? metadata.contributors : local.contributors??[]).slice(0, 50).map((entry) => ({name: compact(entry?.name), role: compact(entry?.role, 80)})).filter((entry) => entry.name),
+    language: compact(metadata.language || google.language||local.language, 80).toLowerCase(),
+    publisher: compact(metadata.publisher || google.publisher||local.publisher),
+    series: names(metadata.series?.length ? metadata.series : local.series?.length?local.series:parts.series),
+    run: compact(metadata.run || metadata.seriesYear||local.run, 100),
+    unitType: compact(metadata.unitType || parts.unitType||local.unitType, 20),
+    unit: compact(metadata.volume ?? metadata.issue ?? (parts.unit||local.volume||local.issue), 40),
+    edition: compact(metadata.edition || parts.edition||local.edition),
     candidateKey: parts.base,
     source: compact(metadata.source || item?.provider, 100)
   };
@@ -86,6 +87,18 @@ export function sameEditionEvidence(left, right) {
   if (left.mediaType === 'game') return 'matching game title and compatible edition';
   if (a.authors.length && overlap(a.authors.map(identityKey), b.authors.map(identityKey))) return 'matching title and author';
   return '';
+}
+
+/** Compare sources individually: a union of two conflicting ISBN lists must not
+ * conceal a disagreement with the provider or an already selected edition. */
+export function editionEnrichmentConflicts(record,candidate){
+  const provider={...record,metadata:{...record.metadata,enrichment:{}}};
+  const evidence=[provider,record];
+  for(const [kind,entry]of Object.entries(record.metadata?.enrichment??{})){
+    if(kind!=='googleBooks'&&!(kind==='localMetadata'&&entry.approved===true))continue;
+    evidence.push({title:[entry.title||record.title,entry.subtitle].filter(Boolean).join(': '),mediaType:record.mediaType,metadata:entry});
+  }
+  return [...new Set(evidence.flatMap(source=>identityConflicts(source,candidate)))];
 }
 
 export function relationshipReason(left, right) {

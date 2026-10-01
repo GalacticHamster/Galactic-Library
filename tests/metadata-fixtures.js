@@ -1,0 +1,15 @@
+// Synthetic ZIP fixtures; no downloaded books, provider accounts or personal data.
+export const comicXml='<ComicInfo><Title>Review manga Vol. 1</Title><Series>Review manga</Series><Number>1</Number><Volume>2024</Volume><Manga>YesAndRightToLeft</Manga><Writer>Writer</Writer><Penciller>Artist</Penciller><LanguageISO>en</LanguageISO><Publisher>Publisher</Publisher><GTIN>9780140328721</GTIN><Summary>Collects Review manga Vol. One. Extras.</Summary></ComicInfo>';
+export const containerXml='<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+export const opfXml='<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title id="title">Review manga Vol. 1</dc:title><dc:creator id="writer">Writer</dc:creator><meta refines="#writer" property="role">aut</meta><dc:identifier>urn:isbn:9780140328721</dc:identifier><dc:publisher>Publisher</dc:publisher><dc:language>en</dc:language><meta property="belongs-to-collection" id="series">Review manga</meta><meta refines="#series" property="group-position">1</meta><dc:subject>Manga</dc:subject></metadata></package>';
+export function metadataZip(entries){
+  const encoder=new TextEncoder(),local=[],central=[];let offset=0;
+  for(const entry of entries){
+    const name=encoder.encode(entry.name),data=encoder.encode(entry.text),payload=entry.compressed??data,method=entry.compressed?8:0,flags=entry.flags??0;
+    let crc=0xffffffff;for(const byte of data){crc^=byte;for(let n=0;n<8;n++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+    const header=new Uint8Array(30+name.length+payload.length),h=new DataView(header.buffer);h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,flags,true);h.setUint16(8,method,true);h.setUint32(14,crc,true);h.setUint32(18,payload.length,true);h.setUint32(22,data.length,true);h.setUint16(26,name.length,true);header.set(name,30);header.set(payload,30+name.length);local.push(header);
+    const directory=new Uint8Array(46+name.length),d=new DataView(directory.buffer);d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,flags,true);d.setUint16(10,method,true);d.setUint32(16,entry.badCrc?0:crc,true);d.setUint32(20,payload.length,true);d.setUint32(24,entry.size??data.length,true);d.setUint16(28,name.length,true);d.setUint32(42,offset,true);directory.set(name,46);central.push(directory);offset+=header.length;
+  }
+  const centralSize=central.reduce((sum,entry)=>sum+entry.length,0),end=new Uint8Array(22),e=new DataView(end.buffer);e.setUint32(0,0x06054b50,true);e.setUint16(8,entries.length,true);e.setUint16(10,entries.length,true);e.setUint32(12,centralSize,true);e.setUint32(16,offset,true);
+  const result=new Uint8Array(offset+centralSize+22);let at=0;for(const part of [...local,...central,end]){result.set(part,at);at+=part.length;}return result;
+}

@@ -53,7 +53,7 @@ export function proposeContents(statement) {
 }
 
 export function contentsStatement(item) {
-  return compact(item?.metadata?.enrichment?.kindleProductComicContents?.statement || item?.metadata?.contentsStatement || item?.metadata?.collects, 10000);
+  return compact(item?.metadata?.enrichment?.kindleProductComicContents?.statement || item?.metadata?.contentsStatement || item?.metadata?.collects || item?.metadata?.enrichment?.localMetadata?.statement, 10000);
 }
 
 export function validateContentReview(value) {

@@ -10,6 +10,7 @@ import { createStorageMessageHandler } from './storage-messages.js';
 import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
 import { restrictStorageAccess } from './storage-access.js';
 import { validateFandangoState } from './import-state.js';
+import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
 
 const storageReady = restrictStorageAccess(chrome.storage);
 // Operations report initialization errors through their normal response channel.
@@ -174,6 +175,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then((candidates) => sendResponse({ ok: true, candidates }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
+  }
+  if(request?.type==='SEARCH_OPEN_LIBRARY_EDITION'){
+    if(!isOwnExtensionPage(sender.url)){sendResponse({ok:false,error:'Edition lookup is available only from Galactic Library.'});return undefined;}
+    (async()=>{
+      const edition=await enrichmentJson(openLibraryEditionUrl(request.isbn),'Open Library');const authors=[];
+      for(const author of (Array.isArray(edition.authors)?edition.authors:[]).slice(0,6)){
+        const key=author?.key??author?.author?.key;if(!/^\/authors\/OL\d+A$/u.test(key??''))continue;
+        const entry=await enrichmentJson(`https://openlibrary.org${key}.json`,'Open Library');if(typeof entry.name==='string')authors.push(entry.name);
+      }
+      return openLibraryEditionCandidate(edition,authors);
+    })().then(candidate=>sendResponse({ok:true,candidate})).catch(error=>sendResponse({ok:false,error:error.message}));return true;
   }
 
   if (request?.type === 'FETCH_FANATICAL_ORDERS') {

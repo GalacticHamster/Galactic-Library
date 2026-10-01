@@ -3,6 +3,9 @@ import { createBackup } from '../src/lib/storage.js';
 import { matchItems } from '../src/lib/matcher.js';
 import '../src/providers/kobo.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
+import {parseLocalMetadata,localMetadataFromFile} from '../src/lib/local-metadata.js';
+import {comicXml,opfXml} from './metadata-fixtures.js';
+import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 
 const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
@@ -20,6 +23,22 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:as
 }},storage:{onChanged:{addListener:()=>{}}}};
 
 try{
+  const comic=parseLocalMetadata(comicXml);
+  assert(comic.run==='2024'&&comic.volume==='1'&&!comic.issue&&comic.contributors.some(entry=>entry.role==='penciller')&&comic.statement==='Collects Review manga Vol. One','ComicInfo numbering, roles or statement lost.');
+  assert(parseLocalMetadata(opfXml,'epub').volume==='1','EPUB namespace/collection metadata lost.');
+  assert(!parseLocalMetadata(opfXml.replace('>1</meta>','>1.2</meta>'),'epub').volume,'Hierarchical EPUB collection position became a guessed volume.');
+  let rejected=false;try{parseLocalMetadata('<!DOCTYPE ComicInfo [<!ENTITY secret SYSTEM "file:///secret">]><ComicInfo><Title>&secret;</Title></ComicInfo>');}catch{rejected=true;}assert(rejected,'Unsafe XML accepted.');
+  checks.push('ComicInfo and EPUB parsers preserve series/run/unit and creator roles, rejecting entities and hierarchical unit guesses');
+  const epubBytes=await (await fetch('/tests/metadata.epub')).arrayBuffer();const epub=await localMetadataFromFile(new File([epubBytes],'synthetic.epub'));
+  assert(epub.title==='Review manga Vol. 1'&&epub.isbn[0]==='9780140328721'&&epub.source==='epub'&&!epub.approved,'Compressed EPUB metadata failed.');
+  checks.push('actual compressed EPUB container and OPF import reads bounded metadata and remains an unapproved proposal');
+  const pagedDatabase={providerItems:{},canonicalItems:{},enrichmentReviews:{},enrichmentHistory:{},contentReviews:{}};
+  for(let n=0;n<61;n++){const id=`humble:page-${n}`,ref=crypto.randomUUID();pagedDatabase.providerItems[id]={id,recordRef:ref,title:`Paged book ${n}`,mediaType:'book',metadata:{}};pagedDatabase.canonicalItems[id]={id,title:`Paged book ${n}`,mediaType:'book',providerItemIds:[id]};}
+  let inspected;
+  const pagedWorkbench=createEnrichmentWorkbench({inspect:refs=>{inspected=refs;}});document.body.append(pagedWorkbench.element);pagedWorkbench.update(pagedDatabase);await open(pagedWorkbench.element);
+  assert(pagedWorkbench.element.querySelectorAll('li').length===50,'Workbench first page is not bounded.');button(pagedWorkbench.element,'Next page').click();assert(pagedWorkbench.element.querySelectorAll('li').length===11&&pagedWorkbench.element.textContent.includes('Paged book 60'),'Workbench truncates results past page one.');
+  const pagedSearch=pagedWorkbench.element.querySelector('input[type="search"]');pagedSearch.value='Paged book 60';pagedSearch.dispatchEvent(new Event('input'));assert(pagedWorkbench.element.querySelectorAll('li').length===1,'Workbench search failed.');button(pagedWorkbench.element,'Review library item').click();assert(inspected[0]===pagedDatabase.providerItems['humble:page-60'].recordRef,'Workbench navigation used the wrong record.');pagedWorkbench.element.remove();
+  checks.push('workbench pagination reaches all rows, title filtering resets its page and item navigation preserves record scope');
   const koboDocument=new DOMParser().parseFromString(`<ul>
     <li class="book-card" data-is-kobo-plus="true"><h3 class="book-title">Subscription book</h3><a data-book-title="Subscription book" href="https://www.kobo.com/ebook/subscription">Read now</a></li>
     <li class="book-card"><h3 class="book-title">Purchased</h3><a data-book-title="Purchased" href="https://www.kobo.com/ebook/title-is-purchased">Read now</a></li>
@@ -152,6 +171,49 @@ try{
   assert(Object.values(values.galacticLibraryDatabase.enrichmentReviews).some(review=>review.recordRefs.includes(queuedRecord.recordRef)),'Batched lookup did not retain its review.');
   assert(!values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment?.googleBooks,'Authorless batch silently approved an edition.');
   checks.push('actual batch runner checkpoints authorless candidates for review and releases its worker lease');
+
+  let localTools=await open(card('Review manga Vol. 1').querySelector('.local-metadata-tools'));
+  const metadataTransfer=new DataTransfer();metadataTransfer.items.add(new File([comicXml],'ComicInfo.xml',{type:'application/xml'}));
+  const metadataInput=localTools.querySelector('input[type="file"]');metadataInput.files=metadataTransfer.files;metadataInput.dispatchEvent(new Event('change'));
+  await wait(()=>Object.values(values.galacticLibraryDatabase.enrichmentReviews).some(review=>review.source==='localMetadata'),'ComicInfo file input did not queue a review.');
+  const workbench=document.querySelector('#enrichment-workbench');await open(workbench);
+  const queueFilter=workbench.querySelector('[aria-label="Enrichment queue"]');queueFilter.value='candidates';queueFilter.dispatchEvent(new Event('change'));
+  let localReviewId=Object.keys(values.galacticLibraryDatabase.enrichmentReviews).find(id=>values.galacticLibraryDatabase.enrichmentReviews[id].source==='localMetadata');
+  let row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);assert(row,'Local review missing from workbench.');
+  let choice=row.querySelector('select');choice.value='0';choice.dispatchEvent(new Event('change'));row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);
+  assert(row.textContent.includes('ComicInfo.xml')&&row.textContent.includes('penciller: Artist')&&row.textContent.includes('2024'),'Local source evidence missing.');
+  let check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Apply selected candidates').click();
+  await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment?.localMetadata?.approved,'Workbench did not apply reviewed local metadata.');
+  await wait(()=>card('Review manga Vol. 1').textContent.includes('Undo localMetadata selection'),'Source evidence did not refresh after approval.');
+  assert(values.galacticLibraryDatabase.providerItems[queuedRecord.id].ownership==='unknown'&&!values.galacticLibraryDatabase.contentReviews[queuedRecord.id],'Local import overclaimed ownership or contents.');
+  queueFilter.value='unparsed';queueFilter.dispatchEvent(new Event('change'));assert(workbench.textContent.includes('Collects Review manga Vol. One'),'Unparsed statement absent from queue.');
+  button(workbench,'Review library item').click();await pause();assert(card('Review manga Vol. 1').querySelector('.contents-editor').open,'Workbench navigation did not open item controls.');
+  checks.push('actual ComicInfo file input queues source evidence and workbench approval preserves ownership and unparsed contents');
+
+  localTools=await open(card('Review manga Vol. 1').querySelector('.local-metadata-tools'));
+  const epubTransfer=new DataTransfer();epubTransfer.items.add(new File([epubBytes],'synthetic.epub',{type:'application/epub+zip'}));
+  localTools.querySelector('input[type="file"]').files=epubTransfer.files;localTools.querySelector('input[type="file"]').dispatchEvent(new Event('change'));
+  await wait(()=>Object.values(values.galacticLibraryDatabase.enrichmentReviews).some(review=>review.source==='localMetadata'&&review.candidates[0].source==='epub'),'Actual EPUB file input did not queue metadata.');
+  queueFilter.value='candidates';queueFilter.dispatchEvent(new Event('change'));
+  localReviewId=Object.keys(values.galacticLibraryDatabase.enrichmentReviews).find(id=>values.galacticLibraryDatabase.enrichmentReviews[id].source==='localMetadata');
+  row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);choice=row.querySelector('select');choice.value='0';choice.dispatchEvent(new Event('change'));row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Apply selected candidates').click();
+  await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.source==='epub','EPUB review did not apply.');
+  await pause();
+  queueFilter.value='undo';queueFilter.dispatchEvent(new Event('change'));
+  const undoRef=values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.selectionRef;row=workbench.querySelector(`[data-review-id="${undoRef}"]`);check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Undo selected enrichments').click();
+  await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.source==='comicinfo','Batch undo did not restore prior ComicInfo selection.');
+  await wait(()=>card('Review manga Vol. 1').textContent.includes('Collects Review manga Vol. One'),'Undo did not rerender.');
+  checks.push('actual EPUB file import requires review and workbench batch undo restores previous metadata without changing provider evidence');
+
+  localTools=await open(card('Review manga Vol. 1').querySelector('.local-metadata-tools'));
+  localTools.querySelector('[aria-label="Edition title on source"]').value='Review manga Vol. 2';localTools.querySelector('[aria-label="Publisher source page URL"]').value='https://publisher.example/books/manga-2';localTools.querySelector('[aria-label="Volume number (if stated)"]').value='2';button(localTools,'Queue publisher evidence').click();
+  await wait(()=>Object.values(values.galacticLibraryDatabase.enrichmentReviews).some(review=>review.source==='localMetadata'&&review.candidates[0].source==='publisher'),'Publisher proposal not queued.');
+  queueFilter.value='conflicts';queueFilter.dispatchEvent(new Event('change'));localReviewId=Object.keys(values.galacticLibraryDatabase.enrichmentReviews).find(id=>values.galacticLibraryDatabase.enrichmentReviews[id].source==='localMetadata');
+  row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);choice=row.querySelector('select');choice.value='0';choice.dispatchEvent(new Event('change'));row=workbench.querySelector(`[data-review-id="${localReviewId}"]`);assert(row.textContent.includes('Cannot apply: conflicting unit'),'Conflicting volume was not exposed.');
+  check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Apply selected candidates').click();
+  await wait(()=>workbench.textContent.includes('Review conflicting unit'),'Worker accepted conflicting proposal or hid its reason.');assert(values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.source==='comicinfo','Conflict overwrote current metadata.');
+  button(workbench,'Dismiss selected reviews').click();await wait(()=>!values.galacticLibraryDatabase.enrichmentReviews[localReviewId],'Conflicting proposal could not be dismissed.');
+  checks.push('publisher proposals expose edition conflicts, fail closed on approval and support batch dismissal');
 
   await writer.replaceProviderItems('humble',[],{},completeProviderSnapshot('humble',[],[completedScope('library',0,0,'reported-count',1)]));
   const historyTransfer=new DataTransfer();historyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'history.json',{type:'application/json'}));
