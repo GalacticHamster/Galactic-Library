@@ -151,7 +151,7 @@ export const relationshipTests = [
     assert.equal(highConfidenceGoogleBooksCandidate(query,[{...candidate,isbn:['9780140328721']}]),null);
     const values={};const writer=createStorageWriter({get:async defaults=>({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
     await writer.mergeProviderItems('humble',[{providerItemId:'isbn',title:'Book',mediaType:'book',metadata:{isbn:'9780306406157'}},{providerItemId:'invalid',title:'Another',mediaType:'book',metadata:{isbn:'9780306406158'}}]);
-    assert.equal((await writer.startGoogleBooksEnrichmentJob()).queue.length,1);
+    assert.equal((await writer.startGoogleBooksEnrichmentJob()).queue.length,2);
   }],
   ['series scopes report union, overlaps and bounded gaps without claiming a series endpoint', () => {
     const a=book('a');const b=book('b');const c={...book('c'),ownership:'subscription'};

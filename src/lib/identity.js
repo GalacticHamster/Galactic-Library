@@ -51,7 +51,7 @@ export function identityEvidence(item) {
     asin: compact(metadata.asin || (item?.provider === 'kindle' ? item.providerItemId : ''), 32),
     steamAppId: /^\d+$/u.test(String(metadata.steamAppId ?? '')) ? String(metadata.steamAppId) : '',
     workIds: names([metadata.workId, open.workKey]),
-    authors: names(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors : open.authors),
+    authors: names(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors : open.approved===true?open.authors:[]),
     contributors: (Array.isArray(metadata.contributors) ? metadata.contributors : []).slice(0, 50).map((entry) => ({name: compact(entry?.name), role: compact(entry?.role, 80)})).filter((entry) => entry.name),
     language: compact(metadata.language || google.language, 80).toLowerCase(),
     publisher: compact(metadata.publisher || google.publisher),

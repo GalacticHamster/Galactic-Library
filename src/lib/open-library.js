@@ -26,7 +26,7 @@ export function openLibrarySearchUrl({ title, authors = [], isbn = [] }) {
   else url.searchParams.set('title', compactText(title));
   const author = stringValues(authors, 1)[0];
   if (author&&!identifier) url.searchParams.set('author', author);
-  url.searchParams.set('fields', 'key,title,author_name,subject,first_publish_year,isbn,edition_key');
+  url.searchParams.set('fields', 'key,title,author_name,subject,first_publish_year,isbn,edition_key,publisher');
   url.searchParams.set('limit', '5');
   return url.toString();
 }
@@ -43,6 +43,7 @@ export function openLibraryCandidatesFromSearch(value) {
       workKey: key,
       title,
       authors: stringValues(document?.author_name, 12),
+      publishers: stringValues(document?.publisher,12),
       subjects: stringValues(document?.subject, 30),
       firstPublishYear: Number.isInteger(document?.first_publish_year) ? document.first_publish_year : null,
       isbn: stringValues(document?.isbn, 12),
@@ -62,6 +63,9 @@ export function openLibraryEnrichment(candidate, appliedAt = new Date().toISOStr
     sourceUrl: candidate.sourceUrl,
     title: compactText(candidate.title),
     authors: stringValues(candidate.authors, 12),
+    publishers: stringValues(candidate.publishers,12),
+    approved:true,
+    matchBasis:'user-selected-work',
     subjects: stringValues(candidate.subjects, 30),
     firstPublishYear: Number.isInteger(candidate.firstPublishYear) ? candidate.firstPublishYear : null,
     isbn: stringValues(candidate.isbn, 12),

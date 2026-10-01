@@ -265,7 +265,7 @@ const tests = [
     assert.deepEqual(openLibraryEnrichment(candidate, '2026-09-18T00:00:00.000Z'), {
       source: 'open-library', workKey: '/works/OL123W', sourceUrl: 'https://openlibrary.org/works/OL123W', title: 'Watchmen',
       authors: ['Alan Moore', 'Dave Gibbons'], subjects: ['Comics & Graphic Novels', 'Superheroes'], firstPublishYear: 1987,
-      isbn: ['9780930289232'], editionKeys: ['OL123M'], appliedAt: '2026-09-18T00:00:00.000Z'
+      isbn: ['9780930289232'], editionKeys: ['OL123M'], publishers:[],approved:true,matchBasis:'user-selected-work',appliedAt: '2026-09-18T00:00:00.000Z'
     });
   }],
   ['auto-selects only a high-confidence title-and-author Google Books result', () => {

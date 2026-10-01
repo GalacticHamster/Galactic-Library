@@ -8,6 +8,9 @@ import { validateContentReview } from '../lib/contents.js';
 import { identityConflicts, identityEvidence } from '../lib/identity.js';
 import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 import { text } from '../lib/validation.js';
+import {needsGoogleBooksEnrichment} from '../lib/enrichment.js';
+import {validateEnrichment} from '../lib/metadata-validation.js';
+import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -259,9 +262,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const queue = Object.values(database.canonicalItems).filter((canonical) => {
       if (canonical.mediaType !== 'book') return false;
       const records = canonical.providerItemIds.map((id) => database.providerItems[id]).filter(Boolean);
-      const hasGoogleBooks = records.some((record) => record.metadata?.enrichment?.googleBooks?.volumeId || record.metadata?.enrichment?.googleBooksGenreHint?.categories?.length);
-      const hasSearchEvidence = records.some((record) => {const evidence=identityEvidence(record);return evidence.authors.length||evidence.isbn.length;});
-      return !hasGoogleBooks && hasSearchEvidence;
+      return needsGoogleBooksEnrichment(records);
     }).map((canonical) => canonical.id).sort();
     return saveGoogleBooksEnrichmentJob({ queue, cursor: 0, processed: 0, matched: 0, genreHints: 0, noMatch: 0, zeroResults: 0, titleVariant: 0, authorVariant: 0, samples: [], skipped: 0, errors: 0, startedAt: new Date().toISOString() });
   }
@@ -292,26 +293,46 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return persistDatabase(database);
   }
 
-  async function saveOpenLibraryEnrichment(itemIds, enrichment) {
+  function verifyRecordRefs(database,ids,refs){
+    if(refs&&(!Array.isArray(refs)||refs.length!==ids.length||ids.some((id,index)=>database.providerItems[id]?.recordRef!==refs[index])))throw new Error('These records changed during enrichment. Reload and review the current profile.');
+  }
+  function selectEnrichment(database,id,kind,value,now){
+    const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
+    database.enrichmentHistory[selectionRef]={recordRef:item.recordRef,kind,selectionRef,previous:item.metadata?.enrichment?.[kind]??null,changedAt:now};
+    const enrichment=validateEnrichment(kind,{...value,selectionRef,retrievedAt:value.retrievedAt??value.appliedAt??now,appliedAt:now,approved:value.approved===true,matchBasis:value.matchBasis??(kind==='googleBooks'?'validated-identifier-or-title-and-author':'source-evidence')});
+    database.providerItems[id]={...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,[kind]:enrichment}},updatedAt:now};
+    for(const [ref,review]of Object.entries(database.enrichmentReviews))if(review.source===kind&&review.recordRefs.includes(item.recordRef))delete database.enrichmentReviews[ref];
+  }
+  async function saveEnrichmentReview(review){
+    const database=await getDatabase();const ref=crypto.randomUUID();
+    const entry=validateEnrichmentReviews({[ref]:{...review,checkedAt:new Date().toISOString()}})[ref];
+    const current=new Set(Object.values(database.providerItems).map(item=>item.recordRef));
+    if(entry.recordRefs.some(ref=>!current.has(ref)))throw new Error('Review records are no longer current.');
+    for(const [id,old]of Object.entries(database.enrichmentReviews))if(old.source===entry.source&&old.recordRefs.some(ref=>entry.recordRefs.includes(ref)))delete database.enrichmentReviews[id];
+    database.enrichmentReviews[ref]=entry;return persistDatabase(database);
+  }
+  async function dismissEnrichmentReview(ref){const database=await getDatabase();delete database.enrichmentReviews[ref];return persistDatabase(database);}
+  async function undoEnrichmentSelection(ref){
+    const database=await getDatabase();const change=database.enrichmentHistory[ref];
+    const item=change&&Object.values(database.providerItems).find(item=>item.recordRef===change.recordRef);
+    if(!item||item.metadata.enrichment?.[change.kind]?.selectionRef!==change.selectionRef)throw new Error('This selection is no longer current; a newer selection or profile replaced it.');
+    if(change.previous===null)delete item.metadata.enrichment[change.kind];else item.metadata.enrichment[change.kind]=change.previous;
+    delete database.enrichmentHistory[ref];database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);return persistDatabase(database);
+  }
+  async function saveOpenLibraryEnrichment(itemIds, enrichment, recordRefs) {
     if (!Array.isArray(itemIds) || !itemIds.length || !enrichment || enrichment.source !== 'open-library') {
       throw new Error('Invalid Open Library enrichment.');
     }
     const database = await getDatabase();
     const ids = [...new Set(itemIds.map(String))];
+    verifyRecordRefs(database,ids,recordRefs);
     if (!ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
       throw new Error('Open Library enrichment can be applied only to current book records.');
     }
     const updatedAt = new Date().toISOString();
     for (const id of ids) {
       const item = database.providerItems[id];
-      database.providerItems[id] = {
-        ...item,
-        metadata: {
-          ...item.metadata,
-          enrichment: { ...item.metadata?.enrichment, openLibrary: { ...enrichment, appliedAt: updatedAt } }
-        },
-        updatedAt
-      };
+      selectEnrichment(database,id,'openLibrary',enrichment,updatedAt);
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
@@ -323,19 +344,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const updatedAt = new Date().toISOString();
     for (const entry of entries) {
       const ids = [...new Set((entry?.itemIds ?? []).map(String))];
+      verifyRecordRefs(database,ids,entry.recordRefs);
       if (!ids.length || !entry?.enrichment || entry.enrichment.source !== 'google-books' || !ids.every((id) => database.providerItems[id]?.mediaType === 'book')) {
         throw new Error('Invalid Google Books enrichment.');
       }
       for (const id of ids) {
         const item = database.providerItems[id];
-        database.providerItems[id] = {
-          ...item,
-          metadata: {
-            ...item.metadata,
-            enrichment: { ...item.metadata?.enrichment, googleBooks: { ...entry.enrichment, appliedAt: updatedAt } }
-          },
-          updatedAt
-        };
+        selectEnrichment(database,id,'googleBooks',entry.enrichment,updatedAt);
       }
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
@@ -354,14 +369,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       }
       for (const id of ids) {
         const item = database.providerItems[id];
-        database.providerItems[id] = {
-          ...item,
-          metadata: {
-            ...item.metadata,
-            enrichment: { ...item.metadata?.enrichment, googleBooksGenreHint: { ...entry.hint, appliedAt: updatedAt } }
-          },
-          updatedAt
-        };
+        selectEnrichment(database,id,'googleBooksGenreHint',entry.hint,updatedAt);
       }
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
@@ -385,23 +393,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       if (!item || item.provider !== 'kindle' || item.mediaType !== 'book' || !isConfirmedComicManga(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 700 || (statement && !/^collects?\b/iu.test(statement)) || (availability === 'unavailable' && statement)) {
         throw new Error('Invalid Kindle comic contents entry.');
       }
-      database.providerItems[itemId] = {
-        ...item,
-        metadata: {
-          ...item.metadata,
-          enrichment: {
-            ...item.metadata?.enrichment,
-            kindleProductComicContents: {
-              source: 'amazon-product-page',
-              sourceUrl,
-              statement,
-              availability,
-              checkedAt: updatedAt
-            }
-          }
-        },
-        updatedAt
-      };
+      selectEnrichment(database,itemId,'kindleProductComicContents',{source:'amazon-product-page',sourceUrl,statement,availability,checkedAt:updatedAt},updatedAt);
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     return persistDatabase(database);
@@ -461,7 +453,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
-    saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
+    saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
     separateEdition, undoEditionSeparation,

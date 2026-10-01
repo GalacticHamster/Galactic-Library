@@ -109,14 +109,15 @@ function isbnValues(value) {
   return [...seen];
 }
 
-export function googleBooksSearchUrl({ title, authors = [], isbn = [], apiKey }) {
+export function googleBooksSearchUrl({ title, authors = [], isbn = [], publisher='',volume='',issue='',apiKey }) {
   const bookTitle = compactText(title);
   const key = compactText(apiKey);
   if (!bookTitle || !key) throw new Error('Google Books needs a book title and API key.');
   const url = new URL('https://www.googleapis.com/books/v1/volumes');
   const author = stringValues(authors, 1)[0];
   const identifier=isbnValues(isbn)[0];
-  url.searchParams.set('q', identifier?`isbn:${identifier}`:[`intitle:${bookTitle}`, author ? `inauthor:${author}` : ''].filter(Boolean).join(' '));
+  const searchTitle=titleUnits(bookTitle).length?bookTitle:`${bookTitle}${volume?` Vol. ${volume}`:issue?` #${issue}`:''}`;
+  url.searchParams.set('q', identifier?`isbn:${identifier}`:[`intitle:${searchTitle}`, author ? `inauthor:${author}` : '',publisher?`inpublisher:${compactText(publisher)}`:''].filter(Boolean).join(' '));
   url.searchParams.set('printType', 'books');
   url.searchParams.set('maxResults', '5');
   url.searchParams.set('projection', 'full');

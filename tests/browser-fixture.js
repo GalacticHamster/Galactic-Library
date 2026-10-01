@@ -14,6 +14,7 @@ const open=async node=>{assert(node,'Missing details');node.open=true;await paus
 const values={};
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
 globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
+  if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
 }},storage:{onChanged:{addListener:()=>{}}}};
@@ -125,6 +126,23 @@ try{
   checks.push('target collection comparison reports missing units and respects language');
   const filter=document.querySelector('[aria-label="Filter reviewed series"]');filter.value='missing series';filter.dispatchEvent(new Event('input'));assert(group.hidden,'Series filter did not hide unmatched scope.');
   checks.push('series search filters reviewed scopes');
+  await writer.mergeProviderItems('humble',[{providerItemId:'review-manga',title:'Review manga Vol. 1',mediaType:'book',ownership:'unknown'}]);
+  const enrichmentTransfer=new DataTransfer();enrichmentTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'enrichment.json',{type:'application/json'}));
+  document.querySelector('#import').files=enrichmentTransfer.files;document.querySelector('#import').dispatchEvent(new Event('change'));
+  await wait(()=>card('Review manga Vol. 1'),'Enrichment fixture did not render.');
+  let tools=card('Review manga Vol. 1').querySelector('details:has([data-action="google-books-search"])');
+  if(!tools)tools=[...card('Review manga Vol. 1').querySelectorAll('details')].find(node=>button(node,'Find Google Books candidates'));
+  await open(tools);button(tools,'Find Google Books candidates').click();
+  await wait(()=>button(card('Review manga Vol. 1'),'Apply edition metadata'),'Authorless candidates did not render.');
+  const apply=button(card('Review manga Vol. 1'),'Apply edition metadata');assert(apply.disabled,'Candidate skipped human approval.');
+  const approval=apply.parentElement.querySelector('input[type="checkbox"]');approval.checked=true;approval.dispatchEvent(new Event('change'));apply.click();
+  await wait(()=>values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks?.approved,'Approved candidate did not persist.');
+  await wait(()=>button(card('Review manga Vol. 1'),'Undo googleBooks selection'),'Undo control did not render.');
+  assert(card('Review manga Vol. 1').textContent.includes('Publisher')&&card('Review manga Vol. 1').textContent.includes('user-selected-edition'),'Field provenance missing.');
+  checks.push('authorless Google Books discovery requires edition approval and exposes source field evidence');
+  button(card('Review manga Vol. 1'),'Undo googleBooks selection').click();
+  await wait(()=>!values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks,'Enrichment undo failed.');
+  checks.push('actual enrichment undo removes the selection and preserves provider ownership');
   await writer.replaceProviderItems('humble',[],{},completeProviderSnapshot('humble',[],[completedScope('library',0,0,'reported-count',1)]));
   const historyTransfer=new DataTransfer();historyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'history.json',{type:'application/json'}));
   document.querySelector('#backup-status').textContent='';input.files=historyTransfer.files;input.dispatchEvent(new Event('change'));

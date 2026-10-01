@@ -15,17 +15,18 @@ const LIMITS = {language:80,run:100,seriesYear:100,volume:80,issue:80,unitType:2
 export function validateEnrichment(kind, value) {
   object(value, 'Enrichment');
   const fields = {
-    openLibrary:['source','workKey','sourceUrl','title','authors','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
-    googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt'],
+    openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
+    googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
     kindleProductComicContents:['source','sourceUrl','statement','availability','checkedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
   const result = {};
-  for (const key of fields) {
+  for (const key of [...fields,'selectionRef','retrievedAt','approved','matchBasis']) {
     if (!Object.hasOwn(value,key)) continue;
-    if (['authors','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
-    else if (['appliedAt','checkedAt'].includes(key)) result[key]=date(value[key]);
+    if (['authors','publishers','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
+    else if(key==='approved'){if(typeof value[key]!=='boolean')throw new Error('Invalid enrichment approval.');result[key]=value[key];}
+    else if (['appliedAt','checkedAt','retrievedAt'].includes(key)) result[key]=date(value[key]);
     else if (key==='sourceUrl') result[key]=url(value[key],{hosts:kind==='openLibrary'?['openlibrary.org']:kind==='kindleProductComicContents'?['amazon.com']:['books.google.com'],googleId:kind!=='openLibrary'&&kind!=='kindleProductComicContents'});
     else if (['pageCount','firstPublishYear'].includes(key)) result[key]=value[key]===null?null:count(value[key],key,key==='pageCount'?1000000:9999);
     else result[key]=text(value[key],key==='statement'?10000:key==='source'?100:500,`Enrichment ${key}`);
