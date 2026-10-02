@@ -21,7 +21,7 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:as
   if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
-}},storage:{onChanged:{addListener:()=>{}}}};
+}},permissions:{request:async()=>true},storage:{onChanged:{addListener:()=>{}}}};
 
 try{
   const comic=parseLocalMetadata(comicXml);
@@ -245,5 +245,12 @@ try{
   const dashboardScan=await writer.beginProviderScan('gog','test-profile','full',false,1);let cancelled=false;
   const runningDashboard=createSyncHealthView(await writer.getDatabase(),{cancel:async(...args)=>{await writer.cancelProviderScan(...args);cancelled=true;},refresh:()=>{}});runningDashboard.id='isolated-sync-dashboard';document.body.append(runningDashboard);await open(runningDashboard);button(runningDashboard,'Cancel pending scan commit').click();await wait(()=>cancelled,'Dashboard cancellation did not run.');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.status==='cancelled','Cancellation did not persist.');runningDashboard.remove();
   checks.push('actual sync dashboard displays validated coverage and freshness and cancels the selected pending commit');
+  await writer.mergeProviderItems('humble',[{providerItemId:'reminder-ui',title:'Reminder key',mediaType:'game',ownership:'owned',metadata:{entitlement:'third-party-key',keyStatus:'revealed',expiresAt:'2026-09-01'}}]);
+  const reminderTransfer=new DataTransfer();reminderTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'reminders.json'));document.querySelector('#backup-status').textContent='';input.files=reminderTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Reminder fixture restore failed.');
+  let reminderView=await open(document.querySelector('#entitlement-reminders'));assert(reminderView.textContent.includes('Destination activation unconfirmed')&&reminderView.textContent.includes('Reported key expiry'),'Unified reminders did not expose actual key evidence.');
+  const keyRow=[...reminderView.querySelectorAll('article')].find(row=>row.textContent.includes('Reported key expiry'));button(keyRow,'Snooze 7 days').click();await wait(()=>Object.values(values.galacticLibraryDatabase.reminderReviews).some(entry=>entry.action==='snoozed'),'Reminder snooze failed.');await wait(()=>document.querySelector('#entitlement-reminders')!==reminderView,'Reminders did not refresh.');
+  reminderView=await open(document.querySelector('#entitlement-reminders'));reminderView.querySelector('select').value='hidden';reminderView.querySelector('select').dispatchEvent(new Event('change'));button(reminderView,'Restore reminder').click();await wait(()=>Object.keys(values.galacticLibraryDatabase.reminderReviews).length===0,'Reminder restore failed.');
+  reminderView=await open(document.querySelector('#entitlement-reminders'));button(reminderView,'Enable desktop reminders').click();await wait(()=>values.galacticLibraryReminderNotifications?.enabled===true,'Optional notification enable failed.');button(reminderView,'Disable desktop reminders').click();await wait(()=>values.galacticLibraryReminderNotifications?.enabled===false,'Optional notification disable failed.');
+  checks.push('actual entitlement dashboard supports snooze/restore and optional notification preferences without changing ownership');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

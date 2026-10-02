@@ -1,3 +1,4 @@
+import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import { matchItems } from '../lib/matcher.js';
 import { handleExternalApiRequest } from '../lib/external-api.js';
@@ -20,6 +21,18 @@ const storageWriter = createStorageWriter(chrome.storage.local, storageReady);
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 
+const reconcileReminders=(notify=false)=>reconcileReminderNotifications(storageWriter,chrome,notify).catch(()=>{});
+let reminderAlarmRegistered=false,reminderClickRegistered=false;
+function registerReminderEvents(){
+  if(chrome.alarms?.onAlarm&&!reminderAlarmRegistered){chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===REMINDER_ALARM)reconcileReminders(true);});reminderAlarmRegistered=true;}
+  if(chrome.notifications?.onClicked&&!reminderClickRegistered){chrome.notifications.onClicked.addListener(id=>{if(id==='galactic-library-reminder')chrome.runtime.openOptionsPage().catch(()=>{});});reminderClickRegistered=true;}
+}
+registerReminderEvents();
+chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
+chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
+chrome.storage.onChanged?.addListener((changes,area)=>{if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();});
+chrome.runtime.onStartup?.addListener(()=>reconcileReminders());
+if(chrome.permissions)reconcileReminders();
 chrome.runtime.onInstalled.addListener(() => {
   chrome.runtime.openOptionsPage().catch(() => {});
 });

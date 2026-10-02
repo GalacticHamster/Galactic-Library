@@ -14,6 +14,8 @@ import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
+import {libraryReminders} from '../lib/reminders.js';
+import {date} from '../lib/validation.js';
 import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/sync-health.js';
 
 /**
@@ -22,6 +24,7 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * context owns a writer or writes a cached database snapshot.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve()) {
+  const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
   async function beginProviderScan(provider,profile,mode='full',switchProfile=false,tabId=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
@@ -92,6 +95,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const validated = validateDatabase(database);
     const updates={[DATABASE_STORAGE_KEY]:validated};
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
+    if(invalidate==='all')updates[NOTIFICATIONS]={enabled:false,lastNotifiedDay:''};
     if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
     await storageArea.set(updates);
     return validated;
@@ -232,7 +236,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS]);
+    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -629,7 +633,36 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return checked;
   }
 
+
+  async function saveReminderReview(ref,action,basis,until=null){
+    const database=await getDatabase(),entry=libraryReminders(database,Date.now(),true).find(item=>item.reminderRef===ref);
+    if(!entry||entry.basis!==basis)throw new Error('This reminder changed. Refresh before reviewing.');
+    if(action==='restore')delete database.reminderReviews[ref];
+    else{
+      if(!['dismissed','snoozed'].includes(action))throw new Error('Invalid reminder action.');
+      const deadline=date(until);if(action==='snoozed'&&(!deadline||Date.parse(deadline)<=Date.now()||Date.parse(deadline)>Date.now()+366*86400000))throw new Error('Snooze must end within the next year.');
+      database.reminderReviews[ref]={action,basis,until:action==='snoozed'?deadline:null,updatedAt:new Date().toISOString()};
+    }
+    return persistDatabase(database);
+  }
+  async function getReminderNotificationSettings(){
+    const stored=await storageArea.get({[NOTIFICATIONS]:null}),value=stored[NOTIFICATIONS];
+    return {enabled:value?.enabled===true,lastNotifiedDay:/^\d{4}-\d{2}-\d{2}$/u.test(value?.lastNotifiedDay??'')?value.lastNotifiedDay:''};
+  }
+  async function saveReminderNotificationSettings(enabled){
+    if(typeof enabled!=='boolean')throw new Error('Invalid notification preference.');
+    const prior=await getReminderNotificationSettings(),value={...prior,enabled};await storageArea.set({[NOTIFICATIONS]:value});return value;
+  }
+  async function reserveReminderNotification(day){
+    if(!/^\d{4}-\d{2}-\d{2}$/u.test(day)||!date(day))throw new Error('Invalid notification date.');
+    const settings=await getReminderNotificationSettings();if(!settings.enabled||settings.lastNotifiedDay===day)return false;
+    await storageArea.set({[NOTIFICATIONS]:{...settings,lastNotifiedDay:day}});return true;
+  }
+  async function releaseReminderNotification(day){
+    const settings=await getReminderNotificationSettings();if(settings.lastNotifiedDay===day)await storageArea.set({[NOTIFICATIONS]:{...settings,lastNotifiedDay:''}});
+  }
   const operations = {
+    saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
     getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,

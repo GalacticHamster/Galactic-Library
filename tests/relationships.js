@@ -42,10 +42,11 @@ export const relationshipTests = [
     const steam=normalizeProviderItem({provider:'steam',providerItemId:'123',title:'Game',ownership:'owned'});
     assert.equal(matchItems(records(item,steam),[query])[0].owned,true);
     for(const keyStatus of ['unrevealed','revealed','unknown']){
-      const active=normalizeProviderItem({...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus}});
+      const active=normalizeProviderItem({...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus,expiresAt:null}});
       const response=handleExternalApiRequest({...createEmptyDatabase(),providerItems:records(active)},{type:'MATCH_ITEMS',apiVersion:1,items:[query]}).results[0];
       assert.equal(response.owned,true);assert.equal(response.matches[0].evidence.activationStatus,'unknown');
     }
+    const dateExpired=normalizeProviderItem({...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus:'revealed'}});assert.equal(matchItems(records(dateExpired,steam),[query])[0].owned,true);assert.equal(matchItems(records(dateExpired),[query])[0].owned,false);
     const invalid={...imported[0],provider:'humble',metadata:{...imported[0].metadata,keyStatus:'activated'}};
     assert.throws(()=>normalizeProviderItem(invalid),/key status/);
     const restored=validateDatabase({...createEmptyDatabase(),providerItems:records(item)});assert.equal(restored.providerItems[item.id].ownership,'unknown');

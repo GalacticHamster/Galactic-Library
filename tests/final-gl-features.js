@@ -11,11 +11,35 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {parsePurchaseEvidence} from '../src/lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {contentCoverage} from '../src/lib/contents.js';
+import {libraryReminders} from '../src/lib/reminders.js';
+import {reconcileReminderNotifications,REMINDER_ALARM} from '../src/background/reminder-notifier.js';
 import {syncFailure,syncHealthRows} from '../src/lib/sync-health.js';
 
 export function memory(){const stored={},writes=[];return {stored,writes,writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));},remove:async keys=>{for(const key of keys)delete stored[key];}})};}
 
-export const finalGlTests=[['sync dashboard tracks snapshot differences, partial quick scans and safe failures without claiming full freshness',async()=>{
+export const finalGlTests=[['reminders distinguish activation, reported deadlines and access without exposing receipts or changing ownership',async()=>{
+  const {writer}=memory();const now=Date.parse('2026-10-01');
+  await writer.mergeProviderItems('humble',[{providerItemId:'key',title:'Private title',mediaType:'game',ownership:'owned',metadata:{entitlement:'third-party-key',keyStatus:'revealed',expiresAt:'2026-10-03',purchaseId:'PRIVATE RECEIPT'}},{providerItemId:'unknown-date',title:'No deadline',metadata:{entitlement:'third-party-key',keyStatus:'unrevealed'}},{providerItemId:'expired',title:'Expired',metadata:{entitlement:'third-party-key',keyStatus:'expired'}}]);
+  await writer.mergeProviderItems('audible',[{providerItemId:'a',title:'Rental',mediaType:'audiobook',ownership:'rental'}]);let db=await writer.getDatabase(),audio=db.providerItems['audible:a'];
+  db=await writer.saveOwnershipReview(audio.recordRef,{ownership:'rental',note:'PRIVATE NOTE',evidenceDate:'2026-09-01',expiresAt:'2026-09-30'});
+  const reminders=libraryReminders(db,now);assert(reminders.some(item=>item.kind==='access-expiry'&&item.severity==='attention'));assert(reminders.some(item=>item.kind==='activation'&&item.title==='Private title'));assert(!reminders.some(item=>item.kind==='key-expiry'&&item.title==='No deadline'));
+  assert.equal(effectiveOwnershipRecord(db.providerItems['humble:key'],db,Date.parse('2026-10-04')).ownership,'unknown');assert.equal(db.providerItems['humble:key'].ownership,'owned');assert.equal(effectiveOwnershipRecord(audio,db,now).ownership,'unknown');
+  const api=handleExternalApiRequest(db,{type:'GET_REMINDERS',apiVersion:1,limit:2});assert(api.ok&&api.reminders.length===2&&api.nextOffset===2);assert(!JSON.stringify(api).includes('PRIVATE RECEIPT')&&!JSON.stringify(api).includes('PRIVATE NOTE')&&!JSON.stringify(api).includes('basis'));
+  assert(handleExternalApiRequest(db,{type:'GET_STATUS'}).capabilities.entitlementReminders);assert(!handleExternalApiRequest(db,{type:'GET_REMINDERS',apiVersion:2}).ok);assert(!handleExternalApiRequest(db,{type:'GET_REMINDERS',apiVersion:1,limit:201}).ok);
+}],['reminder dismiss/snooze stays scoped to current evidence and survives backups without hiding changed deadlines',async()=>{
+  const {writer}=memory();await writer.mergeProviderItems('humble',[{providerItemId:'k',title:'Key',metadata:{entitlement:'third-party-key',expiresAt:'2026-10-02'}}]);let db=await writer.getDatabase(),reminder=libraryReminders(db).find(item=>item.kind==='key-expiry');
+  db=await writer.saveReminderReview(reminder.reminderRef,'dismissed',reminder.basis);assert(!libraryReminders(parseBackup(createBackup(db))).some(item=>item.kind==='key-expiry'));
+  db=await writer.mergeProviderItems('humble',[{providerItemId:'k',title:'Key',metadata:{entitlement:'third-party-key',expiresAt:'2026-10-04'}}]);assert(libraryReminders(db).some(item=>item.kind==='key-expiry'));await assert.rejects(writer.saveReminderReview(reminder.reminderRef,'dismissed',reminder.basis),/changed/);
+  reminder=libraryReminders(db).find(item=>item.kind==='activation');db=await writer.saveReminderReview(reminder.reminderRef,'snoozed',reminder.basis,new Date(Date.now()+86400000).toISOString());assert(!libraryReminders(db).some(item=>item.kind==='activation'));assert(libraryReminders(db,Date.now()+2*86400000).some(item=>item.kind==='activation'));
+  db=await writer.saveReminderReview(reminder.reminderRef,'restore',reminder.basis);assert(libraryReminders(db).some(item=>item.kind==='activation'));
+}],['optional notifications persist daily dedup, respect permission revocation and clear/restore while exposing only aggregate counts',async()=>{
+  const {writer}=memory();let granted=true,alarm=null;const notices=[];
+  const browser={permissions:{contains:async()=>granted},alarms:{clear:async name=>{assert.equal(name,REMINDER_ALARM);alarm=null;},get:async()=>alarm,create:async(name,options)=>{alarm={name,...options};}},notifications:{create:async(id,value)=>{notices.push(value);}},runtime:{getURL:path=>'chrome-extension://test/'+path}};
+  await writer.mergeProviderItems('humble',[{providerItemId:'k',title:'PRIVATE TITLE',metadata:{entitlement:'third-party-key',expiresAt:'2026-09-01'}}]);await reconcileReminderNotifications(writer,browser,true,Date.parse('2026-10-01'));assert.equal(notices.length,0);
+  await writer.saveReminderNotificationSettings(true);await Promise.all([reconcileReminderNotifications(writer,browser,true,Date.parse('2026-10-01')),reconcileReminderNotifications(writer,browser,true,Date.parse('2026-10-01'))]);assert.equal(notices.length,1);assert(!JSON.stringify(notices).includes('PRIVATE TITLE'));assert.equal(alarm.periodInMinutes,60);
+  await reconcileReminderNotifications(writer,browser,true,Date.parse('2026-10-02'));assert.equal(notices.length,2);granted=false;await reconcileReminderNotifications(writer,browser,true,Date.parse('2026-10-03'));assert.equal((await writer.getReminderNotificationSettings()).enabled,false);assert.equal(alarm,null);
+  await writer.saveReminderNotificationSettings(true);const backup=createBackup(await writer.getDatabase());assert(!JSON.stringify(backup).includes('lastNotifiedDay'));await writer.restoreDatabase(parseBackup(backup));assert.equal((await writer.getReminderNotificationSettings()).enabled,false);await writer.saveReminderNotificationSettings(true);await writer.clearDatabase();assert.equal((await writer.getReminderNotificationSettings()).enabled,false);
+}],['sync dashboard tracks snapshot differences, partial quick scans and safe failures without claiming full freshness',async()=>{
   const {writer}=memory();const old=[{providerItemId:'a',title:'A',mediaType:'game',ownership:'owned'},{providerItemId:'b',title:'B',mediaType:'game',ownership:'owned'}];
   const full=items=>writer.replaceProviderItems('gog',items,{fullSyncAt:'2026-09-01',profileLabel:'personal'},completeProviderSnapshot('gog',items,[completedScope('games',items.length,items.length,'reported-count')]));
   await full(old);let db=await full([{...old[0],ownership:'unknown'},{providerItemId:'c',title:'C',mediaType:'game'}]);assert.deepEqual(db.providers.gog.syncHealth.differences,{added:1,missing:1,ownershipChanged:1,observed:2});

@@ -4,8 +4,17 @@
   "name": "Galactic Library",
   "version": "0.1.0",
   "description": "A private, browser-local index of digital media you own.",
-  "permissions": ["storage", "unlimitedStorage", "scripting"],
-  "host_permissions": ["https://api.steampowered.com/*", "https://openlibrary.org/*", "https://www.googleapis.com/*", "https://www.fanatical.com/*"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.steampowered.com/*",
+    "https://openlibrary.org/*",
+    "https://www.googleapis.com/*",
+    "https://www.fanatical.com/*"
+  ],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"
@@ -17,54 +26,143 @@
   "options_page": "options.html",
   "content_scripts": [
     {
-      "matches": ["https://store.steampowered.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/steam-store.js", "src/providers/steam-store-content.js"],
+      "matches": [
+        "https://store.steampowered.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/steam-store.js",
+        "src/providers/steam-store-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.gog.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/gog.js", "src/providers/gog-content.js"],
+      "matches": [
+        "https://www.gog.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/gog.js",
+        "src/providers/gog-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://store.epicgames.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/epic.js", "src/providers/epic-content.js"],
+      "matches": [
+        "https://store.epicgames.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/epic.js",
+        "src/providers/epic-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.audible.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/audible.js", "src/providers/audible-content.js"],
+      "matches": [
+        "https://www.audible.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/audible.js",
+        "src/providers/audible-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://gaming.amazon.com/*", "https://luna.amazon.com/claims/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/amazon-games.js", "src/providers/amazon-games-content.js"],
+      "matches": [
+        "https://gaming.amazon.com/*",
+        "https://luna.amazon.com/claims/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/amazon-games.js",
+        "src/providers/amazon-games-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.amazon.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/kindle.js", "src/providers/kindle-content.js", "src/providers/amazon-video.js", "src/providers/amazon-video-content.js"],
+      "matches": [
+        "https://www.amazon.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/kindle.js",
+        "src/providers/kindle-content.js",
+        "src/providers/amazon-video.js",
+        "src/providers/amazon-video-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.kobo.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/kobo-ownership.js", "src/providers/kobo.js", "src/providers/kobo-content.js"],
+      "matches": [
+        "https://www.kobo.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/kobo-ownership.js",
+        "src/providers/kobo.js",
+        "src/providers/kobo-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://athome.fandango.com/*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/fandango-at-home.js", "src/providers/fandango-at-home-content.js"],
+      "matches": [
+        "https://athome.fandango.com/*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/fandango-at-home.js",
+        "src/providers/fandango-at-home-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.humblebundle.com/home/purchases*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/humble.js", "src/providers/humble-content.js"],
+      "matches": [
+        "https://www.humblebundle.com/home/purchases*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/humble.js",
+        "src/providers/humble-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.fanatical.com/orders*", "https://www.fanatical.com/*/orders*"],
-      "js": ["src/providers/floating-panel.js", "src/providers/provider-snapshot.js", "src/providers/metadata.js", "src/providers/fanatical.js", "src/providers/fanatical-content.js"],
+      "matches": [
+        "https://www.fanatical.com/orders*",
+        "https://www.fanatical.com/*/orders*"
+      ],
+      "js": [
+        "src/providers/floating-panel.js",
+        "src/providers/provider-snapshot.js",
+        "src/providers/metadata.js",
+        "src/providers/fanatical.js",
+        "src/providers/fanatical-content.js"
+      ],
       "run_at": "document_idle"
     }
+  ],
+  "optional_permissions": [
+    "alarms",
+    "notifications"
   ]
 }

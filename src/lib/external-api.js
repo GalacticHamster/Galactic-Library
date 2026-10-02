@@ -1,6 +1,7 @@
 import { EXTERNAL_API_VERSION, PROVIDERS } from './constants.js';
 import { companionResult } from './companion-response.js';
 import { matchItems } from './matcher.js';
+import {libraryReminders,companionReminder} from './reminders.js';
 import { validIsbn } from './identity.js';
 import { validateContents } from './contents.js';
 
@@ -55,7 +56,14 @@ function validMatchRequest(item) {
 export function handleExternalApiRequest(database, request) {
   if (!request || typeof request !== 'object') return { ok: false, error: 'Invalid Galactic Library API request.' };
   if (request.type === 'PING') return { ok: true, apiVersion: EXTERNAL_API_VERSION, appVersion: '0.1.0' };
-  if (request.type === 'GET_STATUS') return { ok: true, apiVersion: EXTERNAL_API_VERSION, ready: true, providers: providerStatus(database.providers), capabilities:{mediaTypes:[...REQUEST_MEDIA_TYPES],relationships:['same-work','same-edition','contains'],reviewedContents:true,opaqueItemReferences:true} };
+  if (request.type === 'GET_STATUS') return { ok: true, apiVersion: EXTERNAL_API_VERSION, ready: true, providers: providerStatus(database.providers), capabilities:{mediaTypes:[...REQUEST_MEDIA_TYPES],relationships:['same-work','same-edition','contains'],reviewedContents:true,opaqueItemReferences:true,entitlementReminders:true} };
+  if(request.type==='GET_REMINDERS'){
+    if(request.apiVersion!==EXTERNAL_API_VERSION)return {ok:false,error:'Unsupported Galactic Library API version.'};
+    const offset=request.offset??0,limit=request.limit??100;
+    if(!Number.isSafeInteger(offset)||offset<0||offset>1000000||!Number.isSafeInteger(limit)||limit<1||limit>200||request.provider!==undefined&&!PROVIDERS.includes(request.provider))return {ok:false,error:'Invalid reminder page or provider.'};
+    const reminders=libraryReminders(database).filter(item=>!request.provider||item.provider===request.provider);
+    return {ok:true,apiVersion:EXTERNAL_API_VERSION,total:reminders.length,nextOffset:offset+limit<reminders.length?offset+limit:null,reminders:reminders.slice(offset,offset+limit).map(companionReminder)};
+  }
   if (request.type !== 'MATCH_ITEMS') return { ok: false, error: 'Unsupported Galactic Library API request.' };
   if (request.apiVersion !== EXTERNAL_API_VERSION) return { ok: false, error: `Unsupported Galactic Library API version: ${request.apiVersion ?? '(missing)'}.` };
   if (!Array.isArray(request.items) || !request.items.length || request.items.length > 500 || !request.items.every(validMatchRequest)) {
