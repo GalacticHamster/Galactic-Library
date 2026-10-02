@@ -17,6 +17,11 @@ function harness(reply) {
   return {scan,paths,get maxActive(){return maxActive;}};
 }
 export const fanaticalSyncTests=[
+  ['Fanatical serialized scanner retains separate opaque occurrences for repeated product purchases',async()=>{
+    const orders=[order(1),order(2)];for(const [index,entry]of orders.entries()){entry.date=`2026-09-${index?'20':'10'}T00:00:00Z`;entry.items[0].name=`Bundle ${index}`;entry.items[0].bundles[0].games[0]={_id:'shared-product',name:'Repeated book',type:'book'};}
+    const run=harness(path=>({status:200,data:path==='/api/user/orders'?orders:orders.find(entry=>path.endsWith(entry._id))}));const result=await run.scan({fullScan:true});assert.equal(result.items.length,1);assert.equal(result.items[0].purchaseOrigins.length,2);assert.equal(new Set(result.items[0].purchaseOrigins.map(entry=>entry.occurrenceRef)).size,2);
+    assert(!JSON.stringify(result).includes('order-000001'));assert(!JSON.stringify(result).includes('PRIVATE_TOKEN'));assert.deepEqual([...result.items[0].purchaseOrigins.map(entry=>entry.bundleTitle)].sort(),['Bundle 0','Bundle 1']);
+  }],
   ['Fanatical shipped scanner bounds a large library to three active requests and follows validated pagination',async()=>{
     const orders=Array.from({length:12},(_,n)=>order(n));
     const run=harness(path=>path==='/api/user/orders'?{status:200,headers:{link:'</api/user/orders?page=2>; rel="next"','x-total-count':'12'},data:orders.slice(0,6)}:

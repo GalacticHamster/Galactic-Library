@@ -12,6 +12,7 @@ import {needsGoogleBooksEnrichment} from '../lib/enrichment.js';
 import {validateEnrichment} from '../lib/metadata-validation.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
+import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -76,6 +77,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
 
   function preserveEnrichment(incoming, previous) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
+    if(incoming.provider==='fanatical'){
+      const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>({...entry,observedAt:incoming.observedAt}));
+      if(origins.length||previous?.metadata.purchaseOrigins?.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(previous?.metadata.purchaseOrigins??[],origins);
+      const dates=[previous?.acquiredAt,incoming.acquiredAt,...(incoming.metadata.purchaseOrigins??[]).map(entry=>entry.purchasedAt)].filter(Boolean).sort();incoming.acquiredAt=dates[0]??null;
+    }
     if(previous&&previous.mediaType!==incoming.mediaType)return incoming;
     const existing = previous?.metadata?.enrichment;
     if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return incoming;

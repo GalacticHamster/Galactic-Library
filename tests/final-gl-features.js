@@ -7,10 +7,19 @@ import {matchItems} from '../src/lib/matcher.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import '../src/providers/humble.js';
 import '../src/providers/fanatical.js';
+import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
 
 export function memory(){const stored={},writes=[];return {stored,writes,writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));},remove:async keys=>{for(const key of keys)delete stored[key];}})};}
 
-export const finalGlTests=[['software classification, central capability and matching remain separate from games and booklet formats',async()=>{
+export const finalGlTests=[['purchase provenance merges quick and full scans, deduplicates repeats, survives backups and isolates profiles without API disclosure',async()=>{
+  const {writer}=memory();const origin=n=>({occurrenceRef:String(n).repeat(64),orderRef:String(n).repeat(64),bundleId:`bundle-${n}`,bundleTitle:`Bundle ${n}`,purchasedAt:`2026-09-${n===1?'10':'20'}T00:00:00Z`,redemptionKey:'NEVER_STORE'});
+  const product=origins=>({providerItemId:'shared-product',title:'Repeated book',mediaType:'book',ownership:'owned',metadata:{authors:['Writer'],purchaseOrigins:origins}});
+  const full=async(origins,profile)=>{const items=[product(origins)];return writer.replaceProviderItems('fanatical',items,{profileLabel:profile,syncMode:'full'},completeProviderSnapshot('fanatical',items,[completedScope('orders',1,1,'index-complete',1)]));};
+  await full([origin(1)],'personal');let db=await writer.mergeProviderItems('fanatical',[product([origin(2)])]);const record=db.providerItems['fanatical:shared-product'];assert.equal(record.metadata.purchaseOrigins.length,2);assert.equal(record.acquiredAt,'2026-09-10T00:00:00.000Z');
+  db=await full([origin(2)],'personal');assert.equal(db.providerItems[record.id].metadata.purchaseOrigins.length,2);assert.equal(parseBackup(createBackup(db)).providerItems[record.id].metadata.purchaseOrigins.length,2);assert(!JSON.stringify(db).includes('NEVER_STORE'));
+  const response=handleExternalApiRequest(db,{type:'MATCH_ITEMS',apiVersion:1,items:[{title:record.title,mediaType:'book',authors:['Writer']}]});assert(response.results[0].owned);assert(!JSON.stringify(response).includes('purchaseOrigins')&&!JSON.stringify(response).includes(origin(1).orderRef));
+  db=await full([origin(2)],'work');assert.equal(db.providerItems[record.id].metadata.purchaseOrigins.length,1);assert.notEqual(db.providerItems[record.id].recordRef,record.recordRef);assert.equal(db.providerHistory[record.recordRef].item.metadata.purchaseOrigins.length,2);
+}],['software classification, central capability and matching remain separate from games and booklet formats',async()=>{
   const items=globalThis.GalacticHumble.humbleItemsFromOrder({subproducts:[{machine_name:'tool',human_name:'Tool',product_type:'software',downloads:[{url:'https://example.test/booklet.pdf'}]},{machine_name:'game',human_name:'Game',product_type:'game'}],tpkd_dict:{all_tpks:[{machine_name:'license',human_name:'License',product_type:'software'}]}},{},'purchase');
   assert.equal(items.find(item=>item.title==='Tool').mediaType,'software');assert.equal(items.find(item=>item.title==='Game').mediaType,'game');assert.equal(items.find(item=>item.title==='License').mediaType,'software');
   assert.equal(globalThis.GalacticFanatical.fanaticalItemsFromProjection({items:[{sourceItemId:'software-product',title:'Tool',mediaType:'software'}]})[0].mediaType,'software');

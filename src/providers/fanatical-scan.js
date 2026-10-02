@@ -247,13 +247,14 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     throw new Error('Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.');
   }
   const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ fingerprint }) => !known.has(fingerprint));
-  const details = await boundedMap(toInspect, async ({ order: listedOrder }) => {
+  const details = await boundedMap(toInspect, async ({ order: listedOrder, fingerprint }) => {
     const { data: order } = await request(`/api/user/orders/${encodeURIComponent(listedOrder._id)}`);
     const projectedItems = [];
     if (!order || order._id !== listedOrder._id || order.status !== 'COMPLETE' || !Array.isArray(order.items) || !order.items.length) throw unreadable();
     const expected = expectedProducts.get(order._id);
     const actual = productCounts(order.items);
     if (actual.size !== expected.size || [...expected].some(([key, quantity]) => actual.get(key) !== quantity)) throw unreadable();
+    let occurrence=0;
     for (const parent of order.items) {
       if (!parent || typeof parent._id !== 'string' || !safeIdInPage(parent._id) || !safeTextInPage(parent.name) || !Array.isArray(parent.bundles) || !parent.bundles.length) throw unreadable();
       for (const group of parent.bundles) {
@@ -262,6 +263,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
           if (typeof leaf?._id !== 'string') throw unreadable();
           const projected = projectLeafInPage(leaf, parent, order);
           if (!projected) throw unreadable();
+          projected.purchaseOrigins=[{occurrenceRef:await fingerprintOrderInPage(`${order._id}\u0000${occurrence++}\u0000${parent._id}\u0000${leaf._id}`),orderRef:fingerprint,bundleId:parent._id,bundleTitle:safeTextInPage(parent.name),purchasedAt:safeDateInPage(order.date)}];
           projectedItems.push(projected);
         }
       }
@@ -269,7 +271,13 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     return projectedItems;
   });
   const items = new Map();
-  for (const products of details) for (const product of products) items.set(product.sourceItemId, product);
+  for (const products of details) for (const product of products){
+    const prior=items.get(product.sourceItemId),purchaseOrigins=[...(prior?.purchaseOrigins??[]),...product.purchaseOrigins];
+    if(purchaseOrigins.length>500)throw incomplete('A product exceeded the 500-purchase occurrence limit.');
+    items.set(product.sourceItemId,{...product,purchaseOrigins});
+  }
+  let currentToken='';try{currentToken=String(JSON.parse(localStorage.getItem('bsauth')||'{}')?.token||'');}catch{}
+  if(currentToken!==token)throw incomplete('The signed-in account changed during the scan.');
   // `token`, summaries, details, and raw leaves remain in this execution world.
   return {
     schemaVersion: 1,

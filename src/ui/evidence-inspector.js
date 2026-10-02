@@ -36,6 +36,10 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       field('Account / profile',compact(provider.accountLabel||provider.profileLabel));
       field('Last observed at provider',record.observedAt);field('Last provider sync (may be incremental)',provider.lastSync);
       field('Record last updated (includes enrichment)',record.updatedAt);field('Acquired / added',record.acquiredAt);
+      if(record.metadata.purchaseOrigins?.length){
+        field('Purchase occurrences',String(record.metadata.purchaseOrigins.length));
+        const origins=element('ul','');for(const origin of record.metadata.purchaseOrigins)origins.append(element('li',`${origin.bundleTitle||'Standalone purchase'} — purchased ${origin.purchasedAt||'date unknown'} — last observed ${origin.observedAt||'unknown'}`));section.append(origins);
+      }
       field('Edition label',identity.edition);field('ISBN (checksum validated)',identity.isbn);field('ASIN',identity.asin);field('Steam App ID',identity.steamAppId);
       field('Catalog work identities',identity.workIds);field('Authors',identity.authors);field('Contributors',identity.contributors.map(person=>`${person.name} (${person.role||'role unknown'})`));
       field('Publisher',identity.publisher);field('Language',identity.language);field('Series',identity.series);field('Run / year',identity.run);field('Unit',`${identity.unitType} ${identity.unit}`.trim());field('Format',names(record.metadata?.format||record.metadata?.formats));

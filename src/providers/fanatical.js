@@ -45,6 +45,7 @@
           slug: compactText(source?.slug),
           drm: safeList(source?.drm),
           formats: safeList(source?.formats),
+          ...(Array.isArray(source?.purchaseOrigins)?{purchaseOrigins:source.purchaseOrigins}:{}),
           ...(steamAppId ? { steamAppId } : {}),
           ...(isbn ? { isbn } : {})
         }

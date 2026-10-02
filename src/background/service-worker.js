@@ -11,6 +11,7 @@ import { completeProviderSnapshot, completedScope } from '../lib/provider-snapsh
 import { restrictStorageAccess } from './storage-access.js';
 import { validateFandangoState } from './import-state.js';
 import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
+import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-origins.js';
 
 const storageReady = restrictStorageAccess(chrome.storage);
 // Operations report initialization errors through their normal response channel.
@@ -112,6 +113,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
       drm: safeList(candidate?.drm), platforms: safeList(candidate?.platforms), formats: safeList(candidate?.formats),
       bundle: { sourceItemId: /^[a-zA-Z0-9_-]{6,128}$/u.test(String(candidate?.bundle?.sourceItemId ?? '')) ? String(candidate.bundle.sourceItemId) : '', title: safeText(candidate?.bundle?.title, 500), slug: safeText(candidate?.bundle?.slug) },
       purchaseDate: typeof candidate?.purchaseDate === 'string' && !Number.isNaN(Date.parse(candidate.purchaseDate)) ? candidate.purchaseDate : null
+      ,...(candidate?.purchaseOrigins!==undefined?{purchaseOrigins:validatePurchaseOrigins(candidate.purchaseOrigins)}:{})
     });
   }
   return {
@@ -119,7 +121,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
     orderFingerprints: knownOrderFingerprints,
     coverage:{complete:true,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
-    items: [...new Map(items.map((item) => [item.sourceItemId, item])).values()],
+    items: [...items.reduce((map,item)=>{const prior=map.get(item.sourceItemId);map.set(item.sourceItemId,{...item,...(item.purchaseOrigins||prior?.purchaseOrigins?{purchaseOrigins:mergePurchaseOrigins(prior?.purchaseOrigins??[],item.purchaseOrigins??[])}:{})});return map;},new Map()).values()],
     snapshot: fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined
   };
 }
