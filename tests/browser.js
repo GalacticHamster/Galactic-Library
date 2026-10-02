@@ -1,3 +1,4 @@
+import {createRelease} from '../scripts/release.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, mkdtemp, rm, access } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import {metadataZip,containerXml,opfXml} from './metadata-fixtures.js';
 
 // No personal profile, installed extensions, provider sessions or remote services.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const packaged=process.argv.includes('--release')?await createRelease():null;
 const importerMode=process.argv.includes('--importers');
 const candidates=[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
 let browser;
@@ -31,7 +33,8 @@ const server=createServer(async(request,response)=>{
     }
     const target=resolve(root,`.${decodeURIComponent(pathname)}`);
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
-    let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':await readFile(target);
+    let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
+    if(!body)throw new Error('File is absent from the validated runtime package.');
     if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"','src="tests/browser-fixture.js"');
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
@@ -49,7 +52,7 @@ try{
   assert.ok(result,'The browser did not finish the UI fixture.');
   for(const check of result.checks)console.log(`PASS browser: ${check}`);
   assert.equal(result.error,undefined,result.error);
-  console.log(`\n${result.checks.length} browser checks passed.`);
+  console.log(`\n${result.checks.length} ${packaged?'packaged ':''}browser checks passed.`);
 }finally{
   await new Promise(done=>server.close(done));
   // Verify the generated absolute profile is inside the intended temporary root.

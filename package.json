@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "test": "node tests/run.js",
-    "test:browser": "node tests/browser.js"
+    "test:browser": "node tests/browser.js",
+    "package": "node scripts/package-release.mjs",
+    "check:package": "node scripts/package-release.mjs --check",
+    "test:browser:release": "node tests/browser.js --release",
+    "test:importers:release": "node tests/browser.js --release --importers"
   }
 }

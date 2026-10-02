@@ -2,3 +2,5 @@
 coverage/
 galactic-library-backup-v*.json
 comixology-ownership-review.md
+
+dist/

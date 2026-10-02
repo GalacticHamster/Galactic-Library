@@ -152,3 +152,5 @@ Complete provider scans archive missing records instead of deleting their purcha
 
 
 Comic/manga enrichment now includes local ComicInfo.xml/EPUB/OPF imports, cited publisher proposals, Open Library ISBN edition lookup and an enrichment workbench with paged queues, batch confirmation, retry, dismissal and undo. Metadata files stay in the browser; source proposals require review and never establish ownership or verified collected contents by themselves. See [comic/manga enrichment and source evaluation](docs/comic-manga-enrichment.md).
+
+Library tools now include Unicode title aliases, central software support, Fanatical purchase occurrences, dated ownership/receipt review, sync health/cancellation, optional entitlement reminders and private reading progress/orders. See [library tools](docs/library-tools.md) for behavior and backup compatibility, and [release packaging](docs/release-packaging.md) for reproducible distribution and packaged browser checks.

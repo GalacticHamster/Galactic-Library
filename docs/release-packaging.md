@@ -1,0 +1,20 @@
+# Release packaging (GL-18)
+
+Run with Node 20 or newer; no npm dependencies are required:
+
+```powershell
+npm test
+npm run package
+npm run test:browser:release
+npm run test:importers:release
+```
+
+`scripts/runtime-files.json` is the explicit, reviewed distribution allowlist. Add new runtime modules/assets to it when adding a feature. The builder never discovers files by recursively copying the repository. Only the manifest, options/popup pages and listed runtime scripts/styles/icon enter the ZIP. Backups, exports, personal notes, audit reports, docs, tests, build scripts, package metadata and Git files are excluded.
+
+Outputs are `dist/GalacticLibrary-<manifest version>.zip`, its `.sha256` checksum and `dist/release-files.json` with each runtime file's size/hash. `dist/` is ignored by Git. `npm run check:package` validates without writing artifacts. The ZIP is an unpacked-extension distribution, not a signed CRX or a store upload. Extract it into a dedicated folder and select that folder with Chrome's Load unpacked control.
+
+Packages use sorted paths, stored ZIP entries, fixed DOS-epoch timestamps and LF-normalized text. Identical runtime content yields identical ZIP bytes despite checkout line endings, file modification times, build time or machine paths. The report contains relative runtime paths only. Missing manifest resources, static/dynamic module imports, page assets and literal runtime URLs fail validation. Nonliteral dynamic imports require an explicit validator update. Directory junctions/symlinks cannot take an allowlisted file outside the project. File and archive bounds reject excessive inputs.
+
+Core release tests verify deterministic content, exclusions, dependency failures, corrupt ZIP rejection, JavaScript syntax and escaping directory junctions. Chrome fixtures in `--release` mode read production resources exclusively from the validated ZIP; developer fixtures and synthetic provider data remain outside it. This exercises the real options UI and all eleven provider panels with mocked extension storage/messages and synthetic HTTP responses, in a fresh temporary browser profile. It catches missing packaged dependencies without exposing personal accounts.
+
+These are runtime UI/importer checks, not a signed-in provider scan, an installed-extension permission-prompt test or proof of OS notification delivery. Desktop reminder permission/revocation/dedup/failure behavior is separately tested with API stubs. Use the built ZIP for a manual installed-extension smoke check before distributing a release. Keep the manifest and `package.json` versions aligned when intentionally making a new version.

@@ -1,3 +1,4 @@
+import {releaseTests} from './release.js';
 import { finalGlTests } from './final-gl-features.js';
 import { localEnrichmentTests } from './local-enrichment.js';
 import { enrichmentTests } from './enrichment.js';
@@ -479,7 +480,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
+for (const [name, run] of [...tests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -490,4 +491,4 @@ for (const [name, run] of [...tests, ...finalGlTests, ...localEnrichmentTests, .
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
+else console.log(`\n${tests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length} tests passed.`);
