@@ -11,6 +11,8 @@
     "test:browser:release": "node tests/browser.js --release",
     "test:importers:release": "node tests/browser.js --release --importers",
     "package:firefox": "node scripts/package-release.mjs --firefox",
-    "check:package:firefox": "node scripts/package-release.mjs --firefox --check"
+    "check:package:firefox": "node scripts/package-release.mjs --firefox --check",
+    "test:firefox": "node tests/firefox.mjs",
+    "test:firefox:companions": "node tests/firefox.mjs --companions"
   }
 }

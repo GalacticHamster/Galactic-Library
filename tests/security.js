@@ -160,3 +160,5 @@ export const securityTests = [
     assert.deepEqual((await dispatch({type:'FANDANGO_IMPORT_STATE',action:'get'},sender)).state,before);
   })]
 ];
+
+securityTests.push(['Firefox protection requires private storage readiness and privileged session support',async()=>{let ready=false;const runtime={getURL:()=> 'moz-extension://synthetic/'},session={get:async()=>({})};await restrictStorageAccess({local:{},session},runtime,{ready:async()=>{ready=true;}});assert.equal(ready,true);await assert.rejects(restrictStorageAccess({local:{},session},runtime),/cannot protect/);await assert.rejects(restrictStorageAccess({local:{},session:{}},runtime,{ready:async()=>{}}),/cannot protect/);await assert.rejects(restrictStorageAccess({session},runtime,{ready:async()=>{throw Error('private storage unavailable');}}),/private storage unavailable/);}]);

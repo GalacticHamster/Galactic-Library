@@ -3,6 +3,7 @@
   "options.html",
   "popup.html",
   "src/background/import-state.js",
+  "src/background/private-storage.js",
   "src/background/reminder-notifier.js",
   "src/background/service-worker.js",
   "src/background/storage-access.js",

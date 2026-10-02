@@ -13,11 +13,17 @@ import { restrictStorageAccess } from './storage-access.js';
 import { validateFandangoState } from './import-state.js';
 import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
 import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 
-const storageReady = restrictStorageAccess(chrome.storage);
+const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
+  // Only key names cross this channel. Library records/API keys never do.
+  chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
+  if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
+});
+const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
-const storageWriter = createStorageWriter(chrome.storage.local, storageReady);
+const storageWriter = createStorageWriter(privateArea, storageReady);
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 

@@ -30,6 +30,7 @@ import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
 import { identityEvidence, identityConflicts, editionEnrichmentConflicts } from '../lib/identity.js';
+import {PRIVATE_STORAGE_CHANGED} from '../background/private-storage.js';
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -973,5 +974,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && !googleBooksRunning && (changes[GOOGLE_BOOKS_API_KEY_STORAGE_KEY] || changes[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])) {
     renderGoogleBooksEnrichment().catch(() => {});
   }
+});
+chrome.runtime.onMessage?.addListener((message,sender)=>{
+  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)refresh().catch(()=>{});
+  return false;
 });
 refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });
