@@ -3,13 +3,13 @@ import { identityConflicts, identityEvidence, relationshipReason, sameEditionEvi
 import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
 import { editionBarriers, pairKey } from './relationships.js';
-import { entitlementEvidence } from './ownership.js';
+import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
   const identity=identityEvidence(item);
   return {provider:item.provider,itemRef:item.recordRef,title:String(item.title).slice(0,500),ownership:item.ownership,confidence,relationship,reason,
-    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null,...entitlementEvidence(item)}};
+    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null,...entitlementEvidence(item),...(item.manualOwnershipEvidence?{ownershipBasis:'dated-manual-confirmation',ownershipConfirmedAt:item.manualOwnershipEvidence.confirmedAt,accessExpiresAt:item.manualOwnershipEvidence.expiresAt}:{})}};
 }
 
 function requestRecord(request) {
@@ -19,6 +19,7 @@ function requestRecord(request) {
 }
 
 export function matchItems(items, requestedItems, context = {}) {
+  items=Object.fromEntries(Object.entries(items).map(([id,item])=>[id,effectiveOwnershipRecord(item,context)]));
   const database={...context,providerItems:items};
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};

@@ -5,6 +5,9 @@ import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {createLocalMetadataTools} from './local-metadata-tools.js';
 import {createTitleAliasTools} from './title-aliases.js';
 import {saveTitleAliases} from '../lib/storage.js';
+import {createOwnershipReviewTools,createPurchaseEvidenceWorkbench} from './ownership-review.js';
+import {effectiveOwnershipRecord} from '../lib/ownership.js';
+import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
@@ -104,7 +107,7 @@ function providerSourceDetails(records) {
   const byProvider = new Map();
   for (const record of records) {
     const providerRecords = byProvider.get(record.provider) ?? [];
-    providerRecords.push(record);
+    providerRecords.push(effectiveOwnershipRecord(record,database));
     byProvider.set(record.provider, providerRecords);
   }
   return [...byProvider].map(([provider, providerRecords]) => {
@@ -234,7 +237,7 @@ function providerMatches(record, provider) {
 }
 
 function ownershipMatches(record, ownership) {
-  return ownership === 'all' || record.ownership === ownership;
+  return ownership === 'all' || effectiveOwnershipRecord(record,database).ownership === ownership;
 }
 
 function filtersAreActive(filters, query) {
@@ -617,6 +620,12 @@ function render() {
     });document.querySelector('.tool-cards').after(enrichmentWorkbench.element);
   }
   enrichmentWorkbench.update(database);
+  const receiptWorkbench=createPurchaseEvidenceWorkbench(database,{
+    save:async()=>{},import:async entries=>{database=await importPurchaseEvidence(entries);},retry:async()=>{database=await refreshPurchaseEvidence();},
+    apply:async(...args)=>{database=await applyPurchaseEvidence(...args);},dismiss:async id=>{database=await dismissPurchaseEvidence(id);},refresh:render
+  });
+  const priorReceipts=document.querySelector('#purchase-evidence-workbench');receiptWorkbench.open=priorReceipts?.open??false;
+  if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else enrichmentWorkbench.element.after(receiptWorkbench);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));
@@ -745,6 +754,9 @@ function render() {
       refresh:render
     }));
     node.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
+    node.append(createOwnershipReviewTools(records,database,{
+      save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render
+    }));
     if (canonicalItem.mediaType === 'book') {
       node.append(createGoogleBooksTools(canonicalItem,records));
       node.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));

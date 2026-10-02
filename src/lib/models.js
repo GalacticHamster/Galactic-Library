@@ -9,6 +9,7 @@ import { editionBarriers, validateEditionSeparations } from './relationships.js'
 import { providerOwnership } from './ownership.js';
 import {validateEnrichmentHistory,validateEnrichmentReviews} from './enrichment-state.js';
 import {validateTitleAliases} from './title-aliases.js';
+import {validateOwnershipReviews,validateOwnershipProposals} from './ownership-review.js';
 
 export function createEmptyDatabase() {
   return {
@@ -19,7 +20,7 @@ export function createEmptyDatabase() {
     manualMatchDecisions: {},
     contentReviews: {},
     editionSeparations: {},
-    providerHistory: {},enrichmentHistory:{},enrichmentReviews:{},titleAliases:{}
+    providerHistory: {},enrichmentHistory:{},enrichmentReviews:{},titleAliases:{},ownershipReviews:{},ownershipProposals:{}
   };
 }
 
@@ -146,7 +147,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, 2, 3, 4, 5, 6, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, 3, 4, 5, 6, 7, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   const normalizedItems = Object.values(value.providerItems).map((item) => {
@@ -203,6 +204,7 @@ export function validateDatabase(value) {
     enrichmentHistory:validateEnrichmentHistory(value.enrichmentHistory),
     enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),
     titleAliases:validateTitleAliases(value.titleAliases),
+    ownershipReviews:validateOwnershipReviews(value.ownershipReviews),ownershipProposals:validateOwnershipProposals(value.ownershipProposals),
     providerItems,
     canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems,editionSeparations),
     manualMatchDecisions,

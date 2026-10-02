@@ -13,6 +13,7 @@ import {validateEnrichment} from '../lib/metadata-validation.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -367,6 +368,45 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     else database.titleAliases[recordRef]=validateTitleAliases({[recordRef]:{titles,note,updatedAt:new Date().toISOString()}})[recordRef];
     return persistDatabase(database);
   }
+
+  function currentOwnershipRecord(database,ref,expected=null){
+    const item=Object.values(database.providerItems).find(item=>item.recordRef===ref);
+    if(!item)throw new Error('This record is no longer in the active library.');
+    if((database.ownershipReviews[ref]?.reviewRef??null)!==expected)throw new Error('Ownership evidence changed. Reload this record before reviewing it.');
+    return item;
+  }
+  async function saveOwnershipReview(ref,value,expected=null){
+    const database=await getDatabase();currentOwnershipRecord(database,ref,expected);
+    database.ownershipReviews[ref]=validateOwnershipReview({...value,source:'manual-confirmation',reviewRef:crypto.randomUUID(),confirmedAt:new Date().toISOString()});return persistDatabase(database);
+  }
+  async function removeOwnershipReview(ref,expected){
+    const database=await getDatabase();currentOwnershipRecord(database,ref,expected);delete database.ownershipReviews[ref];return persistDatabase(database);
+  }
+  async function importPurchaseEvidence(entries){
+    if(!Array.isArray(entries)||!entries.length||entries.length>1000)throw new Error('Import 1–1,000 purchase evidence entries.');
+    const evidence=entries.map(purchaseEvidence),database=await getDatabase(),now=new Date().toISOString();
+    for(const entry of evidence){
+      const profileLabel=database.providers[entry.provider]?.profileLabel??'';
+      if(Object.values(database.ownershipProposals).some(proposal=>proposal.profileLabel===profileLabel&&JSON.stringify(proposal.evidence)===JSON.stringify(entry)))continue;
+      database.ownershipProposals[crypto.randomUUID()]={evidence:entry,profileLabel,recordRefs:purchaseCandidates(entry,database.providerItems),importedAt:now};
+    }
+    return persistDatabase(database);
+  }
+  async function refreshPurchaseEvidence(){
+    const database=await getDatabase();for(const proposal of Object.values(database.ownershipProposals))if(proposal.profileLabel===(database.providers[proposal.evidence.provider]?.profileLabel??''))proposal.recordRefs=purchaseCandidates(proposal.evidence,database.providerItems);return persistDatabase(database);
+  }
+  async function applyPurchaseEvidence(proposalId,ref,confirmed,expected=null){
+    const database=await getDatabase(),proposal=database.ownershipProposals[proposalId];
+    if(!proposal||confirmed!==true||!proposal.recordRefs.includes(ref))throw new Error('Confirm a current candidate for this receipt.');
+    const item=currentOwnershipRecord(database,ref,expected),evidence=proposal.evidence;
+    if(item.provider!==evidence.provider||item.mediaType!==evidence.mediaType||proposal.profileLabel!==(database.providers[item.provider]?.profileLabel??''))throw new Error('This receipt belongs to another provider/profile.');
+    const candidate={title:evidence.title,mediaType:evidence.mediaType,metadata:{...(evidence.asin?{asin:evidence.asin}:{}),...(evidence.isbn?{isbn:[evidence.isbn]}:{})}};
+    const conflicts=identityConflicts(item,candidate);
+    if(evidence.asin&&/^[A-Z0-9]{10}$/iu.test(item.providerItemId)&&item.providerItemId.toUpperCase()!==evidence.asin)conflicts.push('catalog identifier');
+    if(conflicts.length)throw new Error(`Receipt conflicts on ${[...new Set(conflicts)].join(', ')}. Review the identifiers and edition first.`);
+    database.ownershipReviews[ref]=validateOwnershipReview({ownership:'owned',source:'local-purchase-history',reviewRef:crypto.randomUUID(),note:`${evidence.sourceLabel}: ${evidence.title}`,evidenceDate:evidence.acquiredAt,confirmedAt:new Date().toISOString(),expiresAt:null});delete database.ownershipProposals[proposalId];return persistDatabase(database);
+  }
+  async function dismissPurchaseEvidence(proposalId){const database=await getDatabase();delete database.ownershipProposals[proposalId];return persistDatabase(database);}
   function selectEnrichment(database,id,kind,value,now){
     const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
     database.enrichmentHistory[selectionRef]={recordRef:item.recordRef,kind,selectionRef,previous:item.metadata?.enrichment?.[kind]??null,changedAt:now};
@@ -573,7 +613,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
-    separateEdition, undoEditionSeparation, saveTitleAliases,
+    separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions
   };
   let tail = Promise.resolve();

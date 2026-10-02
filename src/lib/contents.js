@@ -1,5 +1,6 @@
 import { compact, identityKey } from './identity.js';
 import { object, text, date, url } from './validation.js';
+import {effectiveOwnershipRecord} from './ownership.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
 export function seriesDescriptor(series, run = '') {
@@ -66,7 +67,7 @@ export function validateContentReview(value) {
 export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {
   const byKey=new Map();
   for (const [itemId,review] of Object.entries(database.contentReviews ?? {})) {
-    const item=database.providerItems[itemId];
+    const item=effectiveOwnershipRecord(database.providerItems[itemId],database);
     if (!item || !['owned','claimed'].includes(item.ownership) || excludeProviders.includes(item.provider) || excludeItemIds.includes(itemId)) continue;
     for (const entry of review.entries) {
       if (entry.completeness!=='full') continue;

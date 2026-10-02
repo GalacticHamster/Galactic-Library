@@ -1,6 +1,6 @@
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
 import { contentCoverage } from '../lib/contents.js';
-import { entitlementEvidence } from '../lib/ownership.js';
+import { entitlementEvidence,effectiveOwnershipRecord } from '../lib/ownership.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 const display=value=>Array.isArray(value)?value.join(', ')||'Unknown':value||'Unknown';
@@ -29,6 +29,8 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       const table=element('dl','');table.className='evidence-fields';
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));
       field('Record reference',record.recordRef);field('Ownership evidence',record.ownership);field('Evidence source',identity.source);
+      const ownershipReview=database.ownershipReviews?.[record.recordRef];
+      if(ownershipReview){field('Reviewed ownership',effectiveOwnershipRecord(record,database).ownership);field('Ownership confirmed',ownershipReview.confirmedAt);field('Ownership evidence date',ownershipReview.evidenceDate);field('Ownership evidence note',ownershipReview.note);field('Reviewed access expiry',ownershipReview.expiresAt);}
       if(record.provider==='kobo')field('Kobo ownership basis',record.metadata.ownershipBasis||'Library presence only; durable ownership unconfirmed');
       const entitlement=entitlementEvidence(record);
       if(entitlement.purchaseEvidence){field('Reseller purchase evidence',entitlement.purchaseEvidence);field('Destination activation',entitlement.activationStatus);}

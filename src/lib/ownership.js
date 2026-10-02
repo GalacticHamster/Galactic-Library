@@ -6,6 +6,16 @@ export function providerOwnership(provider, ownership, metadata) {
   return ownership;
 }
 
+export function effectiveOwnershipRecord(item,database={},now=Date.now()){
+  if(!item)return item;
+  const review=database.ownershipReviews?.[item.recordRef];
+  if(!review)return item;
+  const expired=review.expiresAt&&Date.parse(review.expiresAt)<=now;
+  const negativeKey=item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
+  const ownership=expired||negativeKey&&['owned','claimed'].includes(review.ownership)?'unknown':review.ownership;
+  return {...item,ownership,manualOwnershipEvidence:{source:review.source,confirmedAt:review.confirmedAt,evidenceDate:review.evidenceDate,expiresAt:review.expiresAt}};
+}
+
 // A reseller purchase is evidence of the purchase, never of activation at its
 // destination. Keep this projection small enough to share with companions.
 export function entitlementEvidence(item) {
