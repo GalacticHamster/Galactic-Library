@@ -13,6 +13,8 @@
     "package:firefox": "node scripts/package-release.mjs --firefox",
     "check:package:firefox": "node scripts/package-release.mjs --firefox --check",
     "test:firefox": "node tests/firefox.mjs",
-    "test:firefox:companions": "node tests/firefox.mjs --companions"
+    "test:firefox:companions": "node tests/firefox.mjs --companions",
+    "test:browser:firefox": "node tests/browser.js --release --firefox",
+    "test:importers:firefox": "node tests/browser.js --release --importers --firefox"
   }
 }
