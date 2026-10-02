@@ -7,6 +7,8 @@ import {createTitleAliasTools} from './title-aliases.js';
 import {saveTitleAliases} from '../lib/storage.js';
 import {createOwnershipReviewTools,createPurchaseEvidenceWorkbench} from './ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
+import {createSyncHealthView} from './sync-health.js';
+import {cancelProviderScan} from '../lib/storage.js';
 import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
@@ -626,6 +628,9 @@ function render() {
   });
   const priorReceipts=document.querySelector('#purchase-evidence-workbench');receiptWorkbench.open=priorReceipts?.open??false;
   if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else enrichmentWorkbench.element.after(receiptWorkbench);
+  const syncDashboard=createSyncHealthView(database,{cancel:async(...args)=>{database=await cancelProviderScan(...args);},refresh:render});
+  const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
+  if(priorSync)priorSync.replaceWith(syncDashboard);else receiptWorkbench.after(syncDashboard);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));

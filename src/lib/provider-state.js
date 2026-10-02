@@ -1,5 +1,6 @@
 import { PROVIDERS } from './constants.js';
 import { object, text, strings, date, count } from './validation.js';
+import {validateSyncHealth} from './sync-health.js';
 
 export function validateProviderStates(value = {}) {
   object(value,'Provider states');
@@ -13,6 +14,7 @@ export function validateProviderStates(value = {}) {
       else result[key]=state[key]===null?null:text(state[key],key==='lastError'?600:500,key);
     }
     if(result.syncMode && !['full','incremental'].includes(result.syncMode))throw new Error('Invalid provider scan mode.');
+    if(state.syncHealth!==undefined)result.syncHealth=validateSyncHealth(state.syncHealth);
     if(state.syncState!==undefined){
       object(state.syncState,'Provider sync state');result.syncState={};
       if(provider==='humble')result.syncState.knownPurchaseIds=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');

@@ -38,12 +38,13 @@ try{
     let imported=0; let mode='full';
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
       if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
+      if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
       if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
       if(request.type==='FETCH_FANATICAL_ORDERS')return {ok:true,result:{items:[{sourceItemId:'fixture-123',title:items[0].title,mediaType}],snapshot,orderFingerprints:[]}};
       if(request.type==='FANDANGO_IMPORT_STATE'&&request.action==='get'){const scan=await writer.beginProviderScan(provider,'fixture',mode,false,1);return {ok:true,state:{phase:'tv',fullRescan:scan.forceFull||mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[],scanContext:{profileLabel:'fixture',confirmed:true,mode,scanToken:scan.scanToken}}};}
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
       if(request.type==='COMMIT_PROVIDER_SCAN'){
-        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString()},request.snapshot,request.scanToken,1);
+        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics},request.snapshot,request.scanToken,1);
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state};
       }
       return {ok:false,error:'Unexpected importer request.'};
@@ -65,6 +66,10 @@ try{
       assert(!/failed:/iu.test(shadow.querySelector('.status').textContent),shadow.querySelector('.status').textContent);
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
+    }
+    if(provider==='gog'){
+      globalThis.GalacticGog.fetchGogGames=async()=>{throw new Error('Network failure on page 7: PRIVATE_TOKEN');};const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="full"]').click();
+      await wait(()=>values.galacticLibraryDatabase.providers.gog.syncHealth.status==='failed');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.failedPages[0]===7&&!JSON.stringify(values).includes('PRIVATE_TOKEN'),'Failure report lost its page or leaked raw errors.');assert(values.galacticLibraryDatabase.providerItems['gog:fixture-123'],'Failed scan destroyed prior records.');checks.push('actual GOG failure reports safe dashboard diagnostics and preserves the prior snapshot');
     }
   }
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

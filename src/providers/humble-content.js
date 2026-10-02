@@ -30,6 +30,7 @@
       status.textContent = result.items.length ? `Saving ${result.items.length} Humble entitlement${result.items.length === 1 ? '' : 's'} locally…` : 'No new supported Humble entitlements; recording the completed purchase check…';
       const response = await globalThis.GalacticSync.send({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'humble', mode: fullRescan ? 'full' : 'incremental', items: result.items,
+        scanDiagnostics:{failedRequestCount:result.failures.length},
         syncState: { knownPurchaseIds: result.knownPurchaseIds }, snapshot: result.snapshot
       });
       if (!response?.ok) throw new Error(response?.error ?? 'Humble import did not complete.');
@@ -38,6 +39,7 @@
         : `Quick update read ${result.purchasesRead} new purchase${result.purchasesRead === 1 ? '' : 's'} and skipped ${result.skippedKnown} already checked`;
       status.textContent = `${scope}. Saved ${response.gameCount} Humble game${response.gameCount === 1 ? '' : 's'}, ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'}, and ${response.bookCount} book${response.bookCount === 1 ? '' : 's'} locally.${result.failures.length ? ` ${result.failures.length} new purchase${result.failures.length === 1 ? ' will' : 's will'} be retried next quick update.` : ''}`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('humble',error);
       status.textContent = `Humble import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

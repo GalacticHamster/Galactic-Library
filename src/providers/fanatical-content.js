@@ -34,6 +34,7 @@
       status.textContent = items.length ? `Saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally...` : 'No new supported Fanatical items; recording the completed check...';
       const response = await globalThis.GalacticSync.send({
         type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
+        scanDiagnostics:{retries:projection.result?.coverage?.retries??0,arrayOnly:projection.result?.coverage?.paginationEvidence==='array-only'},
         syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [] }, snapshot: projection.result?.snapshot
       });
       if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
@@ -44,6 +45,7 @@
         : `Quick update read ${stats.ordersScanned ?? 0} new completed order${stats.ordersScanned === 1 ? '' : 's'} and skipped ${Math.max(0, (stats.ordersAvailable ?? 0) - (stats.ordersScanned ?? 0))} already checked`;
       status.textContent = `${scope}.${diagnostics} ${response.gameCount} Fanatical game${response.gameCount === 1 ? '' : 's'}, ${response.bookCount} book${response.bookCount === 1 ? '' : 's'}, and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('fanatical',error);
       status.textContent = `Fanatical import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

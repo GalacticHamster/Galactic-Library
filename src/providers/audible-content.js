@@ -32,6 +32,7 @@
       if (!response?.ok) throw new Error(response?.error ?? 'Audible import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} audiobook${items.length === 1 ? '' : 's'}`}. ${response.audiobookCount} Audible audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally; ${subscriptionCount} new cards exposed a membership-remove action.`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('audible',error);
       status.textContent = `Audible import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

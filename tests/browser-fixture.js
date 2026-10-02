@@ -6,6 +6,7 @@ import { completeProviderSnapshot, completedScope } from '../src/lib/provider-sn
 import {parseLocalMetadata,localMetadataFromFile} from '../src/lib/local-metadata.js';
 import {comicXml,opfXml} from './metadata-fixtures.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
+import {createSyncHealthView} from '../src/ui/sync-health.js';
 
 const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
@@ -240,5 +241,9 @@ try{
   await wait(()=>Object.keys(values.galacticLibraryDatabase.ownershipProposals).length===1,'Actual local receipt input failed.');await wait(()=>document.querySelector('#purchase-evidence-workbench')!==receipts,'Receipt queue did not rerender.');receipts=await open(document.querySelector('#purchase-evidence-workbench'));const receiptChoice=receipts.querySelector('[aria-label="Receipt library candidate"]');assert(receiptChoice&&receiptChoice.value==='','Receipt skipped edition selection.');receiptChoice.value=values.galacticLibraryDatabase.providerItems['audible:B000000007'].recordRef;receipts.querySelector('[aria-label="Confirm receipt matches record"]').checked=true;button(receipts,'Confirm receipt ownership').click();
   const audioRef=values.galacticLibraryDatabase.providerItems['audible:B000000007'].recordRef;await wait(()=>values.galacticLibraryDatabase.ownershipReviews[audioRef]?.source==='local-purchase-history','Receipt approval failed.');assert(values.galacticLibraryDatabase.providerItems['audible:B000000007'].ownership==='subscription'&&!JSON.stringify(values.galacticLibraryDatabase).includes('PRIVATE CUSTOMER')&&!JSON.stringify(values.galacticLibraryDatabase).includes('PRIVATE KEY'),'Receipt leaked private columns or rewrote provider data.');
   checks.push('actual CSV receipt import discards sensitive fields and requires explicit edition/account approval');
+  const dashboard=await open(document.querySelector('#sync-health-dashboard'));assert(dashboard.textContent.includes('Last validated full coverage')&&dashboard.textContent.includes('Last full scan')&&dashboard.textContent.includes('ownership changes'),'Dashboard omitted coverage/freshness/differences.');
+  const dashboardScan=await writer.beginProviderScan('gog','test-profile','full',false,1);let cancelled=false;
+  const runningDashboard=createSyncHealthView(await writer.getDatabase(),{cancel:async(...args)=>{await writer.cancelProviderScan(...args);cancelled=true;},refresh:()=>{}});runningDashboard.id='isolated-sync-dashboard';document.body.append(runningDashboard);await open(runningDashboard);button(runningDashboard,'Cancel pending scan commit').click();await wait(()=>cancelled,'Dashboard cancellation did not run.');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.status==='cancelled','Cancellation did not persist.');runningDashboard.remove();
+  checks.push('actual sync dashboard displays validated coverage and freshness and cancels the selected pending commit');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

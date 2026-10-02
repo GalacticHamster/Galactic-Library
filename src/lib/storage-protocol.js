@@ -4,6 +4,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'getDatabase',
   'beginProviderScan',
   'commitProviderScan',
+  'failProviderScan',
+  'cancelProviderScan',
   'importUnscopedProviderItems',
   'restoreDatabase',
   'replaceProviderItems',

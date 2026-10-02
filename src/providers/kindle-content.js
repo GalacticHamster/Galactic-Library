@@ -46,6 +46,7 @@
       const scope = fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} Kindle item${items.length === 1 ? '' : 's'}`;
       status.textContent = `${scope}. ${response.bookCount} Kindle item${response.bookCount === 1 ? '' : 's'} stored locally. ${categoryDetails}.`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('kindle',error);
       status.textContent = `Kindle import failed: ${error.message}`;
     } finally {
       setSyncButtonsDisabled(false);

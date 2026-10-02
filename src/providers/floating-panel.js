@@ -33,7 +33,13 @@
     }
     return chrome.runtime.sendMessage(request);
   }
-  global.GalacticSync={send};
+  async function failed(provider,error){
+    const context=sessions.get(provider)?.context;if(!context?.scanToken)return;
+    const message=String(error?.message??''),code=/login|sign.in|401|403|account changed/iu.test(message)?'authentication':/timeout|timed out|abort/iu.test(message)?'timeout':/incomplete|coverage|pagination|count|malformed|unreadable|invalid|limit|bounds/iu.test(message)?'coverage':/fetch|network|offline|connection/iu.test(message)?'network':'other';
+    const page=/\bpage\s+([1-9]\d{0,4})\b/iu.exec(message);
+    try{await chrome.runtime.sendMessage({type:'REPORT_PROVIDER_SCAN_FAILURE',provider,scanToken:context.scanToken,failure:{code,failedRequestCount:1,failedPages:page?[Number(page[1])]:[]}});}catch{}
+  }
+  global.GalacticSync={send,failed};
   function attach(shadow,provider) {
     const panel = shadow?.querySelector?.('.panel');
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;

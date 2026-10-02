@@ -30,6 +30,7 @@
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Video import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} Amazon Video title${items.length === 1 ? '' : 's'}`}. ${response.movieCount} Amazon Video movie${response.movieCount === 1 ? '' : 's'} and ${response.tvCount} TV title${response.tvCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('amazon-video',error);
       status.textContent = `Amazon Video import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

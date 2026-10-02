@@ -14,6 +14,7 @@ import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
+import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/sync-health.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -30,8 +31,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if(changing&&(mode!=='full'||switchProfile!==true))throw new Error('A different account/profile is active. Choose Full rescan and explicitly switch profiles; the previous library will be archived.');
     const forceFull=changing||!prior||!database.providers[provider]?.fullSyncAt;
     const stored=await storageArea.get({[SCANS]:{}});const scans=stored[SCANS]??{};const scanToken=crypto.randomUUID();
-    scans[provider]={scanToken,profileLabel,priorProfileLabel:prior,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
-    await storageArea.set({[SCANS]:scans});
+    scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileLabel,priorProfileLabel:prior,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
+    database.providers[provider]={...database.providers[provider],syncHealth:validateSyncHealth({attemptRef:scans[provider].attemptRef,status:'running',mode:scans[provider].mode,attemptedProfileLabel:profileLabel,startedAt:scans[provider].startedAt,finishedAt:null,retryable:false})};
+    await storageArea.set({[SCANS]:scans,[DATABASE_STORAGE_KEY]:validateDatabase(database)});
     return {scanToken,forceFull,profileLabel,database};
   }
   async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null) {
@@ -41,7 +43,26 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const details={...syncDetails,profileLabel:scan.profileLabel};
     return syncDetails.syncMode==='full'?replaceProviderItems(provider,values,details,snapshot):mergeProviderItems(provider,values,details);
   }
-  async function restoreDatabase(database){return persistDatabase(database,'all');}
+  async function failProviderScan(provider,scanToken,tabId,failure={}){
+    const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];
+    if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId)return false;
+    const database=await getDatabase();
+    const failureCode=SYNC_FAILURE_CODES.includes(failure.code)?failure.code:'other';
+    database.providers[provider]={...database.providers[provider],syncHealth:validateSyncHealth({attemptRef:scan.attemptRef,status:'failed',mode:scan.mode,attemptedProfileLabel:scan.profileLabel,startedAt:scan.startedAt,finishedAt:new Date().toISOString(),failureCode,retryable:true,failedRequestCount:failure.failedRequestCount??1,failedPages:failure.failedPages??[]})};
+    await persistDatabase(database,provider);return true;
+  }
+  async function cancelProviderScan(provider,attemptRef){
+    const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];if(!scan||scan.attemptRef!==attemptRef)throw new Error('This scan changed or already finished. Refresh the dashboard.');
+    const database=await getDatabase();database.providers[provider].syncHealth={...database.providers[provider].syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(database,provider);
+  }
+  function successfulSyncHealth(database,provider,records,full,details,changing=false){
+    const diagnostics=details.scanDiagnostics??{};const prior=database.providers[provider]?.syncHealth;
+    const failedRequestCount=diagnostics.failedRequestCount??0;
+    return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:snapshotDifferences(changing?[]:Object.values(database.providerItems).filter(item=>item.provider===provider),records,full)});
+  }
+  async function restoreDatabase(database){
+    const restored=validateDatabase(database);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all');
+  }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
     const database=await getDatabase();
     if(database.providers[provider]?.profileLabel)throw new Error('Reload the provider page and start a confirmed profile scan.');
@@ -135,6 +156,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
       return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
     }).length;
+    const syncHealth=successfulSyncHealth(database,provider,records,true,syncDetails,changing);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
@@ -152,6 +174,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       lastSync: now,
       lastError: null,
       ...syncDetails,
+      syncHealth,
       snapshotValidation: { ...snapshot, validatedAt: now }
     };
     return persistDatabase(database,provider);
@@ -172,6 +195,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
+    const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===(database.providers[provider]?.profileLabel??'')&&unique.has(entry.item.id))delete database.providerHistory[ref];
@@ -202,7 +226,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       recordCount: records.length,
       lastSync: now,
       lastError: null,
-      ...syncDetails
+      ...syncDetails,syncHealth
     };
     return persistDatabase(database,provider);
   }
@@ -606,7 +630,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   const operations = {
-    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,
+    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,

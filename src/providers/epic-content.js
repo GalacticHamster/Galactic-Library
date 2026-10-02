@@ -30,6 +30,7 @@
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       status.textContent = `Saved ${response.gameCount} Epic game${response.gameCount === 1 ? '' : 's'} locally.${response.addOnCount ? ` Saved ${response.addOnCount} Epic add-on${response.addOnCount === 1 ? '' : 's'}; ${response.linkedAddOnCount} linked to a game${unlinkedAddOnCount ? ` and ${unlinkedAddOnCount} shown as unlinked` : ''}.` : ''}${skippedCount ? ` ${skippedCount} non-game account item${skippedCount === 1 ? ' was' : 's were'} excluded.` : ''}`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('epic',error);
       status.textContent = `Epic import failed: ${error.message}`;
     } finally {
       button.disabled = false;

@@ -124,6 +124,7 @@
       await saveItems(completeItems, state.expected, fullRescan);
       await importState('clear');
     } catch (error) {
+      await globalThis.GalacticSync.failed('fandango-at-home',error);
       await importState('clear').catch(() => {});
       status.textContent = `Fandango at Home import failed: ${error.message}`;
     } finally {
@@ -147,6 +148,7 @@
       await importState('clear');
       await startFromMyLibrary(fullRescan, state.syncState?.knownProviderItemIds ?? []);
     } catch (error) {
+      await globalThis.GalacticSync.failed('fandango-at-home',error);
       status.textContent = `Fandango at Home import failed: ${error.message}`;
       busy(false);
     }

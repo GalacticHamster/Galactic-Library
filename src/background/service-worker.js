@@ -313,6 +313,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if(request?.type==='REPORT_PROVIDER_SCAN_FAILURE'){
+    if(!isKnownProvider(request.provider)||!isProviderImportPage(request.provider,sender.url)||!sender.tab?.id){sendResponse({ok:false,error:'Scan failures are accepted only from the matching provider tab.'});return undefined;}
+    storageWriter.failProviderScan(request.provider,request.scanToken,sender.tab.id,request.failure).then(recorded=>sendResponse({ok:true,recorded})).catch(error=>sendResponse({ok:false,error:error.message}));return true;
+  }
   if (!['IMPORT_PROVIDER_ITEMS','COMMIT_PROVIDER_SCAN'].includes(request?.type)) return undefined;
   if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
@@ -364,6 +368,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         syncMode: incrementalProvider ? 'incremental' : 'full',
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
       };
+  if(request.scanDiagnostics!==undefined){
+    const raw=request.scanDiagnostics;
+    if(!raw||typeof raw!=='object'||Array.isArray(raw)||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}
+    syncDetails.scanDiagnostics={failedRequestCount:raw.failedRequestCount??0,...(raw.retries!==undefined?{retries:raw.retries}:{}),coverageLimit:raw.arrayOnly===true?'array-only-index-without-total':''};
+  }
   (request.type==='COMMIT_PROVIDER_SCAN'
     ? storageWriter.commitProviderScan(request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id)
     : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))

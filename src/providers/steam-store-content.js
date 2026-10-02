@@ -37,6 +37,7 @@
       const scope = fullRescan ? `Full rescan checked ${result.newAppCount} apps` : `Quick update checked ${result.newAppCount} new app${result.newAppCount === 1 ? '' : 's'}`;
       status.textContent = `${scope}. Saved ${response.gameCount} Steam game${response.gameCount === 1 ? '' : 's'} locally.${response.addOnCount ? ` Saved ${response.addOnCount} DLC add-on${response.addOnCount === 1 ? '' : 's'}; ${response.linkedAddOnCount} linked to a game${unlinkedAddOnCount ? ` and ${unlinkedAddOnCount} shown as unlinked` : ''}.` : ''}${unresolvedApps.length ? ` ${unresolvedApps.length} app${unresolvedApps.length === 1 ? '' : 's'} could not be resolved and will be retried next quick update.` : ''}`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('steam',error);
       status.textContent = `Steam import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

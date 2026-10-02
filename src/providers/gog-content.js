@@ -31,6 +31,7 @@
       if (!response?.ok) throw new Error(response?.error ?? 'GOG import did not complete.');
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} GOG game${items.length === 1 ? '' : 's'}`}. ${response.gameCount} GOG game${response.gameCount === 1 ? '' : 's'} stored locally.`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('gog',error);
       status.textContent = `GOG import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

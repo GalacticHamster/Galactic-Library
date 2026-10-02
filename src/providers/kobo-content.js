@@ -38,6 +38,7 @@
       const audiobookText = audiobookAvailable ? ` Read ${audiobookPagesRead} Audiobooks page${audiobookPagesRead === 1 ? '' : 's'}.` : ' Kobo did not expose a separate Audiobooks view in this page.';
       status.textContent = `Saved ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} locally.${archiveText}${audiobookText}${ownershipNote}`;
     } catch (error) {
+      await globalThis.GalacticSync.failed('kobo',error);
       status.textContent = `Kobo import failed: ${error.message}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });

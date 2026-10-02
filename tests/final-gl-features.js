@@ -11,10 +11,22 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {parsePurchaseEvidence} from '../src/lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {contentCoverage} from '../src/lib/contents.js';
+import {syncFailure,syncHealthRows} from '../src/lib/sync-health.js';
 
 export function memory(){const stored={},writes=[];return {stored,writes,writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));},remove:async keys=>{for(const key of keys)delete stored[key];}})};}
 
-export const finalGlTests=[['local CSV/JSON purchase evidence projects only safe bibliographic fields and requires dates',()=>{
+export const finalGlTests=[['sync dashboard tracks snapshot differences, partial quick scans and safe failures without claiming full freshness',async()=>{
+  const {writer}=memory();const old=[{providerItemId:'a',title:'A',mediaType:'game',ownership:'owned'},{providerItemId:'b',title:'B',mediaType:'game',ownership:'owned'}];
+  const full=items=>writer.replaceProviderItems('gog',items,{fullSyncAt:'2026-09-01',profileLabel:'personal'},completeProviderSnapshot('gog',items,[completedScope('games',items.length,items.length,'reported-count')]));
+  await full(old);let db=await full([{...old[0],ownership:'unknown'},{providerItemId:'c',title:'C',mediaType:'game'}]);assert.deepEqual(db.providers.gog.syncHealth.differences,{added:1,missing:1,ownershipChanged:1,observed:2});
+  db=await writer.mergeProviderItems('gog',[{providerItemId:'d',title:'D',mediaType:'game'}],{quickSyncAt:'2026-10-01',scanDiagnostics:{failedRequestCount:2,retries:1}});assert.equal(db.providers.gog.syncHealth.status,'partial');assert.equal(db.providers.gog.syncHealth.differences.missing,0);assert.equal(syncHealthRows(db,Date.parse('2026-10-01')).find(row=>row.provider==='gog').fullAgeDays,30);
+  const scan=await writer.beginProviderScan('gog','personal','full',false,17);assert.equal((await writer.getDatabase()).providers.gog.syncHealth.status,'running');const failure=syncFailure(new Error('Network failure on page 3: PRIVATE order or token'));assert(await writer.failProviderScan('gog',scan.scanToken,17,{...failure,rawResponse:'PRIVATE'}));db=await writer.getDatabase();assert.equal(db.providers.gog.syncHealth.status,'failed');assert.deepEqual(db.providers.gog.syncHealth.failedPages,[3]);assert.equal(db.providerItems['gog:c'].title,'C');assert(!JSON.stringify(db).includes('PRIVATE'));
+}],['cancel, restart and restore invalidate only the matching scan; stale failure reports cannot overwrite newer health',async()=>{
+  const {writer,stored}=memory();const first=await writer.beginProviderScan('gog','personal','full',false,17);let db=await writer.getDatabase(),firstRef=db.providers.gog.syncHealth.attemptRef;
+  const second=await writer.beginProviderScan('gog','personal','full',false,17);assert.equal(await writer.failProviderScan('gog',first.scanToken,17,{code:'network'}),false);await assert.rejects(writer.cancelProviderScan('gog',firstRef),/changed/);
+  db=await writer.getDatabase();db=await writer.cancelProviderScan('gog',db.providers.gog.syncHealth.attemptRef);assert.equal(db.providers.gog.syncHealth.status,'cancelled');await assert.rejects(writer.commitProviderScan('gog',[],{syncMode:'full'},null,second.scanToken,17),/superseded/);
+  await writer.beginProviderScan('gog','personal','full',false,17);db=await writer.getDatabase();db=await writer.restoreDatabase(db);assert.equal(db.providers.gog.syncHealth.status,'cancelled');assert.equal(Object.keys(stored.galacticLibraryProviderScans).length,0);
+}],['local CSV/JSON purchase evidence projects only safe bibliographic fields and requires dates',()=>{
   const csv='Title,ASIN,Purchase Date,Customer,Card,Redemption Key\n"Comic, Vol. 1",B000000001,2026-09-01,PRIVATE CUSTOMER,PRIVATE CARD,PRIVATE KEY';const entries=parsePurchaseEvidence(csv,{provider:'comixology'});assert.equal(entries[0].title,'Comic, Vol. 1');assert.equal(entries[0].provider,'kindle');assert(!JSON.stringify(entries).includes('PRIVATE'));
   assert.equal(parsePurchaseEvidence(JSON.stringify([{title:'Audio',asin:'B000000001',acquiredAt:'2026-09-01',customer:'PRIVATE'}]),{provider:'audible'})[0].mediaType,'audiobook');assert.throws(()=>parsePurchaseEvidence('[{"title":"Missing date"}]'),/purchase date/);assert.throws(()=>parsePurchaseEvidence('Title,Date\n"Unclosed,2026-09-01'),/Unclosed/);
 }],['dated ownership review changes matching and reviewed coverage without rewriting provider observations, supports undo and resists stale edits',async()=>{
