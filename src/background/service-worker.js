@@ -412,6 +412,11 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         sendResponse({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
         return null;
       }
+      if(['BEGIN_ENTITLEMENT_FEED','APPEND_ENTITLEMENT_FEED','COMMIT_ENTITLEMENT_FEED','REMOVE_ENTITLEMENT_FEED'].includes(request?.type)){
+        if(request.apiVersion!==1){sendResponse({ok:false,error:'Unsupported Galactic Library API version.'});return null;}
+        const operation=request.type==='BEGIN_ENTITLEMENT_FEED'?storageWriter.beginCompanionFeed(sender.id,request,true):request.type==='APPEND_ENTITLEMENT_FEED'?storageWriter.appendCompanionFeed(sender.id,request.uploadToken,request.offset,request.entries,true):request.type==='COMMIT_ENTITLEMENT_FEED'?storageWriter.commitCompanionFeed(sender.id,request.uploadToken,true):storageWriter.removeCompanionFeed(sender.id,true);
+        return operation.then(result=>sendResponse({ok:true,apiVersion:1,...result}),()=>sendResponse({ok:false,apiVersion:1,error:'Reminder transfer did not complete. Check the active Humble profile, batch order and storage; prior reminders were retained.'}));
+      }
       return getDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
     })
     .catch(() => sendResponse({ ok: false, error: 'The Galactic Library API is unavailable. Open Galactic Library to check its storage.' }));

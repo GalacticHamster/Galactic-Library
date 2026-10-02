@@ -51,3 +51,12 @@ The Reading progress and custom orders workbench searches current books/audioboo
 Progress and order references survive resync, backup and profile changes. Historical entries retain previous progress and are labeled outside the current library without claiming current ownership. New account records never inherit another account's progress through reused provider IDs. Archived records may stay in existing orders but cannot be added as new current entries. Schema 10 preserves reading states/orders and accepts schemas 1?9.
 
 Notification creation uses the callback API for the declared Chrome 102 minimum; the Promise API requires Chrome 116. Failed delivery releases the daily reservation so a later check can retry, without persisting raw OS errors.
+
+
+## Humble companion reminder feeds
+
+In HB's options, pair GL, confirm the same Humble account, enter GL's current Humble profile label and select **Send reminders to Galactic Library**. Labels may differ between extensions; account confirmation is explicit. This requires the updated HB and GL runtimes. Software comparisons also use GL's advertised capability independently of reminder sharing.
+
+The **Entitlement reminders** dashboard labels HB reports separately from native GL evidence, with their observation date and complete/partial scan baseline. These feeds never change owned records or prove destination activation. Use **Review in Humble Comic Library** to open the source extension; dismiss, snooze and restore remain local reminder actions. **Remove Humble companion feed** deletes only that client's feed, including inactive-profile feeds. HB can also retract its own feed while paired.
+
+Sharing is manual. A complete staged upload replaces a client's prior feed atomically; a failed transfer leaves it intact. Saved feeds are included in GL backups and remain after HB is cleared, unlinked or uninstalled. Feeds outside the current GL Humble profile do not generate active reminders. [Protocol and privacy details](companion-api.md#account-scoped-companion-entitlement-feeds-hb-13-receiver).

@@ -10,7 +10,7 @@ import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {createReadingTools,createReadingWorkbench} from './reading.js';
 import {saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder} from '../lib/storage.js';
 import {createRemindersView} from './reminders.js';
-import {saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings} from '../lib/storage.js';
+import {removeCompanionFeed,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings} from '../lib/storage.js';
 import {createSyncHealthView} from './sync-health.js';
 import {cancelProviderScan} from '../lib/storage.js';
 import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
@@ -636,8 +636,8 @@ function render() {
   const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
   if(priorSync)priorSync.replaceWith(syncDashboard);else receiptWorkbench.after(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
-    review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
-    requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings
+    removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
+    requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:clientId=>chrome.tabs.create({url:`chrome://extensions/?options=${clientId}`})
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else syncDashboard.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');

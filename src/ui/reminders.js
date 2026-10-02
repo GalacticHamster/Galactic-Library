@@ -12,6 +12,9 @@ export function createRemindersView(database,actions){
     disable.addEventListener('click',async()=>{try{await actions.notifications(false);status.textContent='Desktop reminders disabled.';}catch(error){status.textContent=error.message;}});
     root.append(node('p','Desktop reminders are off by default. If enabled, Chrome checks hourly while running and shows at most one aggregate notification per day.'),enable,disable);
     actions.notificationSettings().then(settings=>{status.textContent=`Desktop reminders ${settings.enabled?'enabled':'disabled'}.`;}).catch(error=>{status.textContent=error.message;});
+    for(const [clientId,feed]of Object.entries(database.companionFeeds??{})){
+      const remove=node('button','Remove Humble companion feed');remove.type='button';remove.addEventListener('click',async()=>{try{await actions.removeFeed(clientId);actions.refresh();}catch(error){status.textContent=error.message;}});root.append(node('p',`Companion feed: ${feed.entries.length} entitlements; ${feed.coverage} baseline; received ${feed.receivedAt}; ${feed.profileLabel===database.providers.humble?.profileLabel?'current Humble profile':'outside the current Humble profile, hidden from reminders'}.`),remove);
+    }
     const filter=node('select');filter.setAttribute('aria-label','Reminder filter');for(const [value,label]of [['all','All active reminders'],['attention','Needs attention or due within 7 days'],['hidden','Dismissed and snoozed']]){const option=node('option',label);option.value=value;filter.append(option);}root.append(filter);
     const list=node('div'),count=node('p'),previous=node('button','Previous reminders'),next=node('button','Next reminders');previous.type=next.type='button';let page=0;
     const render=()=>{
@@ -19,7 +22,8 @@ export function createRemindersView(database,actions){
       page=Math.min(page,Math.max(0,Math.ceil(all.length/50)-1));count.textContent=`${all.length} reminders; page ${page+1} of ${Math.max(1,Math.ceil(all.length/50))}.`;previous.disabled=page===0;next.disabled=(page+1)*50>=all.length;list.replaceChildren();
       for(const entry of all.slice(page*50,page*50+50)){
         const row=node('article');row.dataset.reminderRef=entry.reminderRef;row.append(node('strong',entry.title),node('p',`${entry.provider}: ${labels[entry.kind]}; ${entry.dueAt||'no reported deadline'}; ${entry.severity}.`));
-        const inspect=node('button','Review library item');inspect.type='button';inspect.addEventListener('click',()=>actions.inspect(entry.itemRef));row.append(inspect);
+        if(entry.sourceClientId)row.append(node('p',`Humble Comic Library report; checked ${entry.checkedAt}; ${entry.coverage} baseline. Separate from native GL evidence; does not establish ownership.`));
+        const inspect=node('button',entry.sourceClientId?'Review in Humble Comic Library':'Review library item');inspect.type='button';inspect.addEventListener('click',()=>entry.sourceClientId?actions.reviewSource(entry.sourceClientId):actions.inspect(entry.itemRef));row.append(inspect);
         const act=(label,action,until=null)=>{const button=node('button',label);button.type='button';button.addEventListener('click',async()=>{button.disabled=true;try{await actions.review(entry.reminderRef,action,entry.basis,until);actions.refresh();}catch(error){status.textContent=error.message;button.disabled=false;}});row.append(button);};
         if(entry.hidden)act('Restore reminder','restore');else{act('Dismiss reminder','dismissed');act('Snooze 7 days','snoozed',new Date(Date.now()+7*86400000).toISOString());}list.append(row);
       }

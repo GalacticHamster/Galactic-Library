@@ -14,6 +14,7 @@ import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
+import {FEED_UPLOAD_KEY,validateEntitlementEntry} from '../lib/companion-entitlements.js';
 import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/reading.js';
 import {libraryReminders} from '../lib/reminders.js';
 import {date} from '../lib/validation.js';
@@ -96,6 +97,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const validated = validateDatabase(database);
     const updates={[DATABASE_STORAGE_KEY]:validated};
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
+    if(invalidate==='all'||invalidate==='humble')updates[FEED_UPLOAD_KEY]={};
     if(invalidate==='all')updates[NOTIFICATIONS]={enabled:false,lastNotifiedDay:''};
     if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
     await storageArea.set(updates);
@@ -237,7 +239,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS]);
+    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -686,7 +688,39 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   async function removeReadingOrder(ref,expected){
     const database=await getDatabase(),order=database.readingOrders[ref];if(!order||order.revisionRef!==expected)throw new Error('Reading order changed. Refresh before deleting.');delete database.readingOrders[ref];return persistDatabase(database);
   }
+
+  async function feedUploads(){return (await storageArea.get({[FEED_UPLOAD_KEY]:{}}))[FEED_UPLOAD_KEY];}
+  async function feedClient(client,external=false){if(!/^[a-p]{32}$/u.test(client))throw new Error('Invalid reminder client.');if(external&&!(await getAllowedExternalClientIds()).includes(client))throw new Error('Companion permission was revoked.');}
+  async function beginCompanionFeed(client,value,external=false){
+    await feedClient(client,external);const database=await getDatabase(),profileLabel=text(value?.profileLabel,100,'Humble profile');
+    if(!profileLabel||database.providers.humble?.profileLabel!==profileLabel)throw new Error('The GL Humble profile does not match. Confirm the same account and enter its current GL profile label.');
+    if(!Number.isSafeInteger(value.count)||value.count<0||value.count>100000||!['complete','partial'].includes(value.coverage)||!date(value.sentAt))throw new Error('Invalid reminder feed summary.');
+    const uploads=Object.fromEntries(Object.entries(await feedUploads()).filter(([key,entry])=>key!==client&&entry.expiresAt>Date.now()));
+    if(Object.keys(uploads).length>=64)throw new Error('Too many active reminder uploads.');
+    const uploadToken=crypto.randomUUID();uploads[client]={uploadToken,profileLabel,count:value.count,coverage:value.coverage,sentAt:date(value.sentAt),expiresAt:Date.now()+600000,entries:[]};await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {uploadToken};
+  }
+  async function activeFeedUpload(client,token,external=false){
+    await feedClient(client,external);const uploads=await feedUploads(),upload=uploads[client];if(!upload||upload.uploadToken!==token||upload.expiresAt<=Date.now())throw new Error('Reminder upload expired or was superseded. Send it again.');
+    const database=await getDatabase();if(database.providers.humble?.profileLabel!==upload.profileLabel)throw new Error('The GL Humble profile changed during reminder sharing.');return {uploads,upload,database};
+  }
+  async function appendCompanionFeed(client,token,offset,entries,external=false){
+    const {uploads,upload}=await activeFeedUpload(client,token,external);
+    if(!Number.isSafeInteger(offset)||offset!==upload.entries.length||!Array.isArray(entries)||!entries.length||entries.length>200||offset+entries.length>upload.count)throw new Error('Invalid reminder batch or offset.');
+    const next=entries.map(validateEntitlementEntry),refs=new Set(upload.entries.map(entry=>entry.itemRef));for(const entry of next){if(refs.has(entry.itemRef))throw new Error('Duplicate reminder reference.');refs.add(entry.itemRef);}
+    if(Object.values(uploads).reduce((sum,entry)=>sum+entry.entries.length,0)+next.length>100000)throw new Error('Active reminder uploads exceed their bound.');
+    upload.entries.push(...next);await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {received:upload.entries.length};
+  }
+  async function commitCompanionFeed(client,token,external=false){
+    const {uploads,upload,database}=await activeFeedUpload(client,token,external);if(upload.entries.length!==upload.count)throw new Error('Reminder feed is incomplete; prior reminders retained.');
+    const previous=database.companionFeeds[client],refs=new Map(previous?.profileLabel===upload.profileLabel?previous.entries.map(entry=>[entry.itemRef,entry.localRef]):[]);
+    database.companionFeeds[client]={profileLabel:upload.profileLabel,coverage:upload.coverage,sentAt:upload.sentAt,receivedAt:new Date().toISOString(),revisionRef:crypto.randomUUID(),entries:upload.entries.map(entry=>({...entry,localRef:refs.get(entry.itemRef)??crypto.randomUUID()}))};
+    delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:upload.entries.length};
+  }
+  async function removeCompanionFeed(client,external=false){
+    await feedClient(client,external);const database=await getDatabase(),uploads=await feedUploads();delete database.companionFeeds[client];delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:0};
+  }
   const operations = {
+    beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
     getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,failProviderScan,cancelProviderScan,

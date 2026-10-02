@@ -34,8 +34,21 @@ export function libraryReminders(database,now=Date.now(),includeHidden=false){
     if(accessExpiry)add('access-expiry',accessExpiry);
     else if(['rental','borrowed','subscription'].includes(effective.ownership))add('temporary-access');
   }
+
+  for(const [clientId,feed]of Object.entries(database.companionFeeds??{})){
+    if(feed.profileLabel!==database.providers.humble?.profileLabel)continue;
+    for(const entry of feed.entries){
+      const add=kind=>{
+        const dueAt=kind==='activation'?null:entry.expiresAt,severity=kind==='key-unavailable'||dueAt&&Date.parse(dueAt)<=now?'attention':dueAt&&Date.parse(dueAt)<=now+7*86400000?'due-soon':'information';
+        const basis=JSON.stringify([kind,dueAt,entry.keyStatus,entry.checkedAt,clientId]),reminderRef=`${entry.localRef}:${kind}`,saved=database.reminderReviews?.[reminderRef];
+        const hidden=saved?.basis===basis&&(saved.action==='dismissed'||saved.action==='snoozed'&&Date.parse(saved.until)>now);
+        if(!hidden||includeHidden)reminders.push({reminderRef,itemRef:entry.localRef,title:entry.title,provider:'humble',mediaType:entry.mediaType,kind,dueAt,severity,basis,hidden:Boolean(hidden),sourceClientId:clientId,source:'humble-companion',checkedAt:entry.checkedAt,coverage:feed.coverage});
+      };
+      if(['expired','unavailable'].includes(entry.keyStatus))add('key-unavailable');else{add('activation');if(entry.expiresAt)add('key-expiry');}
+    }
+  }
   return reminders.sort((a,b)=>(a.dueAt??'9999').localeCompare(b.dueAt??'9999')||a.reminderRef.localeCompare(b.reminderRef));
 }
-export function companionReminder({reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity}){
-  return {reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity};
+export function companionReminder({reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,source}){
+  return {reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,...(source?{source,reviewAvailable:false}:{})};
 }
