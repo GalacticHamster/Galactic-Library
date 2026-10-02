@@ -30,7 +30,18 @@ import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
 import { identityEvidence, identityConflicts, editionEnrichmentConflicts } from '../lib/identity.js';
-import {PRIVATE_STORAGE_CHANGED} from '../background/private-storage.js';
+import {PRIVATE_STORAGE_CHANGED,isFirefoxRuntime} from '../background/private-storage.js';
+
+async function reviewCompanionSource(clientId){
+  if(!isExtensionId(clientId))throw Error('Configure the companion link first.');
+  if(!isFirefoxRuntime(chrome.runtime)&&/^[a-p]{32}$/u.test(clientId))return chrome.tabs.create({url:`chrome://extensions/?options=${clientId}`});
+  let timer;
+  try{
+    const result=await Promise.race([chrome.runtime.sendMessage(clientId,{type:'OPEN_REVIEW',apiVersion:1}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Source review timed out.')),5000);})]);
+    if(result?.ok&&result.apiVersion===1)return;
+  }catch{/* Older or unpaired companions retain a toolbar fallback. */}finally{clearTimeout(timer);}
+  throw Error('Open Humble Comic Library from its Firefox toolbar menu. Check the pairing and update HB to enable source review.');
+}
 
 const providers = document.querySelector('#providers');
 const search = document.querySelector('#search');
@@ -638,7 +649,7 @@ function render() {
   if(priorSync)priorSync.replaceWith(syncDashboard);else receiptWorkbench.after(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
     removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
-    requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:clientId=>chrome.tabs.create({url:`chrome://extensions/?options=${clientId}`})
+    requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else syncDashboard.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');

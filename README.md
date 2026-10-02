@@ -1,6 +1,6 @@
 # Galactic Library
 
-Galactic Library is a Manifest V3 Chrome extension for a browser-local index of digital media ownership. Humble is a first-class provider here; this project remains independent from Humble Comic Library and may later provide that extension with a narrow ownership lookup.
+Galactic Library is a Manifest V3 Chrome and Firefox desktop extension for a browser-local index of digital media ownership. Humble is a first-class provider here; this project remains independent from Humble Comic Library and may later provide that extension with a narrow ownership lookup.
 
 ## Current foundation
 
@@ -9,7 +9,7 @@ Version 0.1.0 establishes the parts that must not be provider-specific:
 - a stable identity of `provider + providerItemId`, never a title;
 - normalized provider records and reproducible canonical game, audiobook, book, movie, and TV records;
 - conservative edition matching with separate Possible candidates and reviewed contents coverage;
-- local Chrome storage plus versioned export/restore; and
+- private browser-local storage plus versioned export/restore; and
 - a minimal library browser and an internal batched `MATCH_ITEMS` handler; and
 - a duplicate-review queue for edition variants and provider-added book/series labels; and
 - user-initiated Steam Store, GOG, Epic Games Store, Audible, Kindle, Amazon Video, Fandango at Home, Kobo, and Humble importers for signed-in libraries.
@@ -30,7 +30,7 @@ The Library search controls include **Download Comixology review list**, which e
 
 For an individual book, select **Find Open Library metadata** in its local library card. Galactic Library prefers a checksum-valid source ISBN, falling back to its title and available author name. It presents up to five candidates and saves nothing until you select **Apply**. The chosen work's Open Library identifier, authors, subjects, ISBNs, available edition identifiers, and first-publication year are stored locally with source attribution. Work-level ISBN lists never identify your owned edition. It does not bulk-enrich a provider library.
 
-For automated Google Books enrichment, first enter your own Google Books API key on the options page. The key is stored only in Chrome local storage, is excluded from backups, and is never sent anywhere except Google's Books API. The resumable job discovers candidates for books missing edition metadata, including authorless records, waits between requests, and applies full metadata only after matching that ISBN or a high-confidence title and author, while rejecting known edition/language/volume conflicts. ISBN-backed books can be looked up without an author. It stores Google Books' volume ID, categories, ISBNs, available publisher, publication date, page count, language, and source link locally. If the author matches and the Google title is a clear shorter form of the local collection title, it may save only Google Books categories as a separately labelled inferred genre; it never takes edition-specific fields from such a result. Authorless, ambiguous and low-confidence results remain in a persistent review queue. Genre hints do not complete edition enrichment; selections have source evidence and undo.
+For automated Google Books enrichment, first enter your own Google Books API key on the options page. The key is stored only in private extension storage, is excluded from backups, and is never sent anywhere except Google's Books API. The resumable job discovers candidates for books missing edition metadata, including authorless records, waits between requests, and applies full metadata only after matching that ISBN or a high-confidence title and author, while rejecting known edition/language/volume conflicts. ISBN-backed books can be looked up without an author. It stores Google Books' volume ID, categories, ISBNs, available publisher, publication date, page count, language, and source link locally. If the author matches and the Google title is a clear shorter form of the local collection title, it may save only Google Books categories as a separately labelled inferred genre; it never takes edition-specific fields from such a result. Authorless, ambiguous and low-confidence results remain in a persistent review queue. Genre hints do not complete edition enrichment; selections have source evidence and undo.
 
 To import Amazon Video, select **Open signed-in Amazon Video library** on the Purchases & Rentals page. **Quick update** returns to Amazon Video's newest-first **Most recent addition** order and stops at a rendered group already stored locally. **Full rescan** reads the complete library. The importer records the stable Amazon title ID, title, card type, detail-page URL, and available artwork URL. Cards explicitly labelled as purchased are stored as owned, cards explicitly labelled as rentals are stored as rentals, and ambiguous cards remain unknown. It does not import Watchlist or Prime-included titles, request individual detail pages, or ask for, copy, or store an Amazon password, cookie, or token.
 
@@ -106,7 +106,7 @@ To load in Chrome, open `chrome://extensions`, enable **Developer mode**, choose
 
 There is no backend, analytics, account, cloud sync, or password collection. Provider data will remain in `chrome.storage.local` until the user clears it, restores a backup, or uninstalls the extension. Galactic Library requests Chrome's `unlimitedStorage` permission because a complete multi-provider libraryâ€”especially a long Humble purchase history with local provenanceâ€”can exceed Chrome's default 10 MB local-storage quota. This permission expands only the browser-local storage available to this extension; it does not transmit data or grant access to other sites. The implementation will access provider sites only through a tab where the user is already signed in.
 
-Galactic Library has a deliberately narrow companion API: `PING`, aggregate provider status/capabilities, and batched `MATCH_ITEMS` with exact matches, related Possible candidates, reviewed relationships and contents coverage. It never exposes raw library records or purchase-bearing provider IDs. Pair companions by entering their 32-character extension IDs under **Companion extension links**; each companion also needs Galactic Library's ID. See the [API contract](docs/companion-api.md) for request fields, coverage semantics and limits. Companion storefront support for the new coverage fields is separate work.
+Galactic Library has a deliberately narrow companion API: `PING`, aggregate provider status/capabilities, and batched `MATCH_ITEMS` with exact matches, related Possible candidates, reviewed relationships and contents coverage. It never exposes raw library records or purchase-bearing provider IDs. Pair companions by entering their Chrome extension IDs or stable Firefox add-on IDs under **Companion extension links**; each companion also needs Galactic Library's ID. See the [API contract](docs/companion-api.md) for request fields, coverage semantics and limits. HB and Fanatical consume Possible candidates, reviewed contents and entitlement reminders.
 
 ## Duplicate review
 
@@ -154,3 +154,9 @@ Complete provider scans archive missing records instead of deleting their purcha
 Comic/manga enrichment now includes local ComicInfo.xml/EPUB/OPF imports, cited publisher proposals, Open Library ISBN edition lookup and an enrichment workbench with paged queues, batch confirmation, retry, dismissal and undo. Metadata files stay in the browser; source proposals require review and never establish ownership or verified collected contents by themselves. See [comic/manga enrichment and source evaluation](docs/comic-manga-enrichment.md).
 
 Library tools now include Unicode title aliases, central software support, Fanatical purchase occurrences, dated ownership/receipt review, sync health/cancellation, optional entitlement reminders and private reading progress/orders. See [library tools](docs/library-tools.md) for behavior and backup compatibility, and [release packaging](docs/release-packaging.md) for reproducible distribution and packaged browser checks.
+
+## Firefox desktop
+
+Run `npm run package:firefox` to build `dist/GalacticLibrary-0.1.0-firefox.zip` for Firefox 140+. Extract it and load its manifest from `about:debugging#/runtime/this-firefox`. This is a temporary development install; permanent distribution requires signing. Import a backup to move your Chrome library into Firefox.
+
+The stable ID is `galactic-library@galactichamster.com`. Allow the HB and Fanatical IDs in GL options and enter GL's ID in each companion. No native messaging helper is needed. See [Firefox setup and verification](docs/firefox.md) for IDs, privacy and test coverage.
