@@ -1,6 +1,6 @@
 # Companion matching API
 
-Only extensions explicitly allowed in Galactic Library's options may use the external API. Send JSON messages with `chrome.runtime.sendMessage(galacticExtensionId, request)`. API version 1 accepts games, books and audiobooks. `PING` tests pairing; `GET_STATUS` reports provider counts and capabilities.
+Only extensions explicitly allowed in Galactic Library's options may use the external API. Send JSON messages with `chrome.runtime.sendMessage(galacticExtensionId, request)`. API version 1 accepts games, books, audiobooks and software. `PING` tests pairing; `GET_STATUS` reports provider counts and capabilities.
 
 `MATCH_ITEMS` accepts 1–500 requests, titles up to 500 characters and at most 20,000 explicitly enumerated contents entries per batch. The original title-only request remains supported. New fields and response fields are additive; consumers must ignore unfamiliar fields.
 

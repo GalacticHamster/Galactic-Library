@@ -76,6 +76,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
 
   function preserveEnrichment(incoming, previous) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
+    if(previous&&previous.mediaType!==incoming.mediaType)return incoming;
     const existing = previous?.metadata?.enrichment;
     if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return incoming;
     return {
@@ -85,6 +86,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         enrichment: { ...existing, ...(incoming.metadata?.enrichment ?? {}) }
       }
     };
+  }
+
+  function reconcileMediaChanges(database,incoming){
+    const changed=new Set(incoming.filter(item=>database.providerItems[item.id]&&database.providerItems[item.id].mediaType!==item.mediaType).map(item=>item.id));
+    for(const id of changed)delete database.contentReviews[id];
+    for(const [key,review]of Object.entries(database.manualMatchDecisions))if(review.itemIds.some(id=>changed.has(id)))delete database.manualMatchDecisions[key];
+    for(const [key,entry]of Object.entries(database.editionSeparations))if(changed.has(entry.itemId)||entry.otherItemIds.some(id=>changed.has(id)))delete database.editionSeparations[key];
   }
 
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
@@ -111,6 +119,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const records = [...unique.values()];
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
+    const softwareCount = records.filter(item=>item.mediaType==='software').length;
     const audiobookCount = records.filter((item) => item.mediaType === 'audiobook').length;
     const bookCount = records.filter((item) => item.mediaType === 'book').length;
     const movieCount = records.filter((item) => item.mediaType === 'movie').length;
@@ -119,6 +128,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
       return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
     }).length;
+    reconcileMediaChanges(database,incoming);
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
@@ -126,7 +136,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       connected: true,
       itemCount: gameCount,
       addOnCount,
-      audiobookCount,
+      audiobookCount,softwareCount,
       bookCount,
       movieCount,
       tvCount,
@@ -155,11 +165,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
+    reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===(database.providers[provider]?.profileLabel??'')&&unique.has(entry.item.id))delete database.providerHistory[ref];
     const records = Object.values(database.providerItems).filter((item) => item.provider === provider);
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
+    const softwareCount = records.filter(item=>item.mediaType==='software').length;
     const audiobookCount = records.filter((item) => item.mediaType === 'audiobook').length;
     const bookCount = records.filter((item) => item.mediaType === 'book').length;
     const movieCount = records.filter((item) => item.mediaType === 'movie').length;
@@ -175,7 +187,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       connected: true,
       itemCount: gameCount,
       addOnCount,
-      audiobookCount,
+      audiobookCount,softwareCount,
       bookCount,
       movieCount,
       tvCount,

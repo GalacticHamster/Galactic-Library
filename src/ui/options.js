@@ -94,6 +94,7 @@ function displayProviderName(provider) {
 function displayMediaType(mediaType) {
   if (mediaType === 'audiobook') return 'Audiobook';
   if (mediaType === 'book') return 'Book';
+  if(mediaType==='software')return 'Software';
   if (mediaType === 'movie') return 'Movie';
   if (mediaType === 'tv') return 'TV show';
   return 'Game';
@@ -625,6 +626,7 @@ function render() {
     const providerParts = [];
     if (state.itemCount) providerParts.push(`${state.itemCount} games`);
     if (state.audiobookCount) providerParts.push(`${state.audiobookCount} audiobooks`);
+    if(state.softwareCount)providerParts.push(`${state.softwareCount} software products`);
     if (state.bookCount) providerParts.push(`${state.bookCount} books`);
     if (state.movieCount) providerParts.push(`${state.movieCount} movies`);
     if (state.tvCount) providerParts.push(`${state.tvCount} TV titles`);
@@ -668,6 +670,7 @@ function render() {
     .sort((left, right) => compareTitles(left.title, right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
+  const softwareCanonicalCount=canonical.filter(item=>item.mediaType==='software').length;
   const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
   const movieCanonicalCount = canonical.filter((item) => item.mediaType === 'movie').length;
   const tvCanonicalCount = canonical.filter((item) => item.mediaType === 'tv').length;
@@ -679,8 +682,9 @@ function render() {
   const movieRecordCount = visibleRecords.filter((item) => item.mediaType === 'movie').length;
   const tvRecordCount = visibleRecords.filter((item) => item.mediaType === 'tv').length;
   const summaryParts = [];
+  if(softwareCanonicalCount)summaryParts.push(`${softwareCanonicalCount} unique software products`);
   const suffix = filtersAreActive(filters, query) ? ' matching filters' : '';
-  if (gameCanonicalCount || (!audiobookCanonicalCount && !bookCanonicalCount && !movieCanonicalCount && !tvCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
+  if (gameCanonicalCount || (!softwareCanonicalCount && !audiobookCanonicalCount && !bookCanonicalCount && !movieCanonicalCount && !tvCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
   if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
   if (bookCanonicalCount) summaryParts.push(`${bookCanonicalCount} unique book${bookCanonicalCount === 1 ? '' : 's'}`);
   if (movieCanonicalCount) summaryParts.push(`${movieCanonicalCount} unique movie${movieCanonicalCount === 1 ? '' : 's'}`);

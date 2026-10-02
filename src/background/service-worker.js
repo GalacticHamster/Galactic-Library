@@ -98,7 +98,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
   for (const candidate of Array.isArray(input.items) ? input.items : []) {
     const sourceItemId = String(candidate?.sourceItemId ?? '').trim();
     const title = String(candidate?.title ?? '').trim().slice(0, 500);
-    const mediaType = ['game', 'book', 'audiobook'].includes(candidate?.mediaType) ? candidate.mediaType : '';
+    const mediaType = ['game', 'book', 'audiobook','software'].includes(candidate?.mediaType) ? candidate.mediaType : '';
     if (!/^[a-zA-Z0-9_-]{6,128}$/u.test(sourceItemId) || !title) throw new Error('Fanatical returned an unreadable projected product.');
     if(!mediaType)continue;
     const safeList = (entries) => [...new Set((Array.isArray(entries) ? entries : []).map((entry) => String(entry ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
@@ -370,6 +370,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
       audiobookCount: database.providers[request.provider].audiobookCount ?? 0,
+      softwareCount:database.providers[request.provider].softwareCount??0,
       bookCount: database.providers[request.provider].bookCount ?? 0,
       movieCount: database.providers[request.provider].movieCount ?? 0,
       tvCount: database.providers[request.provider].tvCount ?? 0,

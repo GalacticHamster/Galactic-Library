@@ -221,5 +221,11 @@ try{
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','History backup restore failed.');
   assert(document.querySelector('#provider-history').textContent.includes('Collection A')&&document.querySelector('#provider-history').textContent.includes('not observed in complete scan'),'Archived purchase evidence is missing from history.');
   checks.push('complete scan history survives backup restore and is displayed separately from current ownership');
+  await writer.mergeProviderItems('humble',[{providerItemId:'software-ui',title:'Creative Tool',mediaType:'software',ownership:'owned'}]);
+  const softwareTransfer=new DataTransfer();softwareTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'software.json',{type:'application/json'}));document.querySelector('#backup-status').textContent='';input.files=softwareTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Software fixture restore failed.');
+  document.querySelector('#media-type-filter').value='software';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));assert(document.querySelectorAll('#library-items > li').length===1&&card('Creative Tool').textContent.includes('Software')&&document.querySelector('#library-summary').textContent.includes('1 unique software products'),'Software is missing or mixed with games in options.');
+  document.querySelector('#media-type-filter').value='all';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));
+  const aliases=await open(card('Creative Tool').querySelector('.title-alias-tools'));aliases.querySelector('textarea').value='創作ツール';button(aliases,'Save alternate titles').click();await wait(()=>values.galacticLibraryDatabase.titleAliases[values.galacticLibraryDatabase.providerItems['humble:software-ui'].recordRef]?.titles.includes('創作ツール'),'Alias controls did not persist Unicode title.');
+  checks.push('actual options filters and counts software separately and saves script-preserving alternate titles');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

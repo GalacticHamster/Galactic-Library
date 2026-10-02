@@ -14,6 +14,7 @@
   function fanaticalMediaType(value) {
     const type = compactText(value).toLocaleLowerCase();
     if (type === 'game') return 'game';
+    if(type==='software'||type==='asset')return 'software';
     if (type === 'book' || type.includes('comic')) return 'book';
     if (type === 'audiobook' || (type.includes('audio') && type.includes('book'))) return 'audiobook';
     return null;

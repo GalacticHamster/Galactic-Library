@@ -5,7 +5,7 @@ import { validIsbn } from './identity.js';
 import { validateContents } from './contents.js';
 
 const EXTENSION_ID = /^[a-p]{32}$/u;
-const REQUEST_MEDIA_TYPES = new Set(['game', 'book', 'audiobook']);
+const REQUEST_MEDIA_TYPES = new Set(['game', 'book', 'audiobook', 'software']);
 
 export function isExtensionId(value) {
   return EXTENSION_ID.test(String(value ?? '').trim());
@@ -23,6 +23,7 @@ function providerStatus(providers) {
     gameCount: count(state?.itemCount),
     audiobookCount: count(state?.audiobookCount),
     bookCount: count(state?.bookCount)
+    ,softwareCount:count(state?.softwareCount)
   }]; }));
 }
 
@@ -58,7 +59,7 @@ export function handleExternalApiRequest(database, request) {
   if (request.type !== 'MATCH_ITEMS') return { ok: false, error: 'Unsupported Galactic Library API request.' };
   if (request.apiVersion !== EXTERNAL_API_VERSION) return { ok: false, error: `Unsupported Galactic Library API version: ${request.apiVersion ?? '(missing)'}.` };
   if (!Array.isArray(request.items) || !request.items.length || request.items.length > 500 || !request.items.every(validMatchRequest)) {
-    return { ok: false, error: 'MATCH_ITEMS needs 1–500 valid game, book, or audiobook titles.' };
+    return { ok: false, error: 'MATCH_ITEMS needs 1–500 valid game, book, audiobook, or software titles.' };
   }
   if(request.items.reduce((sum,item)=>sum+(item.contents?.length??0),0)>20000)return {ok:false,error:'The batch contains too many contents entries.'};
   return { ok: true, apiVersion: EXTERNAL_API_VERSION, results: matchItems(database.providerItems, request.items, database).map(companionResult) };

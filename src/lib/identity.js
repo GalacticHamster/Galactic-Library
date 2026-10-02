@@ -22,7 +22,7 @@ export function titleIdentity(title, mediaType = 'book') {
   base = base.replace(/\s*:\s*[^:]*\b(?:book|volume|vol\.?)\s*\d+\s*$/iu, (suffix, offset) => /\b(?:vol(?:ume)?\.?|book)\s*\d+/iu.test(base.slice(0, offset)) ? '' : suffix);
   let edition = '';
   const bookEdition = /(?:\s*[,;:\u2013\u2014-]\s*|\s+\(?|\s*\()((?:(?:\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+(?:(?:revised|updated|anniversary)\s+)?|(?:revised|updated|expanded|annotated|deluxe|definitive|anniversary|limited)\s+)?(?:edition|ed\.?))\)?\s*$/iu;
-  if (mediaType === 'game') {
+  if (mediaType === 'game'||mediaType==='software') {
     const suffix = /(?:\s*[:\u2013\u2014-]?\s+)((?:game of the year|digital deluxe|deluxe|gold|platinum|ultimate|complete|standard|premium|definitive|legendary|anniversary|collector['’]?s|enhanced)(?:\s+edition)?|(?:[\p{L}\p{N}]+\s+)?edition|remastered|remake|goty)\s*$/iu.exec(base);
     if (suffix) { edition = identityKey(suffix[1]).replace(/\s+edition$/u, ''); base = base.slice(0, suffix.index); }
   } else {
@@ -84,7 +84,7 @@ export function sameEditionEvidence(left, right) {
   if (a.isbn.length && overlap(a.isbn, b.isbn)) return 'shared validated ISBN';
   if (a.asin && a.asin === b.asin) return 'shared ASIN';
   if (left.normalizedTitle !== right.normalizedTitle) return '';
-  if (left.mediaType === 'game') return 'matching game title and compatible edition';
+  if (['game','software'].includes(left.mediaType)) return 'matching product title and compatible edition';
   if (a.authors.length && overlap(a.authors.map(identityKey), b.authors.map(identityKey))) return 'matching title and author';
   return '';
 }

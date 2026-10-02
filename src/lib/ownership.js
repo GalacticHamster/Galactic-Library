@@ -10,7 +10,7 @@ export function providerOwnership(provider, ownership, metadata) {
 // destination. Keep this projection small enough to share with companions.
 export function entitlementEvidence(item) {
   if(!['humble','fanatical'].includes(item.provider))return {};
-  const key=item.metadata?.entitlement==='third-party-key'||item.mediaType==='game';
+  const key=item.metadata?.entitlement==='third-party-key'||['game','software'].includes(item.mediaType);
   return {purchaseEvidence:'confirmed',activationStatus:key?'unknown':'not-applicable',
     ...(key?{keyStatus:item.metadata?.keyStatus||'unknown',expiresAt:item.metadata?.expiresAt||null}: {})};
 }

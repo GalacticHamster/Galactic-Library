@@ -17,6 +17,8 @@ try {
   const uniqueMovieCount = canonical.filter((item) => item.mediaType === 'movie').length;
   const uniqueTvCount = canonical.filter((item) => item.mediaType === 'tv').length;
   const parts = [];
+  const softwareCount=canonical.filter(item=>item.mediaType==='software').length;
+  if(softwareCount)parts.push(`${softwareCount} unique software products`);
   if (total) parts.push(`${gameCount} unique game${gameCount === 1 ? '' : 's'} from ${total} game record${total === 1 ? '' : 's'}`);
   if (audiobookCount) parts.push(`${uniqueAudiobookCount} unique audiobook${uniqueAudiobookCount === 1 ? '' : 's'} from ${audiobookCount} record${audiobookCount === 1 ? '' : 's'}`);
   if (bookCount) parts.push(`${uniqueBookCount} unique book${uniqueBookCount === 1 ? '' : 's'} from ${bookCount} record${bookCount === 1 ? '' : 's'}`);

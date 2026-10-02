@@ -89,6 +89,7 @@
 
   function productKind(product) {
     const serialized = JSON.stringify(product);
+    if(['category','content_type','item_content_type','product_type'].some(key=>String(product?.[key]??'').toLowerCase()==='software'))return 'software';
     if (/"(?:category|content_type|item_content_type|product_type)"\s*:\s*"(?:game|software|dlc)"/iu.test(serialized)
       || /"(?:platform|platform_name|key_type|storefront)"\s*:\s*"[^"\\]*(?:steam|gog|epic|origin|uplay|ubisoft|ea(?:\s+app)?|itch(?:\.io)?|windows|mac|linux|android|ios)[^"\\]*"/iu.test(serialized)
       || /"(?:platforms|platforms_and_oses)"\s*:\s*(?:\[[^\]]*"(?:steam|gog|epic|windows|mac|linux|android|ios)|\{)/iu.test(serialized)
@@ -140,14 +141,14 @@
       return [{
         providerItemId: `${purchaseId}:entitlement:${machineName}:${keyIndex}`,
         title,
-        mediaType: 'game',
+        mediaType: productKind(record)==='software'||/\bsoftware\s+bundle\b/iu.test(baseMetadata.sourceBundle)?'software':'game',
         ownership: 'owned',
         acquiredAt,
         metadata: { ...baseMetadata, entitlement: 'third-party-key', keyType: compactText(record?.key_type_human_name ?? record?.key_type), ...keyEvidence(record) }
       }];
     });
     const keyedTitles=new Set(thirdPartyItems.map(item=>item.title.toLowerCase()));
-    return [...directItems.filter(item=>item.mediaType!=='game'||!keyedTitles.has(item.title.toLowerCase())), ...thirdPartyItems];
+    return [...directItems.filter(item=>!['game','software'].includes(item.mediaType)||!keyedTitles.has(item.title.toLowerCase())), ...thirdPartyItems];
   }
 
   function keyEvidence(record) {

@@ -64,7 +64,7 @@ export function matchItems(items, requestedItems, context = {}) {
       if(ambiguous){candidate(item,'Matching signals refer to multiple distinct editions or works.');continue;}
       const editionGroup=editionByRecord.get(item.id);
       const reviewedEdition=(graph.get(item.id)??[]).some(edge=>edge.decision==='same-edition'&&editionGroup?.providerItemIds.includes(edge.id));
-      if(query.mediaType!=='game'&&!identifierRequired&&!sameEditionEvidence(query,item)&&!reviewedEdition){
+      if(!['game','software'].includes(query.mediaType)&&!identifierRequired&&!sameEditionEvidence(query,item)&&!reviewedEdition){
         candidate(item,'Title-only book identity needs an identifier, compatible author evidence, or a reviewed same-edition relationship.');continue;
       }
       if(!exclude.has(item.provider))exact.set(item.id,publicMatch(item,'same-edition',identifierRequired?'Matching validated edition identifier.':'Exact normalized title with no conflicting edition evidence.'));

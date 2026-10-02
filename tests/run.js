@@ -378,11 +378,11 @@ const tests = [
   }],
   ['keeps Fanatical game, book, and audiobook order items without order secrets', () => {
     assert.equal(fanaticalMediaType('comic'), 'book');
-    assert.equal(fanaticalMediaType('software'), null);
+    assert.equal(fanaticalMediaType('software'), 'software');
     assert.deepEqual(fanaticalItemsFromProjection({ items: [
       { sourceItemId: 'game-leaf-123', title: 'Example Game', mediaType: 'game', platforms: ['windows'], externalIds: { steamAppId: '12345' }, bundle: { sourceItemId: 'bundle-123', title: 'Example Bundle' }, purchaseDate: '2026-09-26T00:00:00.000Z' },
       { sourceItemId: 'comic-leaf-123', title: 'Example Comic', mediaType: 'comic', externalIds: { isbn: '9781234567890' }, bundle: { sourceItemId: 'bundle-123', title: 'Example Bundle' } },
-      { sourceItemId: 'asset-leaf-123', title: 'Ignore Asset', mediaType: 'software' }
+      { sourceItemId: 'asset-leaf-123', title: 'Ignore Asset', mediaType: 'unknown' }
     ] }), [
       { providerItemId: 'game-leaf-123', title: 'Example Game', mediaType: 'game', ownership: 'owned', platform: ['windows'], acquiredAt: '2026-09-26T00:00:00.000Z', metadata: { source: 'fanatical-order-history', bundleId: 'bundle-123', bundleTitle: 'Example Bundle', bundleSlug: '', slug: '', drm: [], formats: [], steamAppId: '12345' } },
       { providerItemId: 'comic-leaf-123', title: 'Example Comic', mediaType: 'book', ownership: 'owned', platform: [], acquiredAt: null, metadata: { source: 'fanatical-order-history', bundleId: 'bundle-123', bundleTitle: 'Example Bundle', bundleSlug: '', slug: '', drm: [], formats: [], isbn: '9781234567890' } }

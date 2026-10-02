@@ -5,7 +5,7 @@ export function validateProviderStates(value = {}) {
   object(value,'Provider states');
   return Object.fromEntries(PROVIDERS.filter(provider=>Object.hasOwn(value,provider)).map(provider=>{
     const state=object(value[provider],'Provider state');const result={};
-    for(const key of ['connected','itemCount','addOnCount','audiobookCount','bookCount','movieCount','tvCount','linkedAddOnCount','recordCount','lastSync','lastError','source','syncMode','quickSyncAt','fullSyncAt','accountLabel','profileLabel']){
+    for(const key of ['connected','itemCount','addOnCount','audiobookCount','softwareCount','bookCount','movieCount','tvCount','linkedAddOnCount','recordCount','lastSync','lastError','source','syncMode','quickSyncAt','fullSyncAt','accountLabel','profileLabel']){
       if(!Object.hasOwn(state,key))continue;
       if(key==='connected'){if(typeof state[key]!=='boolean')throw new Error('Provider connected must be boolean.');result[key]=state[key];}
       else if(key.endsWith('Count'))result[key]=count(state[key],key);
