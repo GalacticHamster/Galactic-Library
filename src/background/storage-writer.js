@@ -1,5 +1,5 @@
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
-import { normaliseExternalClientIds } from '../lib/external-api.js';
+import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
@@ -690,7 +690,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function feedUploads(){return (await storageArea.get({[FEED_UPLOAD_KEY]:{}}))[FEED_UPLOAD_KEY];}
-  async function feedClient(client,external=false){if(!/^[a-p]{32}$/u.test(client))throw new Error('Invalid reminder client.');if(external&&!(await getAllowedExternalClientIds()).includes(client))throw new Error('Companion permission was revoked.');}
+  async function feedClient(client,external=false){if(!isExtensionId(client))throw new Error('Invalid reminder client.');if(external&&!(await getAllowedExternalClientIds()).includes(client))throw new Error('Companion permission was revoked.');}
   async function beginCompanionFeed(client,value,external=false){
     await feedClient(client,external);const database=await getDatabase(),profileLabel=text(value?.profileLabel,100,'Humble profile');
     if(!profileLabel||database.providers.humble?.profileLabel!==profileLabel)throw new Error('The GL Humble profile does not match. Confirm the same account and enter its current GL profile label.');

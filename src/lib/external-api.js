@@ -5,12 +5,10 @@ import {libraryReminders,companionReminder} from './reminders.js';
 import { validIsbn } from './identity.js';
 import { validateContents } from './contents.js';
 
-const EXTENSION_ID = /^[a-p]{32}$/u;
+import {isExtensionId} from './extension-id.js';
+export {isExtensionId} from './extension-id.js';
 const REQUEST_MEDIA_TYPES = new Set(['game', 'book', 'audiobook', 'software']);
 
-export function isExtensionId(value) {
-  return EXTENSION_ID.test(String(value ?? '').trim());
-}
 
 export function normaliseExternalClientIds(values) {
   const candidates = Array.isArray(values) ? values : [];
@@ -56,7 +54,7 @@ function validMatchRequest(item) {
 export function handleExternalApiRequest(database, request) {
   if (!request || typeof request !== 'object') return { ok: false, error: 'Invalid Galactic Library API request.' };
   if (request.type === 'PING') return { ok: true, apiVersion: EXTERNAL_API_VERSION, appVersion: '0.1.0' };
-  if (request.type === 'GET_STATUS') return { ok: true, apiVersion: EXTERNAL_API_VERSION, ready: true, providers: providerStatus(database.providers), capabilities:{mediaTypes:[...REQUEST_MEDIA_TYPES],relationships:['same-work','same-edition','contains'],reviewedContents:true,opaqueItemReferences:true,entitlementReminders:true,entitlementFeed:true} };
+  if (request.type === 'GET_STATUS') return { ok: true, apiVersion: EXTERNAL_API_VERSION, ready: true, providers: providerStatus(database.providers), capabilities:{mediaTypes:[...REQUEST_MEDIA_TYPES],relationships:['same-work','same-edition','contains'],reviewedContents:true,opaqueItemReferences:true,entitlementReminders:true,entitlementFeed:true,centralReview:true} };
   if(request.type==='GET_REMINDERS'){
     if(request.apiVersion!==EXTERNAL_API_VERSION)return {ok:false,error:'Unsupported Galactic Library API version.'};
     const offset=request.offset??0,limit=request.limit??100;

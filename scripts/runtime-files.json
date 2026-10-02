@@ -17,6 +17,7 @@
   "src/lib/enrichment-state.js",
   "src/lib/enrichment-workbench.js",
   "src/lib/enrichment.js",
+  "src/lib/extension-id.js",
   "src/lib/external-api.js",
   "src/lib/genre-hints.js",
   "src/lib/google-books.js",

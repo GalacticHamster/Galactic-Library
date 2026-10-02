@@ -418,6 +418,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         sendResponse({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
         return null;
       }
+      if(request?.type==='OPEN_REVIEW'){
+        if(request.apiVersion!==1){sendResponse({ok:false,apiVersion:1,error:'Unsupported Galactic Library API version.'});return null;}
+        return chrome.runtime.openOptionsPage().then(()=>sendResponse({ok:true,apiVersion:1}),()=>sendResponse({ok:false,apiVersion:1,error:'Could not open Galactic Library options.'}));
+      }
       if(['BEGIN_ENTITLEMENT_FEED','APPEND_ENTITLEMENT_FEED','COMMIT_ENTITLEMENT_FEED','REMOVE_ENTITLEMENT_FEED'].includes(request?.type)){
         if(request.apiVersion!==1){sendResponse({ok:false,error:'Unsupported Galactic Library API version.'});return null;}
         const operation=request.type==='BEGIN_ENTITLEMENT_FEED'?storageWriter.beginCompanionFeed(sender.id,request,true):request.type==='APPEND_ENTITLEMENT_FEED'?storageWriter.appendCompanionFeed(sender.id,request.uploadToken,request.offset,request.entries,true):request.type==='COMMIT_ENTITLEMENT_FEED'?storageWriter.commitCompanionFeed(sender.id,request.uploadToken,true):storageWriter.removeCompanionFeed(sender.id,true);

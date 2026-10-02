@@ -920,7 +920,7 @@ resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
 document.querySelector('#add-companion-extension-id').addEventListener('click', async () => {
   const id = companionExtensionId.value.trim();
   if (!isExtensionId(id)) {
-    companionExtensionLinkStatus.textContent = 'Enter a valid 32-character Chrome extension ID.';
+    companionExtensionLinkStatus.textContent = 'Enter a valid Chrome extension ID or Firefox add-on ID.';
     return;
   }
   try {
