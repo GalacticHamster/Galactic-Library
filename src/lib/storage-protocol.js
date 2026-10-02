@@ -2,6 +2,10 @@ export const STORAGE_MESSAGE_TYPE = 'LIBRARY_STORAGE_OPERATION';
 
 export const STORAGE_OPERATIONS = Object.freeze([
   'getDatabase',
+  'saveReadingState',
+  'removeReadingState',
+  'saveReadingOrder',
+  'removeReadingOrder',
   'saveReminderReview',
   'getReminderNotificationSettings',
   'saveReminderNotificationSettings',

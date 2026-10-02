@@ -14,6 +14,7 @@ import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
+import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/reading.js';
 import {libraryReminders} from '../lib/reminders.js';
 import {date} from '../lib/validation.js';
 import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/sync-health.js';
@@ -661,7 +662,32 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   async function releaseReminderNotification(day){
     const settings=await getReminderNotificationSettings();if(settings.lastNotifiedDay===day)await storageArea.set({[NOTIFICATIONS]:{...settings,lastNotifiedDay:''}});
   }
+
+  function currentReadingRecord(database,ref,expected){
+    const item=Object.values(database.providerItems).find(record=>record.recordRef===ref&&READING_MEDIA.includes(record.mediaType));
+    if(!item)throw new Error('This reading record is not in the current library.');
+    if((database.readingStates[ref]?.revisionRef??null)!==expected)throw new Error('Reading state changed. Refresh before saving.');return item;
+  }
+  async function saveReadingState(ref,value,expected=null){
+    const database=await getDatabase();currentReadingRecord(database,ref,expected);
+    database.readingStates[ref]=validateReadingState({...value,revisionRef:crypto.randomUUID(),accessCheckedAt:value.access==='unknown'?null:new Date().toISOString(),updatedAt:new Date().toISOString()});return persistDatabase(database);
+  }
+  async function removeReadingState(ref,expected){
+    const database=await getDatabase();currentReadingRecord(database,ref,expected);delete database.readingStates[ref];return persistDatabase(database);
+  }
+  async function saveReadingOrder(ref,title,recordRefs,expected=null){
+    const database=await getDatabase(),previous=ref?database.readingOrders[ref]:null;
+    if(ref&&!previous||(previous?.revisionRef??null)!==expected)throw new Error('Reading order changed. Refresh before saving.');
+    const order=validateReadingOrder({title,recordRefs,revisionRef:crypto.randomUUID(),updatedAt:new Date().toISOString()});
+    const active=new Set(Object.values(database.providerItems).filter(item=>READING_MEDIA.includes(item.mediaType)).map(item=>item.recordRef));
+    if(order.recordRefs.some(itemRef=>!active.has(itemRef)&&!previous?.recordRefs.includes(itemRef)))throw new Error('New order entries must be current books or audiobooks.');
+    const orderRef=ref??crypto.randomUUID();database.readingOrders[orderRef]=order;return {database:await persistDatabase(database),orderRef};
+  }
+  async function removeReadingOrder(ref,expected){
+    const database=await getDatabase(),order=database.readingOrders[ref];if(!order||order.revisionRef!==expected)throw new Error('Reading order changed. Refresh before deleting.');delete database.readingOrders[ref];return persistDatabase(database);
+  }
   const operations = {
+    saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
     getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,

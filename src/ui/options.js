@@ -7,6 +7,8 @@ import {createTitleAliasTools} from './title-aliases.js';
 import {saveTitleAliases} from '../lib/storage.js';
 import {createOwnershipReviewTools,createPurchaseEvidenceWorkbench} from './ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
+import {createReadingTools,createReadingWorkbench} from './reading.js';
+import {saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder} from '../lib/storage.js';
 import {createRemindersView} from './reminders.js';
 import {saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings} from '../lib/storage.js';
 import {createSyncHealthView} from './sync-health.js';
@@ -638,6 +640,11 @@ function render() {
     requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else syncDashboard.after(reminderDashboard);
+  const priorReading=document.querySelector('#reading-workbench');
+  const readingWorkbench=createReadingWorkbench(database,{
+    order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref])
+  },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
+  if(priorReading)priorReading.replaceWith(readingWorkbench);else reminderDashboard.after(readingWorkbench);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));
@@ -768,6 +775,9 @@ function render() {
     node.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
     node.append(createOwnershipReviewTools(records,database,{
       save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render
+    }));
+    if(['book','audiobook'].includes(canonicalItem.mediaType))node.append(createReadingTools(records,database,{
+      save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render
     }));
     if (canonicalItem.mediaType === 'book') {
       node.append(createGoogleBooksTools(canonicalItem,records));

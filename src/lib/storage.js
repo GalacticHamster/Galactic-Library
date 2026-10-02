@@ -17,6 +17,7 @@ export function createStorageClient(sendMessage) {
 const client = createStorageClient((message) => chrome.runtime.sendMessage(message));
 export const {
   getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase,
+  saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
   cancelProviderScan,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,
   getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
   saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,

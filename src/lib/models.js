@@ -8,6 +8,7 @@ import { object, text, strings, date } from './validation.js';
 import { editionBarriers, validateEditionSeparations } from './relationships.js';
 import { providerOwnership } from './ownership.js';
 import {validateEnrichmentHistory,validateEnrichmentReviews} from './enrichment-state.js';
+import {validateReadingStates,validateReadingOrders} from './reading.js';
 import {validateReminderReviews} from './reminders.js';
 import {validateTitleAliases} from './title-aliases.js';
 import {validateOwnershipReviews,validateOwnershipProposals} from './ownership-review.js';
@@ -21,7 +22,7 @@ export function createEmptyDatabase() {
     manualMatchDecisions: {},
     contentReviews: {},
     editionSeparations: {},
-    providerHistory: {},enrichmentHistory:{},enrichmentReviews:{},titleAliases:{},ownershipReviews:{},ownershipProposals:{},reminderReviews:{}
+    providerHistory: {},enrichmentHistory:{},enrichmentReviews:{},titleAliases:{},ownershipReviews:{},ownershipProposals:{},reminderReviews:{},readingStates:{},readingOrders:{}
   };
 }
 
@@ -148,7 +149,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, 2, 3, 4, 5, 6, 7, 8, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   const normalizedItems = Object.values(value.providerItems).map((item) => {
@@ -205,6 +206,7 @@ export function validateDatabase(value) {
     enrichmentHistory:validateEnrichmentHistory(value.enrichmentHistory),
     enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),
     titleAliases:validateTitleAliases(value.titleAliases),
+    readingStates:validateReadingStates(value.readingStates),readingOrders:validateReadingOrders(value.readingOrders),
     reminderReviews:validateReminderReviews(value.reminderReviews),
     ownershipReviews:validateOwnershipReviews(value.ownershipReviews),ownershipProposals:validateOwnershipProposals(value.ownershipProposals),
     providerItems,
