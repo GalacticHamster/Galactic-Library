@@ -41,6 +41,7 @@
   "src/lib/storage.js",
   "src/lib/sync-health.js",
   "src/lib/title-aliases.js",
+  "src/lib/title-candidates.js",
   "src/lib/title-sort.js",
   "src/lib/validation.js",
   "src/lib/zip-metadata.js",

@@ -4,6 +4,7 @@ import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
+import { candidateTitleKeys, possibleTitleRelation } from './title-candidates.js';
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
@@ -23,7 +24,9 @@ export function matchItems(items, requestedItems, context = {}) {
   const database={...context,providerItems:items};
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};
+  const byCandidateTitle = new Map();
   for(const item of all){
+    for (const key of candidateTitleKeys(item.title, item.mediaType)) add(byCandidateTitle, item.mediaType + ':' + key, item);
     const identity=identityEvidence(item);add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,item);add(byBase,`${item.mediaType}:${identity.candidateKey}`,item);
     for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,item);
     for(const isbn of identity.isbn)add(byIdentifier,`${item.mediaType}:isbn:${isbn}`,item);
@@ -79,6 +82,15 @@ export function matchItems(items, requestedItems, context = {}) {
     }
     for(const item of byAlias.get(`${query.mediaType}:${query.normalizedTitle}`)??[]){
       if(!identityConflicts(query,item,{edition:false}).some(field=>['authors','run','unit','unitType'].includes(field)))candidate(item,'User-supplied alternate title; edition ownership still needs identifier or relationship evidence.');
+    }
+    const discovered = new Set(candidateTitleKeys(query.title, query.mediaType).flatMap(key => byCandidateTitle.get(query.mediaType + ':' + key) ?? []));
+    for (const item of discovered) {
+      if (exact.has(item.id) || possible.has(item.id) || identityConflicts(query, item, { edition: false }).some(field => ['media type', 'authors', 'run', 'unit', 'unitType'].includes(field))) continue;
+      const reason = possibleTitleRelation(query.title, item.title, query.mediaType);
+      if (reason) {
+        const differences = identityConflicts(query, item);
+        candidate(item, reason + (differences.length ? ' Differences: ' + differences.join(', ') + '.' : ''));
+      }
     }
     for(const anchor of anchors){
       const visited=new Set([anchor.id]);const queue=[anchor.id];
