@@ -16,7 +16,7 @@ export async function reconcileReminderNotifications(writer,browser,notify=false
   const day=new Date(now).toISOString().slice(0,10);
   if(!await writer.reserveReminderNotification(day))return;
   try{
-    await browser.notifications.create('galactic-library-reminder',{type:'basic',iconUrl:browser.runtime.getURL('src/ui/library-icon.png'),title:'Galactic Library',message:`${count} entitlement reminder${count===1?'':'s'} need attention. Open Galactic Library to review.`,priority:0});
+    await new Promise((resolve,reject)=>browser.notifications.create('galactic-library-reminder',{type:'basic',iconUrl:browser.runtime.getURL('src/ui/library-icon.png'),title:'Galactic Library',message:`${count} entitlement reminder${count===1?'':'s'} need attention. Open Galactic Library to review.`,priority:0},()=>{const error=browser.runtime.lastError;if(error)reject(new Error('Desktop notification was not delivered.'));else resolve();}));
   }catch{
     // OS suppression/API errors do not change ownership or interrupt sync.
     await writer.releaseReminderNotification(day);
