@@ -11,6 +11,7 @@ import { text } from '../lib/validation.js';
 import {needsGoogleBooksEnrichment} from '../lib/enrichment.js';
 import {validateEnrichment} from '../lib/metadata-validation.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
+import {validateTitleAliases} from '../lib/title-aliases.js';
 
 /**
  * Instantiate once in the service worker. Every read and mutation shares this
@@ -339,6 +340,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   function verifyRecordRefs(database,ids,refs){
     if(refs&&(!Array.isArray(refs)||refs.length!==ids.length||ids.some((id,index)=>database.providerItems[id]?.recordRef!==refs[index])))throw new Error('These records changed during enrichment. Reload and review the current profile.');
   }
+
+  async function saveTitleAliases(recordRef,titles,note=''){
+    const database=await getDatabase();
+    if(!Object.values(database.providerItems).some(item=>item.recordRef===recordRef))throw new Error('This record is no longer in the active library.');
+    if(!Array.isArray(titles))throw new Error('Alternate titles must be a list.');
+    if(!titles.length)delete database.titleAliases[recordRef];
+    else database.titleAliases[recordRef]=validateTitleAliases({[recordRef]:{titles,note,updatedAt:new Date().toISOString()}})[recordRef];
+    return persistDatabase(database);
+  }
   function selectEnrichment(database,id,kind,value,now){
     const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
     database.enrichmentHistory[selectionRef]={recordRef:item.recordRef,kind,selectionRef,previous:item.metadata?.enrichment?.[kind]??null,changedAt:now};
@@ -545,7 +555,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
-    separateEdition, undoEditionSeparation,
+    separateEdition, undoEditionSeparation, saveTitleAliases,
     getShowEnrichmentActions, saveShowEnrichmentActions
   };
   let tail = Promise.resolve();

@@ -25,6 +25,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'removeManualMatchDecision',
   'separateEdition',
   'undoEditionSeparation',
+  'saveTitleAliases',
   'saveOpenLibraryEnrichment',
   'saveEnrichmentReview',
   'dismissEnrichmentReview',

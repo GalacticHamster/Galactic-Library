@@ -23,6 +23,7 @@ export function normalizeGameTitle(value) {
   let title = String(value ?? '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/gu, '')
+    .normalize('NFC')
     .toLowerCase()
     .replace(/[®™©]/gu, ' ')
     .replace(/[’'`]/gu, '')
@@ -34,7 +35,7 @@ export function normalizeGameTitle(value) {
     .replace(/\bvolume\b/giu, 'vol')
     .replace(/\b(?:the|a|an)\s+/u, '')
     .replace(/\b(i|ii|iii|iv|v|vi|vii|viii|ix|x)\b/gu, (match) => ROMAN_NUMERALS.get(match) ?? match)
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
 

@@ -20,10 +20,11 @@ function requestRecord(request) {
 
 export function matchItems(items, requestedItems, context = {}) {
   const database={...context,providerItems:items};
-  const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();
+  const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};
   for(const item of all){
     const identity=identityEvidence(item);add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,item);add(byBase,`${item.mediaType}:${identity.candidateKey}`,item);
+    for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,item);
     for(const isbn of identity.isbn)add(byIdentifier,`${item.mediaType}:isbn:${isbn}`,item);
     if(identity.asin)add(byIdentifier,`${item.mediaType}:asin:${identity.asin}`,item);
     for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
@@ -74,6 +75,9 @@ export function matchItems(items, requestedItems, context = {}) {
       if(exact.has(item.id))continue;
       const reason=relationshipReason(query,item);
       if(reason)candidate(item,reason);
+    }
+    for(const item of byAlias.get(`${query.mediaType}:${query.normalizedTitle}`)??[]){
+      if(!identityConflicts(query,item,{edition:false}).some(field=>['authors','run','unit','unitType'].includes(field)))candidate(item,'User-supplied alternate title; edition ownership still needs identifier or relationship evidence.');
     }
     for(const anchor of anchors){
       const visited=new Set([anchor.id]);const queue=[anchor.id];

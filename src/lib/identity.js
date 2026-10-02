@@ -2,7 +2,7 @@
 export const compact = (value, max = 500) => typeof value === 'string' || typeof value === 'number'
   ? String(value).normalize('NFKC').replace(/\s+/gu, ' ').trim().slice(0, max) : '';
 export const names = (value) => [...new Set((Array.isArray(value) ? value : [value]).map((entry) => compact(typeof entry === 'object' ? entry?.name : entry)).filter(Boolean))].slice(0, 50);
-export const identityKey = (value) => compact(value).toLocaleLowerCase().replace(/&/gu, ' and ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+export const identityKey = (value) => compact(value).toLocaleLowerCase().replace(/&/gu, ' and ').replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').trim();
 
 export function validIsbn(value) {
   const isbn = compact(value).toUpperCase().replace(/[-\s]/gu, '');

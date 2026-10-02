@@ -24,7 +24,7 @@ export const {
   saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
   saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
   applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
-  separateEdition, undoEditionSeparation,
+  separateEdition, undoEditionSeparation, saveTitleAliases,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
   saveContentReview, removeContentReview,
   getShowEnrichmentActions, saveShowEnrichmentActions

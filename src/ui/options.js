@@ -3,6 +3,8 @@ import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} fr
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {createLocalMetadataTools} from './local-metadata-tools.js';
+import {createTitleAliasTools} from './title-aliases.js';
+import {saveTitleAliases} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
@@ -738,6 +740,7 @@ function render() {
       remove:async(id)=>{database=await removeManualMatchDecision(id);},
       refresh:render
     }));
+    node.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
     if (canonicalItem.mediaType === 'book') {
       node.append(createGoogleBooksTools(canonicalItem,records));
       node.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
