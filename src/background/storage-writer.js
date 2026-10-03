@@ -1,3 +1,4 @@
+import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
@@ -239,7 +240,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY]);
+    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -625,6 +626,17 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return saveAllowedExternalClientIds([...ids, id]);
   }
 
+  async function getUiPreferences() {
+    const stored = await storageArea.get({ [UI_PREFERENCES_KEY]: defaultUiPreferences() });
+    try { return validateUiPreferences(stored[UI_PREFERENCES_KEY]); } catch { return defaultUiPreferences(); }
+  }
+  async function saveUiPreferences(patch) {
+    validateUiPreferences(patch);
+    const current = await getUiPreferences();
+    const next = validateUiPreferences({ ...current, ...patch, library: { ...current.library, ...patch.library }, books: { ...current.books, ...patch.books } });
+    await storageArea.set({ [UI_PREFERENCES_KEY]: next });
+    return next;
+  }
   async function getShowEnrichmentActions() {
     const stored = await storageArea.get({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: true });
     return stored[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY] !== false;
@@ -731,7 +743,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
     saveContentReview, removeContentReview,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
-    getShowEnrichmentActions, saveShowEnrichmentActions
+    getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences
   };
   let tail = Promise.resolve();
 

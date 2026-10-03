@@ -14,7 +14,8 @@ const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const pause=()=>new Promise(done=>setTimeout(done,20));
 const wait=async(predicate,message)=>{for(let n=0;n<100;n++){if(predicate())return;await pause();}throw new Error(message);};
 const button=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label);
-const card=title=>[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);
+const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}return node;};
+const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
 const values={};let openedOptions;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
@@ -71,8 +72,10 @@ try{
   await writer.saveContentReview('kindle:b',{entries:[entry('3'),entry('5')],statement:'Collects Batman (2011) #3 and #5'});
   const backup=createBackup(await writer.getDatabase());
   await import('../src/ui/options.js');
-  await wait(()=>document.querySelectorAll('#library-items > li').length===6,'Library failed to render.');
+  await wait(()=>document.querySelectorAll('#library-items > li').length===6,'Library failed to render: '+document.querySelector('#backup-status').textContent);
   checks.push('actual options page renders distinct editions and same-title homonyms');
+  assert(document.querySelector('#settings-workspace').hidden&&document.querySelector('#books-workspace').hidden&&document.querySelector('#reading-workspace').hidden&&document.querySelector('#ownership-workspace').hidden,'Default library exposes a tool workspace');
+  assert(!document.querySelector('#library-items .evidence-inspector')&&!document.querySelector('#library-items .local-metadata-tools'),'Collapsed cards eagerly expose item tools');checks.push('default view is library first and item controls are lazy behind Details');
   let inspector=card('Collection A').querySelector('.evidence-inspector');
   assert(!inspector.querySelector('select'),'Closed evidence controls should be lazy.');
   await open(inspector);
@@ -136,6 +139,7 @@ try{
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.'&&!values.galacticLibraryDatabase.providerItems['humble:split-test'],'Backup restore failed.');
   assert((await writer.getDatabase()).contentReviews['humble:a'].entries.length===2,'Backup lost contents.');
   checks.push('actual backup import restores reviewed evidence and refreshes the UI');
+  showWorkspace('reading');
   document.querySelector('#series-coverage-panel').open=true;
   const group=await open(document.querySelector('.series-groups details'));
   assert(group.textContent.includes('2, 4')&&group.textContent.includes('Collection A — humble')&&group.textContent.includes('Collection B — kindle')&&group.textContent.includes('Yes'),'Union, gaps or overlap missing.');
@@ -151,6 +155,7 @@ try{
   const enrichmentTransfer=new DataTransfer();enrichmentTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'enrichment.json',{type:'application/json'}));
   document.querySelector('#import').files=enrichmentTransfer.files;document.querySelector('#import').dispatchEvent(new Event('change'));
   await wait(()=>card('Review manga Vol. 1'),'Enrichment fixture did not render.');
+  showWorkspace('books');
   let tools=card('Review manga Vol. 1').querySelector('details:has([data-action="google-books-search"])');
   if(!tools)tools=[...card('Review manga Vol. 1').querySelectorAll('details')].find(node=>button(node,'Find Google Books candidates'));
   await open(tools);button(tools,'Find Google Books candidates').click();
@@ -225,6 +230,7 @@ try{
   checks.push('complete scan history survives backup restore and is displayed separately from current ownership');
   await writer.mergeProviderItems('humble',[{providerItemId:'software-ui',title:'Creative Tool',mediaType:'software',ownership:'owned'}]);
   const softwareTransfer=new DataTransfer();softwareTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'software.json',{type:'application/json'}));document.querySelector('#backup-status').textContent='';input.files=softwareTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Software fixture restore failed.');
+  showWorkspace('library');
   document.querySelector('#media-type-filter').value='software';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));assert(document.querySelectorAll('#library-items > li').length===1&&card('Creative Tool').textContent.includes('Software')&&document.querySelector('#library-summary').textContent.includes('1 unique software products'),'Software is missing or mixed with games in options.');
   document.querySelector('#media-type-filter').value='all';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));
   const aliases=await open(card('Creative Tool').querySelector('.title-alias-tools'));aliases.querySelector('textarea').value='創作ツール';button(aliases,'Save alternate titles').click();await wait(()=>values.galacticLibraryDatabase.titleAliases[values.galacticLibraryDatabase.providerItems['humble:software-ui'].recordRef]?.titles.includes('創作ツール'),'Alias controls did not persist Unicode title.');
@@ -272,5 +278,13 @@ try{
   checks.push('actual shared reminder dashboard shows dated HB source and partial baseline, opens trusted source options and supports dismissal/restore');
   const nativeBefore=JSON.stringify((await writer.getDatabase()).providerItems);sharedDashboard=await open(document.querySelector('#entitlement-reminders'));button(sharedDashboard,'Remove Humble companion feed').click();await wait(()=>!values.galacticLibraryDatabase.companionFeeds[feedClient],'Central shared feed removal failed.');assert(JSON.stringify((await writer.getDatabase()).providerItems)===nativeBefore,'Shared feed removal changed native ownership.');
   checks.push('actual central feed removal deletes only companion reminders and preserves native provider ownership');
+  showWorkspace('library');document.querySelector('#clear-filters').click();
+  await writer.mergeProviderItems('humble',Array.from({length:61},(_,n)=>({providerItemId:'ui-page-'+n,title:'Pagination title '+n,mediaType:'book',ownership:'owned'})));
+  const pageTransfer=new DataTransfer();pageTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'pages.json'));document.querySelector('#backup-status').textContent='';input.files=pageTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Paging fixture import failed');
+  assert(document.querySelectorAll('#library-items > li').length===50&&!document.querySelector('#library-next').disabled,'Library first page is unbounded or cannot advance');document.querySelector('#library-next').click();assert([...document.querySelectorAll('#library-items > li')].some(node=>node.textContent.includes('Pagination title 60')),'Library pagination drops later records');
+  const search=document.querySelector('#search');search.value='Pagination title 60';search.dispatchEvent(new Event('input'));assert(document.querySelectorAll('#library-items > li').length===1&&document.querySelector('#library-previous').disabled,'Library search did not reach all pages and reset pagination');
+  checks.push('compact library pagination and full-library search reach records beyond the first 50');
+  const snapshot=JSON.stringify((await writer.getDatabase()).providerItems);showWorkspace('settings');assert(document.querySelector('#library-section').hidden&&!document.querySelector('#settings-workspace').hidden,'Settings did not replace the library workspace');showWorkspace('books');search.value='Pagination title 2';search.dispatchEvent(new Event('input'));showWorkspace('library');assert(search.value==='Pagination title 60','Book workspace replaced library filters');showWorkspace('books');assert(search.value==='Pagination title 2','Book workspace filters were not remembered');
+  await wait(()=>values.galacticLibraryUiPreferences?.workspace==='books'&&values.galacticLibraryUiPreferences.books.search==='Pagination title 2','Workspace preferences were not persisted');assert(JSON.stringify((await writer.getDatabase()).providerItems)===snapshot,'Navigation changed ownership records');checks.push('workspace and per-view filters persist privately without changing ownership');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

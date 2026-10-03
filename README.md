@@ -64,7 +64,7 @@ For Humble book records, an explicit `comic`, `manga`, or `graphic novel` label 
 
 The Library **Genre** filter groups detailed catalogue subjects into broad genres such as Comics & Graphic Novels, Science Fiction & Fantasy, and History. The source-specific subjects and categories remain stored locally as enrichment evidence; they are not presented as an unwieldy filter list.
 
-The Library search controls include a saved **Show enrichment actions** checkbox. Turn it off to hide per-book lookup and apply controls while keeping existing metadata and source links visible.
+The options page opens in **Library**, with compact entries and 50 results per page. Open **Details** for an item's metadata and actions. **Book information** contains lookup and metadata tools, **Reading** contains progress and series coverage, **Ownership** contains evidence and reviews, and **Settings** contains imports, services, backup and recovery. Library and Book information remember separate searches, filters and pages; the selected workspace also survives reopening. These display preferences stay in private extension storage and are excluded from library backups. Pending reviews and active book lookups appear as compact notices with links to the relevant workspace.
 
 For future issue-contents enrichment, a book is a **confirmed comic/manga candidate** only when a provider explicitly identifies it as Comixology or ComicsUnlimited, its Humble or Fanatical bundle name explicitly says comic/manga/graphic novel, or an already-confirmed catalogue category explicitly says comic/manga/graphic novel. Character names and title patterns alone never qualify. These candidates are shown on library cards and can be filtered through **Genre: Comics & Graphic Novels**.
 

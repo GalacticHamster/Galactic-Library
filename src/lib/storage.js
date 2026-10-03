@@ -31,7 +31,7 @@ export const {
   saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
   saveContentReview, removeContentReview,
-  getShowEnrichmentActions, saveShowEnrichmentActions
+  getUiPreferences, saveUiPreferences, getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;
 
 export function createBackup(database) {

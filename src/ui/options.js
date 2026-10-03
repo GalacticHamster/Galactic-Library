@@ -1,3 +1,5 @@
+import { createWorkspaceNavigation } from './workspaces.js';
+import { getUiPreferences, saveUiPreferences } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -84,6 +86,18 @@ const googleBooksSearches = new Map();
 let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
+let libraryPage = 0;
+const openItemDetails = new Set();
+const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
+const workspace = createWorkspaceNavigation({
+  readView: () => ({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), page: libraryPage }),
+  applyView: view => { search.value = view.search; libraryPage = view.page; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
+  save: saveUiPreferences, changed: () => { if (database) render(); }
+});
+document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; render(); workspace.rememberView(); });
+document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; render(); workspace.rememberView(); });
+document.querySelector("#open-active-book-job").addEventListener("click", () => workspace.select("books"));
+document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book?"; });
 
 async function retryEnrichmentReview(review){
   const byRef=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));
@@ -99,9 +113,10 @@ async function retryEnrichmentReview(review){
 }
 
 function inspectEnrichmentRecords(refs){
-  search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
+  workspace.select(refs.every(ref=>['book','audiobook'].includes(Object.values(database.providerItems).find(record=>record.recordRef===ref)?.mediaType))?'books':'library');search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
+  const first=Object.values(database.providerItems).find(record=>refs.includes(record.recordRef));if(first){search.value=first.title;libraryPage=0;render();workspace.rememberView();}
   const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').some(ref=>refs.includes(ref)));
-  if(card){card.tabIndex=-1;card.scrollIntoView({block:'center'});card.focus();for(const details of card.querySelectorAll('details'))details.open=true;}
+  if(card){card.tabIndex=-1;card.scrollIntoView({block:'center'});card.focus();const root=card.querySelector('.item-details');root.open=true;root.dispatchEvent(new Event('toggle'));for(const details of card.querySelectorAll('details'))details.open=true;}
 }
 
 function displayProviderName(provider) {
@@ -143,7 +158,7 @@ function providerSourceDetails(records) {
           ? 'rental'
           : ownership === 'claimed'
             ? 'claimed'
-            : '';
+            : ownership === 'owned' ? 'Owned' : '';
     return { label: count === 1 ? name : `${name} (${count} records)`, ownershipLabel };
   }).sort((left, right) => left.label.localeCompare(right.label));
 }
@@ -298,6 +313,8 @@ function createAddOnList(addOns) {
 function reviewRecordLabel(record) {
   return `${record.title} — ${displayProviderName(record.provider)}`;
 }
+
+function actionButton(label, onClick) { return reviewButton(label, "", onClick); }
 
 function reviewButton(label, className, onClick) {
   const button = textElement('button', label);
@@ -556,6 +573,13 @@ function renderGoogleBooksDiagnostics(job) {
   }));
 }
 
+function renderActiveBookJob(job) {
+  const active=googleBooksRunning||Boolean(job?.runId&&job.leaseUntil>Date.now());
+  const incomplete=Boolean(job&&job.cursor<job.queue.length);
+  document.querySelector("#active-book-job").hidden=!active&&!incomplete;
+  document.querySelector("#active-book-job-status").textContent=(active?"Finding book details: ":"Book lookup paused: ")+(job?job.cursor+" of "+job.queue.length+" checked.":"Preparing books?");
+  document.querySelector("#pause-active-book-job").hidden=!googleBooksRunning;
+}
 async function renderGoogleBooksEnrichment() {
   const [key, job] = await Promise.all([getGoogleBooksApiKey(), getGoogleBooksEnrichmentJob()]);
   clearGoogleBooksApiKeyButton.disabled = !key || googleBooksRunning;
@@ -566,6 +590,7 @@ async function renderGoogleBooksEnrichment() {
   pauseGoogleBooksEnrichmentButton.hidden = !googleBooksRunning;
   resetGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !job;
   renderGoogleBooksDiagnostics(job);
+  renderActiveBookJob(job);
   if (googleBooksRunning) return;
   if(otherRun){googleBooksEnrichmentStatus.textContent='Another options page is running enrichment. Pause it or wait for its lease to expire.';} else if (!key) {
     googleBooksEnrichmentStatus.textContent = 'Save a private Google Books API key to enable automated enrichment.';
@@ -618,7 +643,7 @@ async function runGoogleBooksEnrichment() {
         outcomes.at(-1).recordObservations=records.map(record=>({ref:record.recordRef,observedAt:record.observedAt,title:record.title}));
         await pause(1200);
       }
-      if(outcomes.length){const committed=await commitEnrichmentBatch(job.jobId,job.runId,cursor,outcomes);job=committed.job;database=committed.database;render();}
+      if(outcomes.length){const committed=await commitEnrichmentBatch(job.jobId,job.runId,cursor,outcomes);job=committed.job;database=committed.database;renderActiveBookJob(job);render();}
     }
   }catch(error){lastError=error.message;}
   finally{
@@ -635,7 +660,7 @@ function render() {
       dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},
       undo:async refs=>{database=await undoEnrichmentSelections(refs);},
       retry:retryEnrichmentReview,inspect:inspectEnrichmentRecords,refresh:render
-    });document.querySelector('.tool-cards').after(enrichmentWorkbench.element);
+    });document.querySelector('#books-workspace').append(enrichmentWorkbench.element);
   }
   enrichmentWorkbench.update(database);
   const receiptWorkbench=createPurchaseEvidenceWorkbench(database,{
@@ -643,23 +668,24 @@ function render() {
     apply:async(...args)=>{database=await applyPurchaseEvidence(...args);},dismiss:async id=>{database=await dismissPurchaseEvidence(id);},refresh:render
   });
   const priorReceipts=document.querySelector('#purchase-evidence-workbench');receiptWorkbench.open=priorReceipts?.open??false;
-  if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else enrichmentWorkbench.element.after(receiptWorkbench);
+  if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else document.querySelector('#ownership-workspace').append(receiptWorkbench);
   const syncDashboard=createSyncHealthView(database,{cancel:async(...args)=>{database=await cancelProviderScan(...args);},refresh:render});
   const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
-  if(priorSync)priorSync.replaceWith(syncDashboard);else receiptWorkbench.after(syncDashboard);
+  if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#settings-workspace').append(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
     removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
     requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
-  if(priorReminders)priorReminders.replaceWith(reminderDashboard);else syncDashboard.after(reminderDashboard);
+  if(priorReminders)priorReminders.replaceWith(reminderDashboard);else receiptWorkbench.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');
   const readingWorkbench=createReadingWorkbench(database,{
     order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref])
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
-  if(priorReading)priorReading.replaceWith(readingWorkbench);else reminderDashboard.after(readingWorkbench);
+  if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));
+  for(const field of Object.values(viewControls))if(field.dataset.pendingValue){field.value=field.dataset.pendingValue;if(!field.value)field.value="all";delete field.dataset.pendingValue;}
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
     node.className = 'provider';
@@ -705,7 +731,7 @@ function render() {
       const matchesGenre = genreMatches(records, filters.genre);
       const matchesSearch = itemMatchesQuery(item, query)
         || matchingLinkedAddOns.some((addOn) => itemMatchesQuery(addOn, query));
-      return matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesGenre && matchesSearch;
+      return (workspace.workspace !== 'books' || ['book','audiobook'].includes(item.mediaType)) && matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesGenre && matchesSearch;
     })
     .sort((left, right) => compareTitles(left.title, right.title));
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
@@ -745,7 +771,11 @@ function render() {
   if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
   summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
 
-  items.replaceChildren(...canonical.map((canonicalItem) => {
+  libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
+  document.querySelector("#library-previous").disabled=libraryPage===0;
+  document.querySelector("#library-next").disabled=(libraryPage+1)*50>=canonical.length;
+  document.querySelector("#library-page-status").textContent=canonical.length ? "Showing "+(libraryPage*50+1)+"?"+Math.min((libraryPage+1)*50,canonical.length)+" of "+canonical.length : "No items to show";
+  items.replaceChildren(...canonical.slice(libraryPage*50,(libraryPage+1)*50).map((canonicalItem) => {
     const node = document.createElement('li');
     const records = canonicalItem.providerItemIds.map((id) => database.providerItems[id]);
     node.dataset.recordRefs=JSON.stringify(records.map(record=>record.recordRef));
@@ -755,18 +785,6 @@ function render() {
     header.className = 'library-item-header';
     header.append(textElement('strong', canonicalItem.title), textElement('span', displayMediaType(canonicalItem.mediaType)));
     node.append(header);
-    const metadataText = displayMediaMetadata(records, canonicalItem.mediaType);
-    if (metadataText) {
-      const metadata = textElement('div', metadataText);
-      metadata.className = 'library-item-metadata';
-      node.append(metadata);
-    }
-    const genreTags = createGenreTags(records);
-    if (genreTags) node.append(genreTags);
-    const comicMangaCandidateTag = createComicMangaCandidateTag(records);
-    if (comicMangaCandidateTag) node.append(comicMangaCandidateTag);
-    const comicContents = createComicContents(records);
-    if (comicContents) node.append(comicContents);
     const providerSources = document.createElement('div');
     providerSources.className = 'library-item-providers';
     providerSources.replaceChildren(...providerSourceDetails(records).map(({ label, ownershipLabel }) => {
@@ -777,35 +795,58 @@ function render() {
       return source;
     }));
     node.append(providerSources);
-    node.append(createEvidenceInspector(canonicalItem,records,database,{
+    const details=document.createElement("details");details.className="item-details";details.dataset.canonicalId=canonicalItem.id;
+    details.append(textElement("summary",workspace.workspace==="books"?"Book details and tools":"Details"));
+    const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;
+    const build=()=>{if(built)return;built=true;
+    const metadataText = displayMediaMetadata(records, canonicalItem.mediaType);
+    if (metadataText) {
+      const metadata = textElement('div', metadataText);
+      metadata.className = 'library-item-metadata';
+      body.append(metadata);
+    }
+    const genreTags = createGenreTags(records);
+    if (genreTags) body.append(genreTags);
+    const comicMangaCandidateTag = createComicMangaCandidateTag(records);
+    if (comicMangaCandidateTag) body.append(comicMangaCandidateTag);
+    const comicContents = createComicContents(records);
+    if (comicContents) body.append(comicContents);
+
+      if(canonicalItem.mediaType==="book"&&workspace.workspace!=="books"){const improve=actionButton("Improve book information",()=>{workspace.select("books");search.value=canonicalItem.title;libraryPage=0;render();workspace.rememberView();const target=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||"[]").some(ref=>records.some(record=>record.recordRef===ref)));if(target){const detail=target.querySelector(".item-details");detail.open=true;detail.dispatchEvent(new Event("toggle"));target.scrollIntoView({block:"center"});}});body.append(improve);}
+    body.append(createEvidenceInspector(canonicalItem,records,database,{
       split:async id=>{database=await separateEdition(id);},
       undoSplit:async ref=>{database=await undoEditionSeparation(ref);},
       save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},
       remove:async(id)=>{database=await removeManualMatchDecision(id);},
       refresh:render
     }));
-    node.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
-    node.append(createOwnershipReviewTools(records,database,{
+    body.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
+    body.append(createOwnershipReviewTools(records,database,{
       save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render
     }));
-    if(['book','audiobook'].includes(canonicalItem.mediaType))node.append(createReadingTools(records,database,{
+    if(['book','audiobook'].includes(canonicalItem.mediaType))body.append(createReadingTools(records,database,{
       save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render
     }));
-    if (canonicalItem.mediaType === 'book') {
-      node.append(createGoogleBooksTools(canonicalItem,records));
-      node.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
-      node.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;backupStatus.textContent='Metadata lookup saved in the enrichment workbench for review.';}}));
+    if (canonicalItem.mediaType === 'book' && workspace.workspace === 'books') {
+      body.append(createGoogleBooksTools(canonicalItem,records));
+      body.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
+      body.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);workspace.select('books');enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;backupStatus.textContent='Metadata lookup saved in the enrichment workbench for review.';}}));
       const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
-      if (openLibraryTools) node.append(openLibraryTools);
+      if (openLibraryTools) body.append(openLibraryTools);
     }
     if (['book','game'].includes(canonicalItem.mediaType)) {
-      for (const record of records) node.append(createContentsEditor(record,database.contentReviews?.[record.id],{
+      for (const record of records) body.append(createContentsEditor(record,database.contentReviews?.[record.id],{
         save:async(id,value)=>{database=await saveContentReview(id,value);},
         remove:async(id)=>{database=await removeContentReview(id);},
         refresh:render
       }));
     }
-    if (linkedAddOns.length) node.append(createAddOnList(linkedAddOns));
+    if (linkedAddOns.length) body.append(createAddOnList(linkedAddOns));
+
+    };
+    details.addEventListener("toggle",()=>{if(details.open){build();openItemDetails.add(canonicalItem.id);}else if(details.isConnected)openItemDetails.delete(canonicalItem.id);});
+    if(openItemDetails.has(canonicalItem.id)){details.open=true;build();}
+    node.append(details);
     return node;
   }));
 
@@ -814,7 +855,7 @@ function render() {
     ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership) && itemMatchesQuery(addOn, query))
       .sort((left, right) => compareTitles(left.title, right.title))
     : [];
-  unlinkedAddOnsSection.hidden = unlinked.length === 0;
+  unlinkedAddOnsSection.hidden = workspace.workspace !== 'library' || unlinked.length === 0;
   if (unlinked.length) {
     unlinkedAddOnsSummary.textContent = 'The provider did not return a parent game record for these add-ons.';
     unlinkedAddOns.replaceChildren(...unlinked.map((addOn) => {
@@ -827,7 +868,7 @@ function render() {
   }
   renderDuplicateReview();
   let history=document.querySelector('#provider-history');
-  if(!history){history=document.createElement('details');history.id='provider-history';items.parentElement.append(history);}
+  if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#ownership-workspace').append(history);}
   const records=Object.values(database.providerHistory??{});
   history.replaceChildren(textElement('summary',`Provider history: ${records.length} records not in the current library`));
   history.append(textElement('p','History preserves earlier purchase and access evidence. A missing record does not prove revocation. Records from the active profile may appear as Possible, never as confirmed current ownership.'));
@@ -835,16 +876,18 @@ function render() {
   for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — profile ${entry.profileLabel||'unassigned'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
   history.append(list);if(records.length>50)history.append(textElement('p',`Showing 50 of ${records.length}. All history is preserved in your backup.`));
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));
+  const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
+  const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+duplicateReviewItems.children.length;
+  if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
+  if(ownershipCount)alerts.append(actionButton(ownershipCount+' ownership reviews',()=>workspace.select('ownership')));
+  alerts.hidden=!alerts.children.length;
 }
 
 async function refresh() {
-  const [loadedDatabase, showActions] = await Promise.all([
-    getDatabase(),
-    getShowEnrichmentActions()
-  ]);
+  const [loadedDatabase, preferences] = await Promise.all([getDatabase(), getUiPreferences()]);
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
-  showEnrichmentActions.checked = showActions;
+  workspace.hydrate(preferences);
   render();
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
 }
@@ -950,7 +993,8 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
     companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }
 });
-search.addEventListener('input', render);
+const viewChanged=()=>{libraryPage=0;render();workspace.rememberView();};
+search.addEventListener('input', viewChanged);
 showEnrichmentActions.addEventListener('change', async () => {
   const checked = showEnrichmentActions.checked;
   render();
@@ -962,11 +1006,11 @@ showEnrichmentActions.addEventListener('change', async () => {
     backupStatus.textContent = `Could not save the enrichment action setting: ${error.message}`;
   }
 });
-providerFilter.addEventListener('change', render);
-mediaTypeFilter.addEventListener('change', render);
-ownershipFilter.addEventListener('change', render);
-dlcFilter.addEventListener('change', render);
-genreFilter.addEventListener('change', render);
+providerFilter.addEventListener('change', viewChanged);
+mediaTypeFilter.addEventListener('change', viewChanged);
+ownershipFilter.addEventListener('change', viewChanged);
+dlcFilter.addEventListener('change', viewChanged);
+genreFilter.addEventListener('change', viewChanged);
 clearFilters.addEventListener('click', () => {
   search.value = '';
   providerFilter.value = 'all';
@@ -979,7 +1023,7 @@ clearFilters.addEventListener('click', () => {
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
   if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
-    showEnrichmentActions.checked = changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY].newValue !== false;
+    showEnrichmentActions.checked = workspace.workspace === 'books';
     if (database) render();
   }
   if (areaName === 'local' && !googleBooksRunning && (changes[GOOGLE_BOOKS_API_KEY_STORAGE_KEY] || changes[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])) {

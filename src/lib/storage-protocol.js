@@ -59,6 +59,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveKindleComicContents',
   'saveContentReview',
   'removeContentReview',
+  'getUiPreferences',
+  'saveUiPreferences',
   'getShowEnrichmentActions',
   'saveShowEnrichmentActions',
 ]);
