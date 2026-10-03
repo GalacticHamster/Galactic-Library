@@ -1,3 +1,4 @@
+import {bookToolHelp} from './book-tool-help.js';
 import { contentsStatement, proposeContents, validateContents } from '../lib/contents.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
@@ -6,9 +7,10 @@ function sourcePage(value) {
 }
 export function createContentsEditor(record, review, actions) {
   const root=document.createElement('details');root.className='contents-editor';
-  root.append(element('summary', `Contents and coverage — ${record.title}`));
+  root.append(element('summary', `Review included issues or volumes \u2014 ${record.title}`));
   let populated=false;
   const populate=()=>{
+  root.append(bookToolHelp({purpose:'Record the full issues or volumes included in this edition.',input:'A contents statement from the book or its publisher, plus the series run and language for each entry.',saves:'Parsing creates editable suggestions only. Save verified contents confirms the entries you reviewed.',review:'Check every entry and mark excerpts as excerpts. Verified full entries can establish coverage only when the collection is owned. Undo contents confirmation removes that coverage.',example:'For ?Collects Example Series #1?6?, check the run/year and language, and confirm that each is a complete issue.'}));
   root.append(element('p','Confirm the actual contents of this edition. Excerpts do not count as owning a full issue or volume. Include the series/run and language to establish complete coverage.'));
   const statement=document.createElement('textarea');statement.value=review?.statement||contentsStatement(record);statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');

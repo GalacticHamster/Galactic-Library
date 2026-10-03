@@ -1,18 +1,19 @@
+import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
 import {enrichmentWorkbenchRows} from '../lib/enrichment-workbench.js';
 
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-const labels={all:'All queues',missing:'Missing metadata',candidates:'Candidates / ambiguous',conflicts:'Conflicts',failed:'Failed / empty lookups',unparsed:'Unparsed contents',undo:'Current selections / undo'};
+const labels={all:'All suggestions and gaps',missing:'Missing book information',candidates:'Suggestions to review',conflicts:'Conflicting suggestions',failed:'Lookups to retry',unparsed:'Contents to review',undo:'Saved sources to undo'};
 
 export function createEnrichmentWorkbench(actions){
   const element=document.createElement('details');element.id='enrichment-workbench';element.className='tool-card';
-  const heading=text('summary','Enrichment workbench');const body=document.createElement('div');element.append(heading,body);
+  const heading=text('summary','Review book suggestions');const body=document.createElement('div');element.append(heading,body);body.append(bookToolHelp({purpose:'Review suggestions from lookups, files and publisher pages in one place.',input:'Saved lookup results and books still missing information.',saves:'Select a candidate, preview it, confirm the source, then Apply selected candidates to save up to 50 selections. Dismiss removes a suggestion; Undo selected enrichments restores earlier saved sources.',review:'Nothing here confirms a purchase or verifies collected contents. Conflicts must be resolved before applying an edition.',example:'Upload an EPUB, choose its queued suggestion, inspect the proposed author and series, then apply it after checking the edition.'}));
   const category=document.createElement('select');category.setAttribute('aria-label','Enrichment queue');
   for(const [key,label]of Object.entries(labels))category.append(Object.assign(text('option',label),{value:key}));
   const search=document.createElement('input');search.type='search';search.placeholder='Filter enrichment titles';search.setAttribute('aria-label','Filter enrichment titles');
   const status=text('p','');status.setAttribute('role','status');const counter=text('p','');
   const list=document.createElement('ol');list.className='review-items';
   const controls=document.createElement('p');controls.className='actions';body.append(category,search,controls,status,counter,list);
-  const choices=new Map(),selected=new Set();let rows=[];let busy=false;let page=0;
+  const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;
   const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return node;};
   const perform=async operation=>{if(busy)return;busy=true;refresh();try{await operation();selected.clear();status.textContent='Saved.';await actions.refresh();}catch(error){status.textContent=error.message;}finally{busy=false;refresh();}};
   const apply=button('Apply selected candidates',()=>perform(()=>{
@@ -45,7 +46,8 @@ export function createEnrichmentWorkbench(actions){
         choice.addEventListener('change',()=>{choices.delete(row.id);if(choice.value!=='')choices.set(row.id,Number(choice.value));selected.delete(row.id);refresh();});node.append(choice);
         const candidate=row.review.candidates[choices.get(row.id)];
         if(candidate){
-          node.append(text('p',`${candidate.source} · ${candidate.fileName||candidate.editionKey||candidate.volumeId||candidate.workKey||''} · retrieved ${candidate.retrievedAt||row.review.checkedAt||'unknown'}`));
+          node.append(metadataPreview(row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean),candidate,row.review.source));
+          node.append(text('p',`${sourceLabel(candidate.source)} · ${candidate.fileName||candidate.editionKey||candidate.volumeId||candidate.workKey||''} · retrieved ${candidate.retrievedAt||row.review.checkedAt||'unknown'}`));
           for(const field of ['series','volume','issue','run','edition','contributors','categories','statement'])if(candidate[field]?.length)node.append(text('p',`${field}: ${Array.isArray(candidate[field])?candidate[field].map(value=>typeof value==='object'?`${value.role}: ${value.name}`:value).join(', '):candidate[field]}`));
           if(candidate.sourceUrl){const link=text('a','View source');link.href=candidate.sourceUrl;link.target='_blank';link.rel='noreferrer';node.append(link);}
           if(row.conflicts[choices.get(row.id)]?.length)node.append(text('p',`Cannot apply: conflicting ${row.conflicts[choices.get(row.id)].join(', ')}. Inspect or undo existing evidence first.`));
@@ -62,5 +64,5 @@ export function createEnrichmentWorkbench(actions){
     }
   }
   category.addEventListener('change',()=>{page=0;refresh();});search.addEventListener('input',()=>{page=0;refresh();});element.addEventListener('toggle',refresh);
-  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(database){rows=enrichmentWorkbenchRows(database);const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);heading.textContent=`Enrichment workbench · ${Object.keys(labels).filter(key=>key!=='all').map(key=>`${labels[key]}: ${rows.filter(row=>row.category===key).length}`).join(' · ')}`;refresh();}};
+  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(database){currentRecords=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database);const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);heading.textContent=`Review book suggestions ? ${rows.filter(row=>row.review).length} pending`;refresh();}};
 }

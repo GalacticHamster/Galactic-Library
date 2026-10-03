@@ -1,3 +1,4 @@
+import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
 import { getUiPreferences, saveUiPreferences } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
@@ -381,9 +382,10 @@ function createOpenLibraryTools(canonicalItem, records) {
   if (!showEnrichmentActions.checked && !enrichment?.workKey) return null;
   const container = document.createElement('div');
   container.className = 'open-library-tools';
+  container.append(bookToolHelp({purpose:'Find the work behind this book, including authors and subjects.',input:'Its ISBN when known, otherwise title and author. Open Library needs no API key.',saves:'Nothing until you select a work. Work information describes a book across editions; its ISBN list is not evidence for your edition.',review:'Choose only the same work. Use edition lookup or reviewed contents for issue and volume coverage. Undo the selection under Sources and undo.',example:'A work for a manga volume may have paperback and digital editions; it does not establish what your omnibus collects.'}));
   const searchState = openLibrarySearches.get(canonicalItem.id);
   if (showEnrichmentActions.checked) {
-    const button = reviewButton(enrichment ? 'Update Open Library metadata' : 'Find Open Library metadata', 'open-library-search', () => {
+    const button = reviewButton(enrichment ? 'Find another Open Library work' : 'Find Open Library work', 'open-library-search', () => {
       searchOpenLibrary(canonicalItem, records).catch(() => {});
     });
     button.disabled = Boolean(searchState?.loading);
@@ -414,8 +416,8 @@ function createOpenLibraryTools(canonicalItem, records) {
   results.className = 'open-library-results';
   for (const candidate of searchState.candidates) {
     const result = document.createElement('li');
-    result.append(textElement('span', openLibraryCandidateLabel(candidate)));
-    const apply = reviewButton('Apply', 'open-library-apply', async () => {
+    result.append(textElement('span', openLibraryCandidateLabel(candidate)),metadataPreview(records,openLibraryEnrichment(candidate),'openLibrary'));
+    const apply = reviewButton('Save this work', 'open-library-apply', async () => {
       try {
         database = await saveOpenLibraryEnrichment(canonicalItem.providerItemIds, openLibraryEnrichment(candidate),records.map(record=>record.recordRef));
         openLibrarySearches.delete(canonicalItem.id);
@@ -435,8 +437,9 @@ function createOpenLibraryTools(canonicalItem, records) {
 function createGoogleBooksTools(canonical,records){
   const container=document.createElement('details');const heading=document.createElement('summary');
   const stages=enrichmentStages(records,database);
-  heading.textContent=`Enrichment stages: ${Object.entries(stages).map(([stage,done])=>`${stage} ${done?'available':'missing'}`).join(' · ')}`;
-  container.append(heading);
+  heading.textContent='Find details for this edition';
+  container.append(heading,bookToolHelp({purpose:'Look up edition details in Google Books, then choose the result that describes your copy.',input:'Its ISBN, or title and known authors. The Google Books API key is configured in Settings.',saves:'Manual searches save suggestions for review. They do not automatically apply edition metadata.',review:'Preview the fields, check the edition, then confirm before applying. Conflicting editions cannot be applied. Undo restores the previous source selection.',example:'A second edition may be related to your first edition, but should not supply its language, ISBN or page count.'}));
+  const available=Object.entries(stages).filter(([,done])=>done).map(([stage])=>({genre:'genres',work:'work information',edition:'edition information',creators:'creators',contents:'reviewed contents',contentsLookup:'contents lookup'}[stage]));container.append(textElement('p',available.length?'Already available: '+available.join(', ')+'.':'No added book information yet.'));
   if(!showEnrichmentActions.checked)return container;
   const search=reviewButton('Find Google Books candidates','google-books-search',async()=>{
     googleBooksSearches.set(canonical.id,{loading:true,candidates:[]});render();
@@ -449,6 +452,7 @@ function createGoogleBooksTools(canonical,records){
   if(state&&!state.loading&&!state.candidates.length&&!state.error)container.append(textElement('p','No results. Try another source or add identifiers through local metadata.'));
   for(const candidate of state?.candidates??[]){
     const row=document.createElement('div');row.append(textElement('p',[candidate.title,candidate.subtitle,candidate.authors?.join(', '),candidate.publisher,candidate.language,candidate.isbn?.join(', ')].filter(Boolean).join(' · ')));
+    row.append(metadataPreview(records,googleBooksEnrichment(candidate),'googleBooks'));
     const conflicts=records.flatMap(record=>editionEnrichmentConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate}));
     if(conflicts.length){row.append(textElement('p',`Edition conflicts: ${[...new Set(conflicts)].join(', ')}. Review the source; this candidate cannot supply this edition's metadata.`));container.append(row);continue;}
     const label=document.createElement('label');const confirm=document.createElement('input');confirm.type='checkbox';label.append(confirm,' I checked the source and this is the edition in my library.');
@@ -586,7 +590,7 @@ async function renderGoogleBooksEnrichment() {
   saveGoogleBooksApiKeyButton.disabled = googleBooksRunning;
   const otherRun=Boolean(job?.runId&&job.leaseUntil>Date.now()&&!googleBooksRunning);
   startGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !key || otherRun;
-  startGoogleBooksEnrichmentButton.textContent = job && job.cursor < job.queue.length ? 'Resume enrichment' : 'Start enrichment';
+  startGoogleBooksEnrichmentButton.textContent = job && job.cursor < job.queue.length ? 'Resume book lookup' : 'Find missing book details';
   pauseGoogleBooksEnrichmentButton.hidden = !googleBooksRunning;
   resetGoogleBooksEnrichmentButton.disabled = googleBooksRunning || !job;
   renderGoogleBooksDiagnostics(job);

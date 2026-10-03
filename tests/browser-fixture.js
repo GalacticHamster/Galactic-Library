@@ -161,12 +161,15 @@ try{
   await open(tools);button(tools,'Find Google Books candidates').click();
   await wait(()=>button(card('Review manga Vol. 1'),'Apply edition metadata'),'Authorless candidates did not render.');
   const apply=button(card('Review manga Vol. 1'),'Apply edition metadata');assert(apply.disabled,'Candidate skipped human approval.');
+  const preview=apply.parentElement.querySelector('.metadata-preview');assert(preview&&preview.textContent.includes('Provider details')&&preview.textContent.includes('Saved source')&&preview.textContent.includes('9780140328721'),'Edition field preview missing.');
+  assert(card('Review manga Vol. 1').textContent.includes('Manual searches save suggestions for review')&&document.querySelector('#book-lookup-card').textContent.includes('Saves automatically'),'Manual and automatic lookup boundaries missing.');
+  checks.push('book tools explain save boundaries and preview source fields before edition approval');
   const approval=apply.parentElement.querySelector('input[type="checkbox"]');approval.checked=true;approval.dispatchEvent(new Event('change'));apply.click();
   await wait(()=>values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks?.approved,'Approved candidate did not persist.');
-  await wait(()=>button(card('Review manga Vol. 1'),'Undo googleBooks selection'),'Undo control did not render.');
+  await wait(()=>button(card('Review manga Vol. 1'),'Undo Google Books selection'),'Undo control did not render.');
   assert(card('Review manga Vol. 1').textContent.includes('Publisher')&&card('Review manga Vol. 1').textContent.includes('user-selected-edition'),'Field provenance missing.');
   checks.push('authorless Google Books discovery requires edition approval and exposes source field evidence');
-  button(card('Review manga Vol. 1'),'Undo googleBooks selection').click();
+  button(card('Review manga Vol. 1'),'Undo Google Books selection').click();
   await wait(()=>!values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks,'Enrichment undo failed.');
   checks.push('actual enrichment undo removes the selection and preserves provider ownership');
   const queuedDatabase=await writer.getDatabase();const queuedRecord=queuedDatabase.providerItems['humble:review-manga'];const queuedCanonical=Object.values(queuedDatabase.canonicalItems).find(item=>item.providerItemIds.includes(queuedRecord.id));
@@ -191,7 +194,7 @@ try{
   assert(row.textContent.includes('ComicInfo.xml')&&row.textContent.includes('penciller: Artist')&&row.textContent.includes('2024'),'Local source evidence missing.');
   let check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Apply selected candidates').click();
   await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment?.localMetadata?.approved,'Workbench did not apply reviewed local metadata.');
-  await wait(()=>card('Review manga Vol. 1').textContent.includes('Undo localMetadata selection'),'Source evidence did not refresh after approval.');
+  await wait(()=>card('Review manga Vol. 1').textContent.includes('Undo File or publisher metadata selection'),'Source evidence did not refresh after approval.');
   assert(values.galacticLibraryDatabase.providerItems[queuedRecord.id].ownership==='unknown'&&!values.galacticLibraryDatabase.contentReviews[queuedRecord.id],'Local import overclaimed ownership or contents.');
   queueFilter.value='unparsed';queueFilter.dispatchEvent(new Event('change'));assert(workbench.textContent.includes('Collects Review manga Vol. One'),'Unparsed statement absent from queue.');
   button(workbench,'Review library item').click();await pause();assert(card('Review manga Vol. 1').querySelector('.contents-editor').open,'Workbench navigation did not open item controls.');

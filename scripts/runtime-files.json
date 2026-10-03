@@ -82,6 +82,7 @@
   "src/ui/local-metadata-tools.js",
   "src/ui/options.js",
   "src/ui/workspaces.js",
+  "src/ui/book-tool-help.js",
   "src/ui/ownership-review.js",
   "src/ui/popup.js",
   "src/ui/reading.js",
