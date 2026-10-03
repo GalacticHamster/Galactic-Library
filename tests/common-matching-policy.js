@@ -20,6 +20,14 @@ commonMatchingPolicyTests.push(['inferred canonical groups cannot transfer a dif
   const reviewed={...stale,manualMatchDecisions:{pair:{decision:'same-edition',itemIds:[left.id,right.id]}}};
   assert.equal(matchItems(items,[{title:left.title,mediaType:'book',authors:['Writer']}],reviewed)[0].owned,true);
 }]);
+commonMatchingPolicyTests.push(['excluded provider ISBN hits cannot suppress an external full-title match',()=>{
+  const excluded=normalizeProviderItem({provider:'humble',providerItemId:'excluded',title:'Shared Comic Title',mediaType:'book',ownership:'owned',metadata:{isbn:'9780306406157'}});
+  const external=normalizeProviderItem({provider:'fanatical',providerItemId:'external',title:'Shared Comic Title',mediaType:'book',ownership:'owned'});
+  const result=matchItems({[excluded.id]:excluded,[external.id]:external},[{title:'Shared Comic Title',mediaType:'book',identifiers:{isbn:'9780306406157'},excludeProviders:['humble']}])[0];
+  assert.equal(result.owned,true);
+  assert.equal(result.matches.length,1);
+  assert.equal(result.matches[0].provider,'fanatical');
+}]);
 commonMatchingPolicyTests.push(['HB, FAN and GL ship identical shared identity rules and decision fixtures',()=>{
   const common=readFileSync(new URL('../src/lib/matching-policy.js',import.meta.url),'utf8').replace(/\r\n/g,'\n').trim();
   const fixture=readFileSync(new URL('./common-matching-cases.json',import.meta.url),'utf8').trim();

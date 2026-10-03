@@ -76,7 +76,8 @@ export function matchItems(items, requestedItems, context = {}) {
   return requestedItems.map((request,index)=>{
     const query=requestRecord(request);const evidence=identityEvidence(query);const exclude=new Set(request.excludeProviders??[]);
     const titled=byTitle.get(`${query.mediaType}:${query.normalizedTitle}`)??[];
-    const identified=[...evidence.isbn.flatMap(isbn=>byIdentifier.get(`${query.mediaType}:isbn:${isbn}`)??[]),...(evidence.asin?byIdentifier.get(`${query.mediaType}:asin:${evidence.asin}`)??[]:[])];
+    const identified=[...evidence.isbn.flatMap(isbn=>byIdentifier.get(`${query.mediaType}:isbn:${isbn}`)??[]),...(evidence.asin?byIdentifier.get(`${query.mediaType}:asin:${evidence.asin}`)??[]:[])]
+      .filter(item=>!exclude.has(item.provider));
     const identifierRequired=evidence.isbn.length>0||Boolean(evidence.asin);
     const bookTitle=['book','audiobook'].includes(query.mediaType);
     const presented=byPresentation.get(query.mediaType+':'+presentationTitle(query.title,query.mediaType))??[];
