@@ -32,7 +32,8 @@ const owned=(item)=>['owned','claimed'].includes(item.ownership);
 export function publicMatch(item, relationship='same-edition', reason='Exact normalized title.', confidence=1) {
   const identity=identityEvidence(item);
   return {provider:item.provider,itemRef:item.recordRef,title:String(item.title).slice(0,500),ownership:item.ownership,confidence,relationship,reason,
-    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null,...entitlementEvidence(item),...(item.manualOwnershipEvidence?{ownershipBasis:'dated-manual-confirmation',ownershipConfirmedAt:item.manualOwnershipEvidence.confirmedAt,accessExpiresAt:item.manualOwnershipEvidence.expiresAt}:{})}};
+    evidence:{isbn:identity.isbn,authors:identity.authors,language:identity.language,edition:identity.edition,series:identity.series,run:identity.run,unit:identity.unit,source:identity.source,checkedAt:item.observedAt??null,...entitlementEvidence(item),...(item.manualOwnershipEvidence?{ownershipBasis:'dated-manual-confirmation',ownershipConfirmedAt:item.manualOwnershipEvidence.confirmedAt,accessExpiresAt:item.manualOwnershipEvidence.expiresAt}:{}),
+      ...(item.ownershipOverride?{ownershipBasis:'user-assumed-owned',observedOwnership:item.ownershipOverride.observedOwnership}:{})}};
 }
 
 function requestRecord(request) {

@@ -23,6 +23,7 @@ import { matchingCandidateTests } from './matching-candidates.js';
 import { companionTitleOwnershipTests } from './companion-title-ownership.js';
 import { commonMatchingPolicyTests } from './common-matching-policy.js';
 import { workspacePreferenceTests } from './workspace-preferences.js';
+import {ownershipPolicyTests} from './ownership-policy.js';
 
 await import('../src/providers/metadata.js');
 await import('../src/providers/steam-store.js');
@@ -49,6 +50,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...ownershipPolicyTests,
   ...commonMatchingPolicyTests,
   ...companionTitleOwnershipTests,
   ['sorts numbered media titles in reading order', () => {

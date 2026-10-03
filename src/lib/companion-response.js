@@ -24,6 +24,8 @@ export function companionMatch(value) {
       run: compact(evidence.run, 100), unit: compact(evidence.unit, 80),
       source: SOURCES.has(evidence.source) ? evidence.source : provider, checkedAt: publicDate(evidence.checkedAt),
       ...(evidence.ownershipBasis==='dated-manual-confirmation'?{ownershipBasis:evidence.ownershipBasis,ownershipConfirmedAt:publicDate(evidence.ownershipConfirmedAt),accessExpiresAt:publicDate(evidence.accessExpiresAt)}:{}),
+      ...(evidence.ownershipBasis==='user-assumed-owned'?{ownershipBasis:evidence.ownershipBasis,
+        observedOwnership:OWNERSHIP_STATES.includes(evidence.observedOwnership)?evidence.observedOwnership:'unknown'}:{}),
       ...(evidence.availability==='not-observed-in-last-full-scan'?{availability:evidence.availability}:{}),
       ...(['humble','fanatical'].includes(provider)?{
         purchaseEvidence:evidence.purchaseEvidence==='confirmed'?'confirmed':'unknown',

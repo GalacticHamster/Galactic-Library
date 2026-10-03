@@ -6,7 +6,7 @@ import { validateMetadata } from './metadata-validation.js';
 import { validateProviderStates } from './provider-state.js';
 import { object, text, strings, date } from './validation.js';
 import { editionBarriers, validateEditionSeparations } from './relationships.js';
-import { providerOwnership } from './ownership.js';
+import { providerOwnership, defaultOwnershipPolicy, validateOwnershipPolicy } from './ownership.js';
 import {validateEnrichmentHistory,validateEnrichmentReviews} from './enrichment-state.js';
 import {validateCompanionFeeds} from './companion-entitlements.js';
 import {validateReadingStates,validateReadingOrders} from './reading.js';
@@ -18,6 +18,7 @@ export function createEmptyDatabase() {
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers: {},
+    ownershipPolicy: defaultOwnershipPolicy(),
     providerItems: {},
     canonicalItems: {},
     manualMatchDecisions: {},
@@ -150,7 +151,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
 
 export function validateDatabase(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   const normalizedItems = Object.values(value.providerItems).map((item) => {
@@ -205,6 +206,7 @@ export function validateDatabase(value) {
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,
     providers,
+    ownershipPolicy: validateOwnershipPolicy(value.ownershipPolicy),
     providerHistory,
     enrichmentHistory:validateEnrichmentHistory(value.enrichmentHistory),
     enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),

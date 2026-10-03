@@ -1,4 +1,5 @@
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
+import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import { isConfirmedComicManga } from '../lib/genre-hints.js';
@@ -103,6 +104,17 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
     await storageArea.set(updates);
     return validated;
+  }
+
+  async function saveOwnershipPolicy(patch) {
+    // Validate before reading or writing. Merge patches inside the shared queue
+    // so changes from two windows cannot overwrite each other's provider flags.
+    validateOwnershipPolicy(patch);
+    if(patch===undefined)throw Error('Choose an ownership preference to save.');
+    const database=await getDatabase();
+    database.ownershipPolicy=validateOwnershipPolicy({...database.ownershipPolicy,...patch,
+      providers:{...database.ownershipPolicy.providers,...patch.providers}});
+    return persistDatabase(database);
   }
 
   function preserveEnrichment(incoming, previous) {
@@ -732,6 +744,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     await feedClient(client,external);const database=await getDatabase(),uploads=await feedUploads();delete database.companionFeeds[client];delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:0};
   }
   const operations = {
+    saveOwnershipPolicy,
     beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,

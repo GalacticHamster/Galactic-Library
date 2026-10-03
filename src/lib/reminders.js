@@ -16,7 +16,7 @@ export function validateReminderReviews(value={}){
 export function libraryReminders(database,now=Date.now(),includeHidden=false){
   const reminders=[];
   for(const item of Object.values(database.providerItems)){
-    const metadata=item.metadata??{},review=database.ownershipReviews?.[item.recordRef],effective=effectiveOwnershipRecord(item,database,now);
+    const metadata=item.metadata??{},review=database.ownershipReviews?.[item.recordRef],effective=effectiveOwnershipRecord(item,database,now,{ignoreOverride:true});
     const key=metadata.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
     const add=(kind,dueAt=null)=>{
       const overdue=dueAt&&Date.parse(dueAt)<=now,soon=dueAt&&Date.parse(dueAt)<=now+7*86400000;
