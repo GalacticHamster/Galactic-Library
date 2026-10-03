@@ -19,11 +19,11 @@ const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]'
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
 const values={};let openedOptions;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
-globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
+globalThis.chrome={runtime:{getManifest:()=>({optional_permissions:['notifications']}),id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
   if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
-}},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async()=>true},storage:{onChanged:{addListener:()=>{}}}};
+}},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:()=>{}}}};
 
 try{
   const comic=parseLocalMetadata(comicXml);

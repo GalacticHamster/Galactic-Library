@@ -12,7 +12,7 @@ import {createOwnershipReviewTools,createPurchaseEvidenceWorkbench} from './owne
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {createReadingTools,createReadingWorkbench} from './reading.js';
 import {saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder} from '../lib/storage.js';
-import {createRemindersView} from './reminders.js';
+import {createRemindersView,requestReminderPermissions} from './reminders.js';
 import {removeCompanionFeed,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings} from '../lib/storage.js';
 import {createSyncHealthView} from './sync-health.js';
 import {cancelProviderScan} from '../lib/storage.js';
@@ -678,7 +678,7 @@ function render() {
   if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#settings-workspace').append(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
     removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
-    requestPermission:()=>chrome.permissions.request({permissions:['alarms','notifications']}),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
+    requestPermission:()=>requestReminderPermissions(chrome),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else receiptWorkbench.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');

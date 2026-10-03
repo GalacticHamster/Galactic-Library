@@ -24,6 +24,10 @@ try{
   const installed=await install(projectRoot,'GL');await navigate(installed.id,installed.manifest.options_page);
   const checks=await evaluate(`
     const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js');
+    const manifest=chrome.runtime.getManifest();if(!manifest.permissions.includes('alarms')||manifest.optional_permissions.includes('alarms')||!manifest.optional_permissions.includes('notifications'))throw Error('Firefox reminder permission declarations are invalid');
+    if(!await chrome.permissions.contains({permissions:['alarms']}))throw Error('Required alarm permission was not granted');if(await chrome.permissions.contains({permissions:['notifications']}))throw Error('Desktop notifications enabled without opt-in');
+    await chrome.alarms.create('gl-test-permission',{delayInMinutes:60});if(!await chrome.alarms.get('gl-test-permission'))throw Error('Required alarm API unavailable');await chrome.alarms.clear('gl-test-permission');
+    const R=await import('./src/ui/reminders.js');let requested;await R.requestReminderPermissions({runtime:chrome.runtime,permissions:{request:async value=>{requested=value;return false;}}});if(JSON.stringify(requested)!==JSON.stringify({permissions:['notifications']}))throw Error('Firefox reminder request includes a required permission');
     await S.mergeProviderItems('gog',[{providerItemId:'native',title:'Native Firefox software',mediaType:'software',ownership:'owned'}]);await S.saveGoogleBooksApiKey('SYNTHETIC-PRIVATE-API-KEY');
     const database=await S.getDatabase();if(database.providerItems['gog:native'].title!=='Native Firefox software')throw Error('Module background writer unavailable');
     const publicState=await chrome.storage.local.get(null);if(JSON.stringify(publicState).includes('Native Firefox')||JSON.stringify(publicState).includes('PRIVATE-API-KEY'))throw Error('Private state leaked to public storage.local');
@@ -31,7 +35,7 @@ try{
     const before=JSON.stringify(database);try{await S.restoreDatabase({...database,providerItems:{bad:{provider:'gog'}}});throw Error('Invalid restore accepted');}catch(error){if(error.message==='Invalid restore accepted')throw error;}if(JSON.stringify(await S.getDatabase())!==before)throw Error('Invalid restore was not atomic');
     const backup=S.createBackup(database);await S.clearDatabase();await S.restoreDatabase(S.parseBackup(backup));if(!(await S.getDatabase()).providerItems['gog:native'])throw Error('Backup round-trip failed');
     await area.set({'adapter-test':{safe:'before'}});try{await area.set({'adapter-test':{safe:'after'},invalid:()=>{}});}catch{}if((await area.get('adapter-test'))['adapter-test'].safe!=='before')throw Error('IndexedDB did not roll back a failed multi-key write');await area.remove('adapter-test');
-    return ['module event page and queued library writer','library/API keys stay outside public storage.local','private database survives a new connection','invalid restore is atomic','backup round-trip','failed multi-key private write rolls back'];
+    return ['valid Firefox reminder manifest, required alarms and opt-in notifications','reminder permission request uses only the installed optional notification permission','module event page and queued library writer','library/API keys stay outside public storage.local','private database survives a new connection','invalid restore is atomic','backup round-trip','failed multi-key private write rolls back'];
   `);checks.forEach(name=>console.log('PASS installed Firefox GL: '+name));
   if(process.argv.includes('--companions')){
     const fanRoot=resolve(projectRoot,'../Fanatical'),hbRoot=resolve(projectRoot,'../HB'),fan=await install(fanRoot,'FAN'),hbStage=join(temporary,'HB');await mkdir(hbStage);

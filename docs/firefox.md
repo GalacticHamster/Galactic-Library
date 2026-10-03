@@ -6,6 +6,8 @@ Firefox cannot restrict storage.local access with Chrome's setAccessLevel API. G
 
 Native tests run npm run test:firefox in a disposable profile, checking real module startup, writer/backup behavior, private state outside public local storage, reopening the database and atomic rollback of failed writes. Set FIREFOX_BIN if needed. This does not access a personal Firefox profile or a provider account.
 
+Firefox declares `alarms` as a required permission because Firefox does not accept it in `optional_permissions`. `notifications` remains optional: desktop reminders stay disabled until you explicitly enable them. The reminder button requests only permissions listed as optional in the installed manifest. The Chrome build retains its existing optional alarms/notifications declarations. Packaging rejects the invalid Firefox declaration, and installed Firefox tests check alarm access and the notification request.
+
 Load the extracted Firefox ZIP manifest from about:debugging to test manually. Import a backup to move an existing Chrome library into Firefox; browser profiles do not share storage automatically.
 
 ## Companion setup

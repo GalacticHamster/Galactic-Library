@@ -18,6 +18,7 @@ function dependency(files,owner,path,root=false){
 export function validateRuntime(files){
   for(const required of ['manifest.json','options.html','popup.html'])if(!files.has(required))throw new Error(`Missing required runtime file: ${required}`);
   const manifest=JSON.parse(files.get('manifest.json'));
+  if(manifest.browser_specific_settings?.gecko&&manifest.optional_permissions?.includes('alarms'))throw new Error('Firefox alarms must be declared in permissions, not optional_permissions.');
   if(manifest.manifest_version!==3||!/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}$/u.test(manifest.version)||manifest.version.split('.').some(part=>Number(part)>65535))throw new Error('Invalid extension manifest/version.');
   for(const path of [manifest.background?.service_worker,...(manifest.background?.scripts??[]),manifest.background?.page,manifest.options_page,manifest.action?.default_popup,...Object.values(manifest.icons??{}),...Object.values(manifest.action?.default_icon??{})])if(path)dependency(files,'manifest.json',path,true);
   for(const entry of manifest.content_scripts??[])for(const path of [...(entry.js??[]),...(entry.css??[])])dependency(files,'manifest.json',path,true);

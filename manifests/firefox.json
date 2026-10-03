@@ -1,4 +1,13 @@
 {
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "scripting",
+    "alarms"
+  ],
+  "optional_permissions": [
+    "notifications"
+  ],
   "background": {
     "scripts": [
       "src/background/service-worker.js"

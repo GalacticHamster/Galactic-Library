@@ -1,5 +1,10 @@
 import {libraryReminders} from '../lib/reminders.js';
 
+export function requestReminderPermissions(browser){
+  const optional=browser.runtime.getManifest().optional_permissions??[];
+  return browser.permissions.request({permissions:['alarms','notifications'].filter(name=>optional.includes(name))});
+}
+
 const labels={'activation':'Destination activation unconfirmed','key-expiry':'Reported key expiry','key-unavailable':'Key expired or unavailable','access-expiry':'Temporary access expiry','temporary-access':'Temporary access; expiry unknown'};
 function node(tag,text=''){const element=document.createElement(tag);element.textContent=text;return element;}
 export function createRemindersView(database,actions){
