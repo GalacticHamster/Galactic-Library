@@ -1,3 +1,5 @@
+import './matching-policy.js';
+const policy = globalThis.LibraryMatchingPolicy;
 /** Identity evidence is separate from title similarity and entitlement. */
 export const compact = (value, max = 500) => typeof value === 'string' || typeof value === 'number'
   ? String(value).normalize('NFKC').replace(/\s+/gu, ' ').trim().slice(0, max) : '';
@@ -52,7 +54,8 @@ export function identityEvidence(item) {
     asin: compact(metadata.asin || (item?.provider === 'kindle' ? item.providerItemId : ''), 32),
     steamAppId: /^\d+$/u.test(String(metadata.steamAppId ?? '')) ? String(metadata.steamAppId) : '',
     workIds: names([metadata.workId, open.workKey,local.workKey]),
-    authors: names(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors :local.authors?.length?local.authors:open.approved===true?open.authors:[]),
+    authors: names(policy.authorNames(metadata.authors?.length ? metadata.authors : google.authors?.length ? google.authors :local.authors?.length?local.authors:open.approved===true?open.authors:[],
+      metadata.contributors?.length ? metadata.contributors : local.contributors)),
     contributors: (Array.isArray(metadata.contributors)&&metadata.contributors.length ? metadata.contributors : local.contributors??[]).slice(0, 50).map((entry) => ({name: compact(entry?.name), role: compact(entry?.role, 80)})).filter((entry) => entry.name),
     language: compact(metadata.language || google.language||local.language, 80).toLowerCase(),
     publisher: compact(metadata.publisher || google.publisher||local.publisher),
@@ -67,12 +70,24 @@ export function identityEvidence(item) {
 }
 
 const overlap = (left, right) => left.some((value) => right.includes(value));
-export function identityConflicts(left, right, { edition = true } = {}) {
+export function identityConflicts(left, right, { edition = true, companion = false } = {}) {
   const a = identityEvidence(left); const b = identityEvidence(right); const conflicts = [];
   if (left.mediaType !== right.mediaType) conflicts.push('media type');
-  if (a.authors.length && b.authors.length && !overlap(a.authors.map(identityKey), b.authors.map(identityKey))) conflicts.push('authors');
-  for (const key of ['language', 'run', 'unitType', 'unit']) if (a[key] && b[key] && identityKey(a[key]) !== identityKey(b[key])) conflicts.push(key);
-  if (edition && a.edition !== b.edition && (a.edition || b.edition)) conflicts.push('edition');
+  const authors = policy.authorRelation(a.authors, b.authors);
+  if (authors === 'different') conflicts.push('authors');
+  if (authors === 'variant') conflicts.push('author name variation');
+  if (companion && left.metadata?.series && right.metadata?.series && a.series.length && b.series.length && !overlap(a.series.map(identityKey), b.series.map(identityKey))) conflicts.push('series');
+  for (const key of ['language', 'run', 'unitType', 'unit']) {
+    const normalize = key === 'unit' ? policy.unitKey : identityKey;
+    if (a[key] && b[key] && normalize(a[key]) !== normalize(b[key])) conflicts.push(key);
+  }
+  if (edition && identityKey(a.edition) !== identityKey(b.edition) && (companion ? a.edition && b.edition : a.edition || b.edition)) conflicts.push('edition');
+  if (edition) {
+    const preview = title => /\b(?:preview|sample|excerpt|read\s+now|demo|trial)\b/iu.test(title);
+    if (preview(left.title) !== preview(right.title)) conflicts.push('preview/full access');
+    const l = titleIdentity(left.title, left.mediaType).edition, r = titleIdentity(right.title, right.mediaType).edition;
+    if (companion && identityKey(l) !== identityKey(r) && (l || r)) conflicts.push('edition wording');
+  }
   if (edition && a.isbn.length && b.isbn.length && !overlap(a.isbn, b.isbn)) conflicts.push('ISBN');
   if (edition && a.asin && b.asin && a.asin!==b.asin) conflicts.push('ASIN');
   return conflicts;
@@ -83,9 +98,9 @@ export function sameEditionEvidence(left, right) {
   const a = identityEvidence(left); const b = identityEvidence(right);
   if (a.isbn.length && overlap(a.isbn, b.isbn)) return 'shared validated ISBN';
   if (a.asin && a.asin === b.asin) return 'shared ASIN';
-  if (left.normalizedTitle !== right.normalizedTitle) return '';
+  if (policy.presentationTitle(left.title, left.mediaType) !== policy.presentationTitle(right.title, right.mediaType)) return '';
   if (['game','software'].includes(left.mediaType)) return 'matching product title and compatible edition';
-  if (a.authors.length && overlap(a.authors.map(identityKey), b.authors.map(identityKey))) return 'matching title and author';
+  if (policy.authorRelation(a.authors, b.authors) === 'same') return 'matching title and author';
   return '';
 }
 

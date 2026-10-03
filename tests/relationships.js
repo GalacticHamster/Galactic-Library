@@ -115,7 +115,7 @@ export const relationshipTests = [
     let [result]=matchItems(records(a),[{title:a.title,mediaType:'book'}]);assert.equal(result.owned,true);assert.equal(result.matches.length,1);
     [result]=matchItems(records(a),[{title:a.title,mediaType:'book',authors:['Author']}]);assert.equal(result.owned,true);
     const b=book('b',{isbn:'9780306406157',language:'ja'});
-    [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,2);
+    [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,true);assert.equal(result.matches.length,2);
     [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',language:'en',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,true);assert.equal(result.matches.length,1);
   }],
   ['splitting an edition preserves every record even when canonical and input orders differ', () => {

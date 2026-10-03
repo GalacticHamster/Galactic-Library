@@ -21,6 +21,7 @@ import { relationshipTests } from './relationships.js';
 import { securityTests } from './security.js';
 import { matchingCandidateTests } from './matching-candidates.js';
 import { companionTitleOwnershipTests } from './companion-title-ownership.js';
+import { commonMatchingPolicyTests } from './common-matching-policy.js';
 import { workspacePreferenceTests } from './workspace-preferences.js';
 
 await import('../src/providers/metadata.js');
@@ -48,6 +49,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...commonMatchingPolicyTests,
   ...companionTitleOwnershipTests,
   ['sorts numbered media titles in reading order', () => {
     assert.deepEqual(
@@ -102,8 +104,9 @@ const tests = [
     const [result] = matchItems(providerItems, [{ requestId: 'soma', mediaType: 'game', title: 'SOMA' }]);
     assert.equal(result.owned, true);
     assert.equal(result.confidence, 1);
-    assert.equal(result.matches.length, 2);
-    assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 1);
+    assert.equal(result.matches.length, 1);
+    assert.equal(result.possibleMatches.length, 1);
+    assert.equal(Object.keys(rebuildCanonicalItems(providerItems)).length, 2);
   }],
   ['returns named game editions as possible matches, never exact ownership', () => {
     const steelrising = normalizeProviderItem({ provider: 'steam', providerItemId: '99', title: 'Steelrising', ownership: 'owned' });

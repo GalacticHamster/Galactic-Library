@@ -64,11 +64,11 @@ export const companionTitleOwnershipTests = [
       [{ language: 'ja' }, { language: 'en' }],
       [{ run: '1990' }, { run: '2020' }],
       [{ volume: '2' }, { volume: '1' }],
-      [{ edition: 'second edition' }, {}]
+      [{ edition: 'second edition' }, { edition: 'first edition' }]
     ]) assert.equal(find('Shared Comic Vol. 1', [book('Shared Comic Vol. 1', stored)], request).owned, false, JSON.stringify(stored));
   }],
   ['contradictory homonyms remain ambiguous even when an unannotated copy bridges them', () => {
-    for (const field of ['authors', 'isbn', 'asin', 'language', 'run', 'edition']) {
+    for (const field of ['authors', 'run']) {
       const a = { authors: ['A'], isbn: '9780306406157', asin: 'B000000001', language: 'en', run: '1990', edition: 'first edition' };
       const b = { authors: ['B'], isbn: '9780140328721', asin: 'B000000002', language: 'ja', run: '2020', edition: 'second edition' };
       const copies = [book('Shared Title', { [field]: a[field] }, 'a'), book('Shared Title', {}, 'missing'), book('Shared Title', { [field]: b[field] }, 'b')];

@@ -1,24 +1,20 @@
 import { titleKey } from './normalization.js';
-import { identityConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
+import { identityConflicts as recordConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
 import { contentCoverage, proposeContents } from './contents.js';
 import { rebuildCanonicalItems } from './models.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
+const policy = globalThis.LibraryMatchingPolicy;
+const identityConflicts = (left, right, options = {}) => recordConflicts(left, right, { ...options, companion: true });
 
 // Companion checks can establish a full storefront title without merging GL's
 // canonical editions or approving enrichment. Missing metadata is not a conflict.
 function ownershipTitleKeys(item) {
-  const keys = [presentationTitle(item.title, item.mediaType)];
-  // An owned copy with bonus content covers the offered base book. The request
-  // uses its unstripped key, so this never claims unowned bonuses in reverse.
-  if (item.mediaType === 'book' && /\s*\(plus extra content\)\s*$/iu.test(item.title)) {
-    keys.push(presentationTitle(item.title.replace(/\s*\(plus extra content\)\s*$/iu, ''), item.mediaType));
-  }
-  return [...new Set(keys.filter(Boolean))];
+  return policy.ownershipTitleKeys(item.title, item.mediaType);
 }
 
-function ambiguousBookMatches(items, editionByRecord, barriers) {
+function ambiguousMatches(items, barriers) {
   // Collapse repeated observations for this comparison only. Keep every row
   // when manual barriers exist, so duplicate purchases cannot hide a review.
   const unique = new Map();
@@ -28,12 +24,8 @@ function ambiguousBookMatches(items, editionByRecord, barriers) {
     const signature = barriers.size ? item.id : JSON.stringify({ keys, evidence });
     unique.set(signature, { item, keys });
   }
-  const distinct = [...unique.values()];
-  return distinct.some((left, index) => distinct.slice(index + 1).some(right => {
-    if (barriers.has(pairKey(left.item.id, right.item.id)) || identityConflicts(left.item, right.item).length) return true;
-    if (editionByRecord.get(left.item.id)?.id === editionByRecord.get(right.item.id)?.id || sameEditionEvidence(left.item, right.item)) return false;
-    return !left.keys.some(key => right.keys.includes(key));
-  }));
+  return policy.ambiguousWorks([...unique.values()].map(row => row.item), identityEvidence,
+    (left, right) => barriers.has(pairKey(left.id, right.id)));
 }
 
 const owned=(item)=>['owned','claimed'].includes(item.ownership);
@@ -91,17 +83,12 @@ export function matchItems(items, requestedItems, context = {}) {
     // A supplied identifier that actually hits the library can distinguish a
     // homonym. Use title fallback when the imported copy lacks that identifier,
     // rather than making sparse title candidates override a validated hit.
-    const anchors=[...new Set(bookTitle?(identified.length?identified:presented):identifierRequired?identified:titled)];
+    const anchors=[...new Set(identified.length?identified:presented)].filter(item=>!exclude.has(item.provider));
     const compatible=anchors.filter(item=>!identityConflicts(query,item).length);
-    const editionGroups=new Set(compatible.map(item=>editionByRecord.get(item.id)?.id??item.id));
     // Repeat purchase rows often have distinct canonical IDs because enrichment
     // needs stronger edition evidence. Only real contradictions or review
     // barriers make an otherwise identical companion title ambiguous.
-    const unresolvedEditions=bookTitle&&!evidence.edition?anchors.filter(item=>{
-      const conflicts=identityConflicts(query,item);
-      return conflicts.length&&conflicts.every(field=>field==='edition');
-    }):[];
-    const ambiguous=bookTitle?ambiguousBookMatches([...new Set([...compatible,...unresolvedEditions])],editionByRecord,barriers):editionGroups.size>1;
+    const ambiguous=ambiguousMatches(compatible,barriers);
     const exact=new Map();const possible=new Map();
     const candidate=(item,reason,relationship='same-work')=>{
       if(compatible.length && compatible.every(anchor=>negative.has([anchor.id,item.id].sort().join('\u0000'))))return;
@@ -117,7 +104,18 @@ export function matchItems(items, requestedItems, context = {}) {
       const reason=identified.includes(item)?'Matching validated edition identifier.':bookTitle
         ?'Matching full book title with no conflicting identity evidence.':'Exact normalized title with no conflicting edition evidence.';
       if(!exclude.has(item.provider))exact.set(item.id,publicMatch(item,'same-edition',reason));
-      for(const id of editionByRecord.get(item.id)?.providerItemIds??[])if(items[id]&&!exclude.has(items[id].provider)&&!exact.has(id))exact.set(id,publicMatch(items[id],'same-edition','Verified same-edition relationship.'));
+      // Older inferred canonical groups cannot bypass companion identity rules.
+      const reviewed=new Set([item.id]),queue=[item.id];
+      while(queue.length)for(const edge of graph.get(queue.shift())??[]){
+        if(edge.decision!=='same-edition'||reviewed.has(edge.id)||barriers.has(pairKey(item.id,edge.id)))continue;
+        reviewed.add(edge.id);queue.push(edge.id);
+      }
+      for(const id of editionByRecord.get(item.id)?.providerItemIds??[]){
+        const other=items[id];
+        if(!other||exclude.has(other.provider)||exact.has(id)||identityConflicts(query,other).length)continue;
+        if(!reviewed.has(id)&&!identified.includes(other)&&!policy.fullTitleMatches(query.title,other.title,query.mediaType))continue;
+        exact.set(id,publicMatch(other,'same-edition',reviewed.has(id)?'Reviewed same-edition relationship.':'Matching compatible full title or validated identifier.'));
+      }
     }
     const related=[...titled,...(byBase.get(`${query.mediaType}:${evidence.candidateKey}`)??[]),...evidence.workIds.flatMap(work=>byBase.get(`${query.mediaType}:work:${work}`)??[])];
     for(const item of new Set(related)){

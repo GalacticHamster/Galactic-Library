@@ -1,23 +1,10 @@
+import './matching-policy.js';
 /** Narrow presentation equality, plus separate review-only title discovery. */
 function normalizeTitle(value) { return presentationTitle(value, 'other'); }
 // Presentation equality is deliberately narrower than the discovery key:
 // Keep articles, general Roman numerals, preview labels and +/# symbols.
 // Roman numbers after an explicit volume/issue label are unit numbers.
-export function presentationTitle(value, kind = 'book') {
-  let title = String(value ?? '').normalize('NFKC').toLowerCase().trim();
-  if (kind === 'book') {
-    const format = /\s+(?:[\[(]\s*)?(?:pdf|cbz|cbr|epub|mobi|kindle|tp|tpb|hc|hardcover|paperback|trade paperback|digital edition)(?:\s*[\])])?\s*$/iu;
-    while (format.test(title)) title = title.replace(format, '').trim();
-  }
-  return title.replace(/&/gu, ' and ').replace(/\bvolume\b|\bvol\.?\b/giu, ' vol ')
-    .replace(/['\u2018\u2019\u0060]/gu, '')
-    // Preserve decimal units and ranges while ignoring ordinary punctuation.
-    .replace(/\d+(?:[.\-\u2013\u2014]\d+)+|[^\p{L}\p{N}\p{M}+#/]+/gu,
-      part => /^\d/u.test(part) ? part.replace(/[\u2013\u2014]/gu, '-') : ' ')
-    .replace(/\b(vol|issue)\s+(i|ii|iii|iv|v|vi|vii|viii|ix|x)\b/gu,
-      (_match, unit, number) => unit + ' ' + ({ i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 })[number])
-    .replace(/\s+/gu, ' ').trim();
-}
+export function presentationTitle(value, kind = 'book') { return globalThis.LibraryMatchingPolicy.presentationTitle(value, kind); }
 
 function relationTitleParts(value, kind) {
   let title = String(value ?? '').normalize('NFKC').replace(/\s+/gu, ' ').trim();
@@ -45,7 +32,7 @@ function relationTitleParts(value, kind) {
 const CANDIDATE_STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'to', 'in', 'for', 'with', 'by', 'vol', 'volume', 'edition', 'book', 'game', 'software']);
 export function candidateTitleKeys(title, kind) {
   const words = normalizeTitle(title).split(' ').filter(word => word.length > 1 && !CANDIDATE_STOP_WORDS.has(word));
-  const keys = words.map(word => 'word:' + word);
+  const keys = [...words.map(word => 'word:' + word), ...globalThis.LibraryMatchingPolicy.relatedTitleKeys(title, kind)];
   for (const word of words) if (word.length >= 7 && !/\p{N}/u.test(word)) {
     keys.push('start:' + word.slice(0, 3), 'end:' + word.slice(-3));
   }
@@ -72,6 +59,8 @@ function closeTitleSpelling(left, right) {
 export function possibleTitleRelation(left, right, kind = 'book') {
   const a = normalizeTitle(left); const b = normalizeTitle(right);
   if (!a || !b) return '';
+  const presentation = globalThis.LibraryMatchingPolicy.relatedPresentationReason(left, right, kind);
+  if (presentation) return presentation;
   if (a === b || presentationTitle(left, kind) === presentationTitle(right, kind)) return 'Related title presentation; identity needs review.';
   const access = value => value.replace(/\s+(?:preview|sample|excerpt|read now|demo|trial)$/iu, '').trim();
   if (access(a) === access(b)) return 'Related title, but preview/sample access does not establish the full product.';
