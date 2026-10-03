@@ -75,7 +75,8 @@ export function identityConflicts(left, right, { edition = true, companion = fal
   if (left.mediaType !== right.mediaType) conflicts.push('media type');
   const authors = policy.authorRelation(a.authors, b.authors);
   if (authors === 'different') conflicts.push('authors');
-  if (authors === 'variant') conflicts.push('author name variation');
+  const sharedEdition = a.isbn.length && overlap(a.isbn, b.isbn) || a.asin && a.asin === b.asin;
+  if (authors === 'variant' && !(companion && sharedEdition)) conflicts.push('author name variation');
   if (companion && left.metadata?.series && right.metadata?.series && a.series.length && b.series.length && !overlap(a.series.map(identityKey), b.series.map(identityKey))) conflicts.push('series');
   for (const key of ['language', 'run', 'unitType', 'unit']) {
     const normalize = key === 'unit' ? policy.unitKey : identityKey;
