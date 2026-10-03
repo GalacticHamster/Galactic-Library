@@ -8,11 +8,13 @@ export function presentationTitle(value, kind = 'book') { return globalThis.Libr
 
 function relationTitleParts(value, kind) {
   let title = String(value ?? '').normalize('NFKC').replace(/\s+/gu, ' ').trim();
+  const revision = globalThis.LibraryMatchingPolicy.revisionTitleParts(title, kind);
+  if (revision.qualifier) title = revision.base;
   const edition = /\s*(?:[,;:\-\u2013\u2014]\s*)?((?:\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|revised|updated|expanded|annotated|new|deluxe)(?:\s+(?:revised|updated))?\s+(?:edition|ed\.?))\s*$/iu;
-  let hasEdition = false;
+  let hasEdition = Boolean(revision.qualifier);
   if (kind === 'software') {
     const version = /^(.*?)\s*(?:[,;:\-\u2013\u2014]\s*)?(?:v(?:ersion)?\.?\s*\d+(?:\.\d+){0,3}|(?:19|20)\d{2})\s*$/iu.exec(title);
-    return { primary: normalizeTitle(version?.[1]?.trim() || title), hasVersion: Boolean(version?.[1]?.trim()), subtitle: false, qualifier: false, hasEdition: false };
+    return { primary: normalizeTitle(version?.[1]?.trim() || title), hasVersion: Boolean(revision.qualifier || version?.[1]?.trim()), subtitle: false, qualifier: false, hasEdition: false };
   }
   const stripEdition = () => {
     const found = edition.exec(title);
@@ -62,6 +64,7 @@ export function possibleTitleRelation(left, right, kind = 'book') {
   const presentation = globalThis.LibraryMatchingPolicy.relatedPresentationReason(left, right, kind);
   if (presentation) return presentation;
   if (a === b || presentationTitle(left, kind) === presentationTitle(right, kind)) return 'Related title presentation; identity needs review.';
+  if (globalThis.LibraryMatchingPolicy.revisionWordingConflict(left, right, kind)) return 'Related complete base title with revision or version wording; identity needs review.';
   const access = value => value.replace(/\s+(?:preview|sample|excerpt|read now|demo|trial)$/iu, '').trim();
   if (access(a) === access(b)) return 'Related title, but preview/sample access does not establish the full product.';
   const numbers = value => (value.match(/\d+(?:\.\d+|\/\d+)?/gu) ?? []).join('|');

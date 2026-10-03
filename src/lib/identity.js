@@ -84,6 +84,7 @@ export function identityConflicts(left, right, { edition = true, companion = fal
   }
   if (edition && identityKey(a.edition) !== identityKey(b.edition) && (companion ? a.edition && b.edition : a.edition || b.edition)) conflicts.push('edition');
   if (edition) {
+    if (companion && policy.revisionWordingConflict(left.title, right.title, left.mediaType)) conflicts.push('revision wording');
     const preview = title => /\b(?:preview|sample|excerpt|read\s+now|demo|trial)\b/iu.test(title);
     if (preview(left.title) !== preview(right.title)) conflicts.push('preview/full access');
     const l = titleIdentity(left.title, left.mediaType).edition, r = titleIdentity(right.title, right.mediaType).edition;

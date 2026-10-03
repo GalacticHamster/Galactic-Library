@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {revisionMatchingTests} from './revision-matching.js';
 import { normalizeProviderItem, createEmptyDatabase, rebuildCanonicalItems } from '../src/lib/models.js';
 import { matchItems } from '../src/lib/matcher.js';
 import { handleExternalApiRequest } from '../src/lib/external-api.js';
@@ -9,6 +10,7 @@ const find = (title, item, extra = {}, context = {}) =>
   matchItems({ [item.id]: item }, [{ title, mediaType: item.mediaType, ...extra }], context)[0];
 
 export const matchingCandidateTests = [
+  ...revisionMatchingTests,
   ['discovers broader Possible titles without treating discovery as identity', () => {
     const cases = [
       ['Think Like a Programmer', 'Think Like a Programmer: An Introduction to Creative Problem Solving', 'book'],
