@@ -1,16 +1,19 @@
-/** Review-only title discovery; never same-edition or ownership evidence. */
+/** Narrow presentation equality, plus separate review-only title discovery. */
 function normalizeTitle(value) { return presentationTitle(value, 'other'); }
 // Presentation equality is deliberately narrower than the discovery key:
 // Keep articles, general Roman numerals, preview labels and +/# symbols.
 // Roman numbers after an explicit volume/issue label are unit numbers.
-function presentationTitle(value, kind = 'book') {
+export function presentationTitle(value, kind = 'book') {
   let title = String(value ?? '').normalize('NFKC').toLowerCase().trim();
   if (kind === 'book') {
     const format = /\s+(?:[\[(]\s*)?(?:pdf|cbz|cbr|epub|mobi|kindle|tp|tpb|hc|hardcover|paperback|trade paperback|digital edition)(?:\s*[\])])?\s*$/iu;
     while (format.test(title)) title = title.replace(format, '').trim();
   }
   return title.replace(/&/gu, ' and ').replace(/\bvolume\b|\bvol\.?\b/giu, ' vol ')
-    .replace(/['\u2018\u2019\u0060]/gu, '').replace(/[^\p{L}\p{N}\p{M}+#/]+/gu, ' ')
+    .replace(/['\u2018\u2019\u0060]/gu, '')
+    // Preserve decimal units and ranges while ignoring ordinary punctuation.
+    .replace(/\d+(?:[.\-\u2013\u2014]\d+)+|[^\p{L}\p{N}\p{M}+#/]+/gu,
+      part => /^\d/u.test(part) ? part.replace(/[\u2013\u2014]/gu, '-') : ' ')
     .replace(/\b(vol|issue)\s+(i|ii|iii|iv|v|vi|vii|viii|ix|x)\b/gu,
       (_match, unit, number) => unit + ' ' + ({ i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 })[number])
     .replace(/\s+/gu, ' ').trim();

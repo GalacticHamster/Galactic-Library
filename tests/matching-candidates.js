@@ -14,8 +14,6 @@ export const matchingCandidateTests = [
       ['Think Like a Programmer', 'Think Like a Programmer: An Introduction to Creative Problem Solving', 'book'],
       ['Maggie the Mechanic', 'Maggie the Mechanic (Love & Rockets)', 'book'],
       ['Dune', 'Dune: A Novel', 'book'],
-      ['Saga Vol. 1 EPUB', 'Saga Vol. 1', 'book'],
-      ['4001 A.D.: Beyond New Japan TPB', '4001 A.D.: Beyond New Japan', 'book'],
       ['Practical Python Programming', 'Pratical Python Programming', 'book'],
       ['Complete Guide to Practical Python Programming', 'Complete Guide to Python Programming', 'book'],
       ['Forest Builder Pro v2', 'Forest Builder Pro v1', 'software'],
@@ -64,7 +62,8 @@ export const matchingCandidateTests = [
     database.canonicalItems = rebuildCanonicalItems(database.providerItems);
     const before = JSON.stringify(database);
     const result = handleExternalApiRequest(database, { type: 'MATCH_ITEMS', apiVersion: 1, items: [{ title: 'Dune', mediaType: 'book' }] }).results[0];
-    assert.equal(result.owned, false);
+    assert.equal(result.owned, true);
+    assert.equal(result.matches[0].title, other.title);
     assert.ok(result.possibleMatches.some(match => match.title === item.title));
     assert.equal(JSON.stringify(database), before);
     assert.equal(Object.keys(database.canonicalItems).length, 2);

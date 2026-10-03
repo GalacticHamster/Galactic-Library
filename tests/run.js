@@ -20,6 +20,7 @@ import { providerSnapshotTests } from './provider-snapshots.js';
 import { relationshipTests } from './relationships.js';
 import { securityTests } from './security.js';
 import { matchingCandidateTests } from './matching-candidates.js';
+import { companionTitleOwnershipTests } from './companion-title-ownership.js';
 import { workspacePreferenceTests } from './workspace-preferences.js';
 
 await import('../src/providers/metadata.js');
@@ -47,6 +48,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...companionTitleOwnershipTests,
   ['sorts numbered media titles in reading order', () => {
     assert.deepEqual(
       ['Batman Vol. 10', 'Batman Vol. 2', 'Batman Vol. 1', 'Batman #12', 'Batman #3']

@@ -110,9 +110,9 @@ export const relationshipTests = [
     assert.equal(Object.keys(grouped).length,2);assert.ok(Object.values(grouped).every(group=>!(group.providerItemIds.includes(a.id)&&group.providerItemIds.includes(c.id))));
     const result=matchItems(items,[{title:a.title,mediaType:'book',authors:['Author']}],{manualMatchDecisions:decisions,canonicalItems:stale})[0];assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,3);
   }],
-  ['title-only books stay candidates and contradictory identifier scopes require disambiguation', () => {
+  ['full book titles establish companion identity while contradictory identifier scopes require disambiguation', () => {
     const a=book('a',{authors:['Author'],isbn:'9780306406157',language:'en'});
-    let [result]=matchItems(records(a),[{title:a.title,mediaType:'book'}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,1);
+    let [result]=matchItems(records(a),[{title:a.title,mediaType:'book'}]);assert.equal(result.owned,true);assert.equal(result.matches.length,1);
     [result]=matchItems(records(a),[{title:a.title,mediaType:'book',authors:['Author']}]);assert.equal(result.owned,true);
     const b=book('b',{isbn:'9780306406157',language:'ja'});
     [result]=matchItems(records(a,b),[{title:a.title,mediaType:'book',identifiers:{isbn:'9780306406157'}}]);assert.equal(result.owned,false);assert.equal(result.possibleMatches.length,2);
@@ -214,7 +214,8 @@ export const relationshipTests = [
     const a=book('a',{},'Story');const b=book('b',{},'Story Deluxe Edition');const c=book('c',{},'Alias');
     const manualMatchDecisions={ab:{decision:'different',itemIds:[a.id,b.id]},ac:{decision:'same-work',itemIds:[a.id,c.id]},bc:{decision:'same-work',itemIds:[c.id,b.id]}};
     const [result]=matchItems(records(a,b,c),[{title:a.title,mediaType:'book'}],{manualMatchDecisions});
-    assert.deepEqual(result.possibleMatches.map(item=>item.title),['Story','Alias']);
+    assert.deepEqual(result.matches.map(item=>item.title),['Story']);
+    assert.deepEqual(result.possibleMatches.map(item=>item.title),['Alias']);
   }],
   ['API distinguishes partial union, complete explicitly enumerated contents and unknown scope', () => {
     const a=book('a',{},'Collection A');const b=book('b',{},'Collection B');
