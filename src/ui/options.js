@@ -581,7 +581,7 @@ function renderActiveBookJob(job) {
   const active=googleBooksRunning||Boolean(job?.runId&&job.leaseUntil>Date.now());
   const incomplete=Boolean(job&&job.cursor<job.queue.length);
   document.querySelector("#active-book-job").hidden=!active&&!incomplete;
-  document.querySelector("#active-book-job-status").textContent=(active?"Finding book details: ":"Book lookup paused: ")+(job?job.cursor+" of "+job.queue.length+" checked.":"Preparing books?");
+  document.querySelector("#active-book-job-status").textContent=(active?"Finding book details: ":"Book lookup paused: ")+(job?job.cursor+" of "+job.queue.length+" checked.":"Preparing books.");
   document.querySelector("#pause-active-book-job").hidden=!googleBooksRunning;
 }
 async function renderGoogleBooksEnrichment() {
@@ -599,7 +599,7 @@ async function renderGoogleBooksEnrichment() {
   if(otherRun){googleBooksEnrichmentStatus.textContent='Another options page is running enrichment. Pause it or wait for its lease to expire.';} else if (!key) {
     googleBooksEnrichmentStatus.textContent = 'Save a private Google Books API key to enable automated enrichment.';
   } else if (job?.lastError) {
-    googleBooksEnrichmentStatus.textContent = `Google Books stopped: ${job.lastError} Progress is saved. If this is a quota limit, wait for Google to reset it, then Resume enrichment.`;
+    googleBooksEnrichmentStatus.textContent = `Google Books stopped: ${job.lastError} Progress is saved. If this is a quota limit, wait for Google to reset it, then Resume book lookup.`;
   } else if (job) {
     googleBooksEnrichmentStatus.textContent = googleBooksStatusText(job, job.cursor >= job.queue.length ? 'Completed: ' : 'Paused: ');
   } else {

@@ -1,8 +1,10 @@
+import {bookToolHelp} from './book-tool-help.js';
 import { contentCoverage, proposeContents, seriesCoverage } from '../lib/contents.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 export function createSeriesCoverageView(database) {
   const root=element('div','');root.className='series-coverage';
+  root.append(bookToolHelp({purpose:'Compare collections and find missing issues or volumes within a known span.',input:'Reviewed full contents from books you own or permanently claimed, keeping series runs, languages and issue/volume types separate.',saves:'This view and its target comparison do not save ownership or book details.',review:'Gaps cover the known span only; there is no automatic complete-series bibliography or chronological reading order.',example:'Owning issues 1, 2 and 4 shows a gap at 3, but does not tell you whether the series ends at 4.'}));
   root.append(element('p','Coverage uses reviewed full contents of owned or permanently claimed records. Excerpts and temporary access are excluded. Runs, languages and unit types stay separate. Gaps below are within the observed range; the end of a series is unknown unless you explicitly supply a target range.'));
   const groups=seriesCoverage(database);
   root.append(element('p',`${groups.length} reviewed series scopes · ${groups.reduce((sum,group)=>sum+group.entries.length,0)} distinct full units · ${groups.reduce((sum,group)=>sum+group.overlap.length,0)} overlapping units.`));
@@ -22,7 +24,7 @@ export function createSeriesCoverageView(database) {
       table.append(body);details.append(table);
     });list.append(details);
   }
-  if(!groups.length)list.append(element('p','No owned contents have been confirmed yet. Expand a library item’s Contents and coverage editor to review its evidence.'));
+  if(!groups.length)list.append(element('p','No owned contents have been confirmed yet. Open a library item\'s Details, then Review included issues or volumes to check its evidence.'));
   search.addEventListener('input',()=>{for(const node of list.querySelectorAll('[data-series]'))node.hidden=!node.dataset.series.includes(search.value.trim().toLocaleLowerCase());});
   root.append(list);
   const comparison=element('details','');comparison.append(element('summary','Compare a target series range or proposed collection'));
