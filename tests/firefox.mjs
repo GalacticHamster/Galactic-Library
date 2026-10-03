@@ -71,6 +71,59 @@ try{
       const base=lookup.results.get('full-title-0');if(base.matches.length!==1||base.matches[0].title!=='4001 A.D. TPB'||!base.possibleMatches.some(item=>item.title==='4001 A.D.: Beyond New Japan'))throw Error('Independent 4001 AD matches regressed');
       return true;
     `);assert(fullTitleCheck);console.log('PASS installed Firefox matching: full comic titles, missing ISBNs, repeated purchases and independent 4001 AD books');
+    await navigate(installed.id,installed.manifest.options_page);
+    await evaluate(`
+      const S=await import('./src/lib/storage.js');
+      await S.mergeProviderItems('humble',[{providerItemId:'override-native',title:'Native uncertain purchase',mediaType:'book',ownership:'unknown'}]);
+      await S.mergeProviderItems('kindle',[{providerItemId:'override-native',title:'Native borrowed book',mediaType:'book',ownership:'borrowed',metadata:{authors:['Original Writer'],source:'amazon-kindle-content-library'}}]);
+      await S.saveOwnershipPolicy({providers:{humble:true}});return true;
+    `);
+    async function checkFanOwnershipOverride(global){
+      await navigate(fan.id,fan.manifest.options_page);
+      assert(await evaluate(`
+        const F=FanaticalLibrary,send=message=>chrome.runtime.sendMessage(${JSON.stringify(installed.id)},message);
+        const products=[{sourceItemId:'assumed-purchase',title:'Native uncertain purchase',mediaType:'book'},{sourceItemId:'assumed-borrowed',title:'Native borrowed book',mediaType:'book',authors:['Original Writer']}];
+        const lookup=await F.queryGalacticItems(F.galacticRequestItems(products),send);
+        if(lookup.failed.size)throw Error('Ownership preference lookup failed');
+        const purchase=lookup.results.get('assumed-purchase'),borrowed=lookup.results.get('assumed-borrowed');
+        if(F.resolveProduct(products[0],[],[],()=>purchase).state!=='owned-elsewhere')throw Error('FAN did not honor the provider ownership preference');
+        if(F.resolveProduct(products[1],[],[],()=>borrowed).state!==${JSON.stringify(global?'owned-elsewhere':'possible')})throw Error('FAN global preference or provider scope failed');
+        if(purchase.matches[0].evidence.ownershipBasis!=='user-assumed-owned'||purchase.matches[0].evidence.observedOwnership!=='unknown')throw Error('Original uncertain ownership missing from the response');
+        if(${global}&&borrowed.matches[0].evidence.observedOwnership!=='borrowed')throw Error('Original borrowed provenance missing from the response');
+        return true;
+      `));
+    }
+    await checkFanOwnershipOverride(false);
+    console.log('PASS Firefox ownership preference: actual FAN resolves provider-assumed ownership and keeps other providers uncertain');
+    await navigate(installed.id,installed.manifest.options_page);
+    await evaluate(`const S=await import('./src/lib/storage.js');await S.saveOwnershipPolicy({allOwned:true});return true;`);
+    await navigate(installed.id,installed.manifest.options_page);
+    await evaluate(`
+      const S=await import('./src/lib/storage.js');
+      for(let n=0;n<200&&!document.querySelector('#assume-all-owned').checked;n++)await new Promise(done=>setTimeout(done,20));
+      const database=await S.getDatabase();
+      if(!document.querySelector('#assume-all-owned').checked||!document.querySelector('#assume-owned-humble').checked||!document.querySelector('#assume-owned-humble').disabled)throw Error('Installed Firefox preferences did not survive reopening');
+      if(database.providerItems['humble:override-native'].ownership!=='unknown'||database.providerItems['kindle:override-native'].ownership!=='borrowed'||database.providerItems['kindle:override-native'].metadata.authors[0]!=='Original Writer')throw Error('Preference rewrote original media evidence');
+      return true;
+    `);
+    await checkFanOwnershipOverride(true);
+    await navigate(hb.id,hb.manifest.options_page);
+    await evaluate(`
+      const response=await chrome.runtime.sendMessage(${JSON.stringify(installed.id)},{type:'MATCH_ITEMS',apiVersion:1,items:[{requestId:'assumed-borrowed',title:'Native borrowed book',mediaType:'book',excludeProviders:['humble']}]});
+      if(!response.ok||!response.results[0].owned||response.results[0].matches[0].ownership!=='owned'||response.results[0].matches[0].evidence.observedOwnership!=='borrowed')throw Error('HB did not receive the effective ownership with original evidence');
+      return true;
+    `);
+    console.log('PASS Firefox ownership preference: installed GL persists global choices and sends owned results with original provenance to HB and FAN');
+    await navigate(installed.id,installed.manifest.options_page);
+    await evaluate(`const S=await import('./src/lib/storage.js');await S.saveOwnershipPolicy({allOwned:false,providers:{humble:false}});return true;`);
+    await navigate(fan.id,fan.manifest.options_page);
+    await evaluate(`
+      const F=FanaticalLibrary,products=['Native uncertain purchase','Native borrowed book'].map((title,index)=>({sourceItemId:'restored-'+index,title,mediaType:'book'}));
+      const lookup=await F.queryGalacticItems(F.galacticRequestItems(products),message=>chrome.runtime.sendMessage(${JSON.stringify(installed.id)},message));
+      if(lookup.failed.size||products.some(product=>F.resolveProduct(product,[],[],()=>lookup.results.get(product.sourceItemId)).state!=='possible'))throw Error('Turning off ownership preferences did not restore Possible');
+      return true;
+    `);
+    console.log('PASS Firefox ownership preference: disabling choices restores uncertain and borrowed matches to Possible');
     const fanReview=await evaluate(`return await chrome.runtime.sendMessage({type:'FANATICAL_OPEN_GALACTIC_REVIEW',url:'https://evil.test'});`);assert.equal(fanReview.ok,true);console.log('PASS Firefox review: FAN delegates central review to GL without a private URL');
     await navigate(hb.id,hb.manifest.options_page);assert.equal((await evaluate(`return await chrome.runtime.sendMessage({type:'HCL_OPEN_GALACTIC_REVIEW',url:'https://evil.test'});`)).ok,true);console.log('PASS Firefox review: HB delegates central review to GL without a private URL');
     await navigate(installed.id,installed.manifest.options_page);const received=await evaluate(`const S=await import('./src/lib/storage.js'),database=await S.getDatabase();return {feed:database.companionFeeds[${JSON.stringify(hb.id)}],publicState:await chrome.storage.local.get(null)};`);assert.equal(received.feed.entries.length,1);assert.equal(received.feed.entries[0].activationStatus,'unknown');assert.doesNotMatch(JSON.stringify(received),/PRIVATE SYNTHETIC/);

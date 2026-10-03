@@ -11,7 +11,7 @@ export function createOwnershipReviewTools(records,database,actions){
     if(!root.open||ready)return;ready=true;
     root.append(node('p','Record a purchase, permanent claim or temporary access with its evidence date. This keeps the provider observation intact. Reseller key status still cannot establish destination activation.'));
     for(const record of records){
-      const prior=database.ownershipReviews[record.recordRef],section=node('div');section.append(node('strong',`${record.title} — ${record.provider}`),node('p',`Provider: ${record.ownership}; reviewed result: ${effectiveOwnershipRecord(record,database).ownership}${prior?`; confirmed ${prior.confirmedAt}`:''}.`));
+      const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.append(node('strong',`${record.title} — ${record.provider}`),node('p',`Provider: ${record.ownership}; display and matching: ${effective.ownership}${effective.ownershipOverride?' (ownership override enabled)':''}${prior?`; confirmed ${prior.confirmedAt}`:''}.`));
       const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of ['owned','claimed','subscription','borrowed','rental','unknown'])ownership.append(Object.assign(node('option',state),{value:state}));ownership.value=prior?.ownership??'owned';
       const evidence=input('Ownership evidence','textarea');evidence.maxLength=2000;evidence.placeholder='Receipt, order history or another checked source';evidence.value=prior?.note??'';
       const date=input('Ownership evidence date','date');date.value=(prior?.evidenceDate??new Date().toISOString()).slice(0,10);

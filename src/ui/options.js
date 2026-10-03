@@ -1,6 +1,6 @@
 import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
-import { getUiPreferences, saveUiPreferences } from '../lib/storage.js';
+import { getUiPreferences, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -47,6 +47,8 @@ async function reviewCompanionSource(clientId){
 }
 
 const providers = document.querySelector('#providers');
+const assumeAllOwned = document.querySelector('#assume-all-owned');
+const ownershipPolicyStatus = document.querySelector('#ownership-policy-status');
 const search = document.querySelector('#search');
 const downloadComixologyListButton = document.querySelector('#download-comixology-list');
 const showEnrichmentActions = document.querySelector('#show-enrichment-actions');
@@ -82,6 +84,24 @@ const companionExtensionLinkStatus = document.querySelector('#companion-extensio
 const allowedCompanionExtensions = document.querySelector('#allowed-companion-extensions');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
+async function changeOwnershipPolicy(patch) {
+  const focusId=document.activeElement?.id;
+  assumeAllOwned.disabled=true;
+  for(const checkbox of providers.querySelectorAll('[data-ownership-provider]'))checkbox.disabled=true;
+  ownershipPolicyStatus.textContent='Saving ownership preference…';
+  try{
+    database=await saveOwnershipPolicy(patch);
+    render();
+    ownershipPolicyStatus.textContent='Saved. Refresh open HB/FAN bundle pages to run matching with this preference.';
+  }catch(error){
+    render();
+    ownershipPolicyStatus.textContent='Could not save ownership preference: '+error.message;
+  }finally{
+    assumeAllOwned.disabled=false;
+    if(focusId)document.getElementById(focusId)?.focus();
+  }
+}
+assumeAllOwned.addEventListener('change',()=>changeOwnershipPolicy({allOwned:assumeAllOwned.checked}));
 const openLibrarySearches = new Map();
 const googleBooksSearches = new Map();
 let googleBooksRunning = false;
@@ -687,6 +707,10 @@ function render() {
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
+  assumeAllOwned.checked=database.ownershipPolicy.allOwned;
+  document.querySelector('#ownership-provider-help').textContent=assumeAllOwned.checked
+    ? 'The global checkbox covers every library. Your provider choices below are saved and apply again when you switch it off.'
+    : 'To apply this to one library, use its checkbox below.';
   populateProviderFilter(providerEntries);
   populateGenreFilter(Object.values(database.providerItems));
   for(const field of Object.values(viewControls))if(field.dataset.pendingValue){field.value=field.dataset.pendingValue;if(!field.value)field.value="all";delete field.dataset.pendingValue;}
@@ -705,6 +729,14 @@ function render() {
     if (state.lastSync) providerParts.push(`synced ${new Date(state.lastSync).toLocaleString()}`);
     const providerSummary = providerParts.join(' · ');
     node.append(textElement('strong', displayProviderName(id)), textElement('span', providerSummary));
+    const choice=document.createElement('label');choice.className='ownership-choice ownership-provider-choice';
+    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.id='assume-owned-'+id;
+    checkbox.dataset.ownershipProvider=id;checkbox.checked=database.ownershipPolicy.providers[id]===true;
+    checkbox.disabled=database.ownershipPolicy.allOwned;
+    checkbox.setAttribute('aria-describedby','ownership-provider-help');
+    checkbox.addEventListener('change',()=>changeOwnershipPolicy({providers:{[id]:checkbox.checked}}));
+    choice.append(checkbox,document.createTextNode('Treat all '+displayProviderName(id)+' items as owned'));
+    node.append(choice);
     return node;
   }) : [Object.assign(document.createElement('p'), { textContent: 'No libraries connected.' })]));
 

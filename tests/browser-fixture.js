@@ -17,11 +17,12 @@ const button=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.
 const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}return node;};
 const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
-const values={};let openedOptions;
+const values={};let openedOptions;let failOwnershipSave=false;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
 globalThis.chrome={runtime:{getManifest:()=>({optional_permissions:['notifications']}),id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
   if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
+  if(message.operation==='saveOwnershipPolicy'&&failOwnershipSave)return {ok:false,error:'Synthetic preference storage failure'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
 }},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:()=>{}}}};
 
@@ -289,5 +290,57 @@ try{
   checks.push('compact library pagination and full-library search reach records beyond the first 50');
   const snapshot=JSON.stringify((await writer.getDatabase()).providerItems);showWorkspace('settings');assert(document.querySelector('#library-section').hidden&&!document.querySelector('#settings-workspace').hidden,'Settings did not replace the library workspace');showWorkspace('books');search.value='Pagination title 2';search.dispatchEvent(new Event('input'));showWorkspace('library');assert(search.value==='Pagination title 60','Book workspace replaced library filters');showWorkspace('books');assert(search.value==='Pagination title 2','Book workspace filters were not remembered');
   await wait(()=>values.galacticLibraryUiPreferences?.workspace==='books'&&values.galacticLibraryUiPreferences.books.search==='Pagination title 2','Workspace preferences were not persisted');assert(JSON.stringify((await writer.getDatabase()).providerItems)===snapshot,'Navigation changed ownership records');checks.push('workspace and per-view filters persist privately without changing ownership');
+  await writer.mergeProviderItems('kindle',[{providerItemId:'override-borrowed',title:'Override borrowed example',mediaType:'book',ownership:'borrowed',metadata:{authors:['Original Writer'],source:'amazon-kindle-content-library'}}]);
+  await writer.mergeProviderItems('humble',[{providerItemId:'override-unknown',title:'Override unknown example',mediaType:'book',ownership:'unknown'}]);
+  const policyTransfer=new DataTransfer();policyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'ownership-policy-library.json'));
+  document.querySelector('#backup-status').textContent='';input.files=policyTransfer.files;input.dispatchEvent(new Event('change'));
+  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Ownership policy fixture failed to restore.');
+  const originalOwnershipRecords=JSON.stringify((await writer.getDatabase()).providerItems);
+  showWorkspace('settings');
+  assert(!document.querySelector('#assume-all-owned').checked&&!document.querySelector('#assume-owned-kindle').checked,'Ownership override must start off.');
+  document.querySelector('#assume-owned-kindle').click();
+  await wait(()=>values.galacticLibraryDatabase.ownershipPolicy.providers.kindle&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'),'Provider override did not save.');
+  showWorkspace('library');document.querySelector('#clear-filters').click();
+  const policyFilter=document.querySelector('#ownership-filter');policyFilter.value='owned';policyFilter.dispatchEvent(new Event('change'));
+  assert(card('Override borrowed example'),'Provider override did not update the Owned filter.');
+  assert(!card('Override unknown example'),'Provider override affected a different provider.');
+  const overrideInspector=await open(card('Override borrowed example').querySelector('.evidence-inspector'));
+  assert(overrideInspector.textContent.includes('Ownership evidenceborrowed')&&overrideInspector.textContent.includes('Owned (user preference; original evidence retained)')&&overrideInspector.textContent.includes('Original Writer'),'Override hid original ownership or media provenance.');
+  assert(overrideInspector.textContent.includes('Your preference treats this record and its reviewed contents as owned.')&&!overrideInspector.textContent.includes('Temporary or unconfirmed access cannot supply owned contents.'),'Inspector contradicted the active ownership override.');
+  checks.push('provider checkbox updates Owned display and filters while the inspector retains original ownership and provenance');
+
+  showWorkspace('settings');document.querySelector('#assume-all-owned').click();
+  await wait(()=>values.galacticLibraryDatabase.ownershipPolicy.allOwned&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'),'Global ownership override did not save.');
+  assert(document.querySelector('#assume-owned-kindle').disabled&&document.querySelector('#assume-owned-kindle').checked&&document.querySelector('#assume-owned-humble').disabled,'Global preference did not preserve and disable provider choices.');
+  const ownershipPolicyBackup=createBackup(await writer.getDatabase());
+  showWorkspace('library');assert(card('Override unknown example')&&card('Override borrowed example'),'Global override did not cover all providers.');
+  assert(JSON.stringify((await writer.getDatabase()).providerItems)===originalOwnershipRecords,'Ownership checkbox rewrote source records.');
+  checks.push('global checkbox covers every library without rewriting records and keeps provider choices for later');
+
+  showWorkspace('settings');document.querySelector('#assume-all-owned').click();
+  await wait(()=>!values.galacticLibraryDatabase.ownershipPolicy.allOwned&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'),'Global ownership override could not turn off.');
+  assert(document.querySelector('#assume-owned-kindle').checked&&!document.querySelector('#assume-owned-kindle').disabled,'Provider choices did not resume after disabling the global preference.');
+  showWorkspace('library');assert(card('Override borrowed example')&&!card('Override unknown example'),'Provider choices did not resume for display and filters.');
+  showWorkspace('settings');document.querySelector('#assume-owned-kindle').click();
+  await wait(()=>!values.galacticLibraryDatabase.ownershipPolicy.providers.kindle&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'),'Provider ownership override could not turn off.');
+  showWorkspace('library');assert(!card('Override borrowed example'),'Disabling the override did not restore borrowed ownership.');
+  checks.push('disabling global and provider checkboxes restores their respective original ownership rules');
+
+  const policyBackupTransfer=new DataTransfer();policyBackupTransfer.items.add(new File([JSON.stringify(ownershipPolicyBackup)],'ownership-policy-backup.json'));
+  showWorkspace('settings');document.querySelector('#backup-status').textContent='';input.files=policyBackupTransfer.files;input.dispatchEvent(new Event('change'));
+  await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Ownership preference backup failed.');
+  assert(document.querySelector('#assume-all-owned').checked&&document.querySelector('#assume-owned-kindle').checked&&document.querySelector('#assume-owned-kindle').disabled,'Backup did not restore ownership preferences.');
+  assert(values.galacticLibraryDatabase.providerItems['kindle:override-borrowed'].ownership==='borrowed','Backup exported the derived override instead of source ownership.');
+  checks.push('actual backup import restores both ownership choices and unchanged source ownership');
+  document.querySelector('#assume-all-owned').click();
+  await wait(()=>!values.galacticLibraryDatabase.ownershipPolicy.allOwned&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'));
+  document.querySelector('#assume-owned-kindle').click();
+  await wait(()=>!values.galacticLibraryDatabase.ownershipPolicy.providers.kindle&&document.querySelector('#ownership-policy-status').textContent.startsWith('Saved.'));
+  failOwnershipSave=true;document.querySelector('#assume-all-owned').click();
+  await wait(()=>document.querySelector('#ownership-policy-status').textContent.startsWith('Could not save'));
+  assert(!document.querySelector('#assume-all-owned').checked&&!document.querySelector('#assume-all-owned').disabled&&!document.querySelector('#assume-owned-kindle').disabled,'Failed save left unsaved assumptions or disabled controls.');
+  assert(!values.galacticLibraryDatabase.ownershipPolicy.allOwned&&JSON.stringify((await writer.getDatabase()).providerItems)===originalOwnershipRecords,'Failed save changed ownership preferences or source records.');
+  failOwnershipSave=false;
+  checks.push('failed ownership preference saves restore controls and cannot silently change ownership');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

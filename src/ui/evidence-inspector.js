@@ -24,13 +24,14 @@ export function createEvidenceInspector(canonical, records, database, actions) {
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
     root.append(element('p',`Persistent edition ID: ${canonical.id}`));
     for(const record of records){
-      const identity=identityEvidence(record);const provider=database.providers[record.provider]??{};
+      const identity=identityEvidence(record);const provider=database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
       const section=element('section','');section.append(element('h4',`${record.title} — ${record.provider}`));
       const table=element('dl','');table.className='evidence-fields';
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));
       field('Record reference',record.recordRef);field('Ownership evidence',record.ownership);field('Evidence source',identity.source);
+      if(effective.ownershipOverride)field('Display and matching','Owned (user preference; original evidence retained)');
       const ownershipReview=database.ownershipReviews?.[record.recordRef];
-      if(ownershipReview){field('Reviewed ownership',effectiveOwnershipRecord(record,database).ownership);field('Ownership confirmed',ownershipReview.confirmedAt);field('Ownership evidence date',ownershipReview.evidenceDate);field('Ownership evidence note',ownershipReview.note);field('Reviewed access expiry',ownershipReview.expiresAt);}
+      if(ownershipReview){field('Reviewed ownership',effectiveOwnershipRecord(record,database,Date.now(),{ignoreOverride:true}).ownership);field('Ownership confirmed',ownershipReview.confirmedAt);field('Ownership evidence date',ownershipReview.evidenceDate);field('Ownership evidence note',ownershipReview.note);field('Reviewed access expiry',ownershipReview.expiresAt);}
       if(record.provider==='kobo')field('Kobo ownership basis',record.metadata.ownershipBasis||'Library presence only; durable ownership unconfirmed');
       const entitlement=entitlementEvidence(record);
       if(entitlement.purchaseEvidence){field('Reseller purchase evidence',entitlement.purchaseEvidence);field('Destination activation',entitlement.activationStatus);}
@@ -48,7 +49,11 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       section.append(table);
       const invalidIsbns=names(record.metadata?.isbn||record.metadata?.isbns).filter(value=>!validIsbn(value));
       if(invalidIsbns.length)section.append(element('p',`Invalid source ISBNs ignored for identity: ${invalidIsbns.join(', ')}.`));
-      if(!['owned','claimed'].includes(record.ownership))section.append(element('p','This record does not establish permanent ownership. Temporary or unconfirmed access cannot supply owned contents.'));
+      if(!['owned','claimed'].includes(record.ownership))section.append(element('p',effective.ownershipOverride
+        ? 'The original provider evidence does not establish permanent ownership. Your preference treats this record and its reviewed contents as owned.'
+        : ['owned','claimed'].includes(effective.ownership)
+          ? 'The original provider evidence does not establish permanent ownership. Your dated ownership confirmation supplies the effective ownership.'
+          : 'This record does not establish permanent ownership. Temporary or unconfirmed access cannot supply owned contents.'));
       if(!record.observedAt)section.append(element('p','This older record has no separate provider-observation date. Enrichment dates are not purchase verification.'));
       const link=sourceLink(record.metadata?.detailUrl,'View provider source');if(link)section.append(link);
       for(const [key,enrichment]of Object.entries(record.metadata?.enrichment??{})){

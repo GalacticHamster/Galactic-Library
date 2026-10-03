@@ -44,6 +44,8 @@ To import Humble purchases, select **Open signed-in Humble purchases**. **Quick 
 
 ## Quick updates
 
+In **Settings**, **Treat everything as owned** overrides ownership uncertainty for display and matching. Each library also has its own checkbox. The original ownership status, media type and provenance remain intact, and turning the checkbox off restores normal ownership rules. Title and edition checks still apply. Choices are included in backups; refresh open HB/FAN bundle pages after changing them. See [ownership overrides](docs/ownership-overrides.md).
+
 Quick updates merge newly discovered records and therefore do not infer that an old entitlement has disappeared. Use a provider's **Full rescan** when you need removals reconciled or after an importer upgrade.
 
 | Provider | Quick update status | Basis |
