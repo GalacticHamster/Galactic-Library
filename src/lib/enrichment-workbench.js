@@ -1,6 +1,6 @@
 import {enrichmentStages} from './enrichment.js';
 import {editionEnrichmentConflicts} from './identity.js';
-import {contentsStatement,proposeContents} from './contents.js';
+import {contentsStatement,proposeContentsForReview} from './contents.js';
 
 export function candidateConflicts(records,source,candidate){
   if(source==='openLibrary')return [];
@@ -24,7 +24,13 @@ export function enrichmentWorkbenchRows(database){
   }
   for(const record of records.values()){
     const statement=contentsStatement(record);
-    if(statement&&!database.contentReviews[record.id]&&proposeContents(statement).unparsed.length)rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],reason:statement});
+    const review = database.contentReviews[record.id];
+    if (statement && (!review || statement !== review.statement)) {
+      const proposal = proposeContentsForReview(statement,record.title);
+      const status = !proposal.entries.length ? 'Unresolved statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
+      rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
+        reason:`${review ? 'Discovery differs from reviewed contents; saved verification is unchanged. ' : status+'. '}${statement}`});
+    }
     for(const [kind,entry]of Object.entries(record.metadata.enrichment??{})){
       if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],reason:`${kind}: ${entry.matchBasis||'source evidence'}; retrieved ${entry.retrievedAt||entry.checkedAt||'unknown'}`});
       if(!['googleBooks','localMetadata'].includes(kind))continue;

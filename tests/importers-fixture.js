@@ -3,6 +3,9 @@ import { createStorageWriter } from '../src/background/storage-writer.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
 import '../src/providers/metadata.js';
 import '../src/providers/fanatical.js';
+import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
+import {createContentsEditor} from '../src/ui/contents-editor.js';
+import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 
 // Real content-script controls, with signed-in fetches replaced by fixtures.
 // Content scripts have no direct storage access; the worker owns this hidden area.
@@ -33,7 +36,7 @@ try{
     const scopes=provider==='kindle'?[completedScope('books',1,1,'reported-count'),completedScope('personal-documents',0,0,'reported-count')].map(scope=>({...scope,duplicateCount:0})):provider==='fandango-at-home'?[completedScope('movie',1,1,'reported-count'),completedScope('tv',0,0,'reported-count')]:[completedScope('library',1,1,'reported-count')];
     const snapshot=completeProviderSnapshot(provider,items,scopes);
     const result={items,snapshot,unresolvedApps:[],newAppCount:1,skippedCount:0,failures:[],knownPurchaseIds:['fixture-purchase'],purchasesRead:1,skippedKnown:0,diagnostics:{windowsRead:1,categoryCounts:{'personal-documents':0}}};
-    if(method)globalThis[globalName]={[method]:async()=>method==='readFandangoGrid'?items:result};
+    if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>method==='readFandangoGrid'?items:result};
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full';
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
@@ -72,5 +75,73 @@ try{
       await wait(()=>values.galacticLibraryDatabase.providers.gog.syncHealth.status==='failed');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.failedPages[0]===7&&!JSON.stringify(values).includes('PRIVATE_TOKEN'),'Failure report lost its page or leaked raw errors.');assert(values.galacticLibraryDatabase.providerItems['gog:fixture-123'],'Failed scan destroyed prior records.');checks.push('actual GOG failure reports safe dashboard diagnostics and preserves the prior snapshot');
     }
   }
+  // Contents controls and DOM extraction use fixture pages, never Amazon.
+  const kindleShadow=shadows.find(root=>root.querySelector('[data-contents-mode]'));
+  const originalFetch=globalThis.fetch;
+  const urls=id=>'https://www.amazon.com/dp/'+id;
+  await writer.mergeProviderItems('kindle',[
+    {providerItemId:'B000000001',title:'Example collection',mediaType:'book',metadata:{detailUrl:urls('B000000001'),originType:'Purchase'}},
+    {providerItemId:'B000000002',title:'Wool Omnibus',mediaType:'book',metadata:{detailUrl:urls('B000000002'),originType:'Purchase'}},
+    {providerItemId:'B000000003',title:'Ordinary novel',mediaType:'book',metadata:{detailUrl:urls('B000000003'),originType:'Purchase'}},
+    {providerItemId:'B000000004',title:'Unavailable',mediaType:'book',metadata:{detailUrl:urls('B000000004'),originType:'Purchase'}}
+  ]);
+  let db=await writer.getDatabase();
+  await writer.saveKindleComicContents([
+    {itemId:'kindle:B000000001',recordRef:db.providerItems['kindle:B000000001'].recordRef,sourceUrl:urls('B000000001'),statement:'Collects Example #1?2',availability:'statement-found'},
+    {itemId:'kindle:B000000004',recordRef:db.providerItems['kindle:B000000004'].recordRef,sourceUrl:urls('B000000004'),statement:'',availability:'unavailable',extractorVersion:2}
+  ]);
+  // Simulate a backup predating extractor/parser versions.
+  db=await writer.getDatabase();const legacy=db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents;delete legacy.extractorVersion;delete legacy.parserVersion;delete legacy.parseOutcome;await writer.restoreDatabase(db);
+  // The production adapter enforces Amazon origin; this localhost fixture uses
+  // its real DOM extractor behind a fixture-only product fetch implementation.
+  globalThis.GalacticKindle.fetchKindleProductComicContents=async (url,{signal}={})=>{
+    const response=await fetch(url,{signal});const document=new DOMParser().parseFromString(await response.text(),'text/html');
+    if(document.querySelector('#captchacharacters'))throw new Error('Amazon requested a CAPTCHA; wait before continuing.');
+    const statement=globalThis.GalacticKindle.kindleContentsStatementFromDocument(document);
+    return {sourceUrl:url,statement,availability:statement?'statement-found':'no-statement',extractorVersion:2};
+  };
+  globalThis.chrome.runtime.sendMessage=async request=>{
+    if(request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES')return {ok:true,...kindleContentsPlan(await writer.getDatabase(),request.mode)};
+    if(request.type==='REPARSE_KINDLE_CONTENTS'){await writer.reparseKindleContents(request.entries);return {ok:true};}
+    if(request.type==='SAVE_KINDLE_COMIC_CONTENTS'){await writer.saveKindleComicContents(request.entries);return {ok:true};}
+    return {ok:false,error:'Unexpected contents request.'};
+  };
+  let requests=[],captcha=false,hold=false;
+  globalThis.fetch=async (input,options)=>{
+    if(!String(input).startsWith('https://www.amazon.com/dp/'))return originalFetch(input,options);
+    requests.push(String(input));
+    if(hold)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Paused','AbortError')),{once:true}));
+    const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1?2.';
+    return new Response(captcha?'<input id="captchacharacters">':'<div id="bookDescription_feature_div">'+description+'</div>',{status:200});
+  };
+  const selector=kindleShadow.querySelector('[data-contents-mode]'),start=kindleShadow.querySelector('[data-action="comic-contents"]'),stop=kindleShadow.querySelector('[data-action="pause-comic-contents"]'),status=kindleShadow.querySelector('.status');
+  const finished=async()=>{for(let n=0;n<600;n++){if(!status.dataset.busy)return;await pause();}throw new Error('Contents UI did not finish: '+status.textContent);};
+  selector.value='scan';start.click();await finished();db=await writer.getDatabase();
+  assert(requests.length===2&&!requests.some(url=>url.endsWith('B000000004')),'Normal scan fetched saved or unavailable pages.');
+  assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.parserVersion===2,'Saved text was not locally reparsed.');
+  assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
+  assert(db.providerItems['kindle:B000000002'].metadata.enrichment.kindleProductComicContents.parseOutcome==='full'&&!Object.keys(db.contentReviews).length,'Named proposal disappeared or became verified.');
+  checks.push('Kindle contents controls scan prose, locally reparse legacy text and skip unavailable pages');
+  const workbench=createEnrichmentWorkbench({inspect(){},refresh(){}});document.body.append(workbench.element);workbench.update(db);workbench.element.open=true;await pause();
+  const queue=workbench.element.querySelector('[aria-label="Enrichment queue"]');queue.value='unparsed';queue.dispatchEvent(new Event('change'));
+  assert(workbench.element.querySelectorAll('li').length===2,'Fully parsed statements are hidden from Contents to review.');
+  const record=db.providerItems['kindle:B000000002'];let savedReview;
+  const editor=createContentsEditor(record,null,{save:async(id,value)=>{savedReview=value;await writer.saveContentReview(id,value);},refresh(){}});document.body.append(editor);editor.open=true;await pause();
+  const click=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label).click();
+  click(editor,'Parse statement for review');assert(editor.querySelectorAll('tbody tr').length===3,'Named works are missing from the editor.');click(editor,'Save verified contents');await wait(()=>Boolean(savedReview));
+  assert(savedReview.entries.every(entry=>entry.unitType==='component'),'Named suggestions changed their component shape.');
+  checks.push('Contents to review lists fully parsed proposals; explicit editor confirmation saves named components');
+  selector.value='reparse';const before=requests.length;start.click();await finished();assert(requests.length===before,'Parser-only mode contacted Amazon.');
+  checks.push('Kindle parser-only mode makes zero requests');
+  captcha=true;selector.value='rescan';start.click();await finished();assert(requests.length===before+1&&/Stopped:.*CAPTCHA/i.test(status.textContent),'CAPTCHA did not stop the queue.');
+  db=await writer.getDatabase();assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement==='Collects Example #1?2','Failed refresh erased saved text.');
+  captcha=false;selector.value='retry';start.click();await finished();assert(requests.length===before+2,'Retry did not target just the incomplete result.');
+  checks.push('Kindle CAPTCHA stops sequential rescan; retry preserves and refreshes the saved statement');
+  await writer.mergeProviderItems('kindle',[{providerItemId:'B000000005',title:'Fresh ordinary book',mediaType:'book',metadata:{detailUrl:urls('B000000005'),originType:'Purchase'}}]);
+  hold=true;selector.value='rescan';const pausedBefore=requests.length;start.click();await wait(()=>requests.length>pausedBefore);stop.click();await finished();
+  assert(/Paused/.test(status.textContent)&&!start.disabled&&!selector.disabled,'Pause failed to abort or re-enable controls.');
+  hold=false;selector.value='scan';const resumeBefore=requests.length;start.click();await finished();assert(requests.length===resumeBefore+1&&requests.at(-1).endsWith('B000000005'),'Normal scan did not resume only unfinished eligible books.');
+  checks.push('Kindle Pause aborts the current request and normal scan resumes unfinished work');
+  globalThis.fetch=originalFetch;
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

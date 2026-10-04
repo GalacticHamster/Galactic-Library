@@ -126,6 +126,30 @@
     return statement.replace(/[.!?]+$/u, '');
   }
 
+  const contentsExtractorVersion = 2;
+  function explicitContentsStatement(value) {
+    const text = compactText(value);
+    const match = text.match(/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*(?::|-)?\s*.{2,10000}/iu);
+    if (!match) return '';
+    const statement = match[0];
+    for (const boundary of statement.matchAll(/[.!?](?=\s+[A-Z])/gu)) {
+      const before = statement.slice(0,boundary.index);
+      if (boundary[0] === '.' && (/\b(?:vols?|no|nos|ed|pt|pts|mr|mrs|dr|st|vs)$/iu.test(before) || /\b(?:[A-Z]\.)*[A-Z]$/u.test(before))) continue;
+      return statement.slice(0,boundary.index).trim();
+    }
+    return statement.replace(/[.!?]+$/u,'');
+  }
+
+  function kindleContentsStatementFromDocument(document) {
+    for (const selector of ['#bookDescription_feature_div','#productDescription','#featurebullets_feature_div','#productOverview_feature_div','[data-feature-name="bookDescription"]']) {
+      for (const element of document.querySelectorAll(selector)) {
+        const statement = explicitContentsStatement(element.textContent);
+        if (statement) return statement;
+      }
+    }
+    return '';
+  }
+
   function kindleCollectsStatementFromDocument(document) {
     const selectors = [
       '#bookDescription_feature_div', '#productDescription', '#featurebullets_feature_div',
@@ -140,20 +164,20 @@
     return '';
   }
 
-  async function fetchKindleProductComicContents(detailUrl) {
+  async function fetchKindleProductComicContents(detailUrl, {signal} = {}) {
     const url = new URL(detailUrl, global.location?.origin ?? 'https://www.amazon.com');
     if (url.origin !== (global.location?.origin ?? 'https://www.amazon.com') || !/^\/dp\//u.test(url.pathname)) throw new Error('Kindle did not provide a usable Amazon product-page URL.');
-    const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store', signal });
     // Older Comixology/Comics Unlimited entitlements can remain in a Kindle
     // library after Amazon removes their public retail listing. That is a
-    // permanent "no page to inspect" result, not a transient import failure.
-    if (response.status === 404) return { sourceUrl: `${url.origin}${url.pathname}`, statement: '', availability: 'unavailable' };
+    // "no page to inspect" result for this lookup; an explicit rescan can revisit it.
+    if (response.status === 404) return { sourceUrl: `${url.origin}${url.pathname}`, statement: '', availability: 'unavailable', extractorVersion:contentsExtractorVersion };
     if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading a Kindle product page.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
     if (document.querySelector('#captchacharacters, form[action*="validateCaptcha" i]')) throw new Error('Amazon requested a CAPTCHA; wait before continuing the Kindle contents scan.');
     if(document.querySelector('#ap_email,form[name="signIn"]'))throw new Error('Sign in again before retrying the Kindle contents lookup.');
-    const statement=kindleCollectsStatementFromDocument(document);
-    return { sourceUrl: `${url.origin}${url.pathname}`, statement, availability: statement?'statement-found':'no-statement' };
+    const statement=kindleContentsStatementFromDocument(document);
+    return { sourceUrl: `${url.origin}${url.pathname}`, statement, availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
   }
 
   function ownershipItemsFromResponse(response) {
@@ -266,5 +290,5 @@
     return { items, diagnostics, snapshot };
   }
 
-  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, fetchKindleProductComicContents, fetchKindleBooks };
+  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };
 }(globalThis));

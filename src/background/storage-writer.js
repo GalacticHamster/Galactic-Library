@@ -2,11 +2,11 @@ import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from 
 import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
-import { isConfirmedComicManga } from '../lib/genre-hints.js';
+import {supportedKindleContentsBook, contentsParseState, KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../lib/kindle-contents.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
-import { validateContentReview,proposeContents } from '../lib/contents.js';
+import { validateContentReview } from '../lib/contents.js';
 import { identityConflicts, identityEvidence, editionEnrichmentConflicts } from '../lib/identity.js';
 import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 import { text } from '../lib/validation.js';
@@ -576,7 +576,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
 
   async function saveKindleComicContents(entries) {
-    if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('No valid Kindle comic contents were provided.');
+    if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('No valid Kindle contents were provided.');
     const database = await getDatabase();
     const updatedAt = new Date().toISOString();
     for (const entry of entries) {
@@ -585,18 +585,37 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim().replace(/[.!?]+$/u, '');
       const availability = (entry?.availability??'available')==='available'?statement?'statement-found':'no-statement':entry?.availability;
       const failed=availability==='temporary-failure';
-      const proposal=statement?proposeContents(statement):null;
       let sourceUrl = '';
       try {
         const url = new URL(String(entry?.sourceUrl ?? ''));
-        if (url.origin === 'https://www.amazon.com' && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
+        if (url.origin === 'https://www.amazon.com' && !url.username && !url.password && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
       } catch { /* invalid source URL remains unusable */ }
-      if (!item || item.provider !== 'kindle' || item.mediaType !== 'book' || !isConfirmedComicManga(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 700 || (statement && !/^collects?\b/iu.test(statement)) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef)) {
-        throw new Error('Invalid Kindle comic contents entry.');
+      if (!supportedKindleContentsBook(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
+        throw new Error('Invalid Kindle contents entry.');
       }
-      selectEnrichment(database,itemId,'kindleProductComicContents',{source:'amazon-product-page',sourceUrl,statement,availability,parseStatus:proposal?(proposal.entries.length&&!proposal.unparsed.length?'parsed':'unparsed'):'not-attempted',...(failed?{failureCode:['captcha','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt},updatedAt);
+      const previous = item.metadata?.enrichment?.kindleProductComicContents;
+      // A failed refresh must not erase previously discovered text. Its latest
+      // fetch outcome remains retryable independently of its parsing state.
+      const keptStatement = failed && previous?.statement ? previous.statement : statement;
+      const result = {source:'amazon-product-page',sourceUrl,statement:keptStatement,availability,
+        extractorVersion:failed && previous?.statement ? previous.extractorVersion ?? 1 : entry.extractorVersion ?? 1,
+        ...(failed?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
+      const parse = contentsParseState({...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,kindleProductComicContents:result}}});
+      selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt);
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
+    return persistDatabase(database);
+  }
+
+  async function reparseKindleContents(entries) {
+    if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('Choose 1–100 saved Kindle statements to reparse.');
+    const database = await getDatabase();const now = new Date().toISOString();
+    for (const entry of entries) {
+      const item = database.providerItems[entry?.itemId];
+      const saved = item?.metadata?.enrichment?.kindleProductComicContents;
+      if (!supportedKindleContentsBook(item) || !entry.recordRef || entry.recordRef !== item.recordRef || !saved?.statement) throw new Error('The saved Kindle statement is no longer current.');
+      selectEnrichment(database,item.id,'kindleProductComicContents',{...saved,...contentsParseState(item)},now);
+    }
     return persistDatabase(database);
   }
 
@@ -753,7 +772,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
     saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
-    saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
+    saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     saveContentReview, removeContentReview,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences

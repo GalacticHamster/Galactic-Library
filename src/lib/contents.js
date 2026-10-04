@@ -3,6 +3,7 @@ import { object, text, date, url } from './validation.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
+export const CONTENTS_PARSER_VERSION = 2;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -34,7 +35,17 @@ export function proposeContents(statement) {
   const entries=[]; const unparsed=[];
   // A partial reprint statement never silently becomes a full issue.
   const completeness = /\b(?:material from|excerpts? from|selections? from|partial)\b/iu.test(text) ? 'excerpt' : 'full';
-  const chunks = text.split(/\s*;\s*|\s*,\s*(?=[\p{L}]|#)|\s+and\s+(?=[\p{L}]|#)/u);
+  const chunks = [];
+  const marker = /#\s*\d|\b(?:vol(?:ume)?s?\.?|books?)\s*\d/iu;
+  for (const part of text.split(/\s*;\s*/u)) {
+    let start = 0;
+    for (const separator of part.matchAll(/\s*,\s*(?=[\p{L}]|#)|\s+and\s+(?=[\p{L}]|#)/gu)) {
+      // Conjunctions inside a series name (Black and White) are not separators.
+      if (!separator[0].includes(',') && !marker.test(part.slice(start, separator.index))) continue;
+      chunks.push(part.slice(start, separator.index).trim());start = separator.index + separator[0].length;
+    }
+    chunks.push(part.slice(start).trim());
+  }
   let lastSeries=''; let lastRun='';
   for (const chunk of chunks) {
     const match=/^(.*?)\s*(?:(vol(?:ume)?s?\.?|books?)\s*|(#)\s*)(\d+\/\d+|\d+(?:\.\d+)?)(?:\s*[-\u2013\u2014]\s*#?(\d+(?:\.\d+)?))?\s*[.!]?$/iu.exec(chunk.replace(/\b(?:material from|excerpts? from|selections? from)\s*/giu,''));
@@ -43,6 +54,7 @@ export function proposeContents(statement) {
     let unitType=match[3]?'issue':'volume';
     if (/\bannuals?$/iu.test(label)) {unitType='annual';label=label.replace(/\s*annuals?$/iu,'').trim();}
     if (/\bspecials?$/iu.test(label)) {unitType='special';label=label.replace(/\s*specials?$/iu,'').trim();}
+    if (/^(?:issues?|volumes?|vols?\.?|books?)$/iu.test(label)) {unparsed.push(chunk);continue;}
     const descriptor=seriesDescriptor(label||lastSeries,label? '':lastRun);
     if (!descriptor.series) {unparsed.push(chunk);continue;}
     lastSeries=descriptor.series;lastRun=descriptor.run;
@@ -51,6 +63,25 @@ export function proposeContents(statement) {
     for (const number of last?Array.from({length:Number(last)-Number(first)+1},(_,index)=>String(Number(first)+index)):[first]) entries.push({...descriptor,unitType,number,language:'',completeness});
   }
   return {entries:entries.length?validateContents(entries):[],unparsed};
+}
+
+/** Discovery/editor-only proposals. Never used to index ordinary title matches. */
+export function proposeContentsForReview(statement, collectionTitle = '') {
+  const original = compact(statement, 10000);
+  const introduction = /^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu;
+  const body = original.replace(introduction, '');
+  let proposal;
+  try {proposal = proposeContents(body);} catch {return {entries:[],unparsed:[body]};}
+  if (proposal.entries.length || !introduction.test(original) || !collectionTitle) return proposal;
+  // Only a straightforward enumerated list becomes named suggestions. Keep
+  // descriptions, chapter lists and unsupported numbered syntax unresolved.
+  if (/#|\b(?:chapters?|essays?|foreword|afterword|appendix|bibliography|bonus|extras?|issues?|volumes?|vols?\.?|books?)\b/iu.test(body)) return proposal;
+  const names = body.replace(/[.!?]+$/u,'').split(/\s*;\s*|\s*,\s*|\s+and\s+/iu)
+    .map(name => name.replace(/^["“]|["”]$/gu,'').trim()).filter(Boolean);
+  if (names.length < 2 || names.length > 100 || names.some(name => name.length > 80 || !/^[\p{Lu}\d]/u.test(name) || name.split(/\s+/u).length > 12)) return proposal;
+  const completeness = /\b(?:material from|excerpts? from|selections? from|partial)\b/iu.test(body) ? 'excerpt' : 'full';
+  try {return {entries:validateContents(names.map(number => ({series:collectionTitle,run:'',unitType:'component',number,language:'',completeness}))),unparsed:[]};}
+  catch {return {entries:[],unparsed:[body]};}
 }
 
 export function contentsStatement(item) {

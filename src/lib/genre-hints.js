@@ -58,7 +58,7 @@ function catalogueComicMangaHints(record) {
 }
 
 // This deliberately excludes title/character-name guesses. It is the strict
-// gate for future product-page issue-contents enrichment.
+// classification evidence for display and optional discovery priority.
 export function comicMangaEvidence(record) {
   return [
     ...kindleComicMangaHints(record),

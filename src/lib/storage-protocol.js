@@ -58,6 +58,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveGoogleBooksEnrichments',
   'saveGoogleBooksGenreHints',
   'saveKindleComicContents',
+  'reparseKindleContents',
   'saveContentReview',
   'removeContentReview',
   'getUiPreferences',

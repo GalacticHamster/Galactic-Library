@@ -1,3 +1,4 @@
+import {kindleContentsTests} from './kindle-contents.js';
 import {companionFeedTests} from './companion-feeds.js';
 import {releaseTests} from './release.js';
 import { finalGlTests } from './final-gl-features.js';
@@ -490,7 +491,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...tests, ...kindleContentsTests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -501,4 +502,4 @@ for (const [name, run] of [...tests, ...companionFeedTests, ...releaseTests, ...
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${tests.length + kindleContentsTests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);

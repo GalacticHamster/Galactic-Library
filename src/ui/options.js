@@ -227,7 +227,7 @@ function createComicMangaCandidateTag(records) {
   const sources = [...new Set(evidence.map((hint) => hint.source.replace(/-/gu, ' ')))];
   const node = document.createElement('div');
   node.className = 'genre-tags';
-  const tag = textElement('span', 'Confirmed comic/manga candidate');
+  const tag = textElement('span', 'Comic/manga evidence');
   tag.className = 'genre-tag';
   tag.title = `Evidence: ${sources.join(', ')}`;
   node.append(tag);
@@ -241,7 +241,7 @@ function createComicContents(records) {
   if (!statements.length) return null;
   const node = document.createElement('div');
   node.className = 'library-item-metadata';
-  node.textContent = statements.map((statement) => `Collects: ${statement.replace(/^collects?\s*:?\s*/iu, '')}`).join(' · ');
+  node.textContent = statements.map((statement) => `Contents found: ${statement}`).join(' · ');
   return node;
 }
 

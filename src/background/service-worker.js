@@ -5,7 +5,7 @@ import { handleExternalApiRequest } from '../lib/external-api.js';
 import '../providers/metadata.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
-import { isConfirmedComicManga } from '../lib/genre-hints.js';
+import {kindleContentsPlan} from '../lib/kindle-contents.js';
 import { createStorageWriter } from './storage-writer.js';
 import { createStorageMessageHandler } from './storage-messages.js';
 import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
@@ -227,27 +227,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request?.type === 'GET_KINDLE_COMIC_CONTENT_CANDIDATES') {
     if (!isProviderImportPage('kindle', sender.url)) {
-      sendResponse({ ok: false, error: 'Kindle comic candidates are available only from the signed-in Kindle library page.' });
+      sendResponse({ ok: false, error: 'Kindle contents discovery is available only from the signed-in Kindle library page.' });
       return undefined;
     }
     getDatabase()
       .then((database) => {
-        const candidates = Object.values(database.providerItems)
-          .filter((item) => item.provider === 'kindle' && item.mediaType === 'book' && isConfirmedComicManga(item) && (!item.metadata?.enrichment?.kindleProductComicContents||item.metadata.enrichment.kindleProductComicContents.availability==='temporary-failure'))
-          .flatMap((item) => {
-            const detailUrl = String(item.metadata?.detailUrl ?? '');
-            return /^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(detailUrl) ? [{ id: item.id, recordRef:item.recordRef,title: item.title, detailUrl }] : [];
-          })
-          .sort((left, right) => left.title.localeCompare(right.title));
-        sendResponse({ ok: true, candidates });
+        sendResponse({ok:true,...kindleContentsPlan(database, request.mode ?? 'scan')});
       })
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
+  if (request?.type === 'REPARSE_KINDLE_CONTENTS') {
+    if (!isProviderImportPage('kindle', sender.url)) {
+      sendResponse({ok:false,error:'Saved Kindle statements can be reprocessed only from the signed-in Kindle library page.'});return undefined;
+    }
+    storageWriter.reparseKindleContents(request.entries).then(() => sendResponse({ok:true}))
+      .catch(error => sendResponse({ok:false,error:error.message}));return true;
+  }
+
   if (request?.type === 'SAVE_KINDLE_COMIC_CONTENTS') {
     if (!isProviderImportPage('kindle', sender.url)) {
-      sendResponse({ ok: false, error: 'Kindle comic contents can be saved only from the signed-in Kindle library page.' });
+      sendResponse({ ok: false, error: 'Kindle contents can be saved only from the signed-in Kindle library page.' });
       return undefined;
     }
     saveKindleComicContents(request.entries)

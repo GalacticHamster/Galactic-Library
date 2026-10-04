@@ -24,7 +24,7 @@ export function createSeriesCoverageView(database) {
       table.append(body);details.append(table);
     });list.append(details);
   }
-  if(!groups.length)list.append(element('p','No owned contents have been confirmed yet. Open a library item\'s Details, then Review included issues or volumes to check its evidence.'));
+  if(!groups.length)list.append(element('p','No owned contents have been confirmed yet. Open a library item\'s Details, then Review included contents to check its evidence.'));
   search.addEventListener('input',()=>{for(const node of list.querySelectorAll('[data-series]'))node.hidden=!node.dataset.series.includes(search.value.trim().toLocaleLowerCase());});
   root.append(list);
   const comparison=element('details','');comparison.append(element('summary','Compare a target series range or proposed collection'));

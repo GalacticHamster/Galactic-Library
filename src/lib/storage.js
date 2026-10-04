@@ -29,7 +29,7 @@ export const {
   applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
   separateEdition, undoEditionSeparation, saveTitleAliases,
   saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
-  saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents,
+  saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
   saveContentReview, removeContentReview,
   getUiPreferences, saveUiPreferences, getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;

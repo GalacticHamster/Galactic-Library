@@ -64,5 +64,5 @@ export function createEnrichmentWorkbench(actions){
     }
   }
   category.addEventListener('change',()=>{page=0;refresh();});search.addEventListener('input',()=>{page=0;refresh();});element.addEventListener('toggle',refresh);
-  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(database){currentRecords=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database);const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);heading.textContent=`Review book suggestions ? ${rows.filter(row=>row.review).length} pending`;refresh();}};
+  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(database){currentRecords=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database);const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);heading.textContent=`Review book suggestions ? ${rows.filter(row=>row.review||row.category==='unparsed').length} pending`;refresh();}};
 }
