@@ -26,6 +26,17 @@ storageReady.catch(() => {});
 const storageWriter = createStorageWriter(privateArea, storageReady);
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
+const contentsPerformance=globalThis.GalacticContentsPerformance;
+const contentsUiTimings=contentsPerformance.collector();
+function contentsTiming(request,kind){
+  const timing=contentsPerformance.trace(request?.diagnosticLookupId,kind);
+  if(timing)timing.onWrite=()=>chrome.runtime.sendMessage({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:timing.id}).catch(()=>{});
+  return timing;
+}
+function timedContentsResponse(timing,sendResponse,value){
+  if(timing){timing.finish();value={...value,performance:contentsPerformance.clean(timing)};}
+  sendResponse(value);
+}
 
 const reconcileReminders=(notify=false)=>reconcileReminderNotifications(storageWriter,chrome,notify).catch(()=>{});
 let reminderAlarmRegistered=false,reminderClickRegistered=false;
@@ -176,6 +187,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ok:false,error:'Library operations are accepted only from Galactic Library.'});
     return undefined;
   }
+  if(request?.type==='GL_CONTENTS_UI_TIMING'){
+    if(isOwnExtensionPage(sender.url)){const clean=contentsPerformance.clean(request.timing);if(clean?.kind==='options')contentsUiTimings.add(clean);}
+    sendResponse({ok:true});return undefined;
+  }
+  if(request?.type==='GET_KINDLE_CONTENTS_UI_TIMINGS'){
+    if(!isProviderImportPage('kindle',sender.url)){sendResponse({ok:false});return undefined;}
+    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean)});return undefined;
+  }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
       sendResponse({ ok: false, error: 'Google Books searches are accepted only from Galactic Library.' });
@@ -230,11 +249,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Kindle contents discovery is available only from the signed-in Kindle library page.' });
       return undefined;
     }
-    getDatabase()
+    const timing=contentsTiming(request,'prepare');const workerEnd=timing?.begin('worker_total');
+    storageWriter.execute('getDatabase',[],timing)
       .then((database) => {
-        sendResponse({ok:true,...kindleContentsPlan(database, request.mode ?? 'scan')});
+        const selectionEnd=timing?.begin('candidate_selection');let plan;
+        try{plan=kindleContentsPlan(database, request.mode ?? 'scan');}finally{selectionEnd?.();}
+        workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true,...plan});
       })
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+      .catch((error) => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});
     return true;
   }
 
@@ -242,8 +264,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (!isProviderImportPage('kindle', sender.url)) {
       sendResponse({ok:false,error:'Saved Kindle statements can be reprocessed only from the signed-in Kindle library page.'});return undefined;
     }
-    storageWriter.reparseKindleContents(request.entries).then(() => sendResponse({ok:true}))
-      .catch(error => sendResponse({ok:false,error:error.message}));return true;
+    const timing=contentsTiming(request,'reparse');const workerEnd=timing?.begin('worker_total');
+    storageWriter.execute('reparseKindleContents',[request.entries],timing).then(() => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true});})
+      .catch(error => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});return true;
   }
 
   if (request?.type === 'SAVE_KINDLE_COMIC_CONTENTS') {
@@ -251,9 +274,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Kindle contents can be saved only from the signed-in Kindle library page.' });
       return undefined;
     }
-    saveKindleComicContents(request.entries)
-      .then(() => sendResponse({ ok: true }))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    const timing=contentsTiming(request,'network');const workerEnd=timing?.begin('worker_total');
+    storageWriter.execute('saveKindleComicContents',[request.entries],timing)
+      .then(() => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true});})
+      .catch(error => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});
     return true;
   }
 

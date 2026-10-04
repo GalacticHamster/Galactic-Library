@@ -164,19 +164,27 @@
     return '';
   }
 
-  async function fetchKindleProductComicContents(detailUrl, {signal} = {}) {
+  async function fetchKindleProductComicContents(detailUrl, {signal,timing} = {}) {
     const url = new URL(detailUrl, global.location?.origin ?? 'https://www.amazon.com');
     if (url.origin !== (global.location?.origin ?? 'https://www.amazon.com') || !/^\/dp\//u.test(url.pathname)) throw new Error('Kindle did not provide a usable Amazon product-page URL.');
-    const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store', signal });
+    const headersEnd=timing?.begin('fetch_headers',timing.attempts);
+    let response;try{response=await fetch(url.toString(), { credentials: 'include', cache: 'no-store', signal });}finally{headersEnd?.();}
     // Older Comixology/Comics Unlimited entitlements can remain in a Kindle
     // library after Amazon removes their public retail listing. That is a
     // "no page to inspect" result for this lookup; an explicit rescan can revisit it.
     if (response.status === 404) return { sourceUrl: `${url.origin}${url.pathname}`, statement: '', availability: 'unavailable', extractorVersion:contentsExtractorVersion };
     if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading a Kindle product page.`);
-    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const bodyEnd=timing?.begin('response_body',timing.attempts);
+    let body;try{body=await response.text();}finally{bodyEnd?.();}
+    const domEnd=timing?.begin('dom_parse',timing.attempts);
+    let document;try{document=new DOMParser().parseFromString(body, 'text/html');}finally{domEnd?.();}
+    const checksEnd=timing?.begin('page_checks',timing.attempts);
+    try{
     if (document.querySelector('#captchacharacters, form[action*="validateCaptcha" i]')) throw new Error('Amazon requested a CAPTCHA; wait before continuing the Kindle contents scan.');
     if(document.querySelector('#ap_email,form[name="signIn"]'))throw new Error('Sign in again before retrying the Kindle contents lookup.');
-    const statement=kindleContentsStatementFromDocument(document);
+    }finally{checksEnd?.();}
+    const extractEnd=timing?.begin('extraction',timing.attempts);
+    let statement;try{statement=kindleContentsStatementFromDocument(document);}finally{extractEnd?.();}
     return { sourceUrl: `${url.origin}${url.pathname}`, statement, availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
   }
 

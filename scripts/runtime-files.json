@@ -13,6 +13,7 @@
   "src/lib/companion-response.js",
   "src/lib/constants.js",
   "src/lib/contents.js",
+  "src/lib/contents-performance.js",
   "src/lib/duplicate-review.js",
   "src/lib/enrichment-state.js",
   "src/lib/enrichment-workbench.js",

@@ -99,6 +99,7 @@
         "src/providers/floating-panel.js",
         "src/providers/provider-snapshot.js",
         "src/providers/metadata.js",
+        "src/lib/contents-performance.js",
         "src/providers/kindle.js",
         "src/providers/kindle-content.js",
         "src/providers/amazon-video.js",

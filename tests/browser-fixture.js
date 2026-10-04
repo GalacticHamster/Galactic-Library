@@ -17,14 +17,16 @@ const button=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.
 const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}return node;};
 const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
+const contentsRuntimeListeners=[],contentsStorageListeners=[],contentsUiTimings=[];
 const values={};let openedOptions;let failOwnershipSave=false;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
-globalThis.chrome={runtime:{getManifest:()=>({optional_permissions:['notifications']}),id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
+globalThis.chrome={runtime:{onMessage:{addListener:listener=>contentsRuntimeListeners.push(listener)},getManifest:()=>({optional_permissions:['notifications']}),id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
+  if(message.type==='GL_CONTENTS_UI_TIMING'){contentsUiTimings.push(message.timing);return {ok:true};}
   if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
   if(message.operation==='saveOwnershipPolicy'&&failOwnershipSave)return {ok:false,error:'Synthetic preference storage failure'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
-}},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:()=>{}}}};
+}},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:listener=>contentsStorageListeners.push(listener)}}};
 
 try{
   const comic=parseLocalMetadata(comicXml);
@@ -342,5 +344,13 @@ try{
   assert(!values.galacticLibraryDatabase.ownershipPolicy.allOwned&&JSON.stringify((await writer.getDatabase()).providerItems)===originalOwnershipRecords,'Failed save changed ownership preferences or source records.');
   failOwnershipSave=false;
   checks.push('failed ownership preference saves restore controls and cannot silently change ownership');
+  const diagnosticId='lookup-abcdef123456-001';
+  for(const listener of contentsRuntimeListeners)listener({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:diagnosticId},{id:chrome.runtime.id});
+  for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');
+  await wait(()=>contentsUiTimings.length===1,'Options refresh did not return correlated diagnostic timing.');
+  const diagnostic=contentsUiTimings[0];assert(diagnostic.id===diagnosticId&&diagnostic.kind==='options'&&['options_read','options_render','options_other','options_total','options_workbench','options_selection','options_cards','options_coverage'].every(stage=>diagnostic.events.some(event=>event.stage===stage)),'Options refresh stage/correlation missing.');
+  assert(!JSON.stringify(diagnostic).includes('Collection A')&&!JSON.stringify(diagnostic).includes('providerItems'),'Options diagnostics contain library data.');
+  for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');await pause();await pause();assert(contentsUiTimings.length===1,'Options correlation was reused by an unrelated write.');
+  checks.push('options diagnostics measure correlated storage refresh and rendering once without exposing library data');
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

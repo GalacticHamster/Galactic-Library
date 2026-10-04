@@ -1,3 +1,4 @@
+import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
@@ -28,6 +29,14 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * context owns a writer or writes a cached database snapshot.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve()) {
+  let activeTiming = null;
+  const timed = (stage, work) => { const end=activeTiming?.begin(stage);try{return work();}finally{end?.();} };
+  const timedAsync = (stage, work) => {
+    if(!activeTiming)return work();
+    const end=activeTiming.begin(stage);
+    if(stage==='storage_write'||stage==='migration_write'){try{activeTiming.onWrite?.();}catch{/* Diagnostics must never prevent a write. */}}
+    return (async()=>{try{return await work();}finally{end();}})();
+  };
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
   async function beginProviderScan(provider,profile,mode='full',switchProfile=false,tabId=null) {
@@ -76,10 +85,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return details.syncMode==='incremental'?mergeProviderItems(provider,values,details):replaceProviderItems(provider,values,details,snapshot);
   }
   async function getDatabase() {
-    const stored = await storageArea.get({ [DATABASE_STORAGE_KEY]: null });
+    const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
-    const database = validateDatabase(stored[DATABASE_STORAGE_KEY]);
-    if (JSON.stringify(stored[DATABASE_STORAGE_KEY]) !== JSON.stringify(database)) {
+    const database = timed('read_validation',()=>validateDatabase(stored[DATABASE_STORAGE_KEY]));
+    if (timed('migration_compare',()=>JSON.stringify(stored[DATABASE_STORAGE_KEY]) !== JSON.stringify(database))) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
@@ -90,19 +99,19 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
           return previous?.providerItemIds?.map((itemId) => byRecord.get(itemId)).find(Boolean) ?? id;
         })};
       }
-      await storageArea.set(migrated);
+      await timedAsync('migration_write',()=>storageArea.set(migrated));
     }
     return database;
   }
 
   async function persistDatabase(database,invalidate=null) {
-    const validated = validateDatabase(database);
+    const validated = timed('persist_validation',()=>validateDatabase(database));
     const updates={[DATABASE_STORAGE_KEY]:validated};
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
     if(invalidate==='all'||invalidate==='humble')updates[FEED_UPLOAD_KEY]={};
     if(invalidate==='all')updates[NOTIFICATIONS]={enabled:false,lastNotifiedDay:''};
     if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
-    await storageArea.set(updates);
+    await timedAsync('storage_write',()=>storageArea.set(updates));
     return validated;
   }
 
@@ -578,6 +587,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   async function saveKindleComicContents(entries) {
     if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('No valid Kindle contents were provided.');
     const database = await getDatabase();
+    let endValidation=activeTiming?.begin('entry_validation');
     const updatedAt = new Date().toISOString();
     for (const entry of entries) {
       const itemId = String(entry?.itemId ?? '').trim();
@@ -591,7 +601,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         if (url.origin === 'https://www.amazon.com' && !url.username && !url.password && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
       } catch { /* invalid source URL remains unusable */ }
       if (!supportedKindleContentsBook(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
-        throw new Error('Invalid Kindle contents entry.');
+        endValidation?.();throw new Error('Invalid Kindle contents entry.');
       }
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
       // A failed refresh must not erase previously discovered text. Its latest
@@ -600,10 +610,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       const result = {source:'amazon-product-page',sourceUrl,statement:keptStatement,availability,
         extractorVersion:failed && previous?.statement ? previous.extractorVersion ?? 1 : entry.extractorVersion ?? 1,
         ...(failed?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
-      const parse = contentsParseState({...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,kindleProductComicContents:result}}});
-      selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt);
+      endValidation?.();
+      const parse = timed('parsing',()=>contentsParseState({...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,kindleProductComicContents:result}}}));
+      timed('enrichment_update',()=>selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt));
+      endValidation=activeTiming?.begin('entry_validation');
     }
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
+    endValidation?.();
+    database.canonicalItems = timed('canonical_rebuild',()=>rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations));
     return persistDatabase(database);
   }
 
@@ -611,10 +624,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if (!Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('Choose 1–100 saved Kindle statements to reparse.');
     const database = await getDatabase();const now = new Date().toISOString();
     for (const entry of entries) {
+      const endValidation=activeTiming?.begin('entry_validation');
       const item = database.providerItems[entry?.itemId];
       const saved = item?.metadata?.enrichment?.kindleProductComicContents;
-      if (!supportedKindleContentsBook(item) || !entry.recordRef || entry.recordRef !== item.recordRef || !saved?.statement) throw new Error('The saved Kindle statement is no longer current.');
-      selectEnrichment(database,item.id,'kindleProductComicContents',{...saved,...contentsParseState(item)},now);
+      if (!supportedKindleContentsBook(item) || !entry.recordRef || entry.recordRef !== item.recordRef || !saved?.statement) {endValidation?.();throw new Error('The saved Kindle statement is no longer current.');}
+      endValidation?.();
+      const parsed=timed('parsing',()=>contentsParseState(item));
+      timed('enrichment_update',()=>selectEnrichment(database,item.id,'kindleProductComicContents',{...saved,...parsed},now));
     }
     return persistDatabase(database);
   }
@@ -779,15 +795,21 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   };
   let tail = Promise.resolve();
 
-  function execute(operation, args = []) {
+  function execute(operation, args = [], timing = null) {
     if (!STORAGE_OPERATIONS.includes(operation) || !Array.isArray(args)) {
       return Promise.reject(new Error('Unsupported Galactic Library storage operation.'));
     }
     // Capture the request at admission, before callers can mutate it.
     let values;
+    const captureEnd=timing?.begin('writer_capture');
     try { values = structuredClone(args); }
     catch { return Promise.reject(new Error('Invalid Galactic Library storage arguments.')); }
-    const result = tail.then(() => ready).then(() => operations[operation](...values));
+    finally {captureEnd?.();}
+    const queueEnd=timing?.begin('writer_queue');
+    const result = tail.then(() => ready).then(timing ? async () => {
+      queueEnd();activeTiming=timing;
+      try{return await operations[operation](...values);}finally{activeTiming=null;}
+    } : () => operations[operation](...values));
     // A rejected operation never poisons the queue; later requests still run.
     tail = result.catch(() => {});
     return result;

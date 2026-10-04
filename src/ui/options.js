@@ -1,3 +1,4 @@
+import '../lib/contents-performance.js';
 import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
 import { getUiPreferences, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
@@ -677,7 +678,9 @@ async function runGoogleBooksEnrichment() {
   }
 }
 
-function render() {
+function render(timing = null) {
+  let endSegment=timing?.begin('options_workbench');
+  try {
   if(!enrichmentWorkbench){
     enrichmentWorkbench=createEnrichmentWorkbench({
       apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},
@@ -687,6 +690,7 @@ function render() {
     });document.querySelector('#books-workspace').append(enrichmentWorkbench.element);
   }
   enrichmentWorkbench.update(database);
+  endSegment?.();endSegment=timing?.begin('options_dashboards');
   const receiptWorkbench=createPurchaseEvidenceWorkbench(database,{
     save:async()=>{},import:async entries=>{database=await importPurchaseEvidence(entries);},retry:async()=>{database=await refreshPurchaseEvidence();},
     apply:async(...args)=>{database=await applyPurchaseEvidence(...args);},dismiss:async id=>{database=await dismissPurchaseEvidence(id);},refresh:render
@@ -706,6 +710,7 @@ function render() {
     order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref])
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
+  endSegment?.();endSegment=timing?.begin('options_filters');
   const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
   assumeAllOwned.checked=database.ownershipPolicy.allOwned;
   document.querySelector('#ownership-provider-help').textContent=assumeAllOwned.checked
@@ -740,6 +745,7 @@ function render() {
     return node;
   }) : [Object.assign(document.createElement('p'), { textContent: 'No libraries connected.' })]));
 
+  endSegment?.();endSegment=timing?.begin('options_selection');
   const allRecords = Object.values(database.providerItems);
   const addOns = allRecords.filter((item) => item.mediaType === 'game-addon');
   const addOnsByParent = new Map();
@@ -807,6 +813,7 @@ function render() {
   if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
   summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
 
+  endSegment?.();endSegment=timing?.begin('options_cards');
   libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
   document.querySelector("#library-previous").disabled=libraryPage===0;
   document.querySelector("#library-next").disabled=(libraryPage+1)*50>=canonical.length;
@@ -886,6 +893,7 @@ function render() {
     return node;
   }));
 
+  endSegment?.();endSegment=timing?.begin('options_reviews');
   const canShowUnlinkedAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc === 'all';
   const unlinked = canShowUnlinkedAddOns
     ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership) && itemMatchesQuery(addOn, query))
@@ -911,21 +919,33 @@ function render() {
   const list=document.createElement('ul');
   for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — profile ${entry.profileLabel||'unassigned'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
   history.append(list);if(records.length>50)history.append(textElement('p',`Showing 50 of ${records.length}. All history is preserved in your backup.`));
+  endSegment?.();endSegment=timing?.begin('options_coverage');
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));
   const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
   const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+duplicateReviewItems.children.length;
   if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
   if(ownershipCount)alerts.append(actionButton(ownershipCount+' ownership reviews',()=>workspace.select('ownership')));
   alerts.hidden=!alerts.children.length;
+  } finally {endSegment?.();}
 }
 
-async function refresh() {
+async function refresh(diagnosticLookupId = null) {
+  const timing=globalThis.GalacticContentsPerformance.trace(diagnosticLookupId,'options');
+  const endTotal=timing?.begin('options_total');
+  let endStage=timing?.begin('options_read');
+  try {
   const [loadedDatabase, preferences] = await Promise.all([getDatabase(), getUiPreferences()]);
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
-  render();
+  endStage?.();endStage=timing?.begin('options_render');
+  render(timing);
+  endStage?.();endStage=timing?.begin('options_other');
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
+  } finally {
+    endStage?.();endTotal?.();
+    if(timing)chrome.runtime.sendMessage({type:'GL_CONTENTS_UI_TIMING',timing:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}).catch(()=>{});
+  }
 }
 
 document.querySelector('#export').addEventListener('click', async () => {
@@ -1056,8 +1076,10 @@ clearFilters.addEventListener('click', () => {
   genreFilter.value = 'all';
   render();
 });
+let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
+const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh().catch(() => {});
+  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh(recentContentsDiagnosticId()).catch(() => {});
   if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
     showEnrichmentActions.checked = workspace.workspace === 'books';
     if (database) render();
@@ -1067,7 +1089,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 chrome.runtime.onMessage?.addListener((message,sender)=>{
-  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)refresh().catch(()=>{});
+  if(sender.id===chrome.runtime.id&&message?.type==='GL_CONTENTS_TIMING_START'&&globalThis.GalacticContentsPerformance.validId(message.diagnosticLookupId)){contentsDiagnosticId=message.diagnosticLookupId;contentsDiagnosticExpires=Date.now()+60000;}
+  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)refresh(recentContentsDiagnosticId()).catch(()=>{});
   return false;
 });
 refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });
