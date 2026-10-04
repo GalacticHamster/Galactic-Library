@@ -1,3 +1,4 @@
+import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import { matchItems } from '../lib/matcher.js';
@@ -28,6 +29,10 @@ const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergePro
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
+const contentsProgressHub=globalThis.GalacticContentsScan.progressHub();
+const broadcastContentsProgress=()=>chrome.runtime.sendMessage({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:contentsProgressHub.list()}).catch(()=>{});
+chrome.tabs?.onRemoved?.addListener(tabId=>{if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
+chrome.tabs?.onUpdated?.addListener((tabId,change)=>{if(change.status==='loading'&&contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
 function contentsTiming(request,kind){
   const timing=contentsPerformance.trace(request?.diagnosticLookupId,kind);
   if(timing)timing.onWrite=()=>chrome.runtime.sendMessage({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:timing.id}).catch(()=>{});
@@ -186,6 +191,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) {
     sendResponse({ok:false,error:'Library operations are accepted only from Galactic Library.'});
     return undefined;
+  }
+  if(request?.type==='KINDLE_CONTENTS_SCAN_PROGRESS'){
+    if(!isProviderImportPage('kindle',sender.url)){sendResponse({ok:false});return undefined;}
+    try{const runs=contentsProgressHub.accept(sender.tab?.id,request.progress);chrome.runtime.sendMessage({type:'GL_KINDLE_CONTENTS_PROGRESS',runs}).catch(()=>{});sendResponse({ok:true});}
+    catch(error){sendResponse({ok:false,error:error.message});}return undefined;
+  }
+  if(request?.type==='GET_KINDLE_CONTENTS_SCAN_PROGRESS'){
+    if(!isOwnExtensionPage(sender.url)){sendResponse({ok:false});return undefined;}
+    sendResponse({ok:true,runs:contentsProgressHub.list()});return undefined;
   }
   if(request?.type==='GL_CONTENTS_UI_TIMING'){
     if(isOwnExtensionPage(sender.url)){const clean=contentsPerformance.clean(request.timing);if(clean?.kind==='options')contentsUiTimings.add(clean);}

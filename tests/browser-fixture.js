@@ -1,3 +1,4 @@
+import {createContentsScanProgress} from '../src/ui/contents-scan-progress.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createBackup } from '../src/lib/storage.js';
 import { matchItems } from '../src/lib/matcher.js';
@@ -352,5 +353,37 @@ try{
   assert(!JSON.stringify(diagnostic).includes('Collection A')&&!JSON.stringify(diagnostic).includes('providerItems'),'Options diagnostics contain library data.');
   for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');await pause();await pause();assert(contentsUiTimings.length===1,'Options correlation was reused by an unrelated write.');
   checks.push('options diagnostics measure correlated storage refresh and rendering once without exposing library data');
+  const scanState={runRef:'12345678-1234-1234-1234-123456789abc',phase:'running',mode:'scan',checked:1,total:40,found:1,empty:0,unavailable:0,failures:0,reparsed:0,durable:0,buffered:1};
+  const emitProgress=run=>contentsRuntimeListeners.forEach(listener=>listener({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:[run]},{id:chrome.runtime.id}));
+  const firstLibraryNode=document.querySelector('#library-items').firstElementChild;
+  emitProgress(scanState);
+  for(let n=0;n<20;n++){emitProgress({...scanState,checked:n+1,found:n+1,buffered:Math.min(n+1,20)});contentsStorageListeners.forEach(listener=>listener({galacticLibraryDatabase:{}},'local'));}
+  await pause();assert(document.querySelector('#library-items').firstElementChild===firstLibraryNode,'Scan progress rebuilt the Library UI.');
+  assert(document.querySelector('#kindle-contents-progress').textContent.includes('20/40 checked'),'Lightweight progress counts are missing.');
+  await writer.mergeProviderItems('kindle',[{providerItemId:'reconciled-after-scan',title:'Reconciled after scan',mediaType:'book',ownership:'owned'}]);
+  emitProgress({...scanState,phase:'completed',checked:20,found:20,durable:20,buffered:0});
+  await wait(()=>document.querySelector('#library-items').firstElementChild!==firstLibraryNode,'Scan completion did not reconcile the Library.');
+  checks.push('actual Options scan progress avoids per-result Library rebuilds and completion reconciles persisted state');
+  let clock=0,fullReconciliations=0,pollCallback;
+  const scope=document.createElement('div');
+  const progressView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:async()=>{fullReconciliations++;},clock:()=>clock,schedule:callback=>{pollCallback=callback;return 1;},cancel(){}});
+  progressView.accept([scanState]);progressView.changed();await pause();assert(fullReconciliations===0,'Active scan performed an immediate full refresh.');
+  clock=120001;progressView.accept([scanState]);await pause();assert(fullReconciliations===1,'Bounded periodic reconciliation is missing.');
+  progressView.changed();await pollCallback();await pause();assert(fullReconciliations===2&&!progressView.running,'Worker restart left the Library stale.');progressView.dispose();
+  checks.push('Options reconciles at a bounded interval and detects interrupted/restarted scan workers');
+
+  let finishRefresh,refreshCount=0;
+  const finishingView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:()=>{refreshCount++;return refreshCount===1?new Promise(done=>{finishRefresh=done;}):Promise.resolve();},schedule:()=>1,cancel(){}});
+  finishingView.accept([scanState]);button(finishingView.element,'Refresh library now').click();await pause();
+  finishingView.accept([{...scanState,phase:'completed'}]);finishRefresh();await pause();
+  assert(refreshCount===2,'Completion during an in-flight refresh lost its final reconciliation.');finishingView.dispose();
+  checks.push('scan completion during an in-flight Options refresh performs a final reconciliation');
+
+  let retryRefreshes=0,retryCallback;
+  const retryView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:async()=>{if(++retryRefreshes===1)throw Error('Synthetic read interruption');},schedule:callback=>{retryCallback=callback;return 1;},cancel(){}});
+  retryView.changed();await pause();assert(retryRefreshes===1&&retryCallback,'Failed reconciliation did not schedule a bounded retry.');
+  await retryCallback();await pause();assert(retryRefreshes===2,'Idle Options stayed stale after a transient reconciliation failure.');retryView.dispose();
+  checks.push('Options retries a failed final reconciliation without requiring another scan or storage event');
+
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

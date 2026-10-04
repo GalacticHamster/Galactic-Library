@@ -1,3 +1,4 @@
+import '../src/lib/kindle-contents-scan.js';
 import '../src/providers/floating-panel.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
@@ -106,6 +107,7 @@ try{
   const perf=globalThis.GalacticContentsPerformance;
   globalThis.chrome.runtime.sendMessage=async request=>{
     contentsMessages.push(request);
+    if(request.type==='KINDLE_CONTENTS_SCAN_PROGRESS')return {ok:true};
     if(request.type==='GET_KINDLE_CONTENTS_UI_TIMINGS')return {ok:true,records:[]};
     const timing=perf.trace(request.diagnosticLookupId,request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES'?'prepare':request.type==='REPARSE_KINDLE_CONTENTS'?'reparse':'network'),end=timing?.begin('worker_total');
     let value;
@@ -115,12 +117,12 @@ try{
     else return {ok:false,error:'Unexpected contents request.'};
     end?.();return timing?{...value,performance:perf.clean(timing.finish())}:value;
   };
-  let requests=[],captcha=false,hold=false,transientOnce=false;
+  let requests=[],captcha=false,hold=false,transientOnce=false,holdAtRequest=0;
   globalThis.fetch=async (input,options)=>{
     if(!String(input).startsWith('https://www.amazon.com/dp/'))return originalFetch(input,options);
     requests.push(String(input));
     if(transientOnce){transientOnce=false;throw Error('Network failure PRIVATE_REQUEST_SECRET');}
-    if(hold)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Paused','AbortError')),{once:true}));
+    if(hold||requests.length===holdAtRequest)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Paused','AbortError')),{once:true}));
     const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1?2.';
     return new Response(captcha?'<input id="captchacharacters">':'<div id="bookDescription_feature_div">'+description+'</div>',{status:200});
   };
@@ -162,6 +164,17 @@ try{
   for(const secret of ['B000000','amazon.com','Ordinary novel','PRIVATE_REQUEST_SECRET','Collects Example','Wool Omnibus'])assert(!diagnosticText.includes(secret),'Diagnostic output leaked '+secret);
   assert(report.records.length<=50&&report.aggregates.retry.stagesMs.total.count===1,'Diagnostic history or retry aggregation changed.');
   checks.push('Kindle opt-in diagnostics join page/worker timing, separate retries/reparse and export no personal data');
+  await writer.mergeProviderItems('kindle',[
+    {providerItemId:'B000000006',title:'Pause buffer first',mediaType:'book',metadata:{detailUrl:urls('B000000006'),originType:'Purchase'}},
+    {providerItemId:'B000000007',title:'Pause buffer second',mediaType:'book',metadata:{detailUrl:urls('B000000007'),originType:'Purchase'}}
+  ]);
+  holdAtRequest=requests.length+2;selector.value='scan';start.click();await wait(()=>requests.length===holdAtRequest);
+  assert(!values.galacticLibraryDatabase.providerItems['kindle:B000000006'].metadata.enrichment?.kindleProductComicContents,'A buffered result wrote the database immediately.');
+  stop.click();await finished();db=await writer.getDatabase();
+  assert(db.providerItems['kindle:B000000006'].metadata.enrichment.kindleProductComicContents.statement&&!db.providerItems['kindle:B000000007'].metadata.enrichment?.kindleProductComicContents,'Pause did not flush only completed results.');
+  holdAtRequest=0;const resumedAt=requests.length;start.click();await finished();assert(requests.length===resumedAt+1&&requests.at(-1).endsWith('B000000007'),'Pause/resume repeated an acknowledged buffered result.');
+  checks.push('actual Kindle Pause flushes buffered completed results and resume checks only the interrupted page');
+
 
   globalThis.fetch=originalFetch;
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

@@ -1,3 +1,4 @@
+import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {contentsPerformanceTests} from './contents-performance.js';
 import {kindleContentsTests} from './kindle-contents.js';
 import {companionFeedTests} from './companion-feeds.js';
@@ -492,7 +493,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...contentsPerformanceTests, ...kindleContentsTests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -503,4 +504,4 @@ for (const [name, run] of [...tests, ...contentsPerformanceTests, ...kindleConte
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + contentsPerformanceTests.length + kindleContentsTests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);

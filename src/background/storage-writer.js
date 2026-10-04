@@ -1,3 +1,4 @@
+import {equalDatabaseData} from '../lib/data-equality.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
@@ -88,7 +89,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
     const database = timed('read_validation',()=>validateDatabase(stored[DATABASE_STORAGE_KEY]));
-    if (timed('migration_compare',()=>JSON.stringify(stored[DATABASE_STORAGE_KEY]) !== JSON.stringify(database))) {
+    if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};

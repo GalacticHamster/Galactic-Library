@@ -14,6 +14,14 @@ const prepare=async writer=>{
 const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}copy.enrichmentHistory={};copy.providers={};return copy;};
 
 export const contentsPerformanceTests=[
+ ['tail checkpoint diagnostics remain separate and retain their cost for amortized live comparisons',()=>{
+  const collector=perf.collector();let clock=0;
+  const page=perf.trace(id(1),'network',()=>clock);page.attempts=1;clock+=3200;collector.add(page.finish('no-statement'));
+  const checkpoint=perf.trace(id(2),'checkpoint',()=>clock);checkpoint.batchSize=7;
+  const end=checkpoint.begin('storage_write');clock+=3000;end();collector.add(checkpoint.finish('checkpointed'));
+  const report=collector.report();assert.equal(report.aggregates.network.stagesMs.total.count,1);assert.equal(report.aggregates.network.stagesMs.total.mean,3200);
+  assert.equal(report.finalCheckpointMs,3000);assert.equal(report.aggregates.checkpoints.stagesMs.persistence.mean,3000);assert.equal(report.records[1].batchSize,7);
+ }],
  ['contents diagnostics are inert without an opaque diagnostic ID',()=>{
   assert.equal(perf.trace(undefined),null);assert.equal(perf.trace('B000000001'),null);assert.equal(perf.trace('PRIVATE_TITLE'),null);
   assert.equal(perf.clean({id:'PRIVATE_ACCOUNT'}),null);

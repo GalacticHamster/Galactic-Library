@@ -1,3 +1,4 @@
+import {createContentsScanProgress} from './contents-scan-progress.js';
 import '../lib/contents-performance.js';
 import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
@@ -1076,10 +1077,11 @@ clearFilters.addEventListener('click', () => {
   genreFilter.value = 'all';
   render();
 });
+const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('main'),reconcile:()=>refresh(recentContentsDiagnosticId())});
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) refresh(recentContentsDiagnosticId()).catch(() => {});
+  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) contentsScanProgress.changed();
   if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
     showEnrichmentActions.checked = workspace.workspace === 'books';
     if (database) render();
@@ -1090,7 +1092,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 chrome.runtime.onMessage?.addListener((message,sender)=>{
   if(sender.id===chrome.runtime.id&&message?.type==='GL_CONTENTS_TIMING_START'&&globalThis.GalacticContentsPerformance.validId(message.diagnosticLookupId)){contentsDiagnosticId=message.diagnosticLookupId;contentsDiagnosticExpires=Date.now()+60000;}
-  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)refresh(recentContentsDiagnosticId()).catch(()=>{});
+  if(sender.id===chrome.runtime.id&&message?.type==='GL_KINDLE_CONTENTS_PROGRESS')contentsScanProgress.accept(message.runs??[]);
+  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)contentsScanProgress.changed();
   return false;
 });
+contentsScanProgress.initialize();
 refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });

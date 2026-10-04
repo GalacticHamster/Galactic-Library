@@ -100,6 +100,7 @@
         "src/providers/provider-snapshot.js",
         "src/providers/metadata.js",
         "src/lib/contents-performance.js",
+        "src/lib/kindle-contents-scan.js",
         "src/providers/kindle.js",
         "src/providers/kindle-content.js",
         "src/providers/amazon-video.js",

@@ -1,5 +1,7 @@
 # Kindle contents performance instrumentation ? 2026-10-04
 
+This report describes the original instrumentation baseline. The subsequent live investigation and implemented batching/storage/UI fixes are documented in [Kindle contents performance fix](kindle-contents-performance-fix-2026-10-04.md). Current `migration_compare` measures semantic object comparison, and checkpoint operations are batched; the historical measurements below remain unchanged.
+
 Baseline: `9eb31e2`. This is an instrumentation-only change. The commit hash is supplied in the completion message; this report is included in that commit.
 
 ## Findings and limits
