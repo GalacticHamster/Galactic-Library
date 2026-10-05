@@ -43,7 +43,7 @@ export function createContentsEditor(record, review, actions) {
   }
   root.append(button('Parse statement for review',()=>{
     const proposed=proposeContentsForReview(statement.value,record.title);body.replaceChildren();proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unparsed text: ${proposed.unparsed.join('; ')}`:'Check every entry before saving.'}`;
+    status.textContent=`${proposed.outcome==='filtered'?'Filtered non-containment':proposed.outcome==='uncertain'?'Uncertain candidate':proposed.outcome==='full'?'Structurally parsed proposal; not verified':proposed.outcome==='partial'?'Partially parsed proposal':'Unresolved containment'}. ${proposed.qualityReason} ${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
   }),button('Add contents entry',()=>addRow()),table);
   root.append(button('Save verified contents',async()=>{
     try{

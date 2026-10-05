@@ -593,7 +593,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     for (const entry of entries) {
       const itemId = String(entry?.itemId ?? '').trim();
       const item = database.providerItems[itemId];
-      const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim().replace(/[.!?]+$/u, '');
+      const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim();
       const availability = (entry?.availability??'available')==='available'?statement?'statement-found':'no-statement':entry?.availability;
       const failed=availability==='temporary-failure';
       let sourceUrl = '';

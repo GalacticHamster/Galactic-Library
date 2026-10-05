@@ -13,6 +13,7 @@
   "src/lib/companion-response.js",
   "src/lib/constants.js",
   "src/lib/contents.js",
+  "src/lib/contents-quality.js",
   "src/lib/contents-performance.js",
   "src/lib/data-equality.js",
   "src/lib/kindle-contents-scan.js",

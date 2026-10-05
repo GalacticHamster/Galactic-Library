@@ -126,15 +126,16 @@
     return statement.replace(/[.!?]+$/u, '');
   }
 
-  const contentsExtractorVersion = 2;
+  const contentsExtractorVersion = 3;
   function explicitContentsStatement(value) {
     const text = compactText(value);
     const match = text.match(/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*(?::|-)?\s*.{2,10000}/iu);
     if (!match) return '';
     const statement = match[0];
-    for (const boundary of statement.matchAll(/[.!?](?=\s+[A-Z])/gu)) {
+    for (const boundary of statement.matchAll(/[.!?](?=\s+[A-Z])|(?<=\d)[.!?](?=[A-Z])/gu)) {
       const before = statement.slice(0,boundary.index);
-      if (boundary[0] === '.' && (/\b(?:vols?|no|nos|ed|pt|pts|mr|mrs|dr|st|vs)$/iu.test(before) || /\b(?:[A-Z]\.)*[A-Z]$/u.test(before))) continue;
+      if (boundary[0] === '.' && (/\b(?:vols?|no|nos|ed|pt|pts|mr|mrs|ms|sgt|gen|ft|dr|st|vs)$/iu.test(before) || /\b(?:[A-Z]\.)*[A-Z]$/u.test(before))) continue;
+      if(boundary[0]!=='.' && !/^\s+(?:a|the|more|also|read|this)\b/iu.test(statement.slice(boundary.index+1)))continue;
       return statement.slice(0,boundary.index).trim();
     }
     return statement.replace(/[.!?]+$/u,'');

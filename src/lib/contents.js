@@ -1,9 +1,10 @@
 import { compact, identityKey } from './identity.js';
 import { object, text, date, url } from './validation.js';
 import {effectiveOwnershipRecord} from './ownership.js';
+import {assessContentsQuality} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 2;
+export const CONTENTS_PARSER_VERSION = 3;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -67,21 +68,103 @@ export function proposeContents(statement) {
 
 /** Discovery/editor-only proposals. Never used to index ordinary title matches. */
 export function proposeContentsForReview(statement, collectionTitle = '') {
-  const original = compact(statement, 10000);
-  const introduction = /^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu;
-  const body = original.replace(introduction, '');
-  let proposal;
-  try {proposal = proposeContents(body);} catch {return {entries:[],unparsed:[body]};}
-  if (proposal.entries.length || !introduction.test(original) || !collectionTitle) return proposal;
-  // Only a straightforward enumerated list becomes named suggestions. Keep
-  // descriptions, chapter lists and unsupported numbered syntax unresolved.
-  if (/#|\b(?:chapters?|essays?|foreword|afterword|appendix|bibliography|bonus|extras?|issues?|volumes?|vols?\.?|books?)\b/iu.test(body)) return proposal;
-  const names = body.replace(/[.!?]+$/u,'').split(/\s*;\s*|\s*,\s*|\s+and\s+/iu)
-    .map(name => name.replace(/^["“]|["”]$/gu,'').trim()).filter(Boolean);
-  if (names.length < 2 || names.length > 100 || names.some(name => name.length > 80 || !/^[\p{Lu}\d]/u.test(name) || name.split(/\s+/u).length > 12)) return proposal;
-  const completeness = /\b(?:material from|excerpts? from|selections? from|partial)\b/iu.test(body) ? 'excerpt' : 'full';
-  try {return {entries:validateContents(names.map(number => ({series:collectionTitle,run:'',unitType:'component',number,language:'',completeness}))),unparsed:[]};}
-  catch {return {entries:[],unparsed:[body]};}
+  const quality=assessContentsQuality(compact(statement,10000),collectionTitle);
+  const body=quality.normalizedInput.replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu,'');
+  const finish=(entries,unparsed)=>({...quality,entries,unparsed,outcome:quality.quality==='filtered'?'filtered':quality.quality==='uncertain'?'uncertain':!entries.length?'failed':unparsed.length?'partial':'full'});
+  if(quality.quality!=='containment')return finish([],body?[body]:[]);
+  const proposal=discoveryNumberedContents(body);
+  if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return finish(proposal.entries,proposal.unparsed);
+  // This fallback is discovery/editor-only; ordinary matching still uses
+  // proposeContents above. Unsupported numeric syntax never becomes a name.
+  const names=containedNames(body);
+  if(!collectionTitle || !names)return finish([],proposal.unparsed);
+  try{return finish(validateContents(names.map(number=>({series:collectionTitle,run:'',unitType:'component',number,language:'',completeness:/^\s*(?:material|excerpts?|selections?|stories)\s+from\b/iu.test(body)?'excerpt':'full'}))),[]);}
+  catch{return finish([],proposal.unparsed);}
+}
+
+const extentPrefix=/^(?:material|excerpts?|selections?|stories?|a story)\s+from\s+/iu;
+const numericMarker=/#\s*\d|\b(?:issues?|vol(?:ume)?s?\.?|books?|chapters?)\s*#?\d|\b\d+(?:\/\d+|\.\d+)?\s*[-–—]\s*\d+/iu;
+
+/** Bounded discovery grammar. Arbitrary prose must not become a series label. */
+function discoveryNumberedContents(body) {
+  const entries=[],unparsed=[],chunks=[];
+  for(const part of body.split(/\s*;\s*/u)){
+    let start=0;
+    for(const separator of part.matchAll(/\s*,\s*(?=[\p{L}\d#])|\s+(?:and|plus)\s+(?=[\p{L}\d#])/giu)){
+      const prefix=part.slice(start,separator.index),next=part.slice(separator.index+separator[0].length);
+      const prefixStem=/^\s*([\p{L}\d-]+)/u.exec(prefix)?.[1],nextStem=/^([\p{L}\d-]+)/u.exec(next)?.[1];
+      const repeatedTitle=separator[0].includes(',') && prefixStem && prefixStem.toLowerCase()===nextStem?.toLowerCase();
+      // Commas/conjunctions before a numeric anchor belong to the title. A
+      // new extent qualifier must still start its own clause after named prose.
+      if(!numericMarker.test(prefix) && !/\d+(?:\/\d+|\.\d+)?\s*$/u.test(prefix) && !extentPrefix.test(next) && !repeatedTitle)continue;
+      chunks.push({raw:part.slice(start,separator.index).trim(),reset:start===0});start=separator.index+separator[0].length;
+    }
+    chunks.push({raw:part.slice(start).trim(),reset:start===0});
+  }
+  let previous=null;
+  const headingExtent=extentPrefix.test(body)?'excerpt':'full';
+  let clauseExtent=headingExtent;
+  for(const {raw,reset} of chunks){
+    if(!raw)continue;
+    if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
+    if(/^collects?\s+/iu.test(raw))clauseExtent='full';
+    let chunk=raw.replace(/^(?:and|collects?|collecting)\s+/iu,'').replace(/[.!]+$/u,'');
+    const qualified=extentPrefix.test(chunk);chunk=chunk.replace(extentPrefix,'').replace(/^the (?:entire|complete) miniseries\s+/iu,'');
+    if(qualified)clauseExtent='excerpt';
+    // A semicolon after partial material may continue that heading or start
+    // a new full list. Without an explicit qualifier, do not choose for users.
+    if(clauseExtent==='uncertain'){unparsed.push(raw);previous=null;continue;}
+    let label='',numbers='',type='issue',after='';
+    const post=/^issues?\s*#?\s*(\d+(?:\s*[-–—]\s*\d+)?)\s+of\s+(.+)$/iu.exec(chunk);
+    const numbered=/^(.*?)\s*(#|issues?\s*#?|vol(?:ume)?s?\.?\s*#?|books?\s*#?|chapters?\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
+    const bare=/^(.*?)\s+(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*\d+)?)$/u.exec(chunk);
+    const continuation=/^#?\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)$/u.exec(chunk);
+    if(post){label=post[2];numbers=post[1];}
+    else if(numbered){label=numbered[1].replace(/^issues?\s+/iu,'');numbers=numbered[3];after=numbered[4];type=/^(?:vol|book)/iu.test(numbered[2])?'volume':'issue';}
+    else if(continuation && previous){numbers=continuation[1];type=previous.unitType;}
+    else if(bare && !/\b(?:first|all|five|six|years?|chapter|script|story|stories|novels?|books?)\b/iu.test(bare[1])){label=bare[1];numbers=bare[2];}
+    else {unparsed.push(raw);previous=null;continue;}
+    const labelDescriptor=seriesDescriptor(label);let explicitRun=labelDescriptor.run;label=labelDescriptor.series;
+    label=label.replace(/\.["”]$/u,'');
+    if(/\bannuals?$/iu.test(label)){type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();}
+    if(/\bspecials?$/iu.test(label)){type='special';label=label.replace(/\s*specials?$/iu,'').trim();}
+    // A marker/qualifier inside a label exposes greedy last-marker parsing.
+    if((label.match(/,/gu)?.length??0)>1 || /\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || /^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /#|\b(?:issues?|volumes?|vols?|books?|chapters?|script|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|description|characters|meet|more|present|was|were|published|you|he|she|they)\b/iu.test(label)
+      || (!label && !previous) || (after && !/^\s*(?:[,;]|and\b|plus\b)/iu.test(after))){unparsed.push(raw);previous=null;continue;}
+    if(after){unparsed.push(after.trim());}
+    const descriptor=label?seriesDescriptor(label,explicitRun):{...previous,run:explicitRun||previous.run};
+    const completeness=clauseExtent;
+    const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness};
+    const match=/^(\d+(?:\/\d+|\.\d+)?)(?:\s*[-–—]\s*#?(\d+))?$/u.exec(numbers);
+    if(!match || match[2] && (!/^\d+$/u.test(match[1]) || Number(match[2])<Number(match[1]) || Number(match[2])-Number(match[1])>499)) {unparsed.push(raw);previous=null;continue;}
+    const values=match[2]?Array.from({length:Number(match[2])-Number(match[1])+1},(_,n)=>String(Number(match[1])+n)):[match[1]];
+    try{const validated=validateContents(values.map(number=>({...base,number})));entries.push(...validated);previous=base;}
+    catch{unparsed.push(raw);previous=null;}
+    if(entries.length>2000)return {entries:[],unparsed:[body]};
+  }
+  return {entries:entries.length?validateContents(entries):[],unparsed};
+}
+
+function containedNames(body) {
+  if(/#|\b(?:chapters?|essays?|foreword|afterword|appendix|bibliography|bonus|extras?|issues?|volumes?|vols?\.?|books?|by|creators?|artists?|writers?|present|reviews?|ratings?|all \d+)\b/iu.test(body))return null;
+  let text=body.replace(/[.!?]+$/u,'').replace(extentPrefix,'');
+  // Quoted contents preserve internal commas/conjunctions. Mixed commentary
+  // cannot be ignored merely because some quoted names were found.
+  const quoted=[...text.matchAll(/["“]([^"”]+)["”]/gu)];
+  let names;
+  if(quoted.length){
+    const remaining=text.replace(/["“][^"”]+["”]/gu,'').replace(/[,;\s]+|\band\b/gu,'');
+    if(remaining)return null;names=quoted.map(match=>match[1]);
+  }else{
+    // INC. is title punctuation, not a new component. An ampersand is a
+    // separator only when the next title repeats the explicit title stem.
+    text=text.replace(/,\s+(?=INC\.?(?:\s|$))/giu,'\u0001 ');
+    const stem=/^([\p{Lu}][\p{L}\d-]*):/u.exec(text)?.[1];
+    if(stem)text=text.replace(new RegExp('\\s+&\\s+(?='+stem+'\\b)','gu'),'; ');
+    names=text.split(/\s*;\s*|\s*,\s*(?:and\s+)?|\s+and\s+/u).map(name=>name.replace(/\u0001/gu,',').trim());
+  }
+  if(names.length<2 || names.length>100 || names.some(name=>name.length>80 || !/^[\p{Lu}\d]/u.test(name) || name.split(/\s+/u).length>12 || /[.!?](?=\s+[\p{Lu}])/u.test(name)))return null;
+  return names;
 }
 
 export function contentsStatement(item) {

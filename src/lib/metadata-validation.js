@@ -19,7 +19,7 @@ export function validateEnrichment(kind, value) {
     openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
     googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
-    kindleProductComicContents:['source','sourceUrl','statement','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','failureCode','checkedAt'],
+    kindleProductComicContents:['source','sourceUrl','statement','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','failureCode','checkedAt'],
     localMetadata:['source','sourceId','sourceUrl','fileName','editionKey','workKey','title','authors','contributors','isbn','publisher','series','volume','issue','unitType','run','edition','language','format','categories','publishedDate','pageCount','statement','approved','matchBasis','retrievedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
@@ -28,10 +28,10 @@ export function validateEnrichment(kind, value) {
     if (!Object.hasOwn(value,key)) continue;
     if (['authors','publishers','series','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
     else if(key==='contributors'){if(!Array.isArray(value[key])||value[key].length>50)throw new Error('Invalid enrichment contributors.');result[key]=value[key].map(entry=>{object(entry,'Contributor');return {name:text(entry.name,500,'Name'),role:text(entry.role,80,'Role')};});}
-    else if(key==='approved'){if(typeof value[key]!=='boolean')throw new Error('Invalid enrichment approval.');result[key]=value[key];}
+    else if(['approved','descriptionMayBeIncomplete'].includes(key)){if(typeof value[key]!=='boolean')throw new Error('Invalid enrichment approval or incomplete-description flag.');result[key]=value[key];}
     else if (['appliedAt','checkedAt','retrievedAt'].includes(key)) result[key]=date(value[key]);
     else if (key==='sourceUrl') result[key]=url(value[key],kind==='localMetadata'?{}:{hosts:kind==='openLibrary'?['openlibrary.org']:kind==='kindleProductComicContents'?['amazon.com']:['books.google.com'],googleId:kind!=='openLibrary'&&kind!=='kindleProductComicContents'});
-    else if (['parserVersion','extractorVersion'].includes(key)) {result[key]=count(value[key],key,1000);if(!result[key])throw new Error('Invalid contents version.');}
+    else if (['parserVersion','extractorVersion','filterVersion'].includes(key)) {result[key]=count(value[key],key,1000);if(!result[key])throw new Error('Invalid contents version.');}
     else if (['pageCount','firstPublishYear'].includes(key)) result[key]=value[key]===null?null:count(value[key],key,key==='pageCount'?1000000:9999);
     else result[key]=text(value[key],key==='statement'?10000:key==='source'?100:500,`Enrichment ${key}`);
   }
@@ -44,7 +44,8 @@ export function validateEnrichment(kind, value) {
   if (kind==='googleBooksGenreHint' && result.confidence && result.confidence!=='author-and-title-stem') throw new Error('Invalid genre hint confidence.');
   if (kind==='kindleProductComicContents' && result.availability && !['available','statement-found','no-statement','unavailable','temporary-failure'].includes(result.availability)) throw new Error('Invalid contents availability.');
   if(result.parseStatus&&!['parsed','unparsed','not-attempted'].includes(result.parseStatus))throw new Error('Invalid contents parsing state.');
-  if(result.parseOutcome&&!['full','partial','failed','not-attempted'].includes(result.parseOutcome))throw new Error('Invalid contents parsing outcome.');
+  if(result.parseOutcome&&!['full','partial','failed','filtered','uncertain','not-attempted'].includes(result.parseOutcome))throw new Error('Invalid contents parsing outcome.');
+  if(result.quality&&!['containment','filtered','uncertain'].includes(result.quality))throw new Error('Invalid contents quality.');
   if(result.failureCode&&!['captcha','sign-in','http','network','unknown'].includes(result.failureCode))throw new Error('Invalid contents failure code.');
   return result;
 }

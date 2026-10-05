@@ -9,6 +9,8 @@ import {comicXml,opfXml} from './metadata-fixtures.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 import {createReadingWorkbench} from '../src/ui/reading.js';
 import {createSyncHealthView} from '../src/ui/sync-health.js';
+import {proposeContentsForReview} from '../src/lib/contents.js';
+import {createContentsEditor} from '../src/ui/contents-editor.js';
 
 const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
@@ -30,6 +32,16 @@ globalThis.chrome={runtime:{onMessage:{addListener:listener=>contentsRuntimeList
 }},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:listener=>contentsStorageListeners.push(listener)}}};
 
 try{
+  const qualityRecord={id:'kindle:quality',title:'Quality collection',metadata:{enrichment:{kindleProductComicContents:{statement:'Collects Comic #1-3 Read More'}}}};
+  const qualityEditor=createContentsEditor(qualityRecord,null,{save:async()=>{},refresh(){}});
+  qualityEditor.open=true;qualityEditor.dispatchEvent(new Event('toggle'));button(qualityEditor,'Parse statement for review').click();
+  assert(qualityEditor.querySelector('textarea').value==='Collects Comic #1-3 Read More','Parsing destroyed original Read More evidence.');
+  assert(qualityEditor.textContent.includes('description may have been incomplete')&&qualityEditor.textContent.includes('not verified'),'Hydration warning or unverified status missing.');
+  assert(qualityEditor.querySelectorAll('tbody tr').length===3,'Captured issue range did not produce review proposals.');
+  const mixedQuality=proposeContentsForReview('Collects A #1-2 and material from B #3','Quality collection');
+  assert(mixedQuality.entries.filter(e=>e.completeness==='full').length===2&&mixedQuality.entries.filter(e=>e.completeness==='excerpt').length===1,'Packaged mixed extent regression.');
+  assert(proposeContentsForReview('including Chris Sprouse, Frazer Irving and Yanick Paquette','Quality collection').outcome==='uncertain','Bare contributor fragment became a full parse.');
+  checks.push('contents quality review preserves evidence, warns about incomplete Amazon descriptions, and keeps scoped unverified proposals');
   const comic=parseLocalMetadata(comicXml);
   assert(comic.run==='2024'&&comic.volume==='1'&&!comic.issue&&comic.contributors.some(entry=>entry.role==='penciller')&&comic.statement==='Collects Review manga Vol. One','ComicInfo numbering, roles or statement lost.');
   assert(parseLocalMetadata(opfXml,'epub').volume==='1','EPUB namespace/collection metadata lost.');

@@ -27,9 +27,9 @@ export function enrichmentWorkbenchRows(database){
     const review = database.contentReviews[record.id];
     if (statement && (!review || statement !== review.statement)) {
       const proposal = proposeContentsForReview(statement,record.title);
-      const status = !proposal.entries.length ? 'Unresolved statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
-      rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
-        reason:`${review ? 'Discovery differs from reviewed contents; saved verification is unchanged. ' : status+'. '}${statement}`});
+      const status = proposal.outcome==='filtered' ? 'Filtered non-containment; original evidence retained' : proposal.outcome==='uncertain' ? 'Uncertain candidate; context needs review' : !proposal.entries.length ? 'Unresolved containment statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
+      if(proposal.outcome!=='filtered' || review || proposal.descriptionMayBeIncomplete)rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
+        reason:`${review ? 'Discovery differs from reviewed contents; saved verification is unchanged. ' : status+'. '}${proposal.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents text may be missing. ':''}${statement}`});
     }
     for(const [kind,entry]of Object.entries(record.metadata.enrichment??{})){
       if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],reason:`${kind}: ${entry.matchBasis||'source evidence'}; retrieved ${entry.retrievedAt||entry.checkedAt||'unknown'}`});

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase,normalizeProviderItem,rebuildCanonicalItems} from '../src/lib/models.js';
-import {kindleContentsPlan,kindleContentsState,supportedKindleContentsBook} from '../src/lib/kindle-contents.js';
-import {proposeContentsForReview,proposeContents,contentCoverage} from '../src/lib/contents.js';
+import {kindleContentsPlan,kindleContentsState,supportedKindleContentsBook,KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../src/lib/kindle-contents.js';
+import {proposeContentsForReview,proposeContents,contentCoverage,CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import {enrichmentWorkbenchRows} from '../src/lib/enrichment-workbench.js';
 import {isConfirmedComicManga} from '../src/lib/genre-hints.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
@@ -25,7 +25,7 @@ export const kindleContentsTests=[
   globalThis.fetch=async (url,options)=>{calls++;assert.equal(options.credentials,'include');assert.equal(options.signal,controller.signal);if(options.signal.aborted)throw new DOMException('Aborted','AbortError');return {status,ok:status===200,text:async()=>text};};
   const run=()=>globalThis.GalacticKindle.fetchKindleProductComicContents(url('B000000001'),{signal:controller.signal});
   try{
-   let result=await run();assert.equal(result.availability,'no-statement');assert.equal(result.statement,'');assert.equal(result.extractorVersion,2);
+   let result=await run();assert.equal(result.availability,'no-statement');assert.equal(result.statement,'');assert.equal(result.extractorVersion,KINDLE_CONTENTS_EXTRACTOR_VERSION);
    text='Contains Wool, Shift and Dust';result=await run();assert.equal(result.availability,'statement-found');assert.equal(result.statement,text);
    status=404;assert.equal((await run()).availability,'unavailable');status=503;await assert.rejects(run(),/503/);status=200;
    text='captcha';await assert.rejects(run(),/CAPTCHA/);text='sign-in';await assert.rejects(run(),/Sign in/);
@@ -71,6 +71,9 @@ export const kindleContentsTests=[
   const extract=globalThis.GalacticKindle.explicitContentsStatement;
   for(const prefix of ['Collects','Contains','Includes','Collecting','Containing','Including','Comprises'])assert.equal(extract(`A collection. ${prefix} Wool, Shift and Dust. More details.`),`${prefix} Wool, Shift and Dust`);
   assert.equal(extract('Collects J.M.S. Spider-Man #1-3. Also extras.'),'Collects J.M.S. Spider-Man #1-3');
+  for(const name of ['Ms. Marvel','Sgt. Fury','Gen. Story','Ft. Adventure','Batman Vs. Bigby!','Haikyu!!'])assert.equal(extract(`Collects ${name} #1-3. More details.`),`Collects ${name} #1-3`);
+  assert.equal(extract('Collects Comic #1-6.The next adventure.'),'Collects Comic #1-6');
+  assert.equal(extract('Collects Comic #1-6 Read More'),'Collects Comic #1-6 Read More','extraction must retain the hydration marker');
   assert.equal(extract('Contains Manga Vol. One and Vol. Two. Other details.'),'Contains Manga Vol. One and Vol. Two');
   assert.equal(extract('An ordinary book about programming.'),'');
   assert.equal(proposeContentsForReview('Includes chapters One, Two and Three','Textbook').entries.length,0);
@@ -104,7 +107,7 @@ export const kindleContentsTests=[
   await writer.restoreDatabase(parseBackup(createBackup(database(item))));let db=await writer.getDatabase();const current=db.providerItems[item.id];
   await writer.saveContentReview(item.id,{entries:[component],statement:'Older reviewed text'});const before=await writer.getDatabase();
   await writer.reparseKindleContents([{itemId:item.id,recordRef:current.recordRef}]);db=await writer.getDatabase();const saved=db.providerItems[item.id].metadata.enrichment.kindleProductComicContents;
-  assert.equal(saved.statement,item.metadata.enrichment.kindleProductComicContents.statement);assert.equal(saved.checkedAt,'2026-10-02T12:00:00.000Z');assert.equal(saved.extractorVersion,undefined);assert.equal(saved.parserVersion,2);assert.equal(saved.parseOutcome,'full');assert.deepEqual(db.contentReviews,before.contentReviews);assert.deepEqual(db.canonicalItems,before.canonicalItems);
+  assert.equal(saved.statement,item.metadata.enrichment.kindleProductComicContents.statement);assert.equal(saved.checkedAt,'2026-10-02T12:00:00.000Z');assert.equal(saved.extractorVersion,undefined);assert.equal(saved.parserVersion,CONTENTS_PARSER_VERSION);assert.equal(saved.parseOutcome,'full');assert.deepEqual(db.contentReviews,before.contentReviews);assert.deepEqual(db.canonicalItems,before.canonicalItems);
   assert.equal(kindleContentsPlan(db).reprocess.length,0);assert.equal(kindleContentsPlan(db).candidates.length,0);
   assert.equal(parseBackup(createBackup(db)).providerItems[item.id].metadata.enrichment.kindleProductComicContents.parseOutcome,'full');
   await assert.rejects(writer.reparseKindleContents([{itemId:item.id,recordRef:'stale'}]),/no longer current/);
@@ -123,7 +126,7 @@ export const kindleContentsTests=[
  }],
  ['contents saving retains source, account/reference and input validation',async()=>{
   const writer=writerFor();await writer.restoreDatabase(database(book('B000000001')));const item=(await writer.getDatabase()).providerItems['kindle:B000000001'];
-  for(const bad of [{recordRef:'stale'},{sourceUrl:'https://www.amazon.com/dp/B000000002'},{sourceUrl:'https://user@www.amazon.com/dp/B000000001'},{statement:'Arbitrary description'},{extractorVersion:3},{availability:'unavailable'}])await assert.rejects(writer.saveKindleComicContents([save(item,'Contains Wool and Shift',bad)]),/Invalid/);
+  for(const bad of [{recordRef:'stale'},{sourceUrl:'https://www.amazon.com/dp/B000000002'},{sourceUrl:'https://user@www.amazon.com/dp/B000000001'},{statement:'Arbitrary description'},{extractorVersion:KINDLE_CONTENTS_EXTRACTOR_VERSION+1},{availability:'unavailable'}])await assert.rejects(writer.saveKindleComicContents([save(item,'Contains Wool and Shift',bad)]),/Invalid/);
   assert.equal((await writer.getDatabase()).providerItems[item.id].metadata.enrichment,undefined);
   const db=await writer.getDatabase();db.providers.kindle={...db.providers.kindle,profileLabel:'account'};await writer.restoreDatabase(db);
   await assert.rejects(writer.saveKindleComicContents([{...save(item,'Contains Wool and Shift'),recordRef:undefined}]),/Invalid/);
