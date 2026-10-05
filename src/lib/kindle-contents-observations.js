@@ -12,7 +12,7 @@ export function contentsObservation(item,saved) {
   if(!saved)return null;
   const {manifest,...fields}=saved;
   const selected=manifest?.candidates?.[manifest.selected];
-  return validateContentsObservation({...fields,titleContext:item.title,seriesContext:item.metadata?.series??[],
+  return validateContentsObservation({...fields,titleContext:manifest?.title||item.title,seriesContext:item.metadata?.series??[],
     ...(manifest?.descriptionMayBeIncomplete!==undefined?{descriptionMayBeIncomplete:Boolean(fields.descriptionMayBeIncomplete||manifest.descriptionMayBeIncomplete)}:{}),
     ...(manifest?{evidence:{blocks:manifest.blocks,...(selected?{selected:{block:selected.block,start:selected.start,end:selected.end,raw:selected.raw,parserInput:selected.parserInput,binding:selected.binding}}:{})}}:{})});
 }

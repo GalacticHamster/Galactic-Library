@@ -52,6 +52,7 @@ add('Refresh preserves incomplete-description evidence even when the capture fou
  await commit(store.writer,plan,[{...observation(plan.candidates[0],'','no-statement'),descriptionBlocks:[{selector:'#description',text:'Description still loading Read more'}]}]);
  const db=await store.writer.getDatabase(),item=db.providerItems['kindle:B000000001'],saved=item.metadata.enrichment.kindleProductComicContents,snapshot=contentsObservation(item,saved);
  equal(snapshot.descriptionMayBeIncomplete,true,'Manifest warning lost in observation');equal(snapshot.evidence.blocks[0].text,'Description still loading Read more','Source warning text removed');equal(db.kindleContentsObservations[item.recordRef].baseline.statement,old().statement,'Incomplete empty result erased baseline');
+ equal(contentsObservation({...item,title:'Later catalog title'},saved).titleContext,item.title,'Captured manifest title was replaced by a later catalog title');
  const restored=parseBackup(createBackup(db));equal(contentsObservation(restored.providerItems[item.id],restored.providerItems[item.id].metadata.enrichment.kindleProductComicContents),snapshot,'Warning backup changed');
 });
 add('Refresh O/P freezes queue, persists pause/restart, rejects stale leases and skips removed identities',async()=>{
