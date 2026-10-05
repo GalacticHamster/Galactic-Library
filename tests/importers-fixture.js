@@ -180,6 +180,8 @@ try{
   const {checkKindleSourceCapture}=await import('./kindle-source-capture-fixture.js');
   const captureFixtures=await (await originalFetch('/tests/fixtures/kindle-source-capture.json')).json();
   checks.push(...await checkKindleSourceCapture(captureFixtures,html=>new DOMParser().parseFromString(html,'text/html')));
+  const {checkIndependentEvidence}=await import('./kindle-independent-evidence-fixture.js');
+  checks.push(...await checkIndependentEvidence(await (await originalFetch('/tests/fixtures/kindle-independent-evidence.json')).json(),{ui:true}));
   const {checkWholeManifest}=await import('./kindle-whole-manifest-fixture.js');
   checks.push(...await checkWholeManifest(await (await originalFetch('/tests/fixtures/kindle-whole-manifest.json')).json(),{ui:true}));
   globalThis.fetch=originalFetch;

@@ -29,6 +29,7 @@
   "src/lib/identity.js",
   "src/lib/kindle-contents.js",
   "src/lib/kindle-manifest.js",
+  "src/lib/kindle-evidence-review.js",
   "src/lib/matching-policy.js",
   "src/lib/local-metadata.js",
   "src/lib/matcher.js",

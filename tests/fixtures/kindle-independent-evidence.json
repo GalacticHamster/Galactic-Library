@@ -1,0 +1,821 @@
+{
+    "legacyKing":  {
+                       "statement":  "King In Black: Namor #1-5",
+                       "manifest":  {
+                                        "title":  "King In Black Omnibus (King In Black (2020-2021))",
+                                        "blocks":  [
+                                                       {
+                                                           "selector":  "#bookDescription_feature_div",
+                                                           "text":  "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook.\nDarkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet\u0027s heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull\u0027s symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume!\nRead more"
+                                                       }
+                                                   ],
+                                        "candidates":  [
+                                                           {
+                                                               "block":  0,
+                                                               "start":  0,
+                                                               "end":  195,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider",
+                                                               "parserInput":  "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  false,
+                                                               "position":  0,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            5,
+                                                                            0,
+                                                                            -1
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "partial",
+                                                               "entries":  5,
+                                                               "unresolved":  1
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  195,
+                                                               "end":  235,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "King In Black: Gwenom vs. Carnage #1-3",
+                                                               "parserInput":  "King In Black: Gwenom vs. Carnage #1-3",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.13948497854077252,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  235,
+                                                               "end":  262,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "King In Black: Namor #1-5",
+                                                               "parserInput":  "King In Black: Namor #1-5",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.1680972818311874,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            5,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  5,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  262,
+                                                               "end":  307,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "King In Black: Planet Of The Symbiotes #1-3",
+                                                               "parserInput":  "King In Black: Planet Of The Symbiotes #1-3",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.18741058655221746,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  307,
+                                                               "end":  352,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "King In Black: Return Of The Valkyries #1-4",
+                                                               "parserInput":  "King In Black: Return Of The Valkyries #1-4",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.21959942775393418,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            4,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  4,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  352,
+                                                               "end":  386,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "King In Black: Thunderbolts #1-3",
+                                                               "parserInput":  "King In Black: Thunderbolts #1-3",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.25178826895565093,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  386,
+                                                               "end":  427,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Symbiote Spider-Man: King In Black #1-5",
+                                                               "parserInput":  "Symbiote Spider-Man: King In Black #1-5",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.2761087267525036,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            5,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  5,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  427,
+                                                               "end":  450,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Black Cat (2020) #1-3",
+                                                               "parserInput":  "Black Cat (2020) #1-3",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.3054363376251788,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  450,
+                                                               "end":  475,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Daredevil (2019) #26-27",
+                                                               "parserInput":  "Daredevil (2019) #26-27",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.3218884120171674,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  2,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  475,
+                                                               "end":  496,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Deadpool (2019) #10",
+                                                               "parserInput":  "Deadpool (2019) #10",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.3397711015736767,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  1,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  496,
+                                                               "end":  526,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Fantastic Four (2018) #29-30",
+                                                               "parserInput":  "Fantastic Four (2018) #29-30",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.3547925608011445,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  2,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  526,
+                                                               "end":  562,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Guardians Of The Galaxy (2020) #10",
+                                                               "parserInput":  "Guardians Of The Galaxy (2020) #10",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.37625178826895567,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  1,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  562,
+                                                               "end":  593,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Miles Morales: Spider-Man #23",
+                                                               "parserInput":  "Miles Morales: Spider-Man #23",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.402002861230329,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  1,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  593,
+                                                               "end":  617,
+                                                               "contextStart":  0,
+                                                               "contextEnd":  738,
+                                                               "raw":  "S.W.O.R.D. (2020) #2-4",
+                                                               "parserInput":  "S.W.O.R.D. (2020) #2-4",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.4241773962804006,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  617,
+                                                               "end":  648,
+                                                               "contextStart":  17,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Savage Avengers (2019) #17-19",
+                                                               "parserInput":  "Savage Avengers (2019) #17-19",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.4413447782546495,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            3,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  3,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  648,
+                                                               "end":  674,
+                                                               "contextStart":  48,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Spider-Woman (2020) #7-8",
+                                                               "parserInput":  "Spider-Woman (2020) #7-8",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.463519313304721,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  2,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  674,
+                                                               "end":  690,
+                                                               "contextStart":  74,
+                                                               "contextEnd":  738,
+                                                               "raw":  "The Union #1-2",
+                                                               "parserInput":  "The Union #1-2",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.4821173104434907,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            2,
+                                                                            1,
+                                                                            0
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "full",
+                                                               "entries":  2,
+                                                               "unresolved":  0
+                                                           },
+                                                           {
+                                                               "block":  0,
+                                                               "start":  690,
+                                                               "end":  738,
+                                                               "contextStart":  90,
+                                                               "contextEnd":  738,
+                                                               "raw":  "Venom (2018) #31-34; And King In Black Handbook.",
+                                                               "parserInput":  "Venom (2018) #31-34; And King In Black Handbook",
+                                                               "binding":  "explicit-clause",
+                                                               "structural":  true,
+                                                               "position":  0.49356223175965663,
+                                                               "rank":  [
+                                                                            2,
+                                                                            2,
+                                                                            4,
+                                                                            0,
+                                                                            -1
+                                                                        ],
+                                                               "quality":  "containment",
+                                                               "outcome":  "partial",
+                                                               "entries":  4,
+                                                               "unresolved":  1
+                                                           }
+                                                       ],
+                                        "selected":  2,
+                                        "secondary":  [
+                                                          6,
+                                                          0,
+                                                          4,
+                                                          17,
+                                                          1,
+                                                          3,
+                                                          5,
+                                                          7,
+                                                          13,
+                                                          14,
+                                                          8,
+                                                          10,
+                                                          15,
+                                                          16,
+                                                          9,
+                                                          11,
+                                                          12
+                                                      ],
+                                        "descriptionMayBeIncomplete":  true
+                                    }
+                   },
+    "rows":  [
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "More than 300 pages of the famous super-team\u0027s inaugural exploits! Superman. Batman. Wonder Woman. The Flash. Green Lantern. Aquaman. The Martian Manhunter. Green Arrow. As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Collects THE BRAVE AND THE BOLD #28-30, JUSTICE LEAGUE OF AMERICA #1-8 and MYSTERY IN SPACE #75, and includes the classic tales \"Doom of the Star Diamond,\" \"The Slave Ship of Space\" and \"Starro the Conqueror!\" Read more"
+                                    }
+                                ],
+                     "title":  "Justice League of America: The Silver Age Vol. 1 (Justice League of America (1960-1987))",
+                     "url":  "https://www.amazon.com/dp/B01AORO2H0",
+                     "id":  "pilot-4-42",
+                     "expected":  [
+                                      "full",
+                                      12,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League have thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of graphic novels! This second volume of THE JUSTICE LEAGUE OF AMERICA: THE SILVER AGE collects the fame super-team\u0027s exploits from JUSTICE LEAGUE OF AMERICA #9-19, and includes the classic tales \"The Origin of the Justice League!,\" \"Riddle of the Robot Justice League!\" and \"The Super-Exiles of Earth!\" Read more"
+                                    }
+                                ],
+                     "title":  "Justice League of America: The Silver Age Vol. 2 (Justice League of America (1960-1987))",
+                     "url":  "https://www.amazon.com/dp/B01MCXTG9B",
+                     "id":  "pilot-4-43",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of trade paperback editions! This third volume of JUSTICE LEAGUE OF AMERICA: THE SILVER AGE collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30, and includes the classic tales “Crisis on Earth-One!” “Crisis on Earth-Two!” and “The Most Dangerous Earth of All!” Read more"
+                                    }
+                                ],
+                     "title":  "Justice League of America: The Silver Age Vol. 3 (Justice League of America (1960-1987))",
+                     "url":  "https://www.amazon.com/dp/B06XXRCN34",
+                     "id":  "pilot-4-44",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "THE WORLD’S GREATEST HEROES! Superman! Batman! Wonder Woman! The Flash! Green Lantern! Aquaman! The Martian Manhunter! Green Arrow! The Atom! Hawkman! As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of trade paperback editions! This fourth volume of Justice League Of America: The Silver Age collects the famed super-team’s exploits from Justice League Of America #31-41, and includes the classic tales “Riddle of the Runaway Room,” “Earth Without a Justice League” and “Crisis on Earth-A.” Read more"
+                                    }
+                                ],
+                     "title":  "Justice League of America: The Silver Age Vol. 4 (Justice League of America (1960-1987))",
+                     "url":  "https://www.amazon.com/dp/B07F1DYZ4J",
+                     "id":  "pilot-4-45",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "The best-selling graphic novels series 100 BULLETS written by Brian Azzarello and illustrated by Eduardo Risso is now re-collected in a five volume series!\nThis dark and intriguing Eisner Award-winning series features a mysterious agent named Graves who approaches ordinary citizens and gives them an opportunity to exact revenge on a person who has wronged them. Offering his clients an attaché case containing proof of the deed and a gun, he guarantees his \"clients\" full immunity for all of their actions, including murder.\nThis volume collects 100 Bullets #1-19.\nRead more"
+                                    }
+                                ],
+                     "title":  "100 Bullets: Book One",
+                     "url":  "https://www.amazon.com/dp/B00OI8ZA00",
+                     "id":  "sample-5-4",
+                     "expected":  [
+                                      "full",
+                                      19,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "How far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat’s the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible — and why?\nThis second of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso’s 100 BULLETS collects issues #20-36 of their acclaimed Vertigo series, and also includes Azzarello’s original script for “The Mimic” from issue #20.\nRead more"
+                                    }
+                                ],
+                     "title":  "100 Bullets: Book Two",
+                     "url":  "https://www.amazon.com/dp/B00UKGEIDO",
+                     "id":  "sample-5-6",
+                     "expected":  [
+                                      "full",
+                                      17,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "To kill without consequence: If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat\u0027s the opportunity that Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: Just who is making these actions possible-and why?\nThis third of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso\u0027s 100 BULLETS collects issues #37-58 of their acclaimed Vertigo series, and includes never-before-seen character sketches by Risso for an unproduced 100 BULLETS video game.\nRead more"
+                                    }
+                                ],
+                     "title":  "100 Bullets: Book Three",
+                     "url":  "https://www.amazon.com/dp/B013TGYKCK",
+                     "id":  "sample-5-5",
+                     "expected":  [
+                                      "full",
+                                      22,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "The continuation of the groundbreaking, Eisner Award-winning series-including the pivotal story arcs \"A Wake\" and \"Punch Line.\"\nIf you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That\u0027s the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why?\nCollects 100 BULLETS #59-80.\nRead more"
+                                    }
+                                ],
+                     "title":  "100 Bullets: Book Four",
+                     "url":  "https://www.amazon.com/dp/B018YP1STO",
+                     "id":  "sample-5-3",
+                     "expected":  [
+                                      "full",
+                                      22,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "The conclusion to Brian Azzarello and Eduardo Risso\u0027s critically acclaimed 100 BULLETS.\nHow far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat\u0027s the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and 100 rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why?\nCollects 100 BULLETS #81-100.\nRead more"
+                                    }
+                                ],
+                     "title":  "100 Bullets: Book Five",
+                     "url":  "https://www.amazon.com/dp/B01D2052NE",
+                     "id":  "sample-5-2",
+                     "expected":  [
+                                      "full",
+                                      20,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "A thousand years have passed since a dragon has been seen in the world. Science and technology have replaced magic, which has dwindled until it has become little more than an element of myth and legend.\nThere are those who still have dragon blood flowing through their veins, distant descendants of the mighty creatures of old. These rare humans have the power to cast magic, the power to heal, and the power to craft alchemical weapons capable of starting wars… or ending them. But they are feared for those powers, and in recent centuries, they have been hunted nearly to extinction.\nThe few remaining survivors must find a way to change how humanity perceives them or be lost to the world forever.\nThe Dragon Blood Collection includes three full-length novels of action, magic, and romance:\nBalanced on the Blade’s Edge\nDeathmaker\nBlood Charged\nRead more"
+                                    }
+                                ],
+                     "title":  "The Dragon Blood Collection, Books 1-3",
+                     "url":  "https://www.amazon.com/dp/B00PXGD274",
+                     "id":  "sample-5-1264",
+                     "expected":  [
+                                      "uncertain",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "“Neil Gaiman is undoubtedly one of the modern masters of fantasy writing....For those who have not read Neverwhere, the new edition is the one to read, and is a fitting introduction to Gaiman’s adult fiction....American readers can experience this spellbinding, magical world the way that Neil Gaiman wanted us to all along.” —Huffington Post\nThe #1 New York Times bestselling author’s ultimate edition of his wildly successful first novel featuring his “preferred text”—and including his special Neverwhere tale, “How the Marquis Got His Coat Back”.\nPublished in 1997, Neil Gaiman’s darkly hypnotic first novel, Neverwhere, heralded the arrival of a major talent and became a touchstone of urban fantasy.\nIt is the story of Richard Mayhew, a young London businessman with a good heart and an ordinary life, which is changed forever when he discovers a girl bleeding on the sidewalk. He stops to help her—an act of kindness that plunges him into a world he never dreamed existed. Slipping through the cracks of reality, Richard lands in Neverwhere—a London of shadows and darkness, monsters and saints, murderers and angels that exists entirely in a subterranean labyrinth. Neverwhere is home to Door, the mysterious girl Richard helped in the London Above. Here in Neverwhere, Door is a powerful noblewoman who has vowed to find the evil agent of her family’s slaughter and thwart the destruction of this strange underworld kingdom. If Richard is ever to return to his former life and home, he must join Lady Door’s quest to save her world—and may well die trying.\nRead more"
+                                    }
+                                ],
+                     "title":  "Neverwhere: A Novel",
+                     "url":  "https://www.amazon.com/dp/B000FC130E",
+                     "id":  "sample-5-901",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Book Description: Code Breakers has been one of the highest rated sci fi series on Amazon for the last four years, with over a million downloads and conversion into an RPG setting. Containing all four novels of the series, this box set will delight fans of gritty post-apocalyptic fiction, with a cyberpunk flavor.\nOften compared to the early works of William Gibson and Neal Stephenson, Code Breakers is a fast-paced, action-packed and thought-provoking series. Barnes has injected the world full of interesting characters, AIs, droids, and advanced tech in a post-cataclysmic setting where the very idea of freedom has to be fought for.\nJoin Gerry, Gabe, and Petal in this epic tale of survival, cutting edge science, and a thrill-a-minute adventure that will have you turning pages as fast as you can, as our heroes struggle for their lives, and for the future of humanity itself.\nContains four full length novels: Alpha, Beta, Gamma, and Delta with a special offer included inside (at the end of the book).\n** Download today for Free for Kindle Unlimited subscribers. **\nRead more"
+                                    }
+                                ],
+                     "title":  "Code Breakers Complete Series: Books 1-4",
+                     "url":  "https://www.amazon.com/dp/B017Y9MBI8",
+                     "id":  "sample-5-370",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Arthur Conan Doyle’s master criminologist Sherlock Holmes continues to delight readers around the world more than a century after he first appeared in print (in 1887’s A Study in Scarlet). The digital age has only increased his popularity: amid the onslaught of contemporary crime fiction there is something reassuring about the classic one volume set of the complete Sherlock Holmes. In Sherlock Holmes: The Ultimate Collection you will find all four Sherlock Holmes novels - A Study In Scarlet, The Sign of the Four, The Hound of the Baskervilles, The Valley of Fear - as well as the short story collections The Adventures of Sherlock Holmes, The Memoirs of Sherlock Holmes, The Return of Sherlock Holmes and His Last Bow - Some Reminiscences of Sherlock Holmes.\nKindle edition includes a selection of illustrations, first edition covers and other Sherlockiana.\nNovels\nA Study In Scarlet by Arthur Conan Doyle.\nThe Sign of the Four by Arthur Conan Doyle.\nThe Hound of the Baskervilles by Arthur Conan Doyle.\nThe Valley of Fear by Arthur Conan Doyle.\nShort Story Collections\nThe Adventures of Sherlock Holmes by Arthur Conan Doyle.\nThe Memoirs of Sherlock Holmes by Arthur Conan Doyle.\nThe Return of Sherlock Holmes by Arthur Conan Doyle.\nHis Last Bow - Some Reminiscences of Sherlock Holmes by Arthur Conan Doyle.\nRead more"
+                                    }
+                                ],
+                     "title":  "Sherlock Holmes: The Ultimate Collection (Illustrated)",
+                     "url":  "https://www.amazon.com/dp/B01HQDYF72",
+                     "id":  "sample-5-1027",
+                     "expected":  [
+                                      "filtered",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "This is the eBook version of the printed book.\nIf you liked this Short, you might also like Fire Your Stock Analyst!: Analyzing Stocks On Your Own, 2nd Edition (9780137010233) by Harry Domash. Available in print and digital formats.\nSix short-and-sweet, quick-start investing primers: practical guidance on ETFs, dividend stocks, growth stocks, emerging markets, mutual funds, closed-end funds, and more!\nHarry Domash’s six quick-start investing guides give you crucial information for investing profitably in any market environment. Learn what you need to know, without useless theory or number-crunching that doesn’t matter! Includes practical, up-to-the-minute primers on ETFs, emerging markets, dividend stocks, growth stocks, advanced growth stock analysis, and mutual funds/closed-end funds!\nRead more"
+                                    }
+                                ],
+                     "title":  "Investing Essentials: What You Need to Know (Collection) (FT Press Delivers Winning Investing Essentials)",
+                     "url":  "https://www.amazon.com/dp/B0054RF64E",
+                     "id":  "sample-5-697",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "John Wyndham\u0027s 1957 book The Midwich Cuckoos is better known by the more sensational title of its two film adaptations, Village of the Damned. The story begins with Richard and Janet Gayford who have spent the night of September 26 in London, returning to their home in Midwich the following day. Then, in ways that are difficult to pin down, the village seems changed--not quite the same place that it was before. The nightmare that descends on Midwich has dire implications for the rest of the world; whatever dwells there is sowing the seeds for a master race of ruthless and inhumane creatures who are bent on nothing less than absolute and total domination.\nIn Wyndam\u0027s classically elegant, calm style, this novel explores the arrival of a collective intelligence on earth that threatens to eliminate mankind. The quiet, eerie changes that befall Midwich manifest in strange ways; on the surface, everything seems normal, but scratch a little deeper and there is a clear sense of dread. After the night of September 26, every woman of childbearing age is pregnant, all to give birth at the same time, to children who are all alike--their eyes mesmerizing, void of emotion. These children are innately possessed with unimaginable mental powers and a formidable intelligence. It is these children who develop into an unstoppable force, capable of anything and far out-reaching other humans in cunning.\nThe London Evening Standard called The Midwich Cuckoos \"humane and urbane with a lightly sophisticated wit putting the ideas into shape.\" Wyndham skillfully heightens the terror by making his narrative so rational and matter-of-fact. In such a nuclear and technological age, Wyndam\u0027s story is rich in irony in that it is set in the picturesque, bucolic English Village and the \"enemy\", the threat, are seeming cherubim.\nABOUT THE AUTHOR\nJohn Wyndham Parkes Lucas Beynon Harris (1903-69) was a British novelist who wrote under the name John Wyndham, although he had at least seven other pen-names. Wyndham began publishing stories in the early 1930s, often in American magazines, but did not really find his stride as a writer as John Wyndham until he returned from serving for World War II.\nThe War changed the world drastically and it was now in the grips of nuclear apocalypse, a scenario that both terrified and fascinated Wyndam. His 1951 novel, The Day of the Triffids transformed him as a writer. While Wyndham\u0027s approach to writing is best classified as fantasy and science fiction, his work is often said to transcend both genre and category.\nFollowing The Day of the Triffids in 1951, Wyndham wrote a series of remarkable novels that include The Chrysalids (1955) and The Midwich Cuckoos (1957), as well as several short story collections. As noted, Wyndham did write under several of his other pseudonyms, and several of these titles were released after his death in March of 1969. There were two film versions, both titled Village of the Damned, made from The Midwich Cuckoos.\nSERIES DESCRIPTIONS\nFrom classic book to classic film, RosettaBooks has gathered some of most memorable books into film available. The selection is broad ranging and far reaching, with books from classic genre to cult classic to science fiction and horror and a blend of the two creating whole new genres like Richard Matheson\u0027s The Shrinking Man. Classic works from Vonnegut, one of the greatest writers of the twentieth century, meet with E.M. Forster\u0027s A Passage to India. Whether the work is centered in the here and now, in the past, or in some distant and almost unimaginable future, each work is lasting and memorable and award-winning.\nRead more"
+                                    }
+                                ],
+                     "title":  "The Midwich Cuckoos (RosettaBooks into Film)",
+                     "url":  "https://www.amazon.com/dp/B003XREM3S",
+                     "id":  "sample-5-1313",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Acclaimed author Kresley Cole introduces a sizzling new series with this tale of a fierce werewolf and a bewitching vampire -- unlikely soul mates whose passion will test the boundaries of life and death.\nA mythic warrior who\u0027ll stop at nothing to possess her . . .\nAfter enduring years of torture from the vampire horde, Lachlain MacRieve, leader of the Lykae Clan, is enraged to find the predestined mate he\u0027s waited millennia for is a vampire. Or partly one. This Emmaline is a small, ethereal half Valkyrie/half vampire, who somehow begins to soothe the fury burning within him.\nA vampire captured by her wildest fantasy . . .\nSheltered Emmaline Troy finally sets out to uncover the truth about her deceased parents -- until a powerful Lykae claims her as his mate and forces her back to his ancestral Scottish castle. There, her fear of the Lykae -- and their notorious dark desires -- ebbs as he begins a slow, wicked seduction to sate her own dark cravings.\nAn all-consuming desire . . .\nYet when an ancient evil from her past resurfaces, will their desire deepen into a love that can bring a proud warrior to his knees and turn a gentle beauty into the fighter she was born to be?\nIncludes an excerpt from Kresley Cole\u0027s next romance novel, No Rest for the Wicked.\nRead more"
+                                    }
+                                ],
+                     "title":  "A Hunger Like No Other (Immortals After Dark Book 2)",
+                     "url":  "https://www.amazon.com/dp/B000GCFCXW",
+                     "id":  "sample-5-21",
+                     "expected":  [
+                                      "full",
+                                      1,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "#1 New York Times Bestseller\nThe villainous Bane breaks the Bat in one of the most popular and well-known Batman tales! The inmates of Arkham Asylum have broken free and Batman must push himself to the limits to re-apprehend the Joker, Poison Ivy, the Riddler, Killer Croc and more. Pushed to the limits, he comes face-to-face against the monstrosity known as Bane, who delivers a crippling blow destined to change the Caped Crusader forever! Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase \u002793 #7-8, and Vengeance of Bane\nRead more"
+                                    }
+                                ],
+                     "title":  "Batman: Knightfall Vol. 1",
+                     "url":  "https://www.amazon.com/dp/B008RNGCAO",
+                     "id":  "sample-5-240",
+                     "expected":  [
+                                      "partial",
+                                      23,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Mentally defeated and physically broken, Bruce Wayne suffered a crippling blow while battling the brutal Bane. Now, the mantle of the Bat must be passed on to another, and Jean Paul Valley answers the call! But as the new Caped Crusader slowly loses his grip on sanity, his idea of justice takes a violent and deadly turn. Witnessing this dangerous behavior firsthand, Nightwing and Robin try to come to grips with Bruce\u0027s highly controversial decision while the new Batman sets his sights on taking revenge against Bane! Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7\nRead more"
+                                    }
+                                ],
+                     "title":  "Batman: Knightfall Vol. 2: Knightquest",
+                     "url":  "https://www.amazon.com/dp/B00919W7MA",
+                     "id":  "sample-5-241",
+                     "expected":  [
+                                      "full",
+                                      27,
+                                      0
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "The Hellboy saga begins--with over 300 pages drawn by Mignola! For the first time, Hellboy\u0027s complete story is presented in chronological order for the ultimate reading experience.\nThe story jumps from Hellboy\u0027s mysterious World War II origin to his 1994 confrontation with the man who summoned him to earth, and the earliest signs of the plague of frogs. Avoiding his supposed fate as the herald of the end of the world, Hellboy continues with the Bureau for Paranormal Research and Defense, fighting alongside Abe Sapien, Liz Sherman, and drafting Roger Homunculus into his own ill-fated service with the B.P.R.D.\nThe four volume Hellboy Omnibus series along with the two volumes of The Complete Short Stories collect all of Mignola\u0027s award-winning Hellboy stories in chronological order for a definitive reading experience.\nThis 368-page volume covers Hellboy\u0027s adventures from 1994 to 1997, reprinting Seed of Destruction, Wake the Devil, and \"Wolves of St August,\" \"The Chained Coffin,\" and \"Almost Colossus,\" from The Chained Coffin and The Right Hand of Doom.\nRead more"
+                                    }
+                                ],
+                     "title":  "Hellboy Omnibus Volume 1: Seed of Destruction",
+                     "url":  "https://www.amazon.com/dp/B07BJKXP63",
+                     "id":  "sample-5-629",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want. Collects TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #16–22 and issues #76–84 of the ongoing TEENAGE MUTANT NINJA TURTLES series.\nRead more"
+                                    }
+                                ],
+                     "title":  "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 11",
+                     "url":  "https://www.amazon.com/dp/B0849K8NVN",
+                     "id":  "sample-5-1228",
+                     "expected":  [
+                                      "partial",
+                                      7,
+                                      1
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "It\u0027s all been leading up to this! A massive showdown on the streets of the Big Apple! As New York gets torn apart by different factions, mutant and human alike, Karai returns and the future of the TMNT—in fact all of NYC—comes down to a final negotiation between Splinter and Karai. It\u0027s the shocking culmination of nearly a decade of storytelling as our heroes face their darkest hour against a multitude of enemies bent on their total destruction. Find out how a City at War will change the world forever! Plus, abandon all hope... as the most infamous villain in the Turtles\u0027 universe, Shredder, returns! Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series.\nRead more"
+                                    }
+                                ],
+                     "title":  "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 13",
+                     "url":  "https://www.amazon.com/dp/B08P2CDGQG",
+                     "id":  "sample-5-1230",
+                     "expected":  [
+                                      "failed",
+                                      0,
+                                      2
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook.\nDarkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet\u0027s heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull\u0027s symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume!\nRead more"
+                                    }
+                                ],
+                     "title":  "King In Black Omnibus (King In Black (2020-2021))",
+                     "url":  "https://www.amazon.com/dp/B0B6Q6JQFC",
+                     "id":  "sample-5-790",
+                     "expected":  [
+                                      "partial",
+                                      52,
+                                      2
+                                  ]
+                 },
+                 {
+                     "blocks":  [
+                                    {
+                                        "selector":  "#bookDescription_feature_div",
+                                        "text":  "A devastating earthquake has left Gotham City in ruins, and the government is getting close to completely cutting it off from the rest of civilization. But there\u0027s one man who\u0027s vowed to save Gotham from whatever foe it comes up against, and now Bruce Wayne must put aside his life as Batman and put on his suit and tie as he takes his fight for the fate of Gotham to Washington, D.C. Lurking in the shadows is the mysterious Nicholas Scratch who will do everything in his power to ensure Gotham becomes a No Man\u0027s Land!\nIn this, the final act before the beginning of the classic event, \"No Man\u0027s Land,\" Bruce Wayne, Robin, Nightwing and many others try to save their city from destruction once again-this time at the hands of the U.S. government.\nBATMAN: ROAD TO NO MAN\u0027S LAND VOL. 2 collects for the first time the complete \"Road to No Man\u0027s Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man\u0027s Land, Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN\u0027S LAND SECRET FILES AND ORIGINS #1.\nRead more"
+                                    }
+                                ],
+                     "title":  "Batman: Road to No Man\u0027s Land Vol. 2 (Batman: No Man\u0027s Land)",
+                     "url":  "https://www.amazon.com/dp/B01GKGB7T0",
+                     "id":  "sample-5-254",
+                     "expected":  [
+                                      "full",
+                                      15,
+                                      0
+                                  ]
+                 }
+             ]
+}

@@ -1,6 +1,7 @@
 import {bookToolHelp} from './book-tool-help.js';
 import { contentsStatement, proposeContentsForReview, validateContents } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
+import {independentContentsClaims} from '../lib/kindle-evidence-review.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 function sourcePage(value) {
@@ -40,6 +41,24 @@ export function createContentsEditor(record, review, actions) {
   };
   for(const entry of review?.entries??[])addRow(entry);
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
+  let loadedClaim=null;
+  const independent=independentContentsClaims(evidence,record.title);
+  if(independent.claims.length){
+    const claims=document.createElement('details');claims.className='contents-independent-evidence';
+    claims.append(element('summary',`Other captured claims to review (${independent.claims.length})`),element('p','These candidates come from separate source claims. They may describe contents, supplements, credits or unrelated prose. Full applies only to the primary claim; it does not account for these other claims or prove complete book contents. Claims are not combined or verified.'));
+    claims.append(element('p','Each library item has one saved contents review. Saving a different claim replaces that review; it does not add to it. Loading a claim only changes the editor until you save.'));
+    for(const claim of independent.claims){
+      const section=document.createElement('section');section.dataset.claimIndex=String(claim.index);section.dataset.sourceBlock=String(claim.block);section.dataset.sourceStart=String(claim.start);section.dataset.sourceEnd=String(claim.end);
+      section.append(element('p',`Separate claim: local parse ${claim.proposal.outcome}; ${claim.proposal.entries.length} proposed entries; ${claim.proposal.unparsed.length} unresolved fragments.`),element('blockquote',claim.raw));
+      if(claim.qualifiers.length)section.append(element('p',`Source qualifiers: ${claim.qualifiers.join('; ')}. Check the material and extent; these are not normal full-work ownership claims.`));
+      if(claim.parserInput!==claim.raw)section.append(element('p','Contextual input for this claim:'),element('blockquote',claim.parserInput));
+      section.append(button('Load this claim for review',()=>{
+        loadedClaim=claim;statement.value=claim.raw;source.value=sourcePage(evidence?.sourceUrl||record.metadata?.detailUrl);body.replaceChildren();
+        status.textContent='One separate claim loaded. Parse and check it before saving. Editor rows were cleared; your saved verified contents remain unchanged. Other claims have not been combined.';
+      }));claims.append(section);
+    }
+    root.append(claims);
+  }
   if(evidence?.manifest){
     const details=document.createElement('details');details.append(element('summary','Discovered manifest evidence (unverified)'));
     details.append(element('p','Full means the selected source manifest was parsed without unresolved text; it does not establish complete book contents or ownership. Windows linked to one explicit collection clause are interpreted using their parent source statement. Other independent clauses remain separate and unverified.'));
@@ -60,7 +79,7 @@ export function createContentsEditor(record, review, actions) {
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; existing verification has not changed.';}));
   }
   root.append(button('Parse statement for review',()=>{
-    const proposed=manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
+    const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
     status.textContent=`${proposed.outcome==='filtered'?'Filtered non-containment':proposed.outcome==='uncertain'?'Uncertain candidate':proposed.outcome==='full'?'Structurally parsed proposal; not verified':proposed.outcome==='partial'?'Partially parsed proposal':'Unresolved containment'}. ${proposed.qualityReason} ${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     if(proposed.parseBinding!=='explicit-statement')status.textContent+=` Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),table);

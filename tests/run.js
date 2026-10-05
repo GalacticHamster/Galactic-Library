@@ -5,6 +5,7 @@ import {kindleContentsQualityTests} from './kindle-contents-quality.js';
 import {kindleManifestTests} from './kindle-manifest.js';
 import {contentsParserV4Tests} from './contents-parser-v4.js';
 import {kindleSourceCaptureTests} from './kindle-source-capture.js';
+import {independentEvidenceTests} from './kindle-independent-evidence.js';
 import {kindleWholeManifestTests} from './kindle-whole-manifest.js';
 import {companionFeedTests} from './companion-feeds.js';
 import {releaseTests} from './release.js';
@@ -498,7 +499,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...tests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...tests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...releaseTests, ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -509,4 +510,4 @@ for (const [name, run] of [...tests, ...kindleWholeManifestTests, ...kindleSourc
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${tests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${tests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + releaseTests.length + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
