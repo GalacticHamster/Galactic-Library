@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {selectManifest,manifestReviewProposal,validateManifest,MANIFEST_LIMITS} from '../src/lib/kindle-manifest.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase,normalizeProviderItem,rebuildCanonicalItems} from '../src/lib/models.js';
-import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
+import {kindleContentsPlan,KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../src/lib/kindle-contents.js';
 import {contentCoverage,proposeContents} from '../src/lib/contents.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 const fixtures=JSON.parse(await readFile(new URL('./kindle-manifest-fixtures.json',import.meta.url),'utf8'));
@@ -75,7 +75,7 @@ export const kindleManifestTests=[
    const db=createEmptyDatabase();db.providerItems[item.id]=item;db.canonicalItems=rebuildCanonicalItems(db.providerItems);
    const stored={};const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>Object.assign(stored,structuredClone(updates))});
    await writer.restoreDatabase(db);await writer.saveContentReview(item.id,{statement:'Manual prior review',entries:[{series:'Prior',unitType:'issue',number:'1'}]});
-   const before=await writer.getDatabase(),entry={itemId:item.id,recordRef:item.recordRef,sourceUrl:item.metadata.detailUrl,statement:'',availability:'no-statement',extractorVersion:4,descriptionBlocks:[{selector:'#bookDescription_feature_div',text:fixtures[5].text}]};
+   const before=await writer.getDatabase(),entry={itemId:item.id,recordRef:item.recordRef,sourceUrl:item.metadata.detailUrl,statement:'',availability:'no-statement',extractorVersion:KINDLE_CONTENTS_EXTRACTOR_VERSION,descriptionBlocks:[{selector:'#bookDescription_feature_div',text:fixtures[5].text}]};
    await writer.saveKindleComicContents([entry]);const after=await writer.getDatabase(),saved=after.providerItems[item.id].metadata.enrichment.kindleProductComicContents;
    assert.equal(saved.parseOutcome,'full');assert.equal(proposal(saved).entries.length,7);assert.deepEqual(after.contentReviews,before.contentReviews);assert.deepEqual(after.canonicalItems,before.canonicalItems);assert.equal(after.providerItems[item.id].ownership,'borrowed');assert.equal(contentCoverage(after,[{series:'Fables',unitType:'issue',number:'22'}]).owned,0);
    const restored=parseBackup(createBackup(after));assert.deepEqual(restored.providerItems[item.id].metadata.enrichment.kindleProductComicContents.manifest,saved.manifest);

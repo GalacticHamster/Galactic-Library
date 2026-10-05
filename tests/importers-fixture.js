@@ -177,6 +177,9 @@ try{
   checks.push('actual Kindle Pause flushes buffered completed results and resume checks only the interrupted page');
 
 
+  const {checkKindleSourceCapture}=await import('./kindle-source-capture-fixture.js');
+  const captureFixtures=await (await originalFetch('/tests/fixtures/kindle-source-capture.json')).json();
+  checks.push(...await checkKindleSourceCapture(captureFixtures,html=>new DOMParser().parseFromString(html,'text/html')));
   globalThis.fetch=originalFetch;
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

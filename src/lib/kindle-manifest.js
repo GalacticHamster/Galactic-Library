@@ -12,7 +12,10 @@ export function validateDescriptionBlocks(value) {
   let total=0;
   return value.map(block=>{
     if(!block||typeof block.text!=='string'||typeof block.selector!=='string'||block.selector.length>100||block.text.length>MANIFEST_LIMITS.block||(total+=block.text.length)>MANIFEST_LIMITS.total)throw Error('Description exceeds manifest bounds.');
-    return {selector:block.selector,text:clean(block.text)};
+    // Source evidence retains captured DOM lines. Candidate/parser copies still
+    // use their existing whitespace normalization; no new grammar or guessed
+    // constituent separators are introduced by a visual line break.
+    return {selector:block.selector,text:block.text.replace(/\r\n?/gu,'\n').split('\n').map(clean).join('\n').replace(/\n{2,}/gu,'\n').trim()};
   });
 }
 

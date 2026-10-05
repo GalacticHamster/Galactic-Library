@@ -37,6 +37,14 @@ export function validateEnrichment(kind, value) {
     else if (['pageCount','firstPublishYear'].includes(key)) result[key]=value[key]===null?null:count(value[key],key,key==='pageCount'?1000000:9999);
     else result[key]=text(value[key],['statement','parseInput'].includes(key)?10000:key==='source'?100:500,`Enrichment ${key}`);
   }
+  // A generation-5 selected clause is exact bounded source evidence, including
+  // DOM lines. Restore it only after validating both the text bounds and its
+  // independently recomputed source-backed window. Parser copies stay compact;
+  // legacy statements and edited/free text retain their existing normalization.
+  if(kind==='kindleProductComicContents'&&result.extractorVersion>=5&&result.manifest){
+    const selected=result.manifest.candidates[result.manifest.selected];
+    if(selected?.raw===value.statement&&selected.raw.length<=10000)result.statement=selected.raw;
+  }
   if(kind==='localMetadata'&&!['comicinfo','epub','publisher','open-library-edition'].includes(result.source))throw new Error('Invalid local/source adapter.');
   const source = kind==='localMetadata'?result.source:kind==='openLibrary'?'open-library':kind==='kindleProductComicContents'?'amazon-product-page':'google-books';
   if (result.source && result.source!==source) throw new Error('Conflicting enrichment source.');

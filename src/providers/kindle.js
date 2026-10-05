@@ -126,7 +126,7 @@
     return statement.replace(/[.!?]+$/u, '');
   }
 
-  const contentsExtractorVersion = 4;
+  const contentsExtractorVersion = 5;
   function explicitContentsStatement(value) {
     const text = compactText(value);
     const match = text.match(/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*(?::|-)?\s*.{2,10000}/iu);
@@ -151,12 +151,36 @@
     return '';
   }
 
+  function kindleDescriptionText(element) {
+    // Static textContent loses BRs and glues adjacent paragraphs. Preserve the
+    // DOM's explicit line/block boundaries in source evidence, without turning
+    // line breaks into punctuation or claiming they delimit bibliographic works.
+    // Inline emphasis/spans must remain contiguous (including split title words).
+    if (!element.childNodes) return compactText(String(element.textContent??'').slice(0,24000));
+    const parts=[];let remaining=24000,visited=0;
+    const append=text=>{if(remaining>0){const piece=text.slice(0,remaining);parts.push(piece);remaining-=piece.length;}};
+    function visit(node,depth) {
+      if(!remaining||visited++>=4000||depth>64)return;
+      if(node.nodeType===3){append(node.nodeValue??'');return;}
+      if(node.nodeType!==1)return;
+      const tag=node.tagName;
+      if(/^(?:SCRIPT|STYLE|NOSCRIPT|IFRAME|FORM|INPUT|BUTTON|SELECT|TEXTAREA)$/u.test(tag))return;
+      if(tag==='BR'){append('\n');return;}
+      const block=/^(?:P|DIV|LI|UL|OL|H[1-6]|BLOCKQUOTE|TR)$/u.test(tag);
+      if(block)append('\n');
+      for(const child of node.childNodes){visit(child,depth+1);if(!remaining||visited>=4000)break;}
+      if(block)append('\n');
+    }
+    visit(element,0);
+    return parts.join('').replace(/\r\n?/gu,'\n').split('\n').map(compactText).join('\n').replace(/\n{2,}/gu,'\n').trim();
+  }
+
   function kindleDescriptionBlocks(document) {
     const blocks=[],seen=new Set();let total=0;
     for(const selector of ['#bookDescription_feature_div','#productDescription','#featurebullets_feature_div','#productOverview_feature_div','[data-feature-name="bookDescription"]']){
       for(const element of document.querySelectorAll(selector)){
         // Bound reads before whitespace normalization, even for pathological pages.
-        const text=compactText(String(element.textContent??'').slice(0,24000)).slice(0,Math.min(12000,24000-total));
+        const text=kindleDescriptionText(element).slice(0,Math.min(12000,24000-total));
         if(!text||seen.has(text))continue;seen.add(text);blocks.push({selector,text});total+=text.length;
         if(blocks.length===8||total===24000)return blocks;
       }
