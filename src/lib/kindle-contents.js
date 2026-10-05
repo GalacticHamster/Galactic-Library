@@ -11,10 +11,11 @@ export const supportedKindleContentsBook = item => item?.provider === 'kindle' &
 export function contentsParseState(item) {
   const statement = item.metadata?.enrichment?.kindleProductComicContents?.statement?.trim() ?? '';
   if (!statement) return {parseStatus:'not-attempted',parseOutcome:'not-attempted',parserVersion:CONTENTS_PARSER_VERSION,filterVersion:CONTENTS_FILTER_VERSION};
-  const proposal = manifestReviewProposal(item.metadata.enrichment.kindleProductComicContents, item.title);
+  const proposal = manifestReviewProposal(item.metadata.enrichment.kindleProductComicContents, item.title,statement,{series:item.metadata?.series});
   const parseOutcome = proposal.outcome;
   return {parseStatus:parseOutcome === 'full' ? 'parsed' : 'unparsed',parseOutcome,parserVersion:CONTENTS_PARSER_VERSION,
-    filterVersion:proposal.filterVersion,quality:proposal.quality,qualityReason:proposal.qualityReason,descriptionMayBeIncomplete:proposal.descriptionMayBeIncomplete};
+    filterVersion:proposal.filterVersion,quality:proposal.quality,qualityReason:proposal.qualityReason,descriptionMayBeIncomplete:proposal.descriptionMayBeIncomplete,
+    parseBinding:proposal.parseBinding,parseInput:proposal.parseInput};
 }
 
 export function kindleContentsState(item, database = {}) {

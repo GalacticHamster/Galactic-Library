@@ -1,6 +1,7 @@
 import {enrichmentStages} from './enrichment.js';
 import {editionEnrichmentConflicts} from './identity.js';
 import {contentsStatement,proposeContentsForReview} from './contents.js';
+import {manifestReviewProposal} from './kindle-manifest.js';
 
 export function candidateConflicts(records,source,candidate){
   if(source==='openLibrary')return [];
@@ -26,7 +27,8 @@ export function enrichmentWorkbenchRows(database){
     const statement=contentsStatement(record);
     const review = database.contentReviews[record.id];
     if (statement && (!review || statement !== review.statement)) {
-      const proposal = proposeContentsForReview(statement,record.title);
+      const saved=record.metadata.enrichment?.kindleProductComicContents;
+      const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);
       const status = proposal.outcome==='filtered' ? 'Filtered non-containment; original evidence retained' : proposal.outcome==='uncertain' ? 'Uncertain candidate; context needs review' : !proposal.entries.length ? 'Unresolved containment statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
       if(proposal.outcome!=='filtered' || review || proposal.descriptionMayBeIncomplete)rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
         reason:`${review ? 'Discovery differs from reviewed contents; saved verification is unchanged. ' : status+'. '}${proposal.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents text may be missing. ':''}${statement}`});

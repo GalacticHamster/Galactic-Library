@@ -54,8 +54,9 @@ export function createContentsEditor(record, review, actions) {
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; existing verification has not changed.';}));
   }
   root.append(button('Parse statement for review',()=>{
-    const proposed=manifestReviewProposal(evidence,record.title,statement.value);body.replaceChildren();proposed.entries.forEach(addRow);
+    const proposed=manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
     status.textContent=`${proposed.outcome==='filtered'?'Filtered non-containment':proposed.outcome==='uncertain'?'Uncertain candidate':proposed.outcome==='full'?'Structurally parsed proposal; not verified':proposed.outcome==='partial'?'Partially parsed proposal':'Unresolved containment'}. ${proposed.qualityReason} ${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    if(proposed.parseBinding!=='explicit-statement')status.textContent+=` Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),table);
   root.append(button('Save verified contents',async()=>{
     try{

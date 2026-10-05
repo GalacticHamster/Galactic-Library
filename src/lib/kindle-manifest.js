@@ -140,19 +140,36 @@ export function selectManifest(blocks,title='') {
   return {statement:winner?.raw??'',manifest:{title:clean(title).slice(0,500),blocks,candidates:candidates.map(({proposal,...c})=>c),selected,secondary,descriptionMayBeIncomplete:blocks.some(b=>/\s+Read more\s*$/iu.test(b.text))}};
 }
 
-export function manifestReviewProposal(saved,title,statement=saved?.statement??'') {
+export function manifestReviewProposal(saved,title,statement=saved?.statement??'',context={}) {
+  const reviewContext={...context,allowTitleBinding:statement===saved?.statement};
   const manifest=saved?.manifest;
   if(manifest&&statement===saved.statement){
     const candidate=manifest.candidates[manifest.selected];
-    if(candidate&&candidate.raw===statement)return {...proposeContentsForReview(candidate.parserInput,title),descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete};
+    if(candidate&&candidate.raw===statement){
+      const proposal=proposeContentsForReview(candidate.parserInput,title,reviewContext);
+      return {...proposal,parseBinding:proposal.parseBinding==='explicit-statement'?candidate.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete};
+    }
   }
-  return proposeContentsForReview(statement,title);
+  return proposeContentsForReview(statement,title,reviewContext);
 }
 
-// Backup metadata is recomputed from bounded source, never trusted arbitrary
-// parser input or a caller-supplied rank/selection. This also validates offsets.
+// Recompute inputs/ranks from bounded source. A parser upgrade must not replace
+// an existing selected source clause simply because its rank changes. Only an
+// exact source-backed window (including offsets) can retain that selection.
 export function validateManifest(value,title='') {
   if(!value||typeof value!=='object')throw Error('Invalid manifest evidence.');
   if(typeof value.title!=='string'||value.title.length>500)throw Error('Invalid manifest title context.');
-  return selectManifest(value.blocks,title||value.title).manifest;
+  const result=selectManifest(value.blocks,title||value.title).manifest;
+  const saved=Array.isArray(value.candidates)&&Number.isInteger(value.selected)?value.candidates[value.selected]:null;
+  const selected=saved?result.candidates.findIndex(c=>c.block===saved.block&&c.start===saved.start&&c.end===saved.end&&c.raw===saved.raw):-1;
+  if(selected>=0 && selected!==result.selected){
+    result.selected=selected;
+    const winner=proposeContentsForReview(result.candidates[selected].parserInput,result.title),keys=new Set(winner.entries.map(contentKey));
+    result.secondary=result.candidates.flatMap((c,index)=>{
+      if(index===selected||c.quality==='filtered')return [];
+      const proposal=proposeContentsForReview(c.parserInput,result.title);
+      return !proposal.entries.length||proposal.entries.some(e=>!keys.has(contentKey(e)))?[index]:[];
+    });
+  }
+  return result;
 }

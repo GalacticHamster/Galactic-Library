@@ -20,7 +20,7 @@ export function validateEnrichment(kind, value) {
     openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
     googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
-    kindleProductComicContents:['source','sourceUrl','statement','manifest','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','failureCode','checkedAt'],
+    kindleProductComicContents:['source','sourceUrl','statement','manifest','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','parseBinding','parseInput','failureCode','checkedAt'],
     localMetadata:['source','sourceId','sourceUrl','fileName','editionKey','workKey','title','authors','contributors','isbn','publisher','series','volume','issue','unitType','run','edition','language','format','categories','publishedDate','pageCount','statement','approved','matchBasis','retrievedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
@@ -35,7 +35,7 @@ export function validateEnrichment(kind, value) {
     else if (key==='sourceUrl') result[key]=url(value[key],kind==='localMetadata'?{}:{hosts:kind==='openLibrary'?['openlibrary.org']:kind==='kindleProductComicContents'?['amazon.com']:['books.google.com'],googleId:kind!=='openLibrary'&&kind!=='kindleProductComicContents'});
     else if (['parserVersion','extractorVersion','filterVersion'].includes(key)) {result[key]=count(value[key],key,1000);if(!result[key])throw new Error('Invalid contents version.');}
     else if (['pageCount','firstPublishYear'].includes(key)) result[key]=value[key]===null?null:count(value[key],key,key==='pageCount'?1000000:9999);
-    else result[key]=text(value[key],key==='statement'?10000:key==='source'?100:500,`Enrichment ${key}`);
+    else result[key]=text(value[key],['statement','parseInput'].includes(key)?10000:key==='source'?100:500,`Enrichment ${key}`);
   }
   if(kind==='localMetadata'&&!['comicinfo','epub','publisher','open-library-edition'].includes(result.source))throw new Error('Invalid local/source adapter.');
   const source = kind==='localMetadata'?result.source:kind==='openLibrary'?'open-library':kind==='kindleProductComicContents'?'amazon-product-page':'google-books';

@@ -1,0 +1,6027 @@
+[
+  {
+    "auditId": 21,
+    "title": "A Hunger Like No Other (Immortals After Dark Book 2)",
+    "statement": "Includes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked",
+    "rawStatement": "Includes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "A Hunger Like No Other (Immortals After Dark Book 2)",
+        "run": "",
+        "unitType": "component",
+        "number": "No Rest for the Wicked",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 32,
+    "title": "Aliens: The Original Years Omnibus Vol. 1",
+    "statement": "Collects Aliens (1988) #1-6; Aliens (1989) #1-4; Aliens, Earth War #1-4; Aliens, Genocide #1-4; Aliens, Hive #1-4; Aliens, Tribes #1; Aliens, Newt’s Tale #1-2; Alien 3 #1-3 And Aliens, Space Marines #1-12 — Plus Material From Dark Horse Insider (1989) #14-27 And Dark Horse Presents (1986) #24, #42-43, #56 And Fifth Anniversary Special",
+    "rawStatement": "Collects Aliens (1988) #1-6; Aliens (1989) #1-4; Aliens, Earth War #1-4; Aliens, Genocide #1-4; Aliens, Hive #1-4; Aliens, Tribes #1; Aliens, Newt’s Tale #1-2; Alien 3 #1-3 And Aliens, Space Marines #1-12 — Plus Material From Dark Horse Insider (1989) #14-27 And Dark Horse Presents (1986) #24, #42-43, #56 And Fifth Anniversary Special",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Earth War",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Earth War",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Earth War",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Earth War",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Genocide",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Genocide",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Genocide",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Genocide",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Hive",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Hive",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Hive",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Hive",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Tribes",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Newt’s Tale",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aliens, Newt’s Tale",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Alien 3",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Alien 3",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Alien 3",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "26",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Insider",
+        "run": "1989",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Presents",
+        "run": "1986",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Presents",
+        "run": "1986",
+        "unitType": "issue",
+        "number": "42",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Presents",
+        "run": "1986",
+        "unitType": "issue",
+        "number": "43",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Dark Horse Presents",
+        "run": "1986",
+        "unitType": "issue",
+        "number": "56",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Aliens, Space Marines #1-12 —",
+      "Fifth Anniversary Special"
+    ]
+  },
+  {
+    "auditId": 48,
+    "title": "Amazing Spider-Man Epic Collection: Kraven's Last Hunt",
+    "statement": "Collects Amazing Spider-Man (1963) #289-294 And Annual #20-21, Spider-Man Versus Wolverine, Web Of Spider-Man (1985) #29-32 And Peter Parker, The Spectacular Spider-Man (1976) #131-132",
+    "rawStatement": "Collects Amazing Spider-Man (1963) #289-294 And Annual #20-21, Spider-Man Versus Wolverine, Web Of Spider-Man (1985) #29-32 And Peter Parker, The Spectacular Spider-Man (1976) #131-132",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "289",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "290",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "291",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "292",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "293",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "294",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "annual",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "annual",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Peter Parker, The Spectacular Spider-Man",
+        "run": "1976",
+        "unitType": "issue",
+        "number": "131",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Peter Parker, The Spectacular Spider-Man",
+        "run": "1976",
+        "unitType": "issue",
+        "number": "132",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Spider-Man Versus Wolverine, Web Of Spider-Man (1985) #29-32"
+    ]
+  },
+  {
+    "auditId": 65,
+    "title": "Amazing Spider-Man Masterworks Vol. 18: The Amazing Spider-Man Vol. 18 (Amazing Spider-Man (1963-1998))",
+    "statement": "Collects Amazing Spider-Man (1963) #181-192 and material from Annual (1964) #12 & Mighty Marvel Comics Calendar 1978",
+    "rawStatement": "Collects Amazing Spider-Man (1963) #181-192 and material from Annual (1964) #12 & Mighty Marvel Comics Calendar 1978",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "181",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "182",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "183",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "184",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "185",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "186",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "187",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "188",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "189",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "190",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "191",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1963",
+        "unitType": "issue",
+        "number": "192",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1964",
+        "unitType": "annual",
+        "number": "12",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Mighty Marvel Comics Calendar 1978"
+    ]
+  },
+  {
+    "auditId": 77,
+    "title": "Animal Man (2011-2014) Vol. 2: Animal vs. Man",
+    "statement": "Collects Animal Man (2011-2014) issues #0, 7-11, Animal Man Annual #1 Read more",
+    "rawStatement": "Collects issues #0, 7-11, Animal Man Annual #1 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "0",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "2011-2014",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Animal Man",
+        "run": "",
+        "unitType": "annual",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 85,
+    "title": "Aquaman (2011-2016) Vol. 3: Throne of Atlantis (Aquaman Series)",
+    "statement": "collects issues #0, 14-16, and Justice League (2011-) #15-17",
+    "rawStatement": "collects issues #0, 14-16, and Justice League (2011-) #15-17",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Aquaman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "0",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aquaman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aquaman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Aquaman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Justice League",
+        "run": "2011-",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Justice League",
+        "run": "2011-",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Justice League",
+        "run": "2011-",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 98,
+    "title": "Atlas Era Jungle Adventure Masterworks Vol. 1",
+    "statement": "Collects Lorna, The Jungle Queen #1-5 & Lorna, The Jungle Girl #6-9",
+    "rawStatement": "Collects Lorna, The Jungle Queen #1-5 & Lorna, The Jungle Girl #6-9",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Lorna, The Jungle Queen",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Queen",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Queen",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Queen",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Queen",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Girl",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Girl",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Girl",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Lorna, The Jungle Girl",
+        "run": "",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 157,
+    "title": "Batman (2011-2016) Vol. 9: Bloom",
+    "statement": "Collects BATMAN #46-50, as well as a short story from DETECTIVE COMICS #27",
+    "rawStatement": "Collects BATMAN #46-50, as well as a short story from DETECTIVE COMICS #27",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "46",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "47",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "48",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "49",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "50",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "DETECTIVE COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 209,
+    "title": "Batman Incorporated (2012-2013) Vol. 2: Gotham's Most Wanted",
+    "statement": "Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more",
+    "rawStatement": "Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman Incorporated",
+        "run": "2012-2013",
+        "unitType": "special",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 240,
+    "title": "Batman: Knightfall Vol. 1",
+    "statement": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more",
+    "rawStatement": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "491",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "492",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "493",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "494",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "495",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "496",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "497",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "498",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "499",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "500",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "659",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "660",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "661",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "662",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "663",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "664",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "665",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "666",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Showcase '93",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Showcase '93",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Vengeance of Bane"
+    ]
+  },
+  {
+    "auditId": 241,
+    "title": "Batman: Knightfall Vol. 2: Knightquest",
+    "statement": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more",
+    "rawStatement": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "667",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "668",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "669",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "670",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "671",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "672",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "673",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "674",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "675",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "26",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "28",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "501",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "502",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "503",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "504",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "505",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "506",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "507",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "508",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Robin",
+        "run": "volume 4",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 242,
+    "title": "Batman: Knightfall Vol. 3: Knightsend",
+    "statement": "Collects Batman vol. 1 #509-510, 512-514, Batman: Shadow of the Bat #29-30, 32-34, Detective Comics vol. 1 #676-677, 679-681, Batman: Legends of the Dark Knight #62-63, Catwoman vol. 2 #12, 13, and Robin vol. 4 #9, 11-13",
+    "rawStatement": "Collects Batman vol. 1 #509-510, 512-514, Batman: Shadow of the Bat #29-30, 32-34, Detective Comics vol. 1 #676-677, 679-681, Batman: Legends of the Dark Knight #62-63, Catwoman vol. 2 #12, 13, and Robin vol. 4 #9, 11-13",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "509",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "510",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "512",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "513",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "514",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "29",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "30",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "32",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "33",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Shadow of the Bat",
+        "run": "",
+        "unitType": "issue",
+        "number": "34",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "676",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "677",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "679",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "680",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "681",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Legends of the Dark Knight",
+        "run": "",
+        "unitType": "issue",
+        "number": "62",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Batman: Legends of the Dark Knight",
+        "run": "",
+        "unitType": "issue",
+        "number": "63",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Robin",
+        "run": "volume 4",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Robin",
+        "run": "volume 4",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Robin",
+        "run": "volume 4",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Robin",
+        "run": "volume 4",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 254,
+    "title": "Batman: Road to No Man's Land Vol. 2 (Batman: No Man's Land)",
+    "statement": "collects for the first time the complete \"Road to No Man's Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man's Land, Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1",
+    "rawStatement": "collects for the first time the complete \"Road to No Man's Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man's Land, Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "560",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "561",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "562",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN: SHADOW OF THE BAT",
+        "run": "",
+        "unitType": "issue",
+        "number": "80",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN: SHADOW OF THE BAT",
+        "run": "",
+        "unitType": "issue",
+        "number": "81",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN: SHADOW OF THE BAT",
+        "run": "",
+        "unitType": "issue",
+        "number": "82",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "THE BATMAN CHRONICLES",
+        "run": "",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AZRAEL",
+        "run": "",
+        "unitType": "issue",
+        "number": "47",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AZRAEL",
+        "run": "",
+        "unitType": "issue",
+        "number": "48",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AZRAEL",
+        "run": "",
+        "unitType": "issue",
+        "number": "49",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AZRAEL",
+        "run": "",
+        "unitType": "issue",
+        "number": "50",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "for the first time the complete \"Road to No Man's Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man's Land, Reprinting DETECTIVE COMICS #727-729"
+    ]
+  },
+  {
+    "auditId": 259,
+    "title": "Batman: The Black Mirror (Detective Comics (1937-2011))",
+    "statement": "Collects Detective Comics vol. 1 #871-881",
+    "rawStatement": "Collects Detective Comics vol. 1 #871-881",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "871",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "872",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "873",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "874",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "875",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "876",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "877",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "878",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "879",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "880",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "881",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 278,
+    "title": "Batman: Whatever Happened To the Caped Crusader? (Batman (1940-2011))",
+    "statement": "collects Gaiman stories from Secret Origins #36, Secret Origins Special #1, and Batman Black And White #2",
+    "rawStatement": "collects Gaiman stories from Secret Origins #36, Secret Origins Special #1, and Batman Black And White #2",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Secret Origins",
+        "run": "",
+        "unitType": "issue",
+        "number": "36",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Secret Origins",
+        "run": "",
+        "unitType": "special",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Batman Black And White",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 284,
+    "title": "Batman/Catwoman (2020-)",
+    "statement": "Collects the entire series, Batman/Catwoman #1-12, plus the Batman/Catwoman Special, along with Batman Annual #2, Catwoman 80th Anniversary 100-Page Super Spectacular #1, and Detective Comics #1027",
+    "rawStatement": "Collects the entire series, Batman/Catwoman #1-12, plus the Batman/Catwoman Special, along with Batman Annual #2, Catwoman 80th Anniversary 100-Page Super Spectacular #1, and Detective Comics #1027",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Batman",
+        "run": "",
+        "unitType": "annual",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman 80th Anniversary 100-Page Super Spectacular",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Detective Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "1027",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "the entire series, Batman/Catwoman #1-12",
+      "plus the Batman/Catwoman Special"
+    ]
+  },
+  {
+    "auditId": 357,
+    "title": "Catwoman (2011-2016) Vol. 2: Dollhouse (Catwoman Vol. IV)",
+    "statement": "Collects Catwoman (2011-2016) issues #7-12 Read more",
+    "rawStatement": "Collects issues #7-12 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Catwoman",
+        "run": "2011-2016",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 367,
+    "title": "Civil War: The Road To Civil War (Spider-Man Book 12)",
+    "statement": "Collects Fantastic Four (1997) #536-537, New Avengers: Illuminati One-Shot, Amazing Spider-Man (1999) #529-531",
+    "rawStatement": "Collects Fantastic Four (1997) #536-537, New Avengers: Illuminati One-Shot, Amazing Spider-Man (1999) #529-531",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Fantastic Four",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "536",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Fantastic Four",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "537",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "529",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "530",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Spider-Man",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "531",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "New Avengers: Illuminati One-Shot"
+    ]
+  },
+  {
+    "auditId": 442,
+    "title": "Dead Boy Detectives by Toby Litt & Mark Buckingham (The Dead Boy Detectives (2013-2014))",
+    "statement": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1",
+    "rawStatement": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Ghosts",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Time Warp",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12",
+      "as well as well as the short stories “Run Ragged” from Witching Hour #1"
+    ]
+  },
+  {
+    "auditId": 448,
+    "title": "Deadman: Book Two (Deadman (DC Universe) 2)",
+    "statement": "Collects BRAVE AND THE BOLD #79, 86, STRANGE ADVENTURES #214-216, backup stories from AQUAMAN #50-52 and CHALLENGERS OF THE UNKNOWN #74",
+    "rawStatement": "Collects BRAVE AND THE BOLD #79, 86, STRANGE ADVENTURES #214-216, backup stories from AQUAMAN #50-52 and CHALLENGERS OF THE UNKNOWN #74",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "BRAVE AND THE BOLD",
+        "run": "",
+        "unitType": "issue",
+        "number": "79",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "BRAVE AND THE BOLD",
+        "run": "",
+        "unitType": "issue",
+        "number": "86",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "STRANGE ADVENTURES",
+        "run": "",
+        "unitType": "issue",
+        "number": "214",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "STRANGE ADVENTURES",
+        "run": "",
+        "unitType": "issue",
+        "number": "215",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "STRANGE ADVENTURES",
+        "run": "",
+        "unitType": "issue",
+        "number": "216",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AQUAMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "50",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "AQUAMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "51",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "AQUAMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "52",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "CHALLENGERS OF THE UNKNOWN",
+        "run": "",
+        "unitType": "issue",
+        "number": "74",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 465,
+    "title": "Doctor Strange Epic Collection: The Vampiric Verses (Doctor Strange: Sorcerer Supreme (1988-1996))",
+    "statement": "Collects Doctor Strange, Sorcerer Supreme (1988) #14-33; Ghost Rider (1990) #12",
+    "rawStatement": "Collects Doctor Strange, Sorcerer Supreme (1988) #14-33; Ghost Rider (1990) #12",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "26",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "28",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "29",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "30",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "31",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "32",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "33",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ghost Rider",
+        "run": "1990",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 466,
+    "title": "Doctor Strange Epic Collection: Triumph And Torment (Doctor Strange: Sorcerer Supreme (1988-1996))",
+    "statement": "Collects Doctor Strange, Sorcerer Supreme (1988) #1-13; Marvel Graphic Novel: Doctor Strange and Doctor Doom - Triumph and Torment (1989)",
+    "rawStatement": "Collects Doctor Strange, Sorcerer Supreme (1988) #1-13; Marvel Graphic Novel: Doctor Strange and Doctor Doom - Triumph and Torment (1989)",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Doctor Strange, Sorcerer Supreme",
+        "run": "1988",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Marvel Graphic Novel: Doctor Strange and Doctor Doom - Triumph and Torment (1989)"
+    ]
+  },
+  {
+    "auditId": 478,
+    "title": "Earth 2 (2012-2015) Vol. 1: The Gathering (Earth 2 Series)",
+    "statement": "Collects #1-6 Read more",
+    "rawStatement": "Collects #1-6 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Earth 2",
+        "run": "2012-2015",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 488,
+    "title": "Elseworlds: Justice League Vol. 3 (DC Elseworlds)",
+    "statement": "Collects Conjurors #1-3, Flashpoint (1999) #1-3, Superman and Batman: World’s Funnest#1, JLA: Created Equal #1-2 and Green Lantern: 1001 Emerald nights #1",
+    "rawStatement": "Collects Conjurors #1-3, Flashpoint (1999) #1-3, Superman and Batman: World’s Funnest#1, JLA: Created Equal #1-2 and Green Lantern: 1001 Emerald nights #1",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Conjurors",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Conjurors",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Conjurors",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Flashpoint",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Flashpoint",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Flashpoint",
+        "run": "1999",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Superman and Batman: World’s Funnest",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "JLA: Created Equal",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "JLA: Created Equal",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Green Lantern: 1001 Emerald nights",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 498,
+    "title": "Ex Machina: Book Three",
+    "statement": "Collects Ex Machina issues #21-29, Ex Machina: Inside the Machine; Ex Machina Special #3 Read more",
+    "rawStatement": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "26",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "28",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "issue",
+        "number": "29",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Ex Machina",
+        "run": "",
+        "unitType": "special",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Ex Machina: Inside the Machine"
+    ]
+  },
+  {
+    "auditId": 545,
+    "title": "Final Crisis: New Edition",
+    "statement": "Collects DC Universe #0, Final Crisis # 1-7, Final Crisis: Superman Beyond # 1-2, Final Crisis: Submit, Batman 682-683 and material from Absolute Final Crisis",
+    "rawStatement": "Collects DC Universe #0, Final Crisis # 1-7, Final Crisis: Superman Beyond # 1-2, Final Crisis: Submit, Batman 682-683 and material from Absolute Final Crisis",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "DC Universe",
+        "run": "",
+        "unitType": "issue",
+        "number": "0",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis: Superman Beyond",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Final Crisis: Superman Beyond",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Final Crisis: Submit, Batman 682-683",
+      "material from Absolute Final Crisis"
+    ]
+  },
+  {
+    "auditId": 603,
+    "title": "Guardians Of The Galaxy Modern Era Epic Collection: War Of Kings",
+    "statement": "Collects Guardians Of The Galaxy (2008) #13-25, Thanos Imperative: Ignition And Thanos Imperative #1-6",
+    "rawStatement": "Collects Guardians Of The Galaxy (2008) #13-25, Thanos Imperative: Ignition And Thanos Imperative #1-6",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Guardians Of The Galaxy",
+        "run": "2008",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thanos Imperative",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Thanos Imperative: Ignition"
+    ]
+  },
+  {
+    "auditId": 626,
+    "title": "Hellboy and the B.P.R.D.: 1954",
+    "statement": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more",
+    "rawStatement": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Hellboy and the BPRD: 1954 - Black Sun",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Hellboy and the BPRD: 1954 - Black Sun",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "The Unreasoning Beast, Ghost Moon #1-2"
+    ]
+  },
+  {
+    "auditId": 661,
+    "title": "Hulk: Planet Hulk (Incredible Hulk (1999-2007))",
+    "statement": "Collecting Incredible Hulk Vol. 2 #92-105, plus stories from Amazing Fantasy Vol. 2 #15, Giant-Size Hulk Vol. 2 #1, and the Planet Hulk Gladiator Guidebook",
+    "rawStatement": "Collecting Incredible Hulk Vol. 2 #92-105, plus stories from Amazing Fantasy Vol. 2 #15, Giant-Size Hulk Vol. 2 #1, and the Planet Hulk Gladiator Guidebook",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "92",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "93",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "94",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "95",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "96",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "97",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "98",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "99",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "100",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "101",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "102",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "103",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "104",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incredible Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "105",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Amazing Fantasy",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Giant-Size Hulk",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "the Planet Hulk Gladiator Guidebook"
+    ]
+  },
+  {
+    "auditId": 691,
+    "title": "Injustice: Gods Among Us: Year Five - The Complete Collection (Injustice: Gods Among Us (2013-2016))",
+    "statement": "Collects Injustice: Gods Among Us: Year Five #1-20 and the Annual #1",
+    "rawStatement": "Collects Injustice: Gods Among Us: Year Five #1-20 and the Annual #1",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Injustice: Gods Among Us: Year Five",
+        "run": "",
+        "unitType": "annual",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 788,
+    "title": "Kamandi by Jack Kirby Vol. 1 Vol. 1 (Kamandi: The Last Boy on Earth (1971-1978))",
+    "statement": "Collects Jack Kirby’s run on Kamandi, the Last Boy on Earth #1-20",
+    "rawStatement": "Collects Jack Kirby’s run on Kamandi, the Last Boy on Earth #1-20",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Kamandi, the Last Boy on Earth",
+        "run": "",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 921,
+    "title": "New X-Men Omnibus (New X-Men (2001-2004))",
+    "statement": "Collects New X-Men #114-154, Annual 2001",
+    "rawStatement": "Collects New X-Men #114-154, Annual 2001",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "114",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "115",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "116",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "117",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "118",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "119",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "120",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "121",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "122",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "123",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "124",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "125",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "126",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "127",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "128",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "129",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "130",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "131",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "132",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "133",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "134",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "135",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "136",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "137",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "138",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "139",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "140",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "141",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "142",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "143",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "144",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "145",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "146",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "147",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "148",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "149",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "150",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "151",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "152",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "153",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "New X-Men",
+        "run": "",
+        "unitType": "issue",
+        "number": "154",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Annual 2001"
+    ]
+  },
+  {
+    "auditId": 959,
+    "title": "Pilgrim’s Progress (Parts 1 & 2): Updated, Modern English. More than 100 Illustrations. (Bunyan Updated Classics)",
+    "statement": "Includes Parts 1 & 2Often disguised as something that would help him, evil accompanies Christian on his journey to the Celestial City",
+    "rawStatement": "Includes Parts 1 & 2Often disguised as something that would help him, evil accompanies Christian on his journey to the Celestial City",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "failed",
+    "entries": [],
+    "unparsed": [
+      "Parts 1",
+      "2Often disguised as something that would help him, evil accompanies Christian on his journey to the Celestial City"
+    ]
+  },
+  {
+    "auditId": 1056,
+    "title": "Spider-Gwen: Ghost-Spider Modern Era Epic Collection: Edge Of Spider-Verse",
+    "statement": "Collects EDGE OF SPIDER-VERSE (2014) #2, SPIDER-GWEN (2015A) #1-5, SPIDER-GWEN (2015B) #1-8, SPIDER-WOMEN ALPHA, SILK (2015B) #7-8, SPIDER-WOMAN (2015) #6-7 and SPIDER-WOMEN OMEGA",
+    "rawStatement": "Collects EDGE OF SPIDER-VERSE (2014) #2, SPIDER-GWEN (2015A) #1-5, SPIDER-GWEN (2015B) #1-8, SPIDER-WOMEN ALPHA, SILK (2015B) #7-8, SPIDER-WOMAN (2015) #6-7 and SPIDER-WOMEN OMEGA",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "EDGE OF SPIDER-VERSE",
+        "run": "2014",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015A)",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015A)",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015A)",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015A)",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015A)",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-GWEN (2015B)",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-WOMAN",
+        "run": "2015",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "SPIDER-WOMAN",
+        "run": "2015",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "SPIDER-WOMEN ALPHA, SILK (2015B) #7-8",
+      "SPIDER-WOMEN OMEGA"
+    ]
+  },
+  {
+    "auditId": 1088,
+    "title": "Star Wars Legends Epic Collection: The Empire Vol. 5",
+    "statement": "Collects Star Wars: Droids (1994) #1-6 And Special, Star Wars: Droids (1995) #1-8, Star Wars: The Protocol Offensive #1 And Material From Star Wars Galaxy Magazine #1 And Star Wars Tales #16 And #20",
+    "rawStatement": "Collects Star Wars: Droids (1994) #1-6 And Special, Star Wars: Droids (1995) #1-8, Star Wars: The Protocol Offensive #1 And Material From Star Wars Galaxy Magazine #1 And Star Wars Tales #16 And #20",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1994",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: Droids",
+        "run": "1995",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars: The Protocol Offensive",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Star Wars Galaxy Magazine",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Star Wars Tales",
+        "run": "",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Star Wars Tales",
+        "run": "",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Special"
+    ]
+  },
+  {
+    "auditId": 1097,
+    "title": "Star Wars Legends Epic Collection: The Newspaper Strips Vol. 1",
+    "statement": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981",
+    "rawStatement": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Classic Star Wars: Han Solo at Stars' End",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars: Han Solo at Stars' End",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars: Han Solo at Stars' End",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars",
+        "run": "",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Classic Star Wars",
+        "run": "",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9",
+      "Star Wars newspaper strips 3/11/1979-7/26/1981"
+    ]
+  },
+  {
+    "auditId": 1162,
+    "title": "Supergirl: The Silver Age Vol. 1 (Action Comics (1938-2011))",
+    "statement": "Collects Supergirl’s backup stories from ACTION COMICS #252-284",
+    "rawStatement": "Collects Supergirl’s backup stories from ACTION COMICS #252-284",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "252",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "253",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "254",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "255",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "256",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "257",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "258",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "259",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "260",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "261",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "262",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "263",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "264",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "265",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "266",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "267",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "268",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "269",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "270",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "271",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "272",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "273",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "274",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "275",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "276",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "277",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "278",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "279",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "280",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "281",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "282",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "283",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "ACTION COMICS",
+        "run": "",
+        "unitType": "issue",
+        "number": "284",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 1170,
+    "title": "Superman in the Fifties (Superman (1939-2011))",
+    "statement": "Collects stories from Superman #65, #79, #80, #96, #97, #127, Action Comics #151, #242, #252, #254, #255, World’s Finest Comics #68, #75, Superman’s Girl Friend, Lois Lane #8, Superman’s Pal, Jimmy Olsen #13, Adventure Comics #210, and Showcase #9",
+    "rawStatement": "Collects stories from Superman #65, #79, #80, #96, #97, #127, Action Comics #151, #242, #252, #254, #255, World’s Finest Comics #68, #75, Superman’s Girl Friend, Lois Lane #8, Superman’s Pal, Jimmy Olsen #13, Adventure Comics #210, and Showcase #9",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "65",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "79",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "80",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "96",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "97",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman",
+        "run": "",
+        "unitType": "issue",
+        "number": "127",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Action Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "151",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Action Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "242",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Action Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "252",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Action Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "254",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Action Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "255",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "World’s Finest Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "68",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "World’s Finest Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "75",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman’s Girl Friend, Lois Lane",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Superman’s Pal, Jimmy Olsen",
+        "run": "",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Adventure Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "210",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Showcase",
+        "run": "",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 1195,
+    "title": "Swamp Thing (2011-2015) Vol. 2: Family Tree (Swamp Thing Volume (The New 52))",
+    "statement": "Collects #0, 8-11, Swamp Thing Annual #1 Read more",
+    "rawStatement": "Collects #0, 8-11, Swamp Thing Annual #1 Read more",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "0",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "",
+        "unitType": "annual",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 1199,
+    "title": "Swamp Thing (2011-2015) Vol. 6: The Sureen",
+    "statement": "Collects issues #28-34 and pages from AQUAMAN #31",
+    "rawStatement": "Collects issues #28-34 and pages from AQUAMAN #31",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "full",
+    "entries": [
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "28",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "29",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "30",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "31",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "32",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "33",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Swamp Thing",
+        "run": "2011-2015",
+        "unitType": "issue",
+        "number": "34",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "AQUAMAN",
+        "run": "",
+        "unitType": "issue",
+        "number": "31",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": []
+  },
+  {
+    "auditId": 1225,
+    "title": "Teenage Mutant Ninja Turtles: The Armageddon Game—Opening Moves",
+    "statement": "Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2",
+    "rawStatement": "Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "TMNT: The Armageddon Game—Opening Moves",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "TMNT: The Armageddon Game—Opening Moves",
+        "run": "",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84",
+      "the 2020",
+      "2021 TMNT Annuals"
+    ]
+  },
+  {
+    "auditId": 1257,
+    "title": "The Demon (1993-1995) Vol. 2: The Longest Day",
+    "statement": "collecting writer Garth Ennis and artist John McCrea's complete run on THE DEMON includes issues #50-58 and #0 of the legendary series, and features some of the earliest adventures of their beloved mercenary Hitman and their implacable solipsist Baytor",
+    "rawStatement": "collecting writer Garth Ennis and artist John McCrea's complete run on THE DEMON includes issues #50-58 and #0 of the legendary series, and features some of the earliest adventures of their beloved mercenary Hitman and their implacable solipsist Baytor",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "failed",
+    "entries": [],
+    "unparsed": [
+      "writer Garth Ennis and artist John McCrea's complete run on THE DEMON includes issues #50-58",
+      "#0 of the legendary series",
+      "features some of the earliest adventures of their beloved mercenary Hitman and their implacable solipsist Baytor"
+    ]
+  },
+  {
+    "auditId": 1365,
+    "title": "Thunderbolts Omnibus Vol. 2 (Thunderbolts (1997-2003))",
+    "statement": "Collects Thunderbolts (1997) #34-63, Thunderbolts Annual 2000, Avengers (1998) #31-34, Avengers Annual 2000, Thunderbolts: Life Sentences (2001) #1, Thunderbolts: From the Marvel Vault (2011) #1, Citizen V and the V-Battalion (2001) #1-3, Citizen V and the V-Battalion: The Everlasting (2002) #1-4",
+    "rawStatement": "Collects Thunderbolts (1997) #34-63, Thunderbolts Annual 2000, Avengers (1998) #31-34, Avengers Annual 2000, Thunderbolts: Life Sentences (2001) #1, Thunderbolts: From the Marvel Vault (2011) #1, Citizen V and the V-Battalion (2001) #1-3, Citizen V and the V-Battalion: The Everlasting (2002) #1-4",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "34",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "35",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "36",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "37",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "38",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "39",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "40",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "41",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "42",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "43",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "44",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "45",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "46",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "47",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "48",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "49",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "50",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "51",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "52",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "53",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "54",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "55",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "56",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "57",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "58",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "59",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "60",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "61",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "62",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts",
+        "run": "1997",
+        "unitType": "issue",
+        "number": "63",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Avengers",
+        "run": "1998",
+        "unitType": "issue",
+        "number": "31",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Avengers",
+        "run": "1998",
+        "unitType": "issue",
+        "number": "32",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Avengers",
+        "run": "1998",
+        "unitType": "issue",
+        "number": "33",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Avengers",
+        "run": "1998",
+        "unitType": "issue",
+        "number": "34",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts: Life Sentences",
+        "run": "2001",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Thunderbolts: From the Marvel Vault",
+        "run": "2011",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion",
+        "run": "2001",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion",
+        "run": "2001",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion",
+        "run": "2001",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion: The Everlasting",
+        "run": "2002",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion: The Everlasting",
+        "run": "2002",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion: The Everlasting",
+        "run": "2002",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Citizen V and the V-Battalion: The Everlasting",
+        "run": "2002",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Thunderbolts Annual 2000",
+      "Avengers Annual 2000"
+    ]
+  },
+  {
+    "auditId": 1437,
+    "title": "Venomnibus by Cates & Stegman",
+    "statement": "Collects Venom (2018) #1-35, Venom Annual (2018) #1, Web of Venom: Ve'Nam (2018) #1, Web of Venom: Carnage Born (2018) #1, Web of Venom: Wraith (2020) #1, Absolute Carnage (2019) #1-5, King in Black (2020) #1-5; material from Free Comic Book Day 2019 (Spider-Man/Venom) #1, Free Comic Book Day 2020 (Spider-Man/Venom) #1, Incoming (2019) #1, Carnage: Black, White & Blood (2021) #2",
+    "rawStatement": "Collects Venom (2018) #1-35, Venom Annual (2018) #1, Web of Venom: Ve'Nam (2018) #1, Web of Venom: Carnage Born (2018) #1, Web of Venom: Wraith (2020) #1, Absolute Carnage (2019) #1-5, King in Black (2020) #1-5; material from Free Comic Book Day 2019 (Spider-Man/Venom) #1, Free Comic Book Day 2020 (Spider-Man/Venom) #1, Incoming (2019) #1, Carnage: Black, White & Blood (2021) #2",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "7",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "9",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "10",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "12",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "14",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "26",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "27",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "28",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "29",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "30",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "31",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "32",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "33",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "34",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "35",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Venom",
+        "run": "2018",
+        "unitType": "annual",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Web of Venom: Ve'Nam",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Web of Venom: Carnage Born",
+        "run": "2018",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Web of Venom: Wraith",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Absolute Carnage",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Absolute Carnage",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Absolute Carnage",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Absolute Carnage",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Absolute Carnage",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "King in Black",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "King in Black",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "King in Black",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "3",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "King in Black",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "4",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "King in Black",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Incoming",
+        "run": "2019",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Carnage: Black, White & Blood",
+        "run": "2021",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "material from Free Comic Book Day 2019 (Spider-Man/Venom) #1",
+      "Free Comic Book Day 2020 (Spider-Man/Venom) #1"
+    ]
+  },
+  {
+    "auditId": 1474,
+    "title": "Wonder Woman: 80 Years of the Amazon Warrior: The Deluxe Edition (Wonder Woman (1942-1986))",
+    "statement": "collects stories from All-Star Comics #8, Sensation Comics, #1, Comic Cavalcade #11, Wonder Woman (vol. 1) #5, #78, #98, #124, #162, #203, and #206, Wonder Woman (vol. 2) #6, #57, #73, and #170, Wonder Woman (vol. 3) #1, #13, #600, Wonder Woman (New 52) #13, Wonder Woman #750, and DC Comics Presents #41, along with new historical essays and a new cover by Jim Lee",
+    "rawStatement": "collects stories from All-Star Comics #8, Sensation Comics, #1, Comic Cavalcade #11, Wonder Woman (vol. 1) #5, #78, #98, #124, #162, #203, and #206, Wonder Woman (vol. 2) #6, #57, #73, and #170, Wonder Woman (vol. 3) #1, #13, #600, Wonder Woman (New 52) #13, Wonder Woman #750, and DC Comics Presents #41, along with new historical essays and a new cover by Jim Lee",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "All-Star Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "8",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Sensation Comics",
+        "run": "",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Comic Cavalcade",
+        "run": "",
+        "unitType": "issue",
+        "number": "11",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "5",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "78",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "98",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "124",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "162",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "203",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 1",
+        "unitType": "issue",
+        "number": "206",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "6",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "57",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "73",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 2",
+        "unitType": "issue",
+        "number": "170",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 3",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 3",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "volume 3",
+        "unitType": "issue",
+        "number": "600",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman (New 52)",
+        "run": "",
+        "unitType": "issue",
+        "number": "13",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "750",
+        "language": "",
+        "completeness": "excerpt"
+      },
+      {
+        "series": "DC Comics Presents",
+        "run": "",
+        "unitType": "issue",
+        "number": "41",
+        "language": "",
+        "completeness": "excerpt"
+      }
+    ],
+    "unparsed": [
+      "along with new historical essays and a new cover by Jim Lee"
+    ]
+  },
+  {
+    "auditId": 1479,
+    "title": "Wonder Woman: The Rebirth Deluxe Edition - Book 2 (Wonder Woman (2016-))",
+    "statement": "Collects Wonder Woman #15-25, Wonder Woman Annual #1 and DC Holiday Special 2017",
+    "rawStatement": "Collects Wonder Woman #15-25, Wonder Woman Annual #1 and DC Holiday Special 2017",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "15",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "16",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "24",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "issue",
+        "number": "25",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Wonder Woman",
+        "run": "",
+        "unitType": "annual",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "DC Holiday Special 2017"
+    ]
+  },
+  {
+    "auditId": 1497,
+    "title": "X-Men Epic Collection: Legacies",
+    "statement": "Collects Uncanny X-Men (1981) #297-300, Uncanny X-Men Annual (1992) #17, X-Men (1991) #17-23, Stryfe's Strike File And X-Men Unlimited (1993) #1",
+    "rawStatement": "Collects Uncanny X-Men (1981) #297-300, Uncanny X-Men Annual (1992) #17, X-Men (1991) #17-23, Stryfe's Strike File And X-Men Unlimited (1993) #1",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "Uncanny X-Men",
+        "run": "1981",
+        "unitType": "issue",
+        "number": "297",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Uncanny X-Men",
+        "run": "1981",
+        "unitType": "issue",
+        "number": "298",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Uncanny X-Men",
+        "run": "1981",
+        "unitType": "issue",
+        "number": "299",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Uncanny X-Men",
+        "run": "1981",
+        "unitType": "issue",
+        "number": "300",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "Uncanny X-Men",
+        "run": "1992",
+        "unitType": "annual",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "17",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "18",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "19",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "20",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "21",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "22",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men",
+        "run": "1991",
+        "unitType": "issue",
+        "number": "23",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "Stryfe's Strike File And X-Men Unlimited (1993) #1"
+    ]
+  },
+  {
+    "auditId": 1508,
+    "title": "X-Men: God Loves, Man Kills Extended Cut (X-Men: God Loves, Man Kills Extended Cut (2020))",
+    "statement": "Collects X-Men: God Loves, Man Kills Extended Cut (2020) #1-2; God Loves, Man Kills Variants",
+    "rawStatement": "Collects X-Men: God Loves, Man Kills Extended Cut (2020) #1-2; God Loves, Man Kills Variants",
+    "context": {
+      "allowTitleBinding": true
+    },
+    "outcome": "partial",
+    "entries": [
+      {
+        "series": "X-Men: God Loves, Man Kills Extended Cut",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "1",
+        "language": "",
+        "completeness": "full"
+      },
+      {
+        "series": "X-Men: God Loves, Man Kills Extended Cut",
+        "run": "2020",
+        "unitType": "issue",
+        "number": "2",
+        "language": "",
+        "completeness": "full"
+      }
+    ],
+    "unparsed": [
+      "God Loves, Man Kills Variants"
+    ]
+  }
+]
