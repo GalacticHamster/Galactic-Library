@@ -28,7 +28,7 @@ export function kindleContentsState(item, database = {}) {
   const review = database.contentReviews?.[item.id];
   return {fetchOutcome,...parse,reviewStatus:review ? 'verified' : statement ? 'unverified' : 'none',
     reviewChanged:Boolean(review && statement && statement !== review.statement),
-    needsReparse:Boolean(statement && (saved.parserVersion !== CONTENTS_PARSER_VERSION || saved.filterVersion !== CONTENTS_FILTER_VERSION || saved.parseOutcome !== parse.parseOutcome)),
+    needsReparse:Boolean(statement && (saved.parserVersion !== CONTENTS_PARSER_VERSION || saved.filterVersion !== CONTENTS_FILTER_VERSION || saved.parseOutcome !== parse.parseOutcome || saved.manifest && saved.parseInput !== parse.parseInput)),
     extractorOutdated:Boolean(saved?.extractorVersion && saved.extractorVersion < KINDLE_CONTENTS_EXTRACTOR_VERSION)};
 }
 

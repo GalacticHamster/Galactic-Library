@@ -13,7 +13,10 @@ export function createContentsEditor(record, review, actions) {
   const populate=()=>{
   root.append(bookToolHelp({purpose:'Review the issues, volumes or named components included in this edition.',input:'The original contents statement plus the scope and language of each proposed entry.',saves:'Parsing creates editable suggestions only. Save verified contents confirms the entries you reviewed.',review:'Check every entry and mark excerpts as excerpts. Named suggestions do not become library-title matches. Verified full entries can establish scoped coverage only when the collection is owned.',example:'Includes Wool, Shift and Dust produces named suggestions; check the original edition before confirming anything.'}));
   root.append(element('p','Discovery and parsing do not verify contents. Check every name or number. Excerpts cannot establish full-unit ownership; missing run or language prevents complete coverage.'));
-  const statement=document.createElement('textarea');statement.value=review?.statement||contentsStatement(record);statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
+  const evidence=record.metadata?.enrichment?.kindleProductComicContents;
+  const interpretedEvidence=evidence?.manifest?manifestReviewProposal(evidence,record.title):null;
+  const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
+  const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   root.append(element('label','Original contents statement'),statement,element('label','Evidence source'),source);
   const status=element('p','');status.setAttribute('role','status');
@@ -37,14 +40,17 @@ export function createContentsEditor(record, review, actions) {
   };
   for(const entry of review?.entries??[])addRow(entry);
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
-  const discovered = contentsStatement(record);
-  const evidence=record.metadata?.enrichment?.kindleProductComicContents;
   if(evidence?.manifest){
     const details=document.createElement('details');details.append(element('summary','Discovered manifest evidence (unverified)'));
-    details.append(element('p','The selected clause uses description or product-title context to interpret numbered units. Other useful clauses remain available below; they have not been combined or verified.'));
+    details.append(element('p','Full means the selected source manifest was parsed without unresolved text; it does not establish complete book contents or ownership. Windows linked to one explicit collection clause are interpreted using their parent source statement. Other independent clauses remain separate and unverified.'));
+    const interpreted=manifestReviewProposal(evidence,record.title);
+    if(interpreted.manifestEvidence){
+      details.append(element('p','Source manifest used for proposals (unverified):'),element('blockquote',interpreted.manifestEvidence));
+      if(interpreted.manifestEvidence!==evidence.statement)details.append(button('Use whole source manifest',()=>{statement.value=interpreted.manifestEvidence;status.textContent='Whole source manifest loaded for review. Parse and check its unresolved evidence before saving; existing verification has not changed.';}));
+    }
     for(const index of [evidence.manifest.selected,...evidence.manifest.secondary]){
       const candidate=evidence.manifest.candidates[index];if(!candidate)continue;
-      details.append(element('p',`${index===evidence.manifest.selected?'Selected':'Additional'}: ${candidate.outcome}; ${candidate.binding}.`),element('blockquote',candidate.raw));
+      details.append(element('p',`${index===evidence.manifest.selected?'Selected':'Additional'}: ${candidate.whole?(candidate.truncated?'bounded portion of source manifest; ':'whole source manifest; '):candidate.manifestRange?'segment of one source manifest; ':''}local parse ${candidate.outcome}; ${candidate.binding}.`),element('blockquote',candidate.raw));
       if(candidate.parserInput!==candidate.raw)details.append(element('p','Contextual input used for the proposal:'),element('blockquote',candidate.parserInput));
     }
     root.append(details);

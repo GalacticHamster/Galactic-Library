@@ -4,7 +4,10 @@ import {assessContentsQuality} from './contents-quality.js';
 // Source acquisition stays in the classic adapter. Assessment stays beside the
 // existing review parser in the worker; no page-side module/permission changes.
 export const MANIFEST_LIMITS=Object.freeze({blocks:8,total:24000,block:12000,candidates:32,window:2000,evidence:16000});
+// Interpretation of existing source, independent of capture/parser generations.
+export const MANIFEST_INTERPRETATION_VERSION=1;
 const trigger=/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?|comprising|reprints?|reprinting)\b/giu;
+const semanticClaim=new RegExp(trigger.source,'iu');
 const clean=value=>String(value??'').replace(/\s+/gu,' ').trim();
 
 export function validateDescriptionBlocks(value) {
@@ -82,6 +85,33 @@ function separateNamedSupplement(input){
   return input.replace(/(#\s*\d+(?:\s*-\s*\d+)?\s*,\s*[^#;]{1,300}?),\s+and\s+(?=[^#;]{1,150}#\s*\d)/giu,'$1; ');
 }
 
+function wholeManifestRange(text,sentence,starts,index,title) {
+  const first=starts[index];if(first.structural)return null;
+  const start=sentence.start+first.index;
+  // Another containment verb is a new semantic claim, never an implicit child.
+  const next=starts.slice(index+1).find(s=>!s.structural);
+  const end=sentence.start+(next?.index??sentence.end-sentence.start);
+  const children=starts.slice(index+1).filter(s=>s.structural&&sentence.start+s.index<end);
+  if(!children.length)return null;
+  const raw=text.slice(start,end).trim().replace(/;\s*$/u,'');
+  const parts=raw.split(';').map(clean).filter(Boolean);
+  // A finite numbered first segment grounds the collection relationship. An
+  // incidental number or a plot/credit/feature claim cannot introduce a parent.
+  const head=parserInput(parts[0],text.slice(Math.max(0,start-600),end),title);
+  const firstProposal=proposeContentsForReview(head.input,title);
+  if(firstProposal.quality!=='containment'||!firstProposal.entries.some(e=>e.unitType!=='component'))return null;
+  // Unresolved named supplements remain literal evidence. Reject intervening
+  // narrative/promotional context rather than linking everything after a ';'.
+  const prose=/\b(?:is|are|was|were|will|would|can|could|he|she|they|you|authors?|creators?|contributors?|artists?|writers?|interviews?|praise|critics?|reviews?|synopsis|available|recommended|following|features?|follows?|explores?|encounters?|travels?|discover(?:s|ed)?|drawn|written|illustrated|published|bestsell\w*)\b/iu;
+  const continuation=parts.slice(1).every(part=>{
+    const value=part.replace(/^(?:and|plus)\s+/iu,'');
+    return !prose.test(value)&&!semanticClaim.test(value)
+      && (!/#\s*\d/u.test(value)||/#\s*\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?[.!]?$/u.test(value))
+      && (/^[\p{Lu}\d"“]/u.test(value)||/^(?:material|excerpts?|selections?|stories)\s+from\b/iu.test(value));
+  });
+  return continuation?{start,end}:null;
+}
+
 export function discoverManifestCandidates(blocks,title='') {
   blocks=validateDescriptionBlocks(blocks);const windows=[],candidates=[],seen=new Set();let evidenceSize=0;
   for(let block=0;block<blocks.length;block++){
@@ -97,6 +127,7 @@ export function discoverManifestCandidates(blocks,title='') {
       // unrelated semantic clause in the same sentence.
       for(const m of body.matchAll(/;\s*(?=(?:[\p{Lu}][^;]{0,120}#\d|issues?\s*#?\d|Contents\s*:))/gu))starts.push({index:m.index+m[0].length,structural:true});
       starts.sort((a,b)=>a.index-b.index);
+      const parents=starts.map((_,index)=>wholeManifestRange(text,sentence,starts,index,title)).filter(Boolean);
       for(let i=0;i<starts.length;i++){
         const start=sentence.start+starts[i].index,end=Math.min(sentence.start+(starts[i+1]?.index??body.length),start+MANIFEST_LIMITS.window);
         const raw=text.slice(start,end).trim().replace(/[,;]\s*(?:and\s+)?(?:also\s+)?$/iu,'').replace(/,?\s+(?:and\s+)?also$/iu,'').replace(/,\s+and$/iu,'').trim();
@@ -106,13 +137,21 @@ export function discoverManifestCandidates(blocks,title='') {
         // numbered/enumerated manifest is even examined. This is capacity
         // allocation by structural syntax, not semantic quality or verb rank.
         const syntax=/#\s*\d|\b(?:issues?|volumes?|books?)\s*#?\d/iu.test(raw)?2:/["“][^"”]+["”].*(?:,|\band\b)|^Contents\s*:/iu.test(raw)?1:0;
-        windows.push({block,start,end,raw,structural:starts[i].structural,syntax,contextStart:Math.max(0,start-600),contextEnd:Math.min(sentence.end,start+1400)});
+        const manifestRange=parents.find(p=>start>=p.start&&end<=p.end);
+        windows.push({block,start,end,raw,structural:starts[i].structural,syntax,contextStart:Math.max(0,start-600),contextEnd:Math.min(sentence.end,start+1400),...(manifestRange?{manifestRange}: {})});
+      }
+      for(const manifestRange of parents){
+        const {start}=manifestRange;let end=Math.min(manifestRange.end,start+MANIFEST_LIMITS.window);
+        if(end<manifestRange.end){const separator=text.lastIndexOf(';',end);if(separator>start)end=separator;}
+        const raw=text.slice(start,end).trim();
+        if(!raw||seen.has(raw))continue;seen.add(raw);
+        windows.push({block,start,end,raw,structural:false,syntax:3,contextStart:Math.max(0,start-600),contextEnd:manifestRange.end,manifestRange,whole:true,truncated:end<manifestRange.end});
       }
     }
   }
   windows.sort((a,b)=>b.syntax-a.syntax||a.block-b.block||a.start-b.start);
   for(const window of windows.slice(0,MANIFEST_LIMITS.candidates)){
-        const {block,start,end,raw,structural,contextStart,contextEnd}=window,text=blocks[block].text;
+        const {block,start,end,raw,structural,contextStart,contextEnd,manifestRange,whole,truncated}=window,text=blocks[block].text;
         const context=text.slice(contextStart,contextEnd);
         const normalized=parserInput(raw,context,title),contextual=assessContentsQuality(raw,title);
         const proposal=proposeContentsForReview(contextual.quality==='filtered'?raw:normalized.input,title);
@@ -124,9 +163,9 @@ export function discoverManifestCandidates(blocks,title='') {
         const quality=proposal.quality==='containment'?2:proposal.quality==='uncertain'?1:0;
         const numeric=proposal.entries.filter(e=>e.unitType!=='component').length;
         const rank=[quality,numeric?2:proposal.entries.length?1:0,Math.min(proposal.entries.length,500),proposal.outcome==='full'?1:0,-proposal.unparsed.length];
-        candidates.push({block,start,end,contextStart,contextEnd,raw,parserInput:normalized.input,binding:normalized.binding,structural,position:start/Math.max(1,text.length),rank,quality:proposal.quality,outcome:proposal.outcome,entries:proposal.entries.length,unresolved:proposal.unparsed.length,proposal});
+        candidates.push({block,start,end,contextStart,contextEnd,raw,parserInput:normalized.input,binding:normalized.binding,structural,position:start/Math.max(1,text.length),rank,quality:proposal.quality,outcome:proposal.outcome,entries:proposal.entries.length,unresolved:proposal.unparsed.length,proposal,...(manifestRange?{manifestRange,...(whole?{whole:true,truncated}: {})}: {})});
   }
-  return candidates.sort((a,b)=>a.block-b.block||a.start-b.start);
+  return candidates.sort((a,b)=>a.block-b.block||a.start-b.start||a.end-b.end);
 }
 
 export function selectManifest(blocks,title='') {
@@ -135,22 +174,32 @@ export function selectManifest(blocks,title='') {
     for(let i=0;i<a.rank.length;i++)if(a.rank[i]!==b.rank[i])return b.rank[i]-a.rank[i];
     return a.position-b.position||a.index-b.index; // weak, deterministic early tie break
   });
-  const winner=ranked[0],selected=winner?.index??-1;
+  // Children are diagnostic pieces of their source-backed parent, not competing
+  // complete manifests. Ranking among independent source claims is unchanged.
+  const winner=ranked.find(c=>!c.manifestRange||c.whole||!ranked.some(p=>p.whole&&p.block===c.block&&p.manifestRange.start===c.manifestRange.start&&p.manifestRange.end===c.manifestRange.end)),selected=winner?.index??-1;
   // Do not join free prose across sentences or guess that separate claims refer
   // to the same edition. Keep useful secondary evidence for explicit review.
   const keys=new Set(winner?.proposal.entries.map(contentKey)??[]);
-  const secondary=ranked.filter(c=>c.index!==selected&&c.quality!=='filtered'&&(c.proposal.entries.some(e=>!keys.has(contentKey(e)))||!c.entries)).map(c=>c.index);
-  return {statement:winner?.raw??'',manifest:{title:clean(title).slice(0,500),blocks,candidates:candidates.map(({proposal,...c})=>c),selected,secondary,descriptionMayBeIncomplete:blocks.some(b=>/\s+Read more\s*$/iu.test(b.text))}};
+  const secondary=ranked.filter(c=>c.index!==selected&&c.quality!=='filtered'&&(c.manifestRange||c.proposal.entries.some(e=>!keys.has(contentKey(e)))||!c.entries)).map(c=>c.index);
+  return {statement:winner?.raw??'',manifest:{interpretationVersion:MANIFEST_INTERPRETATION_VERSION,title:clean(title).slice(0,500),blocks,candidates:candidates.map(({proposal,...c})=>c),selected,secondary,descriptionMayBeIncomplete:blocks.some(b=>/\s+Read more\s*$/iu.test(b.text))}};
 }
 
 export function manifestReviewProposal(saved,title,statement=saved?.statement??'',context={}) {
-  const reviewContext={...context,allowTitleBinding:statement===saved?.statement};
-  const manifest=saved?.manifest;
-  if(manifest&&statement===saved.statement){
+  // Old selections remain source history. Reinterpret only a proven parent of
+  // that exact saved child, never a better-ranked unrelated secondary claim.
+  const manifest=saved?.manifest?.interpretationVersion===MANIFEST_INTERPRETATION_VERSION?saved.manifest:saved?.manifest?validateManifest(saved.manifest):null;
+  let reviewContext={...context,allowTitleBinding:statement===saved?.statement};
+  if(manifest){
     const candidate=manifest.candidates[manifest.selected];
-    if(candidate&&candidate.raw===statement){
-      const proposal=proposeContentsForReview(candidate.parserInput,title,reviewContext);
-      return {...proposal,parseBinding:proposal.parseBinding==='explicit-statement'?candidate.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete};
+    if(candidate&&candidate.raw===saved.statement){
+      const parent=candidate.manifestRange&&!candidate.whole?manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange.start===candidate.manifestRange.start&&c.manifestRange.end===candidate.manifestRange.end):null;
+      if(statement!==saved.statement&&statement!==parent?.raw)return proposeContentsForReview(statement,title,reviewContext);
+      reviewContext={...context,allowTitleBinding:true};
+      const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,reviewContext);
+      const incomplete=interpreted.truncated||candidate.manifestRange&&!candidate.whole&&!parent;
+      const remainder=interpreted.whole?manifest.blocks[interpreted.block].text.slice(interpreted.end,interpreted.manifestRange.end):incomplete?manifest.blocks[candidate.block].text.slice(candidate.manifestRange.start,candidate.manifestRange.end):'';
+      const unparsed=incomplete?[...proposal.unparsed,remainder]:proposal.unparsed;
+      return {...proposal,unparsed,outcome:incomplete&&proposal.outcome==='full'?'partial':proposal.outcome,parseBinding:proposal.parseBinding==='explicit-statement'?interpreted.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete,...(interpreted.whole?{manifestEvidence:interpreted.raw,manifestCoverage:incomplete?'bounded':'whole-clause'}: {})};
     }
   }
   return proposeContentsForReview(statement,title,reviewContext);

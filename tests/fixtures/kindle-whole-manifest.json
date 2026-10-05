@@ -1,0 +1,458 @@
+{
+  "title": "King In Black Omnibus (King In Black (2020-2021))",
+  "blocks": [
+    {
+      "selector": "#bookDescription_feature_div",
+      "text": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook.\nDarkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet's heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull's symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume!\nRead more"
+    }
+  ],
+  "legacy": {
+    "statement": "King In Black: Namor #1-5",
+    "manifest": {
+      "title": "King In Black Omnibus (King In Black (2020-2021))",
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook.\nDarkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet's heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull's symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume!\nRead more"
+        }
+      ],
+      "candidates": [
+        {
+          "block": 0,
+          "start": 0,
+          "end": 195,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider",
+          "parserInput": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider",
+          "binding": "explicit-clause",
+          "structural": false,
+          "position": 0,
+          "rank": [
+            2,
+            2,
+            5,
+            0,
+            -1
+          ],
+          "quality": "containment",
+          "outcome": "partial",
+          "entries": 5,
+          "unresolved": 1
+        },
+        {
+          "block": 0,
+          "start": 195,
+          "end": 235,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "King In Black: Gwenom vs. Carnage #1-3",
+          "parserInput": "King In Black: Gwenom vs. Carnage #1-3",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.13948497854077252,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 235,
+          "end": 262,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "King In Black: Namor #1-5",
+          "parserInput": "King In Black: Namor #1-5",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.1680972818311874,
+          "rank": [
+            2,
+            2,
+            5,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 5,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 262,
+          "end": 307,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "King In Black: Planet Of The Symbiotes #1-3",
+          "parserInput": "King In Black: Planet Of The Symbiotes #1-3",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.18741058655221746,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 307,
+          "end": 352,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "King In Black: Return Of The Valkyries #1-4",
+          "parserInput": "King In Black: Return Of The Valkyries #1-4",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.21959942775393418,
+          "rank": [
+            2,
+            2,
+            4,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 4,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 352,
+          "end": 386,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "King In Black: Thunderbolts #1-3",
+          "parserInput": "King In Black: Thunderbolts #1-3",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.25178826895565093,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 386,
+          "end": 427,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Symbiote Spider-Man: King In Black #1-5",
+          "parserInput": "Symbiote Spider-Man: King In Black #1-5",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.2761087267525036,
+          "rank": [
+            2,
+            2,
+            5,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 5,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 427,
+          "end": 450,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Black Cat (2020) #1-3",
+          "parserInput": "Black Cat (2020) #1-3",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.3054363376251788,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 450,
+          "end": 475,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Daredevil (2019) #26-27",
+          "parserInput": "Daredevil (2019) #26-27",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.3218884120171674,
+          "rank": [
+            2,
+            2,
+            2,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 2,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 475,
+          "end": 496,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Deadpool (2019) #10",
+          "parserInput": "Deadpool (2019) #10",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.3397711015736767,
+          "rank": [
+            2,
+            2,
+            1,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 1,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 496,
+          "end": 526,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Fantastic Four (2018) #29-30",
+          "parserInput": "Fantastic Four (2018) #29-30",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.3547925608011445,
+          "rank": [
+            2,
+            2,
+            2,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 2,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 526,
+          "end": 562,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Guardians Of The Galaxy (2020) #10",
+          "parserInput": "Guardians Of The Galaxy (2020) #10",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.37625178826895567,
+          "rank": [
+            2,
+            2,
+            1,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 1,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 562,
+          "end": 593,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "Miles Morales: Spider-Man #23",
+          "parserInput": "Miles Morales: Spider-Man #23",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.402002861230329,
+          "rank": [
+            2,
+            2,
+            1,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 1,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 593,
+          "end": 617,
+          "contextStart": 0,
+          "contextEnd": 738,
+          "raw": "S.W.O.R.D. (2020) #2-4",
+          "parserInput": "S.W.O.R.D. (2020) #2-4",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.4241773962804006,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 617,
+          "end": 648,
+          "contextStart": 17,
+          "contextEnd": 738,
+          "raw": "Savage Avengers (2019) #17-19",
+          "parserInput": "Savage Avengers (2019) #17-19",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.4413447782546495,
+          "rank": [
+            2,
+            2,
+            3,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 3,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 648,
+          "end": 674,
+          "contextStart": 48,
+          "contextEnd": 738,
+          "raw": "Spider-Woman (2020) #7-8",
+          "parserInput": "Spider-Woman (2020) #7-8",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.463519313304721,
+          "rank": [
+            2,
+            2,
+            2,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 2,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 674,
+          "end": 690,
+          "contextStart": 74,
+          "contextEnd": 738,
+          "raw": "The Union #1-2",
+          "parserInput": "The Union #1-2",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.4821173104434907,
+          "rank": [
+            2,
+            2,
+            2,
+            1,
+            0
+          ],
+          "quality": "containment",
+          "outcome": "full",
+          "entries": 2,
+          "unresolved": 0
+        },
+        {
+          "block": 0,
+          "start": 690,
+          "end": 738,
+          "contextStart": 90,
+          "contextEnd": 738,
+          "raw": "Venom (2018) #31-34; And King In Black Handbook.",
+          "parserInput": "Venom (2018) #31-34; And King In Black Handbook",
+          "binding": "explicit-clause",
+          "structural": true,
+          "position": 0.49356223175965663,
+          "rank": [
+            2,
+            2,
+            4,
+            0,
+            -1
+          ],
+          "quality": "containment",
+          "outcome": "partial",
+          "entries": 4,
+          "unresolved": 1
+        }
+      ],
+      "selected": 2,
+      "secondary": [
+        6,
+        0,
+        4,
+        17,
+        1,
+        3,
+        5,
+        7,
+        13,
+        14,
+        8,
+        10,
+        15,
+        16,
+        9,
+        11,
+        12
+      ],
+      "descriptionMayBeIncomplete": true
+    }
+  }
+}
