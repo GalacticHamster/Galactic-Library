@@ -5,6 +5,7 @@ import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import {supportedKindleContentsBook, contentsParseState, KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../lib/kindle-contents.js';
+import {selectManifest} from '../lib/kindle-manifest.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
@@ -593,15 +594,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     for (const entry of entries) {
       const itemId = String(entry?.itemId ?? '').trim();
       const item = database.providerItems[itemId];
-      const statement = String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim();
-      const availability = (entry?.availability??'available')==='available'?statement?'statement-found':'no-statement':entry?.availability;
+      const selection=entry?.descriptionBlocks!==undefined?selectManifest(entry.descriptionBlocks,item?.title):null;
+      const statement = selection?.statement ?? String(entry?.statement ?? '').replace(/\s+/gu, ' ').trim();
+      const availability = selection ? statement?'statement-found':'no-statement' : (entry?.availability??'available')==='available'?statement?'statement-found':'no-statement':entry?.availability;
       const failed=availability==='temporary-failure';
       let sourceUrl = '';
       try {
         const url = new URL(String(entry?.sourceUrl ?? ''));
         if (url.origin === 'https://www.amazon.com' && !url.username && !url.password && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
       } catch { /* invalid source URL remains unusable */ }
-      if (!supportedKindleContentsBook(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
+      if (!supportedKindleContentsBook(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !selection && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (selection && (entry.extractorVersion!==KINDLE_CONTENTS_EXTRACTOR_VERSION||!['statement-found','no-statement'].includes(entry.availability))) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
         endValidation?.();throw new Error('Invalid Kindle contents entry.');
       }
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
@@ -609,6 +611,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       // fetch outcome remains retryable independently of its parsing state.
       const keptStatement = failed && previous?.statement ? previous.statement : statement;
       const result = {source:'amazon-product-page',sourceUrl,statement:keptStatement,availability,
+        ...(failed&&previous?.manifest?{manifest:previous.manifest}:selection?{manifest:selection.manifest}:{}),
         extractorVersion:failed && previous?.statement ? previous.extractorVersion ?? 1 : entry.extractorVersion ?? 1,
         ...(failed?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
       endValidation?.();

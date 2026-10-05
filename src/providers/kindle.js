@@ -126,7 +126,7 @@
     return statement.replace(/[.!?]+$/u, '');
   }
 
-  const contentsExtractorVersion = 3;
+  const contentsExtractorVersion = 4;
   function explicitContentsStatement(value) {
     const text = compactText(value);
     const match = text.match(/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*(?::|-)?\s*.{2,10000}/iu);
@@ -149,6 +149,19 @@
       }
     }
     return '';
+  }
+
+  function kindleDescriptionBlocks(document) {
+    const blocks=[],seen=new Set();let total=0;
+    for(const selector of ['#bookDescription_feature_div','#productDescription','#featurebullets_feature_div','#productOverview_feature_div','[data-feature-name="bookDescription"]']){
+      for(const element of document.querySelectorAll(selector)){
+        // Bound reads before whitespace normalization, even for pathological pages.
+        const text=compactText(String(element.textContent??'').slice(0,24000)).slice(0,Math.min(12000,24000-total));
+        if(!text||seen.has(text))continue;seen.add(text);blocks.push({selector,text});total+=text.length;
+        if(blocks.length===8||total===24000)return blocks;
+      }
+    }
+    return blocks;
   }
 
   function kindleCollectsStatementFromDocument(document) {
@@ -185,8 +198,14 @@
     if(document.querySelector('#ap_email,form[name="signIn"]'))throw new Error('Sign in again before retrying the Kindle contents lookup.');
     }finally{checksEnd?.();}
     const extractEnd=timing?.begin('extraction',timing.attempts);
-    let statement;try{statement=kindleContentsStatementFromDocument(document);}finally{extractEnd?.();}
-    return { sourceUrl: `${url.origin}${url.pathname}`, statement, availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
+    let statement,descriptionBlocks;try{
+      descriptionBlocks=kindleDescriptionBlocks(document);
+      statement=kindleContentsStatementFromDocument(document);
+      // Preview only. The worker performs contextual candidate assessment using
+      // the existing review parser, including no-trigger structural discovery.
+      if(!statement)statement=descriptionBlocks.find(b=>/\bissues?\s*#?\d|#\s*\d/iu.test(b.text))?.text.slice(0,2000)??'';
+    }finally{extractEnd?.();}
+    return { sourceUrl: `${url.origin}${url.pathname}`, statement, descriptionBlocks, availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
   }
 
   function ownershipItemsFromResponse(response) {
@@ -299,5 +318,5 @@
     return { items, diagnostics, snapshot };
   }
 
-  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };
+  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, kindleDescriptionBlocks, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };
 }(globalThis));

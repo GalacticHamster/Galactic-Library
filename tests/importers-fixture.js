@@ -1,3 +1,4 @@
+import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import '../src/lib/kindle-contents-scan.js';
 import '../src/providers/floating-panel.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
@@ -101,7 +102,7 @@ try{
     const domEnd=timing?.begin('dom_parse',timing.attempts);const document=new DOMParser().parseFromString(body,'text/html');domEnd?.();
     if(document.querySelector('#captchacharacters'))throw new Error('Amazon requested a CAPTCHA; wait before continuing.');
     const extractEnd=timing?.begin('extraction',timing.attempts);const statement=globalThis.GalacticKindle.kindleContentsStatementFromDocument(document);extractEnd?.();
-    return {sourceUrl:url,statement,availability:statement?'statement-found':'no-statement',extractorVersion:2};
+    return {sourceUrl:url,statement,descriptionBlocks:globalThis.GalacticKindle.kindleDescriptionBlocks(document),availability:statement?'statement-found':'no-statement',extractorVersion:globalThis.GalacticKindle.contentsExtractorVersion};
   };
   const contentsMessages=[];
   const perf=globalThis.GalacticContentsPerformance;
@@ -130,7 +131,7 @@ try{
   const finished=async()=>{for(let n=0;n<600;n++){if(!status.dataset.busy)return;await pause();}throw new Error('Contents UI did not finish: '+status.textContent);};
   selector.value='scan';start.click();await finished();db=await writer.getDatabase();
   assert(requests.length===2&&!requests.some(url=>url.endsWith('B000000004')),'Normal scan fetched saved or unavailable pages.');
-  assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.parserVersion===2,'Saved text was not locally reparsed.');
+  assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.parserVersion===CONTENTS_PARSER_VERSION,'Saved text was not locally reparsed.');
   assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
   assert(db.providerItems['kindle:B000000002'].metadata.enrichment.kindleProductComicContents.parseOutcome==='full'&&!Object.keys(db.contentReviews).length,'Named proposal disappeared or became verified.');
   checks.push('Kindle contents controls scan prose, locally reparse legacy text and skip unavailable pages');

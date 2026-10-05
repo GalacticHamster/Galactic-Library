@@ -1,5 +1,6 @@
 import {bookToolHelp} from './book-tool-help.js';
 import { contentsStatement, proposeContentsForReview, validateContents } from '../lib/contents.js';
+import {manifestReviewProposal} from '../lib/kindle-manifest.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 function sourcePage(value) {
@@ -37,12 +38,23 @@ export function createContentsEditor(record, review, actions) {
   for(const entry of review?.entries??[])addRow(entry);
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
   const discovered = contentsStatement(record);
+  const evidence=record.metadata?.enrichment?.kindleProductComicContents;
+  if(evidence?.manifest){
+    const details=document.createElement('details');details.append(element('summary','Discovered manifest evidence (unverified)'));
+    details.append(element('p','The selected clause uses description or product-title context to interpret numbered units. Other useful clauses remain available below; they have not been combined or verified.'));
+    for(const index of [evidence.manifest.selected,...evidence.manifest.secondary]){
+      const candidate=evidence.manifest.candidates[index];if(!candidate)continue;
+      details.append(element('p',`${index===evidence.manifest.selected?'Selected':'Additional'}: ${candidate.outcome}; ${candidate.binding}.`),element('blockquote',candidate.raw));
+      if(candidate.parserInput!==candidate.raw)details.append(element('p','Contextual input used for the proposal:'),element('blockquote',candidate.parserInput));
+    }
+    root.append(details);
+  }
   if (review && discovered && discovered !== review.statement) {
     root.append(element('p','New discovery differs from your reviewed statement. Your verified entries remain unchanged.'),element('blockquote',discovered),
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; existing verification has not changed.';}));
   }
   root.append(button('Parse statement for review',()=>{
-    const proposed=proposeContentsForReview(statement.value,record.title);body.replaceChildren();proposed.entries.forEach(addRow);
+    const proposed=manifestReviewProposal(evidence,record.title,statement.value);body.replaceChildren();proposed.entries.forEach(addRow);
     status.textContent=`${proposed.outcome==='filtered'?'Filtered non-containment':proposed.outcome==='uncertain'?'Uncertain candidate':proposed.outcome==='full'?'Structurally parsed proposal; not verified':proposed.outcome==='partial'?'Partially parsed proposal':'Unresolved containment'}. ${proposed.qualityReason} ${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
   }),button('Add contents entry',()=>addRow()),table);
   root.append(button('Save verified contents',async()=>{

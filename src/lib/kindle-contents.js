@@ -2,6 +2,7 @@ import '../providers/kindle.js';
 import {contentsStatement, proposeContentsForReview, CONTENTS_PARSER_VERSION} from './contents.js';
 import {isConfirmedComicManga} from './genre-hints.js';
 import {CONTENTS_FILTER_VERSION} from './contents-quality.js';
+import {manifestReviewProposal} from './kindle-manifest.js';
 
 export const KINDLE_CONTENTS_EXTRACTOR_VERSION = globalThis.GalacticKindle.contentsExtractorVersion;
 export const supportedKindleContentsBook = item => item?.provider === 'kindle' && item.mediaType === 'book'
@@ -10,7 +11,7 @@ export const supportedKindleContentsBook = item => item?.provider === 'kindle' &
 export function contentsParseState(item) {
   const statement = item.metadata?.enrichment?.kindleProductComicContents?.statement?.trim() ?? '';
   if (!statement) return {parseStatus:'not-attempted',parseOutcome:'not-attempted',parserVersion:CONTENTS_PARSER_VERSION,filterVersion:CONTENTS_FILTER_VERSION};
-  const proposal = proposeContentsForReview(statement, item.title);
+  const proposal = manifestReviewProposal(item.metadata.enrichment.kindleProductComicContents, item.title);
   const parseOutcome = proposal.outcome;
   return {parseStatus:parseOutcome === 'full' ? 'parsed' : 'unparsed',parseOutcome,parserVersion:CONTENTS_PARSER_VERSION,
     filterVersion:proposal.filterVersion,quality:proposal.quality,qualityReason:proposal.qualityReason,descriptionMayBeIncomplete:proposal.descriptionMayBeIncomplete};

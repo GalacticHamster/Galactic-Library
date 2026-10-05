@@ -1,5 +1,6 @@
 import { object, text, strings, date, url, count } from './validation.js';
 import {validatePurchaseOrigins} from './purchase-origins.js';
+import {validateManifest} from './kindle-manifest.js';
 
 export const PROVIDER_SOURCES = Object.freeze({steam:'steam-store-browse-items',gog:'gog-account-library',epic:'epic-store-library','amazon-games':'amazon-games-collection',audible:'audible-library-page',kindle:'amazon-kindle-content-library','amazon-video':'amazon-prime-video-purchases-library','fandango-at-home':'fandango-at-home-library',kobo:'kobo-my-books-library',fanatical:'fanatical-order-history',humble:'humble-purchase-library'});
 const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com'],'amazon-games':['gaming.amazon.com','luna.amazon.com'],audible:['audible.com'],kindle:['amazon.com'],'amazon-video':['amazon.com'],'fandango-at-home':['athome.fandango.com'],kobo:['kobo.com'],fanatical:['fanatical.com'],humble:['humblebundle.com']};
@@ -19,14 +20,15 @@ export function validateEnrichment(kind, value) {
     openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
     googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
-    kindleProductComicContents:['source','sourceUrl','statement','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','failureCode','checkedAt'],
+    kindleProductComicContents:['source','sourceUrl','statement','manifest','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','failureCode','checkedAt'],
     localMetadata:['source','sourceId','sourceUrl','fileName','editionKey','workKey','title','authors','contributors','isbn','publisher','series','volume','issue','unitType','run','edition','language','format','categories','publishedDate','pageCount','statement','approved','matchBasis','retrievedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
   const result = {};
   for (const key of [...fields,'selectionRef','retrievedAt','approved','matchBasis']) {
     if (!Object.hasOwn(value,key)) continue;
-    if (['authors','publishers','series','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
+    if(key==='manifest')result[key]=validateManifest(value[key]);
+    else if (['authors','publishers','series','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
     else if(key==='contributors'){if(!Array.isArray(value[key])||value[key].length>50)throw new Error('Invalid enrichment contributors.');result[key]=value[key].map(entry=>{object(entry,'Contributor');return {name:text(entry.name,500,'Name'),role:text(entry.role,80,'Role')};});}
     else if(['approved','descriptionMayBeIncomplete'].includes(key)){if(typeof value[key]!=='boolean')throw new Error('Invalid enrichment approval or incomplete-description flag.');result[key]=value[key];}
     else if (['appliedAt','checkedAt','retrievedAt'].includes(key)) result[key]=date(value[key]);
