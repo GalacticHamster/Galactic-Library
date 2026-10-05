@@ -2,7 +2,7 @@ import {equalDatabaseData} from '../lib/data-equality.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
-import { DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
+import { DATABASE_SCHEMA_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import {supportedKindleContentsBook, contentsParseState, kindleContentsPlan, KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../lib/kindle-contents.js';
 import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_VERSION,validateKindleRefresh,kindleRefreshSummary} from '../lib/kindle-contents-refresh.js';
@@ -628,6 +628,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
         ...(availability==='temporary-failure'?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
       endValidation?.();
       const parse = timed('parsing',()=>contentsParseState({...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,kindleProductComicContents:result}}}));
+      const endHistory=activeTiming?.begin('history_update');
       const observations=database.kindleContentsObservations??={};
       const history=observations[item.recordRef]??={providerItemId:item.id,baseline:contentsObservation(item,previous)};
       // A record with no prior observation can pin its first trustworthy
@@ -635,6 +636,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       if(!history.baseline&&previous&&['statement-found','no-statement','available'].includes(previous.availability))history.baseline=contentsObservation(item,previous);
       const untrustworthy=['temporary-failure','unavailable'].includes(availability);
       if(untrustworthy)history.latestAttempt=contentsObservation(item,{...result,...parse});else delete history.latestAttempt;
+      endHistory?.();
       if(!untrustworthy||!previous)timed('enrichment_update',()=>selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt));
       endValidation=activeTiming?.begin('entry_validation');
     }
@@ -657,12 +659,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return persistDatabase(database);
   }
 
-  async function readKindleRefresh(){return (await storageArea.get({[KINDLE_REFRESH_KEY]:null}))[KINDLE_REFRESH_KEY];}
+  async function readKindleRefresh(){return (await timedAsync('refresh_checkpoint_read',()=>storageArea.get({[KINDLE_REFRESH_KEY]:null})))[KINDLE_REFRESH_KEY];}
   const queueItemCurrent=(db,target)=>{const item=db.providerItems[target.id];return supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl;};
   function currentRefresh(raw,db){
-    const job=validateKindleRefresh(raw);
-    if(job.profileLabel!==(db.providers.kindle?.profileLabel??''))throw Error('Stale refresh profile; start a new refresh for the current library.');
-    return job;
+    return timed('refresh_checkpoint_validate',()=>{
+      const job=validateKindleRefresh(raw);
+      if(job.profileLabel!==text(db.providers.kindle?.profileLabel??'',100,'Refresh profile'))throw Error('Stale refresh profile; start a new refresh for the current library.');
+      return job;
+    });
   }
   async function getKindleContentsRefresh(){
     const db=await getDatabase(),raw=await readKindleRefresh();let checkpoint=null;
@@ -683,7 +687,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       job={version:KINDLE_REFRESH_VERSION,extractorVersion:KINDLE_CONTENTS_EXTRACTOR_VERSION,parserVersion:CONTENTS_PARSER_VERSION,filterVersion:CONTENTS_FILTER_VERSION,manifestVersion:MANIFEST_INTERPRETATION_VERSION,runRef:crypto.randomUUID(),leaseRef:crypto.randomUUID(),
         status:queue.length?'running':'completed',profileLabel:db.providers.kindle?.profileLabel??'',queue,cursor:0,counts:{found:0,empty:0,unavailable:0,failures:0,skipped:0},tabId,startedAt:now,updatedAt:now};
     }
-    job=validateKindleRefresh(job);await storageArea.set({[KINDLE_REFRESH_KEY]:job});
+    job=timed('refresh_checkpoint_validate',()=>validateKindleRefresh(job));await timedAsync('refresh_checkpoint_write',()=>storageArea.set({[KINDLE_REFRESH_KEY]:job}));
     // Fresh acquisition derives its own parse. Do not reparse the historical
     // observation before pinning its original parser/source metadata.
     return {candidates:job.queue.slice(job.cursor).map((item,n)=>({...item,queuePosition:job.cursor+n})),reprocess:[],eligible:job.queue.length,
@@ -691,9 +695,19 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   }
   function refreshLease(job,runRef,leaseRef,tabId){if(job.runRef!==runRef||job.leaseRef!==leaseRef||job.tabId!==tabId||job.status!=='running')throw Error('This refresh lease is stale; resume or start again.');}
   async function checkKindleContentsRefreshItem(runRef,leaseRef,tabId,position){
-    const db=await getDatabase(),job=currentRefresh(await readKindleRefresh(),db);refreshLease(job,runRef,leaseRef,tabId);
+    // This read-only preflight needs one current record, not validation and
+    // canonical reconstruction of every library record and source history.
+    // Read fresh persisted state each time; do not cache a mutable database.
+    // Legacy/schema migrations retain the normal fully validated path. Every
+    // commit still uses getDatabase() and validates the entire write as before.
+    const stored=await timedAsync('storage_read',()=>storageArea.get({[DATABASE_STORAGE_KEY]:null}));
+    let db=stored[DATABASE_STORAGE_KEY];
+    if(db?.schemaVersion!==DATABASE_SCHEMA_VERSION||!db.providerItems||Array.isArray(db.providerItems)||typeof db.providerItems!=='object'||!db.providers||Array.isArray(db.providers)||typeof db.providers!=='object')db=await getDatabase();
+    const job=currentRefresh(await readKindleRefresh(),db);refreshLease(job,runRef,leaseRef,tabId);
     if(!Number.isInteger(position)||position<job.cursor||position>=Math.min(job.cursor+20,job.queue.length))throw Error('Invalid refresh queue position.');
-    return {valid:queueItemCurrent(db,job.queue[position])};
+    const target=job.queue[position],raw=db.providerItems[target.id];
+    const item=raw?timed('refresh_identity_validation',()=>normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined)):null;
+    return {valid:Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl)};
   }
   async function commitKindleContentsRefresh(entries,runRef,leaseRef,tabId){
     if(!Array.isArray(entries)||!entries.length||entries.length>20)throw Error('Save 1–20 refresh observations.');
@@ -722,7 +736,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       }
     }
     if(job.cursor===job.queue.length)job.status='completed';job.updatedAt=new Date().toISOString();
-    const checkpoint=validateKindleRefresh(job);
+    const checkpoint=timed('refresh_checkpoint_validate',()=>validateKindleRefresh(job));
     // Evidence and cursor acknowledge together in the single private store
     // transaction. A lost reply safely repeats only unacknowledged work.
     await persistDatabase(db,null,{[KINDLE_REFRESH_KEY]:checkpoint});return kindleRefreshSummary(checkpoint);
@@ -733,12 +747,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     if(!['paused','aborted','completed','interrupted'].includes(status))throw Error('Invalid refresh finish state.');
     if(job.status==='completed'||job.status==='blocked'&&status!=='aborted')return kindleRefreshSummary(job);
     if(status==='completed'&&job.cursor!==job.queue.length)throw Error('Refresh still has pending records.');
-    job.status=status;job.updatedAt=new Date().toISOString();await storageArea.set({[KINDLE_REFRESH_KEY]:validateKindleRefresh(job)});return kindleRefreshSummary(job);
+    job.status=status;job.updatedAt=new Date().toISOString();const checkpoint=timed('refresh_checkpoint_validate',()=>validateKindleRefresh(job));await timedAsync('refresh_checkpoint_write',()=>storageArea.set({[KINDLE_REFRESH_KEY]:checkpoint}));return kindleRefreshSummary(job);
   }
   async function interruptKindleContentsRefresh(tabId=null){
     const raw=await readKindleRefresh();if(raw?.status!=='running'||tabId!==null&&raw.tabId!==tabId)return;
     const job=validateKindleRefresh(raw);job.status='interrupted';job.leaseRef='';job.tabId=null;job.updatedAt=new Date().toISOString();
-    await storageArea.set({[KINDLE_REFRESH_KEY]:job});
+    await timedAsync('refresh_checkpoint_write',()=>storageArea.set({[KINDLE_REFRESH_KEY]:job}));
   }
 
   async function removeManualMatchDecision(candidateId) {

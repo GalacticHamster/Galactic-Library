@@ -263,10 +263,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if(!isProviderImportPage('kindle',sender.url)||!sender.url.includes('/hz/mycd/')||!Number.isInteger(sender.tab?.id)){
       sendResponse({ok:false,error:'Refresh is available only from the Kindle library tab.'});return undefined;
     }
+    const timing=request.type==='GET_KINDLE_CONTENTS_REFRESH'?null:contentsTiming(request,request.type==='FINISH_KINDLE_CONTENTS_REFRESH'?'checkpoint':'network'),workerEnd=timing?.begin('worker_total');
     const task=request.type==='GET_KINDLE_CONTENTS_REFRESH'?storageWriter.getKindleContentsRefresh():request.type==='CHECK_KINDLE_CONTENTS_REFRESH_ITEM'
-      ?storageWriter.checkKindleContentsRefreshItem(request.runRef,request.leaseRef,sender.tab.id,request.position)
-      :storageWriter.finishKindleContentsRefresh(request.runRef,request.leaseRef,sender.tab.id,request.status);
-    task.then(result=>sendResponse({ok:true,...(request.type==='FINISH_KINDLE_CONTENTS_REFRESH'?{refresh:result}:result)})).catch(error=>sendResponse({ok:false,error:error.message}));return true;
+      ?storageWriter.execute('checkKindleContentsRefreshItem',[request.runRef,request.leaseRef,sender.tab.id,request.position],timing)
+      :storageWriter.execute('finishKindleContentsRefresh',[request.runRef,request.leaseRef,sender.tab.id,request.status],timing);
+    task.then(result=>{workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true,...(request.type==='FINISH_KINDLE_CONTENTS_REFRESH'?{refresh:result}:result)});}).catch(error=>{workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});return true;
   }
 
   if (request?.type === 'GET_KINDLE_COMIC_CONTENT_CANDIDATES') {

@@ -204,17 +204,20 @@
       }
       for(const candidate of candidates){
         if(pauseComicContentsRequested)break;
-        if(refreshJob){
-          const check=await globalThis.GalacticSync.send({type:'CHECK_KINDLE_CONTENTS_REFRESH_ITEM',runRef:refreshJob.runRef,leaseRef:refreshJob.leaseRef,position:candidate.queuePosition});
-          if(!check?.ok)throw Error(check?.error??'Refresh queue is no longer current.');
-          if(pauseComicContentsRequested)break;
-          if(!check.valid){
-            attempted++;buffer.add({itemId:candidate.id,recordRef:candidate.recordRef,queuePosition:candidate.queuePosition,skip:true});
-            if(buffer.due())await flush();continue;
-          }
-        }
         closePending();
         const timing=beginTiming('network');let resultCategory='failed';
+        if(refreshJob){
+          let check;
+          try{check=await diagnosticSend({type:'CHECK_KINDLE_CONTENTS_REFRESH_ITEM',runRef:refreshJob.runRef,leaseRef:refreshJob.leaseRef,position:candidate.queuePosition},timing,'refresh_check_message');}
+          catch(error){finishTiming(timing,'failed');throw error;}
+          if(!check?.ok){finishTiming(timing,'failed');throw Error(check?.error??'Refresh queue is no longer current.');}
+          if(pauseComicContentsRequested){finishTiming(timing,'paused');break;}
+          if(!check.valid){
+            attempted++;buffer.add({itemId:candidate.id,recordRef:candidate.recordRef,queuePosition:candidate.queuePosition,skip:true});
+            if(timing)timing.kind='prepare';
+            try{if(buffer.due())await flush();}finally{finishTiming(timing,'prepared');}continue;
+          }
+        }
         const initialUiEnd=timing?.begin('page_ui');attempted++;
         status.textContent=`Contents discovery: ${attempted}/${progress.total} pages; ${matched} contents found; ${noStatement} no contents found; ${errors} failed; ${progress.total-attempted} remaining. ${candidate.title}`;
         initialUiEnd?.();
@@ -249,8 +252,11 @@
       // Pause, handled errors and normal completion always drain the tail.
       // A hard tab/browser crash can repeat at most 20 unacknowledged results.
       try{await flush(pendingTiming);}catch(error){stoppedError=errorLabel(error);status.textContent=`Kindle contents save failed: ${error.message}. ${buffer.size} unsaved results may need checking again.`;}
+      closePending();
       if(refreshJob){
-        const result=await globalThis.GalacticSync.send({type:'FINISH_KINDLE_CONTENTS_REFRESH',runRef:refreshJob.runRef,leaseRef:refreshJob.leaseRef,status:stopComicContentsRequested?'aborted':stoppedError?'interrupted':pauseComicContentsRequested?'paused':'completed'}).catch(()=>null);
+        const finalization=beginTiming('checkpoint');
+        const result=await diagnosticSend({type:'FINISH_KINDLE_CONTENTS_REFRESH',runRef:refreshJob.runRef,leaseRef:refreshJob.leaseRef,status:stopComicContentsRequested?'aborted':stoppedError?'interrupted':pauseComicContentsRequested?'paused':'completed'},finalization,'save_message').catch(()=>null);
+        finishTiming(finalization,result?.ok?'checkpointed':'failed');
         if(!result?.ok)status.textContent+=' Refresh checkpoint could not be finalized; reopen this page to resume saved progress.';
       }
       closePending();publish(stoppedError?'stopped':pauseComicContentsRequested?'paused':'completed');

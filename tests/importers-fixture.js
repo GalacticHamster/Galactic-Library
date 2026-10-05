@@ -113,8 +113,8 @@ try{
     const timing=perf.trace(request.diagnosticLookupId,request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES'?'prepare':request.type==='REPARSE_KINDLE_CONTENTS'?'reparse':'network'),end=timing?.begin('worker_total');
     let value;
     if(request.type==='GET_KINDLE_CONTENTS_REFRESH')value={ok:true,...await writer.getKindleContentsRefresh()};
-    else if(request.type==='CHECK_KINDLE_CONTENTS_REFRESH_ITEM')value={ok:true,...await writer.checkKindleContentsRefreshItem(request.runRef,request.leaseRef,1,request.position)};
-    else if(request.type==='FINISH_KINDLE_CONTENTS_REFRESH')value={ok:true,refresh:await writer.finishKindleContentsRefresh(request.runRef,request.leaseRef,1,request.status)};
+    else if(request.type==='CHECK_KINDLE_CONTENTS_REFRESH_ITEM')value={ok:true,...await writer.execute('checkKindleContentsRefreshItem',[request.runRef,request.leaseRef,1,request.position],timing)};
+    else if(request.type==='FINISH_KINDLE_CONTENTS_REFRESH')value={ok:true,refresh:await writer.execute('finishKindleContentsRefresh',[request.runRef,request.leaseRef,1,request.status],timing)};
     else if(request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES'){const db=await writer.execute('getDatabase',[],timing),selectionEnd=timing?.begin('candidate_selection');value={ok:true,...(request.mode==='rescan'?await writer.execute('beginKindleContentsRefresh',[request.refreshAction??'start',1],timing):kindleContentsPlan(db,request.mode))};selectionEnd?.();}
     else if(request.type==='REPARSE_KINDLE_CONTENTS'){await writer.execute('reparseKindleContents',[request.entries],timing);value={ok:true};}
     else if(request.type==='SAVE_KINDLE_COMIC_CONTENTS'){const result=await writer.execute(request.refresh?'commitKindleContentsRefresh':'saveKindleComicContents',request.refresh?[request.entries,request.refresh.runRef,request.refresh.leaseRef,1]:[request.entries],timing);value={ok:true,...(request.refresh?{refresh:result}:{})};}
@@ -191,6 +191,16 @@ try{
   assert(requests.length===resumeStart+2&&!requests.slice(resumeStart).includes(requests[refreshStart]),'Refresh Resume repeated acknowledged item.');
   assert((await writer.getKindleContentsRefresh()).checkpoint.status==='completed'&&/3\/3/.test(status.textContent),'Refresh completion lost frozen progress.');
   checks.push('Refresh all includes prior successes, exposes count and resumes actual frozen queue after Pause');
+  kindleShadow.querySelector('[data-export-timing]').click();await wait(()=>kindleShadow.querySelector('[data-timing-output]').value!==diagnosticText);
+  const refreshTiming=JSON.parse(kindleShadow.querySelector('[data-timing-output]').value),resumedRows=refreshTiming.records.filter(row=>row.kind==='network'&&row.events.some(event=>event.stage==='refresh_check_message')&&row.attempts===1).slice(-2);
+  assert(resumedRows.length===2,'Resumed refresh timings missing.');
+  for(const row of resumedRows){
+    const check=row.events.find(event=>event.stage==='refresh_check_message'),fetch=row.events.find(event=>event.stage==='fetch_headers');
+    assert(check.startMs<=fetch.startMs&&row.events.some(event=>event.stage==='refresh_identity_validation'),'Preflight was charged to another item.');
+    assert(row.timingMs.throttle>=900&&!row.events.some(event=>event.stage==='read_validation'&&event.startMs<fetch.startMs),'Refresh pacing or cheap preflight regressed.');
+  }
+  assert(refreshTiming.records.some(row=>row.kind==='checkpoint'&&row.events.some(event=>event.stage==='refresh_checkpoint_read')),'Final queue housekeeping missing from separate timing.');
+  checks.push('Refresh timings attach fresh identity checks to each fetched item and retain one-second pacing and final checkpoint costs');
   hold=true;const abortStart=requests.length;start.click();await wait(()=>requests.length>abortStart);kindleShadow.querySelector('[data-action="stop-contents"]').click();await finished();hold=false;
   assert((await writer.getKindleContentsRefresh()).checkpoint.status==='aborted'&&resume.hidden,'Stop refresh left a resumable queue.');
   checks.push('Stop refresh aborts the actual request and retains evidence while abandoning the queue');

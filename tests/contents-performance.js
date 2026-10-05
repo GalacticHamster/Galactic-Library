@@ -14,6 +14,15 @@ const prepare=async writer=>{
 const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}for(const observation of Object.values(copy.kindleContentsObservations??{}))delete observation.undoRef;copy.enrichmentHistory={};copy.providers={};return copy;};
 
 export const contentsPerformanceTests=[
+ ['refresh timing joins preflight and save without double counting history, checkpoint or worker costs',()=>{
+  let clock=1000;const page=perf.trace(id(1),'network',()=>clock),worker=perf.trace(id(1),'network',()=>clock);
+  const event=(trace,stage,amount)=>{const end=trace.begin(stage);clock+=amount;end();};
+  let message=page.begin('refresh_check_message'),total=worker.begin('worker_total');event(worker,'storage_read',100);event(worker,'refresh_checkpoint_read',4);event(worker,'refresh_checkpoint_validate',2);event(worker,'refresh_identity_validation',1);total();message();perf.merge(page,worker);
+  event(page,'fetch_headers',400);event(page,'response_body',1500);event(page,'extraction',2);event(page,'throttle',1000);
+  const save=perf.trace(id(1),'network',()=>clock);message=page.begin('save_message');total=save.begin('worker_total');event(save,'history_update',3);event(save,'parsing',5);event(save,'storage_write',200);event(save,'refresh_checkpoint_validate',2);total();message();perf.merge(page,save);
+  const row=perf.breakdown(perf.clean(page.finish('statement-found')));
+  assert.equal(row.total,3219);assert.equal(row.network,1900);assert.equal(row.persistence,300);assert.equal(row.history,3);assert.equal(row.checkpoint,8);assert.equal(row.recomputation,1);assert.equal(row.processing,7);assert.equal(row.throttle,1000);assert.equal(row.messaging,0);assert.equal(row.workerOther,0);assert.equal(row.unexplained,0);assert.equal(row.accountingOverlap,0);
+ }],
  ['tail checkpoint diagnostics remain separate and retain their cost for amortized live comparisons',()=>{
   const collector=perf.collector();let clock=0;
   const page=perf.trace(id(1),'network',()=>clock);page.attempts=1;clock+=3200;collector.add(page.finish('no-statement'));
@@ -63,7 +72,7 @@ export const contentsPerformanceTests=[
  ['contents writer diagnostics measure read/validation/parse/rebuild/checkpoint without changing saved semantics',async()=>{
   const normal=makeWriter(),instrumented=makeWriter(),a=await prepare(normal);await instrumented.restoreDatabase(await normal.getDatabase());const b=structuredClone(a);
   await normal.saveKindleComicContents([a]);const trace=perf.trace(id(1));await instrumented.execute('saveKindleComicContents',[[b]],trace);
-  const measured=new Set(trace.events.map(event=>event.stage));for(const stage of ['writer_capture','writer_queue','storage_read','read_validation','migration_compare','entry_validation','parsing','enrichment_update','canonical_rebuild','persist_validation','storage_write'])assert.ok(measured.has(stage),stage);
+  const measured=new Set(trace.events.map(event=>event.stage));for(const stage of ['writer_capture','writer_queue','storage_read','read_validation','migration_compare','entry_validation','parsing','history_update','enrichment_update','canonical_rebuild','persist_validation','storage_write'])assert.ok(measured.has(stage),stage);
   assert.deepEqual(comparable(await normal.getDatabase()),comparable(await instrumented.getDatabase()));
   const reparse=perf.trace(id(2),'reparse');await instrumented.execute('reparseKindleContents',[[{itemId:b.itemId,recordRef:b.recordRef}]],reparse);assert.ok(reparse.events.some(event=>event.stage==='parsing'));assert.ok(!reparse.events.some(event=>event.stage==='canonical_rebuild'));
   assert.ok(!JSON.stringify(perf.clean(trace)).includes('PRIVATE'));assert.equal(perf.trace(undefined),null);

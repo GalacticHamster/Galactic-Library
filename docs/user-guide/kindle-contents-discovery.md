@@ -35,6 +35,8 @@ To start a full source refresh safely:
 
 The operation can take hours. No refresh is started by installing/reloading or changing the selector. New library additions do not change a running queue's total; removed/unsupported records are skipped safely. Completed, paused, interrupted, blocked, aborted and stale states are shown separately.
 
+To investigate scan speed, enable **Record local timing** before starting and export after pausing. The report separates Amazon requests, one-second pacing, retries, extraction/parsing, storage, source-history work, queue checks and UI work. Refresh includes the current-record check before each fetch. Final checkpoint work is recorded separately and must be included when calculating average time per book. The report contains no book or account details; reloading clears it.
+
 Progress reports checked/total, statements found, no contents found, failures/retryable, remaining pages, unavailable pages and local reparses. **No contents found** describes that lookup, not a permanent assertion that a book contains no works.
 
 ## Storage and compatibility

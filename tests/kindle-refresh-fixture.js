@@ -124,5 +124,29 @@ add('Refresh first acquisition, repeated failed attempts and profile history rem
  await rejects(()=>store.writer.beginKindleContentsRefresh('resume',1),'Changed profile resumed');equal((await store.writer.getKindleContentsRefresh()).checkpoint.status,'stale','Changed profile not shown stale');
 });
 
+add('Refresh preflight validates only the current record without writing or rebuilding the entire library',async()=>{
+ const store=memory();await store.writer.restoreDatabase(database(book(1,old()),book(2)));const plan=await begin(store.writer),snapshot=structuredClone(store.values),target=plan.candidates[0];
+ const trace=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-001');
+ equal(await store.writer.execute('checkKindleContentsRefreshItem',[plan.refresh.runRef,plan.refresh.leaseRef,1,0],trace),{valid:true},'Valid preflight rejected');
+ const stages=new Set(trace.events.map(event=>event.stage));
+ for(const stage of ['storage_read','refresh_checkpoint_read','refresh_checkpoint_validate','refresh_identity_validation'])assert(stages.has(stage),'Missing preflight stage '+stage);
+ for(const stage of ['read_validation','migration_compare','canonical_rebuild','persist_validation','storage_write'])assert(!stages.has(stage),'Preflight repeated whole-library work '+stage);
+ equal(store.values,snapshot,'Read-only preflight changed stored history/cursor');
+ for(const patch of [{recordRef:crypto.randomUUID()},{mediaType:'audiobook'},{metadata:{detailUrl:'https://www.amazon.com/not-supported'}},{providerItemId:'DIFFERENT'}]){
+  store.values.galacticLibraryDatabase=structuredClone(snapshot.galacticLibraryDatabase);Object.assign(store.values.galacticLibraryDatabase.providerItems[target.id],patch);
+  equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:false},'Changed current identity not rejected');
+ }
+ store.values.galacticLibraryDatabase=structuredClone(snapshot.galacticLibraryDatabase);delete store.values.galacticLibraryDatabase.providerItems[target.id];
+ equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:false},'Removed record still fetched');
+});
+add('Refresh preflight retains legacy migration and full commit validation after a cheap identity check',async()=>{
+ const store=memory();await store.writer.restoreDatabase(database(book(1),book(2)));const plan=await begin(store.writer),snapshot=structuredClone(store.values);
+ store.values.galacticLibraryDatabase.schemaVersion=11;const migration=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-002');
+ equal(await store.writer.execute('checkKindleContentsRefreshItem',[plan.refresh.runRef,plan.refresh.leaseRef,1,0],migration),{valid:true},'Legacy preflight failed');assert(migration.events.some(event=>event.stage==='read_validation'),'Legacy validation bypassed');equal(store.values.galacticLibraryDatabase.schemaVersion,12,'Legacy migration skipped');
+ store.values.galacticLibraryDatabase=structuredClone(snapshot.galacticLibraryDatabase);const other=plan.candidates[1];store.values.galacticLibraryDatabase.providerItems[other.id].title='';
+ equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:true},'Unrelated data blocked read-only current identity');
+ const before=structuredClone(store.values);await rejects(()=>commit(store.writer,plan,[observation(plan.candidates[0])]),'Commit bypassed full database validation');equal(store.values,before,'Invalid global commit saved partial data');
+});
+
 export const kindleRefreshCases=cases;
 export async function checkKindleRefresh(){for(const [name,check]of cases){try{await check();}catch(error){throw Error(name+': '+error.message);}}return cases.length;}
