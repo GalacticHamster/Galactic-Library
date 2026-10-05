@@ -32,11 +32,13 @@ These tools depend on explicitly generated or restored local run artifacts:
 | `analyze-kindle-manifest-pilot.mjs` | Input pilot JSON argument; writes pilot metrics. |
 | `freeze-kindle-source-sample.mjs` | Private backup; creates the 25-record sample ledger. |
 | `replay-kindle-source-sample.mjs` | Local `kindle-source-capture-live.json`; uses disposable Chrome, blocks HTTP/HTTPS, writes DOM replay. |
-| `check-kindle-source-safety.mjs` | Private backup, sample ledger, replay and pilot results. |
+| `check-kindle-source-safety.mjs` | Private backup, sample ledger, replay, pilot results and pilot metrics. |
 | `analyze-kindle-source-sample.mjs` | Private backup, sample/live/replay/safety artifacts and pilot results; writes analysis and per-record Markdown. |
 | `render-contents-parser-audit.mjs` | Local parser audit, performance and safety results; writes a new generated report without overwriting the archived investigation. |
 
 The missing-artifact error names the prerequisite and explains that generated results are intentionally not committed. Restore an appropriate private archive or explicitly regenerate prerequisite offline runs. Keep related ledgers/captures from the same experiment together.
+
+The stage-by-stage source analysis is historical: it compares saved acquisition-time parser results with the matching replay and serialization from that experiment. A current whole-manifest replay can legitimately differ from the earlier child-only selection (notably King in Black). Mixing that replay with the old acquisition results correctly fails the equality assertion. Restore the matched historical capture/replay/safety set for that analysis; use the whole-manifest, independent-secondary or named-model audits for current behavior. Do not weaken assertions to make incompatible runs look equivalent.
 
 `recon-kindle-amazon.mjs`, `pilot-kindle-manifests.mjs` and `capture-kindle-source-sample.mjs` perform network acquisition and retain their explicit invocation/authorization guards. Their presence is not permission to run them. Missing artifacts never trigger automatic acquisition. No acquisition is required for normal tests or packaging.
 
