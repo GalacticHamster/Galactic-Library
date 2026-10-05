@@ -3,7 +3,7 @@ import {selectManifest,manifestReviewProposal,validateManifest} from '../src/lib
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase,normalizeProviderItem,rebuildCanonicalItems} from '../src/lib/models.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
-import {ownedContentIndex} from '../src/lib/contents.js';
+import {ownedContentIndex,CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 const assert=(test,message)=>{if(!test)throw Error(message);};
 const equal=(a,b,message)=>assert(JSON.stringify(a)===JSON.stringify(b),message);
@@ -46,7 +46,7 @@ export async function checkKindleSourceCapture(fixtures,parseDocument){
  const restored=parseBackup(createBackup(after));equal(restored.contentReviews,after.contentReviews,'Review restore changed');
  for(const [n,item] of items.entries()){
   const saved=after.providerItems[item.id].metadata.enrichment.kindleProductComicContents;
-  equal(saved.manifest.blocks,captured[n].blocks,'Writer lost source lines');equal(saved.statement,captured[n].s.statement,'Writer changed selected source');assert(saved.extractorVersion===5&&saved.parserVersion===4,'Capture and parser generations conflated');
+  equal(saved.manifest.blocks,captured[n].blocks,'Writer lost source lines');equal(saved.statement,captured[n].s.statement,'Writer changed selected source');assert(saved.extractorVersion===5&&saved.parserVersion===CONTENTS_PARSER_VERSION,'Capture and parser generations conflated');
   equal(restored.providerItems[item.id].metadata.enrichment.kindleProductComicContents,saved,'Backup changed source/derived evidence');
   assert(Object.values(after.enrichmentHistory).some(h=>h.recordRef===item.recordRef&&h.previous?.statement==='Original evidence'&&h.previous.checkedAt==='2026-10-01T00:00:00.000Z'),'Historical evidence lost');
  }

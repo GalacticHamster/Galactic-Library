@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 4;
+export const CONTENTS_PARSER_VERSION = 5;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -97,6 +97,20 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
 const extentPrefix=/^(?:(?:backup|short|selected)\s+)?(?:material|pages|excerpts?|selections?|stories?|a (?:short |backup )?story)\s+(?:from|selected from)\s+|^selected\s+from\s+/iu;
 const numericMarker=/#\s*\d|\b(?:issues?|vol(?:ume)?s?\.?|books?|chapters?)\s*#?\d|\b\d+(?:\/\d+|\.\d+)?\s*[-–—]\s*\d+/iu;
 
+// Discovery ranges only: omit a multi-digit suffix's leading digits, never
+// roll into another prefix or guess a single-digit abbreviation. Identity and
+// the ordinary proposal parser retain their existing numeric semantics.
+function reviewRangeEnd(first,last) {
+  if(!last)return null;
+  if(!/^\d+$/u.test(first)||!/^\d+$/u.test(last))return NaN;
+  let end=Number(last);
+  if(end<Number(first)&&last.length>=2&&last.length<first.length){
+    end=Number(first.slice(0,-last.length)+last);
+    if(end<=Number(first))return NaN;
+  }
+  return end>=Number(first)&&end-Number(first)<=499?end:NaN;
+}
+
 /** Bounded discovery grammar. Arbitrary prose must not become a series label. */
 function discoveryNumberedContents(body,collectionTitle) {
   const entries=[],unparsed=[],chunks=[];
@@ -110,19 +124,28 @@ function discoveryNumberedContents(body,collectionTitle) {
       // Commas/conjunctions before a numeric anchor belong to the title. A
       // new extent qualifier must still start its own clause after named prose.
       const typedWork=/\b(?:one-shot|specials?|annuals?)\s*$/iu.test(prefix);
-      if(!numericMarker.test(prefix) && !/\d+(?:\/\d+|\.\d+)?\s*$/u.test(prefix) && !extentPrefix.test(next) && !repeatedTitle && !typedWork)continue;
-      chunks.push({raw:part.slice(start,separator.index).trim(),reset:start===0});start=separator.index+separator[0].length;
+      const postposed=/^\s*issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+(.+)/iu.exec(prefix);
+      const postTail=/^(?:part of\b|the (?:new |classic |acclaimed )?(?:ongoing )?series\b|features?\b|featuring\b|includes?\b|including\b|(?:written|drawn|illustrated) by\b)/iu.test(next);
+      // Numbering before "of" is not a completed title. Keep title-internal
+      // commas/conjunctions until a genuinely new numbered clause appears.
+      if(postposed&&/^\p{Lu}/u.test(postposed[1])&&!numericMarker.test(next)&&!postTail)continue;
+      const laterCollection=/^collects?\s+/iu.test(next);
+      if(!numericMarker.test(prefix) && !/\d+(?:\/\d+|\.\d+)?\s*$/u.test(prefix) && !extentPrefix.test(next) && !repeatedTitle && !typedWork && !laterCollection)continue;
+      chunks.push({raw:part.slice(start,separator.index).trim(),following:part.slice(start).trim(),reset:start===0});start=separator.index+separator[0].length;
     }
-    chunks.push({raw:part.slice(start).trim(),reset:start===0});
+    chunks.push({raw:part.slice(start).trim(),following:part.slice(start).trim(),reset:start===0});
   }
   let previous=null;
   const headingExtent=extentPrefix.test(body)?'excerpt':'full';
   let clauseExtent=headingExtent;
-  for(const {raw,reset} of chunks){
+  for(const {raw,following,reset} of chunks){
     if(!raw)continue;
     if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
     if(/^collects?\s+/iu.test(raw))clauseExtent='full';
-    let chunk=raw.replace(/^(?:and|plus|as well as|along with|collects?|collecting)\s+/iu,'').replace(/[.!]+$/u,'');
+    let chunk=raw.replace(/^(?:and|plus|as well as|along with|collects?|collecting)\s+/iu,'');
+    // Sentence punctuation can terminate a range; an abbreviation at the end
+    // of a postposed title remains part of its literal label.
+    if(!/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(chunk))chunk=chunk.replace(/[.!]+$/u,'');
     if(/\bstories?\s+(?:["“][^"”]{1,80}["”]\s+)?from\s+/iu.test(chunk))clauseExtent='excerpt';
     // A bounded grammatical run qualifier precedes a title, not an issue.
     chunk=chunk.replace(/^[^#;,]{1,80}['’]s\s+run\s+on\s+/iu,'');
@@ -130,6 +153,8 @@ function discoveryNumberedContents(body,collectionTitle) {
       chunk=chunk.replace(/^[^#;,]{1,80}\s+(?:backup\s+)?stories\s+from\s+/iu,'stories from ');
     }
     const qualified=extentPrefix.test(chunk);chunk=chunk.replace(extentPrefix,'').replace(/^the (?:entire|complete) miniseries\s+/iu,'');
+    // A demonstrated collection wrapper, not a general prose-prefix stripper.
+    chunk=chunk.replace(/^adventures from\s+/iu,'');
     if(qualified)clauseExtent='excerpt';
     // A semicolon after partial material may continue that heading or start
     // a new full list. Without an explicit qualifier, do not choose for users.
@@ -142,13 +167,17 @@ function discoveryNumberedContents(body,collectionTitle) {
     let label='',numbers='',type='issue',after='';
     const post=/^issues?\s*#?\s*(\d+(?:\s*[-–—]\s*\d+)?)\s+of\s+(.+)$/iu.exec(chunk);
     const runIssue=/^(.+?)\s+\(?vol(?:ume)?\.?\s*(\d+)\)?\s+(?:issues?\s*)?#\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
-    const numbered=/^(.*?)\s*(#|issues?\s*#?|vol(?:ume)?s?\.?\s*#?|books?\s*#?|chapters?\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
+    const numbered=/^(.*?)\s*(#|\bissues?\b\s*#?|\bvol(?:ume)?s?\b\.?\s*#?|\bbooks?\b\s*#?|\bchapters?\b\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
     const bare=/^(.*?)\s+(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*\d+)?)$/u.exec(chunk);
-    const continuation=/^#?\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)$/u.exec(chunk);
+    const continuation=/^#?\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)(\s*[.;—–]\s*.+)?$/u.exec(chunk);
     if(runIssue){label=runIssue[1];numbers=runIssue[3];after=runIssue[4];}
-    else if(post){label=post[2];numbers=post[1];}
+    else if(post){
+      label=post[2];numbers=post[1];
+      const boundary=/,\s*(?=part of\b|(?:written|drawn|illustrated) by\b)/iu.exec(label);
+      if(boundary){after=label.slice(boundary.index);label=label.slice(0,boundary.index);}
+    }
     else if(numbered){label=numbered[1].replace(/^issues?\s+/iu,'');numbers=numbered[3];after=numbered[4];type=/^(?:vol|book)/iu.test(numbered[2])?'volume':'issue';}
-    else if(continuation && previous){numbers=continuation[1];type=previous.unitType;}
+    else if(continuation && previous){numbers=continuation[1];type=previous.unitType;after=continuation[2]??'';}
     else if(bare && !/\b(?:first|all|five|six|years?|chapter|parts?|script|story|stories|novels?|books?)\b/iu.test(bare[1]) && !/^(?:19|20)\d{2}$/u.test(bare[2])){label=bare[1];numbers=bare[2];}
     else {unparsed.push(raw);previous=null;continue;}
     label=label.replace(/,\s*$/u,'');
@@ -162,16 +191,20 @@ function discoveryNumberedContents(body,collectionTitle) {
       && !(' '+identityKey(collectionTitle)+' ').includes(' '+identityKey(label)+' ');
     const ambiguousConjunction=!label.includes(':') && /['’]s\b/iu.test(label)&&/\band\b/iu.test(label);
     // A marker/qualifier inside a label exposes greedy last-marker parsing.
-    if(ambiguousComma || ambiguousConjunction || (label.match(/,/gu)?.length??0)>1 || /["“”]|\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || /^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /^(?:all|the|this|these|his|her|their)$/iu.test(label) || /#|\b(?:issues?|volumes?|vols?|books?|chapters?|script|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|stories from|run on|reprinting|storyline|description|characters|meet|more|present|was|were|published|you|he|she|they)\b/iu.test(label)
+    const creditTail=/^from\s+(?!(?:pages?|material|excerpts?|selections?|stories?|issues?|chapters?)\b)[^#;]{1,250}\b(?:creators?|writers?|artists?)\b/iu.test(after+following.slice(raw.length));
+    const boundedTail=/^\s*(?:[,;]|\.(?=\s+|["“])|[—–](?!\s*#?\d)|and\b|plus\b|(?:written|drawn|illustrated|pencilled|penciled|art) by\b|with (?:bonus|additional|supplemental|extra) (?:material|content)\b|of\s+[^#;]{1,180}\brun\b)/iu.test(after)||creditTail;
+    const attachedTail=after&&/^\p{L}/u.test(after)&&/\d$/u.test(chunk.slice(0,chunk.length-after.length));
+    if(ambiguousComma || ambiguousConjunction || attachedTail || (label.match(/,/gu)?.length??0)>1 || /["“”]|\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || /^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /^(?:all|the|this|these|his|her|their)$/iu.test(label) || /#|\b(?:issues?|volumes?|vols?|chapters?|scripts?|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|stories from|recommendations? for|run on|reprinting|storyline|description|characters|meet|more than|and more|present|was|were|published|you)\b|(?<![\p{L}\d-])(?:he|she|they)(?![\p{L}\d-])|\bbooks?\s*#?\d/iu.test(label)
       || type==='annual' && /^\d{4}$/u.test(numbers) && !/#/u.test(chunk)
-      || (!label && !previous) || (after && !/^\s*(?:[,;]|and\b|plus\b)/iu.test(after))){unparsed.push(raw);previous=null;continue;}
+      || (!label && !previous) || (after && !boundedTail)){unparsed.push(raw);previous=null;continue;}
     if(after){unparsed.push(after.trim());}
     const descriptor=label?reviewSeriesDescriptor(label,explicitRun):{...previous,run:explicitRun||previous.run};
     const completeness=clauseExtent;
     const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness};
     const match=/^(\d+(?:\/\d+|\.\d+)?)(?:\s*[-–—]\s*#?(\d+))?$/u.exec(numbers);
-    if(!match || match[2] && (!/^\d+$/u.test(match[1]) || Number(match[2])<Number(match[1]) || Number(match[2])-Number(match[1])>499)) {unparsed.push(raw);previous=null;continue;}
-    const values=match[2]?Array.from({length:Number(match[2])-Number(match[1])+1},(_,n)=>String(Number(match[1])+n)):[match[1]];
+    const end=match?reviewRangeEnd(match[1],match[2]):NaN;
+    if(!match || Number.isNaN(end)) {unparsed.push(raw);previous=null;continue;}
+    const values=end!==null?Array.from({length:end-Number(match[1])+1},(_,n)=>String(Number(match[1])+n)):[match[1]];
     try{const validated=validateContents(values.map(number=>({...base,number})));entries.push(...validated);previous=base;}
     catch{unparsed.push(raw);previous=null;}
     if(entries.length>2000)return {entries:[],unparsed:[body]};

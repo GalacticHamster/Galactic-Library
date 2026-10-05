@@ -2,6 +2,8 @@
 
 These are permanent inputs, not frozen audit result dumps. Expected behavior remains in tests; generated comparisons go to ignored `audit-artifacts/kindle/`.
 
+`tests/contents-numbered-precision-fixture.js` supplies synthetic, minimal parser-5 numbered-clause regressions to both Node and packaged Chrome/Firefox UI checks. It preserves the shapes of lexical unit boundaries, postposed conjunction titles, finite prose tails, and abbreviated numeric endpoints without purchase metadata or complete product descriptions. Parser 5 means bounded numbered precision, not a new named-work grammar. Historical parser snapshots remain unchanged.
+
 - `kindle-contents-quality-fixtures.json`, `contents-parser-v4-corpus.json`, `kindle-manifest-fixtures.json`, `kindle-whole-manifest.json` and `kindle-independent-evidence.json`: bounded source clauses and synthetic cases for quality, parsing, whole manifests and independent claims.
 - `kindle-source-capture.json`: nine sanitized HTML/source cases reproducing description-boundary failures. No full pages, sessions or account state.
 - `captured-manifest-inputs.json`: 127 historical bounded public description observations (77 pilot generation-4, 25 sample generation-4, 25 sample generation-5) across 95 URLs. Existing regression controls need complete bounded blocks; exact selected-source coordinates preserve the previously saved child even when current ranking prefers its whole-manifest parent. It excludes parser results, timestamps, ownership and library IDs.

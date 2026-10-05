@@ -79,7 +79,8 @@ export const kindleContentsQualityTests=[
   assert.equal(parse('Collects issues 1-16 of Harrow County').entries.length,16);
   assert.equal(parse('Collects Comic (2012) 17, 12-13, 15, 19, 21-22').entries.length,7);
   assert.equal(parse('Collects Library Books 1-4').entries.length,4);
-  for(const statement of ['Collects issues #1-4','Collects issues 1-4 of the original series','Collects issues #1-12 plus the complete script for issue #3','Collects Comic #1-99999','Collects Comic #645-50','Collects Comic #-1','Collects Comic #1234567'])assert.equal(parse(statement).entries.length,0,statement);
+  for(const statement of ['Collects issues #1-4','Collects issues 1-4 of the original series','Collects issues #1-12 plus the complete script for issue #3','Collects Comic #1-99999','Collects Comic #645-5','Collects Comic #-1','Collects Comic #1234567'])assert.equal(parse(statement).entries.length,0,statement);
+  assert.deepEqual(parse('Collects Comic #645-50').entries.map(e=>e.number),['645','646','647','648','649','650']);
   assert.equal(parse('Collects Comic #1-2 and bonus essays').outcome,'partial');
   assert.equal(parse('Collects Batman: Black and White #1-4').entries[0].series,'Batman: Black and White');
   assert.deepEqual(parse('Includes "Alpha and Omega", "In Red, with Pearls", and "Third Story"').entries.map(e=>e.number),['Alpha and Omega','In Red, with Pearls','Third Story']);

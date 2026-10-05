@@ -1,5 +1,6 @@
 import {createContentsScanProgress} from '../src/ui/contents-scan-progress.js';
 import {checkParentScopedComponents} from './parent-scoped-components-fixture.js';
+import {checkNumberedPrecision} from './contents-numbered-precision-fixture.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { createBackup } from '../src/lib/storage.js';
 import { matchItems } from '../src/lib/matcher.js';
@@ -399,5 +400,6 @@ try{
   checks.push('Options retries a failed final reconciliation without requiring another scan or storage event');
 
   checks.push(...await checkParentScopedComponents());
+  checks.push(`bounded numbered precision: ${checkNumberedPrecision()} source-shape controls`);
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

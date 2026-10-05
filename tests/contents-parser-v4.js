@@ -11,10 +11,18 @@ const parse=id=>{const f=byId(id);return proposeContentsForReview(f.statement,f.
 const range=(p,series,type='issue')=>p.entries.filter(e=>e.series===series&&e.unitType===type).map(e=>e.number);
 const numbers=(start,end)=>Array.from({length:end-start+1},(_,n)=>String(n+start));
 export const contentsParserV4Tests=[
- ...fixtures.map(f=>[`parser 4 saved-corpus regression ${f.auditId}: ${f.title}`,()=>{
+ ...fixtures.filter(f=>![32,1437].includes(f.auditId)).map(f=>[`parser 4 saved-corpus regression ${f.auditId}: ${f.title}`,()=>{
    const p=proposeContentsForReview(f.statement,f.title,f.context);
    assert.equal(p.outcome,f.outcome);assert.deepEqual(p.entries,f.entries);assert.deepEqual(p.unparsed,f.unparsed);
  }]),
+ ['parser 5 recovers bounded dash clause and lexical Book labels in prior regressions',()=>{
+   const aliens=parse(32);assert.deepEqual(range(aliens,'Aliens, Space Marines'),numbers(1,12));
+   assert.deepEqual(aliens.entries.filter(e=>e.series!=='Aliens, Space Marines'),byId(32).entries);
+   assert.equal(aliens.outcome,'partial');assert.deepEqual(aliens.unparsed,['—','Fifth Anniversary Special']);
+   const venom=parse(1437);assert.equal(venom.outcome,'full');assert.deepEqual(venom.unparsed,[]);
+   assert.deepEqual(venom.entries.filter(e=>!e.series.startsWith('Free Comic Book Day')),byId(1437).entries);
+   assert.deepEqual(venom.entries.filter(e=>e.series.startsWith('Free Comic Book Day')).map(e=>[e.series,e.unitType,e.number,e.completeness]),[['Free Comic Book Day 2019 (Spider-Man/Venom)','issue','1','excerpt'],['Free Comic Book Day 2020 (Spider-Man/Venom)','issue','1','excerpt']]);
+ }],
  ['run qualifiers preserve series, explicit run and issue identity independently',()=>{
    const a=parse(240);assert.deepEqual(range(a,'Batman'),numbers(491,500));assert.deepEqual(range(a,'Detective Comics'),numbers(659,666));
    assert.ok(a.entries.filter(e=>e.series==='Batman').every(e=>e.run==='volume 1'&&e.unitType==='issue'));
@@ -62,7 +70,7 @@ export const contentsParserV4Tests=[
  }],
  ['context basis persists locally; edited statements do not reuse title binding',()=>{
    const f=byId(478),saved={source:'amazon-product-page',sourceUrl:'https://www.amazon.com/dp/B000000001',statement:f.rawStatement,availability:'statement-found',extractorVersion:4,checkedAt:'2026-10-05T00:00:00.000Z'};
-   const state=contentsParseState({title:f.title,metadata:{enrichment:{kindleProductComicContents:saved}}});assert.equal(state.parserVersion,4);assert.equal(state.parseOutcome,'full');assert.equal(state.parseBinding,'explicit-product-series-volume-title');assert.match(state.parseInput,/Earth 2/);
+   const state=contentsParseState({title:f.title,metadata:{enrichment:{kindleProductComicContents:saved}}});assert.equal(state.parserVersion,CONTENTS_PARSER_VERSION);assert.equal(state.parseOutcome,'full');assert.equal(state.parseBinding,'explicit-product-series-volume-title');assert.match(state.parseInput,/Earth 2/);
    const v=validateEnrichment('kindleProductComicContents',{...saved,...state});for(const k of ['statement','checkedAt','extractorVersion'])assert.equal(v[k],saved[k]);for(const k of ['parseInput','parseBinding'])assert.equal(v[k],state[k]);
    assert.equal(manifestReviewProposal(saved,f.title,'Collects #1-3').entries.length,0);
  }],
@@ -77,7 +85,7 @@ export const contentsParserV4Tests=[
    assert.notEqual(prior.selected,current.selected,'parser change demonstrably changes winner');
    const restored=validateManifest(prior);assert.equal(restored.candidates[restored.selected].raw,prior.candidates[prior.selected].raw);assert.deepEqual(restored.blocks,prior.blocks);
    const forged=structuredClone(prior);forged.candidates[forged.selected].raw='Collects Fake #1-99';forged.candidates[0].parserInput='Collects Fake #1-99';assert.deepEqual(validateManifest(forged),current);
-   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,4);
+   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,5);
  }],
  ['ordinary proposal semantics remain independent of discovery grammar',async()=>{
    const old=await oldParser();for(const f of fixtures)assert.deepEqual(proposeContents(f.statement),old.module.proposeContents(f.statement));
