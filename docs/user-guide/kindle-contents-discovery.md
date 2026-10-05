@@ -10,7 +10,7 @@ Existing contents statements, confirmed comic/manga evidence and simple collecti
 
 ## Scan, retry, refresh and local reparse
 
-The signed-in Kindle panel has a contents mode selector. The action is **Find contents** for ordinary scans and **Refresh all eligible books (count)** for a full source refresh:
+The signed-in Kindle panel has a contents mode selector. Contents actions remain disabled until the saved refresh state has loaded successfully. If an unfinished refresh exists, the panel selects refresh mode and makes **Resume refresh (saved/total)** the primary action. Ordinary scans use **Find contents**. **Start new refresh** occupies a separate button slot and asks for confirmation before creating a queue:
 
 | Mode | Page requests | Local work |
 |---|---|---|
@@ -29,9 +29,9 @@ To start a full source refresh safely:
 
 1. Reload the current extension and export a Galactic Library backup. Keep that file and any frozen private audit ledger somewhere durable.
 2. Open your signed-in Kindle Content & Devices library from Galactic Library. Sync the library first if books are missing; the separate **Full rescan** sync button does not refresh product-page contents.
-3. Under **Contents discovery**, choose **Refresh all eligible books**. Check the displayed count, then click **Refresh all eligible books (count)** to start a new frozen queue.
-4. Leave the Kindle library tab open. **Pause** saves completed work; **Resume refresh (saved/total)** continues that queue, including after reopening/restarting. CAPTCHA/sign-in blocks require resolution before Resume.
-5. **Stop refresh** abandons the queue while keeping acquired evidence. Starting Refresh all again creates a new queue and revisits every eligible book. A stale/incompatible queue must also be restarted.
+3. Under **Contents discovery**, choose **Refresh all eligible books**. Check the eligible count in the explanation. Use **Resume refresh** to continue an unfinished queue, or click the separate **Start new refresh** button. Its confirmation explicitly states the completed/total progress that will be abandoned; cancelling preserves the queue.
+4. Leave the Kindle library tab open. **Pause** saves completed work; **Resume refresh (saved/total)** continues that queue, including after reopening/restarting. Pause and Resume occupy the same fixed button slot, anchored at the bottom of the panel. Progress messages and diagnostic output scroll above the controls. CAPTCHA/sign-in blocks require resolution before Resume.
+5. **Stop refresh** abandons the queue while keeping acquired evidence. Confirming **Start new refresh** creates a new queue and revisits every eligible book. A stale/incompatible queue must also be restarted.
 
 The operation can take hours. No refresh is started by installing/reloading or changing the selector. New library additions do not change a running queue's total; removed/unsupported records are skipped safely. Completed, paused, interrupted, blocked, aborted and stale states are shown separately.
 

@@ -8,9 +8,9 @@
   const shadow = host.attachShadow({ mode: 'closed' });
   shadow.innerHTML = `
     <style>
-      .panel { background:#1f2937; border:1px solid #f59e0b; border-radius:8px; box-shadow:0 8px 30px #0008; padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:#f59e0b; color:#1c1917; cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:#fde68a; margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
+      .panel { box-sizing:border-box; display:flex; flex-direction:column; width:350px; max-width:calc(100vw - 36px); max-height:calc(100vh - 36px); background:#1f2937; border:1px solid #f59e0b; border-radius:8px; box-shadow:0 8px 30px #0008; padding:14px; } .panel[hidden] { display:none; } .panel-body { min-height:0; overflow:auto; } .contents-controls { flex-shrink:0; margin-top:10px; } .contents-primary { display:grid; } .contents-primary button { grid-area:1/1; } .contents-secondary { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; } .contents-controls button { width:100%; height:44px; box-sizing:border-box; padding:4px 8px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:#f59e0b; color:#1c1917; cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:#fde68a; margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads the newest Kindle pages until it reaches a page already in your local baseline. <strong>Full rescan</strong> rebuilds the Kindle snapshot.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p><label>Contents discovery <select data-contents-mode><option value="scan">Scan eligible books</option><option value="retry">Retry incomplete checks</option><option value="rescan">Refresh all eligible books</option><option value="reparse">Reparse saved text (no requests)</option></select></label></p><p class="contents-mode-help"></p><p><button type="button" data-action="resume-contents" hidden>Resume refresh</button> <button type="button" data-action="stop-contents" hidden>Stop refresh</button> <button type="button" data-action="comic-contents">Find contents</button> <button type="button" data-action="pause-comic-contents" hidden>Pause</button></p><details><summary>How contents discovery works</summary><p>Any synced Kindle book with a supported Amazon product page can be checked. Likely collections come first. Scanning uses your signed-in tab, saves collection statements as suggestions, and reprocesses older saved text locally. No contents found means this check found no useful statement; it does not prove the book contains nothing.</p><p>Normal scans skip current results and modern unavailable checks. Empty generation-1 checks can be revisited. Retry revisits incomplete checks. Refresh all eligible books fetches every eligible book again, including previous successes, with source generation 5. Previous source evidence is preserved. Reparse saved text makes no requests. Results save in groups of up to 20 or about once a minute, and always when you pause or finish. Pause keeps saved progress. Resume refresh continues the same frozen queue; starting Refresh all again creates a new queue. Stop refresh abandons the queue but retains saved evidence. Normal scans resume their own incomplete checks. Closing the tab stops requests. Reopen the Kindle library and choose Resume refresh after a tab/browser restart. Up to 20 unacknowledged results may repeat. CAPTCHA/sign-in blocks stop the queue; resolve the block before explicitly resuming.</p><p>In Book information, open Details and Review included contents to check proposals before saving verified contents. Names, numbers, run, language and full/excerpt scope need review. Discovered names do not match other library titles or confirm purchases.</p></details><details><summary>Performance diagnostics</summary><p><label><input type="checkbox" data-contents-diagnostics> Record local timing (last 50 operations)</label></p><p>Enable before scanning. Pause after 20?50 pages, then export. Timing contains no book or account information. Reload clears it.</p><button type="button" data-export-timing>Export timing summary</button><textarea data-timing-output readonly hidden aria-label="Contents performance report" style="width:100%;height:100px"></textarea></details><p class="status" role="status"></p></div>`;
+    <div class="panel"><div class="panel-body"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads the newest Kindle pages until it reaches a page already in your local baseline. <strong>Full rescan</strong> rebuilds the Kindle snapshot.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p><label>Contents discovery <select data-contents-mode><option value="scan">Scan eligible books</option><option value="retry">Retry incomplete checks</option><option value="rescan">Refresh all eligible books</option><option value="reparse">Reparse saved text (no requests)</option></select></label></p><p class="contents-mode-help"></p><details><summary>How contents discovery works</summary><p>Any synced Kindle book with a supported Amazon product page can be checked. Likely collections come first. Scanning uses your signed-in tab, saves collection statements as suggestions, and reprocesses older saved text locally. No contents found means this check found no useful statement; it does not prove the book contains nothing.</p><p>Normal scans skip current results and modern unavailable checks. Empty generation-1 checks can be revisited. Retry revisits incomplete checks. Refresh all eligible books fetches every eligible book again, including previous successes, with source generation 5. Previous source evidence is preserved. Reparse saved text makes no requests. Results save in groups of up to 20 or about once a minute, and always when you pause or finish. Pause keeps saved progress. Resume refresh continues the same frozen queue; Start new refresh asks for confirmation before replacing saved queue progress. Stop refresh abandons the queue but retains saved evidence. Normal scans resume their own incomplete checks. Closing the tab stops requests. Reopen the Kindle library and choose Resume refresh after a tab/browser restart. Up to 20 unacknowledged results may repeat. CAPTCHA/sign-in blocks stop the queue; resolve the block before explicitly resuming.</p><p>In Book information, open Details and Review included contents to check proposals before saving verified contents. Names, numbers, run, language and full/excerpt scope need review. Discovered names do not match other library titles or confirm purchases.</p></details><details><summary>Performance diagnostics</summary><p><label><input type="checkbox" data-contents-diagnostics> Record local timing (last 50 operations)</label></p><p>Enable before scanning. Pause after 20?50 pages, then export. Timing contains no book or account information. Reload clears it.</p><button type="button" data-export-timing>Export timing summary</button><textarea data-timing-output readonly hidden aria-label="Contents performance report" style="width:100%;height:100px"></textarea></details><p class="status" role="status"></p></div><div class="contents-controls" aria-label="Contents actions" aria-busy="true"><div class="contents-primary"><button type="button" data-action="comic-contents" disabled>Loading saved refresh...</button><button type="button" data-action="resume-contents" disabled hidden>Resume refresh</button><button type="button" data-action="pause-comic-contents" disabled hidden>Pause</button></div><div class="contents-secondary"><button type="button" data-action="new-refresh" disabled>Start new refresh</button><button type="button" data-action="stop-contents" disabled>Stop refresh</button></div></div></div>`;
   const syncButtons = [...shadow.querySelectorAll('button[data-mode]')];
   const comicContentsButton = shadow.querySelector('button[data-action="comic-contents"]');
   const pauseComicContentsButton = shadow.querySelector('button[data-action="pause-comic-contents"]');
@@ -18,6 +18,10 @@
   const contentsMode = shadow.querySelector('[data-contents-mode]');
   const resumeContentsButton=shadow.querySelector('[data-action="resume-contents"]');
   const stopContentsButton=shadow.querySelector('[data-action="stop-contents"]');
+  const newRefreshButton=shadow.querySelector('[data-action="new-refresh"]');
+  const contentsControls=shadow.querySelector('.contents-controls');
+  const controlTools=globalThis.GalacticContentsScan;
+  const controlsState=controlTools.refreshControlsState();
   const modeHelp=shadow.querySelector('.contents-mode-help');
   const performanceTools=globalThis.GalacticContentsPerformance;
   const diagnosticCheck=shadow.querySelector('[data-contents-diagnostics]');
@@ -49,23 +53,48 @@
   let comicContentsRunning = false;
   let pauseComicContentsRequested = false;
   let stopComicContentsRequested = false;
-  async function describeContentsMode(){
-    if(comicContentsRunning)return;
-    const refresh=contentsMode.value==='rescan';resumeContentsButton.hidden=true;
-    comicContentsButton.textContent=refresh?'Refresh all eligible books':'Find contents';
-    modeHelp.textContent=refresh?'Fetch every eligible Kindle book again using source generation 5. Previous source evidence is preserved.':contentsMode.value==='reparse'?'Reinterpret current saved text with parser 5. No Amazon requests.':contentsMode.value==='retry'?'Retry temporary failures and legacy unknown checks. Successful results are skipped.':'Check new and incomplete books; reparse outdated saved text locally.';
-    if(!refresh)return;
-    const result=await globalThis.GalacticSync.send({type:'GET_KINDLE_CONTENTS_REFRESH'}).catch(()=>null);
-    if(!result?.ok||comicContentsRunning||contentsMode.value!=='rescan')return;
-    comicContentsButton.textContent=`Refresh all eligible books (${result.eligible})`;
-    const job=result.checkpoint;
-    if(job){
-      modeHelp.textContent+=` Saved refresh: ${job.status}${job.total!==undefined?`, ${job.cursor}/${job.total} saved`:''}. Refresh all starts a new queue.`;
-      if(['running','paused','interrupted','blocked'].includes(job.status)){
-        resumeContentsButton.hidden=false;resumeContentsButton.textContent=`Resume refresh (${job.cursor}/${job.total})`;
-      }
-    }
+  let syncing=false;
+  function renderContentsControls(loading=false){
+    const ready=controlsState.ready&&!syncing;
+    const job=controlsState.result?.checkpoint;
+    const refresh=contentsMode.value==='rescan';
+    const resume=refresh&&controlTools.resumableRefresh(job);
+    contentsControls.setAttribute('aria-busy',String(loading));
+    contentsMode.disabled=!ready||comicContentsRunning;
+    comicContentsButton.hidden=comicContentsRunning||resume;
+    resumeContentsButton.hidden=comicContentsRunning||!resume;
+    pauseComicContentsButton.hidden=!comicContentsRunning;
+    comicContentsButton.disabled=!ready||comicContentsRunning||refresh;
+    resumeContentsButton.disabled=!ready||comicContentsRunning;
+    pauseComicContentsButton.disabled=!comicContentsRunning||pauseComicContentsRequested;
+    newRefreshButton.disabled=!ready||comicContentsRunning||!refresh;
+    stopContentsButton.disabled=!comicContentsRunning||!refresh||pauseComicContentsRequested;
+    comicContentsButton.textContent=loading?'Loading saved refresh...':!ready?'Saved state unavailable':refresh?'No refresh to resume':'Find contents';
+    resumeContentsButton.textContent=resume?`Resume refresh (${job.cursor}/${job.total})`:'Resume refresh';
   }
+  async function describeContentsMode(initial=false){
+    if(comicContentsRunning)return false;
+    const token=controlsState.begin();
+    renderContentsControls(true);
+    modeHelp.textContent='Checking saved refresh progress before enabling contents actions...';
+    const result=await globalThis.GalacticSync.send({type:'GET_KINDLE_CONTENTS_REFRESH'}).catch(()=>null);
+    if(!controlsState.resolve(token,result)||comicContentsRunning)return false;
+    if(!controlsState.ready){
+      modeHelp.textContent='Saved refresh state could not be loaded. Reload this page before starting contents discovery; your saved queue has not been changed.';
+      renderContentsControls();return false;
+    }
+    const job=result.checkpoint;
+    if(initial&&controlTools.resumableRefresh(job))contentsMode.value='rescan';
+    const refresh=contentsMode.value==='rescan';
+    modeHelp.textContent=refresh?`Fetch every eligible Kindle book again (${result.eligible}) using source generation 5. Previous source evidence is preserved.`:contentsMode.value==='reparse'?'Reinterpret current saved text with parser 5. No Amazon requests.':contentsMode.value==='retry'?'Retry temporary failures and legacy unknown checks. Successful results are skipped.':'Check new and incomplete books; reparse outdated saved text locally.';
+    if(job)modeHelp.textContent+=` Saved refresh: ${job.status}${job.total!==undefined?`, ${job.cursor}/${job.total} saved`:''}. ${controlTools.resumableRefresh(job)?'Resume refresh continues this queue.':'Start new refresh creates a new queue.'}`;
+    renderContentsControls();return true;
+  }
+  // Capture even gestures aimed at disabled buttons. A pointer/key press that
+  // began during loading cannot become a click on newly enabled controls.
+  for(const type of ['pointerdown','keydown'])shadow.addEventListener(type,event=>{
+    if(event.target.closest('.contents-controls'))controlsState.captureGesture();
+  },true);
   contentsMode.addEventListener('change',()=>describeContentsMode());
 
   function setSyncButtonsDisabled(disabled) {
@@ -73,9 +102,8 @@
   }
 
   async function sync(mode) {
-    setSyncButtonsDisabled(true);
-    comicContentsButton.disabled = true;
-    resumeContentsButton.disabled=true;contentsMode.disabled=true;
+    if(syncing||comicContentsRunning||!controlsState.ready)return;
+    syncing=true;controlsState.invalidate();setSyncButtonsDisabled(true);renderContentsControls(true);
     status.dataset.busy = 'true';
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
@@ -101,8 +129,7 @@
       status.textContent = `Kindle import failed: ${error.message}`;
     } finally {
       setSyncButtonsDisabled(false);
-      comicContentsButton.disabled = false;
-      resumeContentsButton.disabled=false;contentsMode.disabled=false;describeContentsMode();
+      syncing=false;describeContentsMode();
       delete status.dataset.busy;
     }
   }
@@ -146,11 +173,9 @@
   }
 
   async function enrichComicContents(refreshAction='start') {
-    if (comicContentsRunning) return;
+    if (comicContentsRunning||syncing||!controlsState.ready) return;
     comicContentsRunning=true;pauseComicContentsRequested=false;stopComicContentsRequested=false;
-    setSyncButtonsDisabled(true);comicContentsButton.disabled=true;resumeContentsButton.disabled=true;
-    pauseComicContentsButton.hidden=false;pauseComicContentsButton.disabled=false;contentsMode.disabled=true;
-    resumeContentsButton.hidden=true;stopContentsButton.hidden=contentsMode.value!=='rescan';stopContentsButton.disabled=false;
+    controlsState.invalidate();setSyncButtonsDisabled(true);renderContentsControls();
     status.dataset.busy='true';
     const buffer=globalThis.GalacticContentsScan.checkpointBuffer();
     const progress={runRef:crypto.randomUUID(),phase:'preparing',mode:contentsMode.value,checked:0,total:0,found:0,empty:0,unavailable:0,failures:0,reparsed:0,durable:0,buffered:0};
@@ -260,17 +285,31 @@
         if(!result?.ok)status.textContent+=' Refresh checkpoint could not be finalized; reopen this page to resume saved progress.';
       }
       closePending();publish(stoppedError?'stopped':pauseComicContentsRequested?'paused':'completed');
-      comicContentsRunning=false;pauseComicContentsButton.hidden=true;stopContentsButton.hidden=true;
-      setSyncButtonsDisabled(false);comicContentsButton.disabled=false;resumeContentsButton.disabled=false;contentsMode.disabled=false;delete status.dataset.busy;
+      comicContentsRunning=false;
+      setSyncButtonsDisabled(false);delete status.dataset.busy;
       describeContentsMode();
     }
   }
 
   syncButtons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  comicContentsButton.addEventListener('click', () => enrichComicContents());
-  resumeContentsButton.addEventListener('click',()=>enrichComicContents('resume'));
-  stopContentsButton.addEventListener('click',()=>{stopComicContentsRequested=true;pauseComicContentsRequested=true;activeContentsRequest?.abort();stopContentsButton.disabled=true;pauseComicContentsButton.disabled=true;status.textContent='Stopping refresh; saved evidence is kept...';});
+  comicContentsButton.addEventListener('click',()=>{
+    if(comicContentsButton.disabled||comicContentsButton.hidden||!controlsState.allowGesture()||contentsMode.value==='rescan')return;
+    enrichComicContents();
+  });
+  resumeContentsButton.addEventListener('click',()=>{
+    if(resumeContentsButton.disabled||resumeContentsButton.hidden||!controlsState.allowGesture())return;
+    enrichComicContents('resume');
+  });
+  newRefreshButton.addEventListener('click',async()=>{
+    if(newRefreshButton.disabled||!controlsState.allowGesture())return;
+    // Re-read before the confirmation so it describes the current saved cursor.
+    if(!await describeContentsMode()||contentsMode.value!=='rescan'||comicContentsRunning||syncing)return;
+    if(!globalThis.confirm(controlTools.refreshRestartConfirmation(controlsState.result.checkpoint)))return;
+    enrichComicContents('start');
+  });
+  stopContentsButton.addEventListener('click',()=>{if(stopContentsButton.disabled||!comicContentsRunning||!controlsState.allowGesture(false))return;stopComicContentsRequested=true;pauseComicContentsRequested=true;activeContentsRequest?.abort();stopContentsButton.disabled=true;pauseComicContentsButton.disabled=true;status.textContent='Stopping refresh; saved evidence is kept...';});
   pauseComicContentsButton.addEventListener('click', () => {
+    if(pauseComicContentsButton.disabled||!comicContentsRunning||!controlsState.allowGesture(false))return;
     pauseComicContentsRequested = true;
     activeContentsRequest?.abort();
     pauseComicContentsButton.disabled = true;
@@ -278,5 +317,5 @@
   });
   globalThis.GalacticFloatingPanel?.attach(shadow, 'kindle');
   document.documentElement.append(host);
-  describeContentsMode();
+  describeContentsMode(true);
 }());

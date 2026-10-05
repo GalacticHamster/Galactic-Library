@@ -42,6 +42,7 @@ try{
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full';
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
+      if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
       if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
       if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
@@ -64,7 +65,7 @@ try{
         if(mode==='full')await import(`../src/providers/${file}-content.js`);
         const shadow=shadows.at(-1);
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('button');
-        assert(button,`${provider} missing ${mode} button`);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
+        assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
       }
       const shadow=shadows.at(-1);
       await wait(()=>!shadow.querySelector('.status').dataset.busy&&(imported>before||/failed:/iu.test(shadow.querySelector('.status').textContent)));
@@ -78,7 +79,7 @@ try{
     }
   }
   // Contents controls and DOM extraction use fixture pages, never Amazon.
-  const kindleShadow=shadows.find(root=>root.querySelector('[data-contents-mode]'));
+  let kindleShadow=shadows.find(root=>root.querySelector('[data-contents-mode]'));
   const originalFetch=globalThis.fetch;
   const urls=id=>'https://www.amazon.com/dp/'+id;
   await writer.mergeProviderItems('kindle',[
@@ -104,7 +105,9 @@ try{
     const extractEnd=timing?.begin('extraction',timing.attempts);const statement=globalThis.GalacticKindle.kindleContentsStatementFromDocument(document);extractEnd?.();
     return {sourceUrl:url,statement,descriptionBlocks:globalThis.GalacticKindle.kindleDescriptionBlocks(document),availability:statement?'statement-found':'no-statement',extractorVersion:globalThis.GalacticKindle.contentsExtractorVersion};
   };
-  const contentsMessages=[];
+  const contentsMessages=[];let delayedState=null;
+  const confirmationMessages=[];let confirmRestart=false;
+  globalThis.confirm=message=>{confirmationMessages.push(message);return confirmRestart;};
   const perf=globalThis.GalacticContentsPerformance;
   globalThis.chrome.runtime.sendMessage=async request=>{
     contentsMessages.push(request);
@@ -112,7 +115,7 @@ try{
     if(request.type==='GET_KINDLE_CONTENTS_UI_TIMINGS')return {ok:true,records:[]};
     const timing=perf.trace(request.diagnosticLookupId,request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES'?'prepare':request.type==='REPARSE_KINDLE_CONTENTS'?'reparse':'network'),end=timing?.begin('worker_total');
     let value;
-    if(request.type==='GET_KINDLE_CONTENTS_REFRESH')value={ok:true,...await writer.getKindleContentsRefresh()};
+    if(request.type==='GET_KINDLE_CONTENTS_REFRESH'){if(delayedState)return delayedState;value={ok:true,...await writer.getKindleContentsRefresh()};}
     else if(request.type==='CHECK_KINDLE_CONTENTS_REFRESH_ITEM')value={ok:true,...await writer.execute('checkKindleContentsRefreshItem',[request.runRef,request.leaseRef,1,request.position],timing)};
     else if(request.type==='FINISH_KINDLE_CONTENTS_REFRESH')value={ok:true,refresh:await writer.execute('finishKindleContentsRefresh',[request.runRef,request.leaseRef,1,request.status],timing)};
     else if(request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES'){const db=await writer.execute('getDatabase',[],timing),selectionEnd=timing?.begin('candidate_selection');value={ok:true,...(request.mode==='rescan'?await writer.execute('beginKindleContentsRefresh',[request.refreshAction??'start',1],timing):kindleContentsPlan(db,request.mode))};selectionEnd?.();}
@@ -130,9 +133,55 @@ try{
     const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1?2.';
     return new Response(captcha?'<input id="captchacharacters">':'<div id="bookDescription_feature_div">'+description+'</div>',{status:200});
   };
+  // Reload the actual content script with a deliberately delayed saved queue.
+  // Nothing may begin while the read is pending, even a synthetic click.
+  const frozen=await writer.beginKindleContentsRefresh('start',1);
+  await writer.finishKindleContentsRefresh(frozen.refresh.runRef,frozen.refresh.leaseRef,1,'paused');
+  const savedBefore=structuredClone(values.galacticLibraryKindleContentsRefresh);
+  let releaseState;delayedState=new Promise(resolve=>{releaseState=resolve;});
+  document.querySelector('#galactic-library-kindle-importer').remove();
+  history.replaceState({},'','/hz/mycd/');
+  await import('../src/providers/kindle-content.js?delayed-checkpoint');kindleShadow=shadows.at(-1);
   const selector=kindleShadow.querySelector('[data-contents-mode]'),start=kindleShadow.querySelector('[data-action="comic-contents"]'),stop=kindleShadow.querySelector('[data-action="pause-comic-contents"]'),status=kindleShadow.querySelector('.status');
-  const finished=async()=>{for(let n=0;n<600;n++){if(!status.dataset.busy)return;await pause();}throw new Error('Contents UI did not finish: '+status.textContent);};
-  selector.value='scan';start.click();await finished();db=await writer.getDatabase();
+  const finished=async()=>{for(let n=0;n<600;n++){if(!status.dataset.busy&&!selector.disabled)return;await pause();}throw new Error('Contents UI did not finish: '+status.textContent);};
+  const newRefresh=kindleShadow.querySelector('[data-action="new-refresh"]');
+  const resume=kindleShadow.querySelector('[data-action="resume-contents"]');
+  const rect=node=>{const r=node.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(n=>Math.round(n*100)/100).join(',');};
+  let primaryRect=rect(start),restartRect=rect(newRefresh);
+  const preparedBefore=contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length;
+  assert(start.disabled&&resume.disabled&&newRefresh.disabled&&selector.disabled,'Checkpoint loading exposed actionable contents controls.');
+  for(const button of [start,resume,newRefresh])button.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  start.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+  delayedState=null;releaseState({ok:true,...await writer.getKindleContentsRefresh()});
+  await wait(()=>!selector.disabled);
+  resume.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));resume.dispatchEvent(new MouseEvent('click',{bubbles:true}));await pause();
+  assert(selector.value==='rescan'&&!resume.hidden&&start.hidden,'Saved unfinished refresh did not default to Resume.');
+  assert(rect(resume)===primaryRect&&rect(newRefresh)===restartRect,'Checkpoint loading shifted action slots.');
+  assert(contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length===preparedBefore&&!confirmationMessages.length,'A click begun while loading activated a newly enabled action.');
+  assert(JSON.stringify(values.galacticLibraryKindleContentsRefresh)===JSON.stringify(savedBefore),'Loading or racing click changed the saved queue.');
+  delayedState=new Promise(resolve=>{releaseState=resolve;});selector.dispatchEvent(new Event('change'));
+  newRefresh.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+  delayedState=null;releaseState({ok:true,...await writer.getKindleContentsRefresh()});await wait(()=>!selector.disabled);
+  newRefresh.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));newRefresh.dispatchEvent(new MouseEvent('click',{bubbles:true}));await pause();
+  assert(!confirmationMessages.length&&JSON.stringify(values.galacticLibraryKindleContentsRefresh)===JSON.stringify(savedBefore),'A restart gesture begun during loading was not discarded.');
+  delayedState=Promise.resolve({ok:false,error:'Synthetic unavailable state'});selector.dispatchEvent(new Event('change'));
+  await wait(()=>/could not be loaded/.test(kindleShadow.querySelector('.contents-mode-help').textContent));
+  assert(start.disabled&&resume.disabled&&newRefresh.disabled&&selector.disabled,'Failed checkpoint load enabled a refresh action.');
+  delayedState=null;selector.dispatchEvent(new Event('change'));await wait(()=>!selector.disabled);
+  assert(rect(resume)===primaryRect&&rect(newRefresh)===restartRect,'Reloading state shifted the action slots.');
+  newRefresh.click();await wait(()=>confirmationMessages.length===1);
+  assert(/completed\/total progress \(0\/4\) will be abandoned/.test(confirmationMessages[0]),'Restart confirmation omitted saved completed/total progress.');
+  assert(JSON.stringify(values.galacticLibraryKindleContentsRefresh)===JSON.stringify(savedBefore),'Cancelled restart changed the saved queue.');
+  checks.push('Delayed persisted-state loading disables controls, defaults to Resume and rejects clicks begun during resolution');
+  checks.push('Restart occupies a separate stable slot and cancelling its progress confirmation preserves the entire queue');
+  checks.push('Unavailable checkpoint reads fail closed; primary and restart gestures across delayed reloading cannot begin work');
+  kindleShadow.querySelector('[data-galactic-floating-panel-control="minimize"]').click();
+  assert(getComputedStyle(kindleShadow.querySelector('.panel')).display==='none','New panel layout broke Minimize.');
+  kindleShadow.querySelector('[data-galactic-floating-panel-control="restore"]').click();
+  assert(rect(resume)===primaryRect&&rect(newRefresh)===restartRect,'Expand changed the action slots.');
+  const setMode=async value=>{selector.value=value;selector.dispatchEvent(new Event('change'));await wait(()=>!selector.disabled);};
+  const runRefresh=async()=>{confirmRestart=true;const before=contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length;newRefresh.click();await wait(()=>contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length>before);};
+  await setMode('scan');start.click();await finished();db=await writer.getDatabase();
   assert(requests.length===2&&!requests.some(url=>url.endsWith('B000000004')),'Normal scan fetched saved or unavailable pages.');
   assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.parserVersion===CONTENTS_PARSER_VERSION,'Saved text was not locally reparsed.');
   assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
@@ -149,16 +198,16 @@ try{
   click(editor,'Parse statement for review');assert(editor.querySelectorAll('tbody tr').length===3,'Named works are missing from the editor.');click(editor,'Save verified contents');await wait(()=>Boolean(savedReview));
   assert(savedReview.entries.every(entry=>entry.unitType==='component'),'Named suggestions changed their component shape.');
   checks.push('Contents to review lists fully parsed proposals; explicit editor confirmation saves named components');
-  selector.value='reparse';const before=requests.length;start.click();await finished();assert(requests.length===before,'Parser-only mode contacted Amazon.');
+  await setMode('reparse');const before=requests.length;start.click();await finished();assert(requests.length===before,'Parser-only mode contacted Amazon.');
   checks.push('Kindle parser-only mode makes zero requests');
-  captcha=true;selector.value='rescan';start.click();await finished();assert(requests.length===before+1&&/Stopped:.*CAPTCHA/i.test(status.textContent),'CAPTCHA did not stop the queue.');
+  captcha=true;await setMode('rescan');await runRefresh();await finished();assert(requests.length===before+1&&/Stopped:.*CAPTCHA/i.test(status.textContent),'CAPTCHA did not stop the queue.');
   db=await writer.getDatabase();assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement==='Collects Example #1?2','Failed refresh erased saved text.');
-  captcha=false;selector.value='retry';start.click();await finished();assert(requests.length===before+2,'Retry did not target just the incomplete result.');
+  captcha=false;await setMode('retry');start.click();await finished();assert(requests.length===before+2,'Retry did not target just the incomplete result.');
   checks.push('Kindle CAPTCHA stops sequential rescan; retry preserves and refreshes the saved statement');
   await writer.mergeProviderItems('kindle',[{providerItemId:'B000000005',title:'Fresh ordinary book',mediaType:'book',metadata:{detailUrl:urls('B000000005'),originType:'Purchase'}}]);
-  hold=true;selector.value='rescan';const pausedBefore=requests.length;start.click();await wait(()=>requests.length>pausedBefore);stop.click();await finished();
-  assert(/Paused/.test(status.textContent)&&!start.disabled&&!selector.disabled,'Pause failed to abort or re-enable controls.');
-  hold=false;transientOnce=true;selector.value='scan';const resumeBefore=requests.length;start.click();await finished();assert(requests.length===resumeBefore+2&&requests.at(-1).endsWith('B000000005'),'Normal scan did not resume only unfinished eligible books.');
+  hold=true;await setMode('rescan');const pausedBefore=requests.length;await runRefresh();await wait(()=>requests.length>pausedBefore);stop.click();await finished();
+  assert(/Paused/.test(status.textContent)&&!resume.disabled&&!selector.disabled,'Pause failed to abort or re-enable controls.');
+  hold=false;transientOnce=true;await setMode('scan');const resumeBefore=requests.length;start.click();await finished();assert(requests.length===resumeBefore+2&&requests.at(-1).endsWith('B000000005'),'Normal scan did not resume only unfinished eligible books.');
   checks.push('Kindle Pause aborts the current request and normal scan resumes unfinished work');
   kindleShadow.querySelector('[data-export-timing]').click();await wait(()=>!kindleShadow.querySelector('[data-timing-output]').hidden);
   const diagnosticText=kindleShadow.querySelector('[data-timing-output]').value,report=JSON.parse(diagnosticText);
@@ -172,7 +221,7 @@ try{
     {providerItemId:'B000000006',title:'Pause buffer first',mediaType:'book',metadata:{detailUrl:urls('B000000006'),originType:'Purchase'}},
     {providerItemId:'B000000007',title:'Pause buffer second',mediaType:'book',metadata:{detailUrl:urls('B000000007'),originType:'Purchase'}}
   ]);
-  holdAtRequest=requests.length+2;selector.value='scan';start.click();await wait(()=>requests.length===holdAtRequest);
+  holdAtRequest=requests.length+2;await setMode('scan');start.click();await wait(()=>requests.length===holdAtRequest);
   assert(!values.galacticLibraryDatabase.providerItems['kindle:B000000006'].metadata.enrichment?.kindleProductComicContents,'A buffered result wrote the database immediately.');
   stop.click();await finished();db=await writer.getDatabase();
   assert(db.providerItems['kindle:B000000006'].metadata.enrichment.kindleProductComicContents.statement&&!db.providerItems['kindle:B000000007'].metadata.enrichment?.kindleProductComicContents,'Pause did not flush only completed results.');
@@ -182,15 +231,28 @@ try{
   // Exercise the actual refresh controls and frozen position, not just the
   // writer API. Keep the synthetic queue tiny and all product fetches mocked.
   const refreshDb=await writer.getDatabase();refreshDb.providerItems=Object.fromEntries(Object.entries(refreshDb.providerItems).filter(([id])=>['kindle:B000000001','kindle:B000000002','kindle:B000000003'].includes(id)));refreshDb.canonicalItems={};await writer.restoreDatabase(refreshDb);
-  selector.value='rescan';selector.dispatchEvent(new Event('change'));
-  await wait(()=>/\(3\)/.test(start.textContent));
-  const refreshStart=requests.length;holdAtRequest=refreshStart+2;start.click();await wait(()=>requests.length===holdAtRequest);stop.click();await finished();
-  const checkpoint=(await writer.getKindleContentsRefresh()).checkpoint,resume=kindleShadow.querySelector('[data-action="resume-contents"]');
+  // The editor fixtures above change document scrollbars; compare transitions
+  // in the current viewport, not coordinates from before those unrelated UIs.
+  primaryRect=rect(start);restartRect=rect(newRefresh);
+  await setMode('rescan');
+  assert(/\(3\)/.test(kindleShadow.querySelector('.contents-mode-help').textContent),'Refresh eligibility count missing.');
+  const refreshStart=requests.length;holdAtRequest=refreshStart+2;await runRefresh();
+  assert(rect(stop)===primaryRect&&rect(newRefresh)===restartRect,`Running Pause/restart slots moved: ${rect(stop)} vs ${primaryRect}; ${rect(newRefresh)} vs ${restartRect}`);
+  status.textContent+=' '+('Long changing progress text. '.repeat(80));
+  kindleShadow.querySelector('[data-timing-output]').hidden=false;
+  assert(rect(stop)===primaryRect&&rect(newRefresh)===restartRect,'Async status or diagnostics shifted actions.');await wait(()=>requests.length===holdAtRequest);stop.click();await finished();
+  const checkpoint=(await writer.getKindleContentsRefresh()).checkpoint;
   assert(checkpoint.status==='paused'&&checkpoint.cursor===1&&checkpoint.total===3,'Refresh Pause lost fixed denominator or acknowledged position.');
-  await wait(()=>!resume.hidden);holdAtRequest=0;const resumeStart=requests.length;resume.click();await finished();
+  await wait(()=>!resume.hidden&&!resume.disabled);assert(rect(resume)===primaryRect&&rect(newRefresh)===restartRect,'Paused Resume moved from the Pause slot.');
+  const pausedQueue=structuredClone(values.galacticLibraryKindleContentsRefresh),confirmBefore=confirmationMessages.length;
+  confirmRestart=false;newRefresh.click();await wait(()=>confirmationMessages.length>confirmBefore);
+  assert(/completed\/total progress \(1\/3\) will be abandoned/.test(confirmationMessages.at(-1)),'Restart did not describe the current acknowledged progress.');
+  assert(JSON.stringify(values.galacticLibraryKindleContentsRefresh)===JSON.stringify(pausedQueue),'Cancelling restart lost completed work.');
+  holdAtRequest=0;const resumeStart=requests.length;resume.click();await finished();
   assert(requests.length===resumeStart+2&&!requests.slice(resumeStart).includes(requests[refreshStart]),'Refresh Resume repeated acknowledged item.');
   assert((await writer.getKindleContentsRefresh()).checkpoint.status==='completed'&&/3\/3/.test(status.textContent),'Refresh completion lost frozen progress.');
   checks.push('Refresh all includes prior successes, exposes count and resumes actual frozen queue after Pause');
+  checks.push('Pause and Resume share fixed geometry through long status changes; cancelled restart preserves acknowledged progress');
   kindleShadow.querySelector('[data-export-timing]').click();await wait(()=>kindleShadow.querySelector('[data-timing-output]').value!==diagnosticText);
   const refreshTiming=JSON.parse(kindleShadow.querySelector('[data-timing-output]').value),resumedRows=refreshTiming.records.filter(row=>row.kind==='network'&&row.events.some(event=>event.stage==='refresh_check_message')&&row.attempts===1).slice(-2);
   assert(resumedRows.length===2,'Resumed refresh timings missing.');
@@ -202,7 +264,7 @@ try{
   }
   assert(refreshTiming.records.some(row=>row.kind==='checkpoint'&&row.events.some(event=>event.stage==='refresh_checkpoint_read')),'Final queue housekeeping missing from separate timing.');
   checks.push('Refresh timings attach fresh identity checks to each fetched item and retain one-second pacing and final checkpoint costs');
-  hold=true;const abortStart=requests.length;start.click();await wait(()=>requests.length>abortStart);kindleShadow.querySelector('[data-action="stop-contents"]').click();await finished();hold=false;
+  hold=true;const abortStart=requests.length;await runRefresh();await wait(()=>requests.length>abortStart);kindleShadow.querySelector('[data-action="stop-contents"]').click();await finished();hold=false;
   assert((await writer.getKindleContentsRefresh()).checkpoint.status==='aborted'&&resume.hidden,'Stop refresh left a resumable queue.');
   checks.push('Stop refresh aborts the actual request and retains evidence while abandoning the queue');
 

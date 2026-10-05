@@ -18,6 +18,25 @@
   }
   const phases=new Set(['preparing','running','checkpointing','paused','completed','stopped','interrupted']);
   const active=state=>['preparing','running','checkpointing'].includes(state?.phase);
+  // UI-only gate: delayed checkpoint reads and gestures begun before a state
+  // transition must never activate the controls installed by that transition.
+  function refreshControlsState() {
+    let revision=0,ready=false,result=null,gesture=null;
+    return {
+      get ready(){return ready;},get result(){return result;},
+      begin(){ready=false;result=null;return ++revision;},
+      resolve(token,value){if(token!==revision)return false;ready=Boolean(value?.ok);result=ready?value:null;return true;},
+      invalidate(){ready=false;++revision;},
+      captureGesture(){gesture={revision,ready};},
+      allowGesture(requireReady=true){const previous=gesture;gesture=null;return (!requireReady||ready)&&(!previous||(!requireReady||previous.ready)&&previous.revision===revision);}
+    };
+  }
+  const resumableRefresh=job=>['running','paused','interrupted','blocked'].includes(job?.status);
+  function refreshRestartConfirmation(job) {
+    return Number.isInteger(job?.cursor)&&Number.isInteger(job?.total)
+      ? `Start a new refresh from the beginning? The existing completed/total progress (${job.cursor}/${job.total}) will be abandoned. Previously saved contents and source history will be kept.`
+      : `Start a new refresh from the beginning?${job?.status==='stale'?' The saved refresh is incompatible and cannot be resumed.':''} Previously saved contents and source history will be kept.`;
+  }
   function progress(value) {
     if (!/^[a-f0-9-]{36}$/iu.test(value?.runRef??'') || !phases.has(value?.phase)
       || !['scan','retry','rescan','reparse'].includes(value.mode)) throw Error('Invalid contents scan progress.');
@@ -44,5 +63,5 @@
       list(){prune();return [...runs.values()].map(({updatedAt,...state})=>({...state}));}
     };
   }
-  global.GalacticContentsScan=Object.freeze({MAX_RESULTS,CHECKPOINT_MS,checkpointBuffer,progress,progressHub,active});
+  global.GalacticContentsScan=Object.freeze({MAX_RESULTS,CHECKPOINT_MS,checkpointBuffer,progress,progressHub,active,refreshControlsState,resumableRefresh,refreshRestartConfirmation});
 }(globalThis));

@@ -25,6 +25,30 @@ async function seeded(count=21,reorder=false){
 const state=patch=>({runRef:'12345678-1234-1234-1234-123456789abc',phase:'running',mode:'scan',checked:3,total:20,found:1,empty:1,unavailable:1,failures:0,reparsed:0,durable:0,buffered:3,...patch});
 
 export const kindleScanPerformanceTests=[
+ ['refresh controls stay gated through delayed state loading and reject a click begun during resolution',()=>{
+  const controls=tools.refreshControlsState(),token=controls.begin();
+  assert.equal(controls.ready,false);assert.equal(controls.allowGesture(),false);
+  controls.captureGesture();controls.resolve(token,{ok:true,checkpoint:{status:'paused',cursor:37,total:100}});
+  assert.equal(controls.ready,true);assert.equal(controls.allowGesture(),false);
+  controls.captureGesture();assert.equal(controls.allowGesture(),true);
+ }],
+ ['refresh controls ignore stale checkpoint responses and fail closed after an unavailable read',()=>{
+  const controls=tools.refreshControlsState(),old=controls.begin(),current=controls.begin();
+  assert.equal(controls.resolve(old,{ok:true}),false);assert.equal(controls.ready,false);
+  controls.resolve(current,{ok:false});assert.equal(controls.ready,false);assert.equal(controls.result,null);
+  const next=controls.begin();controls.resolve(next,{ok:true});controls.captureGesture();controls.invalidate();
+  assert.equal(controls.resolve(next,{ok:true}),false);assert.equal(controls.allowGesture(),false);
+ }],
+ ['only unfinished refreshes resume; restarting names completed/total progress and preserves source evidence',()=>{
+  for(const status of ['running','paused','interrupted','blocked']){
+   const job={status,cursor:37,total:100};assert.equal(tools.resumableRefresh(job),true);
+   assert.match(tools.refreshRestartConfirmation(job),/completed\/total progress \(37\/100\) will be abandoned/);
+   assert.match(tools.refreshRestartConfirmation(job),/contents and source history will be kept/);
+  }
+  for(const status of ['completed','aborted','stale',undefined])assert.equal(tools.resumableRefresh({status}),false);
+  assert.match(tools.refreshRestartConfirmation({status:'completed',cursor:100,total:100}),/completed\/total progress \(100\/100\) will be abandoned/);
+  assert.match(tools.refreshRestartConfirmation({status:'stale'}),/cannot be resumed/);
+ }],
  ['migration comparison ignores object order, preserves array order and detects real changes',()=>{
   assert.equal(equalDatabaseData({a:1,b:{x:[1,2],y:null}},{b:{y:null,x:[1,2]},a:1}),true);
   assert.equal(equalDatabaseData({a:[1,2]},{a:[2,1]}),false);
