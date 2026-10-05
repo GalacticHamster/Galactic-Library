@@ -57,7 +57,7 @@ export const contentsParserV4Tests=[
    assert.ok(proposeContentsForReview('Includes pages from Wool, Shift and Dust','Wool Omnibus').entries.every(e=>e.completeness==='excerpt'));
    assert.ok(parse(448).entries.filter(e=>e.series==='AQUAMAN'||e.series==='CHALLENGERS OF THE UNKNOWN').every(e=>e.completeness==='excerpt'));
    for(const [id,label]of [[32,'Aliens, Earth War'],[1437,'Carnage: Black, White & Blood'],[465,'Doctor Strange, Sorcerer Supreme'],[1508,'X-Men: God Loves, Man Kills Extended Cut']])assert.ok(parse(id).entries.some(e=>e.series===label));
-   for(const title of ['Promethea: Deluxe Edition Book Two','A Collection Book 1'])assert.equal(proposeContentsForReview('Collects issues #1-3',title,{allowTitleBinding:true}).entries.length,0);
+   for(const title of ['Promethea: Deluxe Edition Book Two','A Collection Book 1','Collection Volume 1','Omnibus Book 2','Collected Works Book One'])assert.equal(proposeContentsForReview('Collects issues #1-3',title,{allowTitleBinding:true}).entries.length,0);
    for(const statement of ['Includes Parts 1 & 2Often plot text','Collects Calendar 1978'])assert.equal(proposeContentsForReview(statement,'Collection').entries.length,0);
  }],
  ['context basis persists locally; edited statements do not reuse title binding',()=>{

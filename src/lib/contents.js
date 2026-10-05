@@ -190,6 +190,7 @@ function reviewSeriesAnchor(title,context) {
   }
   const series=metadata[0]||titleSeries;
   if(!series || /^(?:a|an|the)\s+(?:collection|omnibus|anthology)|\b(?:box set|complete collection|epic collection|deluxe|edition|anniversary|ultimate collection|by)\b/iu.test(series))return null;
+  if(/^(?:(?:a|an|the)\s+)?(?:collection|omnibus|anthology|collected (?:works|stories|novels|essays))$/iu.test(series))return null;
   return {series,basis:metadata.length?'explicit-product-series-metadata':'explicit-product-series-volume-title'};
 }
 
