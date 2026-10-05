@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check:repository": "node scripts/check-repository-layout.mjs",
     "test": "node tests/run.js",
     "test:browser": "node tests/browser.js",
     "package": "node scripts/package-release.mjs",

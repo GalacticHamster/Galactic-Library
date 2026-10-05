@@ -46,7 +46,9 @@ assert.equal(writes,16);assert.equal(networkCalls,0);assert.deepEqual(after.cont
 assert.equal(kindleContentsPlan(after).reprocess.length,0);assert.equal(kindleContentsPlan(after).candidates.length,0);
 for(const row of rows){const saved=after.providerItems[row.item.id].metadata.enrichment.kindleProductComicContents,previous=row.item.metadata.enrichment.kindleProductComicContents;
  assert.equal(saved.statement,previous.statement);assert.equal(saved.checkedAt,previous.checkedAt);assert.equal(saved.extractorVersion,previous.extractorVersion);
- assert.equal(saved.parseOutcome,row.proposal.outcome);assert.equal(after.providerItems[row.item.id].ownership,row.item.ownership);
+ // Raw-snippet quality statistics above intentionally retain their historical
+ // definition. The writer also interprets saved manifest/context evidence.
+ assert.equal(saved.parseOutcome,contentsParseState(row.item).parseOutcome);assert.equal(after.providerItems[row.item.id].ownership,row.item.ownership);
 }
 assert.equal(sourceHash,hash(await readFile(file)));
 console.log(JSON.stringify({sourceHash,sourceUnchanged:true,eligible:plan.eligible,networkCalls,

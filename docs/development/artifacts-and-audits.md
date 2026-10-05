@@ -19,6 +19,8 @@ Use ignored `audit-artifacts/`, normally `audit-artifacts/kindle/`. Audit writer
 
 Do not add output with `git add -f`, ignore all JSON, or copy a complete result dump into fixtures to satisfy a test. Extract only the necessary source input or manual annotation. Check that tests and packaging work without local audit artifacts. Regenerating a report must not overwrite an archived engineering document automatically.
 
+Run `npm run check:repository` to check local Markdown targets, misplaced tracked/generated material, personal path patterns and test dependencies on documentation JSON. This is a layout check, not a comprehensive secret or history scan. Also run `npm test` and both packaging checks from a clean checkout without private inputs; use the browser/importer suites when changes affect their fixtures or packaged resources.
+
 Private backups, purchase/account data, browser profiles, sessions, secrets and personal notes stay outside tracked source. Do not put them into fixtures to make a clean checkout pass. Inspect captured evidence for sensitive fields before adding a minimal case. Scripts requiring private input must explain that requirement; they must not acquire source automatically when input is missing.
 
 Before the first public release, perform a **separate historical privacy/artifact scrub**. Current-tree cleanup does not remove old blobs. Keep the exact purge inventory local under `audit-artifacts/repository-hygiene/`; do not commit sensitive findings or rewrite history as incidental cleanup.

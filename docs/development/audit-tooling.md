@@ -4,7 +4,7 @@ Run from the repository root with Node.js. Tests and extension packages use comm
 
 ## Corpus comparisons
 
-The historical Kindle corpus tools require a separately supplied private backup matching the audited SHA-256. They read it without modifying it, use frozen source selections and implementation snapshots, and do not acquire product pages. A different backup must not inherit its ordinal manual labels.
+The historical Kindle corpus tools require a separately supplied private backup matching the audited SHA-256. They read it without modifying it, use frozen source selections and implementation snapshots, and do not acquire product pages. A different backup must not inherit its ordinal manual labels. Kindle JSON inputs and frozen implementation snapshots use LF line endings so their evidence hashes survive a Windows checkout.
 
 ```text
 node scripts/audit-contents-parser.mjs <path-to-backup>
@@ -19,7 +19,7 @@ node scripts/audit-named-contents-model.mjs <path-to-backup>
 node scripts/check-named-contents-safety.mjs <path-to-backup>
 ```
 
-Missing private input produces a nonzero error explaining the requirement. The whole-manifest, independent-secondary and named-model tools reconstruct historical comparisons from fixtures; they need no committed replay/frozen result JSON. Audit output can contain private-derived records and must remain local.
+Missing private input produces a nonzero error explaining the requirement. The whole-manifest, independent-secondary and named-model tools reconstruct historical comparisons from fixtures; they need no committed replay/frozen result JSON. Output provenance now hashes the minimal pilot-input/parser fixture rather than a deleted generated result. Audit populations, proposal objects and assertions retain their historical definitions. Audit output can contain private-derived records and must remain local.
 
 `measure-contents-local.mjs` and `measure-contents-quality.mjs` print offline measurements to the console. `measure-contents-browser.mjs` writes anonymous timings under the ignored directory and uses a disposable Chrome profile. The quality measurement preserves its historical corpus and in-memory writer assertions. `recon-kindle-corpus.mjs` also needs a local control-evidence JSON and historical Git object `092bce4`.
 
