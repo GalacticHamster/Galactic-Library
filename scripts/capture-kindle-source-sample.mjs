@@ -87,7 +87,9 @@ try{
   if(allowed.has(u.origin+u.pathname)){
    report.requests++;report.requestUrls.push(u.origin+u.pathname);send('Fetch.continueRequest',{requestId:m.params.requestId},session).catch(()=>{});
   }else{
-   report.blockedRequests.push(u.origin+u.pathname);report.stop='Request outside frozen sample blocked';interrupted=true;send('Fetch.failRequest',{requestId:m.params.requestId,errorReason:'BlockedByClient'},session).catch(()=>{});
+   report.blockedRequests.push(u.origin+u.pathname);report.stop='Request outside frozen sample blocked';interrupted=true;
+   if(context){context.pauseComicContentsRequested=true;context.activeContentsRequest?.abort();}
+   send('Fetch.failRequest',{requestId:m.params.requestId,errorReason:'BlockedByClient'},session).catch(()=>{});
   }
  }]);
  await send('Fetch.enable',{patterns:[{urlPattern:'*',requestStage:'Request'}]},session);
@@ -113,7 +115,10 @@ try{
   if(interrupted)break;const item=initial.providerItems[sample.itemId];
   const timing={attempts:0,remoteAttempts:[],begin(){return()=>{};}};let entry,error='';const start=performance.now();
   try{entry=await context.sampleRetry({detailUrl:sample.sourceUrl},sample.ordinal,25,timing);}
-  catch(e){error=e.message;if(/CAPTCHA|Sign in/iu.test(error))report.stop=error;}
+  catch(e){
+   if(interrupted)break; // Interrupted page stays unfinished for explicit resume.
+   error=e.message;if(/CAPTCHA|Sign in/iu.test(error))report.stop=error;
+  }
   const row={ordinal:sample.ordinal,auditId:sample.auditId,itemId:sample.itemId,title:sample.title,sourceUrl:sample.sourceUrl,error,attempts:timing.attempts,ms:performance.now()-start,attemptDiagnostics:timing.remoteAttempts,acquired:entry??null};
   if(entry){const selected=selectManifest(entry.descriptionBlocks??[],item.title);row.selection=selected;buffer.add({...entry,itemId:item.id,recordRef:item.recordRef});}
   report.rows.push(row);await persist();
