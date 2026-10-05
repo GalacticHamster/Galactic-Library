@@ -85,6 +85,10 @@ add('Refresh N/S/T/U/V local reparse and old scan distinctions remain intact',as
  const store=memory();const item=book(1,old());await store.writer.restoreDatabase(database(item,book(2),book(3,{...old(),statement:'',availability:'unavailable'}),book(4,{...old(),statement:'',availability:'temporary-failure'}),book(5,{...old(),statement:'',availability:'no-statement'})));
  const db=await store.writer.getDatabase();assert(!Object.hasOwn(db,'kindleContentsObservations'),'Legacy mass rewrite');
  equal(kindleContentsPlan(db).candidates.length,2,'Normal scan semantics');equal(kindleContentsPlan(db,'retry').candidates.length,1,'Retry semantics');equal(kindleContentsPlan(db,'rescan').candidates.length,5,'All fetch semantics');equal(kindleContentsPlan(db,'reparse').candidates.length,0,'Reparse network queue');
+ const legacyStore=memory();await legacyStore.writer.restoreDatabase(database(book(9,{...old(1),sourceUrl:url('B000000009'),statement:'',availability:'unavailable'})));
+ equal(kindleContentsPlan(await legacyStore.writer.getDatabase()).candidates.length,1,'Normal scan lost pre-generation-2 empty-unavailable exception');
+ const legacyPlan=await begin(legacyStore.writer);await commit(legacyStore.writer,legacyPlan,[observation(legacyPlan.candidates[0],'','unavailable')]);
+ equal(kindleContentsPlan(await legacyStore.writer.getDatabase()).candidates.length,0,'Latest G5 unavailable check kept retrying preserved G1 blank');equal(kindleContentsPlan(await legacyStore.writer.getDatabase(),'retry').candidates.length,0,'Unavailable became retryable');
  equal(parseBackup(createBackup(db)).providerItems,db.providerItems,'Legacy backup');
  await store.writer.reparseKindleContents([{itemId:item.id,recordRef:db.providerItems[item.id].recordRef}]);const after=await store.writer.getDatabase();equal(after.providerItems[item.id].metadata.enrichment.kindleProductComicContents.checkedAt,old().checkedAt,'Reparse acquired source');assert(!after.kindleContentsObservations,'Reparse created source observation');
 });

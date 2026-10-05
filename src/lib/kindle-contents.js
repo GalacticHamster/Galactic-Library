@@ -46,9 +46,11 @@ export function kindleContentsPlan(database, mode = 'scan') {
     if (state.needsReparse || mode === 'reparse' && saved?.statement) reprocess.push(target);
     const incomplete = ['temporary-failure','legacy-unknown'].includes(state.fetchOutcome);
     // A legacy statement can be reparsed locally. Unknown blank outcomes need
-    // another page check; legacy unavailable pages wait for an explicit rescan.
+    // another page check; unavailable checks wait for refresh except known G1
+    // empty checks, covered by the existing outdated-empty rule below.
     const outdatedEmpty = state.fetchOutcome === 'no-statement' && !saved.extractorVersion;
-    const legacyExtractorEmpty = state.extractorOutdated && !saved?.statement && saved?.extractorVersion < 2;
+    const latestCheck=database.kindleContentsObservations?.[item.recordRef]?.latestAttempt??saved;
+    const legacyExtractorEmpty = Boolean(latestCheck?.extractorVersion&&latestCheck.extractorVersion<2&&!saved?.statement);
     const fetch = mode === 'rescan' || mode === 'retry' && incomplete
       || mode === 'scan' && (state.fetchOutcome === 'never-checked' || incomplete || legacyExtractorEmpty || outdatedEmpty);
     if (fetch) candidates.push({...target,priority:contentsStatement(item) || isConfirmedComicManga(item)
