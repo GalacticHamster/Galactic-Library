@@ -10,8 +10,8 @@ const nums=(a,b)=>Array.from({length:b-a+1},(_,n)=>String(a+n));
 add('parser 5 means bounded numbered precision',()=>equal(CONTENTS_PARSER_VERSION,5,'Parser version'));
 for(const title of ['Batman and Robin','Sword and Sorcery','Cloak and Dagger']){
  add('conjunction stays inside numbered title: '+title,()=>{
-  for(const s of [`Collects ${title} #1-3`,`Collects issues #1-3 of ${title}, part of the event`]){
-   const p=parse(s);equal([...new Set(p.entries.map(e=>e.series))],[title],'Title split');equal(p.entries.map(e=>e.number),nums(1,3),'Numbers');
+  for(const label of [title,title.toLowerCase()])for(const s of [`Collects ${label} #1-3`,`Collects issues #1-3 of ${label}, part of the event`]){
+   const p=parse(s);equal([...new Set(p.entries.map(e=>e.series))],[label],'Title split');equal(p.entries.map(e=>e.number),nums(1,3),'Numbers');
    if(s.includes('part of')){equal(p.outcome,'partial','Tail completeness');assert(p.unparsed.join(' ').includes('part of the event'),'Lost tail');}
   }
  });

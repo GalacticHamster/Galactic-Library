@@ -128,7 +128,8 @@ function discoveryNumberedContents(body,collectionTitle) {
       const postTail=/^(?:part of\b|the (?:new |classic |acclaimed )?(?:ongoing )?series\b|features?\b|featuring\b|includes?\b|including\b|(?:written|drawn|illustrated) by\b)/iu.test(next);
       // Numbering before "of" is not a completed title. Keep title-internal
       // commas/conjunctions until a genuinely new numbered clause appears.
-      if(postposed&&/^\p{Lu}/u.test(postposed[1])&&!numericMarker.test(next)&&!postTail)continue;
+      const postLabel=postposed&&!/^(?:all|the|a|an|this|these|his|her|their)\s/u.test(postposed[1]);
+      if(postLabel&&!numericMarker.test(next)&&!postTail)continue;
       const laterCollection=/^collects?\s+/iu.test(next);
       if(!numericMarker.test(prefix) && !/\d+(?:\/\d+|\.\d+)?\s*$/u.test(prefix) && !extentPrefix.test(next) && !repeatedTitle && !typedWork && !laterCollection)continue;
       chunks.push({raw:part.slice(start,separator.index).trim(),following:part.slice(start).trim(),reset:start===0});start=separator.index+separator[0].length;
