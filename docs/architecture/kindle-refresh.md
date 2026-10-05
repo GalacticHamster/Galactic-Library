@@ -1,0 +1,67 @@
+# Kindle contents refresh and source retention
+
+Source acquisition, parser interpretation, human verification and ownership remain separate. Source generation 5, parser 5, filter 1, manifest interpretation 1, schema 12, API v1 and backup v1 are unchanged by this feature. Neither a proposed contents statement nor its history supplies globally owned titles or verified coverage.
+
+## Existing actions: production audit
+
+Before this feature, the internal `rescan` action already fetched **every** supported active Kindle book, irrespective of previous outcome or source generation. It lacked a persisted queue position and generated unbounded enrichment undo selections. This feature renames and strengthens that action; it does not introduce a fifth mode or broaden eligibility.
+
+| Previous action | Network queue | Local parse work |
+| --- | --- | --- |
+| Scan eligible books | Never checked; temporary failures; legacy unknown blanks; no-statement without extractor version; empty results from extractor generations before 2 | Outdated saved statements |
+| Retry incomplete checks | Temporary failures and legacy unknown blanks, including failed attempts with an older useful statement | Outdated saved statements |
+| Rescan previous results | All supported books: never checked, successful G2/G5, failed, unavailable and no-statement | Previously reparsed outdated statements before acquisition |
+| Reparse saved text | None | Every supported saved statement |
+
+Supported means active `kindle` + media type `book` + exact supported `https://www.amazon.com/dp/[A-Z0-9]+` metadata URL. There is no ownership or comic requirement. Saved statements, comic evidence and collection words prioritize requests; they do not exclude ordinary books. Normal/retry scans do not refetch a successful statement just because its source generation is old. Unavailable pages wait for explicit refresh. Known no-statement outcomes from generation 2 or later do too. Parser/filter version changes can cause local reprocessing.
+
+Previously, successful/no-statement/unavailable writes replaced the current statement, lookup date, extractor metadata and derived parser fields. A temporary failure preserved useful text and its extractor generation but changed availability/check date and reparsed that text, mixing prior-source and failed-attempt metadata. Every selection kept an ordinary undo entry, so historical evidence generally survived but grew without a bounded acquisition policy. Local reparse retained source text/date/generation and updated derived metadata plus undo history.
+
+All four actions previously used a tab-local queue, sequential requests, 30-second timeouts, at most three attempts, 2/4-second transient backoff and a one-second inter-item delay. Pause aborted the current request and saved completed buffered results. CAPTCHA/sign-in stopped globally. Normal/retry restart recomputed eligibility; starting rescan restarted at item one. Tab/browser closure stopped fetching; saved results survived but the original queue and cursor did not. Checkpoints were at most 20 results or about one minute, with a tail flush on handled completion/pause/errors.
+
+## Current source and bounded history
+
+Current evidence remains in `item.metadata.enrichment.kindleProductComicContents`; normal UI, contents review and Reparse saved text use that observation. `database.kindleContentsObservations[recordRef]` is an optional separate audit store, created only on actual acquisition, containing:
+
+- Stable provider item ID and the source present before the first acquisition under this policy (`baseline`). Once pinned, this baseline never rotates.
+- A bounded `latestAttempt` for a temporary failure or unavailable result; each such attempt replaces the previous attempt. A trustworthy success removes it.
+- A reference to at most one new ordinary undo selection, for existing Sources and undo behavior. Subsequent acquisition/reparse replaces only that generated undo entry. All preexisting legacy undo entries remain untouched.
+
+An observation preserves statement, stable product URL, source generation, lookup timestamp, parser/filter outcome and input, warnings, title/series context, and bounded sanitized description blocks with original selected coordinates/raw text where present. It excludes HTTP bodies, HTML, cookies, request headers, credentials and account session data. Historical evidence is validated independently of current manifest ranking. Source text/coordinates remain source; stored parser fields describe the interpretation associated with that snapshot. Complete original proposal arrays were not stored for every legacy observation. The separate frozen source/proposal ledger is needed for exact historical complete-proposal reproduction; the offline exporter labels newly derived parses explicitly.
+
+If there was no prior source, baseline is initially null. Before a subsequent acquisition, the first trustworthy current source can become its baseline. A preexisting failed/empty historical observation is retained as the actual prior observation, without inventing useful content. No unused records gain empty history arrays. Record-reference validation prevents an existing active/archived record from borrowing another provider's history; orphaned audit evidence remains retained but supplies no ownership.
+
+| Acquisition outcome | Current result | Audit retention |
+| --- | --- | --- |
+| Useful successful G5 capture | Replace current; derive with parser 5 | Keep pinned baseline; remove obsolete latest failure |
+| Legitimate successful no-statement | Replace current with empty result | Keep baseline and old source; do not infer book completeness |
+| Temporary failure, CAPTCHA or sign-in | Preserve current entirely | Store latest failed attempt separately |
+| Unavailable | Preserve current entirely | Store latest unavailable attempt separately |
+
+If no current observation existed, a failed/unavailable observation is also stored as current so the normal failure state remains readable. Scan/retry eligibility reads the separate latest attempt when present, so preserving an old useful source does not hide a retryable failure. Explicit verified reviews never change automatically. New source differing from a verified review requires review.
+
+Repeated refreshes retain baseline + current + at most one failed/unavailable attempt + one generated undo. They do not append an event log. Existing legacy undo history is preserved, not compacted. Reparse before a record's first acquisition retains the existing undo behavior; this task does not redesign all enrichment history. The bound is per stable record reference; archived account records can retain separate histories.
+
+## Frozen queue and lifecycle
+
+Refresh freezes sorted eligible IDs, persistent record references, URLs and titles. Starting a new refresh includes every currently supported book again; Resume continues the same queue. Refresh does not locally reparse old source before pinning it. New acquisition derives its own parser-5 result.
+
+The separate private-store checkpoint `galacticLibraryKindleContentsRefresh` records semantic/source/parser/filter/manifest versions, run/lease references, account nickname, owner tab, queue, cursor, counts and timestamps. It is not library enrichment and is not exported as an active job in backups. Accepted observations and cursor are saved in one private-store transaction. Per-batch canonical reconstruction occurs once. The checkpoint excludes source bodies and session data.
+
+Eligibility, reference and URL are checked before fetch and again before commit. Disappeared/replaced/unsupported records safely advance as skipped. Additions do not change the denominator. Ordinary failures advance; retrying them later remains possible. CAPTCHA/sign-in saves its failed attempt, marks the queue blocked and leaves the cursor on that item. Resolve the block before explicitly resuming it.
+
+Pause saves completed results and marks the queue paused; Resume uses a new lease from its saved cursor. Stop saves completed results and marks aborted; it cannot resume. Starting a new refresh retains acquired evidence. Closure/navigation/browser startup marks a running queue interrupted when lifecycle events are available. A still-running persisted checkpoint after an unclean shutdown is also recoverable explicitly; there is no automatic fetch on restart. Resume from another live owning tab is refused. Version/profile mismatches are stale and require a new queue. Restore/clear invalidate the checkpoint and old lease.
+
+Up to 20 unacknowledged results can repeat after hard interruption. Saved progress cannot atomically include a request currently in flight. Acquisition stays in the signed-in Kindle library tab. Closing that tab stops requests; the worker never continues acquisition. Existing pacing, retry, timeout and safety detection are unchanged. These semantics are covered by synthetic writer and actual packaged importer tests in both browsers.
+
+## Compatibility, alternatives and audit access
+
+The optional store survives validated backup/restore without a schema/backup version bump. Old backups remain readable and are interpreted lazily. Restored source history survives while the old running queue is invalidated. Older extension versions do not know this new optional store and may drop it when rewriting/exporting; use the current version to preserve it.
+
+Rotating only the previous source would lose the audit baseline on repeated refreshes. An append-only observation store would grow unbounded. A one-time external archive alone would make preservation depend on a file existing forever. Nesting history inside each provider's metadata would collide with existing metadata size limits and unnecessarily complicate provider import schemas. A separate optional baseline store plus existing current source is the smallest compatible choice; it retains the critical old source even if local audit artifacts disappear.
+
+The independently frozen 1,520-row historical source/proposal ledger contains the complete saved corpus, original source and selected proposals. Archive that private ledger **and** a pre-refresh backup independently; ignored audit-artifacts are local scratch space, not archival storage. Production does not require those files to run. Keeping every intermediate production observation is unnecessary for the pinned-baseline/current experiment; legacy history remains available in backups.
+
+For a caller-supplied private backup, `node scripts/export-kindle-observations.mjs PRIVATE_BACKUP audit-artifacts/kindle/observations.json` exports baseline, current and latest failed attempt keyed by stable record/provider identity. Its local parser replay is explicitly a new interpretation of saved input, not an original historical full manifest proposal. Source generation and parser generation remain independent. Missing input fails without acquisition. Exported private data remains ignored and excluded from packages; the tool never reads a human-reference workbook. Original legacy undo entries remain in the supplied backup.
+
+See [user controls](../user-guide/kindle-contents-discovery.md) and [evidence boundaries](contents-evidence.md).

@@ -5,6 +5,7 @@ import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import {ownedContentIndex,CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import {KINDLE_REFRESH_KEY} from '../src/lib/kindle-contents-refresh.js';
+import {contentsObservation} from '../src/lib/kindle-contents-observations.js';
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const equal=(a,b,message)=>assert(JSON.stringify(a)===JSON.stringify(b),message);
 const rejects=async(fn,message)=>{let rejected=false;try{await fn();}catch{rejected=true;}assert(rejected,message);};
@@ -45,6 +46,13 @@ for(const [availability,code]of [['temporary-failure','network'],['temporary-fai
 add('Refresh successful no-statement becomes current, baseline stays accessible',async()=>{
  const store=memory();await store.writer.restoreDatabase(database(book(1,old())));const plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0],'','no-statement')]);
  const db=await store.writer.getDatabase(),item=db.providerItems['kindle:B000000001'];equal(item.metadata.enrichment.kindleProductComicContents.statement,'','Empty success not current');equal(db.kindleContentsObservations[item.recordRef].baseline.statement,old().statement,'Empty erased historical statement');equal(item.metadata.enrichment.kindleProductComicContents.parseOutcome,'not-attempted','Empty parse state');
+});
+add('Refresh preserves incomplete-description evidence even when the capture found no statement',async()=>{
+ const store=memory();await store.writer.restoreDatabase(database(book(1,old())));const plan=await begin(store.writer);
+ await commit(store.writer,plan,[{...observation(plan.candidates[0],'','no-statement'),descriptionBlocks:[{selector:'#description',text:'Description still loading Read more'}]}]);
+ const db=await store.writer.getDatabase(),item=db.providerItems['kindle:B000000001'],saved=item.metadata.enrichment.kindleProductComicContents,snapshot=contentsObservation(item,saved);
+ equal(snapshot.descriptionMayBeIncomplete,true,'Manifest warning lost in observation');equal(snapshot.evidence.blocks[0].text,'Description still loading Read more','Source warning text removed');equal(db.kindleContentsObservations[item.recordRef].baseline.statement,old().statement,'Incomplete empty result erased baseline');
+ const restored=parseBackup(createBackup(db));equal(contentsObservation(restored.providerItems[item.id],restored.providerItems[item.id].metadata.enrichment.kindleProductComicContents),snapshot,'Warning backup changed');
 });
 add('Refresh O/P freezes queue, persists pause/restart, rejects stale leases and skips removed identities',async()=>{
  const store=memory();await store.writer.restoreDatabase(database(book(1),book(2),book(3)));let plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);

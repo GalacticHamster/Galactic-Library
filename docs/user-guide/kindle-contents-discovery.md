@@ -8,22 +8,32 @@ Every active provider record with provider `kindle`, media type `book`, and a su
 
 Existing contents statements, confirmed comic/manga evidence and simple collection words prioritize the queue. Words include Omnibus, Epic Collection, Masterworks, Compendium, Complete Collection, Box Set, anthology and collection. Ordinary books remain eligible. No franchise ontology or replacement collection classifier was added. Comic/manga classification itself is unchanged.
 
-## Scan, retry, rescan and local reparse
+## Scan, retry, refresh and local reparse
 
-The signed-in Kindle panel has one **Find contents** button and a mode selector:
+The signed-in Kindle panel has a contents mode selector. The action is **Find contents** for ordinary scans and **Refresh all eligible books (count)** for a full source refresh:
 
 | Mode | Page requests | Local work |
 |---|---|---|
 | Scan eligible books | Never checked, legacy unknown blanks, temporary failures, empty results from extractor versions before 2, and legacy no-statement results without an extractor version | Reparse saved statements processed by an older/unknown parser |
 | Retry incomplete checks | Temporary failures and legacy unknown blanks | Reparse outdated saved statements |
-| Rescan previous results | All eligible books, including previously found, empty and unavailable results | Reparse outdated saved statements |
+| Refresh all eligible books | Every currently eligible book, including successful G2/G5, failed, empty and unavailable results | Parse fresh source with parser 5; preserve the earlier source before acquisition is saved |
 | Reparse saved text (no requests) | None | Reparse every eligible saved Kindle statement |
 
-Legacy statements with no extractor version are handled locally during a normal scan. They are not automatically fetched again merely because versions were absent. Legacy unavailable pages wait for explicit rescan. An empty result from an extractor version before 2 can be revisited by normal scan. Later source generations and existing statements require explicit rescan for fresh page evidence; a version increment does not automatically refetch them. Parser/filter updates can reprocess saved text locally.
+Legacy statements with no extractor version are handled locally during a normal scan. They are not automatically fetched again merely because versions were absent. Legacy unavailable pages wait for explicit refresh. An empty result from an extractor version before 2 can be revisited by normal scan. Later source generations and existing statements require explicit refresh for fresh page evidence; a version increment does not automatically refetch them. Parser/filter updates can reprocess saved text locally. Refresh replaces the previous **Rescan previous results** action; there is no duplicate fifth mode.
 
 The derived state distinguishes never checked, temporary failure, unavailable, no statement, legacy unknown, statement found, full/partial/failed parsing and reviewed/unverified contents. A temporary failure can coexist with a previously found statement: retrying remains possible without losing the old text. A changed discovery is flagged separately from an existing reviewed statement.
 
-Requests remain sequential, spaced by one second after each result. Transient requests retry at most twice with two/four-second delays. Each attempt has a 30-second timeout. CAPTCHA and sign-in errors stop the run and retain a safe failure category. Pause aborts an in-flight request and retains completed results. A normal scan resumes unfinished work; starting an explicit rescan again intentionally revisits all results rather than maintaining a separate rescan cursor. Closing the tab retains saved checkpoints but does not keep a background fetch running.
+Requests remain sequential, spaced by one second after each result. Transient requests retry at most twice with two/four-second delays. Each attempt has a 30-second timeout. CAPTCHA and sign-in errors stop the run and retain a safe failure category. Pause aborts an in-flight request and retains completed results. A normal scan resumes unfinished checks using current eligibility. Refresh has a persisted frozen queue: **Resume refresh** continues at its saved position. Closing the tab stops fetching; reopening the tab does not start network work automatically. Up to 20 unacknowledged results can repeat after a hard interruption.
+
+To start a full source refresh safely:
+
+1. Reload the current extension and export a Galactic Library backup. Keep that file and any frozen private audit ledger somewhere durable.
+2. Open your signed-in Kindle Content & Devices library from Galactic Library. Sync the library first if books are missing; the separate **Full rescan** sync button does not refresh product-page contents.
+3. Under **Contents discovery**, choose **Refresh all eligible books**. Check the displayed count, then click **Refresh all eligible books (count)** to start a new frozen queue.
+4. Leave the Kindle library tab open. **Pause** saves completed work; **Resume refresh (saved/total)** continues that queue, including after reopening/restarting. CAPTCHA/sign-in blocks require resolution before Resume.
+5. **Stop refresh** abandons the queue while keeping acquired evidence. Starting Refresh all again creates a new queue and revisits every eligible book. A stale/incompatible queue must also be restarted.
+
+The operation can take hours. No refresh is started by installing/reloading or changing the selector. New library additions do not change a running queue's total; removed/unsupported records are skipped safely. Completed, paused, interrupted, blocked, aborted and stale states are shown separately.
 
 Progress reports checked/total, statements found, no contents found, failures/retryable, remaining pages, unavailable pages and local reparses. **No contents found** describes that lookup, not a permanent assertion that a book contains no works.
 
@@ -31,7 +41,11 @@ Progress reports checked/total, statements found, no contents found, failures/re
 
 The existing persisted name `kindleProductComicContents` and internal request names remain intact. There is no schema-number or backup-format change. Optional `extractorVersion`, `parserVersion` and `parseOutcome` fields augment the existing statement, availability, parseStatus, source and checkedAt fields. Older backups remain readable; missing versions are interpreted conservatively. Legacy parsed/unparsed states remain accepted. Sign-in is an additional safe failure category.
 
-The serialized worker remains the sole writer. Existing source-URL, current-record and account/reference checks remain in place. Credential-bearing source URLs are rejected. Local reparse requires a current record reference, retains the original statement and lookup date, updates parsing metadata and creates ordinary source history for undo. A failed refresh preserves previously discovered text. No refresh or reparse changes `contentReviews` or silently replaces verified entries. A changed statement returns to review; the editor offers **Use newly discovered statement** and leaves existing verification intact until the user explicitly saves.
+The serialized worker remains the sole writer. Existing source-URL, current-record and account/reference checks remain in place. Credential-bearing source URLs are rejected. Local reparse requires a current record reference, retains the original statement and lookup date, and updates parsing metadata. No refresh or reparse changes `contentReviews` or silently replaces verified entries. A changed statement returns to review; the editor offers **Use newly discovered statement** and leaves existing verification intact until the user explicitly saves.
+
+Normal use and local reparse use the newest trustworthy current observation. Successful capture, including a legitimate no-statement result, becomes current. Temporary failure, CAPTCHA, sign-in and unavailable results preserve the existing current observation and store the latest attempt separately. Retry still sees temporary failures even when older useful text remains available.
+
+Actual acquisition lazily pins the earlier source with its timestamp, generation, parser metadata and bounded evidence in an optional backup-preserved history store. Repeated refreshes keep that baseline, current source, at most one latest failed/unavailable attempt and one new undo selection; they do not append an unlimited log. Existing legacy undo entries are retained. Books never processed gain no history. Backup restore preserves observations but discards the old running refresh checkpoint. See [refresh architecture](../architecture/kindle-refresh.md) for exact retention and offline export behavior.
 
 ## Extraction and proposals
 

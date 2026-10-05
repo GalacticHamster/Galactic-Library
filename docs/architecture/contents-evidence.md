@@ -16,6 +16,8 @@ Three completeness questions are distinct:
 
 Source generation 5 preserves captured DOM lines; parser 5/filter 1 interpret saved text independently. A parser reparse does not refresh source. Exact source-backed historical selections must survive validation even when a new parser changes ranking. Read more may signal premature/incomplete hydration or extraction; it is not universally disposable garbage. No local reparse can recover source that was never captured.
 
+**Refresh all eligible books** acquires new source for every supported Kindle book, including previous successes. A pinned earlier source and bounded latest failed attempt remain separate from current evidence; verified reviews and ownership are unchanged. See [refresh retention and checkpoint contracts](kindle-refresh.md).
+
 ## Parser 5: bounded numbered precision
 
 Parser 5 improves numbered labels and bounded numbered clauses. It does **not** implement broad named-work parsing. Source generation 5, filter 1, manifest interpretation 1, evidence review 1, schema 12 and API/backup formats remain unchanged.
