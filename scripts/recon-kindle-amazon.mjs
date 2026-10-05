@@ -1,3 +1,4 @@
+import {outputPath} from './audit-artifacts.mjs';
 // Audit-only: two fixed public control pages, disposable anonymous Chrome.
 // Never loads GL storage, runs a library scan, changes production code, or saves
 // cookies/headers/full HTML. Event deadlines bound observations, not readiness.
@@ -7,7 +8,8 @@ import {tmpdir} from 'node:os';
 import {join,resolve,relative,isAbsolute,sep} from 'node:path';
 
 const controls=[{book:'Four',asin:'B018YP1STO',range:'59-80'},{book:'Five',asin:'B01D2052NE',range:'81-100'}];
-const output=process.argv[2];if(!output)throw Error('Usage: node scripts/recon-kindle-amazon.mjs REPORT_JSON');
+if(!process.argv[2])throw Error('Usage: node scripts/recon-kindle-amazon.mjs audit-artifacts/kindle/REPORT_JSON (explicit network experiment; separate authorization required)');
+const output=await outputPath(process.argv[2],'kindle-amazon-recon-controls.json');
 const adapter=await readFile(new URL('../src/providers/kindle.js',import.meta.url),'utf8');
 const profile=await mkdtemp(join(tmpdir(),'gl-amazon-recon-'));
 const child=spawn(process.env.CHROME_BIN??'C:/Program Files/Google/Chrome/Application/chrome.exe',[

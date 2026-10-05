@@ -2,7 +2,7 @@
 
 The companions and Galactic Library use the same presentation and author rules and mirrored decision fixtures. Identity and access are separate: a matching borrowed, temporary, historical or unknown-access record cannot prove permanent ownership.
 
-[MATCHING_PHILOSOPHY.md](../MATCHING_PHILOSOPHY.md) is the authoritative product contract. Revision discovery uses shared structural and semantic rules: numeric/compositional English ordinals, revision labels, version/edition markers and complete-base-title qualifiers remain Possible across unfamiliar syntax. Discovery never supplies exact identity. Conflicting revision wording also prevents a shared ISBN from bypassing an edition warning. Format-only presentation normalization remains supported. See [the implementation and regression report](qualifier-matching-2026-10-03.md).
+[MATCHING_PHILOSOPHY.md](../../MATCHING_PHILOSOPHY.md) is the authoritative product contract. Revision discovery uses shared structural and semantic rules: numeric/compositional English ordinals, revision labels, version/edition markers and complete-base-title qualifiers remain Possible across unfamiliar syntax. Discovery never supplies exact identity. Conflicting revision wording also prevents a shared ISBN from bypassing an edition warning. Format-only presentation normalization remains supported. See [the implementation and regression report](../audits/qualifier-matching-2026-10-03.md).
 
 | Evidence | Result |
 | --- | --- |

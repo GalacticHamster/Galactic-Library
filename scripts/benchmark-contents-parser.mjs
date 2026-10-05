@@ -1,7 +1,9 @@
+import {outputPath} from './audit-artifacts.mjs';
 import {writeFile} from 'node:fs/promises';
 import {loadCorpus,oldParser} from './contents-parser-corpus.mjs';
 import {proposeContentsForReview} from '../src/lib/contents.js';
-const [path,output]=process.argv.slice(2);if(!path||!output)throw Error('Usage: node scripts/benchmark-contents-parser.mjs BACKUP_JSON OUTPUT_JSON');
+const [path,requestedOutput]=process.argv.slice(2);if(!path)throw Error('Usage: node scripts/benchmark-contents-parser.mjs BACKUP_JSON [OUTPUT_JSON]');
+const output=await outputPath(requestedOutput,'kindle-contents-parser-performance-v4.json');
 globalThis.fetch=()=>{throw Error('Network forbidden');};
 const corpus=await loadCorpus(path),old=await oldParser(),runs={parser3:[],parser4:[]};
 function run(version){const start=performance.now();for(const r of corpus.rows)version===3?old.module.proposeContentsForReview(r.input,r.title):proposeContentsForReview(r.input,r.title,r.context);return performance.now()-start;}

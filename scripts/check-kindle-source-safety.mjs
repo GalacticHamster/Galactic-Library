@@ -1,16 +1,17 @@
+import {readArtifact,writeArtifact} from './audit-artifacts.mjs';
 // Entire exported database in private memory. No installed storage or network.
 import assert from 'node:assert/strict';
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {loadCorpus,hash} from './contents-parser-corpus.mjs';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {ownedContentIndex} from '../src/lib/contents.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 const corpus=await loadCorpus(process.argv[2]);
-const ledger=JSON.parse(await readFile(new URL('../docs/kindle-source-capture-sample.json',import.meta.url),'utf8'));
-const replay=JSON.parse(await readFile(new URL('../docs/kindle-source-capture-replay.json',import.meta.url),'utf8'));
-const pilot=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-results.json',import.meta.url),'utf8'));
-const metrics=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-metrics.json',import.meta.url),'utf8'));
+const ledger=JSON.parse(await readArtifact('kindle-source-capture-sample.json'));
+const replay=JSON.parse(await readArtifact('kindle-source-capture-replay.json'));
+const pilot=JSON.parse(await readArtifact('kindle-manifest-pilot-results.json'));
+const metrics=JSON.parse(await readArtifact('kindle-manifest-pilot-metrics.json'));
 let requests=0;globalThis.fetch=()=>{requests++;throw Error('Network forbidden');};
 const db=structuredClone(corpus.db);
 for(const row of corpus.rows.filter(r=>r.sourceGeneration===4)){
@@ -50,5 +51,5 @@ for(const sample of ledger.rows){
 for(const [id,history] of Object.entries(before.enrichmentHistory))assert.deepEqual(after.enrichmentHistory[id],history);
 assert.equal(requests,0);assert.equal(hash(await readFile(process.argv[2])),corpus.sourceHash);
 const result={providerItems:Object.keys(before.providerItems).length,captures:25,parserVersion:4,extractorVersion:5,networkRequests:0,ownershipChanges:0,ordinaryItemChanges:0,canonicalChanges:0,verifiedReviewChanges:0,ordinaryApiComparisons:29,unverifiedOwnedIndexChanges:0,sourceChangesOutsideSample:0,priorSampleEvidenceRetainedInHistory:25,existingHistoryPreserved:true,backupRoundTrip:true,sourceFileUnchanged:true,syntheticVerifiedReviewPreserved:true,rows};
-await writeFile(new URL('../docs/kindle-source-capture-safety.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
+await writeArtifact('kindle-source-capture-safety.json',JSON.stringify(result,null,2)+'\n');
 console.log(JSON.stringify({...result,rows:undefined},null,2));

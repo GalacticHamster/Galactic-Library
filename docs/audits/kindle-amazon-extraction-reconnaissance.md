@@ -1,5 +1,7 @@
 # Kindle/Amazon contents extraction and hydration reconnaissance
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Investigation date: October 4, 2026, America/New_York. Production baseline: `42aac53`. **Audit only:** no production code, versions, schema, storage, ownership, matching, importers, UI, retry behavior or scan lifecycle changed. No library scan, source refresh queue, fixed sleep or implementation was introduced. The completed contents-quality pass remains intact.
 
 ## Executive findings
@@ -25,10 +27,10 @@ Only these two retail products were actively investigated. A fresh headless Chro
 
 Evidence artifacts, all GL-specific and kept in this repo:
 
-- [Second control run](kindle-amazon-recon-controls-second.json): authoritative raw/static, DOM, geometry, expansion and bounded network observations.
-- [Initial control run](kindle-amazon-recon-controls.json): includes an incomplete Book Four response capture and a different initial Book Five response. Its `innerText`-based visibility flag is explicitly unsuitable for establishing visibility through clipping; use the second run's geometry instead.
-- [Offline corpus and extractor probes](kindle-amazon-recon-corpus.json): populations, refresh unions, historical/current extraction and existing quality/parser results.
-- [Control diagnostic](../scripts/recon-kindle-amazon.mjs) and [offline analysis](../scripts/recon-kindle-corpus.mjs): analysis-only scripts, not release runtime files or implementation fixes.
+- [Second control run](../development/artifacts-and-audits.md#generated-output): authoritative raw/static, DOM, geometry, expansion and bounded network observations.
+- [Initial control run](../development/artifacts-and-audits.md#generated-output): includes an incomplete Book Four response capture and a different initial Book Five response. Its `innerText`-based visibility flag is explicitly unsuitable for establishing visibility through clipping; use the second run's geometry instead.
+- [Offline corpus and extractor probes](../development/artifacts-and-audits.md#generated-output): populations, refresh unions, historical/current extraction and existing quality/parser results.
+- [Control diagnostic](../../scripts/recon-kindle-amazon.mjs) and [offline analysis](../../scripts/recon-kindle-corpus.mjs): analysis-only scripts, not release runtime files or implementation fixes.
 
 Two web-tool opens of the control URLs failed with “Cache miss.” Browser investigation made **four product navigations and three explicit same-origin product fetches** across two runs: Book Four had two navigations and one fetch; Book Five had two navigations and two fetches. The first Book Four capture ended early because its response body was requested before streaming completed. The second diagnostic waited for the actual `Network.loadingFinished` event, not a guessed delay.
 
@@ -40,10 +42,10 @@ The local corpus was `galactic-library-backup-v1 (2).json` from Downloads, expor
 
 | Step | Actual implementation and implications |
 | --- | --- |
-| Importer context | [kindle-content.js](../src/providers/kindle-content.js), `attachKindleSync`, installs only on `/hz/mycd/`. The Amazon content scripts run at `document_idle`, normally in the extension's isolated content-script world. This is not a product-page live-DOM scan. |
-| Queue preparation | `enrichComicContents` sends `GET_KINDLE_COMIC_CONTENT_CANDIDATES`. [service-worker.js](../src/background/service-worker.js) obtains the database and calls [kindleContentsPlan](../src/lib/kindle-contents.js). Eligible books have supported Amazon `/dp/<ID>` URLs; collection/genre hints only order them. |
+| Importer context | [kindle-content.js](../../src/providers/kindle-content.js), `attachKindleSync`, installs only on `/hz/mycd/`. The Amazon content scripts run at `document_idle`, normally in the extension's isolated content-script world. This is not a product-page live-DOM scan. |
+| Queue preparation | `enrichComicContents` sends `GET_KINDLE_COMIC_CONTENT_CANDIDATES`. [service-worker.js](../../src/background/service-worker.js) obtains the database and calls [kindleContentsPlan](../../src/lib/kindle-contents.js). Eligible books have supported Amazon `/dp/<ID>` URLs; collection/genre hints only order them. |
 | URL | `kindleItemFromOwnershipItem` builds `https://www.amazon.com/dp/<providerItemId>`. The two exact URLs above came from saved `metadata.detailUrl`. |
-| Request | [fetchKindleProductComicContents](../src/providers/kindle.js) performs browser `fetch(url, {credentials:'include', cache:'no-store', signal})`. Default method GET. No custom headers, Accept-Language or User-Agent are supplied. The browser supplies those and applicable same-origin cookies. No password/token extraction is involved in this lookup. |
+| Request | [fetchKindleProductComicContents](../../src/providers/kindle.js) performs browser `fetch(url, {credentials:'include', cache:'no-store', signal})`. Default method GET. No custom headers, Accept-Language or User-Agent are supplied. The browser supplies those and applicable same-origin cookies. No password/token extraction is involved in this lookup. |
 | Request execution | The content-script adapter fetches from the signed-in Amazon library tab. The service worker prepares/saves records; it does not execute this product fetch. Cookies can therefore be available in production, unlike this anonymous audit. Exact historical request headers were not preserved and cannot be reconstructed. |
 | Response | Await `response.text()`, then `new DOMParser().parseFromString(body,'text/html')`. The body is read to completion. The parsed document is inert: Amazon scripts do not execute and external styles/resources are not loaded by this parser. |
 | Response checks | HTTP 404 becomes unavailable; other non-OK statuses throw. Selected CAPTCHA and sign-in selectors throw. HTTP 200 alone does not establish that a complete product description was received. |
@@ -54,7 +56,7 @@ The local corpus was `galactic-library-backup-v1 (2).json` from Downloads, expor
 | Early return | `kindleContentsStatementFromDocument` immediately returns the first nonempty candidate from the first matching region. It does not inspect later triggers in that region, compare other elements, or evaluate quality before returning. |
 | Read More | No expansion, readiness observation or special marker handling occurs in this extraction function. A Read More control can become literal `textContent`, but often lies after the candidate has already been truncated and never reaches the saved statement. |
 | Chosen statement | The exact choice occurs at `const statement = explicitContentsStatement(element.textContent); if (statement) return statement;`. `fetchKindleProductComicContents` returns that string with source URL, availability and extractor generation. |
-| Persistence and quality | `enrichComicContents` buffers the result, then sends `SAVE_KINDLE_COMIC_CONTENTS`. [saveKindleComicContents](../src/background/storage-writer.js) validates and preserves source evidence and calls [contentsParseState](../src/lib/kindle-contents.js). [assessContentsQuality](../src/lib/contents-quality.js) therefore sees only the already selected fragment. It cannot choose a later sentence discarded upstream. |
+| Persistence and quality | `enrichComicContents` buffers the result, then sends `SAVE_KINDLE_COMIC_CONTENTS`. [saveKindleComicContents](../../src/background/storage-writer.js) validates and preserves source evidence and calls [contentsParseState](../../src/lib/kindle-contents.js). [assessContentsQuality](../../src/lib/contents-quality.js) therefore sees only the already selected fragment. It cannot choose a later sentence discarded upstream. |
 
 The two controls matched both the ID selector and the data-feature selector on the same description wrapper, plus an empty overview wrapper. Those aliases are not independent description evidence. Hidden descendant markup contributes text; embedded JSON, escaped HTML stored inside scripts/attributes and alternative representations are not intentionally searched. A script descendant could incidentally contribute literal script text via `textContent`, which is different from structured decoding.
 

@@ -1,8 +1,11 @@
-import {writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {writeArtifact} from './audit-artifacts.mjs';
+
 import {wholeManifestEvidence,independentBaseline,sentenceRanges,secondarySemanticReview} from './independent-secondary-evidence.mjs';
 import {proposeContentsForReview,contentKey} from '../src/lib/contents.js';
-let requests=0;globalThis.fetch=()=>{requests++;throw Error('Network forbidden');};
-const {corpus,observations}=await wholeManifestEvidence(process.argv[2]),baseline=await independentBaseline();
+export async function frozenIndependentEvidence(backup){
+const {corpus,observations}=await wholeManifestEvidence(backup),baseline=await independentBaseline();
 const key=e=>contentKey(e)+':'+e.completeness;
 const rows=observations.map(row=>{
  const selected=baseline.module.selectManifest(row.blocks,row.title),m=selected.manifest,primary=m.candidates[m.selected];
@@ -23,7 +26,14 @@ const rows=observations.map(row=>{
 });
 for(const r of rows)for(const c of r.secondaries)c.semanticReview=secondarySemanticReview(r,c);
 const population=rows.filter(r=>r.secondaries.length),secondaries=population.flatMap(r=>r.secondaries);
-const result={networkRequests:requests,baselineHash:baseline.hash,sourceHash:corpus.sourceHash,sourceGeneration:5,parserVersion:4,filterVersion:1,schema:12,manifestInterpretationVersion:1,observations:rows.length,recordsWithSecondary:population.length,secondaryObservations:secondaries.length,retainedSecondaryObservations:secondaries.filter(c=>c.retainedSecondary).length,uniqueRealTitles:new Set(population.filter(r=>r.url).map(r=>r.title)).size,categories:Object.fromEntries([...new Set(secondaries.map(c=>c.semanticReview.category))].map(k=>[k,secondaries.filter(c=>c.semanticReview.category===k).length])),rows};
-await writeFile(new URL('../docs/kindle-independent-secondary-frozen.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
+const result={networkRequests:0,baselineHash:baseline.hash,sourceHash:corpus.sourceHash,sourceGeneration:5,parserVersion:4,filterVersion:1,schema:12,manifestInterpretationVersion:1,observations:rows.length,recordsWithSecondary:population.length,secondaryObservations:secondaries.length,retainedSecondaryObservations:secondaries.filter(c=>c.retainedSecondary).length,uniqueRealTitles:new Set(population.filter(r=>r.url).map(r=>r.title)).size,categories:Object.fromEntries([...new Set(secondaries.map(c=>c.semanticReview.category))].map(k=>[k,secondaries.filter(c=>c.semanticReview.category===k).length])),rows};
+// Consumers compare with the historically serialized frozen run contract.
+return JSON.parse(JSON.stringify(result));
+}
+if(resolve(process.argv[1]??'')===fileURLToPath(import.meta.url)){
+let requests=0;globalThis.fetch=()=>{requests++;throw Error('Network forbidden');};
+const result=await frozenIndependentEvidence(process.argv[2]);
+if(requests)throw Error('Unexpected network requests');
+await writeArtifact('kindle-independent-secondary-frozen.json',JSON.stringify(result,null,2)+'\n');
 console.log(JSON.stringify({...result,rows:undefined},null,2));
-for(const r of population){console.log('\n'+r.id+' | '+r.title+' | PRIMARY '+JSON.stringify({raw:r.primary.raw,rank:r.primary.rank,outcome:r.primary.outcome,unparsed:r.primary.proposal.unparsed}));for(const c of r.secondaries)console.log(' SECONDARY '+JSON.stringify({index:c.index,raw:c.raw,rank:c.rank,quality:c.quality,outcome:c.outcome,entries:c.proposal.entries,unparsed:c.proposal.unparsed,relation:c.relation,retained:c.retainedSecondary}));}
+}

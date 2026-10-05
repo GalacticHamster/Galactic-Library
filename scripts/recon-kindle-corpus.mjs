@@ -1,3 +1,4 @@
+import {corpusReviewLabels} from './contents-parser-corpus.mjs';
 // Audit-only offline counts/probes. Does not write library data or make requests.
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -8,9 +9,9 @@ import {supportedKindleContentsBook} from '../src/lib/kindle-contents.js';
 const [backupPath,controlPath]=process.argv.slice(2);
 if(!backupPath||!controlPath)throw Error('Usage: node scripts/recon-kindle-corpus.mjs BACKUP_JSON CONTROL_EVIDENCE_JSON');
 const bytes=await readFile(backupPath),sourceHash=createHash('sha256').update(bytes).digest('hex');
-const audit=await readFile(new URL('../docs/kindle-contents-quality-audit.md',import.meta.url),'utf8');
-if(!audit.includes(sourceHash))throw Error('Backup must match audit hash for ordinal labels');
-const labels=[...audit.split('<details>')[1].split('</details>')[0].matchAll(/^\| (\d{4}) \| .*? \| ([ABCDE]) \| (collect|contain|include|comprise|other) \| (full|partial|failed) \| (\d+) \|/gmu)].map(m=>({id:Number(m[1]),category:m[2],trigger:m[3],before:m[4]}));
+const annotations=await corpusReviewLabels();
+if(sourceHash!==annotations.sourceHash)throw Error('Backup must match the audited SHA-256 before applying ordinal annotations.');
+const labels=annotations.labels.map(r=>({id:r.auditId,category:r.legacyCategory,trigger:r.trigger,before:r.before,beforeEntries:r.beforeEntries}));
 const db=JSON.parse(bytes.toString()).database,eligible=Object.values(db.providerItems).filter(supportedKindleContentsBook);
 const items=eligible.filter(i=>i.metadata?.enrichment?.kindleProductComicContents?.statement?.trim()).sort((a,b)=>a.title.localeCompare(b.title)||a.id.localeCompare(b.id));
 if(items.length!==1520||labels.length!==1520)throw Error('Audit corpus changed');

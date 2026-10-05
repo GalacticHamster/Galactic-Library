@@ -1,6 +1,8 @@
 # Generalized qualifier matching — 2026-10-03
 
-Implemented the supplied [MATCHING_PHILOSOPHY.md](../MATCHING_PHILOSOPHY.md) as the product contract. The three historical regressions and the seven false-New edition/revision examples now produce Possible across HB local, FAN local, GL, HB consuming GL and FAN consuming GL. No importer, receipt, storage, ownership taxonomy or UI redesign was needed.
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
+Implemented the supplied [MATCHING_PHILOSOPHY.md](../../MATCHING_PHILOSOPHY.md) as the product contract. The three historical regressions and the seven false-New edition/revision examples now produce Possible across HB local, FAN local, GL, HB consuming GL and FAN consuming GL. No importer, receipt, storage, ownership taxonomy or UI redesign was needed.
 
 ## Audit before implementation
 
@@ -52,7 +54,7 @@ The permanent 60-case matrix expands to 800 comparisons per local/linked path th
 - GL runtime: `src/lib/matching-policy.js`, `src/lib/title-candidates.js`, `src/lib/identity.js`.
 - HB runtime: `shared.js`, `ownership.js`, `content.js`.
 - FAN runtime: `src/shared.js`.
-- All projects: `MATCHING_PHILOSOPHY.md`, `docs/matching-policy.md`, this report, `tests/revision-matching-cases.json`.
+- All projects: `MATCHING_PHILOSOPHY.md`, `docs/architecture/matching-policy.md`, this report, `tests/revision-matching-cases.json`.
 - GL tests: `tests/revision-matching.js`, `tests/matching-candidates.js`.
 - HB/FAN tests: reusable `tests/matching-fixture.mjs`, existing `tests/matching-policy.test.mjs`, new `tests/revision-matching.test.mjs`.
 - HB additionally updates its expired-key regression in `tests/entitlements.test.mjs` to assert exact identity independently of effective ownership.

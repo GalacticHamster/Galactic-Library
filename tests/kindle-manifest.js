@@ -6,7 +6,7 @@ import {createEmptyDatabase,normalizeProviderItem,rebuildCanonicalItems} from '.
 import {kindleContentsPlan,KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../src/lib/kindle-contents.js';
 import {contentCoverage,proposeContents} from '../src/lib/contents.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
-const fixtures=JSON.parse(await readFile(new URL('./kindle-manifest-fixtures.json',import.meta.url),'utf8'));
+const fixtures=JSON.parse(await readFile(new URL('./fixtures/kindle/kindle-manifest-fixtures.json',import.meta.url),'utf8'));
 const select=(text,title='Example Collection')=>selectManifest([{selector:'#bookDescription_feature_div',text}],title);
 const proposal=s=>manifestReviewProposal(s,s.manifest.title);
 export const kindleManifestTests=[

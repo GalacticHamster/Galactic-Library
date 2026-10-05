@@ -5,7 +5,7 @@ import {manifestReviewProposal,selectManifest,validateManifest} from '../src/lib
 import {contentsParseState} from '../src/lib/kindle-contents.js';
 import {validateEnrichment} from '../src/lib/metadata-validation.js';
 import {oldParser} from '../scripts/contents-parser-corpus.mjs';
-const fixtures=JSON.parse(await readFile(new URL('./fixtures/contents-parser-v4-corpus.json',import.meta.url),'utf8'));
+const fixtures=JSON.parse(await readFile(new URL('./fixtures/kindle/contents-parser-v4-corpus.json',import.meta.url),'utf8'));
 const byId=id=>fixtures.find(r=>r.auditId===id);
 const parse=id=>{const f=byId(id);return proposeContentsForReview(f.statement,f.title,f.context);};
 const range=(p,series,type='issue')=>p.entries.filter(e=>e.series===series&&e.unitType===type).map(e=>e.number);
@@ -68,7 +68,7 @@ export const contentsParserV4Tests=[
  }],
  ['restore preserves a selected source when improved grammar changes the winner',async()=>{
    const source=await readFile(new URL('../src/lib/kindle-manifest.js',import.meta.url),'utf8'),old=await oldParser();
-   const frozen=await readFile(new URL('./fixtures/contents-parser-v3.snapshot.txt',import.meta.url),'utf8');
+   const frozen=await readFile(new URL('./fixtures/kindle/contents-parser-v3.snapshot.txt',import.meta.url),'utf8');
    const oldUrl='data:text/javascript;base64,'+Buffer.from(frozen.replace(/from '\.\/([^']+)'/gu,(_,p)=>`from '${new URL('../src/lib/'+p,import.meta.url).href}'`)).toString('base64');
    const rewritten=source.replace(/from '\.\/([^']+)'/gu,(_,p)=>`from '${p==='contents.js'?oldUrl:new URL('../src/lib/'+p,import.meta.url).href}'`);
    const previous=await import('data:text/javascript;base64,'+Buffer.from(rewritten).toString('base64'));

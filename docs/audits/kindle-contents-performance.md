@@ -1,5 +1,7 @@
 # Kindle contents performance instrumentation ? 2026-10-04
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 This report describes the original instrumentation baseline. The subsequent live investigation and implemented batching/storage/UI fixes are documented in [Kindle contents performance fix](kindle-contents-performance-fix-2026-10-04.md). Current `migration_compare` measures semantic object comparison, and checkpoint operations are batched; the historical measurements below remain unchanged.
 
 Baseline: `9eb31e2`. This is an instrumentation-only change. The commit hash is supplied in the completion message; this report is included in that commit.
@@ -12,7 +14,7 @@ Every saved result performs whole-database work. At 14,081 provider records, a d
 
 **These measurements do not explain the entire observed live 13?14 seconds.** The control uses Node and structured-clone memory storage, without Amazon, real extension messaging, disk/IndexedDB, rendering or the intentional throttle. The dominant live bottleneck cannot honestly be identified until a signed-in diagnostic sample is exported. No live Amazon requests, intentional failures, personal extension writes or active/background browser experiment were performed here.
 
-The October 2 export was read into a temporary in-memory copy and its SHA-256 was checked again afterward. It remained unchanged. Raw diagnostic data is in [kindle-contents-local-timing-2026-10-04.json](kindle-contents-local-timing-2026-10-04.json). It contains timing, generic outcomes, random-format lookup IDs and record counts, without bibliographic or account data. Deterministic offline IDs are unrelated to source records.
+The October 2 export was read into a temporary in-memory copy and its SHA-256 was checked again afterward. It remained unchanged. Raw diagnostic data is in [kindle-contents-local-timing-2026-10-04.json](../development/artifacts-and-audits.md#generated-output). It contains timing, generic outcomes, random-format lookup IDs and record counts, without bibliographic or account data. Deterministic offline IDs are unrelated to source records.
 
 ## Enable, sample and export
 
@@ -215,9 +217,9 @@ Compare `fetch_headers`, `response_body`, `throttle`, `writer_queue`, residuals 
 | `tests/run.js` | Include new focused tests |
 | `tests/importers-fixture.js` | Real scan controls with disabled/enabled diagnostics, retry, pause, CAPTCHA and reparse fixtures |
 | `tests/browser-fixture.js` | Actual options refresh timing and one-use correlation checks |
-| `docs/kindle-contents-local-timing-2026-10-04.json` | Sanitized measured local-control spans and aggregates |
-| `docs/kindle-contents-performance.md` | This report and instructions |
-| `docs/kindle-contents-discovery.md` | Link to diagnostic instructions |
+| `audit-artifacts/kindle/kindle-contents-local-timing-2026-10-04.json` | Sanitized measured local-control spans and aggregates |
+| `docs/audits/kindle-contents-performance.md` | This report and instructions |
+| `docs/user-guide/kindle-contents-discovery.md` | Link to diagnostic instructions |
 
 Disabled diagnostics do not create per-operation traces, read timing clocks, collect samples, send timing notifications or add delays. The writer keeps its original Promise scheduling when uninstrumented. Enabled instrumentation adds bounded timing work and one fire-and-forget options notice per write; it never adds provider requests or changes persistence data.
 

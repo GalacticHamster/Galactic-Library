@@ -1,3 +1,4 @@
+import {outputPath as outputPathForRun} from './audit-artifacts.mjs';
 // Explicitly bounded, one-run static-fetch pilot. No real-page navigation,
 // hydration, clicks, signed-in profile, or installed extension storage access.
 import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
@@ -11,8 +12,9 @@ import {manifestReviewProposal} from '../src/lib/kindle-manifest.js';
 import {proposeContentsForReview,contentKey} from '../src/lib/contents.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import '../src/lib/kindle-contents-scan.js';
-const [backupPath,outputPath,authorization]=process.argv.slice(2);
-if(!backupPath||!outputPath||authorization!=='--run-exact-77')throw Error('Usage: node scripts/pilot-kindle-manifests.mjs BACKUP_JSON NEW_OUTPUT_JSON --run-exact-77');
+const [backupPath,requestedOutput,authorization]=process.argv.slice(2);
+if(!backupPath||!requestedOutput||authorization!=='--run-exact-77')throw Error('Usage: node scripts/pilot-kindle-manifests.mjs BACKUP_JSON NEW_OUTPUT_JSON --run-exact-77');
+const outputPath=await outputPathForRun(requestedOutput,'kindle-manifest-pilot-results.json');
 try{await readFile(outputPath);throw Error('Pilot output already exists; refusing an accidental network rerun.');}catch(e){if(e.code!=='ENOENT')throw e;}
 const bytes=await readFile(backupPath),sourceHash=createHash('sha256').update(bytes).digest('hex');
 if(sourceHash!=='3e7c70701e6577858266365b1b0011e5c2a3dba257018acec92cc7af8b16ae4e')throw Error('Source is not the audited backup.');

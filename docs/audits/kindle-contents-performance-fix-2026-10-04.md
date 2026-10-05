@@ -1,5 +1,7 @@
 # Kindle contents scan performance fix — October 4, 2026
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Implementation and automated validation are complete. A 50-result native Chrome storage control meets the local-overhead target, but the required signed-in Amazon after sample remains pending. The control must not be mistaken for that live acceptance test. This report is included in the single focused performance commit; its hash is provided in the completion message.
 
 ## Confirmed root causes
@@ -50,7 +52,7 @@ Checkpoint time is charged to the associated network result when possible. Pause
 
 The before column is the user's **50-request live** `GL-timing-export.json`. The after column is a **50-result offline native Chrome 153 control** using the actual packaged writer and actual `chrome.storage.local`, seeded from a read-only copy of the October 2 export. It alternates 25 generic statement-found and 25 empty results. It runs without Amazon, the one-second delay, content-to-worker transport or an Options page. These are different measurement environments.
 
-Raw anonymous after measurements: [native Chrome control JSON](kindle-contents-browser-control-2026-10-04.json). The source export hash was checked before/after and remained unchanged. No personal extension profile or installed library was changed, and no provider requests were made.
+Raw anonymous after measurements: [native Chrome control JSON](../development/artifacts-and-audits.md#generated-output). The source export hash was checked before/after and remained unchanged. No personal extension profile or installed library was changed, and no provider requests were made.
 
 | Measure | Live before | Native storage control after | Signed-in live after |
 |---|---:|---:|---|

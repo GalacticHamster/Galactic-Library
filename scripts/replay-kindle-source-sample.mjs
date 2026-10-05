@@ -1,11 +1,12 @@
+import {readArtifact,writeArtifact} from './audit-artifacts.mjs';
 // Offline DOM replay of the frozen sanitized source fragments, never Amazon.
-import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
+import {readFile,mkdtemp,rm} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {hash} from './contents-parser-corpus.mjs';
 import {selectManifest,manifestReviewProposal} from '../src/lib/kindle-manifest.js';
-const live=JSON.parse(await readFile(new URL('../docs/kindle-source-capture-live.json',import.meta.url),'utf8'));
+const live=JSON.parse(await readArtifact('kindle-source-capture-live.json'));
 const adapter=await readFile(new URL('../src/providers/kindle.js',import.meta.url),'utf8');
 const profile=await mkdtemp(join(tmpdir(),'gl-source-replay-'));
 const child=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-component-update','--disable-sync','--remote-debugging-pipe','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:['ignore','ignore','pipe','pipe','pipe']});
@@ -33,7 +34,7 @@ try{
   const selected=selectManifest(row.generation5Blocks,original.title);
   return {...row,title:original.title,selection:selected,parser:manifestReviewProposal(selected,original.title),blocksChanged:JSON.stringify(row.generation4Blocks)!==JSON.stringify(row.generation5Blocks)};
  });
- await writeFile(new URL('../docs/kindle-source-capture-replay.json',import.meta.url),JSON.stringify({liveHash:hash(await readFile(new URL('../docs/kindle-source-capture-live.json',import.meta.url))),adapterHash:hash(adapter),extractorVersion:5,parserVersion:4,networkRequests:0,sanitizedGeneration4ReplayExact:25,rows},null,2)+'\n');
+ await writeArtifact('kindle-source-capture-replay.json',JSON.stringify({liveHash:hash(await readArtifact('kindle-source-capture-live.json')),adapterHash:hash(adapter),extractorVersion:5,parserVersion:4,networkRequests:0,sanitizedGeneration4ReplayExact:25,rows},null,2)+'\n');
  console.log(JSON.stringify(rows.map(r=>({id:r.auditId,outcome:r.parser.outcome,entries:r.parser.entries.length,statement:r.selection.statement,blocksChanged:r.blocksChanged})),null,2));
 }finally{
  try{await send('Browser.close');}catch{}child.kill();for(const p of pending.values())clearTimeout(p.timer);

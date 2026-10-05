@@ -1,5 +1,7 @@
 # Kindle whole-manifest completeness: offline investigation and fix
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Date: 2026-10-05. Scope: interpretation of already captured source only.
 
 ## 1. Executive result
@@ -12,10 +14,10 @@ Source generation **5**, parser **4**, filter **1**, and storage schema **12** r
 
 Evidence:
 
-- [Frozen before trace](kindle-whole-manifest-before.json): original block, sentence, all windows/ranks and historical/parser-4 proposals.
-- [Complete replay ledger](kindle-whole-manifest-audit.json): 137 captured/fixture observations, 1,520 corpus comparisons, source selections and all proposal additions/removals.
-- [Suspicious Full evidence](kindle-whole-manifest-suspicious.md): every audited non-filtered secondary of a previously Full primary.
-- [Full-export safety results](kindle-whole-manifest-safety.json).
+- [Frozen before trace](../development/artifacts-and-audits.md#generated-output): original block, sentence, all windows/ranks and historical/parser-4 proposals.
+- [Complete replay ledger](../development/artifacts-and-audits.md#generated-output): 137 captured/fixture observations, 1,520 corpus comparisons, source selections and all proposal additions/removals.
+- [Suspicious Full evidence](../development/artifacts-and-audits.md#generated-output): every audited non-filtered secondary of a previously Full primary.
+- [Full-export safety results](../development/artifacts-and-audits.md#generated-output).
 
 ## 2. Exact King in Black root cause
 
@@ -180,7 +182,7 @@ There are **29 same-block independent secondary observations deliberately not co
 
 ## 10. Suspicious-Full / secondary-candidate audit
 
-The audit includes every non-filtered secondary candidate of a previously Full primary in the 137-observation replay. Full blocks and candidate offsets were inspected, including every changed record. The [detailed table](kindle-whole-manifest-suspicious.md) contains **52 secondary observations across eight distinct titles**; repeated captures/fixtures are intentional.
+The audit includes every non-filtered secondary candidate of a previously Full primary in the 137-observation replay. Full blocks and candidate offsets were inspected, including every changed record. The [detailed table](../development/artifacts-and-audits.md#generated-output) contains **52 secondary observations across eight distinct titles**; repeated captures/fixtures are intentional.
 
 | Classification | Observations | Interpretation |
 | --- | --- | --- |
@@ -229,8 +231,8 @@ The final Chrome importer fixture was rerun after the last UI wording adjustment
 Reproduce offline from the GL repository:
 
 ```powershell
-node scripts/audit-whole-manifests.mjs 'tests/fixtures/mock-backup.json'
-node scripts/check-whole-manifest-safety.mjs 'tests/fixtures/mock-backup.json'
+node scripts/audit-whole-manifests.mjs '<path-to-backup>'
+node scripts/check-whole-manifest-safety.mjs '<path-to-backup>'
 npm test
 npm run test:browser:release
 npm run test:browser:firefox
@@ -258,8 +260,8 @@ Production:
 
 Tests:
 
-- `tests/fixtures/kindle-manifest-before-whole.snapshot.txt`: frozen original candidate module.
-- `tests/fixtures/kindle-whole-manifest.json`: captured King source and old selection.
+- `tests/fixtures/kindle/kindle-manifest-before-whole.snapshot.txt`: frozen original candidate module.
+- `tests/fixtures/kindle/kindle-whole-manifest.json`: captured King source and old selection.
 - `tests/kindle-whole-manifest-fixture.js`: shared Node/browser regressions.
 - `tests/kindle-whole-manifest.js`, `tests/run.js`, `tests/importers-fixture.js`: unit/control and real-browser integration.
 
@@ -268,7 +270,7 @@ Tooling and reports:
 - `scripts/whole-manifest-evidence.mjs`: existing captured evidence loader and frozen baseline importer.
 - `scripts/audit-whole-manifests.mjs`: complete deterministic replay, suspicious audit and bounded computational benchmark.
 - `scripts/check-whole-manifest-safety.mjs`: actual writer/API/index/backup safety on a private export copy.
-- This report and `docs/kindle-whole-manifest-{before,audit,safety}.json`, `docs/kindle-whole-manifest-suspicious.md`.
+- This report and `audit-artifacts/kindle/kindle-whole-manifest-{before,audit,safety}.json`, `audit-artifacts/kindle/kindle-whole-manifest-suspicious.md`.
 
 Source capture, parser grammar, filter grammar, ordinary matching, models and providers are unchanged. The baseline snapshot hash is `7ccf8c0c214027f6fc4666c16b7f9a98bac3c12bfbe91ae3314e5e28fb84a147`.
 

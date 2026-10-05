@@ -1,3 +1,4 @@
+import {readArtifact,outputPath as outputPathForRun} from './audit-artifacts.mjs';
 // Explicit bounded experiment, never installed-extension storage. Static HTML
 // only, synthetic locally fulfilled origin, no product navigation/hydration.
 import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
@@ -9,9 +10,10 @@ import {loadCorpus,hash} from './contents-parser-corpus.mjs';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {selectManifest,manifestReviewProposal} from '../src/lib/kindle-manifest.js';
 import '../src/lib/kindle-contents-scan.js';
-const [backupPath,outputPath,authorization,resume]=process.argv.slice(2);
-if(!backupPath||!outputPath||authorization!=='--run-frozen-25'||resume&&!['--resume'].includes(resume))throw Error('Usage: node scripts/capture-kindle-source-sample.mjs BACKUP NEW_OUTPUT --run-frozen-25 [--resume]');
-const ledger=JSON.parse(await readFile(new URL('../docs/kindle-source-capture-sample.json',import.meta.url),'utf8'));
+const [backupPath,requestedOutput,authorization,resume]=process.argv.slice(2);
+if(!backupPath||!requestedOutput||authorization!=='--run-frozen-25'||resume&&!['--resume'].includes(resume))throw Error('Usage: node scripts/capture-kindle-source-sample.mjs BACKUP NEW_OUTPUT --run-frozen-25 [--resume]');
+const outputPath=await outputPathForRun(requestedOutput,'kindle-source-capture-live.json');
+const ledger=JSON.parse(await readArtifact('kindle-source-capture-sample.json'));
 if(ledger.planned!==25||ledger.rows.length!==25||hash(ledger.rows.map(r=>r.sourceUrl).join('\n'))!==ledger.populationHash||new Set(ledger.rows.map(r=>r.sourceUrl)).size!==25)throw Error('Frozen population changed');
 let previous;
 try{previous=JSON.parse(await readFile(outputPath,'utf8'));if(!resume)throw Error('Output exists; refusing accidental network rerun');}catch(e){if(e.code!=='ENOENT')throw e;}
@@ -20,8 +22,8 @@ if(previous&&(previous.populationHash!==ledger.populationHash||previous.rows.len
 const corpus=await loadCorpus(backupPath);
 if(corpus.sourceHash!==ledger.sourceHash)throw Error('Wrong backup');
 const original=structuredClone(corpus.db);
-const rawPilot=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-results.json',import.meta.url),'utf8'));
-const metrics=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-metrics.json',import.meta.url),'utf8'));
+const rawPilot=JSON.parse(await readArtifact('kindle-manifest-pilot-results.json'));
+const metrics=JSON.parse(await readArtifact('kindle-manifest-pilot-metrics.json'));
 for(const row of ledger.rows.filter(r=>r.extractorVersion===4)){
  const p=rawPilot.rows.find(p=>p.sourceUrl===row.sourceUrl),m=metrics.rows.find(p=>p.sourceUrl===row.sourceUrl);
  Object.assign(original.providerItems[row.itemId].metadata.enrichment.kindleProductComicContents,{statement:m.statement,extractorVersion:4,manifest:{...p.manifest,candidates:m.candidates,selected:m.selected,secondary:m.secondary}});

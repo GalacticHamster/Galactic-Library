@@ -1,7 +1,10 @@
+import {frozenIndependentEvidence} from './freeze-independent-secondary.mjs';
+import {historicalParser4} from './contents-parser-corpus.mjs';
+import {writeArtifact} from './audit-artifacts.mjs';
 // Offline representation audit, deliberately NOT a new parser or production test.
 // Unsafe results characterize the current contract; they are not desired behavior.
 import assert from 'node:assert/strict';
-import {readFile, writeFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {wholeManifestEvidence} from './whole-manifest-evidence.mjs';
 import {hash} from './contents-parser-corpus.mjs';
 import {proposeContentsForReview, validateContents, validateContentReview, contentKey, contentCoverage, ownedContentIndex, seriesCoverage} from '../src/lib/contents.js';
@@ -13,8 +16,8 @@ import {handleExternalApiRequest} from '../src/lib/external-api.js';
 let requests=0;
 globalThis.fetch=()=>{requests++;throw Error('Network acquisition forbidden in named-model audit');};
 const {corpus,observations,savedByUrl}=await wholeManifestEvidence(process.argv[2]);
-const frozenPrior=JSON.parse(await readFile(new URL('../docs/kindle-independent-secondary-frozen.json',import.meta.url),'utf8'));
-const historical=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-audit-v4.json',import.meta.url),'utf8'));
+const frozenPrior=await frozenIndependentEvidence(process.argv[2]);
+const historical=await historicalParser4(corpus);
 const totals=rows=>({records:rows.length,proposals:rows.reduce((n,r)=>n+r.proposal.entries.length,0),unresolved:rows.reduce((n,r)=>n+r.proposal.unparsed.length,0),outcomes:Object.fromEntries(['full','partial','failed','filtered','uncertain'].map(k=>[k,rows.filter(r=>r.proposal.outcome===k).length]))});
 function replay(){
  const saved=corpus.rows.map(row=>{
@@ -125,6 +128,6 @@ assert.equal(requests,0);assert.equal(hash(await readFile(process.argv[2])),corp
 const implementationHashes=Object.fromEntries(await Promise.all(['contents.js','contents-quality.js','kindle-manifest.js','kindle-evidence-review.js','models.js','matcher.js','external-api.js','companion-response.js'].map(async file=>[file,hash(await readFile(new URL('../src/lib/'+file,import.meta.url)))])));
 const frozen={baselineCommit:'4ac1bfd',sourceHash:corpus.sourceHash,implementationHashes,versions:{source:5,parser:4,filter:1,schema:12,manifestInterpretation:1,evidenceReview:1},networkRequests:requests,decision:'C: stop before grammar; explicit parent scope is missing.',populationDefinition:'Inclusive, reproducible audit queue, not an accepted finite-work population or production classifier.',savedQueueCount:population.length,capturedQueueCount:capturedPopulation.length,tagCounts:Object.fromEntries([...new Set(population.flatMap(r=>r.tags))].sort().map(tag=>[tag,population.filter(r=>r.tags.includes(tag)).length])),saved:population,captured:capturedPopulation,syntheticControls:grammarControls,modelProof:proof};
 const replayResult={sourceHash:corpus.sourceHash,networkRequests:requests,versions:frozen.versions,decision:frozen.decision,deterministic:true,historicalParser4ObjectsUnchanged:1520,saved:totals(first.saved),captured:totals(first.captured),recordsChanged:0,added:[],removed:[],modelProof:proof,performance:{firstMs,secondMs,warmRuns:7,parser4MedianMs:[...times].sort((a,b)=>a-b)[3],parser5Impact:'Not applicable; no implementation.'},rows:first.saved,capturedRows:first.captured};
-await writeFile(new URL('../docs/kindle-named-contained-works-frozen.json',import.meta.url),JSON.stringify(frozen,null,2)+'\n');
-await writeFile(new URL('../docs/kindle-named-contained-works-replay.json',import.meta.url),JSON.stringify(replayResult,null,2)+'\n');
+await writeArtifact('kindle-named-contained-works-frozen.json',JSON.stringify(frozen,null,2)+'\n');
+await writeArtifact('kindle-named-contained-works-replay.json',JSON.stringify(replayResult,null,2)+'\n');
 console.log(JSON.stringify({decision:frozen.decision,savedQueue:frozen.savedQueueCount,capturedQueue:frozen.capturedQueueCount,tagCounts:frozen.tagCounts,saved:replayResult.saved,captured:replayResult.captured,unsafeExplicitCoverageOwned:completeApi.results[0].owned,numericTitleCollision:true,deterministic:true,networkRequests:requests,performance:replayResult.performance},null,2));

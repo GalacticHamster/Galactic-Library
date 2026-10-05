@@ -19,7 +19,7 @@ export function secondarySemanticReview(row,c){
  return {category:'F',meaning:'Unrelated prose / contributor / wider product / topic',rationale:id==='pilot-4-13'?'Robin synopsis references another product volume, not contents.':id==='pilot-4-32'?'Variant-cover gallery contributor names; works in parentheses are credits.':id==='pilot-4-52'?'Technical features/protocols, not contained works.':'Five-volume all-100-issues series scope is not this individual volume; do not extend its local issue range.'};
 }
 export async function independentBaseline(){
- const source=await readFile(new URL('../tests/fixtures/kindle-manifest-before-independent.snapshot.txt',import.meta.url),'utf8');
+ const source=await readFile(new URL('../tests/fixtures/kindle/kindle-manifest-before-independent.snapshot.txt',import.meta.url),'utf8');
  const rewritten=source.replace(/from '\.\/([^']+)'/gu,(_,path)=>`from '${new URL('../src/lib/'+path,import.meta.url).href}'`);
  return {module:await import('data:text/javascript;base64,'+Buffer.from(rewritten).toString('base64')),hash:hash(source)};
 }

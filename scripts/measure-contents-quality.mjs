@@ -1,3 +1,4 @@
+import {corpusReviewLabels} from './contents-parser-corpus.mjs';
 // Offline corpus comparison against audit labels. No source/export writes,
 // provider requests, browser profiles, or real extension storage are used.
 import assert from 'node:assert/strict';
@@ -14,10 +15,9 @@ import {enrichmentWorkbenchRows} from '../src/lib/enrichment-workbench.js';
 const [file]=process.argv.slice(2);
 if(!file)throw Error('Usage: node scripts/measure-contents-quality.mjs BACKUP_JSON');
 const bytes=await readFile(file),hash=value=>createHash('sha256').update(value).digest('hex'),sourceHash=hash(bytes);
-const audit=await readFile(new URL('../docs/kindle-contents-quality-audit.md',import.meta.url),'utf8');
-if(!audit.includes(sourceHash))throw Error('This export does not match the completed audit SHA-256; do not apply its ordinal labels to a different corpus.');
-const labels=[...audit.split('<details>')[1].split('</details>')[0].matchAll(/^\| (\d{4}) \| .*? \| ([ABCDE]) \| (collect|contain|include|comprise|other) \| (full|partial|failed) \| (\d+) \|/gmu)]
-  .map(match=>({id:Number(match[1]),category:match[2],trigger:match[3],before:match[4],beforeEntries:Number(match[5])}));
+const annotations=await corpusReviewLabels();
+if(sourceHash!==annotations.sourceHash)throw Error('Backup must match the audited SHA-256 before applying ordinal annotations.');
+const labels=annotations.labels.map(r=>({id:r.auditId,category:r.legacyCategory,trigger:r.trigger,before:r.before,beforeEntries:r.beforeEntries}));
 assert.equal(labels.length,1520);
 const db=parseBackup(JSON.parse(bytes.toString('utf8')));
 const items=Object.values(db.providerItems).filter(i=>i.provider==='kindle'&&i.metadata?.enrichment?.kindleProductComicContents?.statement?.trim()).sort((a,b)=>a.title.localeCompare(b.title)||a.id.localeCompare(b.id));
@@ -30,7 +30,7 @@ const start=performance.now();
 const rows=items.map((item,n)=>({...labels[n],item,proposal:proposeContentsForReview(item.metadata.enrichment.kindleProductComicContents.statement,item.title)}));
 const filterParseMs=performance.now()-start;
 const risks=rows.filter(row=>useful(row)&&/\b(?:material from|excerpts? from|selections? from|partial)\b/iu.test(row.item.metadata.enrichment.kindleProductComicContents.statement));
-const fixture=JSON.parse(await readFile(new URL('../tests/kindle-contents-quality-fixtures.json',import.meta.url),'utf8')).fixtures;
+const fixture=JSON.parse(await readFile(new URL('../tests/fixtures/kindle/kindle-contents-quality-fixtures.json',import.meta.url),'utf8')).fixtures;
 const readMoreIds=new Set(fixture.filter(row=>row.readMore28).map(row=>row.auditId));
 const falseFullIds=new Set(fixture.filter(row=>row.falseFull).map(row=>row.auditId));
 const knownStructural=rows.filter(row=>fixture.some(f=>f.auditId===row.id&&f.structural));

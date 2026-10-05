@@ -1,5 +1,7 @@
 # Kindle finite named contained works: representation-first audit
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Completed 2026-10-05. Offline only; no Amazon requests, refreshes or installed-library writes.
 
 ## 1. Executive result
@@ -18,16 +20,16 @@ All 1,520 saved statements, 137 captured/fixture observations and 1,520 historic
 
 Evidence:
 
-- [Representation decision, committed before grammar](kindle-named-contained-works-decision.md).
-- [Frozen inclusive evidence queue, synthetic controls and model proofs](kindle-named-contained-works-frozen.json).
-- [Complete current replay objects and identity probes](kindle-named-contained-works-replay.json).
-- [Private full-export writer/backup/API safety](kindle-named-contained-works-safety.json).
-- [Offline representation/replay tool](../scripts/audit-named-contents-model.mjs).
-- [Offline private-copy safety tool](../scripts/check-named-contents-safety.mjs).
+- [Representation decision, committed before grammar](../development/artifacts-and-audits.md#generated-output).
+- [Frozen inclusive evidence queue, synthetic controls and model proofs](../development/artifacts-and-audits.md#generated-output).
+- [Complete current replay objects and identity probes](../development/artifacts-and-audits.md#generated-output).
+- [Private full-export writer/backup/API safety](../development/artifacts-and-audits.md#generated-output).
+- [Offline representation/replay tool](../../scripts/audit-named-contents-model.mjs).
+- [Offline private-copy safety tool](../../scripts/check-named-contents-safety.mjs).
 
 ## 2. Current contents-model audit
 
-The authoritative entry validator is [contents.js](../src/lib/contents.js). It accepts 1–2,000 entries, returns only the following six fields, and deduplicates on `contentKey + completeness`.
+The authoritative entry validator is [contents.js](../../src/lib/contents.js). It accepts 1–2,000 entries, returns only the following six fields, and deduplicates on `contentKey + completeness`.
 
 | Field | Current meaning and validation | Named-work consequence |
 | --- | --- | --- |
@@ -50,7 +52,7 @@ There is no accepted per-entry parent reference, media type, source claim, quali
 
 Verified reviews are stored at `database.contentReviews[parentItemId]`, one review per item. Their accepted fields are entries, statement (10,000 characters), source URL, source label (100 characters), and verification timestamp. The statement validator compacts whitespace, including source newlines. Source-generation-5 manifest blocks preserve original line boundaries separately; a saved verified review is not itself a lossless copy of those boundaries or per-entry offsets.
 
-[Storage save](../src/background/storage-writer.js) permits reviews for current **book or game** records and replaces the prior item review. [Database validation](../src/lib/models.js) and [backup/restore](../src/lib/storage.js) validate these same fields. Old reviews survive today; no migration or compatibility change was made.
+[Storage save](../../src/background/storage-writer.js) permits reviews for current **book or game** records and replaces the prior item review. [Database validation](../../src/lib/models.js) and [backup/restore](../../src/lib/storage.js) validate these same fields. Old reviews survive today; no migration or compatibility change was made.
 
 ## 3. Named-work identity semantics
 
@@ -327,8 +329,8 @@ Browser checks use isolated profiles and local synthetic fixture servers. Node a
 Reproduce from GL:
 
 ```powershell
-node scripts/audit-named-contents-model.mjs 'tests/fixtures/mock-backup.json'
-node scripts/check-named-contents-safety.mjs 'tests/fixtures/mock-backup.json'
+node scripts/audit-named-contents-model.mjs '<path-to-backup>'
+node scripts/check-named-contents-safety.mjs '<path-to-backup>'
 npm test
 npm run test:browser:release
 npm run test:browser:firefox
@@ -353,12 +355,12 @@ Audit tooling only:
 
 Documentation/evidence:
 
-- This report and `docs/kindle-named-contained-works-decision.md`.
-- `docs/kindle-named-contained-works-frozen.json`.
-- `docs/kindle-named-contained-works-replay.json`.
-- `docs/kindle-named-contained-works-safety.json`.
+- This report and `audit-artifacts/kindle/kindle-named-contained-works-decision.md`.
+- `audit-artifacts/kindle/kindle-named-contained-works-frozen.json`.
+- `audit-artifacts/kindle/kindle-named-contained-works-replay.json`.
+- `audit-artifacts/kindle/kindle-named-contained-works-safety.json`.
 
-No production code, schema, runtime packaging, tests, source acquisition, ordinary matching, grouping, ownership, HB or FAN changes. Unrelated GL `start.txt` and FAN reconnaissance files remain untouched. Test logs are in the shared `D:\projects\logs` directory; GL-specific documentation and scripts are inside GL.
+No production code, schema, runtime packaging, tests, source acquisition, ordinary matching, grouping, ownership, HB or FAN changes. Unrelated GL `start.txt` and FAN reconnaissance files remain untouched. Test logs are in the shared `<local-project-path>` directory; GL-specific documentation and scripts are inside GL.
 
 ## 23. Commits
 

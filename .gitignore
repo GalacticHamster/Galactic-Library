@@ -4,3 +4,8 @@ galactic-library-backup-v*.json
 comixology-ownership-review.md
 
 dist/
+
+# Local audit/replay output and private publication-cleanup inventories.
+/audit-artifacts/
+/node_modules/
+/start.txt

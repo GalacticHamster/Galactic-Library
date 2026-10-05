@@ -1,6 +1,7 @@
+import {writeArtifact} from './audit-artifacts.mjs';
 // Full private database, source-only overlays; zero acquisition or user writes.
 import assert from 'node:assert/strict';
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {independentContentsClaims} from '../src/lib/kindle-evidence-review.js';
 import {wholeManifestEvidence} from './whole-manifest-evidence.mjs';
 import {hash} from './contents-parser-corpus.mjs';
@@ -39,4 +40,4 @@ assert.equal(after.providerItems[king.item.id].metadata.enrichment.kindleProduct
 assert.equal(after.providerItems[king.item.id].metadata.enrichment.kindleProductComicContents.parseOutcome,'partial');
 assert.equal(requests,0);assert.equal(hash(await readFile(process.argv[2])),corpus.sourceHash);
 const result={sourceHash:corpus.sourceHash,networkRequests:0,providerItems:Object.keys(before.providerItems).length,reparsed:1520,ownershipChanges:0,ordinaryMetadataChanges:0,canonicalChanges:0,editionSeparationChanges:0,ownershipReviewChanges:0,manualDecisionChanges:0,verifiedReviewChanges:0,ordinaryApiComparisons:29,ownedIndexChanges:0,sourceEvidenceChanges:0,oldHistoryPreserved:true,syntheticVerifiedReviewPreserved:true,gen5BackupRoundTrip:true,kingOriginalSelectedSourcePreserved:true,independentEvidenceChanges:0,kingNewOutcome:'partial',elapsedMs:performance.now()-start};
-await writeFile(new URL('../docs/kindle-independent-secondary-safety.json',import.meta.url),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));
+await writeArtifact('kindle-independent-secondary-safety.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));

@@ -1,9 +1,11 @@
+import {readArtifact,outputPath} from './audit-artifacts.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
-const doc=new URL('../docs/kindle-contents-parser-audit-v4.md',import.meta.url);
-const audit=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-audit-v4.json',import.meta.url),'utf8'));
-const perf=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-performance-v4.json',import.meta.url),'utf8'));
-const safety=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-safety-v4.json',import.meta.url),'utf8'));
-const previous=await readFile(doc,'utf8');
+const sourceDoc=new URL('../docs/audits/kindle-contents-parser-audit-v4.md',import.meta.url);
+const doc=await outputPath(undefined,'kindle-contents-parser-audit-v4.md');
+const audit=JSON.parse(await readArtifact('kindle-contents-parser-audit-v4.json'));
+const perf=JSON.parse(await readArtifact('kindle-contents-parser-performance-v4.json'));
+const safety=JSON.parse(await readArtifact('kindle-contents-parser-safety-v4.json'));
+const previous=await readFile(sourceDoc,'utf8');
 const baseline=/## Pre-change audit[\s\S]*?(?=\n## (?:Final result|Rules implemented)|$)/u.exec(previous)?.[0].replace('Implementation and final replay results follow after validation.','').trimEnd();
 if(!baseline)throw Error('The committed pre-change audit must remain in the report.');
 const lines=[],add=(...parts)=>lines.push(...parts),table=(headers,rows)=>[headers,headers.map(()=> '---'),...rows].map(row=>'| '+row.join(' | ')+' |').join('\n');
@@ -56,17 +58,17 @@ add(table(['Metric','Parser 3','Parser 4'],[
  '', 'After reloading GL, choose Reparse saved text in the Kindle panel?s Contents discovery menu to apply parser 4 locally. No refresh is required for these grammar changes. For a future extractor/source-quality experiment, recommend at most 20–30 records with demonstrable missing or concatenated source text, including incomplete-description evidence and non-comic named works. Establish a concrete capture/serialization improvement first; repeating unchanged acquisition is not a remedy for unresolved grammar. Do not treat the broad 642-candidate or 3,194-page populations as the next experiment. No next population was selected or fetched here.',
  '', '## Changed files and commits','',
  '- Production: `src/lib/contents.js`, `kindle-contents.js`, `kindle-manifest.js`, `metadata-validation.js`, `enrichment-workbench.js`, and `src/ui/contents-editor.js`.',
- '- Tests: `tests/contents-parser-v4.js`, `tests/run.js`, frozen parser-3 snapshot and real parser-4 corpus fixtures in `tests/fixtures/`.',
+ '- Tests: `tests/contents-parser-v4.js`, `tests/run.js`, frozen parser-3 snapshot and real parser-4 corpus fixtures in `tests/fixtures/kindle/`.',
  '- Offline tools: corpus loader, comparison, review annotations, writer safety check, benchmark and this report renderer in `scripts/`.',
- '- Artifacts: this report, complete baseline-v3/comparison-v4 JSON, safety-v4 and performance-v4 JSON in `docs/`. No HB/FAN changes; unrelated `start.txt` was left alone.',
+ '- Artifacts: this report, complete baseline-v3/comparison-v4 JSON, safety-v4 and performance-v4 JSON in ignored `audit-artifacts/kindle/`. No HB/FAN changes; unrelated `start.txt` was left alone.',
  '- `eb3574a`: pre-change corpus audit and frozen parser-3 baseline.',
  '- `c7cb155`: bounded grammar, source-selection preservation, context provenance, and permanent regressions.',
  '- `bb8818b`: additional generic-volume/omnibus negative controls; corpus results remain identical.',
- '- Final audit/artifact commit: identified by `git log -- docs/kindle-contents-parser-audit-v4.md` (the commit contains this document, so its own hash is not embedded).',
+ '- Historical investigation commit: identified by `git log --follow -- docs/audits/kindle-contents-parser-audit-v4.md` (the generated report itself is not committed).',
  '', 'Reproduce offline:', '', '```powershell',
- "node scripts/audit-contents-parser.mjs 'tests/fixtures/mock-backup.json' docs/kindle-contents-parser-audit-v4.json",
- "node scripts/check-contents-parser-safety.mjs 'tests/fixtures/mock-backup.json' docs/kindle-contents-parser-safety-v4.json",
- "node scripts/benchmark-contents-parser.mjs 'tests/fixtures/mock-backup.json' docs/kindle-contents-parser-performance-v4.json",
+ "node scripts/audit-contents-parser.mjs '<path-to-backup>' audit-artifacts/kindle/kindle-contents-parser-audit-v4.json",
+ "node scripts/check-contents-parser-safety.mjs '<path-to-backup>' audit-artifacts/kindle/kindle-contents-parser-safety-v4.json",
+ "node scripts/benchmark-contents-parser.mjs '<path-to-backup>' audit-artifacts/kindle/kindle-contents-parser-performance-v4.json",
  'node scripts/render-contents-parser-audit.mjs','```',
  '', '## Human review sample','',
  `The bounded sample contains **${audit.humanReview.length} records**, including **${audit.humanReview.filter(id=>audit.rows.find(r=>r.auditId===id).added.length).length} with added proposals**, every one of the 33 records losing a prior key, all 12 Full → Partial downgrades, remaining Failed/Partial and non-comic examples, and all 43 remaining flagged Full results. IDs match the original corpus ledger. Compressed entry ranges below preserve all values; exact objects, additions and removals are in the JSON. “Full” means all meaningful tokens of this saved input are represented, not verified complete ownership or page completeness.`, '');

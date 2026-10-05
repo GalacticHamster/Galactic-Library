@@ -1,0 +1,2060 @@
+{
+  "purpose": "Bounded public description input and exact historical source selections for existing 127 capture observations. No parser outcomes, account data, timestamps, source-library IDs or inventory.",
+  "captures": [
+    {
+      "id": "pilot-4-1",
+      "title": "100 Bullets: Book Five",
+      "url": "https://www.amazon.com/dp/B01D2052NE",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The conclusion to Brian Azzarello and Eduardo Risso's critically acclaimed 100 BULLETS. How far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and 100 rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why? Collects 100 BULLETS #81-100. Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects 100 BULLETS #81-100."
+      }
+    },
+    {
+      "id": "pilot-4-2",
+      "title": "100 Bullets: Book Four",
+      "url": "https://www.amazon.com/dp/B018YP1STO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The continuation of the groundbreaking, Eisner Award-winning series-including the pivotal story arcs \"A Wake\" and \"Punch Line.\" If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why? Collects 100 BULLETS #59-80. Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects 100 BULLETS #59-80."
+      }
+    },
+    {
+      "id": "pilot-4-3",
+      "title": "1,001 Old-Time Household Hints: Timeless Bits of Household Wisdom for Today's Home and Garden",
+      "url": "https://www.amazon.com/dp/B00PSSEL04",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Wonder what Grandma would have used to clean greasy kitchen walls? Cure a sore throat? Conquer insect pests in her vegetable garden? Wonder no longer! Whatever your grandma did to fix and maintain things around the house and garden, it probably worked. That's because the old ways are often the best ways when it comes to solutions for everyday problems, ideas for saving time, and handy advice for getting the job done. And that's where 1,001 Old-Time Household Hints comes in. Find the best hints, tips, and secrets for everything from cooking, cleaning, and home maintenance to pet care, gardening, and holiday celebrations. You'll also find ways to adapt and improve some old-time methods. Discover an amazing variety of useful and clever ideas, including how to:Clean copper pans, using buttermilk and saltMake real sourdough bread the way the pioneers didFight wrinkles and create kissable lipsUse natural ingredients to repair your hairCreate your own unique perfumeOrganize common space in your homeUse ivory soap for polishing silver and insect controlSafely separate drinking glasses that have been stuck togetherAnd more!With 1,001 Old-Time Household Hints on your kitchen table or nightstand, you're always in the good company of an old-timer who's ready to dispense a helpful hint, encouraging word, or sage secret at the turn of a page.310 color photographs Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including how to:Clean copper pans, using buttermilk and saltMake real sourdough bread the way the pioneers didFight wrinkles and create kissable lipsUse natural ingredients to repair your hairCreate your own unique perfumeOrganize common space in your homeUse ivory soap for polishing silver and insect controlSafely separate drinking glasses that have been stuck togetherAnd more!With 1,001 Old-Time Household Hints on your kitchen table or nightstand, you're always in the good company of an old-timer who's ready to dispense a helpful hint, encouraging word, or sage secret at the turn of a page.310 color photographs Read more"
+      }
+    },
+    {
+      "id": "pilot-4-4",
+      "title": "Absolute Batman Vol. 1: The Zoo (Absolute Batman (2024-))",
+      "url": "https://www.amazon.com/dp/B0FKKYVDS1",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A gang of masked killers terrorizes the streets of Gotham. A vigilante fightsfor his city—but he’s not the Batman you know.The Absolute Universe, born out of the Justice League’s apocalyptic battlewith Darkseid, ushers in a set of brand-new realities that reimagine yourfavorite heroes as you’ve never seen them before. In Absolute Batman, meeta young Bruce Wayne with no Wayne Manor, no Alfred by his side, and adifferent axe to grind as the Dark Knight.From the minds of writer Scott Snyder and artist Nick Dragotta, andfeaturing special guest artist Gabriel Walta, comes an origin story you won’twant to miss! Collects Absolute Batman #1-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Absolute Batman #1-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-5",
+      "title": "American Vampire Vol. 1",
+      "url": "https://www.amazon.com/dp/B0064W65N4",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "This volume follows two stories: one written by Scott Snyder and one written by legendary horror writer Stephen King. In Snyder's story set in 1920s LA, we follow Pearl, a young woman who is turned into a vampire and sets out on a path of righteous revenge against the European vampires who tortured and abused her. This story is paired with King's story, a western about Skinner Sweet, the original American Vampire--a stronger, faster creature than any vampire ever seen before. Collects American Vampire #1-5 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects American Vampire #1-5 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-6",
+      "title": "Animal Man (2011-2014) Vol. 2: Animal vs. Man",
+      "url": "https://www.amazon.com/dp/B00B14FN9W",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Ever since he discovered his daughter's connection to the Red--the strange source of his powers and the mystical connective tissue between all life on the planet--Buddy Baker and his family have been on the run. But when Buddy goes missing, his family receives assistance from John Constantine and the Justice League Dark. Plus, learn the history between The Red, the Green, and the Rot! Collects issues #0, 7-11, Animal Man Annual #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues #0, 7-11, Animal Man Annual #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-7",
+      "title": "Aquaman (2011-2016) Vol. 1: The Trench (Aquaman Series)",
+      "url": "https://www.amazon.com/dp/B0096YP52E",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "#1 NEW YORK TIMES Bestseller! Aquaman, King of the Seven Seas, is back with DC Entertainment Chief Creative Officer Geoff Johns and GREEN LANTERN artist Ivan Reis at the helm! Between proving himself to a world that sees him as a joke, Aquaman and his bride Mera face off against a long-buried terror from the depths of the ocean! Collects Aquaman #1-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Aquaman #1-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-8",
+      "title": "Arduino Cookbook: Recipes to Begin, Expand, and Enhance Your Projects",
+      "url": "https://www.amazon.com/dp/B006MHUK32",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Want to create devices that interact with the physical world? This cookbook is perfect for anyone who wants to experiment with the popular Arduino microcontroller and programming environment. You’ll find more than 200 tips and techniques for building a variety of objects and prototypes such as toys, detectors, robots, and interactive clothing that can sense and respond to touch, sound, position, heat, and light.You don’t need to have mastered Arduino or programming to get started. Updated for the Arduino 1.0 release, the recipes in this second edition include practical examples and guidance to help you begin, expand, and enhance your projects right away—whether you’re an artist, designer, hobbyist, student, or engineer.Get up to speed on the Arduino board and essential software concepts quicklyLearn basic techniques for reading digital and analog signalsUse Arduino with a variety of popular input devices and sensorsDrive visual displays, generate sound, and control several types of motorsInteract with devices that use remote controls, including TVs and appliancesLearn techniques for handling time delays and time measurementApply advanced coding and memory handling techniques Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including TVs and appliancesLearn techniques for handling time delays and time measurementApply advanced coding and memory handling techniques Read more"
+      }
+    },
+    {
+      "id": "pilot-4-9",
+      "title": "Atlanta Travel Guide (Unanchor) - 3-Day Highlights Itinerary",
+      "url": "https://www.amazon.com/dp/B009L5BLYO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Atlanta 3-Day Highlights Itinerary Each day in Atlanta is a surprise and this itinerary reflects that. It takes you to tourist spots like the Georgia Aquarium and balances that out with trips to lesser-known neighborhoods like Cabbagetown. I tried to keep as much diversity in attractions as possible in such a big city. What you'll find in this Atlanta itinerary - Restaurant recommendations near most of the activities that are unique to the city and its local flavors. - Maps to help you get from one destination to the next, whether it be by foot, train, or bus. - Optional sub-activities for areas if you have extra time. - Helpful tips that only a local would know. Why use this Atlanta guide - To help you get the most of your three days in Atlanta without spending all your time in transit. - To show you how much of a travel destination Atlanta has become in its own right. - To eat some of the best Southern meals of your life. What does the itinerary include? - Countless pictures, all taken by the author, a native of the city - Maps to ensure you get around with ease - Insider tips to get the most out of your trip - Author contact information for more recommendations Itinerary Table of Contents - How to Use this Guide - The 3-Day Itinerary - Transportation Tips - Restaurants - Hotels - Money - Getting into the City - Useful Local Phrases - Nightlife - About the Author Atlanta Highlights Included - Getting up close and personal with the fish at the world's largest aquarium - Tasting the city's local beverages - Eating dinner with a Motown legend - Shopping in Atlanta's \"alternative\" neighborhood - Watching America's favorite pastime - Dining at America's largest drive-in Who is this Atlanta travel guide for? - Business travelers - Families - Honeymooners - Backpackers Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "include? - Countless pictures, all taken by the author, a native of the city - Maps to ensure you get around with ease - Insider tips to get the most out of your trip - Author contact information for more recommendations Itinerary Table of Contents - How to Use this Guide - The 3-Day Itinerary - Transportation Tips - Restaurants - Hotels - Money - Getting into the City - Useful Local Phrases - Nightlife - About the Author Atlanta Highlights Included - Getting up close and personal with the fish at the world's largest aquarium - Tasting the city's local beverages - Eating dinner with a Motown legend - Shopping in Atlanta's \"alternative\" neighborhood - Watching America's favorite pastime - Dining at America's largest drive-in Who is this Atlanta travel guide for? - Business travelers - Families - Honeymooners - Backpackers Read more"
+      }
+    },
+    {
+      "id": "pilot-4-10",
+      "title": "Batgirl (2011-2016) Vol. 2: Knightfall Descends (Batgirl(DC Comics-The New 52))",
+      "url": "https://www.amazon.com/dp/B00BAYS6YM",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Batgirl Barbara Gordon faces foe after foe now that she's back in the role of Batgirl. A deadly new gentleman killer, Grotesque, stalks the streets of Gotham City; The Court of Owls sets its sight on her father Commissoner Gordon; and an innocent woman sentenced to Arkham emerges more dangerous than the innmates she was locked up with! A new chapter in the riveting adventures of Batgirl continue in stunning fashion, with script by fan-favorite Gail Simone and stellar art by superstar Ardian Syaf! Collects Batgirl #0, 7-13 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batgirl #0, 7-13 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-11",
+      "title": "Batman (2016-) Vol. 4: The Cowardly Lot",
+      "url": "https://www.amazon.com/dp/B09CH9TGC5",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The bestselling creative team behind last year's epic “The Joker War” returns for a thrill-packed, dangerous story line as “The Cowardly Lot” begins. Is the new gang in Gotham connected to the resurgence of the Scarecrow? Meanwhile, Mayor Nakano meets with shadowy billionaire Simon Saint, who comes to Gotham to pitch the concept of an advanced law-enforcement project known as...the Magistrate! It’s always darkest before the dawn, especially in Gotham City! Collects Batman #106-111 and Infinite Frontier #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman #106-111 and Infinite Frontier #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-12",
+      "title": "Batman (2016-) Vol. 9: The Tyrant Wing",
+      "url": "https://www.amazon.com/dp/B07PJMC28W",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The Dark Knight waddles into a turf war with the Penguin! Still reeling from the attacks on his Bat-Family and reputation, the Caped Crusader looks to track down the mysterious operator lurking behind the scenes in Gotham City—the Penguin! But the Penguin is on Batman's side for once, and the crime boss sees dangerous things on the horizon. How can he convince the Caped Crusader he's on the level? Collects Batman #58-60 plus Batman Secret Files #1 and Batman Annual #3 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman #58-60 plus Batman Secret Files #1 and Batman Annual #3 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-13",
+      "title": "Batman and Robin (2011-2015) Vol. 2: Pearl (Batman & Robin Volumes)",
+      "url": "https://www.amazon.com/dp/B00BUSN8F0",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Batman's son Robin must prove to his father-as well as his previous mantle-holders-that he's worthy of being the newest Boy Wonder. Damian Wayne, a.k.a. Robin, must prove to Batman, as well as the previous Boy Wonders that he's every bit the hero that his father is in the wake of the cataclysmic events of the best-selling BATMAN & ROBIN VOLUME 1: BORN TO KILL. Collects Batman & Robin #0, 9-14 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman & Robin #0, 9-14 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-14",
+      "title": "Batman by Ed Brubaker Vol. 1 (Batman (1940-2011))",
+      "url": "https://www.amazon.com/dp/B01AKVJQJO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Award-winning writer Ed Brubaker begins his legendary run on the title as the Batman goes head-to-head with a seemingly unstoppable assassin. Someone has been spying on the Dark Knight from the shadows, studying his fighting style and planning a counterattack. The killer known as Zeiss is prepared for every trick Batman might try. And with experimental surgeries enhancing his eyes and reflexes, Zeiss can react at lightning speed, blocking any punch with ease. Batman is one of the most skilled fighters on the planet, but can he defeat an enemy who can anticipate his every move? Collects BATMAN #582-586, #591-597 and BATMAN: OUR WORLDS AT WAR #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BATMAN #582-586, #591-597 and BATMAN: OUR WORLDS AT WAR #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-15",
+      "title": "Batman Incorporated (2012-2013) Vol. 1: Demon Star",
+      "url": "https://www.amazon.com/dp/B00BUSN8FK",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Eisner Award-winning fan-favorite writer Grant Morrison concludes the Batman epic he began nearly a decade ago in BATMAN & SON, pitting the entirity of Batman Incorporated against the Levianthan organization headed by the Dark Knight's former romantic interest Talia al Ghul. As Leviathan enacts a plan that threatens the world, Batman and his allies must fight against the rising storm--but not everyone will make it out of the encounter alive. Collects BATMAN INCORPORATED #0-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BATMAN INCORPORATED #0-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-16",
+      "title": "Batman Incorporated (2012-2013) Vol. 2: Gotham's Most Wanted",
+      "url": "https://www.amazon.com/dp/B00ET886IW",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Years of epic storylines converge as Batman Incorporated battles Talia and Leviathan for the very soul of Gotham City! Tragedy and triumph are the hallmarks of the second volume of Grant Morrison's epic Batman Incorporated. Batman and his allies must strengthen their resolve as Leviathan moves to take Gotham City. Everything since Batman Incorporated #1 has been leading to this! Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-17",
+      "title": "Batman: Batman and Son (Deluxe Edition) (Batman by Grant Morrison series Book 1)",
+      "url": "https://www.amazon.com/dp/B00HVH15YU",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Batman receives the shock of his life when he discovers that he has a son, Damian! After violent conflict with Robin and Damian, Batman must teach his son what it means to carry the legacy of Gotham's Dark Knight. Meanwhile, mysterious Batman imposters begin to appear on the streets of Gotham. One of these imposters begins to kill cops, working his way towards Police Commissioner Jim Gordon. But after failing in his pursuit and being captured, Batman falls into a coma and his mind flashes back to a defining adventure in the life of a young Bruce Wayne...the hunt for his parents' killer! Collects BATMAN issues #655-658, #663-669 and #672-675, previously published as \"Batman and Son\" and \"Batman: The Black Glove.\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BATMAN issues #655-658, #663-669 and #672-675, previously published as \"Batman and Son\" and \"Batman: The Black Glove.\" Read more"
+      }
+    },
+    {
+      "id": "pilot-4-18",
+      "title": "Batman: Detective Comics (2011-2016) Vol. 3: Emperor Penguin (Batman - Detective Comics)",
+      "url": "https://www.amazon.com/dp/B00GOHNEPG",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Author of the critically acclaimed, award-winning Image series Chew John Layman takes over writing duties on DC Comics' flagship titles DETECTIVE COMICS. The Dark Knight faces a series of his deadliest enemies, including Poison Ivy, Clayface, and the Penguin, all while dealing with the Joker and the League of Smiles as part of the events of the best-selling Bat-Family crossover \"Death of the Family.\" Collects issues BATMAN: DETECTIVE COMICS #13-18 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues BATMAN: DETECTIVE COMICS #13-18 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-19",
+      "title": "Batman: Knightfall Vol. 1",
+      "url": "https://www.amazon.com/dp/B008RNGCAO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "#1 New York Times Bestseller The villainous Bane breaks the Bat in one of the most popular and well-known Batman tales! The inmates of Arkham Asylum have broken free and Batman must push himself to the limits to re-apprehend the Joker, Poison Ivy, the Riddler, Killer Croc and more. Pushed to the limits, he comes face-to-face against the monstrosity known as Bane, who delivers a crippling blow destined to change the Caped Crusader forever! Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more"
+      }
+    },
+    {
+      "id": "pilot-4-20",
+      "title": "Batman: Knightfall Vol. 2: Knightquest",
+      "url": "https://www.amazon.com/dp/B00919W7MA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Mentally defeated and physically broken, Bruce Wayne suffered a crippling blow while battling the brutal Bane. Now, the mantle of the Bat must be passed on to another, and Jean Paul Valley answers the call! But as the new Caped Crusader slowly loses his grip on sanity, his idea of justice takes a violent and deadly turn. Witnessing this dangerous behavior firsthand, Nightwing and Robin try to come to grips with Bruce's highly controversial decision while the new Batman sets his sights on taking revenge against Bane! Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-21",
+      "title": "Batman: The Dark Knight (2011-2014) Vol. 1: Knight Terrors (Batman: The Dark Knight series)",
+      "url": "https://www.amazon.com/dp/B009DNVW3Y",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The Dark Knight continues his crusade as defender of Gotham City, taking on his greatest foes during a breakout at Arkham Asylum. But when his enemies gain powers and abilities far beyond their normal capacities, the Caped Crusader's crusade may finally be at an end! Collects Batman: The Dark Knight #1-9 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Batman: The Dark Knight #1-9 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-22",
+      "title": "Batman: The Dark Knight (2011-2014) Vol. 3: Mad (Batman: The Dark Knight series)",
+      "url": "https://www.amazon.com/dp/B00H4EW102",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The third volume of the Best selling Batman: The Dark Knight kicks off with the new all star team of Gregg Hurwitz and Ethan Van Sciver. Batman discovers a trail of bodies but no leads. His detective skills are put to the test as the Mad Hatter begins kidnapping Gotham citizens for an unknown purpose. But as the Dark Knight delves deeper into this mystery, he soon realizes that this is unlike any Mad Hatter case before. The Hatter's gory past will be revealed and Batman's resolve will be put to the test. Collects issues #16-21 of BATMAN: THE DARK KNIGHT and BATMAN - THE DARK KNIGHT ANNUAL #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues #16-21 of BATMAN: THE DARK KNIGHT and BATMAN - THE DARK KNIGHT ANNUAL #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-23",
+      "title": "Before Watchmen: Ozymandias/Crimson Corsair",
+      "url": "https://www.amazon.com/dp/B00CXY58OE",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Discover what happened before WATCHMEN. The team of legendary writer Len Wein and acclaimed artist Jae Lee--in his first DC Comics' work in nearly a decade--delve into the mind of the smartest man in the world: Ozymandias. How does one go from the son of immigrant parents to becoming the world's smartest man? Adrian Veidt begins his journey, both spiritual and physical, that will one day make him one of the most pivotal players in the world-changing events of WATCHMEN. Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\" Read more"
+      }
+    },
+    {
+      "id": "pilot-4-24",
+      "title": "Blackest Night",
+      "url": "https://www.amazon.com/dp/B0064W66QK",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Geoff Johns (GREEN LANTERN: SINESTRO CORPS WAR, THE FLASH, ACTION COMICS, JSA) and superstar artist Ivan Reis raise the dead in a story that rocks the foundations of the DC Universe! Throughout the decades, death has plagued the DC Universe and taken the lives of heroes and villains alike. But to what end? As the war between the different colored Lantern Corps rages on, the prophecy of the Blackest Night descends and it's up to Hal Jordan and the Green Lantern Corps to lead DC's greatest champions in a battle to save the Universe from an army of undead Black Lanterns made up of fallen Green Lanterns and DC's deceased heroes and villains. This collection of the bestselling epic is the culmination of the events that Geoff Johns has been leading to since he relaunched the Green Lantern franchise in 2006! Collects BLACKEST NIGHT #0-8 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BLACKEST NIGHT #0-8 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-25",
+      "title": "BRZRKR Vol. 2",
+      "url": "https://www.amazon.com/dp/B0B9R45W91",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Half-mortal and half-god, cursed and compelled to violence, the man known only as B. begins wandering the world anew. After enduring a series of experiments and missions, B.’s memories of his origins will be finally restored. But what does this revelation mean for his future? Keanu Reeves continues his comic book writing debut alongside New York Times bestselling co-writer Matt Kindt (Folklords, Grass Kings) and legendary artist Ron Garney (Wolverine, Captain America) in a brutally violent new series about one immortal warrior’s fight through the ages. Collects BRZRKR #5-8 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects BRZRKR #5-8 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-26",
+      "title": "Catwoman (2011-2016) Vol. 2: Dollhouse (Catwoman Vol. IV)",
+      "url": "https://www.amazon.com/dp/B00BJCY022",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "In the wake of her run-in with Batman and the loss of someone very dear to her, Catwoman turns over a new leaf. Kind of. She teams with a new running buddy named Spark, and together they're taking Gotham City, literally! However, when Catwoman runs into Dollhouse, a psychotic who kidnaps children from the streets of Gotham City, a rage awakens in her that nobody knew existed, not even herself! Collects issues #7-12 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues #7-12 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-27",
+      "title": "Earth 2 (2012-2015) Vol. 1: The Gathering (Earth 2 Series)",
+      "url": "https://www.amazon.com/dp/B00BLVSRFW",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Earth's greatest heroes have defeated grave threats from Apokolips, but not at a grave price. Left in their stead is a group of young, untrained hereoes who pick up the pieces in the dusty aftermath. The Flash, Green Lantern, Hawkgirl and the Atom are humanity's nascent guardians, but not the ones we've all known and revered. These are different heroes, in a strange and foreign world with dangerous new villains. This is Earth 2. Award-winning writer James Robinson (STARMAN, JUSTICE LEAGUE) joins forces with artist Nicola Scott (SUPERMAN, TEEN TITANS) to remiagine the classic Justice Society of America for DC COMICS--THE NEW 52 universe. Collects #1-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects #1-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-28",
+      "title": "Electronics from the Ground Up: Learn by Hacking, Designing, and Inventing",
+      "url": "https://www.amazon.com/dp/B00O2A7H9G",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Discover the inner-workings of electronics through innovative hands-on experimentsAre you fascinated by the power of even the smallest electronic device? Electronics from the Ground Up guides you through step-by-step experiments that reveal how electronic circuits function so you can advance your skills and design custom circuits. You’ll work with a range of circuits and signals related to optical emitters and receivers, audio, oscillators, and video. This practical resource explains components, construction techniques, basic test equipment, circuit analysis, and troubleshooting. Photographs, schematics, equations, and graphs are included throughout. By the end of the book, you’ll be able to hack and modify existing circuits to create your own unique designs. Do-it-yourself experiments cover: Batteries, lamps, and flashlightsLight emitters and receiversDiodes, rectifiers, and associated circuitsTransistors, FETs, and vacuum tubesAmplifiers and feedbackAudio signals and circuitsOscillatorsAM and FM signals and circuitsVideo basics, including video signalsVideo circuits and systems“Excellent… Nothing can replace hands-on experience and Quan immerses the hobbyist/designer right into the fray up to their elbows.”—EDN Magazine Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including video signalsVideo circuits and systems“Excellent… Nothing can replace hands-on experience and Quan immerses the hobbyist/designer right into the fray up to their elbows.”—EDN Magazine Read more"
+      }
+    },
+    {
+      "id": "pilot-4-29",
+      "title": "Ex Machina: Book Three",
+      "url": "https://www.amazon.com/dp/B00NGUWRDY",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "In this volume, Mayor Mitchell Hundred - formerly known as the super hero The Great Machine --faces difficult decisions regarding New York City's drug laws. But will a string of brazen, violent robberies and a shocking suicide affect the the Mayor's policy? And in a second story, \"Power Down,\" set during the New York blackout of 2003, the mayor must deal with a city gone dark. Award-winning writer Brian K. Vaughan (Saga, Y: THE LAST MAN) deftly combines big city politics and superheroes in this critically acclaimed series. Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-30",
+      "title": "Ex Machina: Book Two",
+      "url": "https://www.amazon.com/dp/B00JRILKPU",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Award-winning writer Brian K. Vaughan (PRIDE OF BAGHDAD, Y: THE LAST MAN) uniquely combines big city politics and superheroes in this criticially acclaimed series. Set in our modern-day world, EX MACHINA tells the story of civil engineer Mitchell Hundred, who becomes America's first living, breathing super-hero after a strange accident gives him the power to communicate with machines. Eventually Mitchell tires of risking his life merely to maintain the status quo, retires from masked crime fighting and runs for mayor of New York City, winning by a landslide after the events of 9/11. Illustrated by Tony Harris, EX MACHINA BOOK TWO finds Mayor Mitchell Hundred making a difficult decision about his own future, becomes part of a shocking trial complicated by the unexpected arrival of an all-new superhero, and leaves New York City for the first time since his election to embark on a strange adventure. Plus, a shocking tragedy strikes an Iraq War protest in downtown Manhattan. Collects issues #12-20 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects issues #12-20 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-31",
+      "title": "Fairest Vol. 3: Return of the Maharaja",
+      "url": "https://www.amazon.com/dp/B00IUSN5U6",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "New York Times bestselling, award-winning creator Bill Willingham presents a new series starring the female FABLES. Balancing horror, humor and adventure in the FABLES tradition, FAIREST explores the secret histories of Sleeping Beauty, Rapunzel, Cinderella, The Snow Queen, Thumbelina, Snow White, Rose Red and others. When Nalayani seeks the help of the Maharaja to save her village from the Dhole, she uncovers a secret that could change the Fables Universe forever: the still alive and long-thought dead Prince Charming! This volume collects Fairest #15-20 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects Fairest #15-20 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-32",
+      "title": "Gideon Falls Vol. 1: The Black Barn",
+      "url": "https://www.amazon.com/dp/B07GL6KYHM",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Picked up for TV by Hivemind after a multi-studio bidding war with long-time producing partners Sean Daniel and Jason Brown, Bad Robot veteran Kathy Lingg, and former Valiant Entertainment CEO & Chief Creative Officer Dinesh Shamdasani. From the bestselling creative team behind Old Man Logan and Green Arrow comes a character-driven meditation on obsession, mental illness, and faith. The legend of the Black Barn—an otherworldly building alleged to have appeared and reappeared throughout history, bringing death and madness in its wake—ensnares and entwines the lives of two very different men. Plus, this collection includes a variant cover gallery from some of comics’ best artists, including CLIFF CHIANG (PAPER GIRLS), JOCK (WYTCHES), SKOTTIE YOUNG (I HATE FAIRYLAND), and more! Collects GIDEON FALLS #1-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects GIDEON FALLS #1-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-33",
+      "title": "Hacking Electronics: An Illustrated DIY Guide for Makers and Hobbyists",
+      "url": "https://www.amazon.com/dp/B00BPO76XE",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Bring your electronic inventions to life!\"This full-color book is impressive...there are some really fun projects!\" -GeekDad, Wired.com Who needs an electrical engineering degree? This intuitive guide shows how to wire, disassemble, tweak, and re-purpose everyday devices quickly and easily. Packed with full-color illustrations, photos, and diagrams, Hacking Electronics teaches by doing--each topic features fun, easy-to-follow projects. Discover how to hack sensors, accelerometers, remote controllers, ultrasonic rangefinders, motors, stereo equipment, microphones, and FM transmitters. The final chapter contains useful information on getting the most out of cheap or free bench and software tools.Safely solder, join wires, and connect switchesIdentify components and read schematic diagramsUnderstand the how and why of electronics theoryWork with transistors, LEDs, and laser diode modulesPower your devices with a/c supplies, batteries, or solar panelsGet up and running on Arduino boards and pre-made modulesUse sensors to detect everything from noxious gas to accelerationBuild and modify audio amps, microphones, and transmittersFix gadgets and scavenge useful parts from dead equipment Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "contains useful information on getting the most out of cheap or free bench and software tools.Safely solder, join wires, and connect switchesIdentify components and read schematic diagramsUnderstand the how and why of electronics theoryWork with transistors, LEDs, and laser diode modulesPower your devices with a/c supplies, batteries, or solar panelsGet up and running on Arduino boards and pre-made modulesUse sensors to detect everything from noxious gas to accelerationBuild and modify audio amps, microphones, and transmittersFix gadgets and scavenge useful parts from dead equipment Read more"
+      }
+    },
+    {
+      "id": "pilot-4-34",
+      "title": "Hellboy and the B.P.R.D.: 1954",
+      "url": "https://www.amazon.com/dp/B078GBT5MB",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "iZombie co-creator Chris Roberson teams with Mike Mignola and a team of artists to explore the horror and intrigue of Hellboy's early Cold War years.No longer a rookie, Hellboy is joined by other Bureau agents in a series of far-flung mysteries that take them searching for yetis terrorizing an Arctic research team, into the American suburbs where a family is haunted by a phantom monkey, and to Hong Kong, where demons are drawn to a Chinese artifact.This is the 3rd Volume in the Hellboy and B.P.R.D series, following 1952, and 1953. This collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-35",
+      "title": "Hellboy Volume 10: The Crooked Man and Others",
+      "url": "https://www.amazon.com/dp/B00A820YF6",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The Eisner Award-winning miniseries The Crooked Man, by Mignola and Richard Corben, teams Hellboy with a wandering hillman in a devilish tale of Appalachian witchcraft. This volume also includes the rare \"They Who Go Down to the Sea in Ships\" by Mignola, Josh Dysart (B.P.R.D.: 1947), and Jason Shawn Alexander (Abe Sapien: The Drowning), never before available for purchase; Mignola and Duncan Fegredo's \"The Mole,\" from Free Comic Book Day 2008; and Mignola's most recent solo outing, \"In the Chapel of Moloch.\"* Also includes a look into the artists' sketchbooks!* 2009 Eisner Award winner for Best Limited Series!\"Richard Corben shows these youngsters how it's done... and it's so good, in its grotesquely beautiful way.\" -Comic Book Resources Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "includes the rare \"They Who Go Down to the Sea in Ships\" by Mignola, Josh Dysart (B.P.R.D.: 1947), and Jason Shawn Alexander (Abe Sapien: The Drowning), never before available for purchase; Mignola and Duncan Fegredo's \"The Mole,\" from Free Comic Book Day 2008; and Mignola's most recent solo outing, \"In the Chapel of Moloch.\"*"
+      }
+    },
+    {
+      "id": "pilot-4-36",
+      "title": "Holiday Vegan Entrees (Holiday Vegan Cookbooks)",
+      "url": "https://www.amazon.com/dp/B00ECYOG7S",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "\"Holiday Vegan Entrees\" is a fantastic collection of 14 scrumptious, heartwarming vegan holiday recipes.Recipe collection includes:Barbecue Vegetable LoafButternut Squash and Mushroom LasagnaFaux Turkey RoastGluten Roast with VegetablesPecan RoastSeitan RoastSimple Tofu TurkeySoy Meat LoafStuffed Portobello MushroomsTeriyaki Mushroom Loaf with GravyThanksgiving Meat LoafTofu Chicken and StuffingTraditional Tofu TurkeyWalnut and Mushroom Loaf Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "includes:Barbecue Vegetable LoafButternut Squash and Mushroom LasagnaFaux Turkey RoastGluten Roast with VegetablesPecan RoastSeitan RoastSimple Tofu TurkeySoy Meat LoafStuffed Portobello MushroomsTeriyaki Mushroom Loaf with GravyThanksgiving Meat LoafTofu Chicken and StuffingTraditional Tofu TurkeyWalnut and Mushroom Loaf Read more"
+      }
+    },
+    {
+      "id": "pilot-4-37",
+      "title": "How to Diagnose and Fix Everything Electronic",
+      "url": "https://www.amazon.com/dp/B004QWY5YK",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Master the Art of Electronics RepairIn this hands-on guide, a lifelong electronics repair guru shares his tested techniques and invaluable insights. How to Diagnose and Fix Everything Electronic shows you how to repair and extend the life of all kinds of solid-state devices, from modern digital gadgetry to cherished analog products of yesteryear.You'll start by selecting the tools and test equipment you'll need and setting up your workbench. Then, you'll get familiar with components and how they form circuits, stages, and sections of a device. Next, you'll learn how to take a product apart, figure out what's wrong with it, replace components, and reassemble it. Real-world case studies help clarify the topics covered. Tips and tricks for specific devices, such as optical disc players, computers, and video recorders, are also included in this practical resource.Set up a workbench and equip it with tools and test instrumentsEnsure personal safety and avoid electrical and physical damage to devicesUnderstand electrical units, circuits, and signalsUse test equipment, including a digital multimeter, signal generator, frequency counter, and an oscilloscopeRepair circuit boards and replace partsWork with components, from capacitors and ICs to transistors and zenersLearn to read block, schematic, and pictorial diagramsDisassemble devices and identify sections and stagesTroubleshoot and diagnose to the component levelPerform reverse-order reassembly Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including a digital multimeter, signal generator, frequency counter, and an oscilloscopeRepair circuit boards and replace partsWork with components, from capacitors and ICs to transistors and zenersLearn to read block, schematic, and pictorial diagramsDisassemble devices and identify sections and stagesTroubleshoot and diagnose to the component levelPerform reverse-order reassembly Read more"
+      }
+    },
+    {
+      "id": "pilot-4-38",
+      "title": "Identity Crisis (New Edition)",
+      "url": "https://www.amazon.com/dp/B01AKVJQ7Q",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Novelist Brad Meltzer's #1 New York Times best-selling miniseries that rocked the DC Universe and influenced new storylines for years to come. When Sue Dibny, wife of the Elongated Man, is murdered in her own home, the superhero community is devastated. They come together in mourning, hold their loved ones closer, and immediately begin a worldwide search to find her killer. But a handful of heroes think they already know who murdered Sue Dibny. Years ago, to protect Sue and others like her from super-villains, Green Arrow, Hawkman, Black Canary, the Atom and Zatanna crossed a line. Now, their long-buried secret will break the superhero community apart. Collects IDENTITY CRISIS #1-7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects IDENTITY CRISIS #1-7 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-39",
+      "title": "iZombie Vol. 2: uVampire",
+      "url": "https://www.amazon.com/dp/B00HO03H04",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Told from a female zombie's perspective, this smart, witty detective series mixes urban fantasy and romantic dramedy. Gwendolyn \"Gwen\" Dylan is a 20-something gravedigger in an eco-friendly cemetery. Once a month she must eat a human brain to keep from losing her memories, but in the process she becomes consumed with the thoughts and personality of the dead person - until she eats her next brain. She sets out to fulfill the dead person's last request, solve a crime or right a wrong. In uVAMPIRE, Gwen dines on the grey matter of a person who knew her as a child - and things quickly get complicated. Meanwhile, ghost-girl Ellie learns a few tricks from Amon the mummy; Spot the were-terrier goes to the comics shop and meets someone from Gwen's past, the mad scientist Galatea engages in a bit of grave-robbing; and the monster-hunters tackle the town's vampire problem once and for all. Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-40",
+      "title": "Java 8 Preview Sampler",
+      "url": "https://www.amazon.com/dp/B00JJQJL1A",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "In this exclusive eBook, preview excerpts from brand-new and forthcoming Oracle Press Java JDK 8 books. Written by leading Java experts, Oracle Press books offer the most definitive, complete, and up-to-date coverage of the latest Java release. Featuring an introduction by bestselling programming author Herb Schildt, this eBook includes chapters from the following Oracle Press books:Java: The Complete Reference, Ninth Edition by Herb SchildtJava: A Beginner’s Guide, Sixth Edition by Herb SchildtMastering Lambdas: Java Programming in a Multicore World by Maurice NaftalinQuick Start Guide to JavaFX by J.F. DiMarzioMastering JavaFX 8 Controls: Create Custom JavaFX 8 Controls for Cross-Platform Applications by Hendrik Ebbers Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "includes chapters from the following Oracle Press books:Java: The Complete Reference, Ninth Edition by Herb SchildtJava: A Beginner’s Guide, Sixth Edition by Herb SchildtMastering Lambdas: Java Programming in a Multicore World by Maurice NaftalinQuick Start Guide to JavaFX by J.F. DiMarzioMastering JavaFX 8 Controls: Create Custom JavaFX 8 Controls for Cross-Platform Applications by Hendrik Ebbers Read more"
+      }
+    },
+    {
+      "id": "pilot-4-41",
+      "title": "Justice League Dark (2011-2015) Vol. 3: The Death of Magic (Justice League Dark Graphic Novels)",
+      "url": "https://www.amazon.com/dp/B00HVH15YA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "\"Transported to another dimension by the Books of Magic, Tim Hunter and Zatanna awake in a world where magic once ruled in peace until mad scientists banned magic and forced all of the magical creatures underground in exile. Tim soon finds out that his ancestors are tied to this world and that only he, through the Books of Magic, can free the \"\"Wild World.\"\" Unsure of what transpired when Tim and Zatanna disappeared, the remaining members of JLD, with the help of Tim Hunter's father, manage to transport themselves to the \"\"Wild World\"\" and soon find that the rules of magic here are very different and very deadly. This volume collects issues #14-21 of JUSTICE LEAGUE DARK.\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects issues #14-21 of JUSTICE LEAGUE DARK.\" Read more"
+      }
+    },
+    {
+      "id": "pilot-4-42",
+      "title": "Justice League of America: The Silver Age Vol. 1 (Justice League of America (1960-1987))",
+      "url": "https://www.amazon.com/dp/B01AORO2H0",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "More than 300 pages of the famous super-team's inaugural exploits! Superman. Batman. Wonder Woman. The Flash. Green Lantern. Aquaman. The Martian Manhunter. Green Arrow. As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Collects THE BRAVE AND THE BOLD #28-30, JUSTICE LEAGUE OF AMERICA #1-8 and MYSTERY IN SPACE #75, and includes the classic tales \"Doom of the Star Diamond,\" \"The Slave Ship of Space\" and \"Starro the Conqueror!\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects THE BRAVE AND THE BOLD #28-30, JUSTICE LEAGUE OF AMERICA #1-8 and MYSTERY IN SPACE #75"
+      }
+    },
+    {
+      "id": "pilot-4-43",
+      "title": "Justice League of America: The Silver Age Vol. 2 (Justice League of America (1960-1987))",
+      "url": "https://www.amazon.com/dp/B01MCXTG9B",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League have thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of graphic novels! This second volume of THE JUSTICE LEAGUE OF AMERICA: THE SILVER AGE collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19, and includes the classic tales \"The Origin of the Justice League!,\" \"Riddle of the Robot Justice League!\" and \"The Super-Exiles of Earth!\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19"
+      }
+    },
+    {
+      "id": "pilot-4-44",
+      "title": "Justice League of America: The Silver Age Vol. 3 (Justice League of America (1960-1987))",
+      "url": "https://www.amazon.com/dp/B06XXRCN34",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of trade paperback editions! This third volume of JUSTICE LEAGUE OF AMERICA: THE SILVER AGE collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30, and includes the classic tales “Crisis on Earth-One!” “Crisis on Earth-Two!” and “The Most Dangerous Earth of All!” Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30"
+      }
+    },
+    {
+      "id": "pilot-4-45",
+      "title": "Justice League of America: The Silver Age Vol. 4 (Justice League of America (1960-1987))",
+      "url": "https://www.amazon.com/dp/B07F1DYZ4J",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "THE WORLD’S GREATEST HEROES! Superman! Batman! Wonder Woman! The Flash! Green Lantern! Aquaman! The Martian Manhunter! Green Arrow! The Atom! Hawkman! As individuals, their names are legend. Together, they are even greater than the sum of their parts. They are the Justice League of America, and they stand for truth, justice and the American way! Since they were first commissioned by renowned DC Comics editor Julius Schwartz in 1960, the Justice League has thrilled audiences across the globe in tales that span time and space. Now, for the first time, all of their original Silver Age adventures are available in an all-new series of trade paperback editions! This fourth volume of Justice League Of America: The Silver Age collects the famed super-team’s exploits from Justice League Of America #31-41, and includes the classic tales “Riddle of the Runaway Room,” “Earth Without a Justice League” and “Crisis on Earth-A.” Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects the famed super-team’s exploits from Justice League Of America #31-41"
+      }
+    },
+    {
+      "id": "pilot-4-46",
+      "title": "Kingdom Come: (New Edition)",
+      "url": "https://www.amazon.com/dp/B0064W64XU",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The unforgettable, best-selling miniseries by acclaimed writer Mark Waid and superstar painter Alex Ross returns, with a sketchbook section, annotations on the series, rare art and more! Set just after the dawn of the 21st Century in a world spinning inexorably out of control comes this grim tale of youth versus experience, tradition versus change and what defines a hero. KINGDOM COME is a riveting story pitting the old guard--Superman, Batman, Wonder Woman and their peers--against a new uncompromising generation and ultimately in the final war against each other to determine nothing less than the future of the planet. Collects Kingdom Come #1-4 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Kingdom Come #1-4 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-47",
+      "title": "Life Skills: How to Do Almost Anything",
+      "url": "https://www.amazon.com/dp/B008ET6YJA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "An entertaining treasury of tips, hacks, and step-by-step techniques to smooth your way through the world.How do you give a good wedding toast? How do you fix a clogged drain? How do you bowl without hurting anyone? Questions like these—some highly practical, others wildly funny—make up this engaging do-it-yourself guide. Including illustrations and diagrams and compiled from the Chicago Tribune how-to column \"Life Skills,\" this book is filled with often-humorous instructions on performing a variety of tasks—from technical challenges to social interactions.sew a button • wrap a gift • shine your shoes • clean your keyboard • ask for a raise • give yourself a facial massage • flirt • pack for a road trip • turn down a request • teach someone to ride a bike • photograph a dog • change a tire • fix a faucet • load a moving truck • end a relationship • give a tip • choose an engagement ring • and more Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Including illustrations and diagrams and compiled from the Chicago Tribune how-to column \"Life Skills,\" this book is filled with often-humorous instructions on performing a variety of tasks—from technical challenges to social interactions.sew a button • wrap a gift • shine your shoes • clean your keyboard • ask for a raise • give yourself a facial massage • flirt • pack for a road trip • turn down a request • teach someone to ride a bike • photograph a dog • change a tire • fix a faucet • load a moving truck • end a relationship • give a tip • choose an engagement ring • and more Read more"
+      }
+    },
+    {
+      "id": "pilot-4-48",
+      "title": "Nightwing (2011-2014) Vol. 1: Traps and Trapezes",
+      "url": "https://www.amazon.com/dp/B009MD2AEA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "As a part of the acclaimed DC Comics - The New 52 event of September 2011, Dick Grayson flies high once more as Nightwing in a new series from hot new writer Kyle Higgins (BATMAN: GATES OF GOTHAM) and artist Eddy Barrows (SUPERMAN)! Haley's Circus, the big top where Dick once performed, makes a stop on its tour in Gotham City - bringing with it murder, mystery and superhuman evil. To uncover more clues as to why a mysterious assassin is targetting him, Nightwing joins the Haley's Circus tour in order to find more clues and protect those he loves. But as Dick becomes closer acquainted with the big top he grew up with, he discovers there's a much deeper, darker secret to be discovered. Collects Nightwing #1-7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Nightwing #1-7 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-49",
+      "title": "Nightwing (2011-2014) Vol. 2: Night of the Owls",
+      "url": "https://www.amazon.com/dp/B00E3F7S6W",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Dick Grayson must face his past and a deadly adversary in the present as he learns of his connection to the mysterious Court of Owls. But even if he's able to stop an undead, unstoppable assassin, he'll still have to deal with the rising forces of the anti-Gotham City army and its leader the mysterious Paragon. Collects Nightwing #0, 8-12 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Nightwing #0, 8-12 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-50",
+      "title": "Planetary Book Two",
+      "url": "https://www.amazon.com/dp/B07B5TWTY7",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Best-selling writer Warren Ellis (TRANSMESTROPOLITAN, THE WILD STORM) and acclaimed artist John Cassaday (STAR WARS, UNCANNY AVENGERS) deliver this epic, mind-bending tale of an interdimensional peacekeeping force tasked with tracking down evidence of superhuman activity. These mystery archaeologists uncover unknown paranormal secrets and histories, such as a gateway to the Dreamtime in Ayers Rock, a space capsule over a century old and an alien construct adrift within our solar system. Elijah Snow, Jakita Wagner and the Drummer. These three Archaeologists of the Unknown have delved into the secret places where most would fear to tread. Now they are preparing to take on their strangest challenges yet: breaking the power of the Four and bringing their own fourth member back from the dead! This second of two volumes collects PLANETARY #15-27, JLA/PLANETARY: TERRA OCCULTA and BATMAN/PLANETARY: NIGHT ON EARTH Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects PLANETARY #15-27, JLA/PLANETARY: TERRA OCCULTA and BATMAN/PLANETARY: NIGHT ON EARTH Read more"
+      }
+    },
+    {
+      "id": "pilot-4-51",
+      "title": "Practice Power: Secrets to Practicing and Playing Amazing Guitar",
+      "url": "https://www.amazon.com/dp/B00CPYDNFS",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Every guitarist, regardless of style, wants to be a better player. What if there were ways to prepare and practice that could save you literally hundreds -- or even thousands -- of hours of time and frustration? Practice Power will show you how.Dan Green, founder of the popular instructional site Purple Tiger Guitar, brings over 20 years of playing and teaching experience to helping guitarists of all levels and styles. The PTG site has attracted attention from guitarists worldwide, with something for everyone -- from red-hot shred tabs to step-by-step tutorials on how to play and use chords and scales. Practice Power is designed to help players get the most of those materials.Practice Power will get you thinking about your goals as a player, and show you how to get the most out of your practice environment, materials, and work habits. Rather than swamping you with tons of tab exercises to sort through, Practice Power focuses on how to sort through it all in the first place, and how to save yourself countless hours in the long run by practicing the right material.Whether you’re a beginner looking for tips on how to get started, or an experienced player seeking a way past the inevitable rut, Practice Power will give you ideas to move your playing forward. Become a better player in less time, by knowing how to develop practice routines that focus on the right areas.Contains:A Philosophy of Practice (Why, How, Where, When and What to Practice)15 Action Tips for Quick ResultsHow to Build SpeedMotivationVisualization Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Contains:A Philosophy of Practice (Why, How, Where, When and What to Practice)15 Action Tips for Quick ResultsHow to Build SpeedMotivationVisualization Read more"
+      }
+    },
+    {
+      "id": "pilot-4-52",
+      "title": "Programming Arduino Next Steps: Going Further with Sketches",
+      "url": "https://www.amazon.com/dp/B00EHIEJYY",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Take your Arduino skills to the next level!In this practical guide, electronics guru Simon Monk takes you under the hood of Arduino and reveals professional programming secrets. Featuring coverage of the Arduino Uno, Leonardo, and Due boards, Programming Arduino Next Steps: Going Further with Sketches shows you how to use interrupts, manage memory, program for the Internet, maximize serial communications, perform digital signal processing, and much more. All of the 75+ example sketches featured in the book are available for download.Learn advanced Arduino programming techniques, including how to:Use hardware and timer interruptsBoost performance and speed by writing time-efficient sketchesMinimize power consumption and memory usageInterface with different types of serial busses, including I2C, 1-Wire, SPI, and TTL SerialUse Arduino with USB, including the keyboard and mouse emulation features of the Leonardo and Due boardsProgram Arduino for the InternetPerform digital signal processingAccomplish more than one task at a time—without multi-threadingCreate and release your own code library Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including I2C, 1-Wire, SPI, and TTL SerialUse Arduino with USB"
+      }
+    },
+    {
+      "id": "pilot-4-53",
+      "title": "Red Hood and the Outlaws (2011-2015) Vol. 1: REDemption",
+      "url": "https://www.amazon.com/dp/B009MD2MX4",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "No sooner has Batman's former sidekick, Jason Todd, put his past as the Red Hood behind him than he finds himself cornered by a pair of modern day outlaws: Green Arrow's rejected sidekick Arsenal, the damaged soldier of fortune, and the alien Starfire, a former prisoner of intergalactic war who won't be chained again. As a loner, Jason has absolutely no interest in this motley crew of outlaws. So what's he going to do when they choose the Red Hood as their leader? Collects Red Hood and the Outlaws #1-7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Red Hood and the Outlaws #1-7 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-54",
+      "title": "Saga of the Swamp Thing: Book Four",
+      "url": "https://www.amazon.com/dp/B00DY8FG2C",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "\"Continuing the collection of master comics writer Alan Moore's award-winning run on THE SAGA OF THE SWAMP THING, this fourth volume brings Swamp Thing's quest for self-discovery with the mystic John Constantine to its shattering conclusion. A harbinger of doom has been released with the sole charge of waking an evil beyond comprehension, and Swamp Thing, John Constantine, Deadman, The Phantom Stranger, Etrigan the Demon, The Spectre and other masters of the occult must unite against the dark forces that threaten to eradicate Heaven's light. Collecting SWAMP THING #43-50.\" Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collecting SWAMP THING #43-50.\" Read more"
+      }
+    },
+    {
+      "id": "pilot-4-55",
+      "title": "Service Management: An Integrated Approach to Supply Chain Management and Operations (FT Press Operations Management)",
+      "url": "https://www.amazon.com/dp/B00DCNNJG4",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Tie customer-driven strategies to service operations and process management, and sharpen your focus on creating customer value throughout your entire service organization! This comprehensive, multidisciplinary reference thoroughly covers today's most effective theories and methods for managing service organizations, drawing on innovative insights from economics, consumer behavior, marketing, strategy, and operations management. Leading experts Cengiz Haksever and Barry Render provide crucial insights into emerging service operation and supply chain topics, reinforcing key points with up-to-date case studies. Service Management contains a valuable chapter-length introduction to linear and goal programming and its services applications; and also addresses many other topics ignored by competitive texts, such as: Service SCM methods and approaches Focusing on customers and their service purchase behavior Service productivity Managing public and private nonprofit service organizations Vehicle routing and scheduling Ethical challenges to SCM Service Management will be an invaluable resource for senior and mid-level managers throughout any service organization, and for students and faculty in any graduate or upper-level undergraduate program in service management, service operations management, or operations management Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "contains a valuable chapter-length introduction to linear and goal programming and its services applications; and also addresses many other topics ignored by competitive texts, such as: Service SCM methods and approaches Focusing on customers and their service purchase behavior Service productivity Managing public and private nonprofit service organizations Vehicle routing and scheduling Ethical challenges to SCM Service Management will be an invaluable resource for senior and mid-level managers throughout any service organization, and for students and faculty in any graduate or upper-level undergraduate program in service management, service operations management, or operations management Read more"
+      }
+    },
+    {
+      "id": "pilot-4-56",
+      "title": "Shifting Shadows: Stories from the World of Mercy Thompson",
+      "url": "https://www.amazon.com/dp/B00IOE4M9O",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Shapeshifter Mercy Thompson has friends in high places—and in low, dark, scary ones. And in this must-have collection of short stories, you’ll meet new faces and catch up with old acquaintances—in all their forms...Includes the new stories...“Silver”“Roses in Winter”“Redemption”“Hollow”…and reader favorites“Fairy Gifts”“Gray”“Seeing Eye”“Alpha and Omega”“The Star of David”“In Red, with Pearls”“One of the best urban fantasy anthologies I’ve ever read.”—The BiblioSanctum Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Includes the new stories...“Silver”“Roses in Winter”“Redemption”“Hollow”…and reader favorites“Fairy Gifts”“Gray”“Seeing Eye”“Alpha and Omega”“The Star of David”“In Red, with Pearls”“One of the best urban fantasy anthologies I’ve ever read.”—The BiblioSanctum Read more"
+      }
+    },
+    {
+      "id": "pilot-4-57",
+      "title": "Simply Delicious Raw Recipes: 80/10/10 Fall Retreat Menu - Special Edition (80/10/10 Raw Food Recipes Book 0)",
+      "url": "https://www.amazon.com/dp/B00KBAN3VW",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Simply Delicious Fall Retreat Menu - 80/10/10 Raw Vegan Style from Dr. Douglas Graham. This Special Edition of the Simply Delicious Recipe series is based on the 80/10/10 Raw Vegan menu that we serve at our Fall Retreats in Sedro-Wooley, Washington State every year. Our retreat participants absolutely LOVE the wonderful recipes we create for them three times a day and we decided we should bring them to anyone interested in making 80/10/10 part of their lifestyle. These recipes are \"Simply Delicious\" because they bring to life incredible 80/10/10 recipes that are gourmet, low-fat and have a small number of simple ingredients. Dr. Graham, Alicia Ojeda and Katy Craine created and thoroughly tested these recipes in the retreat kitchen over the years to ensure that you can reproduce these recipes in your own kitchen - simply and quickly. From Dr. Graham: \"My time at FoodnSport Retreats is very, very special to me, and watching everyone devour their 80/10/10 meals each day with glee and absolute satisfaction makes it one of my favorite times. These recipes are sure to please and simple enough that anyone can succeed in creating them and delicious enough to satisfy the most discerning palate! I hope you will enjoy making all of the recipes in this special edition of 'Simply Delicious 80/10/10 Raw Food Recipes', and will continue customizing them until they perfectly fit your taste desires. And perhaps we will meet some day at a FoodnSport Retreat!\" These are special 80/10/10 raw food recipes that don't exist elsewhere. You're not just getting another flax cracker recipe, you're getting recipes that just don't exist out there in the raw food world!Get Simply Delicious 80/10/10 Fall Retreat Menu now! And collect the entire series as it's released (Desserts Vol. 1 and Soups Vol. 2 to be released soon!) Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collect the entire series as it's released (Desserts Vol. 1 and Soups Vol. 2 to be released soon!) Read more"
+      }
+    },
+    {
+      "id": "pilot-4-58",
+      "title": "Spider-Verse (Spider-Verse (2014))",
+      "url": "https://www.amazon.com/dp/B00UIB55RY",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "When the evil Inheritors begin exterminating spider-characters throughout the Multiverse, every single Spider-Man ever is needed to save the day! An interdimensional Spider-Army gathers to fight Morlun and his deadly family, but none of them is safe as the Prophecy comes to fruition! What will this brutal war for survival mean for Peter Parker and the rest of the spiders? Starring the Superior Spider-Man, the Ultimate Universe's Miles Morales and Jessica Drew, Spider-Man 2099, Spider-Woman, Silk, Kaine, Scarlet Spider, MC2's Spider-Girl, Spider-Man Noir, Spider-Man 1602, Spider-Ham, Spider-Monkey, Lady Spider, Spider-Punk, Spider-UK, a spider-powered Gwen Stacy...and hundreds more, from the beloved to the obscure! Collecting:AMAZING SPIDER-MAN (2014) #7-15, SUPERIOR SPIDER-MAN #32-33, SPIDER-VERSE #1-2, SPIDER-VERSE TEAM-UP #1-3, SCARLET SPIDERS #1-3, SPIDER-WOMAN (2014) #1-4, SPIDER-MAN 2099 (2014) #6-8 and material from FREE COMIC BOOK DAY 2014 (GUARDIANS OF THE GALAXY) #1Written by DAN SLOTT, CHRISTOS GAGE, MICHAEL COSTA, DENNIS HOPELESS & PETER DAVID with SKOTTIE YOUNG, ROBBIE THOMPSON, KATIE COOK, KATHRYN IMMONEN, JED MCKAY, ROGER STERN, GERRY CONWAY, TOM DEFALCO & MOREPenciled by GIUSEPPE CAMUNCOLI, OLIVIER COIPEL, DAVE WILLIAMS, PACO DIAZ, GREG LAND & WILL SLINEY with HUMBERTO RAMOS, ADAM KUBERT, MIGUEL SEPULVEDA, JAKE PARKER, DENNIS MEDRI, KATIE COOK, MARK BROOKS, DAVID LAFUENTE, SHELDON VELLA, BOB MCLEOD, PAUL SMITH, RON FRENZ & MORECover by OLIVIER COIPEL Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collecting:AMAZING SPIDER-MAN (2014) #7-15, SUPERIOR SPIDER-MAN #32-33, SPIDER-VERSE #1-2, SPIDER-VERSE TEAM-UP #1-3, SCARLET SPIDERS #1-3, SPIDER-WOMAN (2014) #1-4, SPIDER-MAN 2099 (2014) #6-8 and material from FREE COMIC BOOK DAY 2014 (GUARDIANS OF THE GALAXY) #1Written by DAN SLOTT, CHRISTOS GAGE, MICHAEL COSTA, DENNIS HOPELESS & PETER DAVID with SKOTTIE YOUNG, ROBBIE THOMPSON, KATIE COOK, KATHRYN IMMONEN, JED MCKAY, ROGER STERN, GERRY CONWAY, TOM DEFALCO & MOREPenciled by GIUSEPPE CAMUNCOLI, OLIVIER COIPEL, DAVE WILLIAMS, PACO DIAZ, GREG LAND & WILL SLINEY with HUMBERTO RAMOS, ADAM KUBERT, MIGUEL SEPULVEDA, JAKE PARKER, DENNIS MEDRI, KATIE COOK, MARK BROOKS, DAVID LAFUENTE, SHELDON VELLA, BOB MCLEOD, PAUL SMITH, RON FRENZ & MORECover by OLIVIER COIPEL Read more"
+      }
+    },
+    {
+      "id": "pilot-4-59",
+      "title": "Starman: Sins of the Father (Starman (1994-2001) Book 1)",
+      "url": "https://www.amazon.com/dp/B07818JNHF",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A riot rocks Opal City while an ailing Ted Knight recovers from a recent attack. The action forces Ted's son Jack Knight to pick up Starman's Cosmic Rod and directly oppose the villainy he swore he'd never face! Is this his calling? Or his doom? Collecting Starman #0-5 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collecting Starman #0-5 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-60",
+      "title": "Superman - Action Comics (2011-2016) Vol. 1: Superman and the Men of Steel (Superman - Action Comics Volumes (The New 52))",
+      "url": "https://www.amazon.com/dp/B008VFN65M",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "DC Comics took a bold step and renumbered the longest-running monthly comic, Action Comics, to #1 for the first time since 1938 as part of the DC Comics--The New 52 event. With this renumbering comes a new creative team featuring comics legend Grant Morrison and fan-favorite artist Rag Morales. While Morrison is no stranger to writing the Superman character, having won three Eisner Award's for his work on All-Star Superman, Action Comics will be something new for both old and new readers and present humanity's first encounters with Superman, before he became one of the World's Greatest Super Heroes. Set a few years in the past, it's a bold new take on a classic hero. Collects Action Comics #1-8 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Action Comics #1-8 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-61",
+      "title": "Swamp Thing (2011-2015) Vol. 2: Family Tree (Swamp Thing Volume (The New 52))",
+      "url": "https://www.amazon.com/dp/B00BUSN8EQ",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Alec Holland is back as the Swamp Thing, fully formed as the protector of The Green. Immediately upon his return, he must battle his way through the Bone Kingdom and The Rot to free his ally - and ex-girlfriend - Abigail Arcane. But will the cost of freeing her be...fighting her? Nothing, not even this titanic battle, will prepare Swampy for what he has to face next--a resurrected and even more dangerous Anton Arcane! BATMAN writer Scott Snyder and artist Yanick Paquette bring you one of the New 52's breakthrough titles with the classic DC mainstay, Swamp Thing! Collects #0, 8-11, Swamp Thing Annual #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects #0, 8-11, Swamp Thing Annual #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-62",
+      "title": "Swamp Thing (2011-2015) Vol. 7: Season's End",
+      "url": "https://www.amazon.com/dp/B01AKVJR3E",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Witness the rise of the Machine Kingdom and the end of the Green as you know it in this heart-pounding collection from creators Charles Soule (SUPERMAN: DOOMED) and Jesus Saiz (GREEN LANTERN: LOST ARMY). A new Kingdom has emerged-a new form of life to stand alongside the animals of the Red and the fungi of the Grey. As the Avatar of the Green and all plant life on Earth, Swamp Thing is keenly interested in what this new Kingdom-the artificial intelligence of the Machine-might want. Unfortunately, what the Machine wants is to run the Green-or else destroy it completely! Now, war is declared and sides are drawn. As the Machine creates its own human avatar and forms alliances with some of the Green's deadliest enemies, Swamp Thing must turn to the person he trusts most-who happens to be the one person who can do the most harm to him: Abigail Arcane, his true love and Avatar of the Rot. Collects SWAMP THING #35-40, SWAMP THING ANNUAL #3 and SWAMP THING: FUTURES END #1 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects SWAMP THING #35-40, SWAMP THING ANNUAL #3 and SWAMP THING: FUTURES END #1 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-63",
+      "title": "Tales from the DC Dark Multiverse (Tales from the Dark Multiverse (2019-))",
+      "url": "https://www.amazon.com/dp/B084YV3DKV",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "After the events of Dark Nights: Metal, a gateway into the Dark Multiverse has opened, and its stories are revealed! Journey into twisted and tragic worlds where Bruce Wayne never reclaimed the mantle of the Bat from Azrael, Lois Lane became the Eradicator, and more! Collects Tales from the Dark Multiverse: Batman: Knightfall #1, Tales from the Dark Multiverse: Death of Superman #1, Tales from the Dark Multiverse: Blackest Night #1, Tales from the Dark Multiverse: Infinite Crisis #1, and Tales from the Dark Multiverse: Teen Titans: The Judas Contract #1 Plus these inspirational issues Batman #497, Superman #75, Blackest Night #1, Infinite Crisis #1 and Tales of the Teen Titans Annual #3 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Tales from the Dark Multiverse: Batman: Knightfall #1, Tales from the Dark Multiverse: Death of Superman #1, Tales from the Dark Multiverse: Blackest Night #1, Tales from the Dark Multiverse: Infinite Crisis #1, and Tales from the Dark Multiverse: Teen Titans: The Judas Contract #1 Plus these inspirational issues Batman #497, Superman #75, Blackest Night #1, Infinite Crisis #1 and Tales of the Teen Titans Annual #3 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-64",
+      "title": "Teen Titans (2011-2014) Vol. 1: It's Our Right To Fight (Teen Titans Boxset)",
+      "url": "https://www.amazon.com/dp/B0098SWEKY",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "As a part of the acclaimed DC Comics - The New 52 event of September 2011, writer Scott Lobdell (X-Men, The Age of Apocalypse) and artist Brett Booth (JUSTICE LEAGUE OF AMERICA) deliver a fresh new take on DC Comics' teen heroes, the Teen Titans. Tim Drake, Batman's former sidekick, is back in action when an international organization called Project N.O.W.H.E.R.E. seeks to capture, kill or co-opt super-powered teenagers. As Red Robin, he's going to have to team up with the mysterious and belligerent powerhouse thief known as Wonder Girl, the hyperactive speedster calling himself Kid Flash and few more all-new teen super-heroes to stand any chance at all against N.O.W.H.E.R.E. But as Superboy meets them for the first time, the Titans have to wonder, is he a friend - or foe? Collects Teen Titans #1-7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Teen Titans #1-7 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-65",
+      "title": "The Department of Truth Vol. 2: The City Upon a Hill",
+      "url": "https://www.amazon.com/dp/B09BK7TSGB",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Cole Turner thought he'd joined the right side in the war for the Truth. But the more he learns about Lee Harvey Oswald's tenure leading the Department, the less sure he is. And as Tulpas start to gain a stronger foothold in the real world, Cole's time to decide where he stands is running out. The second arc of smash-hit series THE DEPARTMENT OF TRUTH from JAMES TYNION IV (Batman) and MARTIN SIMMONDS (Dying is Easy) is collected here! Collects THE DEPARTMENT OF TRUTH #8-13 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects THE DEPARTMENT OF TRUTH #8-13 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-66",
+      "title": "The Department Of Truth Vol. 3: Free Country",
+      "url": "https://www.amazon.com/dp/B09TS2JKVZ",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Six acclaimed guest artists join Eisner winner JAMES TYNION IV (Something is Killing the Children, Batman) and MARTIN SIMMONDS (Dying is Easy) to uncover the deep, tangled roots of the Department of Truth…and Lee Harvey Oswald's rise to its top position. From the Phantom Time Hypothesis to Mothman, find out what terrible secrets are waiting in the archives. Collects THE DEPARTMENT OF TRUTH #6-7, 14-17 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects THE DEPARTMENT OF TRUTH #6-7, 14-17 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-67",
+      "title": "The Department Of Truth Vol. 4",
+      "url": "https://www.amazon.com/dp/B0BGT8R5TB",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "For decades, the Department of Truth battled a secret war against its Soviet counterpart, the Ministry of Lies. Now, Cole Turner will have to face the consequences of his predecessors as the dark actions of the past unfurl before him… The fourth arc of the Eisner-nominated THE DEPARTMENT OF TRUTH from JAMES TYNION IV (Something is Killing the Children) and MARTIN SIMMONDS (Dying is Easy) is collected here! Collects THE DEPARTMENT OF TRUTH #18-22 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects THE DEPARTMENT OF TRUTH #18-22 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-68",
+      "title": "The Dragon Blood Collection, Books 1-3",
+      "url": "https://www.amazon.com/dp/B00PXGD274",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A thousand years have passed since a dragon has been seen in the world. Science and technology have replaced magic, which has dwindled until it has become little more than an element of myth and legend. There are those who still have dragon blood flowing through their veins, distant descendants of the mighty creatures of old. These rare humans have the power to cast magic, the power to heal, and the power to craft alchemical weapons capable of starting wars… or ending them. But they are feared for those powers, and in recent centuries, they have been hunted nearly to extinction. The few remaining survivors must find a way to change how humanity perceives them or be lost to the world forever. The Dragon Blood Collection includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more"
+      }
+    },
+    {
+      "id": "pilot-4-69",
+      "title": "The Flash: Year One (2024 Edition) (The Flash (2016-))",
+      "url": "https://www.amazon.com/dp/B07X5MRYDS",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Superstar writer Joshua Williamson continues his explosive run on The Flash! Go back to the very beginning of Barry Allen's journey in The Flash: Year One! Barry Allen feels helpless in his life in Central City. As a forensic scientist, he's always catching criminals after they've committed their crimes. All that changes one fateful night when Barry is struck by a bolt of lightning and doused in chemicals. When he wakes from a coma, he realizes he can run at incredible speeds. Can Barry master these powers and be the hero his city needs...or will the powers burn through him? Collects The Flash #70-75 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects The Flash #70-75 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-70",
+      "title": "The Joker (2021-) Vol. 1",
+      "url": "https://www.amazon.com/dp/B09HN8R1NZ",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Following the events of Infinite Frontier #0 and The Joker War, The Joker gets targeted as the most wanted man in the world! But the Clown Prince of Crime is several steps ahead of law enforcement-and he’s on the run overseas. James Gordon, facing retirement, realizes this is the manhunt of his life and the last piece of a storied career…but what mysterious and deadly forces are also in pursuit of The Joker? THE JOKER VOL. 1 collects THE JOKER #1-6 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collects THE JOKER #1-6 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-71",
+      "title": "The Joy of jQuery: A Beginner's Guide to the World's Most Popular Javascript Library",
+      "url": "https://www.amazon.com/dp/B00H1G7B08",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "How to leverage jQuery to make your web applications sizzle with awesomeness-- even if you've never programmed before and don't know any JavascriptFrom the author of the #1 best seller \"The Joy of PHP\" comes another great beginner's guide for those seeking to learn jQuery. jQuery is a programming language you can use to create cool web applications. jQuery is free, powerful, simple to reference in your web pages, and easy to learn. You can get started quickly, and you won't outgrow it later when you get really good at it. You'll find that you use jQuery in all your web applications once you get the hang of it.Beginners: This is the jQuery book for youMost programming books are long, dry, and boring-- but this one is the opposite of that. It's short and to the point, and uses the example of a (somewhat shady) used car salesman's web site to give the learning some context and humor. The Joy of PHP by the same author is consistently the top-rated book in its category precisely because it makes learning PHP fun. This book does the same for jQuery.What's jQuery?jQuery is a fast, small, and feature-rich JavaScript library. JavaScript 'library' means that it is full of JavaScript that you don't need to understand to be able to use-- in the same way that an automobile is a car parts 'library'. The parts are there and we can use them, so who really cares how they work? jQuery makes things like HTML manipulation, event handling, animation, and Ajax much simpler. jQuery works across a multitude of browsers. With a combination of versatility and extensibility, jQuery has changed the way that millions of people write JavaScript, and this book can change how YOU code too!Book Contents Include:What is jQuery?Get the Source CodeGetting Started with jQueryIntroduction to HTMLIntroduction to CSSjQuery SelectorsjQuery UI Widgets: Dramatic Page EnhancementsUsing jQuery for Form ValidationjQuery AJAXjQuery MobilejQuery AnimationScroll up and click \"Buy\" now. :) Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Include:What is jQuery?Get the Source CodeGetting Started with jQueryIntroduction to HTMLIntroduction to CSSjQuery SelectorsjQuery UI Widgets: Dramatic Page EnhancementsUsing jQuery for Form ValidationjQuery AJAXjQuery MobilejQuery AnimationScroll up and click \"Buy\" now. :) Read more"
+      }
+    },
+    {
+      "id": "pilot-4-72",
+      "title": "The Quinoa Cookbook: Nutrition Facts, Cooking Tips, and 116 Superfood Recipes for a Healthy Diet",
+      "url": "https://www.amazon.com/dp/B008718TYS",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "WALL STREET JOURNAL BESTSELLER You've read about quinoa's myriad health benefits, noticed its migration onto restaurant menus, even learned how to correctly pronounce its name, and now the important part: How do you incorporate quinoa into your kitchen? Quinoa is a gluten-free superfood high in fiber, and rich in protein and antioxidants that can do wonders for your health. Quinoa is proven to promote weight loss, and is an excellent source of nutrients such as calcium, iron, and B vitamins. Many do not realize that quinoa can be incorporated into practically any recipe from breakfast to dessert. The Quinoa Cookbook will show you how to easily make quinoa one of your diet staples, and how quinoa can help you lose weight and improve your overall health. The Quinoa Cookbook will show you how to use quinoa in your everyday cooking, with: • Quinoa nutrition facts, cooking tips, and a brief history of the ancient superfood • 116 recipes that introduce quinoa into every meal of the day, and dessert, too • Delicious versions of your favorite meals, including quinoa, such as Quinoa Risotto with Mushrooms and Flourless Chocolate Cake • A chapter dedicated to ensuring that you understand how to work with quinoa and achieve the tastiest results Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "including quinoa, such as Quinoa Risotto with Mushrooms and Flourless Chocolate Cake • A chapter dedicated to ensuring that you understand how to work with quinoa and achieve the tastiest results Read more"
+      }
+    },
+    {
+      "id": "pilot-4-73",
+      "title": "Thrilling Thieves: Thrilling Thieves: Liars, Cheats, and Cons Who Changed History (Changed History Series)",
+      "url": "https://www.amazon.com/dp/B06WW8H7ML",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Dramatic True Tales of Thomas Edison, Catherine the Great, Boss Tweed, Queen Elizabeth I, and More What do Mother Theresa, Honest Abe, and Mahatma Gandhi have in common? They’re all too upstanding to be included in Thrilling Thieves: Liars, Cheats, and Cons who Changed History. Sure, you’ll find some familiar faces like Queen Elizabeth I and Thomas Edison in here, but you’ll learn that behind their angelic smiles were cunning con artists who stole their way to gold, glory, and greatness. Follow the twisting trail of twelve troublemakers to learn what really made the Mona Lisa the most iconic painting in the world, meet the most powerful pirate from history (it’s probably not who you’re expecting), and watch empires rise and fall with the theft of a simple tea plant. Turns out our world owes a lot to those who dabble on the dark side. If you’re not scared of crooks, cons, and criminals, take a peek at this new side of history. Tales of twelve troublemakers inside include: The VenetiansFrancisco PizarroQueen Elizabeth ICatherine the GreatMadame ChengRobert FortuneRobert SmallsWilliam TweedThomas EdisonVincenzo PeruggiaKlaus Fuchs Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "include: The VenetiansFrancisco PizarroQueen Elizabeth ICatherine the GreatMadame ChengRobert FortuneRobert SmallsWilliam TweedThomas EdisonVincenzo PeruggiaKlaus Fuchs Read more"
+      }
+    },
+    {
+      "id": "pilot-4-74",
+      "title": "Trinity (2016-2018) Vol. 3: Dark Destiny",
+      "url": "https://www.amazon.com/dp/B07FCVR13C",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "THE MYSTIC TRINITY RISES…AND FALLS? Batman gathers a trinity of dark, mystical heroes to help him, Superman and Wonder Woman save the world! But what sort of threat could possibly require the additional power of Zatanna, John Constantine and Deadman? And what hope is there if even those heroes can’t resist the power of Wonder Woman’s greatest rival? Circe has a plan that transforms Red Hood, Bizarro and Artemis into even deadlier foes than they were before! And when Deadman falls to the power of the mysterious Pandora Pits, the tide may turn against the heroes once and for all, because now he’s able to possess Superman himself! Can Batman and Wonder Woman stand against the power of a Superman who won’t hold back? Writer Rob Williams (Suicide Squad, Unfollow) teams with artists V Ken Marion (Hal Jordan and the Green Lantern Corps) and Guillem March (Catwoman) in Trinity Vol. 3: Dark Destiny, collecting Trinity #12-16 and Annual #1! “Entertaining and fast-paced, with appropriately gruesome, supernatural-tinged art.” —Comicosity Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "collecting Trinity #12-16 and Annual #1!"
+      }
+    },
+    {
+      "id": "pilot-4-75",
+      "title": "Winston's War: A Novel of Conspiracy",
+      "url": "https://www.amazon.com/dp/B003H29CB6",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "From Michael Dobbs, author of the book that inspired the smash hit Netflix series House of Cards, comes Winston's War, a thrilling novel about the dawn of WWII and Winston Churchill's rise to power.At the beginning of WWII, Neville Chamberlain believes he has bought \"peace for our time\" from Adolph Hitler, who has just seized Czechoslovakia's Sudetenland. The English are alarmed by the huge German army, while the soldiers that would defend London don't even have steel helmets. For many, compromise and appeasement seem to be England's best defense.But there are a few leaders who don't agree. Among them is Winston Churchill, who understands that the relentless march of fascism will be democracy's death knell. In October 1938, Churchill pleads his case in the press to the BBC's Guy Burgess. One of these two will become the most revered man of his time, and the other will be known as the greatest of traitors.This stunning novel brings to life the surprising political intrigues that set the stage for World War II, and brings alive the passionate, grumpy, whiskey-drinking Winston Churchill, as he inspires his fellow countrymen to take on the world's mightiest army.Includes bonus reading group guidePraise for Michael Dobbs, bestselling author of House of Cards, the book that inspired the Netflix series:\"An intriguing tale of espionage and treason... this is a work to enthrall.\"—Daily Mail\"An author who can bring historical happenings so vitally back to life and made all the more impressive by being historically accurate in every respect.\"—Times of London\"A fascinating tale of conspiracy, blackmail, and treachery.\"—Irish Independent\"Dobbs takes us so far inside the mind of Winston Churchill that we feel as though we actually are him.\"—Booklist\"Dobbs infuses dramatic tension, inventive plots, and heady pacing in the narration of a British icon's noblest hours.\"—Publishers Weekly \"Dobbs has done a brilliant job in evoking the drama and despair of Britain hovering on the edge of the abyss.\"—Sunday Express Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Includes bonus reading group guidePraise for Michael Dobbs, bestselling author of House of Cards, the book that inspired the Netflix series:\"An intriguing tale of espionage and treason... this is a work to enthrall.\"—Daily Mail\"An author who can bring historical happenings so vitally back to life and made all the more impressive by being historically accurate in every respect.\"—Times of London\"A fascinating tale of conspiracy, blackmail, and treachery.\"—Irish Independent\"Dobbs takes us so far inside the mind of Winston Churchill that we feel as though we actually are him.\"—Booklist\"Dobbs infuses dramatic tension, inventive plots, and heady pacing in the narration of a British icon's noblest hours.\"—Publishers Weekly \"Dobbs has done a brilliant job in evoking the drama and despair of Britain hovering on the edge of the abyss.\"—Sunday Express Read more"
+      }
+    },
+    {
+      "id": "pilot-4-76",
+      "title": "Wonder Woman (2011-2016): Blood and Guts: The Deluxe Edition",
+      "url": "https://www.amazon.com/dp/B0CHSFLXHJ",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "When Wonder Woman is willing to take a stand against Hera, queen of the gods, she makes herself an enemy. But Hera isn’t the one Wonder Woman should be worried about…Hera’s daughter, Eris, has a secret that will shatter Wonder Woman’s life. Plus, Hades and Poseidon need to settle who will be king of the gods, and Wonder Woman can’t let their turf war decimate the realm of man! And what true story of the gods is complete without a little trip to hell? Collects WONDER WOMAN (2011) #0-12 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects WONDER WOMAN (2011) #0-12 Read more"
+      }
+    },
+    {
+      "id": "pilot-4-77",
+      "title": "Y: The Last Man: Book Four",
+      "url": "https://www.amazon.com/dp/B01AORO2FM",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The continuation of Brian K. Vaughan and artist Pia Guerra's acclaimed VERTIGO series Y: THE LAST MAN brings to vivid life the age-old speculation: What would really happen to the last man on Earth? In 2002, the world changes forever. Every man, every boy, every mammal with a Y chromosome everywhere on Earth suddenly collapses and dies. With the loss of nearly half the planet's population, the gears of society grind to a halt, and a world of women are left to pick up the pieces and try to keep civilization from collapsing entirely. The \"gendercide,\" however, is not absolutely complete. For some unknown reason, one young man named Yorick Brown and his pet male monkey, Ampersand, are spared. Overnight, this anonymous twenty-something becomes the most important person on the planet—the key, it is hoped, to unlocking the secret of the mysterious sex-specific plague. For Yorick himself, the most important person on the planet has been agonizingly out of reach. But now, after three long years and 10,000 arduous miles, the last man is closing in on the truth about his lost fiancée—and the shocking facts behind his own survival. Collects Y: THE LAST MAN #37-48 Read more"
+        }
+      ],
+      "selectedSource": {
+        "raw": "Collects Y: THE LAST MAN #37-48 Read more"
+      }
+    },
+    {
+      "id": "sample-4-4",
+      "title": "100 Bullets: Book One",
+      "url": "https://www.amazon.com/dp/B00OI8ZA00",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The best-selling graphic novels series 100 BULLETS written by Brian Azzarello and illustrated by Eduardo Risso is now re-collected in a five volume series! This dark and intriguing Eisner Award-winning series features a mysterious agent named Graves who approaches ordinary citizens and gives them an opportunity to exact revenge on a person who has wronged them. Offering his clients an attaché case containing proof of the deed and a gun, he guarantees his \"clients\" full immunity for all of their actions, including murder. This volume collects 100 Bullets #1-19. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 539,
+        "end": 566,
+        "raw": "collects 100 Bullets #1-19."
+      }
+    },
+    {
+      "id": "sample-4-6",
+      "title": "100 Bullets: Book Two",
+      "url": "https://www.amazon.com/dp/B00UKGEIDO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "How far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That’s the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible — and why? This second of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso’s 100 BULLETS collects issues #20-36 of their acclaimed Vertigo series, and also includes Azzarello’s original script for “The Mimic” from issue #20. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 728,
+        "end": 795,
+        "raw": "collects issues #20-36 of their acclaimed Vertigo series"
+      }
+    },
+    {
+      "id": "sample-4-5",
+      "title": "100 Bullets: Book Three",
+      "url": "https://www.amazon.com/dp/B013TGYKCK",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "To kill without consequence: If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: Just who is making these actions possible-and why? This third of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso's 100 BULLETS collects issues #37-58 of their acclaimed Vertigo series, and includes never-before-seen character sketches by Risso for an unproduced 100 BULLETS video game. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 707,
+        "end": 769,
+        "raw": "collects issues #37-58 of their acclaimed Vertigo series"
+      }
+    },
+    {
+      "id": "sample-4-3",
+      "title": "100 Bullets: Book Four",
+      "url": "https://www.amazon.com/dp/B018YP1STO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The continuation of the groundbreaking, Eisner Award-winning series-including the pivotal story arcs \"A Wake\" and \"Punch Line.\" If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why? Collects 100 BULLETS #59-80. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 701,
+        "end": 729,
+        "raw": "Collects 100 BULLETS #59-80."
+      }
+    },
+    {
+      "id": "sample-4-2",
+      "title": "100 Bullets: Book Five",
+      "url": "https://www.amazon.com/dp/B01D2052NE",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The conclusion to Brian Azzarello and Eduardo Risso's critically acclaimed 100 BULLETS. How far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and 100 rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why? Collects 100 BULLETS #81-100. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 687,
+        "end": 716,
+        "raw": "Collects 100 BULLETS #81-100."
+      }
+    },
+    {
+      "id": "sample-4-1264",
+      "title": "The Dragon Blood Collection, Books 1-3",
+      "url": "https://www.amazon.com/dp/B00PXGD274",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A thousand years have passed since a dragon has been seen in the world. Science and technology have replaced magic, which has dwindled until it has become little more than an element of myth and legend. There are those who still have dragon blood flowing through their veins, distant descendants of the mighty creatures of old. These rare humans have the power to cast magic, the power to heal, and the power to craft alchemical weapons capable of starting wars… or ending them. But they are feared for those powers, and in recent centuries, they have been hunted nearly to extinction. The few remaining survivors must find a way to change how humanity perceives them or be lost to the world forever. The Dragon Blood Collection includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 729,
+        "end": 857,
+        "raw": "includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more"
+      }
+    },
+    {
+      "id": "sample-4-901",
+      "title": "Neverwhere: A Novel",
+      "url": "https://www.amazon.com/dp/B000FC130E",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "“Neil Gaiman is undoubtedly one of the modern masters of fantasy writing....For those who have not read Neverwhere, the new edition is the one to read, and is a fitting introduction to Gaiman’s adult fiction....American readers can experience this spellbinding, magical world the way that Neil Gaiman wanted us to all along.” —Huffington PostThe #1 New York Times bestselling author’s ultimate edition of his wildly successful first novel featuring his “preferred text”—and including his special Neverwhere tale, “How the Marquis Got His Coat Back”.Published in 1997, Neil Gaiman’s darkly hypnotic first novel, Neverwhere, heralded the arrival of a major talent and became a touchstone of urban fantasy. It is the story of Richard Mayhew, a young London businessman with a good heart and an ordinary life, which is changed forever when he discovers a girl bleeding on the sidewalk. He stops to help her—an act of kindness that plunges him into a world he never dreamed existed. Slipping through the cracks of reality, Richard lands in Neverwhere—a London of shadows and darkness, monsters and saints, murderers and angels that exists entirely in a subterranean labyrinth. Neverwhere is home to Door, the mysterious girl Richard helped in the London Above. Here in Neverwhere, Door is a powerful noblewoman who has vowed to find the evil agent of her family’s slaughter and thwart the destruction of this strange underworld kingdom. If Richard is ever to return to his former life and home, he must join Lady Door’s quest to save her world—and may well die trying. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 474,
+        "end": 703,
+        "raw": "including his special Neverwhere tale, “How the Marquis Got His Coat Back”.Published in 1997, Neil Gaiman’s darkly hypnotic first novel, Neverwhere, heralded the arrival of a major talent and became a touchstone of urban fantasy."
+      }
+    },
+    {
+      "id": "sample-4-1482",
+      "title": "Wool Omnibus Edition [Kindle in Motion] (Silo series Book 1)",
+      "url": "https://www.amazon.com/dp/B0071XO8RA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "This is the story of mankind clawing for survival, of mankind on the edge. The world outside has grown unkind, the view of it limited, talk of it forbidden. But there are always those who hope, who dream. These are the dangerous people, the residents who infect others with their optimism. Their punishment is simple. They are allowed to go outside. *** What the press is saying: *** Boing Boing's Official Review: \"This story is terrific. I was completely immersed, watching Howey slowly paint a picture of a society gone wrong through the eyes and discovery of some truly compelling characters.\" Wired.com's Official GeekDad Review: \"Howey is among a growing list of authors who are making successful careers of publishing without the assistance of agents and traditional publishing houses. The traditional argument has been that if a book couldn’t find a publisher it probably wasn’t worth reading. However, just as iTunes changed how consumers found music and the way in which bands made their bread, ebook readers, and in particular the Kindle, are changing the ways in which authors find their readers and make a living. All of this means the old assumptions about indie books no longer hold true, and readers need to be prepared to adjust their expectations accordingly. The Wool Omnibus is a great book and deserves recognition as a full fledged contribution to the science fiction genre.\" WOOL went from a self-published short story to a blockbuster New York Times bestseller in 2012 (New York Times, October 2012). The work has been translated into over 40 languages, and was picked up by Ridley Scott and 20th Century Fox for a feature film adaptation. Note from the author: This Omnibus Edition collects the five Wool books into a single volume. It is for those who arrived late to the party and who wish to save a dollar or two while picking up the same stories in a single package. The first Wool story was released as a standalone short in July of 2011. Due to reviewer demand, the rest of the story was released over the next six months. My thanks go out to those reviewers who clamored for more. Without you, none of this would exist. Your demand created this as much as I did. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 1707,
+        "end": 1757,
+        "raw": "collects the five Wool books into a single volume."
+      }
+    },
+    {
+      "id": "sample-4-370",
+      "title": "Code Breakers Complete Series: Books 1-4",
+      "url": "https://www.amazon.com/dp/B017Y9MBI8",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Book Description: Code Breakers has been one of the highest rated sci fi series on Amazon for the last four years, with over a million downloads and conversion into an RPG setting. Containing all four novels of the series, this box set will delight fans of gritty post-apocalyptic fiction, with a cyberpunk flavor. Often compared to the early works of William Gibson and Neal Stephenson, Code Breakers is a fast-paced, action-packed and thought-provoking series. Barnes has injected the world full of interesting characters, AIs, droids, and advanced tech in a post-cataclysmic setting where the very idea of freedom has to be fought for. Join Gerry, Gabe, and Petal in this epic tale of survival, cutting edge science, and a thrill-a-minute adventure that will have you turning pages as fast as you can, as our heroes struggle for their lives, and for the future of humanity itself. Contains four full length novels: Alpha, Beta, Gamma, and Delta with a special offer included inside (at the end of the book).** Download today for Free for Kindle Unlimited subscribers. ** Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 181,
+        "end": 314,
+        "raw": "Containing all four novels of the series, this box set will delight fans of gritty post-apocalyptic fiction, with a cyberpunk flavor."
+      }
+    },
+    {
+      "id": "sample-4-1027",
+      "title": "Sherlock Holmes: The Ultimate Collection (Illustrated)",
+      "url": "https://www.amazon.com/dp/B01HQDYF72",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Arthur Conan Doyle’s master criminologist Sherlock Holmes continues to delight readers around the world more than a century after he first appeared in print (in 1887’s A Study in Scarlet). The digital age has only increased his popularity: amid the onslaught of contemporary crime fiction there is something reassuring about the classic one volume set of the complete Sherlock Holmes. In Sherlock Holmes: The Ultimate Collection you will find all four Sherlock Holmes novels - A Study In Scarlet, The Sign of the Four, The Hound of the Baskervilles, The Valley of Fear - as well as the short story collections The Adventures of Sherlock Holmes, The Memoirs of Sherlock Holmes, The Return of Sherlock Holmes and His Last Bow - Some Reminiscences of Sherlock Holmes. Kindle edition includes a selection of illustrations, first edition covers and other Sherlockiana. Novels A Study In Scarlet by Arthur Conan Doyle. The Sign of the Four by Arthur Conan Doyle. The Hound of the Baskervilles by Arthur Conan Doyle. The Valley of Fear by Arthur Conan Doyle. Short Story Collections The Adventures of Sherlock Holmes by Arthur Conan Doyle. The Memoirs of Sherlock Holmes by Arthur Conan Doyle. The Return of Sherlock Holmes by Arthur Conan Doyle. His Last Bow - Some Reminiscences of Sherlock Holmes by Arthur Conan Doyle. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 780,
+        "end": 863,
+        "raw": "includes a selection of illustrations, first edition covers and other Sherlockiana."
+      }
+    },
+    {
+      "id": "sample-4-697",
+      "title": "Investing Essentials: What You Need to Know (Collection) (FT Press Delivers Winning Investing Essentials)",
+      "url": "https://www.amazon.com/dp/B0054RF64E",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "This is the eBook version of the printed book.If you liked this Short, you might also like Fire Your Stock Analyst!: Analyzing Stocks On Your Own, 2nd Edition (9780137010233) by Harry Domash. Available in print and digital formats.Six short-and-sweet, quick-start investing primers: practical guidance on ETFs, dividend stocks, growth stocks, emerging markets, mutual funds, closed-end funds, and more! Harry Domash’s six quick-start investing guides give you crucial information for investing profitably in any market environment. Learn what you need to know, without useless theory or number-crunching that doesn’t matter! Includes practical, up-to-the-minute primers on ETFs, emerging markets, dividend stocks, growth stocks, advanced growth stock analysis, and mutual funds/closed-end funds! Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 625,
+        "end": 795,
+        "raw": "Includes practical, up-to-the-minute primers on ETFs, emerging markets, dividend stocks, growth stocks, advanced growth stock analysis, and mutual funds/closed-end funds!"
+      }
+    },
+    {
+      "id": "sample-4-1313",
+      "title": "The Midwich Cuckoos (RosettaBooks into Film)",
+      "url": "https://www.amazon.com/dp/B003XREM3S",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "John Wyndham's 1957 book The Midwich Cuckoos is better known by the more sensational title of its two film adaptations, Village of the Damned. The story begins with Richard and Janet Gayford who have spent the night of September 26 in London, returning to their home in Midwich the following day. Then, in ways that are difficult to pin down, the village seems changed--not quite the same place that it was before. The nightmare that descends on Midwich has dire implications for the rest of the world; whatever dwells there is sowing the seeds for a master race of ruthless and inhumane creatures who are bent on nothing less than absolute and total domination.In Wyndam's classically elegant, calm style, this novel explores the arrival of a collective intelligence on earth that threatens to eliminate mankind. The quiet, eerie changes that befall Midwich manifest in strange ways; on the surface, everything seems normal, but scratch a little deeper and there is a clear sense of dread. After the night of September 26, every woman of childbearing age is pregnant, all to give birth at the same time, to children who are all alike--their eyes mesmerizing, void of emotion. These children are innately possessed with unimaginable mental powers and a formidable intelligence. It is these children who develop into an unstoppable force, capable of anything and far out-reaching other humans in cunning. The London Evening Standard called The Midwich Cuckoos \"humane and urbane with a lightly sophisticated wit putting the ideas into shape.\" Wyndham skillfully heightens the terror by making his narrative so rational and matter-of-fact. In such a nuclear and technological age, Wyndam's story is rich in irony in that it is set in the picturesque, bucolic English Village and the \"enemy\", the threat, are seeming cherubim.ABOUT THE AUTHORJohn Wyndham Parkes Lucas Beynon Harris (1903-69) was a British novelist who wrote under the name John Wyndham, although he had at least seven other pen-names. Wyndham began publishing stories in the early 1930s, often in American magazines, but did not really find his stride as a writer as John Wyndham until he returned from serving for World War II.The War changed the world drastically and it was now in the grips of nuclear apocalypse, a scenario that both terrified and fascinated Wyndam. His 1951 novel, The Day of the Triffids transformed him as a writer. While Wyndham's approach to writing is best classified as fantasy and science fiction, his work is often said to transcend both genre and category.Following The Day of the Triffids in 1951, Wyndham wrote a series of remarkable novels that include The Chrysalids (1955) and The Midwich Cuckoos (1957), as well as several short story collections. As noted, Wyndham did write under several of his other pseudonyms, and several of these titles were released after his death in March of 1969. There were two film versions, both titled Village of the Damned, made from The Midwich Cuckoos.SERIES DESCRIPTIONSFrom classic book to classic film, RosettaBooks has gathered some of most memorable books into film available. The selection is broad ranging and far reaching, with books from classic genre to cult classic to science fiction and horror and a blend of the two creating whole new genres like Richard Matheson's The Shrinking Man. Classic works from Vonnegut, one of the greatest writers of the twentieth century, meet with E.M. Forster's A Passage to India. Whether the work is centered in the here and now, in the past, or in some distant and almost unimaginable future, each work is lasting and memorable and award-winning. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 2643,
+        "end": 2748,
+        "raw": "include The Chrysalids (1955) and The Midwich Cuckoos (1957), as well as several short story collections."
+      }
+    },
+    {
+      "id": "sample-4-21",
+      "title": "A Hunger Like No Other (Immortals After Dark Book 2)",
+      "url": "https://www.amazon.com/dp/B000GCFCXW",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Acclaimed author Kresley Cole introduces a sizzling new series with this tale of a fierce werewolf and a bewitching vampire -- unlikely soul mates whose passion will test the boundaries of life and death.A mythic warrior who'll stop at nothing to possess her . . . After enduring years of torture from the vampire horde, Lachlain MacRieve, leader of the Lykae Clan, is enraged to find the predestined mate he's waited millennia for is a vampire. Or partly one. This Emmaline is a small, ethereal half Valkyrie/half vampire, who somehow begins to soothe the fury burning within him. A vampire captured by her wildest fantasy . . . Sheltered Emmaline Troy finally sets out to uncover the truth about her deceased parents -- until a powerful Lykae claims her as his mate and forces her back to his ancestral Scottish castle. There, her fear of the Lykae -- and their notorious dark desires -- ebbs as he begins a slow, wicked seduction to sate her own dark cravings. An all-consuming desire . . . Yet when an ancient evil from her past resurfaces, will their desire deepen into a love that can bring a proud warrior to his knees and turn a gentle beauty into the fighter she was born to be? Includes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 1188,
+        "end": 1271,
+        "raw": "Includes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked."
+      }
+    },
+    {
+      "id": "sample-4-240",
+      "title": "Batman: Knightfall Vol. 1",
+      "url": "https://www.amazon.com/dp/B008RNGCAO",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "#1 New York Times Bestseller The villainous Bane breaks the Bat in one of the most popular and well-known Batman tales! The inmates of Arkham Asylum have broken free and Batman must push himself to the limits to re-apprehend the Joker, Poison Ivy, the Riddler, Killer Croc and more. Pushed to the limits, he comes face-to-face against the monstrosity known as Bane, who delivers a crippling blow destined to change the Caped Crusader forever! Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 443,
+        "end": 607,
+        "raw": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more"
+      }
+    },
+    {
+      "id": "sample-4-241",
+      "title": "Batman: Knightfall Vol. 2: Knightquest",
+      "url": "https://www.amazon.com/dp/B00919W7MA",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Mentally defeated and physically broken, Bruce Wayne suffered a crippling blow while battling the brutal Bane. Now, the mantle of the Bat must be passed on to another, and Jean Paul Valley answers the call! But as the new Caped Crusader slowly loses his grip on sanity, his idea of justice takes a violent and deadly turn. Witnessing this dangerous behavior firsthand, Nightwing and Robin try to come to grips with Bruce's highly controversial decision while the new Batman sets his sights on taking revenge against Bane! Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 522,
+        "end": 681,
+        "raw": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more"
+      }
+    },
+    {
+      "id": "sample-4-498",
+      "title": "Ex Machina: Book Three",
+      "url": "https://www.amazon.com/dp/B00NGUWRDY",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "In this volume, Mayor Mitchell Hundred - formerly known as the super hero The Great Machine --faces difficult decisions regarding New York City's drug laws. But will a string of brazen, violent robberies and a shocking suicide affect the the Mayor's policy? And in a second story, \"Power Down,\" set during the New York blackout of 2003, the mayor must deal with a city gone dark. Award-winning writer Brian K. Vaughan (Saga, Y: THE LAST MAN) deftly combines big city politics and superheroes in this critically acclaimed series. Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 529,
+        "end": 620,
+        "raw": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more"
+      }
+    },
+    {
+      "id": "sample-4-626",
+      "title": "Hellboy and the B.P.R.D.: 1954",
+      "url": "https://www.amazon.com/dp/B078GBT5MB",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "iZombie co-creator Chris Roberson teams with Mike Mignola and a team of artists to explore the horror and intrigue of Hellboy's early Cold War years.No longer a rookie, Hellboy is joined by other Bureau agents in a series of far-flung mysteries that take them searching for yetis terrorizing an Arctic research team, into the American suburbs where a family is haunted by a phantom monkey, and to Hong Kong, where demons are drawn to a Chinese artifact.This is the 3rd Volume in the Hellboy and B.P.R.D series, following 1952, and 1953. This collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 542,
+        "end": 644,
+        "raw": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more"
+      }
+    },
+    {
+      "id": "sample-4-629",
+      "title": "Hellboy Omnibus Volume 1: Seed of Destruction",
+      "url": "https://www.amazon.com/dp/B07BJKXP63",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The Hellboy saga begins--with over 300 pages drawn by Mignola! For the first time, Hellboy's complete story is presented in chronological order for the ultimate reading experience. The story jumps from Hellboy's mysterious World War II origin to his 1994 confrontation with the man who summoned him to earth, and the earliest signs of the plague of frogs. Avoiding his supposed fate as the herald of the end of the world, Hellboy continues with the Bureau for Paranormal Research and Defense, fighting alongside Abe Sapien, Liz Sherman, and drafting Roger Homunculus into his own ill-fated service with the B.P.R.D. The four volume Hellboy Omnibus series along with the two volumes of The Complete Short Stories collect all of Mignola's award-winning Hellboy stories in chronological order for a definitive reading experience. This 368-page volume covers Hellboy's adventures from 1994 to 1997, reprinting Seed of Destruction, Wake the Devil, and \"Wolves of St August,\" \"The Chained Coffin,\" and \"Almost Colossus,\" from The Chained Coffin and The Right Hand of Doom. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 712,
+        "end": 826,
+        "raw": "collect all of Mignola's award-winning Hellboy stories in chronological order for a definitive reading experience."
+      }
+    },
+    {
+      "id": "sample-4-1228",
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 11",
+      "url": "https://www.amazon.com/dp/B0849K8NVN",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want. Collects TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #16–22 and issues #76–84 of the ongoing TEENAGE MUTANT NINJA TURTLES series. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 185,
+        "end": 315,
+        "raw": "Collects TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #16–22 and issues #76–84 of the ongoing TEENAGE MUTANT NINJA TURTLES series."
+      }
+    },
+    {
+      "id": "sample-4-1230",
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 13",
+      "url": "https://www.amazon.com/dp/B08P2CDGQG",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "It's all been leading up to this! A massive showdown on the streets of the Big Apple! As New York gets torn apart by different factions, mutant and human alike, Karai returns and the future of the TMNT—in fact all of NYC—comes down to a final negotiation between Splinter and Karai. It's the shocking culmination of nearly a decade of storytelling as our heroes face their darkest hour against a multitude of enemies bent on their total destruction. Find out how a City at War will change the world forever! Plus, abandon all hope... as the most infamous villain in the Turtles' universe, Shredder, returns! Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 608,
+        "end": 761,
+        "raw": "Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series."
+      }
+    },
+    {
+      "id": "sample-4-790",
+      "title": "King In Black Omnibus (King In Black (2020-2021))",
+      "url": "https://www.amazon.com/dp/B0B6Q6JQFC",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook. Darkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet's heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull's symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume! Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 235,
+        "end": 262,
+        "raw": "King In Black: Namor #1-5"
+      }
+    },
+    {
+      "id": "sample-4-254",
+      "title": "Batman: Road to No Man's Land Vol. 2 (Batman: No Man's Land)",
+      "url": "https://www.amazon.com/dp/B01GKGB7T0",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A devastating earthquake has left Gotham City in ruins, and the government is getting close to completely cutting it off from the rest of civilization. But there's one man who's vowed to save Gotham from whatever foe it comes up against, and now Bruce Wayne must put aside his life as Batman and put on his suit and tie as he takes his fight for the fate of Gotham to Washington, D.C. Lurking in the shadows is the mysterious Nicholas Scratch who will do everything in his power to ensure Gotham becomes a No Man's Land! In this, the final act before the beginning of the classic event, \"No Man's Land,\" Bruce Wayne, Robin, Nightwing and many others try to save their city from destruction once again-this time at the hands of the U.S. government. BATMAN: ROAD TO NO MAN'S LAND VOL. 2 collects for the first time the complete \"Road to No Man's Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man's Land, Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 941,
+        "end": 1126,
+        "raw": "Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1."
+      }
+    },
+    {
+      "id": "sample-4-442",
+      "title": "Dead Boy Detectives by Toby Litt & Mark Buckingham (The Dead Boy Detectives (2013-2014))",
+      "url": "https://www.amazon.com/dp/B0C7RKH6X6",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Edwin Paine and Charles Roland have a lot in common - they’re both English schoolboys who love a good detective story, and they’ve been known to dabble in mystery-solving themselves. They’re also both dead, a condition which has proven to be less of a hindrance than one might think. From the pages of THE SANDMAN, Neil Gaiman's intrepid dead schoolboys head back to the horror that is St. Hilarions School; the place where they both were murdered. This volume collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 461,
+        "end": 629,
+        "raw": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1."
+      }
+    },
+    {
+      "id": "sample-4-1097",
+      "title": "Star Wars Legends Epic Collection: The Newspaper Strips Vol. 1",
+      "url": "https://www.amazon.com/dp/B01MU9S9CM",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981. Classic tales of Star Wars, from the funny pages to your bookshelves! Beginning in 1979, fans got a daily dose of a galaxy far, far away in their newspapers — now, with this volume, you can savor those stories without the 24-hour wait! C-3PO chronicles the adventures of the Rebel heroes! Luke takes his chances on a gambler's world! A sojourn on Tatooine is anything but peaceful! Princess Leia is put to work as an Imperial servant! Han Solo makes another Kessel Run! Han and Chewie get more than they bargained for on a job! And Boba Fett makes his comic debut! Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 0,
+        "end": 255,
+        "raw": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981."
+      }
+    },
+    {
+      "id": "sample-4-1225",
+      "title": "Teenage Mutant Ninja Turtles: The Armageddon Game—Opening Moves",
+      "url": "https://www.amazon.com/dp/B0BFFVNVBM",
+      "sourceGeneration": 4,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The TMNT have faced enemy ninjas, government agents, fellow mutants, and alien armies, but now they must confront the machinations of an actual demi-god! Untangle the maze of secrets and treachery on the road to The Armageddon Game! One of the Turtles' most enigmatic foes, the Rat King, is finally bringing his long-simmering plan to fruition, after years of quiet preparations. Soon, Leonardo, Michelangelo, Donatello, and Raphael—under the leadership of the Shredder—will embark on a dangerous quest to find allies against Rat King’s trio of terror: LeatherKrang, Baxter Stockman, and Madame Null. But, before the game can truly begin, discover the histories of the Rat King, Kitsune, and the rest of the Pantheon, witness their previous encounters with the TMNT, and understand their connection to the recently resurrected Shredder. Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2. Read more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 837,
+        "end": 1046,
+        "raw": "Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2."
+      }
+    },
+    {
+      "id": "sample-5-4",
+      "title": "100 Bullets: Book One",
+      "url": "https://www.amazon.com/dp/B00OI8ZA00",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The best-selling graphic novels series 100 BULLETS written by Brian Azzarello and illustrated by Eduardo Risso is now re-collected in a five volume series!\nThis dark and intriguing Eisner Award-winning series features a mysterious agent named Graves who approaches ordinary citizens and gives them an opportunity to exact revenge on a person who has wronged them. Offering his clients an attaché case containing proof of the deed and a gun, he guarantees his \"clients\" full immunity for all of their actions, including murder.\nThis volume collects 100 Bullets #1-19.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 539,
+        "end": 566,
+        "raw": "collects 100 Bullets #1-19."
+      }
+    },
+    {
+      "id": "sample-5-6",
+      "title": "100 Bullets: Book Two",
+      "url": "https://www.amazon.com/dp/B00UKGEIDO",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "How far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat’s the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible — and why?\nThis second of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso’s 100 BULLETS collects issues #20-36 of their acclaimed Vertigo series, and also includes Azzarello’s original script for “The Mimic” from issue #20.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 728,
+        "end": 795,
+        "raw": "collects issues #20-36 of their acclaimed Vertigo series"
+      }
+    },
+    {
+      "id": "sample-5-5",
+      "title": "100 Bullets: Book Three",
+      "url": "https://www.amazon.com/dp/B013TGYKCK",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "To kill without consequence: If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat's the opportunity that Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: Just who is making these actions possible-and why?\nThis third of five volumes reprinting all 100 issues of writer Brian Azzarello and artist Eduardo Risso's 100 BULLETS collects issues #37-58 of their acclaimed Vertigo series, and includes never-before-seen character sketches by Risso for an unproduced 100 BULLETS video game.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 707,
+        "end": 769,
+        "raw": "collects issues #37-58 of their acclaimed Vertigo series"
+      }
+    },
+    {
+      "id": "sample-5-3",
+      "title": "100 Bullets: Book Four",
+      "url": "https://www.amazon.com/dp/B018YP1STO",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The continuation of the groundbreaking, Eisner Award-winning series-including the pivotal story arcs \"A Wake\" and \"Punch Line.\"\nIf you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it? That's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and one hundred rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why?\nCollects 100 BULLETS #59-80.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 701,
+        "end": 729,
+        "raw": "Collects 100 BULLETS #59-80."
+      }
+    },
+    {
+      "id": "sample-5-2",
+      "title": "100 Bullets: Book Five",
+      "url": "https://www.amazon.com/dp/B01D2052NE",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The conclusion to Brian Azzarello and Eduardo Risso's critically acclaimed 100 BULLETS.\nHow far would you go for revenge? If you were given a chance at deadly retribution with a guarantee that the law could not touch you, would you take it?\nThat's the opportunity that a man called Agent Graves provides, in the form of a special briefcase containing an untraceable gun and 100 rounds of ammunition. To the damaged and downtrodden living on the fringes of society, the offer is a once-in-a-lifetime chance to even their scores. But beyond the dilemma of whether or not to pull the trigger lies a deeper and even more troubling concern: just who is making these actions possible-and why?\nCollects 100 BULLETS #81-100.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 687,
+        "end": 716,
+        "raw": "Collects 100 BULLETS #81-100."
+      }
+    },
+    {
+      "id": "sample-5-1264",
+      "title": "The Dragon Blood Collection, Books 1-3",
+      "url": "https://www.amazon.com/dp/B00PXGD274",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A thousand years have passed since a dragon has been seen in the world. Science and technology have replaced magic, which has dwindled until it has become little more than an element of myth and legend.\nThere are those who still have dragon blood flowing through their veins, distant descendants of the mighty creatures of old. These rare humans have the power to cast magic, the power to heal, and the power to craft alchemical weapons capable of starting wars… or ending them. But they are feared for those powers, and in recent centuries, they have been hunted nearly to extinction.\nThe few remaining survivors must find a way to change how humanity perceives them or be lost to the world forever.\nThe Dragon Blood Collection includes three full-length novels of action, magic, and romance:\nBalanced on the Blade’s Edge\nDeathmaker\nBlood Charged\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 729,
+        "end": 857,
+        "raw": "includes three full-length novels of action, magic, and romance:\nBalanced on the Blade’s Edge\nDeathmaker\nBlood Charged\nRead more"
+      }
+    },
+    {
+      "id": "sample-5-901",
+      "title": "Neverwhere: A Novel",
+      "url": "https://www.amazon.com/dp/B000FC130E",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "“Neil Gaiman is undoubtedly one of the modern masters of fantasy writing....For those who have not read Neverwhere, the new edition is the one to read, and is a fitting introduction to Gaiman’s adult fiction....American readers can experience this spellbinding, magical world the way that Neil Gaiman wanted us to all along.” —Huffington Post\nThe #1 New York Times bestselling author’s ultimate edition of his wildly successful first novel featuring his “preferred text”—and including his special Neverwhere tale, “How the Marquis Got His Coat Back”.\nPublished in 1997, Neil Gaiman’s darkly hypnotic first novel, Neverwhere, heralded the arrival of a major talent and became a touchstone of urban fantasy.\nIt is the story of Richard Mayhew, a young London businessman with a good heart and an ordinary life, which is changed forever when he discovers a girl bleeding on the sidewalk. He stops to help her—an act of kindness that plunges him into a world he never dreamed existed. Slipping through the cracks of reality, Richard lands in Neverwhere—a London of shadows and darkness, monsters and saints, murderers and angels that exists entirely in a subterranean labyrinth. Neverwhere is home to Door, the mysterious girl Richard helped in the London Above. Here in Neverwhere, Door is a powerful noblewoman who has vowed to find the evil agent of her family’s slaughter and thwart the destruction of this strange underworld kingdom. If Richard is ever to return to his former life and home, he must join Lady Door’s quest to save her world—and may well die trying.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 475,
+        "end": 550,
+        "raw": "including his special Neverwhere tale, “How the Marquis Got His Coat Back”."
+      }
+    },
+    {
+      "id": "sample-5-1482",
+      "title": "Wool Omnibus Edition [Kindle in Motion] (Silo series Book 1)",
+      "url": "https://www.amazon.com/dp/B0071XO8RA",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "This is the story of mankind clawing for survival, of mankind on the edge. The world outside has grown unkind, the view of it limited, talk of it forbidden. But there are always those who hope, who dream. These are the dangerous people, the residents who infect others with their optimism. Their punishment is simple. They are allowed to go outside.\n*** What the press is saying: ***\nBoing Boing's Official Review: \"This story is terrific. I was completely immersed, watching Howey slowly paint a picture of a society gone wrong through the eyes and discovery of some truly compelling characters.\"\nWired.com's Official GeekDad Review: \"Howey is among a growing list of authors who are making successful careers of publishing without the assistance of agents and traditional publishing houses. The traditional argument has been that if a book couldn’t find a publisher it probably wasn’t worth reading. However, just as iTunes changed how consumers found music and the way in which bands made their bread, ebook readers, and in particular the Kindle, are changing the ways in which authors find their readers and make a living. All of this means the old assumptions about indie books no longer hold true, and readers need to be prepared to adjust their expectations accordingly. The Wool Omnibus is a great book and deserves recognition as a full fledged contribution to the science fiction genre.\"\nWOOL went from a self-published short story to a blockbuster New York Times bestseller in 2012 (New York Times, October 2012). The work has been translated into over 40 languages, and was picked up by Ridley Scott and 20th Century Fox for a feature film adaptation.\nNote from the author: This Omnibus Edition collects the five Wool books into a single volume. It is for those who arrived late to the party and who wish to save a dollar or two while picking up the same stories in a single package.\nThe first Wool story was released as a standalone short in July of 2011. Due to reviewer demand, the rest of the story was released over the next six months. My thanks go out to those reviewers who clamored for more. Without you, none of this would exist. Your demand created this as much as I did.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 1707,
+        "end": 1757,
+        "raw": "collects the five Wool books into a single volume."
+      }
+    },
+    {
+      "id": "sample-5-370",
+      "title": "Code Breakers Complete Series: Books 1-4",
+      "url": "https://www.amazon.com/dp/B017Y9MBI8",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Book Description: Code Breakers has been one of the highest rated sci fi series on Amazon for the last four years, with over a million downloads and conversion into an RPG setting. Containing all four novels of the series, this box set will delight fans of gritty post-apocalyptic fiction, with a cyberpunk flavor.\nOften compared to the early works of William Gibson and Neal Stephenson, Code Breakers is a fast-paced, action-packed and thought-provoking series. Barnes has injected the world full of interesting characters, AIs, droids, and advanced tech in a post-cataclysmic setting where the very idea of freedom has to be fought for.\nJoin Gerry, Gabe, and Petal in this epic tale of survival, cutting edge science, and a thrill-a-minute adventure that will have you turning pages as fast as you can, as our heroes struggle for their lives, and for the future of humanity itself.\nContains four full length novels: Alpha, Beta, Gamma, and Delta with a special offer included inside (at the end of the book).\n** Download today for Free for Kindle Unlimited subscribers. **\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 181,
+        "end": 314,
+        "raw": "Containing all four novels of the series, this box set will delight fans of gritty post-apocalyptic fiction, with a cyberpunk flavor."
+      }
+    },
+    {
+      "id": "sample-5-1027",
+      "title": "Sherlock Holmes: The Ultimate Collection (Illustrated)",
+      "url": "https://www.amazon.com/dp/B01HQDYF72",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Arthur Conan Doyle’s master criminologist Sherlock Holmes continues to delight readers around the world more than a century after he first appeared in print (in 1887’s A Study in Scarlet). The digital age has only increased his popularity: amid the onslaught of contemporary crime fiction there is something reassuring about the classic one volume set of the complete Sherlock Holmes. In Sherlock Holmes: The Ultimate Collection you will find all four Sherlock Holmes novels - A Study In Scarlet, The Sign of the Four, The Hound of the Baskervilles, The Valley of Fear - as well as the short story collections The Adventures of Sherlock Holmes, The Memoirs of Sherlock Holmes, The Return of Sherlock Holmes and His Last Bow - Some Reminiscences of Sherlock Holmes.\nKindle edition includes a selection of illustrations, first edition covers and other Sherlockiana.\nNovels\nA Study In Scarlet by Arthur Conan Doyle.\nThe Sign of the Four by Arthur Conan Doyle.\nThe Hound of the Baskervilles by Arthur Conan Doyle.\nThe Valley of Fear by Arthur Conan Doyle.\nShort Story Collections\nThe Adventures of Sherlock Holmes by Arthur Conan Doyle.\nThe Memoirs of Sherlock Holmes by Arthur Conan Doyle.\nThe Return of Sherlock Holmes by Arthur Conan Doyle.\nHis Last Bow - Some Reminiscences of Sherlock Holmes by Arthur Conan Doyle.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 780,
+        "end": 863,
+        "raw": "includes a selection of illustrations, first edition covers and other Sherlockiana."
+      }
+    },
+    {
+      "id": "sample-5-697",
+      "title": "Investing Essentials: What You Need to Know (Collection) (FT Press Delivers Winning Investing Essentials)",
+      "url": "https://www.amazon.com/dp/B0054RF64E",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "This is the eBook version of the printed book.\nIf you liked this Short, you might also like Fire Your Stock Analyst!: Analyzing Stocks On Your Own, 2nd Edition (9780137010233) by Harry Domash. Available in print and digital formats.\nSix short-and-sweet, quick-start investing primers: practical guidance on ETFs, dividend stocks, growth stocks, emerging markets, mutual funds, closed-end funds, and more!\nHarry Domash’s six quick-start investing guides give you crucial information for investing profitably in any market environment. Learn what you need to know, without useless theory or number-crunching that doesn’t matter! Includes practical, up-to-the-minute primers on ETFs, emerging markets, dividend stocks, growth stocks, advanced growth stock analysis, and mutual funds/closed-end funds!\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 627,
+        "end": 797,
+        "raw": "Includes practical, up-to-the-minute primers on ETFs, emerging markets, dividend stocks, growth stocks, advanced growth stock analysis, and mutual funds/closed-end funds!"
+      }
+    },
+    {
+      "id": "sample-5-1313",
+      "title": "The Midwich Cuckoos (RosettaBooks into Film)",
+      "url": "https://www.amazon.com/dp/B003XREM3S",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "John Wyndham's 1957 book The Midwich Cuckoos is better known by the more sensational title of its two film adaptations, Village of the Damned. The story begins with Richard and Janet Gayford who have spent the night of September 26 in London, returning to their home in Midwich the following day. Then, in ways that are difficult to pin down, the village seems changed--not quite the same place that it was before. The nightmare that descends on Midwich has dire implications for the rest of the world; whatever dwells there is sowing the seeds for a master race of ruthless and inhumane creatures who are bent on nothing less than absolute and total domination.\nIn Wyndam's classically elegant, calm style, this novel explores the arrival of a collective intelligence on earth that threatens to eliminate mankind. The quiet, eerie changes that befall Midwich manifest in strange ways; on the surface, everything seems normal, but scratch a little deeper and there is a clear sense of dread. After the night of September 26, every woman of childbearing age is pregnant, all to give birth at the same time, to children who are all alike--their eyes mesmerizing, void of emotion. These children are innately possessed with unimaginable mental powers and a formidable intelligence. It is these children who develop into an unstoppable force, capable of anything and far out-reaching other humans in cunning.\nThe London Evening Standard called The Midwich Cuckoos \"humane and urbane with a lightly sophisticated wit putting the ideas into shape.\" Wyndham skillfully heightens the terror by making his narrative so rational and matter-of-fact. In such a nuclear and technological age, Wyndam's story is rich in irony in that it is set in the picturesque, bucolic English Village and the \"enemy\", the threat, are seeming cherubim.\nABOUT THE AUTHOR\nJohn Wyndham Parkes Lucas Beynon Harris (1903-69) was a British novelist who wrote under the name John Wyndham, although he had at least seven other pen-names. Wyndham began publishing stories in the early 1930s, often in American magazines, but did not really find his stride as a writer as John Wyndham until he returned from serving for World War II.\nThe War changed the world drastically and it was now in the grips of nuclear apocalypse, a scenario that both terrified and fascinated Wyndam. His 1951 novel, The Day of the Triffids transformed him as a writer. While Wyndham's approach to writing is best classified as fantasy and science fiction, his work is often said to transcend both genre and category.\nFollowing The Day of the Triffids in 1951, Wyndham wrote a series of remarkable novels that include The Chrysalids (1955) and The Midwich Cuckoos (1957), as well as several short story collections. As noted, Wyndham did write under several of his other pseudonyms, and several of these titles were released after his death in March of 1969. There were two film versions, both titled Village of the Damned, made from The Midwich Cuckoos.\nSERIES DESCRIPTIONS\nFrom classic book to classic film, RosettaBooks has gathered some of most memorable books into film available. The selection is broad ranging and far reaching, with books from classic genre to cult classic to science fiction and horror and a blend of the two creating whole new genres like Richard Matheson's The Shrinking Man. Classic works from Vonnegut, one of the greatest writers of the twentieth century, meet with E.M. Forster's A Passage to India. Whether the work is centered in the here and now, in the past, or in some distant and almost unimaginable future, each work is lasting and memorable and award-winning.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 2648,
+        "end": 2753,
+        "raw": "include The Chrysalids (1955) and The Midwich Cuckoos (1957), as well as several short story collections."
+      }
+    },
+    {
+      "id": "sample-5-21",
+      "title": "A Hunger Like No Other (Immortals After Dark Book 2)",
+      "url": "https://www.amazon.com/dp/B000GCFCXW",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Acclaimed author Kresley Cole introduces a sizzling new series with this tale of a fierce werewolf and a bewitching vampire -- unlikely soul mates whose passion will test the boundaries of life and death.\nA mythic warrior who'll stop at nothing to possess her . . .\nAfter enduring years of torture from the vampire horde, Lachlain MacRieve, leader of the Lykae Clan, is enraged to find the predestined mate he's waited millennia for is a vampire. Or partly one. This Emmaline is a small, ethereal half Valkyrie/half vampire, who somehow begins to soothe the fury burning within him.\nA vampire captured by her wildest fantasy . . .\nSheltered Emmaline Troy finally sets out to uncover the truth about her deceased parents -- until a powerful Lykae claims her as his mate and forces her back to his ancestral Scottish castle. There, her fear of the Lykae -- and their notorious dark desires -- ebbs as he begins a slow, wicked seduction to sate her own dark cravings.\nAn all-consuming desire . . .\nYet when an ancient evil from her past resurfaces, will their desire deepen into a love that can bring a proud warrior to his knees and turn a gentle beauty into the fighter she was born to be?\nIncludes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 1189,
+        "end": 1272,
+        "raw": "Includes an excerpt from Kresley Cole's next romance novel, No Rest for the Wicked."
+      }
+    },
+    {
+      "id": "sample-5-240",
+      "title": "Batman: Knightfall Vol. 1",
+      "url": "https://www.amazon.com/dp/B008RNGCAO",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "#1 New York Times Bestseller\nThe villainous Bane breaks the Bat in one of the most popular and well-known Batman tales! The inmates of Arkham Asylum have broken free and Batman must push himself to the limits to re-apprehend the Joker, Poison Ivy, the Riddler, Killer Croc and more. Pushed to the limits, he comes face-to-face against the monstrosity known as Bane, who delivers a crippling blow destined to change the Caped Crusader forever! Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 443,
+        "end": 607,
+        "raw": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane\nRead more"
+      }
+    },
+    {
+      "id": "sample-5-241",
+      "title": "Batman: Knightfall Vol. 2: Knightquest",
+      "url": "https://www.amazon.com/dp/B00919W7MA",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Mentally defeated and physically broken, Bruce Wayne suffered a crippling blow while battling the brutal Bane. Now, the mantle of the Bat must be passed on to another, and Jean Paul Valley answers the call! But as the new Caped Crusader slowly loses his grip on sanity, his idea of justice takes a violent and deadly turn. Witnessing this dangerous behavior firsthand, Nightwing and Robin try to come to grips with Bruce's highly controversial decision while the new Batman sets his sights on taking revenge against Bane! Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 522,
+        "end": 681,
+        "raw": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7\nRead more"
+      }
+    },
+    {
+      "id": "sample-5-498",
+      "title": "Ex Machina: Book Three",
+      "url": "https://www.amazon.com/dp/B00NGUWRDY",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "In this volume, Mayor Mitchell Hundred - formerly known as the super hero The Great Machine --faces difficult decisions regarding New York City's drug laws. But will a string of brazen, violent robberies and a shocking suicide affect the the Mayor's policy? And in a second story, \"Power Down,\" set during the New York blackout of 2003, the mayor must deal with a city gone dark.\nAward-winning writer Brian K. Vaughan (Saga, Y: THE LAST MAN) deftly combines big city politics and superheroes in this critically acclaimed series.\nCollects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 529,
+        "end": 620,
+        "raw": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more"
+      }
+    },
+    {
+      "id": "sample-5-626",
+      "title": "Hellboy and the B.P.R.D.: 1954",
+      "url": "https://www.amazon.com/dp/B078GBT5MB",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "iZombie co-creator Chris Roberson teams with Mike Mignola and a team of artists to explore the horror and intrigue of Hellboy's early Cold War years.\nNo longer a rookie, Hellboy is joined by other Bureau agents in a series of far-flung mysteries that take them searching for yetis terrorizing an Arctic research team, into the American suburbs where a family is haunted by a phantom monkey, and to Hong Kong, where demons are drawn to a Chinese artifact.\nThis is the 3rd Volume in the Hellboy and B.P.R.D series, following 1952, and 1953. This collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 544,
+        "end": 646,
+        "raw": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2\nRead more"
+      }
+    },
+    {
+      "id": "sample-5-629",
+      "title": "Hellboy Omnibus Volume 1: Seed of Destruction",
+      "url": "https://www.amazon.com/dp/B07BJKXP63",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The Hellboy saga begins--with over 300 pages drawn by Mignola! For the first time, Hellboy's complete story is presented in chronological order for the ultimate reading experience.\nThe story jumps from Hellboy's mysterious World War II origin to his 1994 confrontation with the man who summoned him to earth, and the earliest signs of the plague of frogs. Avoiding his supposed fate as the herald of the end of the world, Hellboy continues with the Bureau for Paranormal Research and Defense, fighting alongside Abe Sapien, Liz Sherman, and drafting Roger Homunculus into his own ill-fated service with the B.P.R.D.\nThe four volume Hellboy Omnibus series along with the two volumes of The Complete Short Stories collect all of Mignola's award-winning Hellboy stories in chronological order for a definitive reading experience.\nThis 368-page volume covers Hellboy's adventures from 1994 to 1997, reprinting Seed of Destruction, Wake the Devil, and \"Wolves of St August,\" \"The Chained Coffin,\" and \"Almost Colossus,\" from The Chained Coffin and The Right Hand of Doom.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 712,
+        "end": 826,
+        "raw": "collect all of Mignola's award-winning Hellboy stories in chronological order for a definitive reading experience."
+      }
+    },
+    {
+      "id": "sample-5-1228",
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 11",
+      "url": "https://www.amazon.com/dp/B0849K8NVN",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want. Collects TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #16–22 and issues #76–84 of the ongoing TEENAGE MUTANT NINJA TURTLES series.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 185,
+        "end": 315,
+        "raw": "Collects TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #16–22 and issues #76–84 of the ongoing TEENAGE MUTANT NINJA TURTLES series."
+      }
+    },
+    {
+      "id": "sample-5-1230",
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 13",
+      "url": "https://www.amazon.com/dp/B08P2CDGQG",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "It's all been leading up to this! A massive showdown on the streets of the Big Apple! As New York gets torn apart by different factions, mutant and human alike, Karai returns and the future of the TMNT—in fact all of NYC—comes down to a final negotiation between Splinter and Karai. It's the shocking culmination of nearly a decade of storytelling as our heroes face their darkest hour against a multitude of enemies bent on their total destruction. Find out how a City at War will change the world forever! Plus, abandon all hope... as the most infamous villain in the Turtles' universe, Shredder, returns! Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 608,
+        "end": 761,
+        "raw": "Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series."
+      }
+    },
+    {
+      "id": "sample-5-790",
+      "title": "King In Black Omnibus (King In Black (2020-2021))",
+      "url": "https://www.amazon.com/dp/B0B6Q6JQFC",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Collects King In Black #1-5; King In Black: Immortal Hulk, Iron Man/Doctor Doom, Black Knight, Marauders, Black Panther, Captain America, Wiccan And Hulkling, Spider-Man, Scream And Ghost Rider; King In Black: Gwenom vs. Carnage #1-3; King In Black: Namor #1-5; King In Black: Planet Of The Symbiotes #1-3; King In Black: Return Of The Valkyries #1-4; King In Black: Thunderbolts #1-3; Symbiote Spider-Man: King In Black #1-5; Black Cat (2020) #1-3; Daredevil (2019) #26-27; Deadpool (2019) #10; Fantastic Four (2018) #29-30; Guardians Of The Galaxy (2020) #10; Miles Morales: Spider-Man #23; S.W.O.R.D. (2020) #2-4; Savage Avengers (2019) #17-19; Spider-Woman (2020) #7-8; The Union #1-2; Venom (2018) #31-34; And King In Black Handbook.\nDarkness reigns in the Marvel Universe! After a campaign of terror across the galaxy, Knull - ancient and malevolent god of symbiotes - reaches Earth with an endless army of symbiote dragons at his command! The King in Black is a force unlike any ever faced by Venom and the rest of the planet's heroes - but now Spider-Man, the Avengers, the Hulk, the Fantastic Four, the Sub-Mariner and more must battle an endless wave of darkness! Outgunned and badly outnumbered, can anyone possibly survive Knull's symbiotic onslaught? Or will they all be forced to bow to the King in Black? Featuring every epic chapter in one monstrous, black-hearted volume!\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 235,
+        "end": 262,
+        "raw": "King In Black: Namor #1-5"
+      }
+    },
+    {
+      "id": "sample-5-254",
+      "title": "Batman: Road to No Man's Land Vol. 2 (Batman: No Man's Land)",
+      "url": "https://www.amazon.com/dp/B01GKGB7T0",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "A devastating earthquake has left Gotham City in ruins, and the government is getting close to completely cutting it off from the rest of civilization. But there's one man who's vowed to save Gotham from whatever foe it comes up against, and now Bruce Wayne must put aside his life as Batman and put on his suit and tie as he takes his fight for the fate of Gotham to Washington, D.C. Lurking in the shadows is the mysterious Nicholas Scratch who will do everything in his power to ensure Gotham becomes a No Man's Land!\nIn this, the final act before the beginning of the classic event, \"No Man's Land,\" Bruce Wayne, Robin, Nightwing and many others try to save their city from destruction once again-this time at the hands of the U.S. government.\nBATMAN: ROAD TO NO MAN'S LAND VOL. 2 collects for the first time the complete \"Road to No Man's Land\" storyline that rocked the Bat family and leads into the hit crossover event No Man's Land, Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 941,
+        "end": 1126,
+        "raw": "Reprinting DETECTIVE COMICS #727-729, BATMAN #560-562, BATMAN: SHADOW OF THE BAT #80-82, THE BATMAN CHRONICLES #15, AZRAEL #47-50, and BATMAN: NO MAN'S LAND SECRET FILES AND ORIGINS #1."
+      }
+    },
+    {
+      "id": "sample-5-442",
+      "title": "Dead Boy Detectives by Toby Litt & Mark Buckingham (The Dead Boy Detectives (2013-2014))",
+      "url": "https://www.amazon.com/dp/B0C7RKH6X6",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Edwin Paine and Charles Roland have a lot in common - they’re both English schoolboys who love a good detective story, and they’ve been known to dabble in mystery-solving themselves. They’re also both dead, a condition which has proven to be less of a hindrance than one might think. From the pages of THE SANDMAN, Neil Gaiman's intrepid dead schoolboys head back to the horror that is St. Hilarions School; the place where they both were murdered. This volume collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 461,
+        "end": 629,
+        "raw": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1."
+      }
+    },
+    {
+      "id": "sample-5-1097",
+      "title": "Star Wars Legends Epic Collection: The Newspaper Strips Vol. 1",
+      "url": "https://www.amazon.com/dp/B01MU9S9CM",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981.\nClassic tales of Star Wars, from the funny pages to your bookshelves! Beginning in 1979, fans got a daily dose of a galaxy far, far away in their newspapers — now, with this volume, you can savor those stories without the 24-hour wait! C-3PO chronicles the adventures of the Rebel heroes! Luke takes his chances on a gambler's world! A sojourn on Tatooine is anything but peaceful! Princess Leia is put to work as an Imperial servant! Han Solo makes another Kessel Run! Han and Chewie get more than they bargained for on a job! And Boba Fett makes his comic debut!\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 0,
+        "end": 255,
+        "raw": "Collects Star Wars Special: The Constancia Affair, Classic Star Wars: The Early Adventures #1-9, Classic Star Wars: Han Solo at Stars' End #1-3, Classic Star Wars #1-3, material from Classic Star Wars #4 and Star Wars newspaper strips 3/11/1979-7/26/1981."
+      }
+    },
+    {
+      "id": "sample-5-1225",
+      "title": "Teenage Mutant Ninja Turtles: The Armageddon Game—Opening Moves",
+      "url": "https://www.amazon.com/dp/B0BFFVNVBM",
+      "sourceGeneration": 5,
+      "blocks": [
+        {
+          "selector": "#bookDescription_feature_div",
+          "text": "The TMNT have faced enemy ninjas, government agents, fellow mutants, and alien armies, but now they must confront the machinations of an actual demi-god! Untangle the maze of secrets and treachery on the road to The Armageddon Game! One of the Turtles' most enigmatic foes, the Rat King, is finally bringing his long-simmering plan to fruition, after years of quiet preparations. Soon, Leonardo, Michelangelo, Donatello, and Raphael—under the leadership of the Shredder—will embark on a dangerous quest to find allies against Rat King’s trio of terror: LeatherKrang, Baxter Stockman, and Madame Null. But, before the game can truly begin, discover the histories of the Rat King, Kitsune, and the rest of the Pantheon, witness their previous encounters with the TMNT, and understand their connection to the recently resurrected Shredder. Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2.\nRead more"
+        }
+      ],
+      "selectedSource": {
+        "block": 0,
+        "start": 837,
+        "end": 1046,
+        "raw": "Collects TMNT: The Armageddon Game Pre-Game stories \"Kingdom of Rats Prelude,\" Teenage Mutant Ninja Turtles #84, and the 2020 and 2021 TMNT Annuals, as well as TMNT: The Armageddon Game—Opening Moves #1 and 2."
+      }
+    }
+  ]
+}

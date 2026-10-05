@@ -1,5 +1,7 @@
 # Kindle independent secondary evidence: offline audit and review-only access
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Completed 2026-10-05. Stable source **5**, parser **4**, filter **1**, schema **12**, manifest interpretation **1**. No Amazon requests or source refreshes.
 
 ## 1. Executive result
@@ -14,11 +16,11 @@ Zero network acquisition. The original export and installed extension storage we
 
 Evidence and reproducible tools:
 
-- [Frozen population and exact primary/secondary traces](kindle-independent-secondary-frozen.json).
-- [Decision committed before production changes](kindle-independent-secondary-decision.md).
-- [Deterministic captured/corpus replay](kindle-independent-secondary-replay.json).
-- [Private full-export safety results](kindle-independent-secondary-safety.json).
-- [Frozen baseline loader](../scripts/independent-secondary-evidence.mjs), [freeze tool](../scripts/freeze-independent-secondary.mjs), [replay tool](../scripts/audit-independent-secondary.mjs), [safety tool](../scripts/check-independent-secondary-safety.mjs).
+- [Frozen population and exact primary/secondary traces](../development/artifacts-and-audits.md#generated-output).
+- [Decision committed before production changes](../development/artifacts-and-audits.md#generated-output).
+- [Deterministic captured/corpus replay](../development/artifacts-and-audits.md#generated-output).
+- [Private full-export safety results](../development/artifacts-and-audits.md#generated-output).
+- [Frozen baseline loader](../../scripts/independent-secondary-evidence.mjs), [freeze tool](../../scripts/freeze-independent-secondary.mjs), [replay tool](../../scripts/audit-independent-secondary.mjs), [safety tool](../../scripts/check-independent-secondary-safety.mjs).
 
 ## 2. Frozen secondary-evidence population
 
@@ -264,8 +266,8 @@ The complete GL suite needed subprocess permission for its existing packaging ch
 Reproduction from the GL repository:
 
 ```powershell
-node scripts/audit-independent-secondary.mjs 'tests/fixtures/mock-backup.json'
-node scripts/check-independent-secondary-safety.mjs 'tests/fixtures/mock-backup.json'
+node scripts/audit-independent-secondary.mjs '<path-to-backup>'
+node scripts/check-independent-secondary-safety.mjs '<path-to-backup>'
 npm test
 npm run test:browser:release
 npm run test:browser:firefox
@@ -287,7 +289,7 @@ First full comparison/trace construction took 416.76 ms, second 128.91 ms; these
 
 Production: `src/lib/kindle-evidence-review.js` (separate bounded derived review view), `src/ui/contents-editor.js` (claim visibility/loading), `scripts/runtime-files.json` (package the new module).
 
-Tests: `tests/fixtures/kindle-manifest-before-independent.snapshot.txt`, `tests/fixtures/kindle-independent-evidence.json`, `tests/kindle-independent-evidence-fixture.js`, `tests/kindle-independent-evidence.js`, `tests/run.js`, `tests/importers-fixture.js`.
+Tests: `tests/fixtures/kindle/kindle-manifest-before-independent.snapshot.txt`, `tests/fixtures/kindle/kindle-independent-evidence.json`, `tests/kindle-independent-evidence-fixture.js`, `tests/kindle-independent-evidence.js`, `tests/run.js`, `tests/importers-fixture.js`.
 
 Audit/safety: `scripts/independent-secondary-evidence.mjs`, `scripts/freeze-independent-secondary.mjs`, `scripts/audit-independent-secondary.mjs`, `scripts/check-independent-secondary-safety.mjs`; this report, decision MD, and frozen/replay/safety JSON artifacts.
 

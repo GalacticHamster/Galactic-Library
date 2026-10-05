@@ -1,6 +1,7 @@
+import {writeArtifact} from './audit-artifacts.mjs';
 // Offline definition. Run before capture; never makes requests or edits backups.
-import {readFile,writeFile} from 'node:fs/promises';
-import {loadCorpus,hash} from './contents-parser-corpus.mjs';
+import {readFile} from 'node:fs/promises';
+import {loadCorpus,hash,historicalParser4} from './contents-parser-corpus.mjs';
 const selections=[
  [4,'historical early clause','Book One: plot-only old snippet; family control for the later collected range.'],
  [6,'historical early clause','Book Two: same misleading plot clause; independently test later static evidence.'],
@@ -29,15 +30,15 @@ const selections=[
  [1225,'annual and named prelude','TMNT Opening Moves mixes quoted prelude, annual years and issues; inspect structural fidelity.'],
 ];
 const corpus=await loadCorpus(process.argv[2]);
-const audit=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-audit-v4.json',import.meta.url),'utf8'));
+const audit=await historicalParser4(corpus);
 const rows=selections.map(([id,category,reason],index)=>{
  const row=corpus.rows.find(r=>r.auditId===id),a=audit.rows.find(r=>r.auditId===id);
  if(!row||!a)throw Error('Missing audit record '+id);
  return {ordinal:index+1,auditId:id,itemId:row.item.id,providerItemId:row.item.providerItemId,asin:new URL(row.item.metadata.detailUrl).pathname.split('/').at(-1),title:row.title,sourceUrl:row.item.metadata.detailUrl,extractorVersion:row.sourceGeneration,parserVersion:4,outcome:a.after.outcome,savedStatementLength:row.statement.length,proposalCount:a.after.entries.length,unresolved:a.after.unparsed,category,reason,statement:row.statement,parseInput:row.input};
 });
 if(rows.length!==25||new Set(rows.map(r=>r.sourceUrl)).size!==25)throw Error('Invalid sample');
-const ledger={frozenAt:new Date().toISOString(),sourceHash:corpus.sourceHash,parserAuditHash:hash(await readFile(new URL('../docs/kindle-contents-parser-audit-v4.json',import.meta.url))),populationHash:hash(rows.map(r=>r.sourceUrl).join('\n')),planned:25,requestsMade:0,definition:'Purposive diverse source-quality sample, not a representative prevalence estimate.',rows};
-await writeFile(new URL('../docs/kindle-source-capture-sample.json',import.meta.url),JSON.stringify(ledger,null,2)+'\n');
+const ledger={frozenAt:new Date().toISOString(),sourceHash:corpus.sourceHash,parserFixtureHash:hash(await readFile(new URL('../tests/fixtures/kindle/contents-parser-v4.snapshot.txt',import.meta.url))),populationHash:hash(rows.map(r=>r.sourceUrl).join('\n')),planned:25,requestsMade:0,definition:'Purposive diverse source-quality sample, not a representative prevalence estimate.',rows};
+await writeArtifact('kindle-source-capture-sample.json',JSON.stringify(ledger,null,2)+'\n');
 const cell=s=>String(s).replace(/\|/gu,'\\|').replace(/\s+/gu,' ');
-await writeFile(new URL('../docs/kindle-source-capture-sample.md',import.meta.url),`# Frozen Kindle source-capture sample\n\nFrozen ${ledger.frozenAt}, before any network request. **25 distinct product URLs**, parser v4 throughout. This purposive sample cannot estimate whole-library prevalence. Exact URL population SHA-256: \`${ledger.populationHash}\`. Source backup SHA-256: \`${ledger.sourceHash}\`. JSON contains exact old evidence and parser input.\n\n| # / audit | ASIN | Title | Source generation / parser | Outcome | Saved chars / proposals | Unresolved evidence | Category and reason |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n`+rows.map(r=>`| ${r.ordinal} / ${r.auditId} | ${r.asin} | ${cell(r.title)} | ${r.extractorVersion} / 4 | ${r.outcome} | ${r.savedStatementLength} / ${r.proposalCount} | ${cell(r.unresolved.join('; ')||'None')} | ${cell(r.category+': '+r.reason)} |`).join('\n')+'\n');
+await writeArtifact('kindle-source-capture-sample.md',`# Frozen Kindle source-capture sample\n\nFrozen ${ledger.frozenAt}, before any network request. **25 distinct product URLs**, parser v4 throughout. This purposive sample cannot estimate whole-library prevalence. Exact URL population SHA-256: \`${ledger.populationHash}\`. Source backup SHA-256: \`${ledger.sourceHash}\`. JSON contains exact old evidence and parser input.\n\n| # / audit | ASIN | Title | Source generation / parser | Outcome | Saved chars / proposals | Unresolved evidence | Category and reason |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n`+rows.map(r=>`| ${r.ordinal} / ${r.auditId} | ${r.asin} | ${cell(r.title)} | ${r.extractorVersion} / 4 | ${r.outcome} | ${r.savedStatementLength} / ${r.proposalCount} | ${cell(r.unresolved.join('; ')||'None')} | ${cell(r.category+': '+r.reason)} |`).join('\n')+'\n');
 console.log(JSON.stringify({planned:25,populationHash:ledger.populationHash,requestsMade:0}));

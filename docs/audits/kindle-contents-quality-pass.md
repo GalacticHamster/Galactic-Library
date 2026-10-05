@@ -1,5 +1,7 @@
 # Kindle contents-quality implementation pass
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Completed October 4, 2026 (America/New_York), against the corpus and classifications in [the committed quality audit](kindle-contents-quality-audit.md), baseline commit `092bce4`. This is a focused discovery-quality change. Existing ownership, identity, canonical grouping, ordinary matching, HB/FAN integration, database schema and discovery eligibility remain unchanged.
 
 ## Results
@@ -8,7 +10,7 @@ The new contextual filter rejects **249 of 330 known false extractions (75.45%)*
 
 These are measurements against the audit's rule-assisted, record-weighted labels, not independently verified Amazon manifests. A full parse means the saved statement was structurally accounted for; it does not establish that the entire product description was captured or that the contents are verified. The user's subsequent **100 Bullets hydration observation** materially changes how terminal `Read More` should be interpreted; see the dedicated section below.
 
-The source backup was read locally, never modified, and no Amazon requests were made. The complete machine-readable measurement is [kindle-contents-quality-pass-results.json](kindle-contents-quality-pass-results.json).
+The source backup was read locally, never modified, and no Amazon requests were made. The complete machine-readable measurement is [kindle-contents-quality-pass-results.json](../development/artifacts-and-audits.md#generated-output).
 
 ## Source and reproduction
 
@@ -22,7 +24,7 @@ The source backup was read locally, never modified, and no Amazon requests were 
 Run from GalacticLibrary, supplying the same backup:
 
 ```powershell
-node scripts/measure-contents-quality.mjs 'tests/fixtures/mock-backup.json'
+node scripts/measure-contents-quality.mjs '<path-to-backup>'
 ```
 
 The script obtains labels from the committed audit ledger, checks the source hash, processes all 1,520 statements, and exercises the actual storage writer against an in-memory clone in batches of 100. It asserts unchanged source evidence, lookup dates/generation, ownership, canonical data and reviews, zero requests, 16 database writes and no remaining stale local parses. Its output contains aggregate statistics and audit ordinals, not account IDs or purchase metadata. The regression fixture file contains 201 unique public-description examples, including every known false-full, structural-full, Read-more target and excerpt-risk statement.
@@ -42,11 +44,11 @@ all eligible Kindle books
   -> explicit user review, if desired
 ```
 
-[contents-quality.js](../src/lib/contents-quality.js) adds a small, versioned assessment stage. Numbered units, work terminology, collection claims and bounded named enumerations provide positive evidence. Feature/topic/credit/plot/promotion contexts provide negative evidence. Missing subjects, incomplete fragments, isolated person-like lists and ambiguous inclusion prose remain uncertain. Rules apply to context and syntax; they do not depend on a franchise or specific product title. Words such as `includes`, `contains` and `comprises` remain supported. A collection-looking parent title alone cannot establish containment.
+[contents-quality.js](../../src/lib/contents-quality.js) adds a small, versioned assessment stage. Numbered units, work terminology, collection claims and bounded named enumerations provide positive evidence. Feature/topic/credit/plot/promotion contexts provide negative evidence. Missing subjects, incomplete fragments, isolated person-like lists and ambiguous inclusion prose remain uncertain. Rules apply to context and syntax; they do not depend on a franchise or specific product title. Words such as `includes`, `contains` and `comprises` remain supported. A collection-looking parent title alone cannot establish containment.
 
 The audit's false families motivating the filter were: instructional/features/other non-work prose (98), plot/warnings (94), recipe/ingredient features (31), catalogue promotion (25), art/maps/design extras (24), contributor lists (21), delivery features (14), front/back/bonus matter (12), awards/marketing (6), and travel/places (5). These describe dominant contexts, not a prohibition on individually identified maps, introductions or stories ever being contained units.
 
-[contents.js](../src/lib/contents.js) applies the improved grammar only through `proposeContentsForReview`. The ordinary `proposeContents` query/matching grammar and reviewed contents ownership index are unchanged. Unverified names never become ordinary owned titles.
+[contents.js](../../src/lib/contents.js) applies the improved grammar only through `proposeContentsForReview`. The ordinary `proposeContents` query/matching grammar and reviewed contents ownership index are unchanged. Unverified names never become ordinary owned titles.
 
 ### Cleanup and source preservation
 

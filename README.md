@@ -1,5 +1,7 @@
 # Galactic Library
 
+See the [documentation index](docs/README.md) for current user guides, architecture, development instructions and selected historical audits.
+
 Galactic Library is a Manifest V3 Chrome and Firefox desktop extension for a browser-local index of digital media ownership. Humble is a first-class provider here; this project remains independent from Humble Comic Library and may later provide that extension with a narrow ownership lookup.
 
 ## Current foundation
@@ -44,7 +46,7 @@ To import Humble purchases, select **Open signed-in Humble purchases**. **Quick 
 
 ## Quick updates
 
-In **Settings**, **Treat everything as owned** overrides ownership uncertainty for display and matching. Each library also has its own checkbox. The original ownership status, media type and provenance remain intact, and turning the checkbox off restores normal ownership rules. Title and edition checks still apply. Choices are included in backups; refresh open HB/FAN bundle pages after changing them. See [ownership overrides](docs/ownership-overrides.md).
+In **Settings**, **Treat everything as owned** overrides ownership uncertainty for display and matching. Each library also has its own checkbox. The original ownership status, media type and provenance remain intact, and turning the checkbox off restores normal ownership rules. Title and edition checks still apply. Choices are included in backups; refresh open HB/FAN bundle pages after changing them. See [ownership overrides](docs/user-guide/ownership-overrides.md).
 
 Quick updates merge newly discovered records and therefore do not infer that an old entitlement has disappeared. Use a provider's **Full rescan** when you need removals reconciled or after an importer upgrade.
 
@@ -72,7 +74,7 @@ For comic/manga classification, a book has **Comic/manga evidence** only when a 
 
 On the signed-in Kindle library page, **Find contained issues** visits only unscanned confirmed Kindle comic/manga candidates. It reads Amazon product-description fields and stores the exact sentence beginning **Collects** when present; no issue list is inferred from a title, author, or description that lacks that explicit wording. Each successfully read page is recorded locally even when it has no Collects statement, so later runs continue with unscanned candidates. A product page that Amazon returns as 404—common for retired Comixology listings—is marked unavailable so it is not retried. The user can pause between pages; temporary Amazon 429/5xx/network failures are retried with backoff and summarized at the end, while CAPTCHA responses stop the scan without marking later candidates as read.
 
-Contents are usually product-page information rather than library metadata. After syncing, use **Find contents** in the Kindle panel: every Kindle book with a supported Amazon product URL is eligible, regardless of comic classification. Choose normal scan, retry, explicit rescan, or local reparse. Discovery saves original statements and editable proposals, never verified contents or ownership. See [Kindle contents discovery](docs/kindle-contents-discovery.md) for lifecycle rules and validation results.
+Contents are usually product-page information rather than library metadata. After syncing, use **Find contents** in the Kindle panel: every Kindle book with a supported Amazon product URL is eligible, regardless of comic classification. Choose normal scan, retry, explicit rescan, or local reparse. Discovery saves original statements and editable proposals, never verified contents or ownership. See [Kindle contents discovery](docs/user-guide/kindle-contents-discovery.md) for current lifecycle rules.
 
 ## Storage operation ordering
 
@@ -108,7 +110,7 @@ To load in Chrome, open `chrome://extensions`, enable **Developer mode**, choose
 
 There is no backend, analytics, account, cloud sync, or password collection. Provider data will remain in `chrome.storage.local` until the user clears it, restores a backup, or uninstalls the extension. Galactic Library requests Chrome's `unlimitedStorage` permission because a complete multi-provider libraryâ€”especially a long Humble purchase history with local provenanceâ€”can exceed Chrome's default 10 MB local-storage quota. This permission expands only the browser-local storage available to this extension; it does not transmit data or grant access to other sites. The implementation will access provider sites only through a tab where the user is already signed in.
 
-Galactic Library has a deliberately narrow companion API: `PING`, aggregate provider status/capabilities, and batched `MATCH_ITEMS` with exact matches, related Possible candidates, reviewed relationships and contents coverage. It never exposes raw library records or purchase-bearing provider IDs. Pair companions by entering their Chrome extension IDs or stable Firefox add-on IDs under **Companion extension links**; each companion also needs Galactic Library's ID. See the [API contract](docs/companion-api.md) for request fields, coverage semantics and limits. HB and Fanatical consume Possible candidates, reviewed contents and entitlement reminders.
+Galactic Library has a deliberately narrow companion API: `PING`, aggregate provider status/capabilities, and batched `MATCH_ITEMS` with exact matches, related Possible candidates, reviewed relationships and contents coverage. It never exposes raw library records or purchase-bearing provider IDs. Pair companions by entering their Chrome extension IDs or stable Firefox add-on IDs under **Companion extension links**; each companion also needs Galactic Library's ID. See the [API contract](docs/architecture/companion-api.md) for request fields, coverage semantics and limits. HB and Fanatical consume Possible candidates, reviewed contents and entitlement reminders.
 
 ## Duplicate review
 
@@ -142,7 +144,7 @@ Run `npm run test:browser` for the actual options-page checks using synthetic da
 
 Run `node tests/browser.js --importers` to exercise all eleven actual importer panels through full and quick sync controls with direct content-script storage access denied. Signed-in provider fetches are synthetic; Epic has only a full scan, and Fandango checks its final resumable View All stage. Worker tests additionally check provider/sender authorization and storage initialization failure. Chrome 102 or newer is required for trusted-context storage access controls.
 
-Imports and restores now use [central metadata validation](docs/metadata-validation.md): provider-specific fields, bounded creators/identifiers/contents, sanitized source URLs, validated timestamps and narrow enrichment schemas. Unsupported fields are removed; malformed supported fields reject the operation without partially saving it. Provider imports cannot inject approved enrichment or verification timestamps. Existing supported enrichment and record references survive resync.
+Imports and restores now use [central metadata validation](docs/architecture/metadata-validation.md): provider-specific fields, bounded creators/identifiers/contents, sanitized source URLs, validated timestamps and narrow enrichment schemas. Unsupported fields are removed; malformed supported fields reject the operation without partially saving it. Provider imports cannot inject approved enrichment or verification timestamps. Existing supported enrichment and record references survive resync.
 
 To undo an incorrect edition group, expand **Ownership evidence and relationships** and choose **Separate this record into its own edition**. The record and its enrichment/contents stay intact; its separation survives resync and backup restore. Related editions remain Possible in companions. **Undo edition separation** removes that separation while respecting any other reviews. **Same work** now also prevents automatic edition merging; **Different works** continues to block direct and indirect grouping. Database schema 3 preserves separations and accepts older schema 1/2 backups; older extension versions cannot restore schema 3 backups.
 
@@ -157,12 +159,12 @@ Complete provider scans archive missing records instead of deleting their purcha
 
 In **Book information**, each lookup/import tool explains its purpose, inputs, automatic saves or review requirements, and a practical example under **How this works**. Candidate previews show provider details, the current saved source, and the suggested fields before approval. **Sources and undo** compares saved evidence and restores earlier selections; reviewed contents have their own undo control. Publisher-page proposals are entered manually and do not fetch the URL.
 
-Comic/manga enrichment now includes local ComicInfo.xml/EPUB/OPF imports, cited publisher proposals, Open Library ISBN edition lookup and an enrichment workbench with paged queues, batch confirmation, retry, dismissal and undo. Metadata files stay in the browser; source proposals require review and never establish ownership or verified collected contents by themselves. See [comic/manga enrichment and source evaluation](docs/comic-manga-enrichment.md).
+Comic/manga enrichment now includes local ComicInfo.xml/EPUB/OPF imports, cited publisher proposals, Open Library ISBN edition lookup and an enrichment workbench with paged queues, batch confirmation, retry, dismissal and undo. Metadata files stay in the browser; source proposals require review and never establish ownership or verified collected contents by themselves. See [comic/manga enrichment and source evaluation](docs/user-guide/comic-manga-enrichment.md).
 
-Library tools now include Unicode title aliases, central software support, Fanatical purchase occurrences, dated ownership/receipt review, sync health/cancellation, optional entitlement reminders and private reading progress/orders. See [library tools](docs/library-tools.md) for behavior and backup compatibility, and [release packaging](docs/release-packaging.md) for reproducible distribution and packaged browser checks.
+Library tools now include Unicode title aliases, central software support, Fanatical purchase occurrences, dated ownership/receipt review, sync health/cancellation, optional entitlement reminders and private reading progress/orders. See [library tools](docs/user-guide/library-tools.md) for behavior and backup compatibility, and [release packaging](docs/development/release-packaging.md) for reproducible distribution and packaged browser checks.
 
 ## Firefox desktop
 
 Run `npm run package:firefox` to build `dist/GalacticLibrary-0.1.0-firefox.zip` for Firefox 140+. Extract it and load its manifest from `about:debugging#/runtime/this-firefox`. This is a temporary development install; permanent distribution requires signing. Import a backup to move your Chrome library into Firefox.
 
-The stable ID is `galactic-library@galactichamster.com`. Allow the HB and Fanatical IDs in GL options and enter GL's ID in each companion. No native messaging helper is needed. See [Firefox setup and verification](docs/firefox.md) for IDs, privacy and test coverage.
+The stable ID is `galactic-library@galactichamster.com`. Allow the HB and Fanatical IDs in GL options and enter GL's ID in each companion. No native messaging helper is needed. See [Firefox setup and verification](docs/user-guide/firefox.md) for IDs, privacy and test coverage.

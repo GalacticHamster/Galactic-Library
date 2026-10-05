@@ -1,3 +1,4 @@
+import {outputPath} from './audit-artifacts.mjs';
 // Offline control against actual Chrome storage in a disposable extension/profile.
 // No Amazon requests, user browser profile, source-export writes or runtime edits.
 import {spawn} from 'node:child_process';
@@ -9,8 +10,9 @@ import {setTimeout as pause} from 'node:timers/promises';
 import {createRelease} from './release.mjs';
 import {chromePipe} from '../tests/native-protocol.mjs';
 
-const [file,countText='50',output]=process.argv.slice(2),count=Number(countText);
+const [file,countText='50',requestedOutput]=process.argv.slice(2),count=Number(countText);
 if(!file||!Number.isInteger(count)||count<20||count>50||process.argv.length>5)throw Error('Usage: node scripts/measure-contents-browser.mjs BACKUP_JSON [20..50] [REPORT_JSON]');
+const output=requestedOutput?await outputPath(requestedOutput,'kindle-contents-browser-control.json'):await outputPath(undefined,'kindle-contents-browser-control.json');
 if(output&&resolve(output)===resolve(file))throw Error('The report must not replace the source backup.');
 const bytes=await readFile(file),hash=value=>createHash('sha256').update(value).digest('hex');
 const input=JSON.parse(bytes.toString('utf8'));

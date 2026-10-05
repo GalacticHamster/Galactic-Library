@@ -1,13 +1,15 @@
+import {historicalParser4} from './contents-parser-corpus.mjs';
+import {writeArtifact} from './audit-artifacts.mjs';
 // Complete offline comparison; production acquisition is never invoked.
 import assert from 'node:assert/strict';
-import {readFile,writeFile} from 'node:fs/promises';
+
 import {wholeManifestEvidence,baselineManifest} from './whole-manifest-evidence.mjs';
 import {hash} from './contents-parser-corpus.mjs';
 import * as current from '../src/lib/kindle-manifest.js';
 import {proposeContentsForReview,contentKey} from '../src/lib/contents.js';
 let requests=0;globalThis.fetch=()=>{requests++;throw Error('Network forbidden');};
 const {corpus,observations,savedByUrl}=await wholeManifestEvidence(process.argv[2]),{module:old,hash:baselineHash}=await baselineManifest();
-const audit=JSON.parse(await readFile(new URL('../docs/kindle-contents-parser-audit-v4.json',import.meta.url),'utf8'));
+const audit=await historicalParser4(corpus);
 const key=e=>contentKey(e)+':'+e.completeness;
 const assessment=(p,q)=>({before:{outcome:p.outcome,proposals:p.entries.length,unresolved:p.unparsed},after:{outcome:q.outcome,proposals:q.entries.length,unresolved:q.unparsed},added:q.entries.filter(e=>!new Set(p.entries.map(key)).has(key(e))),removed:p.entries.filter(e=>!new Set(q.entries.map(key)).has(key(e))),changed:JSON.stringify(p.entries)!==JSON.stringify(q.entries)||p.outcome!==q.outcome||JSON.stringify(p.unparsed)!==JSON.stringify(q.unparsed)});
 function replay(){
@@ -51,7 +53,7 @@ const bench=module=>{const start=performance.now();for(const r of observations){
 const oldMs=[],newMs=[];for(let n=0;n<7;n++){oldMs.push(bench(old));newMs.push(bench(current));}
 const median=list=>[...list].sort((a,b)=>a-b)[Math.floor(list.length/2)];
 const result={networkRequests:requests,baselineHash,sourceHash:corpus.sourceHash,interpretationVersion:1,sourceGeneration:5,parserVersion:4,filterVersion:1,schema:12,deterministic:true,captured:sums(rows),uniqueCapturedUrls:new Set(observations.filter(r=>r.url).map(r=>r.url)).size,sourceObservations:observations.filter(r=>r.url).length,fixtureObservations:observations.filter(r=>!r.url).length,corpus:sums(corpusRows),parser4HistoricalObjectsUnchanged:1520,parentObservations:rows.filter(r=>r.parentCount).length,childWindowsPerManifest:rows.filter(r=>r.parentCount).map(r=>({observation:r.id,children:r.childrenPerParent})),equivalentChildDuplicates:rows.reduce((n,r)=>n+r.equivalentChildDuplicates,0),independentSecondariesNotCombined:rows.reduce((n,r)=>n+r.rejectedIndependentSecondaries,0),performance:{firstReplayMs:firstMs,secondReplayMs:secondMs,warmRuns:7,baselineMedianMs:median(oldMs),currentMedianMs:median(newMs)},suspiciousCategories:Object.fromEntries([...new Set(suspicious.map(s=>s.classification))].map(c=>[c,suspicious.filter(s=>s.classification===c).length])),suspicious,rows,corpusRows};
-await writeFile(new URL('../docs/kindle-whole-manifest-audit.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
+await writeArtifact('kindle-whole-manifest-audit.json',JSON.stringify(result,null,2)+'\n');
 const cell=s=>String(s).replace(/\|/gu,'\\|').replace(/\s+/gu,' ');
-await writeFile(new URL('../docs/kindle-whole-manifest-suspicious.md',import.meta.url),'# Full-primary / secondary-evidence audit\n\nEvery non-filtered secondary of a previously Full primary is included, not automatically merged. Counts are observations (the same record may occur in multiple source generations). Classifications are source-scope assessments; unknown identity is not inferred.\n\n| Observation | Title | Secondary (literal) | Classification |\n| --- | --- | --- | --- |\n'+suspicious.map(s=>`| ${s.observation} | ${cell(s.title)} | ${cell(s.secondary)} | ${s.classification} |`).join('\n')+'\n');
+await writeArtifact('kindle-whole-manifest-suspicious.md','# Full-primary / secondary-evidence audit\n\nEvery non-filtered secondary of a previously Full primary is included, not automatically merged. Counts are observations (the same record may occur in multiple source generations). Classifications are source-scope assessments; unknown identity is not inferred.\n\n| Observation | Title | Secondary (literal) | Classification |\n| --- | --- | --- | --- |\n'+suspicious.map(s=>`| ${s.observation} | ${cell(s.title)} | ${cell(s.secondary)} | ${s.classification} |`).join('\n')+'\n');
 console.log(JSON.stringify({...result,rows:undefined,corpusRows:undefined,suspicious:undefined},null,2));

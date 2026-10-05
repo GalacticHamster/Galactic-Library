@@ -9,7 +9,7 @@ import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {validateEnrichment} from '../src/lib/metadata-validation.js';
 
-const fixtures=JSON.parse(readFileSync(new URL('./kindle-contents-quality-fixtures.json',import.meta.url),'utf8')).fixtures;
+const fixtures=JSON.parse(readFileSync(new URL('./fixtures/kindle/kindle-contents-quality-fixtures.json',import.meta.url),'utf8')).fixtures;
 const parse=statement=>proposeContentsForReview(statement,'A collection');
 const byId=id=>fixtures.find(row=>row.auditId===id);
 const scope=proposal=>[proposal.entries.filter(e=>e.completeness==='full').length,proposal.entries.filter(e=>e.completeness==='excerpt').length];

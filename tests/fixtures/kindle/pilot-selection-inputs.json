@@ -1,0 +1,467 @@
+{
+  "purpose": "77 exact historical selected snippets/normalized parser inputs; prevents reranking the historical corpus during parser comparison.",
+  "selections": [
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01D2052NE",
+      "statement": "Collects 100 BULLETS #81-100.",
+      "parserInput": "Collects 100 BULLETS #81-100",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B018YP1STO",
+      "statement": "Collects 100 BULLETS #59-80.",
+      "parserInput": "Collects 100 BULLETS #59-80",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00PSSEL04",
+      "statement": "including how to:Clean copper pans, using buttermilk and saltMake real sourdough bread the way the pioneers didFight wrinkles and create kissable lipsUse natural ingredients to repair your hairCreate your own unique perfumeOrganize common space in your homeUse ivory soap for polishing silver and insect controlSafely separate drinking glasses that have been stuck togetherAnd more!With 1,001 Old-Time Household Hints on your kitchen table or nightstand, you're always in the good company of an old-timer who's ready to dispense a helpful hint, encouraging word, or sage secret at the turn of a page.310 color photographs Read more",
+      "parserInput": "including how to:Clean copper pans, using buttermilk and saltMake real sourdough bread the way the pioneers didFight wrinkles and create kissable lipsUse natural ingredients to repair your hairCreate your own unique perfumeOrganize common space in your homeUse ivory soap for polishing silver and insect controlSafely separate drinking glasses that have been stuck togetherAnd more!With 1,001 Old-Time Household Hints on your kitchen table or nightstand, you're always in the good company of an old-timer who's ready to dispense a helpful hint, encouraging word, or sage secret at the turn of a page.310 color photographs Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0FKKYVDS1",
+      "statement": "Collects Absolute Batman #1-6 Read more",
+      "parserInput": "Collects Absolute Batman #1-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0064W65N4",
+      "statement": "Collects American Vampire #1-5 Read more",
+      "parserInput": "Collects American Vampire #1-5 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00B14FN9W",
+      "statement": "Collects issues #0, 7-11, Animal Man Annual #1 Read more",
+      "parserInput": "Collects Animal Man (2011-2014) issues #0, 7-11, Animal Man Annual #1 Read more",
+      "binding": "explicit-product-series-volume-title"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0096YP52E",
+      "statement": "Collects Aquaman #1-6 Read more",
+      "parserInput": "Collects Aquaman #1-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B006MHUK32",
+      "statement": "including TVs and appliancesLearn techniques for handling time delays and time measurementApply advanced coding and memory handling techniques Read more",
+      "parserInput": "including TVs and appliancesLearn techniques for handling time delays and time measurementApply advanced coding and memory handling techniques Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B009L5BLYO",
+      "statement": "include? - Countless pictures, all taken by the author, a native of the city - Maps to ensure you get around with ease - Insider tips to get the most out of your trip - Author contact information for more recommendations Itinerary Table of Contents - How to Use this Guide - The 3-Day Itinerary - Transportation Tips - Restaurants - Hotels - Money - Getting into the City - Useful Local Phrases - Nightlife - About the Author Atlanta Highlights Included - Getting up close and personal with the fish at the world's largest aquarium - Tasting the city's local beverages - Eating dinner with a Motown legend - Shopping in Atlanta's \"alternative\" neighborhood - Watching America's favorite pastime - Dining at America's largest drive-in Who is this Atlanta travel guide for? - Business travelers - Families - Honeymooners - Backpackers Read more",
+      "parserInput": "include? - Countless pictures, all taken by the author, a native of the city - Maps to ensure you get around with ease - Insider tips to get the most out of your trip - Author contact information for more recommendations Itinerary Table of Contents - How to Use this Guide - The 3-Day Itinerary - Transportation Tips - Restaurants - Hotels - Money - Getting into the City - Useful Local Phrases - Nightlife - About the Author Atlanta Highlights Included - Getting up close and personal with the fish at the world's largest aquarium - Tasting the city's local beverages - Eating dinner with a Motown legend - Shopping in Atlanta's \"alternative\" neighborhood - Watching America's favorite pastime - Dining at America's largest drive-in Who is this Atlanta travel guide for? - Business travelers - Families - Honeymooners - Backpackers Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BAYS6YM",
+      "statement": "Collects Batgirl #0, 7-13 Read more",
+      "parserInput": "Collects Batgirl #0, 7-13 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B09CH9TGC5",
+      "statement": "Collects Batman #106-111 and Infinite Frontier #1 Read more",
+      "parserInput": "Collects Batman #106-111 and Infinite Frontier #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07PJMC28W",
+      "statement": "Collects Batman #58-60 plus Batman Secret Files #1 and Batman Annual #3 Read more",
+      "parserInput": "Collects Batman #58-60 plus Batman Secret Files #1 and Batman Annual #3 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BUSN8F0",
+      "statement": "Collects Batman & Robin #0, 9-14 Read more",
+      "parserInput": "Collects Batman & Robin #0, 9-14 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01AKVJQJO",
+      "statement": "Collects BATMAN #582-586, #591-597 and BATMAN: OUR WORLDS AT WAR #1 Read more",
+      "parserInput": "Collects BATMAN #582-586, #591-597 and BATMAN: OUR WORLDS AT WAR #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BUSN8FK",
+      "statement": "Collects BATMAN INCORPORATED #0-6 Read more",
+      "parserInput": "Collects BATMAN INCORPORATED #0-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00ET886IW",
+      "statement": "Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more",
+      "parserInput": "Collects Batman Incorporated (2012-2013) #7-13 and Batman Incorporated Special (2012-2013) #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00HVH15YU",
+      "statement": "Collects BATMAN issues #655-658, #663-669 and #672-675, previously published as \"Batman and Son\" and \"Batman: The Black Glove.\" Read more",
+      "parserInput": "Collects BATMAN issues #655-658, #663-669 and #672-675, previously published as \"Batman and Son\" and \"Batman: The Black Glove.\" Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00GOHNEPG",
+      "statement": "Collects issues BATMAN: DETECTIVE COMICS #13-18 Read more",
+      "parserInput": "Collects issues BATMAN: DETECTIVE COMICS #13-18 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B008RNGCAO",
+      "statement": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more",
+      "parserInput": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00919W7MA",
+      "statement": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more",
+      "parserInput": "Collects Detective Comics vol. 1 #667-675, Batman: Shadow of the Bat #19-20, 24-28, Batman vol. 1 #501-508, Catwoman vol. 2 #6-7, and Robin vol. 4 #7 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B009DNVW3Y",
+      "statement": "Collects Batman: The Dark Knight #1-9 Read more",
+      "parserInput": "Collects Batman: The Dark Knight #1-9 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00H4EW102",
+      "statement": "Collects issues #16-21 of BATMAN: THE DARK KNIGHT and BATMAN - THE DARK KNIGHT ANNUAL #1 Read more",
+      "parserInput": "Collects issues #16-21 of BATMAN: THE DARK KNIGHT and BATMAN - THE DARK KNIGHT ANNUAL #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00CXY58OE",
+      "statement": "Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\" Read more",
+      "parserInput": "Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\" Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0064W66QK",
+      "statement": "Collects BLACKEST NIGHT #0-8 Read more",
+      "parserInput": "Collects BLACKEST NIGHT #0-8 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0B9R45W91",
+      "statement": "Collects BRZRKR #5-8 Read more",
+      "parserInput": "Collects BRZRKR #5-8 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BJCY022",
+      "statement": "Collects issues #7-12 Read more",
+      "parserInput": "Collects Catwoman (2011-2016) issues #7-12 Read more",
+      "binding": "explicit-product-series-volume-title"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BLVSRFW",
+      "statement": "Collects #1-6 Read more",
+      "parserInput": "Collects #1-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00O2A7H9G",
+      "statement": "including video signalsVideo circuits and systems“Excellent… Nothing can replace hands-on experience and Quan immerses the hobbyist/designer right into the fray up to their elbows.”—EDN Magazine Read more",
+      "parserInput": "including video signalsVideo circuits and systems“Excellent… Nothing can replace hands-on experience and Quan immerses the hobbyist/designer right into the fray up to their elbows.”—EDN Magazine Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00NGUWRDY",
+      "statement": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more",
+      "parserInput": "Collects Ex Machina issues #21-29, Ex Machina: Inside the Machine; Ex Machina Special #3 Read more",
+      "binding": "explicit-description-title-anchor"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00JRILKPU",
+      "statement": "Collects issues #12-20 Read more",
+      "parserInput": "Collects Ex Machina issues #12-20 Read more",
+      "binding": "explicit-description-title-anchor"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00IUSN5U6",
+      "statement": "collects Fairest #15-20 Read more",
+      "parserInput": "collects Fairest #15-20 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07GL6KYHM",
+      "statement": "Collects GIDEON FALLS #1-6 Read more",
+      "parserInput": "Collects GIDEON FALLS #1-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BPO76XE",
+      "statement": "contains useful information on getting the most out of cheap or free bench and software tools.Safely solder, join wires, and connect switchesIdentify components and read schematic diagramsUnderstand the how and why of electronics theoryWork with transistors, LEDs, and laser diode modulesPower your devices with a/c supplies, batteries, or solar panelsGet up and running on Arduino boards and pre-made modulesUse sensors to detect everything from noxious gas to accelerationBuild and modify audio amps, microphones, and transmittersFix gadgets and scavenge useful parts from dead equipment Read more",
+      "parserInput": "contains useful information on getting the most out of cheap or free bench and software tools.Safely solder, join wires, and connect switchesIdentify components and read schematic diagramsUnderstand the how and why of electronics theoryWork with transistors, LEDs, and laser diode modulesPower your devices with a/c supplies, batteries, or solar panelsGet up and running on Arduino boards and pre-made modulesUse sensors to detect everything from noxious gas to accelerationBuild and modify audio amps, microphones, and transmittersFix gadgets and scavenge useful parts from dead equipment Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B078GBT5MB",
+      "statement": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more",
+      "parserInput": "collects Hellboy and the BPRD: 1954 - Black Sun #1-2, The Unreasoning Beast, Ghost Moon #1-2 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00A820YF6",
+      "statement": "includes the rare \"They Who Go Down to the Sea in Ships\" by Mignola, Josh Dysart (B.P.R.D.: 1947), and Jason Shawn Alexander (Abe Sapien: The Drowning), never before available for purchase; Mignola and Duncan Fegredo's \"The Mole,\" from Free Comic Book Day 2008; and Mignola's most recent solo outing, \"In the Chapel of Moloch.\"*",
+      "parserInput": "includes the rare \"They Who Go Down to the Sea in Ships\" by Mignola, Josh Dysart (B.P.R.D.: 1947), and Jason Shawn Alexander (Abe Sapien: The Drowning), never before available for purchase; Mignola and Duncan Fegredo's \"The Mole,\" from Free Comic Book Day 2008; and Mignola's most recent solo outing, \"In the Chapel of Moloch.\"*",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00ECYOG7S",
+      "statement": "includes:Barbecue Vegetable LoafButternut Squash and Mushroom LasagnaFaux Turkey RoastGluten Roast with VegetablesPecan RoastSeitan RoastSimple Tofu TurkeySoy Meat LoafStuffed Portobello MushroomsTeriyaki Mushroom Loaf with GravyThanksgiving Meat LoafTofu Chicken and StuffingTraditional Tofu TurkeyWalnut and Mushroom Loaf Read more",
+      "parserInput": "includes:Barbecue Vegetable LoafButternut Squash and Mushroom LasagnaFaux Turkey RoastGluten Roast with VegetablesPecan RoastSeitan RoastSimple Tofu TurkeySoy Meat LoafStuffed Portobello MushroomsTeriyaki Mushroom Loaf with GravyThanksgiving Meat LoafTofu Chicken and StuffingTraditional Tofu TurkeyWalnut and Mushroom Loaf Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B004QWY5YK",
+      "statement": "including a digital multimeter, signal generator, frequency counter, and an oscilloscopeRepair circuit boards and replace partsWork with components, from capacitors and ICs to transistors and zenersLearn to read block, schematic, and pictorial diagramsDisassemble devices and identify sections and stagesTroubleshoot and diagnose to the component levelPerform reverse-order reassembly Read more",
+      "parserInput": "including a digital multimeter, signal generator, frequency counter, and an oscilloscopeRepair circuit boards and replace partsWork with components, from capacitors and ICs to transistors and zenersLearn to read block, schematic, and pictorial diagramsDisassemble devices and identify sections and stagesTroubleshoot and diagnose to the component levelPerform reverse-order reassembly Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01AKVJQ7Q",
+      "statement": "Collects IDENTITY CRISIS #1-7 Read more",
+      "parserInput": "Collects IDENTITY CRISIS #1-7 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00HO03H04",
+      "statement": "Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more",
+      "parserInput": "Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00JJQJL1A",
+      "statement": "includes chapters from the following Oracle Press books:Java: The Complete Reference, Ninth Edition by Herb SchildtJava: A Beginner’s Guide, Sixth Edition by Herb SchildtMastering Lambdas: Java Programming in a Multicore World by Maurice NaftalinQuick Start Guide to JavaFX by J.F. DiMarzioMastering JavaFX 8 Controls: Create Custom JavaFX 8 Controls for Cross-Platform Applications by Hendrik Ebbers Read more",
+      "parserInput": "includes chapters from the following Oracle Press books:Java: The Complete Reference, Ninth Edition by Herb SchildtJava: A Beginner’s Guide, Sixth Edition by Herb SchildtMastering Lambdas: Java Programming in a Multicore World by Maurice NaftalinQuick Start Guide to JavaFX by J.F. DiMarzioMastering JavaFX 8 Controls: Create Custom JavaFX 8 Controls for Cross-Platform Applications by Hendrik Ebbers Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00HVH15YA",
+      "statement": "collects issues #14-21 of JUSTICE LEAGUE DARK.\" Read more",
+      "parserInput": "collects issues #14-21 of JUSTICE LEAGUE DARK.\" Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01AORO2H0",
+      "statement": "Collects THE BRAVE AND THE BOLD #28-30, JUSTICE LEAGUE OF AMERICA #1-8 and MYSTERY IN SPACE #75",
+      "parserInput": "Collects THE BRAVE AND THE BOLD #28-30, JUSTICE LEAGUE OF AMERICA #1-8 and MYSTERY IN SPACE #75",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01MCXTG9B",
+      "statement": "collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19",
+      "parserInput": "collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B06XXRCN34",
+      "statement": "collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30",
+      "parserInput": "collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07F1DYZ4J",
+      "statement": "collects the famed super-team’s exploits from Justice League Of America #31-41",
+      "parserInput": "collects the famed super-team’s exploits from Justice League Of America #31-41",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0064W64XU",
+      "statement": "Collects Kingdom Come #1-4 Read more",
+      "parserInput": "Collects Kingdom Come #1-4 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B008ET6YJA",
+      "statement": "Including illustrations and diagrams and compiled from the Chicago Tribune how-to column \"Life Skills,\" this book is filled with often-humorous instructions on performing a variety of tasks—from technical challenges to social interactions.sew a button • wrap a gift • shine your shoes • clean your keyboard • ask for a raise • give yourself a facial massage • flirt • pack for a road trip • turn down a request • teach someone to ride a bike • photograph a dog • change a tire • fix a faucet • load a moving truck • end a relationship • give a tip • choose an engagement ring • and more Read more",
+      "parserInput": "Including illustrations and diagrams and compiled from the Chicago Tribune how-to column \"Life Skills,\" this book is filled with often-humorous instructions on performing a variety of tasks—from technical challenges to social interactions.sew a button • wrap a gift • shine your shoes • clean your keyboard • ask for a raise • give yourself a facial massage • flirt • pack for a road trip • turn down a request • teach someone to ride a bike • photograph a dog • change a tire • fix a faucet • load a moving truck • end a relationship • give a tip • choose an engagement ring • and more Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B009MD2AEA",
+      "statement": "Collects Nightwing #1-7 Read more",
+      "parserInput": "Collects Nightwing #1-7 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00E3F7S6W",
+      "statement": "Collects Nightwing #0, 8-12 Read more",
+      "parserInput": "Collects Nightwing #0, 8-12 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07B5TWTY7",
+      "statement": "collects PLANETARY #15-27, JLA/PLANETARY: TERRA OCCULTA and BATMAN/PLANETARY: NIGHT ON EARTH Read more",
+      "parserInput": "collects PLANETARY #15-27, JLA/PLANETARY: TERRA OCCULTA and BATMAN/PLANETARY: NIGHT ON EARTH Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00CPYDNFS",
+      "statement": "Contains:A Philosophy of Practice (Why, How, Where, When and What to Practice)15 Action Tips for Quick ResultsHow to Build SpeedMotivationVisualization Read more",
+      "parserInput": "Contains:A Philosophy of Practice (Why, How, Where, When and What to Practice)15 Action Tips for Quick ResultsHow to Build SpeedMotivationVisualization Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00EHIEJYY",
+      "statement": "including I2C, 1-Wire, SPI, and TTL SerialUse Arduino with USB",
+      "parserInput": "including I2C, 1-Wire, SPI, and TTL SerialUse Arduino with USB",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B009MD2MX4",
+      "statement": "Collects Red Hood and the Outlaws #1-7 Read more",
+      "parserInput": "Collects Red Hood and the Outlaws #1-7 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00DY8FG2C",
+      "statement": "Collecting SWAMP THING #43-50.\" Read more",
+      "parserInput": "Collecting SWAMP THING #43-50.\" Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00DCNNJG4",
+      "statement": "contains a valuable chapter-length introduction to linear and goal programming and its services applications; and also addresses many other topics ignored by competitive texts, such as: Service SCM methods and approaches Focusing on customers and their service purchase behavior Service productivity Managing public and private nonprofit service organizations Vehicle routing and scheduling Ethical challenges to SCM Service Management will be an invaluable resource for senior and mid-level managers throughout any service organization, and for students and faculty in any graduate or upper-level undergraduate program in service management, service operations management, or operations management Read more",
+      "parserInput": "contains a valuable chapter-length introduction to linear and goal programming and its services applications; and also addresses many other topics ignored by competitive texts, such as: Service SCM methods and approaches Focusing on customers and their service purchase behavior Service productivity Managing public and private nonprofit service organizations Vehicle routing and scheduling Ethical challenges to SCM Service Management will be an invaluable resource for senior and mid-level managers throughout any service organization, and for students and faculty in any graduate or upper-level undergraduate program in service management, service operations management, or operations management Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00IOE4M9O",
+      "statement": "Includes the new stories...“Silver”“Roses in Winter”“Redemption”“Hollow”…and reader favorites“Fairy Gifts”“Gray”“Seeing Eye”“Alpha and Omega”“The Star of David”“In Red, with Pearls”“One of the best urban fantasy anthologies I’ve ever read.”—The BiblioSanctum Read more",
+      "parserInput": "Includes the new stories...“Silver”“Roses in Winter”“Redemption”“Hollow”…and reader favorites“Fairy Gifts”“Gray”“Seeing Eye”“Alpha and Omega”“The Star of David”“In Red, with Pearls”“One of the best urban fantasy anthologies I’ve ever read.”—The BiblioSanctum Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00KBAN3VW",
+      "statement": "collect the entire series as it's released (Desserts Vol. 1 and Soups Vol. 2 to be released soon!) Read more",
+      "parserInput": "collect the entire series as it's released (Desserts Vol. 1 and Soups Vol. 2 to be released soon!) Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00UIB55RY",
+      "statement": "Collecting:AMAZING SPIDER-MAN (2014) #7-15, SUPERIOR SPIDER-MAN #32-33, SPIDER-VERSE #1-2, SPIDER-VERSE TEAM-UP #1-3, SCARLET SPIDERS #1-3, SPIDER-WOMAN (2014) #1-4, SPIDER-MAN 2099 (2014) #6-8 and material from FREE COMIC BOOK DAY 2014 (GUARDIANS OF THE GALAXY) #1Written by DAN SLOTT, CHRISTOS GAGE, MICHAEL COSTA, DENNIS HOPELESS & PETER DAVID with SKOTTIE YOUNG, ROBBIE THOMPSON, KATIE COOK, KATHRYN IMMONEN, JED MCKAY, ROGER STERN, GERRY CONWAY, TOM DEFALCO & MOREPenciled by GIUSEPPE CAMUNCOLI, OLIVIER COIPEL, DAVE WILLIAMS, PACO DIAZ, GREG LAND & WILL SLINEY with HUMBERTO RAMOS, ADAM KUBERT, MIGUEL SEPULVEDA, JAKE PARKER, DENNIS MEDRI, KATIE COOK, MARK BROOKS, DAVID LAFUENTE, SHELDON VELLA, BOB MCLEOD, PAUL SMITH, RON FRENZ & MORECover by OLIVIER COIPEL Read more",
+      "parserInput": "Collecting:AMAZING SPIDER-MAN (2014) #7-15, SUPERIOR SPIDER-MAN #32-33, SPIDER-VERSE #1-2, SPIDER-VERSE TEAM-UP #1-3, SCARLET SPIDERS #1-3, SPIDER-WOMAN (2014) #1-4, SPIDER-MAN 2099 (2014) #6-8 and material from FREE COMIC BOOK DAY 2014 (GUARDIANS OF THE GALAXY) #1Written by DAN SLOTT, CHRISTOS GAGE, MICHAEL COSTA, DENNIS HOPELESS & PETER DAVID with SKOTTIE YOUNG, ROBBIE THOMPSON, KATIE COOK, KATHRYN IMMONEN, JED MCKAY, ROGER STERN, GERRY CONWAY, TOM DEFALCO & MOREPenciled by GIUSEPPE CAMUNCOLI, OLIVIER COIPEL, DAVE WILLIAMS, PACO DIAZ, GREG LAND & WILL SLINEY with HUMBERTO RAMOS, ADAM KUBERT, MIGUEL SEPULVEDA, JAKE PARKER, DENNIS MEDRI, KATIE COOK, MARK BROOKS, DAVID LAFUENTE, SHELDON VELLA, BOB MCLEOD, PAUL SMITH, RON FRENZ & MORECover by OLIVIER COIPEL Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07818JNHF",
+      "statement": "Collecting Starman #0-5 Read more",
+      "parserInput": "Collecting Starman #0-5 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B008VFN65M",
+      "statement": "Collects Action Comics #1-8 Read more",
+      "parserInput": "Collects Action Comics #1-8 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00BUSN8EQ",
+      "statement": "Collects #0, 8-11, Swamp Thing Annual #1 Read more",
+      "parserInput": "Collects #0, 8-11, Swamp Thing Annual #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01AKVJR3E",
+      "statement": "Collects SWAMP THING #35-40, SWAMP THING ANNUAL #3 and SWAMP THING: FUTURES END #1 Read more",
+      "parserInput": "Collects SWAMP THING #35-40, SWAMP THING ANNUAL #3 and SWAMP THING: FUTURES END #1 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B084YV3DKV",
+      "statement": "Collects Tales from the Dark Multiverse: Batman: Knightfall #1, Tales from the Dark Multiverse: Death of Superman #1, Tales from the Dark Multiverse: Blackest Night #1, Tales from the Dark Multiverse: Infinite Crisis #1, and Tales from the Dark Multiverse: Teen Titans: The Judas Contract #1 Plus these inspirational issues Batman #497, Superman #75, Blackest Night #1, Infinite Crisis #1 and Tales of the Teen Titans Annual #3 Read more",
+      "parserInput": "Collects Tales from the Dark Multiverse: Batman: Knightfall #1, Tales from the Dark Multiverse: Death of Superman #1, Tales from the Dark Multiverse: Blackest Night #1, Tales from the Dark Multiverse: Infinite Crisis #1, and Tales from the Dark Multiverse: Teen Titans: The Judas Contract #1 Plus these inspirational issues Batman #497, Superman #75, Blackest Night #1, Infinite Crisis #1 and Tales of the Teen Titans Annual #3 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0098SWEKY",
+      "statement": "Collects Teen Titans #1-7 Read more",
+      "parserInput": "Collects Teen Titans #1-7 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B09BK7TSGB",
+      "statement": "Collects THE DEPARTMENT OF TRUTH #8-13 Read more",
+      "parserInput": "Collects THE DEPARTMENT OF TRUTH #8-13 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B09TS2JKVZ",
+      "statement": "Collects THE DEPARTMENT OF TRUTH #6-7, 14-17 Read more",
+      "parserInput": "Collects THE DEPARTMENT OF TRUTH #6-7, 14-17 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0BGT8R5TB",
+      "statement": "Collects THE DEPARTMENT OF TRUTH #18-22 Read more",
+      "parserInput": "Collects THE DEPARTMENT OF TRUTH #18-22 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00PXGD274",
+      "statement": "includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more",
+      "parserInput": "includes three full-length novels of action, magic, and romance: Balanced on the Blade’s Edge Deathmaker Blood Charged Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07X5MRYDS",
+      "statement": "Collects The Flash #70-75 Read more",
+      "parserInput": "Collects The Flash #70-75 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B09HN8R1NZ",
+      "statement": "collects THE JOKER #1-6 Read more",
+      "parserInput": "collects THE JOKER #1-6 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B00H1G7B08",
+      "statement": "Include:What is jQuery?Get the Source CodeGetting Started with jQueryIntroduction to HTMLIntroduction to CSSjQuery SelectorsjQuery UI Widgets: Dramatic Page EnhancementsUsing jQuery for Form ValidationjQuery AJAXjQuery MobilejQuery AnimationScroll up and click \"Buy\" now. :) Read more",
+      "parserInput": "Include:What is jQuery?Get the Source CodeGetting Started with jQueryIntroduction to HTMLIntroduction to CSSjQuery SelectorsjQuery UI Widgets: Dramatic Page EnhancementsUsing jQuery for Form ValidationjQuery AJAXjQuery MobilejQuery AnimationScroll up and click \"Buy\" now. :) Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B008718TYS",
+      "statement": "including quinoa, such as Quinoa Risotto with Mushrooms and Flourless Chocolate Cake • A chapter dedicated to ensuring that you understand how to work with quinoa and achieve the tastiest results Read more",
+      "parserInput": "including quinoa, such as Quinoa Risotto with Mushrooms and Flourless Chocolate Cake • A chapter dedicated to ensuring that you understand how to work with quinoa and achieve the tastiest results Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B06WW8H7ML",
+      "statement": "include: The VenetiansFrancisco PizarroQueen Elizabeth ICatherine the GreatMadame ChengRobert FortuneRobert SmallsWilliam TweedThomas EdisonVincenzo PeruggiaKlaus Fuchs Read more",
+      "parserInput": "include: The VenetiansFrancisco PizarroQueen Elizabeth ICatherine the GreatMadame ChengRobert FortuneRobert SmallsWilliam TweedThomas EdisonVincenzo PeruggiaKlaus Fuchs Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B07FCVR13C",
+      "statement": "collecting Trinity #12-16 and Annual #1!",
+      "parserInput": "collecting Trinity #12-16 and Annual #1",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B003H29CB6",
+      "statement": "Includes bonus reading group guidePraise for Michael Dobbs, bestselling author of House of Cards, the book that inspired the Netflix series:\"An intriguing tale of espionage and treason... this is a work to enthrall.\"—Daily Mail\"An author who can bring historical happenings so vitally back to life and made all the more impressive by being historically accurate in every respect.\"—Times of London\"A fascinating tale of conspiracy, blackmail, and treachery.\"—Irish Independent\"Dobbs takes us so far inside the mind of Winston Churchill that we feel as though we actually are him.\"—Booklist\"Dobbs infuses dramatic tension, inventive plots, and heady pacing in the narration of a British icon's noblest hours.\"—Publishers Weekly \"Dobbs has done a brilliant job in evoking the drama and despair of Britain hovering on the edge of the abyss.\"—Sunday Express Read more",
+      "parserInput": "Includes bonus reading group guidePraise for Michael Dobbs, bestselling author of House of Cards, the book that inspired the Netflix series:\"An intriguing tale of espionage and treason... this is a work to enthrall.\"—Daily Mail\"An author who can bring historical happenings so vitally back to life and made all the more impressive by being historically accurate in every respect.\"—Times of London\"A fascinating tale of conspiracy, blackmail, and treachery.\"—Irish Independent\"Dobbs takes us so far inside the mind of Winston Churchill that we feel as though we actually are him.\"—Booklist\"Dobbs infuses dramatic tension, inventive plots, and heady pacing in the narration of a British icon's noblest hours.\"—Publishers Weekly \"Dobbs has done a brilliant job in evoking the drama and despair of Britain hovering on the edge of the abyss.\"—Sunday Express Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B0CHSFLXHJ",
+      "statement": "Collects WONDER WOMAN (2011) #0-12 Read more",
+      "parserInput": "Collects WONDER WOMAN (2011) #0-12 Read more",
+      "binding": "explicit-clause"
+    },
+    {
+      "sourceUrl": "https://www.amazon.com/dp/B01AORO2FM",
+      "statement": "Collects Y: THE LAST MAN #37-48 Read more",
+      "parserInput": "Collects Y: THE LAST MAN #37-48 Read more",
+      "binding": "explicit-clause"
+    }
+  ]
+}

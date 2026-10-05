@@ -1,0 +1,12 @@
+# Kindle regression inputs
+
+These are permanent inputs, not frozen audit result dumps. Expected behavior remains in tests; generated comparisons go to ignored `audit-artifacts/kindle/`.
+
+- `kindle-contents-quality-fixtures.json`, `contents-parser-v4-corpus.json`, `kindle-manifest-fixtures.json`, `kindle-whole-manifest.json` and `kindle-independent-evidence.json`: bounded source clauses and synthetic cases for quality, parsing, whole manifests and independent claims.
+- `kindle-source-capture.json`: nine sanitized HTML/source cases reproducing description-boundary failures. No full pages, sessions or account state.
+- `captured-manifest-inputs.json`: 127 historical bounded public description observations (77 pilot generation-4, 25 sample generation-4, 25 sample generation-5) across 95 URLs. Existing regression controls need complete bounded blocks; exact selected-source coordinates preserve the previously saved child even when current ranking prefers its whole-manifest parent. It excludes parser results, timestamps, ownership and library IDs.
+- `pilot-selection-inputs.json`: 77 exact selected snippets, normalized parser inputs and binding flags. Corpus comparisons must reuse these selections rather than silently rerank historical inputs.
+- `corpus-review-labels.json`: irreplaceable manual semantic annotations for 1,520 frozen ordinals, restricted to category/trigger/old parse-count labels and the input hash. It has no titles, identifiers, statements or provider records. A matching private backup is supplied separately.
+- `contents-parser-v3.snapshot.txt`, `contents-parser-v4.snapshot.txt`, `kindle-manifest-before-whole.snapshot.txt` and `kindle-manifest-before-independent.snapshot.txt`: frozen comparison implementations. Tool loaders resolve their imports against current library modules, matching the original comparison contract. The parser-v4 snapshot replaces dependence on a generated 1,520-row result dump.
+
+Captured inputs came from the historical investigations in [docs/audits](../../../docs/audits/README.md); only necessary source evidence and manual annotations were extracted from their local run archives. Synthetic HTML cases use public-description fragments or artificial controls. None imply verified contents, complete book coverage or ownership. New fixtures require a specific regression purpose and a review for sensitive fields; do not append a library catalogue here.

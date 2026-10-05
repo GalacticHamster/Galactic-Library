@@ -1,5 +1,7 @@
 # Kindle manifest candidate discovery and exact 77-page pilot
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Completed 2026-10-04/05 (America/New_York / UTC). Implementation, regression tests, one bounded network pilot, offline analysis, and commits are complete. No broader refresh was launched. The user's source export and installed extension database were not modified.
 
 ## Result
@@ -86,7 +88,7 @@ Read More remains an incomplete-source risk flag. Removing it from an already ca
 
 ## Exact pilot population and acquisition
 
-Source: `tests/fixtures/mock-backup.json`.
+Source: `<path-to-backup>`.
 
 - Export timestamp: `2026-10-05T00:48:15.011Z`.
 - Source SHA-256: `3e7c70701e6577858266365b1b0011e5c2a3dba257018acec92cc7af8b16ae4e`.
@@ -193,9 +195,9 @@ The 22 new focused manifest tests cover the ten named fixtures; exact 100-issue 
 
 Implementation files: `src/providers/kindle.js`, new `src/lib/kindle-manifest.js`, `src/lib/kindle-contents.js`, `src/lib/metadata-validation.js`, `src/background/storage-writer.js`, `src/ui/contents-editor.js`, and `scripts/runtime-files.json`.
 
-Test files: new `tests/kindle-manifest.js`, new `tests/kindle-manifest-fixtures.json`, `tests/kindle-contents.js`, `tests/importers-fixture.js`, and `tests/run.js`.
+Test files: new `tests/kindle-manifest.js`, new `tests/fixtures/kindle/kindle-manifest-fixtures.json`, `tests/kindle-contents.js`, `tests/importers-fixture.js`, and `tests/run.js`.
 
-Pilot tooling/evidence: [pilot driver](../scripts/pilot-kindle-manifests.mjs), [offline analyzer](../scripts/analyze-kindle-manifest-pilot.mjs), [raw initial pilot results](kindle-manifest-pilot-results.json), and [final offline metrics and record-level assessment](kindle-manifest-pilot-metrics.json).
+Pilot tooling/evidence: [pilot driver](../../scripts/pilot-kindle-manifests.mjs), [offline analyzer](../../scripts/analyze-kindle-manifest-pilot.mjs), [raw initial pilot results](../development/artifacts-and-audits.md#generated-output), and [final offline metrics and record-level assessment](../development/artifacts-and-audits.md#generated-output).
 
 Commits:
 

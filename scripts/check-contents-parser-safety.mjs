@@ -1,21 +1,23 @@
+import {capturedManifestEvidence} from './whole-manifest-evidence.mjs';
+import {outputPath} from './audit-artifacts.mjs';
 // Offline integration check against a private in-memory copy; never writes the
 // user's export, extension storage, or source evidence.
 import assert from 'node:assert/strict';
-import {readFile,writeFile} from 'node:fs/promises';
+import {writeFile} from 'node:fs/promises';
 import {loadCorpus,oldParser} from './contents-parser-corpus.mjs';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {proposeContents,ownedContentIndex} from '../src/lib/contents.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import {parseBackup,createBackup} from '../src/lib/storage.js';
-const [path,output]=process.argv.slice(2);if(!path||!output)throw Error('Usage: node scripts/check-contents-parser-safety.mjs BACKUP_JSON OUTPUT_JSON');
+const [path,requestedOutput]=process.argv.slice(2);if(!path)throw Error('Usage: node scripts/check-contents-parser-safety.mjs BACKUP_JSON [OUTPUT_JSON]');
+const output=await outputPath(requestedOutput,'kindle-contents-parser-safety-v4.json');
 let requests=0;globalThis.fetch=()=>{requests++;throw Error('Network forbidden');};
 const corpus=await loadCorpus(path),old=await oldParser();
-const pilot=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-results.json',import.meta.url),'utf8'));
-const metrics=JSON.parse(await readFile(new URL('../docs/kindle-manifest-pilot-metrics.json',import.meta.url),'utf8'));
+const {observations}=await capturedManifestEvidence();
 const db=structuredClone(corpus.db);
 for(const row of corpus.rows.filter(r=>r.sourceGeneration===4)){
- const m=metrics.rows.find(r=>r.sourceUrl===row.item.metadata.detailUrl),p=pilot.rows.find(r=>r.sourceUrl===row.item.metadata.detailUrl);
- Object.assign(db.providerItems[row.item.id].metadata.enrichment.kindleProductComicContents,{statement:m.statement,extractorVersion:4,manifest:{...p.manifest,candidates:m.candidates,selected:m.selected,secondary:m.secondary}});
+ const capture=observations.find(r=>r.id.startsWith('pilot-4-')&&r.url===row.item.metadata.detailUrl);
+ Object.assign(db.providerItems[row.item.id].metadata.enrichment.kindleProductComicContents,capture.saved);
 }
 const stored={};let writes=0;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async update=>{writes++;Object.assign(stored,structuredClone(update));}});

@@ -1,6 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {checkKindleSourceCapture} from './kindle-source-capture-fixture.js';
-const fixtures=JSON.parse(await readFile(new URL('./fixtures/kindle-source-capture.json',import.meta.url),'utf8'));
+const fixtures=JSON.parse(await readFile(new URL('./fixtures/kindle/kindle-source-capture.json',import.meta.url),'utf8'));
 // Minimal tree for these sanitized fragments. Real DOMParser runs the same
 // checks in packaged Chrome and Firefox importer suites, independently.
 function fragmentDocument(html){

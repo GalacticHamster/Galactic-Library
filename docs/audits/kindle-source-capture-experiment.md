@@ -1,5 +1,7 @@
 # Kindle source-capture experiment — 25 records
 
+> Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
+
 Completed 2026-10-05. Stable baseline: parser **4**, filter **1**, storage schema **12**, source extractor **4**. Implemented source capture **5**; parser, filtering, identity and ownership semantics remain unchanged.
 
 ## Findings
@@ -12,7 +14,7 @@ A particularly important separate problem is **King in Black Omnibus**: generati
 
 ## Frozen population and provenance
 
-The [complete sample ledger](kindle-source-capture-sample.md) was written and committed as `cefe368` **before any network request**. The [JSON ledger](kindle-source-capture-sample.json) contains each provider item ID/ASIN, title, extractor generation, parser version, outcome, exact saved statement and length, proposals, unresolved evidence, suspicion category, and individual selection rationale. No population substitution occurred.
+The [complete sample ledger](../development/artifacts-and-audits.md#generated-output) was written and committed as `cefe368` **before any network request**. The [JSON ledger](../development/artifacts-and-audits.md#generated-output) contains each provider item ID/ASIN, title, extractor generation, parser version, outcome, exact saved statement and length, proposals, unresolved evidence, suspicion category, and individual selection rationale. No population substitution occurred.
 
 The sample includes all five 100 Bullets volumes, named/count-based non-comic collections, historical short snippets, concatenated paragraphs/titles, generation-4 Read More observations, complex successful manifests, mixed annual/excerpt cases, and negative topic/bibliography controls. Seven records already have complete historical generation-4 blocks; eighteen have older statements without historical full HTML. Non-comic records remain eligible; no comic/manga gate was introduced.
 
@@ -20,7 +22,7 @@ Source: `galactic-library-backup-v1 (2).json`, exported `2026-10-05T00:48:15.011
 
 - Backup SHA-256: `3e7c70701e6577858266365b1b0011e5c2a3dba257018acec92cc7af8b16ae4e`.
 - Frozen ordered URL population SHA-256: `beff30d5a18625262ba3342cec9f98e2b620ec3768f4e094c291de7b669eea8f`.
-- [Analysis JSON](kindle-source-capture-analysis.json) records evidence hashes, primary classifications, exact comparisons and all 25 row assessments.
+- [Analysis JSON](../development/artifacts-and-audits.md#generated-output) records evidence hashes, primary classifications, exact comparisons and all 25 row assessments.
 
 Existing parser-v4, quality-pass and manifest-pilot reports, acquisition/retry/scan code, candidate assessment, storage/validation paths and current tests/fixtures were read before implementation.
 
@@ -38,11 +40,11 @@ No full product responses, cookies, headers, authentication, account details, pr
 
 | Stage | Observed evidence / artifact |
 | --- | --- |
-| A — acquired response | HTTP status, response URL and character count; sanitized relevant-region markup from that same static response in [live capture](kindle-source-capture-live.json). Full HTML is deliberately not persisted. |
+| A — acquired response | HTTP status, response URL and character count; sanitized relevant-region markup from that same static response in [live capture](../development/artifacts-and-audits.md#generated-output). Full HTML is deliberately not persisted. |
 | B — relevant description regions | Literal `textContent`, sanitized structural HTML and untruncated-region flags for the five production selectors; empty overview whitespace is separately visible. |
 | C — gen-4 candidate discovery | Exact bounded blocks and candidate windows, offsets, binding, quality, counts and rank vectors. |
 | D — selection | Selected index plus secondary candidate indexes. No candidate merging occurs. |
-| E — actual serialized evidence | Exact statement, manifest, source/version/timestamps and derived fields from the real private-copy writer; gen-4 in live JSON, gen-5 in [safety JSON](kindle-source-capture-safety.json). |
+| E — actual serialized evidence | Exact statement, manifest, source/version/timestamps and derived fields from the real private-copy writer; gen-4 in live JSON, gen-5 in [safety JSON](../development/artifacts-and-audits.md#generated-output). |
 | F — normalized parser input | Exact candidate/parser input, binding and quality; the source statement remains distinct. |
 | G — parser v4 | Exact outcome, unverified entries and unresolved fragments. Existing grammar and quality gates remain unchanged. |
 
@@ -73,7 +75,7 @@ The six parser cases mean that usable evidence reaches parser v4 intact, not tha
 
 ## Per-record comparison
 
-The [complete 25-record trace](kindle-source-capture-records.md) contains the old/live/gen-5 comparison table and individual A–G records: raw-region lengths, block/candidate statistics, selected index, secondary counts, exact old and serialized statements, normalized input, proposals, unresolved evidence, causal assessment and drift qualification. It includes every frozen record; no success-only subset is reported.
+The [complete 25-record trace](../development/artifacts-and-audits.md#generated-output) contains the old/live/gen-5 comparison table and individual A–G records: raw-region lengths, block/candidate statistics, selected index, secondary counts, exact old and serialized statements, normalized input, proposals, unresolved evidence, causal assessment and drift qualification. It includes every frozen record; no success-only subset is reported.
 
 | Representative record | Old parser-v4 result | Fresh static gen-4 result | Generation-5 capture result |
 | --- | --- | --- | --- |
@@ -118,7 +120,7 @@ Shared low-level sanitized-HTML fixtures run through region extraction → block
 
 The five static 100 Bullets fragments produce **1–19, 20–36, 37–58, 59–80, 81–100** exactly once, no gaps/overlaps. All prior manifest/parser-v4 families remain, including Knightfall, Ex Machina, Hellboy, Earth 2, Swamp Thing, secondary series, annual/special, excerpts, non-comic and false-Full cases. The existing capture fixture now references the current exported extractor constant; historical gen-4 restore/parser fixtures remain historical. No existing assertions were weakened.
 
-The [full private-copy safety check](kindle-source-capture-safety.json) used all **14,081** provider records and only the 25 frozen captured fragments, with zero network requests. A pre-existing synthetic verified review made review/index preservation non-vacuous because the export has no verified contents. Results:
+The [full private-copy safety check](../development/artifacts-and-audits.md#generated-output) used all **14,081** provider records and only the 25 frozen captured fragments, with zero network requests. A pre-existing synthetic verified review made review/index preservation non-vacuous because the export has no verified contents. Results:
 
 | Safety check | Result |
 | --- | --- |
@@ -159,9 +161,9 @@ Offline DOM replay also reproduced gen-4 blocks exactly for all 25 fragments bef
 
 Production: `src/providers/kindle.js`, `src/lib/kindle-manifest.js`, `src/lib/metadata-validation.js`.
 
-Tests: `tests/fixtures/kindle-source-capture.json`, `tests/kindle-source-capture-fixture.js`, `tests/kindle-source-capture.js`, `tests/kindle-manifest.js`, `tests/importers-fixture.js`, `tests/run.js`.
+Tests: `tests/fixtures/kindle/kindle-source-capture.json`, `tests/kindle-source-capture-fixture.js`, `tests/kindle-source-capture.js`, `tests/kindle-manifest.js`, `tests/importers-fixture.js`, `tests/run.js`.
 
-Tooling: `scripts/freeze-kindle-source-sample.mjs`, `scripts/capture-kindle-source-sample.mjs`, `scripts/replay-kindle-source-sample.mjs`, `scripts/check-kindle-source-safety.mjs`, `scripts/analyze-kindle-source-sample.mjs`. Reports/evidence: the `docs/kindle-source-capture-*` files linked above. Capture is an explicit one-run experiment; it refuses accidental output overwrites and checks the frozen population/source generation. Do not interpret its presence as authorization for further requests.
+Tooling: `scripts/freeze-kindle-source-sample.mjs`, `scripts/capture-kindle-source-sample.mjs`, `scripts/replay-kindle-source-sample.mjs`, `scripts/check-kindle-source-safety.mjs`, `scripts/analyze-kindle-source-sample.mjs`. Reports/evidence: the `audit-artifacts/kindle/kindle-source-capture-*` files linked above. Capture is an explicit one-run experiment; it refuses accidental output overwrites and checks the frozen population/source generation. Do not interpret its presence as authorization for further requests.
 
 The unrelated GL `start.txt` and pre-existing FAN untracked reconnaissance files remain untouched. No HB/FAN commits were made.
 

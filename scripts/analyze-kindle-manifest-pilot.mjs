@@ -1,8 +1,10 @@
+import {outputPath} from './audit-artifacts.mjs';
 // Offline replay and metrics only. Never makes requests or alters a library.
 import {readFile,writeFile} from 'node:fs/promises';
 import {selectManifest,manifestReviewProposal} from '../src/lib/kindle-manifest.js';
 import {contentKey,proposeContentsForReview} from '../src/lib/contents.js';
-const [input,output]=process.argv.slice(2);if(!input||!output)throw Error('Usage: node scripts/analyze-kindle-manifest-pilot.mjs PILOT_JSON METRICS_JSON');
+const [input,requestedOutput]=process.argv.slice(2);if(!input)throw Error('Usage: node scripts/analyze-kindle-manifest-pilot.mjs PILOT_JSON [METRICS_JSON]');
+const output=await outputPath(requestedOutput,'kindle-manifest-pilot-metrics.json');
 const pilot=JSON.parse(await readFile(input,'utf8'));if(!pilot.finishedAt)throw Error('Pilot is not finished.');
 const count=(rows,fn)=>rows.reduce((r,x)=>(r[fn(x)]=(r[fn(x)]??0)+1,r),{});
 const normalize=s=>String(s??'').replace(/\s+/gu,' ').replace(/\s+Read more\s*$/iu,'').replace(/[.!]+$/u,'').trim().toLowerCase();
