@@ -14,7 +14,22 @@ Three completeness questions are distinct:
 
 **Full is local parse completeness, not universal book completeness or ownership.** A literal same-clause parent can represent structural children, preserving unresolved material and diagnostic windows. Independent semantic claims stay separate; neither adjacent location nor higher proposal count authorizes aggregation or automatic promotion. Loading one independent claim changes editor text/rows only; saving replaces the parent's single saved review.
 
-Source generation 5 preserves captured DOM lines; parser 4/filter 1 interpret saved text independently. A parser reparse does not refresh source. Exact source-backed historical selections must survive validation even when a new parser changes ranking. Read more may signal premature/incomplete hydration or extraction; it is not universally disposable garbage. No local reparse can recover source that was never captured.
+Source generation 5 preserves captured DOM lines; parser 5/filter 1 interpret saved text independently. A parser reparse does not refresh source. Exact source-backed historical selections must survive validation even when a new parser changes ranking. Read more may signal premature/incomplete hydration or extraction; it is not universally disposable garbage. No local reparse can recover source that was never captured.
+
+## Parser 5: bounded numbered precision
+
+Parser 5 improves numbered labels and bounded numbered clauses. It does **not** implement broad named-work parsing. Source generation 5, filter 1, manifest interpretation 1, evidence review 1, schema 12 and API/backup formats remain unchanged.
+
+- Discovery unit markers (`issue`, `volume`/`vol`, `book`, `chapter`) require lexical boundaries. `Guidebook #1` is an issue with the literal Guidebook title, not Guide volume 1. Annual/special suffix handling stays unchanged; part/guide are not new unit types or markers.
+- Numbering before `of` is not a completed series label. For an explicitly capitalized postposed title, commas/conjunctions stay inside the label until another numbered clause or a defined prose-tail head occurs. Existing comma ambiguity and prose guards still apply. Descriptive `part of`, series commentary, feature and credit clauses remain unresolved. Ordinary numbered title conjunctions remain literal.
+- Label guards no longer reject a title merely for `Books`, `More`, or hyphenated `He`/`She`/`They`. Markers/numeric syntax and genuine prose still prevent a label from being accepted. No franchise or publisher aliases are used.
+- The exact leading wrapper `adventures from` is consumed before numbered label extraction. Longer narrative wrappers are not understood or globally stripped. A later explicit `collects` clause can be segmented from an unnumbered prelude, which remains unresolved; no manifest candidates or independent claims are combined.
+- A numbered clause can retain an unresolved tail after a comma/semicolon, a sentence period, a nonnumeric en/em dash, a supported creator credit, `with bonus/additional/supplemental/extra material/content`, or a bounded `of … run` qualifier. A `from …` credit requires an explicit creator/writer/artist word within 250 characters and no numbered work in that bounded span; page/material/story attribution is excluded. Generic `from`/`of` tails, colon qualifiers, attached number/text and arbitrary narrative tails remain unresolved as whole clauses. Numeric continuations may precede sentence punctuation; qualifiers never become component proposals.
+- Integer ranges remain limited to 500 entries. If a shorter endpoint is below the start, at least two endpoint digits may replace the start's suffix only if this yields a **strictly greater** endpoint within the same prefix. No rollover, single-digit guessing or decimal/fractional range expansion is added. `645-50` expands to `645-650`; `100-05` to `100-105`. `99-01`, `199-02`, `645-5` and `645-45` remain unresolved. Ordinary `proposeContents`, numeric keys and verified contents validation retain their existing semantics.
+
+Accepted tails and unsupported material remain in `unparsed`, keeping local proposals Partial. Excerpt heading/qualifier propagation remains conservative. A Full result only means this bounded parser accounted for its input. Neither parser version nor proposal count authorizes verification or ownership.
+
+Permanent synthetic controls live in `tests/contents-numbered-precision-fixture.js`, shared by unit and packaged UI checks. Frozen parser-4 snapshots remain historical controls. Offline replay tooling accepts a separately supplied source-only ledger; reference answers never become parser input. Detailed population/reference comparisons belong in ignored audit artifacts, not runtime or committed fixtures.
 
 ## Named components: parent-local identity
 
@@ -32,6 +47,6 @@ Existing reviews and backups remain readable and editable. Scope is reconstructe
 
 HB/FAN contents requests are unscoped. Their typed contents serializers preserve literal names, and local/central coverage merging cannot promote named equality to Owned. Their ordinary title matching and numbered contents controls are unchanged. See [the companion request contract](companion-api.md).
 
-These changes do not add parser grammar: parser 4, source generation 5, filter 1 and manifest interpretation 1 remain unchanged. Novel/story type, source attribution and named-versus-numbered overlap must not be inferred from title equality. Original scripts/apparatus and unknown overlap remain review evidence.
+Parent-local identity does not depend on the parser upgrade. Novel/story type, source attribution and named-versus-numbered overlap must not be inferred from title equality. Original scripts/apparatus and unknown overlap remain review evidence.
 
 See the [historical audit index](../audits/README.md) for the failure modes behind these invariants, and [matching policy](matching-policy.md) for conservative Owned and broader Possible behavior.

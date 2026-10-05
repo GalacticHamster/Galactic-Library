@@ -1,6 +1,6 @@
 # Kindle contents discovery
 
-Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **4**, and filtering version **1**.
+Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **5**, and filtering version **1**.
 
 ## Eligibility and priority
 
@@ -34,6 +34,12 @@ The existing persisted name `kindleProductComicContents` and internal request na
 The serialized worker remains the sole writer. Existing source-URL, current-record and account/reference checks remain in place. Credential-bearing source URLs are rejected. Local reparse requires a current record reference, retains the original statement and lookup date, updates parsing metadata and creates ordinary source history for undo. A failed refresh preserves previously discovered text. No refresh or reparse changes `contentReviews` or silently replaces verified entries. A changed statement returns to review; the editor offers **Use newly discovered statement** and leaves existing verification intact until the user explicitly saves.
 
 ## Extraction and proposals
+
+Parser 5 improves explicit numbered contents: it preserves conjunctions inside series titles, prevents unit words inside titles from becoming markers, and recovers some numbered clauses followed by credits or supplemental material. Unresolved prose remains visible and keeps a proposal Partial. This is a numbered precision update; it does not add general named-story/novel parsing.
+
+Shortened integer endpoints such as `#645-50` can now expand to `#645-650`. At least two endpoint digits and an increasing result within the same prefix are required. `#100-05` means `#100-105`; ambiguous forms such as `#99-01`, `#199-02` and `#645-5` stay unresolved for review.
+
+After reloading the extension, **Reparse saved text (no requests)** applies these improvements to existing source. It retains captured statements and existing verified reviews. It cannot recover an uncaptured ending or establish ownership automatically.
 
 The extractor retains bounded description blocks, preserves paragraph/list boundaries, and records multiple candidate containment statements with their source coordinates. It recognizes collecting, containing, including, comprising and reprinting phrases. A semicolon-delimited manifest can be evaluated as a whole while its child clauses remain diagnostic evidence. It selects a primary candidate rather than blindly merging every nearby mention. Static source capture cannot guarantee that a dynamically expanded description is complete: a terminal **Read more** can indicate missing/hydrating text and remains review evidence.
 
