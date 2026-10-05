@@ -28,6 +28,7 @@ const before=await writer.getDatabase(),writeStart=writes;
 const queries=[...corpus.rows.slice(0,20).map(r=>({title:r.title,mediaType:'book'})),...['No Rest for the Wicked','Ghost Moon','Ex Machina Special #3','Batman #491'].map(title=>({title,mediaType:'book'}))];
 const api=database=>queries.map(item=>handleExternalApiRequest(database,{type:'MATCH_ITEMS',apiVersion:1,items:[item]}));
 const initialApi=api(before);
+assert.ok(initialApi.every(result=>result.ok===true&&result.results.length===1),'Compare successful matching responses, not errors.');
 for(let n=0;n<corpus.rows.length;n+=100){
  await writer.reparseKindleContents(corpus.rows.slice(n,n+100).map(r=>({itemId:r.item.id,recordRef:r.item.recordRef})));
  process.stderr.write(`Reparsed ${Math.min(n+100,corpus.rows.length)}/${corpus.rows.length}\n`);
