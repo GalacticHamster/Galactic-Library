@@ -13,6 +13,7 @@ import {validateReadingStates,validateReadingOrders} from './reading.js';
 import {validateReminderReviews} from './reminders.js';
 import {validateTitleAliases} from './title-aliases.js';
 import {validateOwnershipReviews,validateOwnershipProposals} from './ownership-review.js';
+import {validateKindleContentsObservations} from './kindle-contents-observations.js';
 
 export function createEmptyDatabase() {
   return {
@@ -209,6 +210,7 @@ export function validateDatabase(value) {
     ownershipPolicy: validateOwnershipPolicy(value.ownershipPolicy),
     providerHistory,
     enrichmentHistory:validateEnrichmentHistory(value.enrichmentHistory),
+    ...(value.kindleContentsObservations!==undefined?{kindleContentsObservations:validateKindleContentsObservations(value.kindleContentsObservations,[...Object.values(providerItems),...Object.values(providerHistory).map(entry=>entry.item)])}:{}),
     enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),
     titleAliases:validateTitleAliases(value.titleAliases),
     readingStates:validateReadingStates(value.readingStates),readingOrders:validateReadingOrders(value.readingOrders),

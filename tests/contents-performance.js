@@ -11,7 +11,7 @@ const prepare=async writer=>{
  const db=await writer.getDatabase(),record=db.providerItems['kindle:B000000001'];
  return {itemId:record.id,recordRef:record.recordRef,sourceUrl:record.metadata.detailUrl,statement:'Includes PRIVATE_ONE and PRIVATE_TWO',availability:'statement-found',extractorVersion:2};
 };
-const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}copy.enrichmentHistory={};copy.providers={};return copy;};
+const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}for(const observation of Object.values(copy.kindleContentsObservations??{}))delete observation.undoRef;copy.enrichmentHistory={};copy.providers={};return copy;};
 
 export const contentsPerformanceTests=[
  ['tail checkpoint diagnostics remain separate and retain their cost for amortized live comparisons',()=>{

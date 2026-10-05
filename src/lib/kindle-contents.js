@@ -20,8 +20,9 @@ export function contentsParseState(item) {
 
 export function kindleContentsState(item, database = {}) {
   const saved = item.metadata?.enrichment?.kindleProductComicContents;
+  const latestAttempt=database.kindleContentsObservations?.[item.recordRef]?.latestAttempt;
   const statement = saved?.statement?.trim() ?? '';
-  const fetchOutcome = !saved ? 'never-checked' : saved.availability === 'temporary-failure' ? 'temporary-failure'
+  const fetchOutcome = latestAttempt?.availability === 'temporary-failure' ? 'temporary-failure' : latestAttempt?.availability === 'unavailable' ? 'unavailable' : !saved ? 'never-checked' : saved.availability === 'temporary-failure' ? 'temporary-failure'
     : saved.availability === 'unavailable' ? 'unavailable' : statement ? 'statement-found'
     : saved.availability === 'no-statement' ? 'no-statement' : 'legacy-unknown';
   const parse = contentsParseState(item);

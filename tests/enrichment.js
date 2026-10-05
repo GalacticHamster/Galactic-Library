@@ -57,7 +57,7 @@ export const enrichmentTests=[['Google Books rejects different, missing and ambi
   await writer.mergeProviderItems('kindle',[{providerItemId:'B000000001',title:'Test Comic',mediaType:'book',metadata:{contentType:'Comic',detailUrl:'https://www.amazon.com/dp/B000000001'}}]);
   const entry={itemId:'kindle:B000000001',sourceUrl:'https://www.amazon.com/dp/B000000001',statement:''};
   for(const availability of ['no-statement','unavailable','temporary-failure']){
-    await writer.saveKindleComicContents([{...entry,availability}]);assert.equal((await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents.availability,availability);
+    await writer.saveKindleComicContents([{...entry,availability}]);const db=await writer.getDatabase(),item=db.providerItems[entry.itemId];assert.equal(db.kindleContentsObservations[item.recordRef].latestAttempt?.availability??item.metadata.enrichment.kindleProductComicContents.availability,availability);
   }
   await writer.saveKindleComicContents([{...entry,availability:'statement-found',statement:'Collects Manga Vol. 1-3'}]);let metadata=(await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents;assert.equal(metadata.parseStatus,'parsed');
   await writer.saveKindleComicContents([{...entry,availability:'statement-found',statement:'Collects Manga Vol. One'}]);metadata=(await writer.getDatabase()).providerItems[entry.itemId].metadata.enrichment.kindleProductComicContents;assert.equal(metadata.parseStatus,'unparsed');

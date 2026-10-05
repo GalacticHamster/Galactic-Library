@@ -31,8 +31,9 @@ const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
 const contentsProgressHub=globalThis.GalacticContentsScan.progressHub();
 const broadcastContentsProgress=()=>chrome.runtime.sendMessage({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:contentsProgressHub.list()}).catch(()=>{});
-chrome.tabs?.onRemoved?.addListener(tabId=>{if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
-chrome.tabs?.onUpdated?.addListener((tabId,change)=>{if(change.status==='loading'&&contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
+chrome.tabs?.onRemoved?.addListener(tabId=>{storageWriter.interruptKindleContentsRefresh(tabId).catch(()=>{});if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
+chrome.tabs?.onUpdated?.addListener((tabId,change)=>{if(change.status==='loading'){storageWriter.interruptKindleContentsRefresh(tabId).catch(()=>{});if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}}});
+chrome.runtime.onStartup?.addListener(()=>storageWriter.interruptKindleContentsRefresh().catch(()=>{}));
 function contentsTiming(request,kind){
   const timing=contentsPerformance.trace(request?.diagnosticLookupId,kind);
   if(timing)timing.onWrite=()=>chrome.runtime.sendMessage({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:timing.id}).catch(()=>{});
@@ -258,12 +259,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if(['GET_KINDLE_CONTENTS_REFRESH','CHECK_KINDLE_CONTENTS_REFRESH_ITEM','FINISH_KINDLE_CONTENTS_REFRESH'].includes(request?.type)){
+    if(!isProviderImportPage('kindle',sender.url)||!sender.url.includes('/hz/mycd/')||!Number.isInteger(sender.tab?.id)){
+      sendResponse({ok:false,error:'Refresh is available only from the Kindle library tab.'});return undefined;
+    }
+    const task=request.type==='GET_KINDLE_CONTENTS_REFRESH'?storageWriter.getKindleContentsRefresh():request.type==='CHECK_KINDLE_CONTENTS_REFRESH_ITEM'
+      ?storageWriter.checkKindleContentsRefreshItem(request.runRef,request.leaseRef,sender.tab.id,request.position)
+      :storageWriter.finishKindleContentsRefresh(request.runRef,request.leaseRef,sender.tab.id,request.status);
+    task.then(result=>sendResponse({ok:true,...(request.type==='FINISH_KINDLE_CONTENTS_REFRESH'?{refresh:result}:result)})).catch(error=>sendResponse({ok:false,error:error.message}));return true;
+  }
+
   if (request?.type === 'GET_KINDLE_COMIC_CONTENT_CANDIDATES') {
     if (!isProviderImportPage('kindle', sender.url)) {
       sendResponse({ ok: false, error: 'Kindle contents discovery is available only from the signed-in Kindle library page.' });
       return undefined;
     }
     const timing=contentsTiming(request,'prepare');const workerEnd=timing?.begin('worker_total');
+    if(request.mode==='rescan'){
+      if(!sender.url.includes('/hz/mycd/')||!Number.isInteger(sender.tab?.id)){sendResponse({ok:false,error:'Refresh requires the Kindle library tab.'});return undefined;}
+      (async()=>{
+        const info=await storageWriter.getKindleContentsRefresh();let otherOwnerOpen=true,closedOwnerTabId=null;
+        if(info.checkpoint?.status==='running'&&info.checkpoint.tabId!==sender.tab.id){
+          otherOwnerOpen=true;
+          if(chrome.tabs?.get)try{await chrome.tabs.get(info.checkpoint.tabId);}catch{otherOwnerOpen=false;closedOwnerTabId=info.checkpoint.tabId;}
+        }
+        return storageWriter.execute('beginKindleContentsRefresh',[request.refreshAction??'start',sender.tab.id,otherOwnerOpen,closedOwnerTabId],timing);
+      })().then(plan=>{workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true,...plan});})
+        .catch(error=>{workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});return true;
+    }
     storageWriter.execute('getDatabase',[],timing)
       .then((database) => {
         const selectionEnd=timing?.begin('candidate_selection');let plan;
@@ -284,13 +307,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type === 'SAVE_KINDLE_COMIC_CONTENTS') {
-    if (!isProviderImportPage('kindle', sender.url)) {
+    if (!isProviderImportPage('kindle', sender.url) || request.refresh && (!sender.url.includes('/hz/mycd/') || !Number.isInteger(sender.tab?.id))) {
       sendResponse({ ok: false, error: 'Kindle contents can be saved only from the signed-in Kindle library page.' });
       return undefined;
     }
     const timing=contentsTiming(request,'network');const workerEnd=timing?.begin('worker_total');
-    storageWriter.execute('saveKindleComicContents',[request.entries],timing)
-      .then(() => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true});})
+    const operation=request.refresh?'commitKindleContentsRefresh':'saveKindleComicContents';
+    const args=request.refresh?[request.entries,request.refresh.runRef,request.refresh.leaseRef,sender.tab?.id]:[request.entries];
+    storageWriter.execute(operation,args,timing)
+      .then(result => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:true,...(request.refresh?{refresh:result}:{})});})
       .catch(error => {workerEnd?.();timedContentsResponse(timing,sendResponse,{ok:false,error:error.message});});
     return true;
   }

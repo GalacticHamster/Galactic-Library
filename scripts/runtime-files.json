@@ -28,6 +28,8 @@
   "src/lib/google-books.js",
   "src/lib/identity.js",
   "src/lib/kindle-contents.js",
+  "src/lib/kindle-contents-observations.js",
+  "src/lib/kindle-contents-refresh.js",
   "src/lib/kindle-manifest.js",
   "src/lib/kindle-evidence-review.js",
   "src/lib/matching-policy.js",

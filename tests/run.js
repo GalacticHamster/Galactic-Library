@@ -5,6 +5,8 @@ import {kindleContentsQualityTests} from './kindle-contents-quality.js';
 import {kindleManifestTests} from './kindle-manifest.js';
 import {contentsParserV4Tests} from './contents-parser-v4.js';
 import {numberedPrecisionCases} from './contents-numbered-precision-fixture.js';
+import {kindleRefreshCases} from './kindle-refresh-fixture.js';
+import {kindleRefreshWorkerTests} from './kindle-refresh.js';
 import {kindleSourceCaptureTests} from './kindle-source-capture.js';
 import {independentEvidenceTests} from './kindle-independent-evidence.js';
 import {kindleWholeManifestTests} from './kindle-whole-manifest.js';
@@ -61,6 +63,8 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...kindleRefreshCases,
+  ...kindleRefreshWorkerTests,
   ...numberedPrecisionCases,
   ...parentScopedComponentCases,
   ...ownershipPolicyTests,
