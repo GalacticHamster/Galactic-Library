@@ -86,6 +86,10 @@ const scoped=entry('Collection A','Alpha',{run:'2020',language:'en'});
 db.contentReviews[a.id]=review([scoped]);delete db.contentReviews[b.id];
 const completeApi=api(db,[{title:'Unrelated offered collection',mediaType:'book',contents:[scoped],contentsComplete:true}]);
 assert.equal(completeApi.ok,true);assert.equal(completeApi.results[0].owned,true);
+const crossMedia=createEmptyDatabase(),game=normalizeProviderItem({provider:'gog',providerItemId:'named-game-control',recordRef:'00000000-0000-4000-8000-000000000004',title:'Collection A',mediaType:'game',ownership:'owned'},'2026-10-05T00:00:00.000Z');
+crossMedia.providerItems[game.id]=game;crossMedia.contentReviews[game.id]=review([scoped]);
+const crossMediaApi=api(validateDatabase(crossMedia),[{title:'Unrelated offered book',mediaType:'book',contents:[scoped],contentsComplete:true}]);
+assert.equal(crossMediaApi.results[0].owned,true,'Characterize absent media boundary in explicit contents coverage');
 assert.equal(contentCoverage(db,[entry('Collection A','Alpha: Special Edition',{run:'2020',language:'en'})]).owned,0);
 assert.notEqual(contentKey(entry('Collection A','Alpha')),contentKey(entry('Collection A','alpha')));
 assert.equal(contentKey(entry('Collection A','01')),contentKey(entry('Collection A','1')));
@@ -99,7 +103,7 @@ assert.throws(()=>validateContents([entry('Collection A','A'.repeat(81))]));
 const restored=parseBackup(createBackup(validateDatabase(db)));
 assert.deepEqual(restored.contentReviews,db.contentReviews);
 assert.equal(api(restored,[{title:'Unrelated offered collection',mediaType:'book',contents:[scoped],contentsComplete:true}]).results[0].owned,true);
-const proof={ordinaryBareTitleBefore:withoutReview,ordinaryBareTitleAfterVerification:bareApi,differentCollectionCoverage:differentCollection,sameDisplayCoverage:sameDisplay,explicitIncompleteRequest:incompleteApi,explicitCompleteRequest:completeApi,sameTitleParentItems:[a.id,b.id],sameKeyIndexEvidenceCount:index.length,scopeFieldsDiscarded:extra,numericComponentTitleCollision:true,parentPunctuationCollision:true,casePreserved:true,editionTitlePreserved:true,backupPreservesReviews:true,unsafeCompleteRequestSurvivesBackup:true};
+const proof={ordinaryBareTitleBefore:withoutReview,ordinaryBareTitleAfterVerification:bareApi,differentCollectionCoverage:differentCollection,sameDisplayCoverage:sameDisplay,explicitIncompleteRequest:incompleteApi,explicitCompleteRequest:completeApi,crossMediaExplicitRequest:crossMediaApi,sameTitleParentItems:[a.id,b.id],sameKeyIndexEvidenceCount:index.length,scopeFieldsDiscarded:extra,numericComponentTitleCollision:true,parentPunctuationCollision:true,casePreserved:true,editionTitlePreserved:true,backupPreservesReviews:true,unsafeCompleteRequestSurvivesBackup:true};
 const grammarControls=[
  ['finite-count','Contains four novels: Alpha, Beta, Gamma, and Delta.'],
  ['count-mismatch','Contains four novels: Alpha, Beta, and Gamma.'],
