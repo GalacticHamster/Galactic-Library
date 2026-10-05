@@ -27,6 +27,7 @@ export const kindleContentsTests=[
   try{
    let result=await run();assert.equal(result.availability,'no-statement');assert.equal(result.statement,'');assert.equal(result.extractorVersion,KINDLE_CONTENTS_EXTRACTOR_VERSION);
    text='Contains Wool, Shift and Dust';result=await run();assert.equal(result.availability,'statement-found');assert.equal(result.statement,text);
+   text='Contents: "Wool", "Shift", and "Dust"';result=await run();assert.equal(result.availability,'statement-found');assert.equal(result.descriptionBlocks[0].text,text);
    status=404;assert.equal((await run()).availability,'unavailable');status=503;await assert.rejects(run(),/503/);status=200;
    text='captcha';await assert.rejects(run(),/CAPTCHA/);text='sign-in';await assert.rejects(run(),/Sign in/);
    const before=calls;await assert.rejects(globalThis.GalacticKindle.fetchKindleProductComicContents('https://example.com/dp/B000000001'),/usable/);assert.equal(calls,before);

@@ -200,10 +200,10 @@
     const extractEnd=timing?.begin('extraction',timing.attempts);
     let statement,descriptionBlocks;try{
       descriptionBlocks=kindleDescriptionBlocks(document);
-      statement=kindleContentsStatementFromDocument(document);
+      statement=descriptionBlocks.map(block=>explicitContentsStatement(block.text)).find(Boolean)??'';
       // Preview only. The worker performs contextual candidate assessment using
       // the existing review parser, including no-trigger structural discovery.
-      if(!statement)statement=descriptionBlocks.find(b=>/\bissues?\s*#?\d|#\s*\d/iu.test(b.text))?.text.slice(0,2000)??'';
+      if(!statement)statement=descriptionBlocks.find(b=>/\bissues?\s*#?\d|#\s*\d|\bContents\s*:/iu.test(b.text))?.text.slice(0,2000)??'';
     }finally{extractEnd?.();}
     return { sourceUrl: `${url.origin}${url.pathname}`, statement, descriptionBlocks, availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
   }

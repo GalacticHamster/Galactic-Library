@@ -48,9 +48,25 @@ export const kindleManifestTests=[
      assert.equal(proposal(s).descriptionMayBeIncomplete,Boolean(suffix));assert.equal(Object.hasOwn(s.manifest,'complete'),false);
    }
  }],
+ ['context binding preserves explicit other-series labels, excerpt scope and negative source context',()=>{
+   const explicit=proposal(select('Collects issues #1-3 of OTHER SERIES.','Fables Vol. 5'));
+   assert.ok(explicit.entries.every(e=>e.series==='OTHER SERIES'));assert.equal(explicit.entries.length,3);
+   const excerpt=proposal(select('SERIES Collection. Material from issues #1-3.','SERIES Collection'));
+   assert.equal(excerpt.entries.length,3);assert.ok(excerpt.entries.every(e=>e.completeness==='excerpt'));
+   assert.equal(proposal(select('SERIES Collection. Also available: issues #1-3.','SERIES Collection')).entries.length,0);
+ }],
+ ['pilot regression: mixed named supplement cannot become a greedy issue label',()=>{
+   const s=select('Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3 Read more','Ex Machina: Book Three'),p=proposal(s);
+   assert.equal(p.outcome,'partial');assert.equal(p.entries.length,10);assert.equal(p.entries.at(-1).series,'Ex Machina');assert.equal(p.entries.at(-1).unitType,'special');assert.ok(p.unparsed.join(' ').includes('Inside the Machine'));
+ }],
+ ['pilot regression: incidental plot references and bestseller numbers are not structural manifests',()=>{
+   for(const text of ['Following the events of Infinite Frontier #0 and The Joker War, The Joker gets targeted as the most wanted man in the world!','#1 NEW YORK TIMES Bestseller!','Everything since Batman Incorporated #1 has been leading to this!'])assert.equal(select(text).manifest.candidates.length,0,text);
+   const s=select('Following the events of Infinite Frontier #0 and The Joker War, The Joker gets targeted as the most wanted man in the world! Collects THE JOKER #1-6.');assert.deepEqual(s.manifest.secondary,[]);assert.equal(proposal(s).entries.length,6);
+ }],
  ['candidate/source bounds are deterministic and reject oversized imported evidence',()=>{
    const text=Array.from({length:100},(_,n)=>`Collects SERIES #${n+1}.`).join(' ');
    const a=select(text);assert.ok(a.manifest.candidates.length<=MANIFEST_LIMITS.candidates);assert.deepEqual(select(text),a);
+   const later=select(Array.from({length:80},(_,n)=>`Includes wireless delivery option ${n}.`).join(' ')+' Contains SERIES #1-6.');assert.equal(proposal(later).entries.length,6);
    assert.throws(()=>select('x'.repeat(MANIFEST_LIMITS.block+1)),/bounds/);
    assert.throws(()=>validateManifest({title:'x',blocks:Array.from({length:9},()=>({selector:'x',text:'x'}))}),/blocks/);
  }],
