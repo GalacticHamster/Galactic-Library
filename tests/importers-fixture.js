@@ -11,7 +11,7 @@ import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 
 // Real content-script controls, with signed-in fetches replaced by fixtures.
 // Content scripts have no direct storage access; the worker owns this hidden area.
-const checks=[]; const values={}; const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates))});
+const checks=[]; const values={}; const writer=createStorageWriter({get:async defaults=>Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])])),set:async updates=>Object.assign(values,structuredClone(updates))},Promise.resolve(),{cacheRefreshPreflight:true});
 const shadows=[]; const attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
@@ -194,6 +194,7 @@ try{
   kindleShadow.querySelector('[data-export-timing]').click();await wait(()=>kindleShadow.querySelector('[data-timing-output]').value!==diagnosticText);
   const refreshTiming=JSON.parse(kindleShadow.querySelector('[data-timing-output]').value),resumedRows=refreshTiming.records.filter(row=>row.kind==='network'&&row.events.some(event=>event.stage==='refresh_check_message')&&row.attempts===1).slice(-2);
   assert(resumedRows.length===2,'Resumed refresh timings missing.');
+  assert(resumedRows.some(row=>row.events.some(event=>event.stage==='refresh_projection_hit')),'Actual resumed queue did not reuse bounded eligibility answers.');
   for(const row of resumedRows){
     const check=row.events.find(event=>event.stage==='refresh_check_message'),fetch=row.events.find(event=>event.stage==='fetch_headers');
     assert(check.startMs<=fetch.startMs&&row.events.some(event=>event.stage==='refresh_identity_validation'),'Preflight was charged to another item.');

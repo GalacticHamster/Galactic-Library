@@ -19,12 +19,13 @@ import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
+  if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
-const storageWriter = createStorageWriter(privateArea, storageReady);
+const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function'});
 const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
@@ -53,7 +54,10 @@ function registerReminderEvents(){
 registerReminderEvents();
 chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
-chrome.storage.onChanged?.addListener((changes,area)=>{if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();});
+chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();
+  if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();
+});
 chrome.runtime.onStartup?.addListener(()=>reconcileReminders());
 if(chrome.permissions)reconcileReminders();
 chrome.runtime.onInstalled.addListener(() => {

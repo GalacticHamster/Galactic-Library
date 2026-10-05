@@ -13,7 +13,7 @@ const url=id=>'https://www.amazon.com/dp/'+id;
 const book=(n,saved)=>normalizeProviderItem({provider:'kindle',providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+n,mediaType:'book',ownership:'owned',metadata:{detailUrl:url('B'+String(n).padStart(9,'0')),...(saved?{enrichment:{kindleProductComicContents:saved}}:{})}});
 const old=(version=2)=>({source:'amazon-product-page',sourceUrl:url('B000000001'),statement:'Collects Historical #1-2',availability:'statement-found',checkedAt:'2026-10-01T00:00:00.000Z',extractorVersion:version,parserVersion:4,parseOutcome:'full'});
 const database=(...items)=>{const db=createEmptyDatabase();for(const i of items)db.providerItems[i.id]=i;return validateDatabase(db);};
-const memory=()=>{const values={};let fail=false;const area={get:async defaults=>structuredClone({...defaults,...values}),set:async patch=>{if(fail)throw Error('Synthetic write failure');Object.assign(values,structuredClone(patch));},remove:async keys=>keys.forEach(k=>delete values[k])};return {values,area,writer:createStorageWriter(area),setFail:value=>{fail=value;}};};
+const memory=(cacheRefreshPreflight=false)=>{const values={},reads=[];let fail=false;const area={get:async defaults=>{reads.push(Object.keys(defaults));return Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])]));},set:async patch=>{if(fail)throw Error('Synthetic write failure');Object.assign(values,structuredClone(patch));},remove:async keys=>keys.forEach(k=>delete values[k])};return {values,reads,area,writer:createStorageWriter(area,Promise.resolve(),{cacheRefreshPreflight}),setFail:value=>{fail=value;}};};
 const observation=(candidate,statement='Collects Fresh #3-4',availability='statement-found',failureCode)=>({itemId:candidate.id,recordRef:candidate.recordRef,queuePosition:candidate.queuePosition,sourceUrl:candidate.detailUrl,statement,availability,extractorVersion:5,...(failureCode?{failureCode}:{}),...(availability==='statement-found'?{descriptionBlocks:[{selector:'#description',text:statement}]}:{})});
 const begin=writer=>writer.beginKindleContentsRefresh('start',1);
 const commit=(writer,plan,entries)=>writer.commitKindleContentsRefresh(entries,plan.refresh.runRef,plan.refresh.leaseRef,1);
@@ -146,6 +146,70 @@ add('Refresh preflight retains legacy migration and full commit validation after
  store.values.galacticLibraryDatabase=structuredClone(snapshot.galacticLibraryDatabase);const other=plan.candidates[1];store.values.galacticLibraryDatabase.providerItems[other.id].title='';
  equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:true},'Unrelated data blocked read-only current identity');
  const before=structuredClone(store.values);await rejects(()=>commit(store.writer,plan,[observation(plan.candidates[0])]),'Commit bypassed full database validation');equal(store.values,before,'Invalid global commit saved partial data');
+});
+
+add('Refresh projection eliminates repeated library reads within its bounded window without saving anything',async()=>{
+ const store=memory(true);await store.writer.restoreDatabase(database(...Array.from({length:42},(_,n)=>book(n+1))));const plan=await begin(store.writer),snapshot=structuredClone(store.values),start=store.reads.length;
+ for(let position=0;position<20;position++){
+  const timing=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-'+String(position+1).padStart(3,'0'));
+  equal(await store.writer.execute('checkKindleContentsRefreshItem',[plan.refresh.runRef,plan.refresh.leaseRef,1,position],timing),{valid:true},'Projected eligible item rejected');
+  assert(timing.events.some(e=>e.stage==='refresh_checkpoint_read'),'Queue state not read fresh');assert(timing.events.some(e=>e.stage==='refresh_identity_validation'),'Identity not checked');
+  assert(timing.events.some(e=>e.stage===(position?'refresh_projection_hit':'refresh_projection_build')),'Missing projection diagnostic');
+  equal(timing.events.filter(e=>e.stage==='storage_read').length,position?0:1,'Wrong library read count');
+ }
+ equal(store.reads.slice(start).filter(keys=>keys.includes('galacticLibraryDatabase')).length,1,'Repeated full-library reads');
+ equal(store.reads.slice(start).filter(keys=>keys.includes(KINDLE_REFRESH_KEY)).length,20,'Queue read skipped');equal(store.values,snapshot,'Preflight saved source, queue or history');
+ await rejects(()=>store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,20),'Projection fetched beyond unacknowledged window');
+});
+add('Refresh projection invalidates at serialized reads, mutations and failed writes and rechecks before commit',async()=>{
+ const store=memory(true);await store.writer.restoreDatabase(database(book(1),book(2),book(3)));const plan=await begin(store.writer);
+ const check=()=>store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0);
+ await check();let reads=store.reads.length;await store.writer.getUiPreferences();await check();assert(store.reads.slice(reads).some(keys=>keys.includes('galacticLibraryDatabase')),'Other operation kept a projection');
+ store.setFail(true);await rejects(()=>store.writer.saveGoogleBooksApiKey('a'.repeat(24)),'Synthetic failure did not happen');store.setFail(false);reads=store.reads.length;await check();assert(store.reads.slice(reads).some(keys=>keys.includes('galacticLibraryDatabase')),'Failed mutation kept a projection');
+ const item=plan.candidates[0];await store.writer.mergeProviderItems('kindle',[{providerItemId:item.id.slice(7),title:item.title,mediaType:'book',metadata:{detailUrl:url('B000000099')}}]);
+ equal(await check(),{valid:false},'Changed URL borrowed a cached answer');
+ await commit(store.writer,plan,[observation(item)]);equal(store.values[KINDLE_REFRESH_KEY].counts.skipped,1,'Commit trusted stale preflight');assert(!store.values.galacticLibraryDatabase.providerItems[item.id].metadata.enrichment?.kindleProductComicContents,'Stale source was written');
+ const current={...plan,refresh:{...plan.refresh,cursor:1}};reads=store.reads.length;equal(await store.writer.checkKindleContentsRefreshItem(current.refresh.runRef,current.refresh.leaseRef,1,1),{valid:true},'Committed cursor failed');assert(store.reads.slice(reads).some(keys=>keys.includes('galacticLibraryDatabase')),'Checkpoint kept old projection');
+});
+add('Refresh projection is lost on restart, invalidated by observed external changes and cannot survive clear or restore',async()=>{
+ for(const action of ['restart','profile','record','queue','clear','restore']){
+  const store=memory(true);await store.writer.restoreDatabase(database(book(1),book(2)));const plan=await begin(store.writer),snapshot=structuredClone(store.values.galacticLibraryDatabase);
+  const check=()=>store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0);await check();const reads=store.reads.length;
+  if(action==='restart'){store.writer=createStorageWriter(store.area,Promise.resolve(),{cacheRefreshPreflight:true});equal(await check(),{valid:true},'Restart lost resumable identity');assert(store.reads.slice(reads).some(keys=>keys.includes('galacticLibraryDatabase')),'Restart retained a projection');}
+  else if(action==='profile'){store.values.galacticLibraryDatabase.providers.kindle={profileLabel:'Changed profile'};store.writer.invalidateRefreshPreflight();await rejects(check,'Changed profile borrowed old evidence');}
+  else if(action==='record'){delete store.values.galacticLibraryDatabase.providerItems[plan.candidates[0].id];store.writer.invalidateRefreshPreflight();equal(await check(),{valid:false},'Removed current record borrowed a cached answer');}
+  else if(action==='queue'){store.values[KINDLE_REFRESH_KEY].queue[0].detailUrl=url('B000000099');equal(await check(),{valid:false},'Changed queue target borrowed a cached answer');}
+  else{await store.writer[action==='clear'?'clearDatabase':'restoreDatabase'](...(action==='restore'?[snapshot]:[]));await rejects(check,'Invalidated queue reused cached eligibility');equal(store.values[KINDLE_REFRESH_KEY]??null,null,'Invalidated queue recreated');}
+ }
+});
+add('Refresh projection never replaces authoritative full commit validation or hides malformed neighboring records',async()=>{
+ const store=memory(true);await store.writer.restoreDatabase(database(book(1),book(2)));const plan=await begin(store.writer),target=plan.candidates[0],other=plan.candidates[1];
+ await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0);
+ store.values.galacticLibraryDatabase.providerItems[other.id].title='';store.writer.invalidateRefreshPreflight();
+ equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:true},'Malformed neighbor blocked current eligible item');
+ await rejects(()=>store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,1),'Malformed cached neighbor became eligible');
+ const snapshot=structuredClone(store.values);await rejects(()=>commit(store.writer,plan,[observation(target)]),'Cached identity bypassed full validation');equal(store.values,snapshot,'Invalid database was partially saved');
+});
+add('Refresh projection invalidates at queued mutation boundaries and during an observed in-flight queue read',async()=>{
+ const store=memory(true);await store.writer.restoreDatabase(database(book(1),book(2)));const plan=await begin(store.writer),target=plan.candidates[0];
+ const check=()=>store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0);await check();
+ const before=check(),mutation=store.writer.mergeProviderItems('kindle',[{providerItemId:target.id.slice(7),title:target.title,mediaType:'book',metadata:{detailUrl:url('B000000099')}}]),after=check();
+ equal(await before,{valid:true},'Queued later mutation changed preceding check');await mutation;equal(await after,{valid:false},'Queued mutation did not invalidate following check');
+ await check();const get=store.area.get;let entered,release;const started=new Promise(resolve=>{entered=resolve;}),held=new Promise(resolve=>{release=resolve;});
+ store.area.get=async defaults=>{const result=await get(defaults);if(Object.keys(defaults).length===1&&Object.hasOwn(defaults,KINDLE_REFRESH_KEY)){entered();await held;}return result;};
+ const pending=check();await started;store.values.galacticLibraryDatabase.providerItems[target.id].metadata.detailUrl=target.detailUrl;store.writer.invalidateRefreshPreflight();release();
+ equal(await pending,{valid:true},'Change notification during queue read reused old eligibility');store.area.get=get;
+ const writes=structuredClone(store.values);store.values.galacticLibraryDatabase.schemaVersion=11;store.writer.invalidateRefreshPreflight();
+ equal(await check(),{valid:true},'Observed legacy data did not take migration path');equal(store.values.galacticLibraryDatabase.schemaVersion,12,'Legacy migration skipped');equal(store.values[KINDLE_REFRESH_KEY],writes[KINDLE_REFRESH_KEY],'Migration altered queue/cursor');
+});
+add('Refresh relies on final canonical validation without an extra rebuild while preserving identities and history',async()=>{
+ const duplicate=normalizeProviderItem({provider:'humble',providerItemId:'H1',title:'Collection 1',mediaType:'book',ownership:'owned'}),store=memory(true);
+ await store.writer.restoreDatabase(database(book(1,old()),book(2),duplicate));const before=await store.writer.getDatabase(),plan=await begin(store.writer);
+ const timing=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-050');
+ await store.writer.execute('commitKindleContentsRefresh',[[observation(plan.candidates[0])],plan.refresh.runRef,plan.refresh.leaseRef,1],timing);
+ assert(timing.events.some(e=>e.stage==='persist_validation'),'Full final validation missing');assert(!timing.events.some(e=>e.stage==='canonical_rebuild'),'Extra pre-validation rebuild remained');
+ const after=await store.writer.getDatabase();equal(after.canonicalItems,before.canonicalItems,'Canonical identities changed');equal(after.contentReviews,before.contentReviews,'Verified reviews changed');
+ equal(after.providerItems['humble:H1'],before.providerItems['humble:H1'],'Unrelated provider changed');equal(after.kindleContentsObservations[plan.candidates[0].recordRef].baseline.statement,'Collects Historical #1-2','Baseline changed');
 });
 
 export const kindleRefreshCases=cases;

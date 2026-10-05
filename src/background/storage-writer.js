@@ -33,8 +33,12 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * queue, including calls made directly by provider message handlers. No client
  * context owns a writer or writes a cached database snapshot.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve()) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false} = {}) {
   let activeTiming = null;
+  // Private, bounded read-only eligibility answers. No database/source snapshot
+  // is reused for a write. Only the worker with change observation enables this.
+  let refreshProjection=null,refreshProjectionEpoch=0;
+  const invalidateRefreshPreflight=()=>{refreshProjection=null;refreshProjectionEpoch++;};
   const timed = (stage, work) => { const end=activeTiming?.begin(stage);try{return work();}finally{end?.();} };
   const timedAsync = (stage, work) => {
     if(!activeTiming)return work();
@@ -605,7 +609,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     return persistDatabase(database);
   }
 
-  function applyKindleComicContents(database,entries) {
+  function applyKindleComicContents(database,entries,rebuild=true) {
     let endValidation=activeTiming?.begin('entry_validation');
     const updatedAt = new Date().toISOString();
     for (const entry of entries) {
@@ -641,7 +645,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       endValidation=activeTiming?.begin('entry_validation');
     }
     endValidation?.();
-    database.canonicalItems = timed('canonical_rebuild',()=>rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations));
+    if(rebuild)database.canonicalItems = timed('canonical_rebuild',()=>rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations));
   }
 
   async function reparseKindleContents(entries) {
@@ -694,20 +698,41 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       refresh:{...kindleRefreshSummary(job),leaseRef:job.leaseRef}};
   }
   function refreshLease(job,runRef,leaseRef,tabId){if(job.runRef!==runRef||job.leaseRef!==leaseRef||job.tabId!==tabId||job.status!=='running')throw Error('This refresh lease is stale; resume or start again.');}
+  const refreshIdentity=(db,target)=>{
+    const raw=db.providerItems[target.id];
+    const item=raw?normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined):null;
+    return Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl);
+  };
+  const projectionMatches=(cache,job)=>cache&&job&&cache.runRef===job.runRef&&cache.leaseRef===job.leaseRef&&cache.tabId===job.tabId&&cache.cursor===job.cursor&&cache.profileLabel===job.profileLabel;
+  const projectionEntryMatches=(entry,target)=>entry&&target&&entry.id===target.id&&entry.recordRef===target.recordRef&&entry.detailUrl===target.detailUrl;
   async function checkKindleContentsRefreshItem(runRef,leaseRef,tabId,position){
-    // This read-only preflight needs one current record, not validation and
-    // canonical reconstruction of every library record and source history.
-    // Read fresh persisted state each time; do not cache a mutable database.
-    // Legacy/schema migrations retain the normal fully validated path. Every
-    // commit still uses getDatabase() and validates the entire write as before.
-    const stored=await timedAsync('storage_read',()=>storageArea.get({[DATABASE_STORAGE_KEY]:null}));
-    let db=stored[DATABASE_STORAGE_KEY];
-    if(db?.schemaVersion!==DATABASE_SCHEMA_VERSION||!db.providerItems||Array.isArray(db.providerItems)||typeof db.providerItems!=='object'||!db.providers||Array.isArray(db.providers)||typeof db.providers!=='object')db=await getDatabase();
-    const job=currentRefresh(await readKindleRefresh(),db);refreshLease(job,runRef,leaseRef,tabId);
+    // Queue/lease/cursor remain freshly read on every request. Reuse at most
+    // twenty eligibility answers only across uninterrupted checks by this sole
+    // writer. Any other admitted operation (including failed writes/reads),
+    // storage change or worker restart discards them. Commits never use them.
+    const epoch=refreshProjectionEpoch,rawJob=await readKindleRefresh();
+    let cache=refreshProjection,db;
+    if(!cacheRefreshPreflight||!projectionMatches(cache,rawJob)||!projectionEntryMatches(cache.entries[position-rawJob.cursor],rawJob.queue?.[position]))cache=null;
+    if(cache)db={providers:{kindle:{profileLabel:cache.profileLabel}}};
+    else{
+      const stored=await timedAsync('storage_read',()=>storageArea.get({[DATABASE_STORAGE_KEY]:null}));db=stored[DATABASE_STORAGE_KEY];
+      if(db?.schemaVersion!==DATABASE_SCHEMA_VERSION||!db.providerItems||Array.isArray(db.providerItems)||typeof db.providerItems!=='object'||!db.providers||Array.isArray(db.providers)||typeof db.providers!=='object')db=await getDatabase();
+    }
+    const job=currentRefresh(rawJob,db);refreshLease(job,runRef,leaseRef,tabId);
     if(!Number.isInteger(position)||position<job.cursor||position>=Math.min(job.cursor+20,job.queue.length))throw Error('Invalid refresh queue position.');
-    const target=job.queue[position],raw=db.providerItems[target.id];
-    const item=raw?timed('refresh_identity_validation',()=>normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined)):null;
-    return {valid:Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl)};
+    const target=job.queue[position],entry=cache?.entries[position-job.cursor];
+    if(cache&&projectionEntryMatches(entry,target)){
+      timed('refresh_projection_hit',()=>{});
+      return timed('refresh_identity_validation',()=>{if(entry.error)throw entry.error;return {valid:entry.valid};});
+    }
+    const valid=timed('refresh_identity_validation',()=>refreshIdentity(db,target));
+    if(cacheRefreshPreflight&&epoch===refreshProjectionEpoch){
+      refreshProjection=timed('refresh_projection_build',()=>({runRef:job.runRef,leaseRef:job.leaseRef,tabId:job.tabId,cursor:job.cursor,profileLabel:job.profileLabel,entries:job.queue.slice(job.cursor,job.cursor+20).map(next=>{
+        const identity={id:next.id,recordRef:next.recordRef,detailUrl:next.detailUrl};
+        try{return {...identity,valid:next===target?valid:refreshIdentity(db,next)};}catch(error){return {...identity,error};}
+      })}));
+    }
+    return {valid};
   }
   async function commitKindleContentsRefresh(entries,runRef,leaseRef,tabId){
     if(!Array.isArray(entries)||!entries.length||entries.length>20)throw Error('Save 1–20 refresh observations.');
@@ -727,7 +752,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
       if(!current)job.counts.skipped++;
     }
     if(accepted.length){
-      applyKindleComicContents(db,accepted.map(row=>row.entry));
+      // persistDatabase fully validates and reconstructs canonical items. The
+      // contents update changes no identity fields; avoid an identical rebuild
+      // immediately before that authoritative validation.
+      applyKindleComicContents(db,accepted.map(row=>row.entry),false);
       // Worker selection is authoritative; adapter preliminary counts may
       // differ from the saved selected source. Rebuild only once per batch.
       for(const {entry,counted}of accepted)if(counted){
@@ -916,6 +944,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
   };
   let tail = Promise.resolve();
 
+  function runOperation(operation,values){
+    if(operation!=='checkKindleContentsRefreshItem')invalidateRefreshPreflight();
+    return operations[operation](...values);
+  }
+
   function execute(operation, args = [], timing = null) {
     if (!STORAGE_OPERATIONS.includes(operation) || !Array.isArray(args)) {
       return Promise.reject(new Error('Unsupported Galactic Library storage operation.'));
@@ -929,8 +962,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
     const queueEnd=timing?.begin('writer_queue');
     const result = tail.then(() => ready).then(timing ? async () => {
       queueEnd();activeTiming=timing;
-      try{return await operations[operation](...values);}finally{activeTiming=null;}
-    } : () => operations[operation](...values));
+      try{return await runOperation(operation,values);}catch(error){invalidateRefreshPreflight();throw error;}finally{activeTiming=null;}
+    } : async () => {try{return await runOperation(operation,values);}catch(error){invalidateRefreshPreflight();throw error;}});
     // A rejected operation never poisons the queue; later requests still run.
     tail = result.catch(() => {});
     return result;
@@ -938,6 +971,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve()) {
 
   return Object.freeze({
     execute,
+    invalidateRefreshPreflight,
     ...Object.fromEntries(STORAGE_OPERATIONS.map((name) => [name, (...args) => execute(name, args)]))
   });
 }

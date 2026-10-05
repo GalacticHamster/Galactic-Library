@@ -1,6 +1,20 @@
 import assert from 'node:assert/strict';
 import {withWorker} from './storage.js';
 export const kindleRefreshWorkerTests=[
+ ['Actual worker observes storage changes before reusing a bounded refresh projection',()=>withWorker(async({dispatch,importItems,pageA,memory,notifyStorageChange})=>{
+  globalThis.chrome.runtime.sendMessage=async()=>({ok:true});
+  await importItems('kindle',[{providerItemId:'B000000001',title:'Synthetic collection',mediaType:'book',metadata:{detailUrl:'https://www.amazon.com/dp/B000000001'}}]);
+  const sender={id:chrome.runtime.id,url:'https://www.amazon.com/hz/mycd/',tab:{id:1}},plan=await dispatch({type:'GET_KINDLE_COMIC_CONTENT_CANDIDATES',mode:'rescan'},sender),candidate=plan.candidates[0];
+  const request={type:'CHECK_KINDLE_CONTENTS_REFRESH_ITEM',runRef:plan.refresh.runRef,leaseRef:plan.refresh.leaseRef,position:0};let sequence=0;
+  const check=()=>dispatch({...request,diagnosticLookupId:'lookup-abcdef123456-'+String(++sequence).padStart(3,'0')},sender);
+  let response=await check();assert.equal(response.valid,true);assert.ok(response.performance.events.some(e=>e.stage==='refresh_projection_build'));
+  response=await check();assert.ok(response.performance.events.some(e=>e.stage==='refresh_projection_hit'));assert.ok(!response.performance.events.some(e=>e.stage==='storage_read'));
+  const before=structuredClone(memory.values);notifyStorageChange({galacticLibraryDatabase:{newValue:before.galacticLibraryDatabase}},'session');
+  response=await check();assert.ok(response.performance.events.some(e=>e.stage==='refresh_projection_hit'),'Unrelated storage area invalidated local state');
+  memory.values.galacticLibraryDatabase.providerItems[candidate.id].metadata.detailUrl='https://www.amazon.com/dp/B000000099';notifyStorageChange({galacticLibraryDatabase:{newValue:memory.values.galacticLibraryDatabase}});
+  response=await check();assert.equal(response.valid,false);assert.ok(response.performance.events.some(e=>e.stage==='storage_read'),'Observed external change reused old identity');
+  await pageA.restoreDatabase(before.galacticLibraryDatabase);response=await check();assert.equal(response.ok,false,'Restored queue reused an old projection');
+ },{storageEvents:true})],
  ['Actual worker refresh messages require Kindle library, preserve queue ownership and acknowledge evidence/cursor together',()=>withWorker(async({dispatch,importItems,pageA})=>{
   globalThis.chrome.runtime.sendMessage=async()=>({ok:true});
   await importItems('kindle',[{providerItemId:'B000000001',title:'Synthetic collection',mediaType:'book',metadata:{detailUrl:'https://www.amazon.com/dp/B000000001'}}]);

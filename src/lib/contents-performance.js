@@ -3,7 +3,7 @@
 (function attachContentsPerformance(global) {
   'use strict';
   const LIMIT = 50;
-  const stages = new Set(['queue_prepare','request_dispatch','fetch_headers','response_body','dom_parse','extraction','page_checks','attempt','retry_wait','save_message','refresh_check_message','refresh_checkpoint_read','refresh_checkpoint_validate','refresh_checkpoint_write','refresh_identity_validation','history_update','worker_total','writer_capture','writer_queue','storage_read','read_validation','migration_compare','migration_write','entry_validation','parsing','enrichment_update','canonical_rebuild','persist_validation','storage_write','candidate_selection','page_ui','throttle','options_read','options_render','options_other','options_total','options_workbench','options_dashboards','options_filters','options_selection','options_cards','options_reviews','options_coverage']);
+  const stages = new Set(['queue_prepare','request_dispatch','fetch_headers','response_body','dom_parse','extraction','page_checks','attempt','retry_wait','save_message','refresh_check_message','refresh_checkpoint_read','refresh_checkpoint_validate','refresh_checkpoint_write','refresh_identity_validation','refresh_projection_build','refresh_projection_hit','history_update','worker_total','writer_capture','writer_queue','storage_read','read_validation','migration_compare','migration_write','entry_validation','parsing','enrichment_update','canonical_rebuild','persist_validation','storage_write','candidate_selection','page_ui','throttle','options_read','options_render','options_other','options_total','options_workbench','options_dashboards','options_filters','options_selection','options_cards','options_reviews','options_coverage']);
   const categories = new Set(['pending','statement-found','no-statement','unavailable','temporary-failure','captcha','sign-in','paused','save-failure','prepared','reparsed','failed','checkpointed']);
   const now = () => performance.timeOrigin + performance.now();
   const validId = id => /^lookup-[a-f0-9]{12}-\d{3,6}$/u.test(id ?? '');
@@ -30,7 +30,7 @@
     const network=sum(record,'fetch_headers')+sum(record,'response_body');
     const processing=sum(record,'dom_parse')+sum(record,'page_checks')+sum(record,'extraction')+sum(record,'parsing');
     const persistence=sum(record,'storage_read')+sum(record,'read_validation')+sum(record,'migration_compare')+sum(record,'migration_write')+sum(record,'persist_validation')+sum(record,'storage_write');
-    const recomputation=sum(record,'canonical_rebuild')+sum(record,'enrichment_update')+sum(record,'entry_validation')+sum(record,'candidate_selection')+sum(record,'refresh_identity_validation');
+    const recomputation=sum(record,'canonical_rebuild')+sum(record,'enrichment_update')+sum(record,'entry_validation')+sum(record,'candidate_selection')+sum(record,'refresh_identity_validation')+sum(record,'refresh_projection_build')+sum(record,'refresh_projection_hit');
     const history=sum(record,'history_update');
     const checkpoint=sum(record,'refresh_checkpoint_read')+sum(record,'refresh_checkpoint_validate')+sum(record,'refresh_checkpoint_write');
     const worker=sum(record,'worker_total');
