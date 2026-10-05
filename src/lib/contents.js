@@ -262,20 +262,19 @@ export function parentContentCoverage(database,parentItemId,requested,options = 
 function evaluateContentCoverage(database, requested, options, parentScope) {
   const entries=validateContents(requested).filter((entry)=>entry.completeness==='full');
   const index=ownedContentIndex(database, options);
-  const byUnit=new Map(),byComponent=new Map();
+  const byUnit=new Map(),byComponent=new Map(),needsComponents=entries.some(entry=>entry.unitType==='component');
   const add=(map,key,evidence)=>{const matches=map.get(key)??[];matches.push(...evidence);map.set(key,matches);};
   for(const evidence of index.values()){
-    const [series,,type,number]=JSON.parse(contentKey(evidence[0].entry));const key=JSON.stringify([series,type,number]);
-    if(type==='component'){
-      const parent=evidence[0].item;
+    const first=evidence[0],entry=first.entry;
+    if(entry.unitType==='component'){
+      if(!needsComponents)continue;
       // Explicit parent comparisons never borrow another parent's candidates.
       if(parentScope){
-        if(parentScope.valid&&parentScope.mediaType===options.mediaType){
-          const scoped=index.get(componentContentKey(evidence[0].entry,parentScope.parentItemId,parentScope.mediaType));
-          if(scoped===evidence)add(byComponent,JSON.stringify([options.mediaType,number]),evidence);
-        }
-      }else add(byComponent,JSON.stringify([parent.mediaType,series,number]),evidence);
-    }else add(byUnit,key,evidence);
+        if(parentScope.valid&&parentScope.mediaType===options.mediaType&&first.parentItemId===parentScope.parentItemId)add(byComponent,JSON.stringify([options.mediaType,entry.number]),evidence);
+      }else add(byComponent,JSON.stringify([first.item.mediaType,identityKey(entry.series),entry.number]),evidence);
+    }else{
+      const [series,,type,number]=JSON.parse(contentKey(entry));add(byUnit,JSON.stringify([series,type,number]),evidence);
+    }
   }
   const covered=[]; const missing=[]; const possibleCovered=[];
   for (const entry of entries) {
