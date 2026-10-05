@@ -1,13 +1,14 @@
+import {checkParentScopedComponents} from '../tests/parent-scoped-components-fixture.js';
 import {frozenIndependentEvidence} from './freeze-independent-secondary.mjs';
 import {historicalParser4} from './contents-parser-corpus.mjs';
 import {writeArtifact} from './audit-artifacts.mjs';
 // Offline representation audit, deliberately NOT a new parser or production test.
-// Unsafe results characterize the current contract; they are not desired behavior.
+// The former unsafe counterexamples now assert the parent-scoped contract.
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {wholeManifestEvidence} from './whole-manifest-evidence.mjs';
 import {hash} from './contents-parser-corpus.mjs';
-import {proposeContentsForReview, validateContents, validateContentReview, contentKey, contentCoverage, ownedContentIndex, seriesCoverage} from '../src/lib/contents.js';
+import {proposeContentsForReview, validateContents, validateContentReview, contentKey, contentCoverage, parentContentCoverage, ownedContentIndex, seriesCoverage} from '../src/lib/contents.js';
 import {selectManifest, manifestReviewProposal} from '../src/lib/kindle-manifest.js';
 import {independentContentsClaims} from '../src/lib/kindle-evidence-review.js';
 import {createEmptyDatabase, normalizeProviderItem, validateDatabase} from '../src/lib/models.js';
@@ -74,30 +75,30 @@ const bareApi=api(db,[{title:'Alpha',mediaType:'book'}]);
 assert.deepEqual(bareApi,withoutReview);
 const differentCollection=contentCoverage(db,[entry('Collection B')]);
 assert.equal(differentCollection.owned,0);
-const sameDisplay=contentCoverage(db,[entry()]);
+const sameDisplay=parentContentCoverage(db,a.id,[entry()]);
 assert.equal(sameDisplay.owned,1);assert.equal(sameDisplay.complete,false);
 const incompleteApi=api(db,[{title:'Unrelated offered collection',mediaType:'book',contents:[entry()],contentsComplete:true}]);
-assert.equal(incompleteApi.results[0].owned,false);assert.equal(incompleteApi.results[0].partialMatches.length,1);
+assert.equal(incompleteApi.results[0].owned,false);assert.equal(incompleteApi.results[0].partialMatches.length,0);assert.equal(incompleteApi.results[0].possibleMatches.length,1);
 db.contentReviews[b.id]=review([entry()]);
 const merged=[...ownedContentIndex(db).values()][0];
 // b is unknown, so it is excluded until owned; no access-state loophole.
 assert.equal(merged.length,1);
 db.providerItems[b.id]={...b,ownership:'owned'};
-const index=[...ownedContentIndex(db).values()][0];assert.equal(index.length,2);
-assert.equal(seriesCoverage(db)[0].overlap.length,1);
+const index=[...ownedContentIndex(db).values()][0];assert.equal(index.length,1);assert.equal(ownedContentIndex(db).size,2);
+assert.equal(seriesCoverage(db)[0].overlap.length,0);
 const scoped=entry('Collection A','Alpha',{run:'2020',language:'en'});
 db.contentReviews[a.id]=review([scoped]);delete db.contentReviews[b.id];
 const completeApi=api(db,[{title:'Unrelated offered collection',mediaType:'book',contents:[scoped],contentsComplete:true}]);
-assert.equal(completeApi.ok,true);assert.equal(completeApi.results[0].owned,true);
+assert.equal(completeApi.ok,true);assert.equal(completeApi.results[0].owned,false);assert.equal(parentContentCoverage(db,a.id,[scoped]).complete,true);
 const crossMedia=createEmptyDatabase(),game=normalizeProviderItem({provider:'gog',providerItemId:'named-game-control',recordRef:'00000000-0000-4000-8000-000000000004',title:'Collection A',mediaType:'game',ownership:'owned'},'2026-10-05T00:00:00.000Z');
 crossMedia.providerItems[game.id]=game;crossMedia.contentReviews[game.id]=review([scoped]);
 const crossMediaApi=api(validateDatabase(crossMedia),[{title:'Unrelated offered book',mediaType:'book',contents:[scoped],contentsComplete:true}]);
-assert.equal(crossMediaApi.results[0].owned,true,'Characterize absent media boundary in explicit contents coverage');
+assert.equal(crossMediaApi.results[0].owned,false,'Block cross-media named coverage');assert.equal(crossMediaApi.results[0].coverage.possibleCovered.length,0);
 assert.equal(contentCoverage(db,[entry('Collection A','Alpha: Special Edition',{run:'2020',language:'en'})]).owned,0);
 assert.notEqual(contentKey(entry('Collection A','Alpha')),contentKey(entry('Collection A','alpha')));
-assert.equal(contentKey(entry('Collection A','01')),contentKey(entry('Collection A','1')));
+assert.notEqual(contentKey(entry('Collection A','01')),contentKey(entry('Collection A','1')));
 assert.equal(contentKey(entry('Collection: A')),contentKey(entry('Collection A')));
-assert.equal(validateContents([entry('Collection A','01'),entry('Collection A','1')]).length,1);
+assert.equal(validateContents([entry('Collection A','01'),entry('Collection A','1')]).length,2);
 assert.equal(validateContents([entry(),entry()]).length,1);
 assert.equal(validateContents([entry(),entry('Collection A','Alpha: Special Edition')]).length,2);
 const extra=validateContents([entry('Collection A','Alpha',{parentItemId:a.id,workType:'novel',sourceClaim:'candidate-1',qualifiers:['full-length']})])[0];
@@ -105,8 +106,9 @@ assert.equal(Object.hasOwn(extra,'parentItemId'),false);assert.equal(Object.hasO
 assert.throws(()=>validateContents([entry('Collection A','A'.repeat(81))]));
 const restored=parseBackup(createBackup(validateDatabase(db)));
 assert.deepEqual(restored.contentReviews,db.contentReviews);
-assert.equal(api(restored,[{title:'Unrelated offered collection',mediaType:'book',contents:[scoped],contentsComplete:true}]).results[0].owned,true);
-const proof={ordinaryBareTitleBefore:withoutReview,ordinaryBareTitleAfterVerification:bareApi,differentCollectionCoverage:differentCollection,sameDisplayCoverage:sameDisplay,explicitIncompleteRequest:incompleteApi,explicitCompleteRequest:completeApi,crossMediaExplicitRequest:crossMediaApi,sameTitleParentItems:[a.id,b.id],sameKeyIndexEvidenceCount:index.length,scopeFieldsDiscarded:extra,numericComponentTitleCollision:true,parentPunctuationCollision:true,casePreserved:true,editionTitlePreserved:true,backupPreservesReviews:true,unsafeCompleteRequestSurvivesBackup:true};
+assert.equal(api(restored,[{title:'Unrelated offered collection',mediaType:'book',contents:[scoped],contentsComplete:true}]).results[0].owned,false);assert.equal(parentContentCoverage(restored,a.id,[scoped]).complete,true);
+const proof={ordinaryBareTitleBefore:withoutReview,ordinaryBareTitleAfterVerification:bareApi,differentCollectionCoverage:differentCollection,sameDisplayCoverage:sameDisplay,explicitIncompleteRequest:incompleteApi,explicitCompleteRequest:completeApi,crossMediaExplicitRequest:crossMediaApi,sameTitleParentItems:[a.id,b.id],sameKeyIndexEvidenceCount:index.length,scopeFieldsDiscarded:extra,numericComponentTitleCollision:false,parentPunctuationCollision:true,casePreserved:true,editionTitlePreserved:true,backupPreservesReviews:true,unscopedOwnedBlockedAfterBackup:true};
+const syntheticAcceptance=await checkParentScopedComponents();
 const grammarControls=[
  ['finite-count','Contains four novels: Alpha, Beta, Gamma, and Delta.'],
  ['count-mismatch','Contains four novels: Alpha, Beta, and Gamma.'],
@@ -126,8 +128,8 @@ const grammarControls=[
 const times=[];for(let n=0;n<7;n++){const t=performance.now();for(const row of corpus.rows)proposeContentsForReview(row.input,row.title,row.context);times.push(performance.now()-t);}
 assert.equal(requests,0);assert.equal(hash(await readFile(process.argv[2])),corpus.sourceHash);
 const implementationHashes=Object.fromEntries(await Promise.all(['contents.js','contents-quality.js','kindle-manifest.js','kindle-evidence-review.js','models.js','matcher.js','external-api.js','companion-response.js'].map(async file=>[file,hash(await readFile(new URL('../src/lib/'+file,import.meta.url)))])));
-const frozen={baselineCommit:'4ac1bfd',sourceHash:corpus.sourceHash,implementationHashes,versions:{source:5,parser:4,filter:1,schema:12,manifestInterpretation:1,evidenceReview:1},networkRequests:requests,decision:'C: stop before grammar; explicit parent scope is missing.',populationDefinition:'Inclusive, reproducible audit queue, not an accepted finite-work population or production classifier.',savedQueueCount:population.length,capturedQueueCount:capturedPopulation.length,tagCounts:Object.fromEntries([...new Set(population.flatMap(r=>r.tags))].sort().map(tag=>[tag,population.filter(r=>r.tags.includes(tag)).length])),saved:population,captured:capturedPopulation,syntheticControls:grammarControls,modelProof:proof};
+const frozen={baselineCommit:'4ac1bfd',sourceHash:corpus.sourceHash,implementationHashes,versions:{source:5,parser:4,filter:1,schema:12,manifestInterpretation:1,evidenceReview:1},networkRequests:requests,decision:'Parent-scoped named identity enforced; no parser-5 grammar implemented.',populationDefinition:'Inclusive, reproducible audit queue, not an accepted finite-work population or production classifier.',savedQueueCount:population.length,capturedQueueCount:capturedPopulation.length,tagCounts:Object.fromEntries([...new Set(population.flatMap(r=>r.tags))].sort().map(tag=>[tag,population.filter(r=>r.tags.includes(tag)).length])),saved:population,captured:capturedPopulation,syntheticControls:grammarControls,modelProof:proof,syntheticAcceptance};
 const replayResult={sourceHash:corpus.sourceHash,networkRequests:requests,versions:frozen.versions,decision:frozen.decision,deterministic:true,historicalParser4ObjectsUnchanged:1520,saved:totals(first.saved),captured:totals(first.captured),recordsChanged:0,added:[],removed:[],modelProof:proof,performance:{firstMs,secondMs,warmRuns:7,parser4MedianMs:[...times].sort((a,b)=>a-b)[3],parser5Impact:'Not applicable; no implementation.'},rows:first.saved,capturedRows:first.captured};
 await writeArtifact('kindle-named-contained-works-frozen.json',JSON.stringify(frozen,null,2)+'\n');
 await writeArtifact('kindle-named-contained-works-replay.json',JSON.stringify(replayResult,null,2)+'\n');
-console.log(JSON.stringify({decision:frozen.decision,savedQueue:frozen.savedQueueCount,capturedQueue:frozen.capturedQueueCount,tagCounts:frozen.tagCounts,saved:replayResult.saved,captured:replayResult.captured,unsafeExplicitCoverageOwned:completeApi.results[0].owned,numericTitleCollision:true,deterministic:true,networkRequests:requests,performance:replayResult.performance},null,2));
+console.log(JSON.stringify({decision:frozen.decision,savedQueue:frozen.savedQueueCount,capturedQueue:frozen.capturedQueueCount,tagCounts:frozen.tagCounts,saved:replayResult.saved,captured:replayResult.captured,unsafeExplicitCoverageOwned:completeApi.results[0].owned,numericTitleCollision:false,deterministic:true,networkRequests:requests,performance:replayResult.performance},null,2));

@@ -7,6 +7,7 @@ import {contentsParserV4Tests} from './contents-parser-v4.js';
 import {kindleSourceCaptureTests} from './kindle-source-capture.js';
 import {independentEvidenceTests} from './kindle-independent-evidence.js';
 import {kindleWholeManifestTests} from './kindle-whole-manifest.js';
+import {parentScopedComponentCases} from './parent-scoped-components-fixture.js';
 import {companionFeedTests} from './companion-feeds.js';
 import {releaseTests} from './release.js';
 import { finalGlTests } from './final-gl-features.js';
@@ -59,6 +60,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...parentScopedComponentCases,
   ...ownershipPolicyTests,
   ...commonMatchingPolicyTests,
   ...companionTitleOwnershipTests,

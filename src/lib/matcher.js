@@ -152,11 +152,12 @@ export function matchItems(items, requestedItems, context = {}) {
     }
     let coverage=null;const partialMatches=new Map();
     if(requested?.length){
-      const result=contentCoverage(database,requested,{excludeProviders:[...exclude]});
+      // API v1 has no trusted parent scope. Never forward caller parent fields.
+      const result=contentCoverage(database,requested,{excludeProviders:[...exclude],mediaType:query.mediaType});
       const exposed=entries=>entries.map(entry=>({...entry,evidence:entry.evidence.map(({item,review})=>({...publicMatch(item,'contains','Reviewed collected contents.'),verifiedAt:review.verifiedAt}))}));
       coverage={...result,covered:exposed(result.covered),possibleCovered:exposed(result.possibleCovered)};
       for(const entry of result.covered)for(const {item}of entry.evidence)partialMatches.set(item.id,publicMatch(item,'contains','Verified coverage of requested contents.'));
-      for(const entry of result.possibleCovered)for(const {item}of entry.evidence)candidate(item,'Reviewed contents may overlap; the series/run or language needs confirmation.','contains');
+      for(const entry of result.possibleCovered)for(const {item}of entry.evidence)candidate(item,entry.unitType==='component'?'Reviewed named contents are parent-local; the offered parent identity is not established.':'Reviewed contents may overlap; the series/run or language needs confirmation.','contains');
       if(result.complete&&request.contentsComplete===true)for(const [id,item]of partialMatches)exact.set(id,{...item,reason:'All explicitly enumerated requested contents are verified owned.'});
     }
     for(const id of exact.keys())possible.delete(id);

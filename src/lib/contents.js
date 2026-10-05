@@ -26,8 +26,14 @@ export function validateContents(entries) {
 
 export function contentKey(entry) {
   const fraction=/^(\d+)\/(\d+)$/u.exec(entry.number);
-  const number=fraction?String(Number(fraction[1])/Number(fraction[2])):/^\d+(?:\.\d+)?$/u.test(entry.number)?String(Number(entry.number)):entry.number;
+  const number=entry.unitType==='component'?entry.number:fraction?String(Number(fraction[1])/Number(fraction[2])):/^\d+(?:\.\d+)?$/u.test(entry.number)?String(Number(entry.number)):entry.number;
   return JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,number,identityKey(entry.language)]);
+}
+
+// contentKey is an entry/dedup key, never global named-work identity. Verified
+// component keys derive scope from the review owner and stored parent media.
+function componentContentKey(entry,parentItemId,mediaType) {
+  return JSON.stringify(['parent-component',parentItemId,mediaType,identityKey(entry.run),entry.number,identityKey(entry.language)]);
 }
 
 /** Parse explicit number statements into a proposal. Only review makes it evidence. */
@@ -234,47 +240,74 @@ export function ownedContentIndex(database, {excludeProviders = [], excludeItemI
     if (!item || !['owned','claimed'].includes(item.ownership) || excludeProviders.includes(item.provider) || excludeItemIds.includes(itemId)) continue;
     for (const entry of review.entries) {
       if (entry.completeness!=='full') continue;
-      const key=contentKey(entry);const matches=byKey.get(key)??[];
-      matches.push({item,entry,review});byKey.set(key,matches);
+      const key=entry.unitType==='component'?componentContentKey(entry,itemId,item.mediaType):contentKey(entry);const matches=byKey.get(key)??[];
+      matches.push({item,entry,review,...(entry.unitType==='component'?{parentItemId:itemId}:{})});byKey.set(key,matches);
     }
   }
   return byKey;
 }
 
 export function contentCoverage(database, requested, options = {}) {
+  return evaluateContentCoverage(database,requested,options,null);
+}
+
+/** Trusted local parent comparison. This context is never read from entries or
+ * external requests; the review owner must be an actual current stored record. */
+export function parentContentCoverage(database,parentItemId,requested,options = {}) {
+  const parent=typeof parentItemId==='string'&&Object.hasOwn(database.providerItems,parentItemId)?database.providerItems[parentItemId]:null;
+  return evaluateContentCoverage(database,requested,{...options,mediaType:options.mediaType??parent?.mediaType},
+    {parentItemId,mediaType:parent?.mediaType,valid:Boolean(parent)});
+}
+
+function evaluateContentCoverage(database, requested, options, parentScope) {
   const entries=validateContents(requested).filter((entry)=>entry.completeness==='full');
   const index=ownedContentIndex(database, options);
-  const byUnit=new Map();
+  const byUnit=new Map(),byComponent=new Map();
+  const add=(map,key,evidence)=>{const matches=map.get(key)??[];matches.push(...evidence);map.set(key,matches);};
   for(const evidence of index.values()){
     const [series,,type,number]=JSON.parse(contentKey(evidence[0].entry));const key=JSON.stringify([series,type,number]);
-    const matches=byUnit.get(key)??[];matches.push(...evidence);byUnit.set(key,matches);
+    if(type==='component'){
+      const parent=evidence[0].item;
+      // Explicit parent comparisons never borrow another parent's candidates.
+      if(parentScope){
+        if(parentScope.valid&&parentScope.mediaType===options.mediaType){
+          const scoped=index.get(componentContentKey(evidence[0].entry,parentScope.parentItemId,parentScope.mediaType));
+          if(scoped===evidence)add(byComponent,JSON.stringify([options.mediaType,number]),evidence);
+        }
+      }else add(byComponent,JSON.stringify([parent.mediaType,series,number]),evidence);
+    }else add(byUnit,key,evidence);
   }
   const covered=[]; const missing=[]; const possibleCovered=[];
   for (const entry of entries) {
-    const evidence=index.get(contentKey(entry))??[];
+    const component=entry.unitType==='component';
+    const scoped=component&&parentScope?.valid&&parentScope.mediaType===options.mediaType;
+    const key=component?(scoped?componentContentKey(entry,parentScope.parentItemId,parentScope.mediaType):null):contentKey(entry);
+    const evidence=key?index.get(key)??[]:[];
     (evidence.length?covered:missing).push({...entry, ...(evidence.length?{evidence}: {})});
     if (!evidence.length) {
       const [series,run,type,number,language]=JSON.parse(contentKey(entry));
-      const possible=(byUnit.get(JSON.stringify([series,type,number]))??[]).filter(({entry:owned}) => {
+      const candidates=component?byComponent.get(JSON.stringify(parentScope?[options.mediaType,number]:[options.mediaType,series,number])):byUnit.get(JSON.stringify([series,type,number]));
+      const possible=(candidates??[]).filter(({entry:owned}) => {
         const other=JSON.parse(contentKey(owned));
-        return series===other[0] && type===other[2] && number===other[3] && (!run||!other[1]||run===other[1]) && (!language||!other[4]||language===other[4]);
+        return (component&&parentScope||series===other[0]) && type===other[2] && number===other[3] && (!run||!other[1]||run===other[1]) && (!language||!other[4]||language===other[4]);
       });
       if(possible.length)possibleCovered.push({...entry,evidence:possible});
     }
   }
-  const scopeUncertain=entries.some((entry)=>!entry.run || !entry.language);
+  const scopeUncertain=entries.some((entry)=>!entry.run || !entry.language || entry.unitType==='component'&&(!parentScope?.valid||parentScope.mediaType!==options.mediaType));
   return {total:entries.length,owned:covered.length,complete:entries.length>0&&!missing.length&&!scopeUncertain,scopeUncertain:scopeUncertain||possibleCovered.length>0,covered,possibleCovered,missing};
 }
 
 export function seriesCoverage(database) {
   const index=ownedContentIndex(database);const groups=new Map();
   for (const evidence of index.values()) {
-    const entry=evidence[0].entry; const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]);
-    const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[]};
+    const entry=evidence[0].entry,parent=evidence[0].item,component=entry.unitType==='component',parentItemId=evidence[0].parentItemId;
+    const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language),...(component?[parentItemId,parent.mediaType]:[])]);
+    const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     group.entries.push({number:entry.number,sources:evidence.map(({item})=>({id:item.id,title:item.title,provider:item.provider}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
-    const numeric=group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);
+    const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);
     const gaps=[];
     if (numeric.length && numeric.at(-1)-numeric[0]<=2000) for(let n=numeric[0];n<=numeric.at(-1);n++) if(!numeric.includes(n)) gaps.push(String(n));
     return {...group,gaps,overlap:group.entries.filter((entry)=>new Set(entry.sources.map((source)=>source.id)).size>1)};
