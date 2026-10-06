@@ -2,7 +2,7 @@ import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import { matchItems } from '../lib/matcher.js';
-import { handleExternalApiRequest } from '../lib/external-api.js';
+import { handleExternalApiRequestAsync } from '../lib/external-api.js';
 import '../providers/metadata.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
 import { openLibraryCandidatesFromSearch, openLibrarySearchUrl } from '../lib/open-library.js';
@@ -32,6 +32,9 @@ const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderIt
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
+const companionTimings=contentsPerformance.collector();
+let contentsDiagnosticUntil=0,companionDiagnosticSequence=0;
+const companionDiagnosticPrefix=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
 const contentsProgressHub=globalThis.GalacticContentsScan.progressHub();
 const broadcastContentsProgress=()=>chrome.runtime.sendMessage({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:contentsProgressHub.list()}).catch(()=>{});
 chrome.tabs?.onRemoved?.addListener(tabId=>{storageWriter.interruptKindleContentsRefresh(tabId).catch(()=>{});if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
@@ -39,6 +42,7 @@ chrome.tabs?.onUpdated?.addListener((tabId,change)=>{if(change.status==='loading
 chrome.runtime.onStartup?.addListener(()=>storageWriter.interruptKindleContentsRefresh().catch(()=>{}));
 function contentsTiming(request,kind){
   const timing=contentsPerformance.trace(request?.diagnosticLookupId,kind);
+  if(timing)contentsDiagnosticUntil=contentsPerformance.now()+60000;
   if(timing)timing.onWrite=()=>chrome.runtime.sendMessage({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:timing.id}).catch(()=>{});
   return timing;
 }
@@ -215,7 +219,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if(request?.type==='GET_KINDLE_CONTENTS_UI_TIMINGS'){
     if(!isProviderImportPage('kindle',sender.url)){sendResponse({ok:false});return undefined;}
-    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean)});return undefined;
+    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean)});return undefined;
   }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
@@ -362,7 +366,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return undefined;
     }
     storageWriter.getQueryDatabase()
-      .then((database) => sendResponse(handleExternalApiRequest(database, {...request,apiVersion:request.apiVersion??1})))
+      .then(database=>handleExternalApiRequestAsync(database,{...request,apiVersion:request.apiVersion??1},{cacheImmutableRecords:true})).then(sendResponse)
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
@@ -484,10 +488,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  const entered=contentsPerformance.now(),sent=request?.diagnosticSentEpochMs;
+  const explicit=contentsPerformance.validId(request?.diagnosticLookupId);
+  const diagnosticId=explicit?request.diagnosticLookupId:request?.type==='MATCH_ITEMS'&&entered<contentsDiagnosticUntil?'lookup-'+companionDiagnosticPrefix+'-'+String(++companionDiagnosticSequence).padStart(3,'0'):null;
+  const timing=contentsPerformance.trace(diagnosticId,'companion',undefined,explicit&&Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000?sent:null);
+  if(timing)timing.scheduling={yields:0,maxSliceMs:0,cpuMs:0};
+  if(timing&&timing.start<entered)timing.events.push({stage:'handler_delay',attempt:0,startMs:0,durationMs:entered-timing.start});
+  let endStage=timing?.begin('query_authorization');
+  const respond=value=>{
+    endStage?.();endStage=null;
+    const end=timing?.begin('response_dispatch');
+    try{sendResponse(explicit&&timing?{...value,performance:contentsPerformance.clean(timing.finish())}:value);}
+    finally{end?.();if(timing)companionTimings.add(timing.finish());}
+  };
   storageWriter.getQueryAllowedExternalClientIds()
     .then((allowedIds) => {
+      endStage?.();endStage=null;
       if (!sender.id || !allowedIds.includes(sender.id)) {
-        sendResponse({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
+        respond({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
         return null;
       }
       if(request?.type==='OPEN_REVIEW'){
@@ -499,8 +517,13 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         const operation=request.type==='BEGIN_ENTITLEMENT_FEED'?storageWriter.beginCompanionFeed(sender.id,request,true):request.type==='APPEND_ENTITLEMENT_FEED'?storageWriter.appendCompanionFeed(sender.id,request.uploadToken,request.offset,request.entries,true):request.type==='COMMIT_ENTITLEMENT_FEED'?storageWriter.commitCompanionFeed(sender.id,request.uploadToken,true):storageWriter.removeCompanionFeed(sender.id,true);
         return operation.then(result=>sendResponse({ok:true,apiVersion:1,...result}),()=>sendResponse({ok:false,apiVersion:1,error:'Reminder transfer did not complete. Check the active Humble profile, batch order and storage; prior reminders were retained.'}));
       }
-      return storageWriter.getQueryDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
+      endStage=timing?.begin('query_snapshot');
+      return storageWriter.getQueryDatabase().then(async database=>{
+        endStage?.();endStage=null;
+        const result=await handleExternalApiRequestAsync(database,request,{cacheImmutableRecords:true,onStage:stage=>{endStage?.();endStage=timing?.begin(stage);},onSlice:(duration,yielded)=>{if(timing){timing.scheduling.yields+=Number(yielded);timing.scheduling.maxSliceMs=Math.max(timing.scheduling.maxSliceMs,duration);timing.scheduling.cpuMs+=duration;}}});
+        respond(result);
+      });
     })
-    .catch(() => sendResponse({ ok: false, error: 'The Galactic Library API is unavailable. Open Galactic Library to check its storage.' }));
+    .catch(() => respond({ ok: false, error: 'The Galactic Library API is unavailable. Open Galactic Library to check its storage.' }));
   return true;
 });

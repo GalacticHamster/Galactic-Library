@@ -1,6 +1,7 @@
 import {object,text,strings} from './validation.js';
 import {validateEnrichment} from './metadata-validation.js';
 import {validateDescriptionBlocks} from './kindle-manifest.js';
+import {finishWork} from './cooperative-work.js';
 
 const reference=value=>{if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(value??''))throw Error('Invalid contents observation reference.');return value;};
 const rawText=(value,max)=>{if(typeof value!=='string'||value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value))throw Error('Invalid bounded source text.');return value;};
@@ -37,16 +38,22 @@ export function validateContentsObservation(value) {
 }
 
 export function validateKindleContentsObservations(value,records=[]) {
+  return finishWork(kindleContentsObservationsSteps(value,records));
+}
+export function* kindleContentsObservationsSteps(value,records=[]) {
   object(value,'Kindle contents observations');if(Object.keys(value).length>50000)throw Error('Too many contents observation records.');
   const owners=new Map(records.map(item=>[item.recordRef,item]));
-  return Object.fromEntries(Object.entries(value).map(([ref,entry])=>{
+  const result=[];
+  for(const [ref,entry] of Object.entries(value)){
+    yield;
     reference(ref);object(entry,'Contents observation record');
     const providerItemId=text(entry.providerItemId,550,'Observation provider item');
     if(!/^kindle:[A-Z0-9]+$/u.test(providerItemId))throw Error('Invalid observation provider item.');
     const owner=owners.get(ref);
     if(owner&&(owner.provider!=='kindle'||owner.id!==providerItemId))throw Error('Contents history belongs to another provider record.');
-    return [ref,{providerItemId,baseline:entry.baseline===null?null:validateContentsObservation(entry.baseline),
+    result.push([ref,{providerItemId,baseline:entry.baseline===null?null:validateContentsObservation(entry.baseline),
       ...(entry.latestAttempt?{latestAttempt:validateContentsObservation(entry.latestAttempt)}:{}),
-      ...(entry.undoRef?{undoRef:reference(entry.undoRef)}:{})}];
-  }));
+      ...(entry.undoRef?{undoRef:reference(entry.undoRef)}:{})}]);
+  }
+  return Object.fromEntries(result);
 }

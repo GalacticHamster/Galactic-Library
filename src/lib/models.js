@@ -7,13 +7,15 @@ import { validateProviderStates } from './provider-state.js';
 import { object, text, strings, date } from './validation.js';
 import { editionBarriers, validateEditionSeparations } from './relationships.js';
 import { providerOwnership, defaultOwnershipPolicy, validateOwnershipPolicy } from './ownership.js';
-import {validateEnrichmentHistory,validateEnrichmentReviews} from './enrichment-state.js';
+import {validateEnrichmentReviews} from './enrichment-state.js';
 import {validateCompanionFeeds} from './companion-entitlements.js';
 import {validateReadingStates,validateReadingOrders} from './reading.js';
 import {validateReminderReviews} from './reminders.js';
 import {validateTitleAliases} from './title-aliases.js';
 import {validateOwnershipReviews,validateOwnershipProposals} from './ownership-review.js';
-import {validateKindleContentsObservations} from './kindle-contents-observations.js';
+import {kindleContentsObservationsSteps} from './kindle-contents-observations.js';
+import {enrichmentHistorySteps} from './enrichment-state.js';
+import {finishWork,finishWorkAsync} from './cooperative-work.js';
 
 export function createEmptyDatabase() {
   return {
@@ -73,6 +75,9 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
 }
 
 export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, previousCanonicalItems = {}, editionSeparations = {}) {
+  return finishWork(canonicalItemsSteps(providerItems,manualMatchDecisions,previousCanonicalItems,editionSeparations));
+}
+export function* canonicalItemsSteps(providerItems, manualMatchDecisions = {}, previousCanonicalItems = {}, editionSeparations = {}) {
   const records = Object.values(providerItems).filter((item) => item.mediaType !== 'game-addon');
   const parent = new Map(records.map((item) => [item.id, item.id]));
   const members = new Map(records.map((item) => [item.id, [item]]));
@@ -95,6 +100,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
   };
   const exactGroups = new Map();
   for (const item of records) {
+    yield;
     const identity = identityEvidence(item);
     const keys = [`title:${item.normalizedTitle}`, ...identity.isbn.map((isbn) => `isbn:${isbn}`), ...(identity.asin ? [`asin:${identity.asin}`] : [])];
     for (const signal of keys) {
@@ -105,10 +111,11 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
   }
   for (const group of exactGroups.values()) {
     for (let index = 0; index < group.length; index += 1) {
-      for (const item of group.slice(index + 1)) if (sameEditionEvidence(group[index], item)) join(group[index].id, item.id);
+      for (const item of group.slice(index + 1)) {yield;if (sameEditionEvidence(group[index], item)) join(group[index].id, item.id);}
     }
   }
   for (const decision of Object.values(manualMatchDecisions)) {
+    yield;
     if (decision?.decision !== 'same-edition' || !Array.isArray(decision.itemIds) || decision.itemIds.length !== 2) continue;
     const [left, right] = decision.itemIds;
     const leftItem = providerItems[left];
@@ -118,6 +125,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
   }
   const grouped = new Map();
   for (const item of records) {
+    yield;
     const key = find(item.id);
     const existing = grouped.get(key) ?? [];
     existing.push(item);
@@ -126,9 +134,12 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
   const usedIds = new Set();
   const previousByRecord = new Map();
   for (const entry of Object.values(previousCanonicalItems ?? {})) {
+    yield;
     if (/^edition:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(entry?.id??'') && Array.isArray(entry.providerItemIds) && entry.providerItemIds.length<=500000) for (const itemId of entry.providerItemIds) if(typeof itemId==='string'&&providerItems[itemId]) previousByRecord.set(itemId, entry);
   }
-  return Object.fromEntries([...grouped.values()].map((items) => {
+  const result=[];
+  for(const items of grouped.values()) {
+    yield;
     const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
     const normalizedTitles = ordered.map((item) => item.normalizedTitle).sort();
     const previous = ordered.map((item) => previousByRecord.get(item.id)).find((entry) => entry && !usedIds.has(entry.id));
@@ -137,7 +148,7 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
     // Never overwrite that group when input/provider order changes.
     if(usedIds.has(id))id=ordered.map(item=>`edition:${item.recordRef}`).find(candidate=>!usedIds.has(candidate))??`edition:${crypto.randomUUID()}`;
     usedIds.add(id);
-    return [id, {
+    result.push([id, {
       id,
       mediaType: ordered[0].mediaType,
       title: ordered[0].title,
@@ -146,19 +157,27 @@ export function rebuildCanonicalItems(providerItems, manualMatchDecisions = {}, 
       edition: ordered[0].edition,
       providerItemIds: ordered.map((item) => item.id),
       providerCount: ordered.length
-    }];
-  }));
+    }]);
+  }
+  return Object.fromEntries(result);
 }
 
 export function validateDatabase(value) {
+  return finishWork(databaseSteps(value));
+}
+export function validateDatabaseAsync(value,options){return finishWorkAsync(databaseSteps(value),options);}
+function* databaseSteps(value) {
+  yield 'validation_records';
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
   if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
-  const normalizedItems = Object.values(value.providerItems).map((item) => {
+  const normalizedItems=[];
+  for(const item of Object.values(value.providerItems)) {
+    yield;
     const normalized = normalizeProviderItem({...item,observedAt:item?.observedAt??null}, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
-    return [normalized.id, normalized];
-  });
+    normalizedItems.push([normalized.id, normalized]);
+  }
   if(new Set(normalizedItems.map(([id])=>id)).size!==normalizedItems.length)throw new Error('Backup contains duplicate provider identities.');
   const providerItems = Object.fromEntries(normalizedItems);
   // Older Humble imports labelled a game product as a direct download even
@@ -171,16 +190,22 @@ export function validateDatabase(value) {
   for(const item of Object.values(providerItems))if(item.provider==='humble'&&item.mediaType==='game'
     &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
   const providers = validateProviderStates(value.providers ?? {});
+  yield 'validation_history';
   object(value.providerHistory??{},'Provider history');
   if(Object.keys(value.providerHistory??{}).length>500000)throw new Error('Provider history exceeds its limit.');
-  const providerHistory=Object.fromEntries(Object.entries(value.providerHistory??{}).map(([ref,entry])=>{
+  const historyEntries=[];
+  for(const [ref,entry] of Object.entries(value.providerHistory??{})){
+    yield;
     object(entry,'Historical record');
     if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref)||!['missing-from-complete-scan','profile-switch'].includes(entry.reason))throw new Error('Invalid historical record.');
     const item=normalizeProviderItem({...entry.item,observedAt:entry.item?.observedAt??null},entry.item?.updatedAt);
-    return [ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason}];
-  }));
+    historyEntries.push([ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason}]);
+  }
+  const providerHistory=Object.fromEntries(historyEntries);
   const refs=new Set();
+  yield 'validation_other';
   for(const item of Object.values(providerItems)){
+    yield;
     if(refs.has(item.recordRef))throw new Error('Backup contains duplicate persistent record references.');
     refs.add(item.recordRef);
   }
@@ -190,6 +215,7 @@ export function validateDatabase(value) {
   object(value.manualMatchDecisions??{},'Saved relationships');
   if (Object.keys(value.manualMatchDecisions??{}).length>100000) throw new Error('Too many saved relationships.');
   for(const decision of Object.values(value.manualMatchDecisions??{})){
+    yield;
     if(!['same','same-work','same-edition','different'].includes(decision?.decision)||!Array.isArray(decision.itemIds)||decision.itemIds.length!==2||decision.itemIds.some(id=>typeof id!=='string')||decision.itemIds[0]===decision.itemIds[1])throw new Error('Invalid saved relationship.');
     const itemIds=[...decision.itemIds].sort();
     const [left,right]=itemIds.map(id=>providerItems[id]);
@@ -201,23 +227,31 @@ export function validateDatabase(value) {
   if(Object.keys(value.contentReviews??{}).length>500000)throw new Error('Too many contents reviews.');
   const editionSeparations=validateEditionSeparations(value.editionSeparations??{});
   for(const separation of Object.values(editionSeparations)){
+    yield;
     const item=providerItems[separation.itemId];
     if(item&&separation.otherItemIds.some(id=>providerItems[id]&&providerItems[id].mediaType!==item.mediaType))throw new Error('An edition separation crosses media types.');
   }
+  const ownershipPolicy=validateOwnershipPolicy(value.ownershipPolicy);
+  yield 'validation_history';
+  const enrichmentHistory=yield* enrichmentHistorySteps(value.enrichmentHistory);
+  const observations=value.kindleContentsObservations!==undefined?yield* kindleContentsObservationsSteps(value.kindleContentsObservations,[...Object.values(providerItems),...Object.values(providerHistory).map(entry=>entry.item)]):undefined;
+  yield 'validation_other';
+  const remaining={enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),titleAliases:validateTitleAliases(value.titleAliases),
+    readingStates:validateReadingStates(value.readingStates),readingOrders:validateReadingOrders(value.readingOrders),reminderReviews:validateReminderReviews(value.reminderReviews),
+    ownershipReviews:validateOwnershipReviews(value.ownershipReviews),ownershipProposals:validateOwnershipProposals(value.ownershipProposals)};
+  yield 'validation_canonical';
+  const canonicalItems=yield* canonicalItemsSteps(providerItems,manualMatchDecisions,value.canonicalItems,editionSeparations);
+  yield 'validation_other';
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,
     providers,
-    ownershipPolicy: validateOwnershipPolicy(value.ownershipPolicy),
+    ownershipPolicy,
     providerHistory,
-    enrichmentHistory:validateEnrichmentHistory(value.enrichmentHistory),
-    ...(value.kindleContentsObservations!==undefined?{kindleContentsObservations:validateKindleContentsObservations(value.kindleContentsObservations,[...Object.values(providerItems),...Object.values(providerHistory).map(entry=>entry.item)])}:{}),
-    enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),
-    titleAliases:validateTitleAliases(value.titleAliases),
-    readingStates:validateReadingStates(value.readingStates),readingOrders:validateReadingOrders(value.readingOrders),
-    reminderReviews:validateReminderReviews(value.reminderReviews),
-    ownershipReviews:validateOwnershipReviews(value.ownershipReviews),ownershipProposals:validateOwnershipProposals(value.ownershipProposals),
+    enrichmentHistory,
+    ...(observations!==undefined?{kindleContentsObservations:observations}:{}),
+    ...remaining,
     providerItems,
-    canonicalItems: rebuildCanonicalItems(providerItems, manualMatchDecisions, value.canonicalItems,editionSeparations),
+    canonicalItems,
     manualMatchDecisions,
     editionSeparations,
     contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => {if(id.length>550)throw new Error('Contents review ID exceeds its bounds.');return [id, validateContentReview(review)];}))

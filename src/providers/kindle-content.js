@@ -46,7 +46,7 @@
   shadow.querySelector('[data-export-timing]').addEventListener('click',async()=>{
     if(!timings)return;
     const response=await globalThis.GalacticSync.send({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}).catch(()=>null);
-    timingOutput.value=JSON.stringify(timings.report(response?.records??[]),null,2);timingOutput.hidden=false;timingOutput.focus();timingOutput.select();
+    timingOutput.value=JSON.stringify(timings.report(response?.records??[],response?.companions??[]),null,2);timingOutput.hidden=false;timingOutput.focus();timingOutput.select();
   });
   diagnosticCheck.addEventListener('change',()=>{closePending();if(!diagnosticCheck.checked){diagnosticPrefix='';}});
   let activeContentsRequest = null;

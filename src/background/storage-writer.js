@@ -9,7 +9,7 @@ import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_VERSION,validateKindleRefresh,kindleRe
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
-import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase } from '../lib/models.js';
+import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase,validateDatabaseAsync } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
 import { validateProviderSnapshot } from '../lib/provider-snapshot.js';
 import { validateContentReview,CONTENTS_PARSER_VERSION } from '../lib/contents.js';
@@ -83,7 +83,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         // result over a newer committed revision, including clear/restore.
         if(epoch!==querySnapshotEpoch)continue;
         const raw=stored[DATABASE_STORAGE_KEY];
-        const database=raw?validateDatabase(raw):createEmptyDatabase();
+        const database=raw?await validateDatabaseAsync(raw):createEmptyDatabase();
+        if(epoch!==querySnapshotEpoch)continue;
         if(raw&&!equalDatabaseData(raw,database)){
           // Legacy/repair reads may allocate persistent record/canonical refs.
           // Preserve the existing ordered migration; never expose identities
@@ -116,6 +117,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(stage==='storage_write'||stage==='migration_write'){try{activeTiming.onWrite?.();}catch{/* Diagnostics must never prevent a write. */}}
     return (async()=>{try{return await work();}finally{end();}})();
   };
+  async function validateForWriter(value){
+    const timing=activeTiming;let endStage;
+    try{return await validateDatabaseAsync(value,{onStage:stage=>{endStage?.();endStage=timing?.begin(stage);}});}
+    finally{endStage?.();}
+  }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
   async function beginProviderScan(provider,profile,mode='full',switchProfile=false,tabId=null) {
@@ -166,7 +172,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function getDatabase() {
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
-    const database = timed('read_validation',()=>validateDatabase(stored[DATABASE_STORAGE_KEY]));
+    const database = await timedAsync('read_validation',()=>validateForWriter(stored[DATABASE_STORAGE_KEY]));
     if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
@@ -184,7 +190,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function persistDatabase(database,invalidate=null,extra={}) {
-    const validated = timed('persist_validation',()=>validateDatabase(database));
+    const validated = await timedAsync('persist_validation',()=>validateForWriter(database));
     const updates={...extra,[DATABASE_STORAGE_KEY]:validated};
     if(invalidate==='all')updates[KINDLE_REFRESH_KEY]=null;
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}

@@ -1,11 +1,15 @@
 import { titleKey } from './normalization.js';
 import { identityConflicts as recordConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
 import { contentCoverage, proposeContents } from './contents.js';
-import { rebuildCanonicalItems } from './models.js';
+import { canonicalItemsSteps } from './models.js';
+import {finishWork,finishWorkAsync} from './cooperative-work.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
 const policy = globalThis.LibraryMatchingPolicy;
+// The worker alone enables this for its deeply frozen committed snapshots.
+// Cache only title/identity derivations, never entitlement, expiry or decisions.
+const immutableRecordKeys=new WeakMap();
 const identityConflicts = (left, right, options = {}) => recordConflicts(left, right, { ...options, companion: true });
 
 // Companion checks can establish a full storefront title without merging GL's
@@ -43,22 +47,32 @@ function requestRecord(request) {
 }
 
 export function matchItems(items, requestedItems, context = {}) {
+  return finishWork(matchItemsSteps(items,requestedItems,context));
+}
+export function matchItemsAsync(items,requestedItems,context={},options){return finishWorkAsync(matchItemsSteps(items,requestedItems,context,options),options);}
+function* matchItemsSteps(items, requestedItems, context = {}, {cacheImmutableRecords=false}={}) {
+  yield 'matching_index';
+  const sourceItems=items;
   items=Object.fromEntries(Object.entries(items).map(([id,item])=>[id,effectiveOwnershipRecord(item,context)]));
   const database={...context,providerItems:items};
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};
   const byCandidateTitle = new Map();const byPresentation = new Map();
   for(const item of all){
-    for (const key of ownershipTitleKeys(item)) add(byPresentation, item.mediaType + ':' + key, item);
-    for (const key of candidateTitleKeys(item.title, item.mediaType)) add(byCandidateTitle, item.mediaType + ':' + key, item);
-    const identity=identityEvidence(item);add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,item);add(byBase,`${item.mediaType}:${identity.candidateKey}`,item);
+    yield;
+    const source=sourceItems[item.id]??item,useCache=cacheImmutableRecords&&Object.isFrozen(source);
+    let keys=useCache?immutableRecordKeys.get(source):null;
+    if(!keys){keys={presentation:ownershipTitleKeys(item),candidate:candidateTitleKeys(item.title,item.mediaType),identity:identityEvidence(item)};if(useCache)immutableRecordKeys.set(source,keys);}
+    for (const key of keys.presentation) add(byPresentation, item.mediaType + ':' + key, item);
+    for (const key of keys.candidate) add(byCandidateTitle, item.mediaType + ':' + key, item);
+    const identity=keys.identity;add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,item);add(byBase,`${item.mediaType}:${identity.candidateKey}`,item);
     for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,item);
     for(const isbn of identity.isbn)add(byIdentifier,`${item.mediaType}:isbn:${isbn}`,item);
     if(identity.asin)add(byIdentifier,`${item.mediaType}:asin:${identity.asin}`,item);
     for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
   }
   const barriers=editionBarriers(context.manualMatchDecisions,context.editionSeparations);
-  const canonical=Object.values(barriers.size?rebuildCanonicalItems(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??rebuildCanonicalItems(items,context.manualMatchDecisions));
+  const canonical=Object.values(barriers.size?yield* canonicalItemsSteps(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??(yield* canonicalItemsSteps(items,context.manualMatchDecisions)));
   const editionByRecord=new Map(canonical.flatMap(group=>group.providerItemIds.map(id=>[id,group])));
   const graph=new Map();const negative=new Set();
   for(const decision of Object.values(context.manualMatchDecisions??{})){
@@ -73,8 +87,11 @@ export function matchItems(items, requestedItems, context = {}) {
   }
   const history=Object.values(context.providerHistory??{}).filter(entry=>entry.reason==='missing-from-complete-scan'
     &&entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??'')&&!items[entry.item.id]);
-  const historicalResults=history.length?matchItems(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
-  return requestedItems.map((request,index)=>{
+  const historicalResults=history.length?yield* matchItemsSteps(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
+  yield 'matching_execution';
+  const results=[];
+  for(const [index,request] of requestedItems.entries()){
+    yield;
     const query=requestRecord(request);const evidence=identityEvidence(query);const exclude=new Set(request.excludeProviders??[]);
     const titled=byTitle.get(`${query.mediaType}:${query.normalizedTitle}`)??[];
     const identified=[...evidence.isbn.flatMap(isbn=>byIdentifier.get(`${query.mediaType}:isbn:${isbn}`)??[]),...(evidence.asin?byIdentifier.get(`${query.mediaType}:asin:${evidence.asin}`)??[]:[])]
@@ -164,7 +181,8 @@ export function matchItems(items, requestedItems, context = {}) {
     for(const match of [...(historicalResults[index]?.matches??[]),...(historicalResults[index]?.possibleMatches??[])])possible.set(`history:${match.itemRef}`,{
       ...match,reason:'Previously recorded; not observed in the last complete scan. Current access needs review.',
       evidence:{...match.evidence,availability:'not-observed-in-last-full-scan'}});
-    return {requestId:request.requestId??null,owned:[...exact.keys()].some(id=>owned(items[id])),confidence:exact.size?1:0,
-      matches:[...exact.values()],possibleMatches:[...possible.values()],partialMatches:[...partialMatches.values()],coverage};
-  });
+    results.push({requestId:request.requestId??null,owned:[...exact.keys()].some(id=>owned(items[id])),confidence:exact.size?1:0,
+      matches:[...exact.values()],possibleMatches:[...possible.values()],partialMatches:[...partialMatches.values()],coverage});
+  }
+  return results;
 }

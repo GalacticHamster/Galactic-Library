@@ -1,14 +1,21 @@
 import {object,text,strings,date} from './validation.js';
 import {validateEnrichment} from './metadata-validation.js';
+import {finishWork} from './cooperative-work.js';
 
 export const ENRICHMENT_KINDS=['openLibrary','googleBooks','googleBooksGenreHint','kindleProductComicContents','localMetadata'];
 export function recordReference(value){const ref=text(value,36,'Record reference');if(!/^[a-f0-9-]{36}$/iu.test(ref))throw new Error('Invalid enrichment record reference.');return ref;}
 export function validateEnrichmentHistory(value={}){
+  return finishWork(enrichmentHistorySteps(value));
+}
+export function* enrichmentHistorySteps(value={}){
   object(value,'Enrichment history');if(Object.keys(value).length>100000)throw new Error('Too much enrichment history.');
-  return Object.fromEntries(Object.entries(value).map(([id,entry])=>{
+  const result=[];
+  for(const [id,entry] of Object.entries(value)){
+    yield;
     recordReference(id);object(entry,'Enrichment change');if(!ENRICHMENT_KINDS.includes(entry.kind))throw new Error('Invalid enrichment history source.');
-    return [id,{recordRef:recordReference(entry.recordRef),kind:entry.kind,selectionRef:recordReference(entry.selectionRef),previous:entry.previous===null?null:validateEnrichment(entry.kind,entry.previous),changedAt:date(entry.changedAt)}];
-  }));
+    result.push([id,{recordRef:recordReference(entry.recordRef),kind:entry.kind,selectionRef:recordReference(entry.selectionRef),previous:entry.previous===null?null:validateEnrichment(entry.kind,entry.previous),changedAt:date(entry.changedAt)}]);
+  }
+  return Object.fromEntries(result);
 }
 export function validateEnrichmentReviews(value={}){
   object(value,'Enrichment review queue');if(Object.keys(value).length>50000)throw new Error('Too many enrichment reviews.');

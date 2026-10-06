@@ -208,7 +208,7 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
 // Recompute inputs/ranks from bounded source. A parser upgrade must not replace
 // an existing selected source clause simply because its rank changes. Only an
 // exact source-backed window (including offsets) can retain that selection.
-export function validateManifest(value,title='') {
+function recomputeManifest(value,title='') {
   if(!value||typeof value!=='object')throw Error('Invalid manifest evidence.');
   if(typeof value.title!=='string'||value.title.length>500)throw Error('Invalid manifest title context.');
   const result=selectManifest(value.blocks,title||value.title).manifest;
@@ -225,3 +225,27 @@ export function validateManifest(value,title='') {
   }
   return result;
 }
+
+// A cache hit reuses only a deterministic source interpretation, never input
+// validation or caller-supplied candidates/ranks. Every output is detached.
+// Source text, title and saved selection coordinates are the complete inputs.
+export function createManifestValidator({maxBytes=16*1024*1024,maxEntries=4096,compute=recomputeManifest}={}){
+  const cache=new Map();let bytes=0;
+  return (value,title='')=>{
+    if(!value||typeof value!=='object')throw Error('Invalid manifest evidence.');
+    if(typeof value.title!=='string'||value.title.length>500)throw Error('Invalid manifest title context.');
+    const blocks=validateDescriptionBlocks(value.blocks);
+    const saved=Array.isArray(value.candidates)&&Number.isInteger(value.selected)?value.candidates[value.selected]:null;
+    const selection=saved&&Number.isInteger(saved.block)&&Number.isInteger(saved.start)&&Number.isInteger(saved.end)&&typeof saved.raw==='string'&&saved.raw.length<=MANIFEST_LIMITS.window?[saved.block,saved.start,saved.end,saved.raw]:null;
+    const key=JSON.stringify([String(title||value.title),blocks,selection]);
+    const hit=cache.get(key);
+    if(hit){cache.delete(key);cache.set(key,hit);return structuredClone(hit.value);}
+    const result=compute({...value,blocks},title),size=2*(key.length+JSON.stringify(result).length);
+    if(size<=maxBytes&&maxEntries>0){
+      const entry={value:structuredClone(result),size};cache.set(key,entry);bytes+=size;
+      while(bytes>maxBytes||cache.size>maxEntries){const oldest=cache.keys().next().value;bytes-=cache.get(oldest).size;cache.delete(oldest);}
+    }
+    return result;
+  };
+}
+export const validateManifest=createManifestValidator();

@@ -1,6 +1,6 @@
 import { EXTERNAL_API_VERSION, PROVIDERS } from './constants.js';
 import { companionResult } from './companion-response.js';
-import { matchItems } from './matcher.js';
+import { matchItems,matchItemsAsync } from './matcher.js';
 import {libraryReminders,companionReminder} from './reminders.js';
 import { validIsbn } from './identity.js';
 import { validateContents } from './contents.js';
@@ -63,10 +63,20 @@ export function handleExternalApiRequest(database, request) {
     return {ok:true,apiVersion:EXTERNAL_API_VERSION,total:reminders.length,nextOffset:offset+limit<reminders.length?offset+limit:null,reminders:reminders.slice(offset,offset+limit).map(companionReminder)};
   }
   if (request.type !== 'MATCH_ITEMS') return { ok: false, error: 'Unsupported Galactic Library API request.' };
+  const invalid=invalidMatchRequest(request);if(invalid)return invalid;
+  return { ok: true, apiVersion: EXTERNAL_API_VERSION, results: matchItems(database.providerItems, request.items, database).map(companionResult) };
+}
+function invalidMatchRequest(request){
   if (request.apiVersion !== EXTERNAL_API_VERSION) return { ok: false, error: `Unsupported Galactic Library API version: ${request.apiVersion ?? '(missing)'}.` };
   if (!Array.isArray(request.items) || !request.items.length || request.items.length > 500 || !request.items.every(validMatchRequest)) {
     return { ok: false, error: 'MATCH_ITEMS needs 1–500 valid game, book, audiobook, or software titles.' };
   }
   if(request.items.reduce((sum,item)=>sum+(item.contents?.length??0),0)>20000)return {ok:false,error:'The batch contains too many contents entries.'};
-  return { ok: true, apiVersion: EXTERNAL_API_VERSION, results: matchItems(database.providerItems, request.items, database).map(companionResult) };
+  return null;
+}
+export async function handleExternalApiRequestAsync(database,request,options){
+  if(request?.type!=='MATCH_ITEMS')return handleExternalApiRequest(database,request);
+  const invalid=invalidMatchRequest(request);if(invalid)return invalid;
+  const results=await matchItemsAsync(database.providerItems,request.items,database,options);
+  return {ok:true,apiVersion:EXTERNAL_API_VERSION,results:results.map(companionResult)};
 }
