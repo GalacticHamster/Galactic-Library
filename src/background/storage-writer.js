@@ -32,7 +32,8 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
 /**
  * Instantiate once in the service worker. Mutations and ordinary storage
  * operations share one queue. Integration queries use detached committed read
- * snapshots; no mutation ever reads from those snapshots.
+ * snapshots. Refresh can reuse their validation only after a fresh, exact
+ * whole-value storage comparison, and receives a detached mutable copy.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false} = {}) {
   let activeTiming = null;
@@ -48,7 +49,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function invalidateQuerySnapshot(value){
     // Chrome can deliver our own notification after the commit promise. Keep
     // an identical committed snapshot; any different/removed value is a miss.
-    try{if(value&&querySnapshot&&equalDatabaseData(value,querySnapshot))return;}
+    try{if(value&&querySnapshot&&timed('storage_change_compare',()=>equalDatabaseData(value,querySnapshot)))return;}
     catch{/* A malformed change must invalidate, never retain, the snapshot. */}
     querySnapshot=null;querySnapshotEpoch++;
   }
@@ -68,7 +69,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   storageArea={
     get:defaults=>committedArea.get(defaults),
     async set(updates){
-      await committedArea.set(updates);
+      let pending;
+      const dispatchEnd=activeTiming?.begin('storage_set_dispatch');
+      try{pending=committedArea.set(updates);}finally{dispatchEnd?.();}
+      const waitEnd=activeTiming?.begin('storage_set_wait');
+      try{await pending;}finally{waitEnd?.();}
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))publishQuerySnapshot(updates[DATABASE_STORAGE_KEY]);
     },
     async remove(keys){
@@ -191,8 +196,22 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return details.syncMode==='incremental'?mergeProviderItems(provider,values,details):replaceProviderItems(provider,values,details,snapshot);
   }
   async function getDatabase() {
+    return readDatabase();
+  }
+  async function readDatabase(reuseCommittedValidation=false) {
+    // A successful refresh commit should publish a proof for its next batch,
+    // even if no Options/companion query has requested a snapshot yet.
+    if(reuseCommittedValidation&&cacheQuerySnapshots)querySnapshotsUsed=true;
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
+    // Refresh-only proof: the freshly read authoritative value is exactly the
+    // already validated immutable committed revision. Never use the eligibility
+    // projection, an uncommitted working copy, or epoch identity alone as proof.
+    const committed=querySnapshot;
+    if(reuseCommittedValidation&&cacheQuerySnapshots&&committed
+      &&timed('read_committed_compare',()=>equalDatabaseData(stored[DATABASE_STORAGE_KEY],committed))){
+      return timed('read_committed_clone',()=>structuredClone(committed));
+    }
     const database = await timedAsync('read_validation',()=>validateForWriter(stored[DATABASE_STORAGE_KEY]));
     if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
@@ -833,7 +852,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   async function commitKindleContentsRefresh(entries,runRef,leaseRef,tabId){
     if(!Array.isArray(entries)||!entries.length||entries.length>20)throw Error('Save 1–20 refresh observations.');
-    const db=await getDatabase(),job=currentRefresh(await readKindleRefresh(),db);refreshLease(job,runRef,leaseRef,tabId);
+    const db=await readDatabase(true),job=currentRefresh(await readKindleRefresh(),db);refreshLease(job,runRef,leaseRef,tabId);
     const accepted=[];
     for(const [offset,entry]of entries.entries()){
       const target=job.queue[job.cursor],position=job.cursor;

@@ -1,4 +1,5 @@
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
+import {refreshWritePacingTests} from './refresh-write-pacing.js';
 import {companionQueryConcurrencyTests} from './companion-query-concurrency.js';
 import {checkpointResponsivenessTests} from './checkpoint-responsiveness.js';
 import {committedProjectionTests} from './committed-projection.js';
@@ -69,6 +70,7 @@ const tests = [
   ...companionQueryConcurrencyTests,
   ...checkpointResponsivenessTests,
   ...committedProjectionTests,
+  ...refreshWritePacingTests,
   ...kindleRefreshCases,
   ...kindleRefreshWorkerTests,
   ...numberedPrecisionCases,

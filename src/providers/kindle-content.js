@@ -21,6 +21,7 @@
   const newRefreshButton=shadow.querySelector('[data-action="new-refresh"]');
   const contentsControls=shadow.querySelector('.contents-controls');
   const controlTools=globalThis.GalacticContentsScan;
+  const contentsRequestPacer=controlTools.requestStartPacer();
   const controlsState=controlTools.refreshControlsState();
   const modeHelp=shadow.querySelector('.contents-mode-help');
   const performanceTools=globalThis.GalacticContentsPerformance;
@@ -153,9 +154,14 @@
       let attemptEnd=timing?.begin('attempt',attempt+1);
       activeContentsRequest = new AbortController();
       const controller = activeContentsRequest;
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      let timeout;
+      // Waiting for the start gate must not consume the existing 30-second
+      // acquisition timeout. Arm it only when the adapter dispatches fetch.
+      const requestPacer={start:(request,options)=>contentsRequestPacer.start(()=>{
+        timeout=setTimeout(()=>controller.abort(),30000);return request();
+      },options)};
       try {
-        return await globalThis.GalacticKindle.fetchKindleProductComicContents(candidate.detailUrl, {signal:controller.signal,timing});
+        return await globalThis.GalacticKindle.fetchKindleProductComicContents(candidate.detailUrl, {signal:controller.signal,timing,requestPacer});
       } catch (error) {
         lastError = controller.signal.aborted && !pauseComicContentsRequested ? new Error('Network request timed out while loading Kindle contents.') : error;
         if (!isTransientAmazonError(lastError) || attempt === 2 || pauseComicContentsRequested) break;
@@ -265,7 +271,6 @@
           if(/CAPTCHA|sign in/iu.test(error.message)){stoppedError=label;finishTiming(timing,resultCategory);break;}
         }
         publish('running');
-        if(!pauseComicContentsRequested){const throttleEnd=timing?.begin('throttle');await wait(1000);throttleEnd?.();}
         if(timing){timing.result=resultCategory;pendingTiming=timing;}
       }
       await flush(pendingTiming);

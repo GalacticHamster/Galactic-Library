@@ -16,7 +16,9 @@ const shadows=[]; const attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
 const assert=(value,message)=>{if(!value)throw new Error(message);};
-const wait=async predicate=>{for(let n=0;n<100;n++){if(predicate())return;await pause();}throw new Error('Importer did not finish.');};
+// The page-lifetime pacing gate can wait for a previous run's last start and
+// then a second request. Allow that legitimate interval; assert rate below.
+const wait=async predicate=>{for(let n=0;n<500;n++){if(predicate())return;await pause();}throw new Error('Importer did not finish.');};
 const fixtures=[
   ['steam','steam-store','GalacticSteamStore','fetchOwnedSteamGames','/account'],
   ['gog','gog','GalacticGog','fetchGogGames','/account'],
@@ -97,8 +99,9 @@ try{
   db=await writer.getDatabase();const legacy=db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents;delete legacy.extractorVersion;delete legacy.parserVersion;delete legacy.parseOutcome;await writer.restoreDatabase(db);
   // The production adapter enforces Amazon origin; this localhost fixture uses
   // its real DOM extractor behind a fixture-only product fetch implementation.
-  globalThis.GalacticKindle.fetchKindleProductComicContents=async (url,{signal,timing}={})=>{
-    const headers=timing?.begin('fetch_headers',timing.attempts);let response;try{response=await fetch(url,{signal});}finally{headers?.();}
+  globalThis.GalacticKindle.fetchKindleProductComicContents=async (url,{signal,timing,requestPacer}={})=>{
+    const request=async()=>{const headers=timing?.begin('fetch_headers',timing.attempts);try{return await fetch(url,{signal});}finally{headers?.();}};
+    const response=await requestPacer.start(request,{signal,timing});
     const bodyEnd=timing?.begin('response_body',timing.attempts);const body=await response.text();bodyEnd?.();
     const domEnd=timing?.begin('dom_parse',timing.attempts);const document=new DOMParser().parseFromString(body,'text/html');domEnd?.();
     if(document.querySelector('#captchacharacters'))throw new Error('Amazon requested a CAPTCHA; wait before continuing.');
@@ -124,10 +127,11 @@ try{
     else return {ok:false,error:'Unexpected contents request.'};
     end?.();return timing?{...value,performance:perf.clean(timing.finish())}:value;
   };
-  let requests=[],captcha=false,hold=false,transientOnce=false,holdAtRequest=0;
+  let requests=[],requestStarts=[],captcha=false,hold=false,transientOnce=false,holdAtRequest=0;
   globalThis.fetch=async (input,options)=>{
     if(!String(input).startsWith('https://www.amazon.com/dp/'))return originalFetch(input,options);
     requests.push(String(input));
+    requestStarts.push(performance.now());
     if(transientOnce){transientOnce=false;throw Error('Network failure PRIVATE_REQUEST_SECRET');}
     if(hold||requests.length===holdAtRequest)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Paused','AbortError')),{once:true}));
     const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1?2.';
@@ -213,7 +217,7 @@ try{
   const diagnosticText=kindleShadow.querySelector('[data-timing-output]').value,report=JSON.parse(diagnosticText);
   assert(report.records.some(row=>row.kind==='reparse')&&report.records.some(row=>row.result==='captcha')&&report.records.some(row=>row.result==='paused'),'Diagnostic operation classes missing.');
   const retry=report.records.find(row=>row.attempts===2);assert(retry&&retry.timingMs.retry>=1900&&retry.events.some(event=>event.stage==='writer_queue')&&retry.events.some(event=>event.stage==='storage_write'),'Retry/worker timing is incomplete.');
-  assert(retry.events.some(event=>event.stage==='fetch_headers')&&retry.events.some(event=>event.stage==='extraction')&&retry.timingMs.throttle>=900,'Page timing is incomplete.');
+  assert(retry.events.some(event=>event.stage==='fetch_headers')&&retry.events.some(event=>event.stage==='extraction')&&retry.timingMs.throttle>=0,'Page timing is incomplete.');
   for(const secret of ['B000000','amazon.com','Ordinary novel','PRIVATE_REQUEST_SECRET','Collects Example','Wool Omnibus'])assert(!diagnosticText.includes(secret),'Diagnostic output leaked '+secret);
   assert(report.records.length<=50&&report.aggregates.retry.stagesMs.total.count===1,'Diagnostic history or retry aggregation changed.');
   checks.push('Kindle opt-in diagnostics join page/worker timing, separate retries/reparse and export no personal data');
@@ -260,13 +264,15 @@ try{
   for(const row of resumedRows){
     const check=row.events.find(event=>event.stage==='refresh_check_message'),fetch=row.events.find(event=>event.stage==='fetch_headers');
     assert(check.startMs<=fetch.startMs&&row.events.some(event=>event.stage==='refresh_identity_validation'),'Preflight was charged to another item.');
-    assert(row.timingMs.throttle>=900&&!row.events.some(event=>event.stage==='read_validation'&&event.startMs<fetch.startMs),'Refresh pacing or cheap preflight regressed.');
+    assert(row.timingMs.throttle>=0&&!row.events.some(event=>event.stage==='read_validation'&&event.startMs<fetch.startMs),'Refresh pacing or cheap preflight regressed.');
   }
   assert(refreshTiming.records.some(row=>row.kind==='checkpoint'&&row.events.some(event=>event.stage==='refresh_checkpoint_read')),'Final queue housekeeping missing from separate timing.');
   checks.push('Refresh timings attach fresh identity checks to each fetched item and retain one-second pacing and final checkpoint costs');
   hold=true;const abortStart=requests.length;await runRefresh();await wait(()=>requests.length>abortStart);kindleShadow.querySelector('[data-action="stop-contents"]').click();await finished();hold=false;
   assert((await writer.getKindleContentsRefresh()).checkpoint.status==='aborted'&&resume.hidden,'Stop refresh left a resumable queue.');
   checks.push('Stop refresh aborts the actual request and retains evidence while abandoning the queue');
+  assert(requestStarts.slice(1).every((start,index)=>start-requestStarts[index]>=1000),'Contents requests started more frequently than once per second.');
+  checks.push('Actual contents controls keep every request start at least 1000 ms apart across retries, CAPTCHA, Pause/Resume and checkpoints');
 
 
   const {checkKindleSourceCapture}=await import('./kindle-source-capture-fixture.js');

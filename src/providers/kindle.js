@@ -202,11 +202,14 @@
     return '';
   }
 
-  async function fetchKindleProductComicContents(detailUrl, {signal,timing} = {}) {
+  async function fetchKindleProductComicContents(detailUrl, {signal,timing,requestPacer} = {}) {
     const url = new URL(detailUrl, global.location?.origin ?? 'https://www.amazon.com');
     if (url.origin !== (global.location?.origin ?? 'https://www.amazon.com') || !/^\/dp\//u.test(url.pathname)) throw new Error('Kindle did not provide a usable Amazon product-page URL.');
-    const headersEnd=timing?.begin('fetch_headers',timing.attempts);
-    let response;try{response=await fetch(url.toString(), { credentials: 'include', cache: 'no-store', signal });}finally{headersEnd?.();}
+    const request=async()=>{
+      const headersEnd=timing?.begin('fetch_headers',timing.attempts);
+      try{return await fetch(url.toString(), { credentials: 'include', cache: 'no-store', signal });}finally{headersEnd?.();}
+    };
+    const response=requestPacer?await requestPacer.start(request,{signal,timing}):await request();
     // Older Comixology/Comics Unlimited entitlements can remain in a Kindle
     // library after Amazon removes their public retail listing. That is a
     // "no page to inspect" result for this lookup; an explicit rescan can revisit it.

@@ -1,7 +1,27 @@
-/* Shared, bounded contents-scan lifecycle. No changes to fetch/extraction rules. */
+/* Shared, bounded contents-scan lifecycle and sequential request-start pacing. */
 (function attachContentsScan(global) {
   'use strict';
   const MAX_RESULTS = 20, CHECKPOINT_MS = 60000;
+  // One page-lifetime gate, shared by all contents attempts and resumed runs.
+  // Recheck after every timer: hidden/late timers can only delay admission.
+  function requestStartPacer({clock=()=>performance.now(),wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+    let lastStart=-Infinity;
+    return Object.freeze({async start(request,{signal,timing}={}){
+      const cancelled=()=>{if(signal?.aborted)throw new DOMException('Kindle contents request aborted.','AbortError');};
+      cancelled();let end;
+      try{
+        for(;;){
+          cancelled();const remaining=1000-(clock()-lastStart);
+          if(remaining<=0)break;
+          end??=timing?.begin('throttle');await wait(remaining);
+        }
+      }finally{end?.();}
+      cancelled();
+      // Timestamp after synchronous fetch dispatch, so URL/diagnostic work
+      // before fetch cannot make successive actual starts less than 1000 ms.
+      try{return request();}finally{lastStart=clock();}
+    }});
+  }
   function checkpointBuffer(clock = Date.now) {
     let entries = [], lastCheckpoint = clock();
     return {
@@ -63,5 +83,5 @@
       list(){prune();return [...runs.values()].map(({updatedAt,...state})=>({...state}));}
     };
   }
-  global.GalacticContentsScan=Object.freeze({MAX_RESULTS,CHECKPOINT_MS,checkpointBuffer,progress,progressHub,active,refreshControlsState,resumableRefresh,refreshRestartConfirmation});
+  global.GalacticContentsScan=Object.freeze({MAX_RESULTS,CHECKPOINT_MS,requestStartPacer,checkpointBuffer,progress,progressHub,active,refreshControlsState,resumableRefresh,refreshRestartConfirmation});
 }(globalThis));
