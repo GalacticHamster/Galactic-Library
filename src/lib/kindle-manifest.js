@@ -5,7 +5,7 @@ import {assessContentsQuality} from './contents-quality.js';
 // existing review parser in the worker; no page-side module/permission changes.
 export const MANIFEST_LIMITS=Object.freeze({blocks:8,total:24000,block:12000,candidates:32,window:2000,evidence:16000});
 // Interpretation of existing source, independent of capture/parser generations.
-export const MANIFEST_INTERPRETATION_VERSION=1;
+export const MANIFEST_INTERPRETATION_VERSION=2;
 const trigger=/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?|comprising|reprints?|reprinting)\b/giu;
 const semanticClaim=new RegExp(trigger.source,'iu');
 const clean=value=>String(value??'').replace(/\s+/gu,' ').trim();
@@ -48,13 +48,30 @@ function contextAnchor(title,context) {
 
 function parserInput(raw,context,title) {
   let input=clean(raw).replace(/(?<=\d)\s*[–—]\s*(?=#?\d)/gu,'-').replace(/[.!]+$/u,'');
+  // Segmentation before a containment verb can leave the product's own volume
+  // looking like the last listed child. Carry its literal predicate into the
+  // parsing copy, without absorbing the next claim or any of its numbers.
+  const subject=/[,;]\s*([^,;]+\b(?:vol(?:ume)?\.?|book)\s+\d+)$/iu.exec(input);
+  if(subject&&clean(subject[1]).toLowerCase()===clean(title).toLowerCase()){
+    const source=clean(context),position=source.indexOf(clean(raw));
+    const predicate=position<0?null:/^\s+(includes?|contains?|collects?|collecting)\b/iu.exec(source.slice(position+clean(raw).length));
+    if(predicate)input+=' '+predicate[1];
+  }
   const hit=[...input.matchAll(trigger)][0];
   if(hit)input=input.slice(hit.index);
   input=input.replace(/^(?:reprints?|reprinting|comprising)\b/iu,'Collects').replace(/^Contents\s*:\s*/iu,'Includes ');
-  const start=input.replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\s*/iu,'');
+  const collecting=/^collecting\b/iu.test(input);
+  const start=input.replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*/iu,'');
   const elliptical=/^(?:the\s+)?(?:final\s+\d+\s+)?issues?\s*,?\s*(#?\d+(?:\s*[-–—]\s*#?\d+)?(?:\s*(?:,|and)\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*)/iu.exec(start);
   const anchor=contextAnchor(title,context);
   if(elliptical&&anchor){
+    // This newly enabled prefix path must retain an explicit run already in
+    // the product's series title, rather than reducing it to a shorter anchor.
+    if(collecting){
+      const productSeries=clean(title).split(/\s*[:,-]?\s+\b(?:vol(?:ume)?\.?|book)\s+(?:\d+|one|two|three|four|five)\b/iu)[0];
+      const run=/\s+(\(\d{4}(?:[-–—]\d{0,4})?\))$/u.exec(productSeries);
+      if(run&&clean(productSeries.slice(0,run.index)).toLowerCase()===anchor.series.toLowerCase())anchor.series+=' '+run[1];
+    }
     const tail=start.slice(elliptical[0].length);
     // An explicit "of OTHER SERIES" is not an elliptical attribution.
     // Let the existing parser interpret that label instead of substituting the
@@ -64,7 +81,11 @@ function parserInput(raw,context,title) {
     // actual supplements as unresolved text rather than silently dropping them.
     const supplement=/[,;]\s*(?:and\s+)?(?:also\s+)?(?:includes?|contains?)\s+(.+)$/iu.exec(tail);
     const attribution=/^\s*[,]?\s*(?:of\s+(?:their|the|creator)\b|in\s+[^,;]{1,100}['’]s\b)/iu.test(tail);
-    const other=tail&&!attribution?tail:'';
+    // Keep a literal supplementary work clause when the prefix fix enables
+    // attribution normalization. Do not discard it with the series/credits,
+    // or invent delimiters/names inside it; the existing parser owns scope.
+    const addedWork=collecting&&attribution?/[,;]\s*plus\b|\s+(?:together with|as well as)\b|[,;]\s*(?:and\s+)?(?:material|stories|a\s+story|excerpts?)\s+from\b/iu.exec(tail):null;
+    const other=addedWork?'; '+tail.slice(addedWork.index).replace(/^[,;]\s*/u,'').trim():tail&&!attribution?tail:'';
     return {input:separateNamedSupplement(`Collects ${anchor.series} issues ${elliptical[1]}${supplement?'; '+supplement[1]:other}`),binding:anchor.basis};
   }
   if(!hit&&anchor){
@@ -102,11 +123,16 @@ function wholeManifestRange(text,sentence,starts,index,title) {
   if(firstProposal.quality!=='containment'||!firstProposal.entries.some(e=>e.unitType!=='component'))return null;
   // Unresolved named supplements remain literal evidence. Reject intervening
   // narrative/promotional context rather than linking everything after a ';'.
-  const prose=/\b(?:is|are|was|were|will|would|can|could|he|she|they|you|authors?|creators?|contributors?|artists?|writers?|interviews?|praise|critics?|reviews?|synopsis|available|recommended|following|features?|follows?|explores?|encounters?|travels?|discover(?:s|ed)?|drawn|written|illustrated|published|bestsell\w*)\b/iu;
+  // A singular Feature can be a numbered title; hyphenated pronouns can be
+  // part of a work name. Keep actual predicates and contributor prose blocked.
+  const prose=/\b(?:is|are|was|were|will|would|can|could|(?<!-)he(?!-)|(?<!-)she(?!-)|they|you|authors?|creators?|contributors?|artists?|writers?|interviews?|praise|critics?|reviews?|synopsis|available|recommended|following|features|follows?|explores?|encounters?|travels?|discover(?:s|ed)?|drawn|written|illustrated|published|bestsell\w*)\b/iu;
   const continuation=parts.slice(1).every(part=>{
     const value=part.replace(/^(?:and|plus)\s+/iu,'');
+    // The finite numbered head establishes one collection span. Comma issue
+    // lists, excerpt qualifiers and unresolved named tails need not end in a
+    // bare range. They remain within this sentence and before the next claim;
+    // narrative/contributor prose still prevents a parent from forming.
     return !prose.test(value)&&!semanticClaim.test(value)
-      && (!/#\s*\d/u.test(value)||/#\s*\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?[.!]?$/u.test(value))
       && (/^[\p{Lu}\d"“]/u.test(value)||/^(?:material|excerpts?|selections?|stories)\s+from\b/iu.test(value));
   });
   return continuation?{start,end}:null;

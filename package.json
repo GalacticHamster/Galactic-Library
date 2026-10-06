@@ -6,6 +6,7 @@
   "scripts": {
     "check:repository": "node scripts/check-repository-layout.mjs",
     "test": "node tests/run.js",
+    "test:contents": "node tests/run-contents.mjs",
     "test:browser": "node tests/browser.js",
     "package": "node scripts/package-release.mjs",
     "check:package": "node scripts/package-release.mjs --check",

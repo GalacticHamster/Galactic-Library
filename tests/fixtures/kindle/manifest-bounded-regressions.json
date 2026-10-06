@@ -1,0 +1,1660 @@
+{
+  "provenance": "Minimal public containment clauses from the completed V5 findings. No workbook cells, account identifiers, ASINs, URLs or source-history dumps. Expectations retain the existing parser interpretation; named/unsupported material remains unresolved.",
+  "cases": [
+    {
+      "name": "Superman: The Man of Steel Vol. 2",
+      "kind": "precision",
+      "text": "Collecting Superman #5-11, Action Comics #588-593, Adventures in Superman #439-435, Legion of Super-Heroes #37-38, and profiles from Who's Who: Update '87, Superman: The Man of Steel Vol. 2 includes more than 500 pages of groundbreaking stories from the birth of a new era for the Man of Tomorrow!",
+      "expected": [
+        {
+          "series": "Superman",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11"
+          ]
+        },
+        {
+          "series": "Action Comics",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "588",
+            "589",
+            "590",
+            "591",
+            "592",
+            "593"
+          ]
+        },
+        {
+          "series": "Legion of Super-Heroes",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "37",
+            "38"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Adventures in Superman #439-435",
+        "profiles from Who's Who: Update '87",
+        "Superman: The Man of Steel Vol. 2 includes more than 500 pages of groundbreaking stories from the birth of a new era for the Man of Tomorrow"
+      ],
+      "legacyChild": null
+    },
+    {
+      "name": "Black Widow Epic Collection: Beware The Black Widow",
+      "kind": "whole",
+      "text": "Collects Tales of Suspense (1959) #52-53, 57, 60, 64; Avengers (1963) #29-30, 36-37, 43-44; Amazing Spider-Man (1963) #86; Amazing Adventures (1970) #1-8; Daredevil (1964) #81 and material from Avengers (1963) #16, 32-33, 38-39, 41-42, 45-47, 57, 63-64, 76.",
+      "expected": [
+        {
+          "series": "Tales of Suspense",
+          "run": "1959",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "52",
+            "53",
+            "57",
+            "60",
+            "64"
+          ]
+        },
+        {
+          "series": "Avengers",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "29",
+            "30",
+            "36",
+            "37",
+            "43",
+            "44"
+          ]
+        },
+        {
+          "series": "Amazing Spider-Man",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "86"
+          ]
+        },
+        {
+          "series": "Amazing Adventures",
+          "run": "1970",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
+          ]
+        },
+        {
+          "series": "Daredevil",
+          "run": "1964",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "81"
+          ]
+        },
+        {
+          "series": "Avengers",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "16",
+            "32",
+            "33",
+            "38",
+            "39",
+            "41",
+            "42",
+            "45",
+            "46",
+            "47",
+            "57",
+            "63",
+            "64",
+            "76"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 155,
+        "end": 257,
+        "raw": "Daredevil (1964) #81 and material from Avengers (1963) #16, 32-33, 38-39, 41-42, 45-47, 57, 63-64, 76."
+      }
+    },
+    {
+      "name": "Venom Epic Collection: Lethal Protector (Venom: Lethal Protector (1993))",
+      "kind": "whole",
+      "text": "Collects Amazing Spider-Man (1963) #361-363, 374; Spider-Man: The Trial of Venom (1992) #1; Web of Spider-Man (1985) #95-96; Ghost Rider/Blaze: Spirits of Vengeance (1992) #5-6; Venom: Lethal Protector (1993) #1-6; material from Marvel Comics Presents (1988) #117-122; Amazing Spider-Man (1963) #373, 375.",
+      "expected": [
+        {
+          "series": "Amazing Spider-Man",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "361",
+            "362",
+            "363",
+            "374"
+          ]
+        },
+        {
+          "series": "Spider-Man: The Trial of Venom",
+          "run": "1992",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Web of Spider-Man",
+          "run": "1985",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "95",
+            "96"
+          ]
+        },
+        {
+          "series": "Ghost Rider/Blaze: Spirits of Vengeance",
+          "run": "1992",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Venom: Lethal Protector",
+          "run": "1993",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Marvel Comics Presents",
+          "run": "1988",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "117",
+            "118",
+            "119",
+            "120",
+            "121",
+            "122"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Amazing Spider-Man (1963) #373",
+        "375"
+      ],
+      "legacySelection": {
+        "start": 178,
+        "end": 269,
+        "raw": "Venom: Lethal Protector (1993) #1-6; material from Marvel Comics Presents (1988) #117-122"
+      }
+    },
+    {
+      "name": "X-Men: Fall Of The Mutants Omnibus",
+      "kind": "whole",
+      "text": "Collects New Mutants (1983) #55-61; Uncanny X-Men (1981) #220-227; X-Factor (1986) #18-26; Captain America (1968) #339; Daredevil (1964) #252; Fantastic Four (1961) #312; Incredible Hulk (1968) #336-337, 340; Power Pack (1984) #35.",
+      "expected": [
+        {
+          "series": "New Mutants",
+          "run": "1983",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "55",
+            "56",
+            "57",
+            "58",
+            "59",
+            "60",
+            "61"
+          ]
+        },
+        {
+          "series": "Uncanny X-Men",
+          "run": "1981",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "220",
+            "221",
+            "222",
+            "223",
+            "224",
+            "225",
+            "226",
+            "227"
+          ]
+        },
+        {
+          "series": "X-Factor",
+          "run": "1986",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "18",
+            "19",
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "series": "Captain America",
+          "run": "1968",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "339"
+          ]
+        },
+        {
+          "series": "Daredevil",
+          "run": "1964",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "252"
+          ]
+        },
+        {
+          "series": "Fantastic Four",
+          "run": "1961",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "312"
+          ]
+        },
+        {
+          "series": "Incredible Hulk",
+          "run": "1968",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "336",
+            "337",
+            "340"
+          ]
+        },
+        {
+          "series": "Power Pack",
+          "run": "1984",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "35"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 67,
+        "end": 91,
+        "raw": "X-Factor (1986) #18-26"
+      }
+    },
+    {
+      "name": "X-Factor Epic Collection: Genesis & Apocalypse (X-Factor (1986-1998))",
+      "kind": "whole",
+      "text": "Collects Avengers (1963) #263; Fantastic Four (1961) #286; X-Factor (1986) #1-9, Annual #1; Iron Man Annual #8; Amazing Spider-Man (1963) #282 and material from Classic X-Men #8, 43.",
+      "expected": [
+        {
+          "series": "Avengers",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "263"
+          ]
+        },
+        {
+          "series": "Fantastic Four",
+          "run": "1961",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "286"
+          ]
+        },
+        {
+          "series": "X-Factor",
+          "run": "1986",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+          ]
+        },
+        {
+          "series": "X-Factor",
+          "run": "1986",
+          "unitType": "annual",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Iron Man",
+          "run": "",
+          "unitType": "annual",
+          "completeness": "full",
+          "numbers": [
+            "8"
+          ]
+        },
+        {
+          "series": "Amazing Spider-Man",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "282"
+          ]
+        },
+        {
+          "series": "Classic X-Men",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "8",
+            "43"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 59,
+        "end": 92,
+        "raw": "X-Factor (1986) #1-9, Annual #1"
+      }
+    },
+    {
+      "name": "Deadpool Epic Collection: The Circle Chase (Deadpool: The Circle Chase)",
+      "kind": "whole",
+      "text": "Collects New Mutants (1983) #98; X-Force (1991) #2, 11, 15; Nomad (1992) #4; Deadpool: The Circle Chase (1993) #1-4; Secret Defenders (1993) #15-17; Deadpool (1994) #1-4; material from Avengers (1963) #366, Silver Sable & the Wild Pack (1992) #23.",
+      "expected": [
+        {
+          "series": "New Mutants",
+          "run": "1983",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "98"
+          ]
+        },
+        {
+          "series": "X-Force",
+          "run": "1991",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "2",
+            "11",
+            "15"
+          ]
+        },
+        {
+          "series": "Nomad",
+          "run": "1992",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "4"
+          ]
+        },
+        {
+          "series": "Deadpool: The Circle Chase",
+          "run": "1993",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Secret Defenders",
+          "run": "1993",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "15",
+            "16",
+            "17"
+          ]
+        },
+        {
+          "series": "Deadpool",
+          "run": "1994",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Avengers",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "366"
+          ]
+        },
+        {
+          "series": "Silver Sable & the Wild Pack",
+          "run": "1992",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "23"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 149,
+        "end": 247,
+        "raw": "Deadpool (1994) #1-4; material from Avengers (1963) #366, Silver Sable & the Wild Pack (1992) #23."
+      }
+    },
+    {
+      "name": "Morbius Epic Collection: The End Of A Living Vampire",
+      "kind": "whole",
+      "text": "Collects Fear (1970) #27-31; Marvel Premiere (1972) #28; Marvel Two-In-One (1974) #15; Spectacular Spider-Man (1976) #6-8, 38; Savage She-Hulk (1980) #9-12; material from Vampire Tales (1973) #9-11, Annual (1975) #1; Marvel Preview (1975) #8.",
+      "expected": [
+        {
+          "series": "Fear",
+          "run": "1970",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "27",
+            "28",
+            "29",
+            "30",
+            "31"
+          ]
+        },
+        {
+          "series": "Marvel Premiere",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "28"
+          ]
+        },
+        {
+          "series": "Marvel Two-In-One",
+          "run": "1974",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "15"
+          ]
+        },
+        {
+          "series": "Spectacular Spider-Man",
+          "run": "1976",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "6",
+            "7",
+            "8",
+            "38"
+          ]
+        },
+        {
+          "series": "Savage She-Hulk",
+          "run": "1980",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        {
+          "series": "Vampire Tales",
+          "run": "1973",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "9",
+            "10",
+            "11"
+          ]
+        },
+        {
+          "series": "Vampire Tales",
+          "run": "1975",
+          "unitType": "annual",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Marvel Preview (1975) #8"
+      ],
+      "legacySelection": {
+        "start": 127,
+        "end": 217,
+        "raw": "Savage She-Hulk (1980) #9-12; material from Vampire Tales (1973) #9-11, Annual (1975) #1"
+      }
+    },
+    {
+      "name": "Doctor Strange Epic Collection: A Separate Reality (Doctor Strange (1974-1987))",
+      "kind": "whole",
+      "text": "Collects Doctor Strange (1968) #180-183; Sub-Mariner (1968) #22; Incredible Hulk (1968) #126; Marvel Feature (1971) #1; Marvel Premiere (1972) #3-10, material from #11, and #12-14; Doctor Strange (1974) #1-2, material from #3, and #4-5.",
+      "expected": [
+        {
+          "series": "Doctor Strange",
+          "run": "1968",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "180",
+            "181",
+            "182",
+            "183"
+          ]
+        },
+        {
+          "series": "Sub-Mariner",
+          "run": "1968",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "22"
+          ]
+        },
+        {
+          "series": "Incredible Hulk",
+          "run": "1968",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "126"
+          ]
+        },
+        {
+          "series": "Marvel Feature",
+          "run": "1971",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Marvel Premiere",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10"
+          ]
+        },
+        {
+          "series": "Marvel Premiere",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "11",
+            "12",
+            "13",
+            "14"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Doctor Strange (1974) #1-2",
+        "material from #3",
+        "#4-5"
+      ],
+      "legacySelection": {
+        "start": 120,
+        "end": 181,
+        "raw": "Marvel Premiere (1972) #3-10, material from #11, and #12-14"
+      }
+    },
+    {
+      "name": "Aliens: The Original Years Omnibus Vol. 1",
+      "kind": "whole",
+      "text": "Collects Aliens (1988) #1-6; Aliens (1989) #1-4; Aliens, Earth War #1-4; Aliens, Genocide #1-4; Aliens, Hive #1-4; Aliens, Tribes #1; Aliens, Newt’s Tale #1-2; Alien 3 #1-3 And Aliens, Space Marines #1-12 — Plus Material From Dark Horse Insider (1989) #14-27 And Dark Horse Presents (1986) #24, #42-43, #56 And Fifth Anniversary Special.",
+      "expected": [
+        {
+          "series": "Aliens",
+          "run": "1988",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Aliens",
+          "run": "1989",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Aliens, Earth War",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Aliens, Genocide",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Aliens, Hive",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Aliens, Tribes",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Aliens, Newt’s Tale",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "series": "Alien 3",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "series": "Aliens, Space Marines",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        {
+          "series": "Dark Horse Insider",
+          "run": "1989",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27"
+          ]
+        },
+        {
+          "series": "Dark Horse Presents",
+          "run": "1986",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "24",
+            "42",
+            "43",
+            "56"
+          ]
+        }
+      ],
+      "unresolved": [
+        "—",
+        "Fifth Anniversary Special"
+      ],
+      "legacySelection": {
+        "start": 160,
+        "end": 337,
+        "raw": "Alien 3 #1-3 And Aliens, Space Marines #1-12 — Plus Material From Dark Horse Insider (1989) #14-27 And Dark Horse Presents (1986) #24, #42-43, #56 And Fifth Anniversary Special."
+      }
+    },
+    {
+      "name": "Marvel Horror: The Magazine Collection",
+      "kind": "whole",
+      "text": "Collects material from Marvel Preview #3, 7-8, 12, 16; Haunt of Horror (1974) #1-2; Monsters Unleashed (1973) #3-9; Bizarre Adventures 2#5, 33.",
+      "expected": [
+        {
+          "series": "Marvel Preview",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "3",
+            "7",
+            "8",
+            "12",
+            "16"
+          ]
+        },
+        {
+          "series": "Haunt of Horror",
+          "run": "1974",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "series": "Monsters Unleashed",
+          "run": "1973",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Bizarre Adventures 2#5",
+        "33"
+      ],
+      "legacySelection": {
+        "start": 84,
+        "end": 116,
+        "raw": "Monsters Unleashed (1973) #3-9"
+      }
+    },
+    {
+      "name": "Man-Wolf: The Complete Collection",
+      "kind": "whole",
+      "text": "Collects Amazing Spider-Man (1963) #124-125, 189-190; Giant-Size Super-Heroes #1; Creatures on the Loose #30-37; Marvel Premiere #45-46; Marvel Team-Up (1972) #36-37; Savage She-Hulk #13-14; material from Peter Parker, the Spectacular Spider-Man Annual #3.",
+      "expected": [
+        {
+          "series": "Amazing Spider-Man",
+          "run": "1963",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "124",
+            "125",
+            "189",
+            "190"
+          ]
+        },
+        {
+          "series": "Giant-Size Super-Heroes",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Creatures on the Loose",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37"
+          ]
+        },
+        {
+          "series": "Marvel Premiere",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "45",
+            "46"
+          ]
+        },
+        {
+          "series": "Marvel Team-Up",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "36",
+            "37"
+          ]
+        },
+        {
+          "series": "Savage She-Hulk",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "13",
+            "14"
+          ]
+        },
+        {
+          "series": "Peter Parker, the Spectacular Spider-Man",
+          "run": "",
+          "unitType": "annual",
+          "completeness": "excerpt",
+          "numbers": [
+            "3"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 82,
+        "end": 113,
+        "raw": "Creatures on the Loose #30-37"
+      }
+    },
+    {
+      "name": "Brother Voodoo Masterworks Vol. 1",
+      "kind": "whole",
+      "text": "Collects Strange Tales (1951) #169-173; Marvel Team-Up (1972) #24, Werewolf by Night (1972) #39-41, Marvel Two-In-One (1974) #41, Doctor Strange (1974) #41, Moon Knight (1980) #21; material from Tales of the Zombie (1973) #6, 10, Tomb of Dracula (1972) #34-37, Werewolf by Night (1972) #38, Marvel Super-Heroes (1990) #1, Doctor Strange (1988) #16-17, 20.",
+      "expected": [
+        {
+          "series": "Strange Tales",
+          "run": "1951",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "169",
+            "170",
+            "171",
+            "172",
+            "173"
+          ]
+        },
+        {
+          "series": "Marvel Team-Up",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "24"
+          ]
+        },
+        {
+          "series": "Werewolf by Night",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "39",
+            "40",
+            "41"
+          ]
+        },
+        {
+          "series": "Marvel Two-In-One",
+          "run": "1974",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "41"
+          ]
+        },
+        {
+          "series": "Doctor Strange",
+          "run": "1974",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "41"
+          ]
+        },
+        {
+          "series": "Moon Knight",
+          "run": "1980",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "21"
+          ]
+        },
+        {
+          "series": "Tales of the Zombie",
+          "run": "1973",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "6",
+            "10"
+          ]
+        },
+        {
+          "series": "Tomb of Dracula",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "34",
+            "35",
+            "36",
+            "37"
+          ]
+        },
+        {
+          "series": "Werewolf by Night",
+          "run": "1972",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "38"
+          ]
+        },
+        {
+          "series": "Marvel Super-Heroes",
+          "run": "1990",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Doctor Strange",
+          "run": "1988",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "16",
+            "17",
+            "20"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 40,
+        "end": 355,
+        "raw": "Marvel Team-Up (1972) #24, Werewolf by Night (1972) #39-41, Marvel Two-In-One (1974) #41, Doctor Strange (1974) #41, Moon Knight (1980) #21; material from Tales of the Zombie (1973) #6, 10, Tomb of Dracula (1972) #34-37, Werewolf by Night (1972) #38, Marvel Super-Heroes (1990) #1, Doctor Strange (1988) #16-17, 20."
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: The Empire Vol. 6",
+      "kind": "whole",
+      "text": "Collects Star Wars: Agent of the Empire – Iron Eclipse (2011) #1-5; Star Wars: Agent of the Empire – Hard Targets (2012) #1-5; Star Wars: The Force Unleashed (2008) GN; Star Wars: The Force Unleashed II (2010) GN; material from Star Wars Tales (1999) #11, 15; A Decade of Dark Horse (1996) 2.",
+      "expected": [
+        {
+          "series": "Star Wars: Agent of the Empire – Iron Eclipse",
+          "run": "2011",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        },
+        {
+          "series": "Star Wars: Agent of the Empire – Hard Targets",
+          "run": "2012",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        },
+        {
+          "series": "Star Wars Tales",
+          "run": "1999",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "11",
+            "15"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Star Wars: The Force Unleashed (2008) GN",
+        "Star Wars: The Force Unleashed II (2010) GN",
+        "A Decade of Dark Horse (1996) 2"
+      ],
+      "legacySelection": {
+        "start": 68,
+        "end": 292,
+        "raw": "Star Wars: Agent of the Empire – Hard Targets (2012) #1-5; Star Wars: The Force Unleashed (2008) GN; Star Wars: The Force Unleashed II (2010) GN; material from Star Wars Tales (1999) #11, 15; A Decade of Dark Horse (1996) 2."
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: The Rebellion Vol. 4",
+      "kind": "whole",
+      "text": "Collects Star Wars: Rebellion (2006) #1-16; Star Wars: Boba Fett – Overkill (2006) #1; Star Wars: Boba Fett (1997) #1/2; material from Star Wars: Knights of the Old Republic/Rebellion (2006) #0; Star Wars Tales (1999) #3, 15, 17, 21.",
+      "expected": [
+        {
+          "series": "Star Wars: Rebellion",
+          "run": "2006",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16"
+          ]
+        },
+        {
+          "series": "Star Wars: Boba Fett – Overkill",
+          "run": "2006",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Star Wars: Boba Fett",
+          "run": "1997",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1/2"
+          ]
+        },
+        {
+          "series": "Star Wars: Knights of the Old Republic/Rebellion",
+          "run": "2006",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "0"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Star Wars Tales (1999) #3",
+        "15",
+        "17",
+        "21"
+      ],
+      "legacySelection": {
+        "start": 0,
+        "end": 44,
+        "raw": "Collects Star Wars: Rebellion (2006) #1-16"
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: The New Republic Vol. 2",
+      "kind": "whole",
+      "text": "Collects Star Wars: X-Wing Rogue Leader #1-3; Star Wars: X-Wing Rogue Squadron #1-16, Special and material from Star Wars Tales #12 & 23.",
+      "expected": [
+        {
+          "series": "Star Wars: X-Wing Rogue Leader",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "series": "Star Wars: X-Wing Rogue Squadron",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16"
+          ]
+        },
+        {
+          "series": "Star Wars Tales",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "12",
+            "23"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Special"
+      ],
+      "legacySelection": {
+        "start": 46,
+        "end": 137,
+        "raw": "Star Wars: X-Wing Rogue Squadron #1-16, Special and material from Star Wars Tales #12 & 23."
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: The New Republic Vol. 5",
+      "kind": "whole",
+      "text": "Collects Star Wars: Dark Empire (1991) #1-6; Star Wars: Dark Empire II (1994) #1-6; Star Wars: Empire's End (1995) #1-2; Star Wars Handbook (1998) #1, 3; material from Star Wars Tales (1999) #8, 11, 16-17.",
+      "expected": [
+        {
+          "series": "Star Wars: Dark Empire",
+          "run": "1991",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Star Wars: Dark Empire II",
+          "run": "1994",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Star Wars: Empire's End",
+          "run": "1995",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "series": "Star Wars Handbook",
+          "run": "1998",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "3"
+          ]
+        },
+        {
+          "series": "Star Wars Tales",
+          "run": "1999",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "8",
+            "11",
+            "16",
+            "17"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "legacySelection": {
+        "start": 0,
+        "end": 45,
+        "raw": "Collects Star Wars: Dark Empire (1991) #1-6"
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: The Clone Wars Vol. 1",
+      "kind": "whole",
+      "text": "Collects Star Wars: Republic #49-54; Star Wars: Jedi - Mace Windu, Shaak Ti, Aayla Secura, Count Dooku, Yoda one-shots and material from Star Wars Tales #14, 19 & Star Wars Visionaries OGN.",
+      "expected": [
+        {
+          "series": "Star Wars: Republic",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54"
+          ]
+        },
+        {
+          "series": "Star Wars Tales",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "14",
+            "19"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Star Wars: Jedi - Mace Windu, Shaak Ti, Aayla Secura, Count Dooku, Yoda one-shots",
+        "Star Wars Visionaries OGN"
+      ],
+      "legacySelection": {
+        "start": 0,
+        "end": 37,
+        "raw": "Collects Star Wars: Republic #49-54"
+      }
+    },
+    {
+      "name": "Star Wars Legends Epic Collection: Rise of the Sith Vol. 2",
+      "kind": "whole",
+      "text": "Collecting Star Wars (1998) #0-3; Star Wars: Darth Maul (2000) #1-4; Star Wars: Episode I - The Phantom Menace #1/2, 1-4; Star Wars: Episode I - Anakin Skywalker, Queen Amidala, Qui-Gon Jinn, Obi-Wan Kenobi and material from Star Wars (1998) #4-6; Star Wars Tales #3, 5, 7, 14, 20.",
+      "expected": [
+        {
+          "series": "Star Wars",
+          "run": "1998",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "series": "Star Wars: Darth Maul",
+          "run": "2000",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Star Wars: Episode I - The Phantom Menace",
+          "run": "",
+          "unitType": "issue",
+          "completeness": "full",
+          "numbers": [
+            "1/2",
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "series": "Star Wars",
+          "run": "1998",
+          "unitType": "issue",
+          "completeness": "excerpt",
+          "numbers": [
+            "4",
+            "5",
+            "6"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Star Wars: Episode I - Anakin Skywalker, Queen Amidala, Qui-Gon Jinn, Obi-Wan Kenobi",
+        "Star Wars Tales #3",
+        "5",
+        "7",
+        "14",
+        "20"
+      ],
+      "legacySelection": {
+        "start": 69,
+        "end": 122,
+        "raw": "Star Wars: Episode I - The Phantom Menace #1/2, 1-4"
+      }
+    },
+    {
+      "name": "Task Force Z (2021-) Vol. 1: Death's Door",
+      "kind": "prefix",
+      "text": "Collecting issues 1-6 of the critically acclaimed series!",
+      "numbers": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ]
+    },
+    {
+      "name": "Doom Patrol (1987-1995) Vol. 4: Musclebound",
+      "kind": "prefix",
+      "text": "collecting issues #42-50 of the surreal series written by Grant Morrison.",
+      "numbers": [
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50"
+      ]
+    },
+    {
+      "name": "John Constantine, Hellblazer Vol. 14: Good Intentions",
+      "kind": "prefix",
+      "text": "collecting issues 146-161 of the signature VERTIGO series together with the nostalgic tale \"The First Time\" from VERTIGO SECRET FILES: HELLBLAZER.",
+      "numbers": [
+        "146",
+        "147",
+        "148",
+        "149",
+        "150",
+        "151",
+        "152",
+        "153",
+        "154",
+        "155",
+        "156",
+        "157",
+        "158",
+        "159",
+        "160",
+        "161"
+      ]
+    },
+    {
+      "name": "John Constantine, Hellblazer Vol. 15: Highwater",
+      "kind": "prefix",
+      "text": "collecting issues 162-174 of the signature Vertigo series and featuring stunning art from Marcelo Frusin, Guy Davis, Giuseppe Camuncoli and Cameron Stewart.",
+      "numbers": [
+        "162",
+        "163",
+        "164",
+        "165",
+        "166",
+        "167",
+        "168",
+        "169",
+        "170",
+        "171",
+        "172",
+        "173",
+        "174"
+      ]
+    },
+    {
+      "name": "John Constantine, Hellblazer Vol. 16: The Wild Card",
+      "kind": "prefix",
+      "text": "collecting issues #175-188 of the signature Vertigo series and featuring the fan-favorite artistic talents of Marcelo Frusin, Steve Dillon, Lee Bermejo, Doug Alexander Gregory and Jock.",
+      "numbers": [
+        "175",
+        "176",
+        "177",
+        "178",
+        "179",
+        "180",
+        "181",
+        "182",
+        "183",
+        "184",
+        "185",
+        "186",
+        "187",
+        "188"
+      ]
+    },
+    {
+      "name": "Justice League (2011-2016) Vol. 2: The Villain's Journey (Justice League Graphic Novel)",
+      "kind": "prefix",
+      "text": "collecting issues #7-12 of the series.",
+      "numbers": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ]
+    },
+    {
+      "name": "Lucifer (2015-2017) Vol. 2: Father Lucifer",
+      "kind": "prefix",
+      "text": "collecting issues #7-12 of the acclaimed series from author Holly Black (The Spiderwick Chronicles) and artist Lee Garbett (Loki).",
+      "numbers": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ]
+    },
+    {
+      "name": "Lucifer (2015-2017) Vol. 3: Blood in the Streets",
+      "kind": "prefix",
+      "text": "collecting issues #13-19 of the signature VERTIGO series.",
+      "numbers": [
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19"
+      ]
+    },
+    {
+      "name": "Swamp Thing (1982-1996) Vol. 1: The Root of All Evil",
+      "kind": "prefix",
+      "text": "collecting issues #140-150 of the original VERTIGO series.",
+      "numbers": [
+        "140",
+        "141",
+        "142",
+        "143",
+        "144",
+        "145",
+        "146",
+        "147",
+        "148",
+        "149",
+        "150"
+      ]
+    },
+    {
+      "name": "Swamp Thing (1982-1996) Vol. 2: Darker Genesis",
+      "kind": "prefix",
+      "text": "collecting issues #151-160 of the original VERTIGO series.",
+      "numbers": [
+        "151",
+        "152",
+        "153",
+        "154",
+        "155",
+        "156",
+        "157",
+        "158",
+        "159",
+        "160"
+      ]
+    }
+  ]
+}
