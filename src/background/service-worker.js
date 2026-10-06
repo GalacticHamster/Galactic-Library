@@ -20,13 +20,15 @@ const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
+  if(keys.includes('galacticLibraryDatabase'))storageWriter.invalidateQuerySnapshot();
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
-const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function'});
-const { getAllowedExternalClientIds, getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
+const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
+const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges});
+const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
@@ -56,6 +58,7 @@ chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcile
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
   if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();
+  if(area==='local'&&changes.galacticLibraryDatabase)storageWriter.invalidateQuerySnapshot(changes.galacticLibraryDatabase.newValue);
   if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();
 });
 chrome.runtime.onStartup?.addListener(()=>reconcileReminders());
@@ -358,7 +361,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ok:false,error:'Library comparisons are accepted only from Galactic Library pages.'});
       return undefined;
     }
-    getDatabase()
+    storageWriter.getQueryDatabase()
       .then((database) => sendResponse(handleExternalApiRequest(database, {...request,apiVersion:request.apiVersion??1})))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -481,7 +484,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
-  getAllowedExternalClientIds()
+  storageWriter.getQueryAllowedExternalClientIds()
     .then((allowedIds) => {
       if (!sender.id || !allowedIds.includes(sender.id)) {
         sendResponse({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
@@ -496,7 +499,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         const operation=request.type==='BEGIN_ENTITLEMENT_FEED'?storageWriter.beginCompanionFeed(sender.id,request,true):request.type==='APPEND_ENTITLEMENT_FEED'?storageWriter.appendCompanionFeed(sender.id,request.uploadToken,request.offset,request.entries,true):request.type==='COMMIT_ENTITLEMENT_FEED'?storageWriter.commitCompanionFeed(sender.id,request.uploadToken,true):storageWriter.removeCompanionFeed(sender.id,true);
         return operation.then(result=>sendResponse({ok:true,apiVersion:1,...result}),()=>sendResponse({ok:false,apiVersion:1,error:'Reminder transfer did not complete. Check the active Humble profile, batch order and storage; prior reminders were retained.'}));
       }
-      return getDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
+      return storageWriter.getQueryDatabase().then((database) => sendResponse(handleExternalApiRequest(database, request)));
     })
     .catch(() => sendResponse({ ok: false, error: 'The Galactic Library API is unavailable. Open Galactic Library to check its storage.' }));
   return true;

@@ -29,12 +29,82 @@ import {date} from '../lib/validation.js';
 import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/sync-health.js';
 
 /**
- * Instantiate once in the service worker. Every read and mutation shares this
- * queue, including calls made directly by provider message handlers. No client
- * context owns a writer or writes a cached database snapshot.
+ * Instantiate once in the service worker. Mutations and ordinary storage
+ * operations share one queue. Integration queries use detached committed read
+ * snapshots; no mutation ever reads from those snapshots.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false} = {}) {
   let activeTiming = null;
+  const committedArea=storageArea;
+  let querySnapshot=null,querySnapshotEpoch=0,querySnapshotPending=null,querySnapshotsUsed=false;
+  function freezeQuerySnapshot(value){
+    if(value&&typeof value==='object'&&!Object.isFrozen(value)){
+      for(const child of Object.values(value))freezeQuerySnapshot(child);
+      Object.freeze(value);
+    }
+    return value;
+  }
+  function invalidateQuerySnapshot(value){
+    // Chrome can deliver our own notification after the commit promise. Keep
+    // an identical committed snapshot; any different/removed value is a miss.
+    try{if(value&&querySnapshot&&equalDatabaseData(value,querySnapshot))return;}
+    catch{/* A malformed change must invalidate, never retain, the snapshot. */}
+    querySnapshot=null;querySnapshotEpoch++;
+  }
+  function publishQuerySnapshot(database){
+    querySnapshotEpoch++;
+    // Only these trusted writer paths supply fully validated committed values.
+    // Detach before sharing: caller-owned mutable results must not affect queries.
+    querySnapshot=null;
+    try{if(cacheQuerySnapshots&&querySnapshotsUsed)querySnapshot=freezeQuerySnapshot(structuredClone(database));}
+    catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
+  }
+  storageArea={
+    get:defaults=>committedArea.get(defaults),
+    async set(updates){
+      await committedArea.set(updates);
+      if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))publishQuerySnapshot(updates[DATABASE_STORAGE_KEY]);
+    },
+    async remove(keys){
+      await committedArea.remove(keys);
+      if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))publishQuerySnapshot(createEmptyDatabase());
+    }
+  };
+  async function getQueryDatabase(){
+    querySnapshotsUsed=true;await ready;
+    if(cacheQuerySnapshots&&querySnapshot)return querySnapshot;
+    if(querySnapshotPending)return querySnapshotPending;
+    const loading=(async()=>{
+      for(;;){
+        if(cacheQuerySnapshots&&querySnapshot)return querySnapshot;
+        const epoch=querySnapshotEpoch;
+        const stored=await committedArea.get({[DATABASE_STORAGE_KEY]:null});
+        // A read overlapped a commit or invalidation. Never publish its older
+        // result over a newer committed revision, including clear/restore.
+        if(epoch!==querySnapshotEpoch)continue;
+        const raw=stored[DATABASE_STORAGE_KEY];
+        const database=raw?validateDatabase(raw):createEmptyDatabase();
+        if(raw&&!equalDatabaseData(raw,database)){
+          // Legacy/repair reads may allocate persistent record/canonical refs.
+          // Preserve the existing ordered migration; never expose identities
+          // synthesized from a read that has not been committed. Normal active
+          // refresh data is already validated and does not take this fallback.
+          await execute('getDatabase');continue;
+        }
+        freezeQuerySnapshot(database);
+        if(cacheQuerySnapshots)querySnapshot=database;
+        return database;
+      }
+    })();
+    querySnapshotPending=loading;
+    try{return await loading;}finally{if(querySnapshotPending===loading)querySnapshotPending=null;}
+  }
+  async function getQueryAllowedExternalClientIds(){
+    await ready;
+    // Authorization is never cached and does not wait on a refresh mutation.
+    const stored=await committedArea.get({[EXTERNAL_CLIENT_IDS_STORAGE_KEY]:[]});
+    return normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+  }
   // Private, bounded read-only eligibility answers. No database/source snapshot
   // is reused for a write. Only the worker with change observation enables this.
   let refreshProjection=null,refreshProjectionEpoch=0;
@@ -972,6 +1042,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   return Object.freeze({
     execute,
     invalidateRefreshPreflight,
+    getQueryDatabase,getQueryAllowedExternalClientIds,invalidateQuerySnapshot,
     ...Object.fromEntries(STORAGE_OPERATIONS.map((name) => [name, (...args) => execute(name, args)]))
   });
 }

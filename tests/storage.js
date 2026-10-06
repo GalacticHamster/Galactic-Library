@@ -52,21 +52,24 @@ function memoryStorage() {
   const commits = [];
   let active = 0;
   let highWater = 0;
+  let activeWrites=0,writeHighWater=0;
   let getCount = 0;
   let heldRead = null;
   let failSet = false;
-  async function access(operation) {
+  async function access(operation,write=false) {
     active += 1;
     highWater = Math.max(highWater, active);
+    if(write){activeWrites++;writeHighWater=Math.max(writeHighWater,activeWrites);}
     try {
       await nextTurn();
       return await operation();
-    } finally { active -= 1; }
+    } finally { active -= 1;if(write)activeWrites--; }
   }
   return {
     values,
     commits,
     get highWater() { return highWater; },
+    get writeHighWater(){return writeHighWater;},
     get getCount() { return getCount; },
     holdNextRead() {
       heldRead = { started: deferred(), released: deferred() };
@@ -91,11 +94,11 @@ function memoryStorage() {
         }
         Object.assign(values, structuredClone(updates));
         if (updates[DATABASE_STORAGE_KEY]) commits.push(Object.keys(updates[DATABASE_STORAGE_KEY].providers).sort());
-      }),
+      },true),
       remove: (keys) => access(() => {
         for (const key of Array.isArray(keys) ? keys : [keys]) delete values[key];
         commits.push('clear');
-      })
+      },true)
     }
   };
 }
@@ -120,7 +123,7 @@ const googleHint = { source: 'google-books', confidence: 'author-and-title-stem'
 const comicContents = { itemId: itemIds[0], sourceUrl: kindleBooks[0].metadata.detailUrl, statement: 'Collects Test Comic #1-4' };
 
 let workerNumber = 0;
-export async function withWorker(run, {accessGate = Promise.resolve(), accessError = null, storageEvents=false} = {}) {
+export async function withWorker(run, {accessGate = Promise.resolve(), accessError = null, storageEvents=false,concurrentQueries=false} = {}) {
   const previousChrome = globalThis.chrome;
   const memory = memoryStorage();
   const listeners = [];
@@ -173,7 +176,8 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
       return response;
     });
     await run({ memory, dispatch, dispatchExternal, pageA: page('a'), pageB: page('b'), importItems, accessLevels,notifyStorageChange });
-    assert.ok(memory.highWater <= 1, 'Storage operations overlapped instead of sharing the writer.');
+    assert.ok(memory.writeHighWater<=1,'Storage mutations overlapped instead of sharing the writer.');
+    if(!concurrentQueries)assert.ok(memory.highWater <= 1, 'Storage operations overlapped instead of sharing the writer.');
   } finally {
     if (previousChrome === undefined) delete globalThis.chrome;
     else globalThis.chrome = previousChrome;

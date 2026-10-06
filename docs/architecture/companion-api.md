@@ -4,6 +4,18 @@ Only extensions explicitly allowed in Galactic Library's options may use the ext
 
 `MATCH_ITEMS` accepts 1–500 requests, titles up to 500 characters and at most 20,000 explicitly enumerated contents entries per batch. The original title-only request remains supported. New fields and response fields are additive; consumers must ignore unfamiliar fields.
 
+## Reads during background acquisition
+
+Integration authorization reads and `MATCH_ITEMS`, `PING`, `GET_STATUS` and `GET_REMINDERS` bypass the serialized mutation queue. Internal GL-page comparisons use the same read path. Ordinary page storage operations and every mutation retain their existing admission order and atomic validation/save behavior.
+
+Queries read a detached, immutable, fully validated database snapshot. A query overlapping an unfinished write may see the preceding committed revision; it never sees buffered refresh observations or a partially modified database. Successful database writes publish a new detached snapshot after storage commits, and queries begun after acknowledgement see that revision. Failed writes do not publish their attempted state. Clear and restore replace the snapshot. A delayed cold read cannot overwrite a newer committed revision.
+
+Snapshots remain private to the worker, are never consumed by mutation operations, and contain the complete matching context. The existing matcher still evaluates identity, ownership/access, manual decisions, aliases, edition barriers, archived records and reviewed coverage for each request; query results are not cached. Authorization is read afresh for every external request, including after revocation. Initialization/protected-storage failure still prevents access. A cold legacy/repair read that requires normalization uses the existing serialized migration before publishing identities; failed migrations cannot expose uncommitted record references. Already validated active refresh data does not take this fallback.
+
+Warm snapshots are enabled only when the worker observes private database changes. Chrome `storage.onChanged` and Firefox private-store notifications invalidate differing or removed data; late notifications for an identical committed snapshot do not discard it. Without change observation, queries make fresh validated reads and only coalesce concurrent in-flight reads. A worker restart loses the snapshot. No storage key, schema, backup or external API version is added.
+
+This separation removes refresh queue waits and repeated query validation of unchanged data. It does not provide a separate JavaScript thread: synchronous checkpoint validation, canonical reconstruction and matching can still briefly delay message dispatch. Performance controls therefore distinguish a held asynchronous checkpoint from CPU/scheduling delays; simulated latency is not a promise of live latency for every library size.
+
 ```json
 {
   "type": "MATCH_ITEMS",
