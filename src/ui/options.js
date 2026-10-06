@@ -2,7 +2,7 @@ import {createContentsScanProgress} from './contents-scan-progress.js';
 import '../lib/contents-performance.js';
 import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
-import { getUiPreferences, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
+import { getCommittedLibraryView, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -935,7 +935,8 @@ async function refresh(diagnosticLookupId = null) {
   const endTotal=timing?.begin('options_total');
   let endStage=timing?.begin('options_read');
   try {
-  const [loadedDatabase, preferences] = await Promise.all([getDatabase(), getUiPreferences()]);
+  const {database:loadedDatabase,preferences,performance:workerTiming}=await getCommittedLibraryView(diagnosticLookupId);
+  globalThis.GalacticContentsPerformance.merge(timing,workerTiming);
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);

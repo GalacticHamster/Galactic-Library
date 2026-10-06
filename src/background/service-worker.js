@@ -33,6 +33,7 @@ chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, 
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
 const companionTimings=contentsPerformance.collector();
+const companionCallbacks=new Map();
 let contentsDiagnosticUntil=0,companionDiagnosticSequence=0;
 const companionDiagnosticPrefix=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
 const contentsProgressHub=globalThis.GalacticContentsScan.progressHub();
@@ -366,7 +367,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return undefined;
     }
     storageWriter.getQueryDatabase()
-      .then(database=>handleExternalApiRequestAsync(database,{...request,apiVersion:request.apiVersion??1},{cacheImmutableRecords:true})).then(sendResponse)
+      .then(database=>handleExternalApiRequestAsync(database,{...request,apiVersion:request.apiVersion??1},{cacheImmutableRecords:true,cacheCommittedProjection:true})).then(sendResponse)
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
@@ -488,16 +489,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  if(request?.type==='MATCH_ITEMS_DIAGNOSTIC_CALLBACK'){
+    const observed=contentsPerformance.now(),callback=request.diagnosticCallbackEpochMs,id=request.diagnosticLookupId;
+    storageWriter.getQueryAllowedExternalClientIds().then(allowed=>{
+      const original=companionCallbacks.get(id);
+      if(request.apiVersion!==1||!sender.id||!allowed.includes(sender.id)||!original||original.sender!==sender.id||!Number.isFinite(callback)||callback<original.start||callback>observed+1000||observed-original.responded>60000){sendResponse({ok:false});return;}
+      companionCallbacks.delete(id);
+      companionTimings.annotate(id,[{stage:'client_round_trip',attempt:0,startMs:0,durationMs:callback-original.start},{stage:'response_transport',attempt:0,startMs:original.responded-original.start,durationMs:Math.max(0,callback-original.responded)}]);
+      sendResponse({ok:true,apiVersion:1});
+    }).catch(()=>sendResponse({ok:false}));return true;
+  }
   const entered=contentsPerformance.now(),sent=request?.diagnosticSentEpochMs;
   const explicit=contentsPerformance.validId(request?.diagnosticLookupId);
   const diagnosticId=explicit?request.diagnosticLookupId:request?.type==='MATCH_ITEMS'&&entered<contentsDiagnosticUntil?'lookup-'+companionDiagnosticPrefix+'-'+String(++companionDiagnosticSequence).padStart(3,'0'):null;
   const timing=contentsPerformance.trace(diagnosticId,'companion',undefined,explicit&&Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000?sent:null);
-  if(timing)timing.scheduling={yields:0,maxSliceMs:0,cpuMs:0};
+  if(timing)timing.scheduling={yields:0,maxSliceMs:0,cpuMs:0,waitMs:0,maxWaitMs:0};
   if(timing&&timing.start<entered)timing.events.push({stage:'handler_delay',attempt:0,startMs:0,durationMs:entered-timing.start});
   let endStage=timing?.begin('query_authorization');
   const respond=value=>{
     endStage?.();endStage=null;
     const end=timing?.begin('response_dispatch');
+    if(explicit&&timing){companionCallbacks.set(timing.id,{sender:sender.id,start:timing.start,responded:contentsPerformance.now()});if(companionCallbacks.size>50)companionCallbacks.delete(companionCallbacks.keys().next().value);}
     try{sendResponse(explicit&&timing?{...value,performance:contentsPerformance.clean(timing.finish())}:value);}
     finally{end?.();if(timing)companionTimings.add(timing.finish());}
   };
@@ -518,9 +530,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         return operation.then(result=>sendResponse({ok:true,apiVersion:1,...result}),()=>sendResponse({ok:false,apiVersion:1,error:'Reminder transfer did not complete. Check the active Humble profile, batch order and storage; prior reminders were retained.'}));
       }
       endStage=timing?.begin('query_snapshot');
-      return storageWriter.getQueryDatabase().then(async database=>{
+      const beginSpan=stage=>timing?.begin(stage);
+      return storageWriter.getQueryDatabase({beginSpan}).then(async database=>{
         endStage?.();endStage=null;
-        const result=await handleExternalApiRequestAsync(database,request,{cacheImmutableRecords:true,onStage:stage=>{endStage?.();endStage=timing?.begin(stage);},onSlice:(duration,yielded)=>{if(timing){timing.scheduling.yields+=Number(yielded);timing.scheduling.maxSliceMs=Math.max(timing.scheduling.maxSliceMs,duration);timing.scheduling.cpuMs+=duration;}}});
+        const result=await handleExternalApiRequestAsync(database,request,{cacheImmutableRecords:true,cacheCommittedProjection:true,beginSpan,onStage:stage=>{endStage?.();endStage=timing?.begin(stage);},onSlice:(duration,yielded)=>{if(timing){timing.scheduling.yields+=Number(yielded);timing.scheduling.maxSliceMs=Math.max(timing.scheduling.maxSliceMs,duration);timing.scheduling.cpuMs+=duration;}},onWait:duration=>{if(timing){timing.scheduling.waitMs+=duration;timing.scheduling.maxWaitMs=Math.max(timing.scheduling.maxWaitMs,duration);}}});
         respond(result);
       });
     })

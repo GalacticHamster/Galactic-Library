@@ -1,4 +1,5 @@
 import {equalDatabaseData} from '../lib/data-equality.js';
+import {registerCommittedSnapshot} from '../lib/committed-snapshot.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
@@ -56,7 +57,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     // Only these trusted writer paths supply fully validated committed values.
     // Detach before sharing: caller-owned mutable results must not affect queries.
     querySnapshot=null;
-    try{if(cacheQuerySnapshots&&querySnapshotsUsed)querySnapshot=freezeQuerySnapshot(structuredClone(database));}
+    try{if(cacheQuerySnapshots&&querySnapshotsUsed){
+      const endClone=activeTiming?.begin('snapshot_clone');let detached;
+      try{detached=structuredClone(database);}finally{endClone?.();}
+      const endFreeze=activeTiming?.begin('snapshot_freeze');
+      try{querySnapshot=registerCommittedSnapshot(freezeQuerySnapshot(detached));}finally{endFreeze?.();}
+    }}
     catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
   }
   storageArea={
@@ -70,29 +76,35 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))publishQuerySnapshot(createEmptyDatabase());
     }
   };
-  async function getQueryDatabase(){
+  async function getQueryDatabase({beginSpan=()=>{}}={}){
+    const span=async(stage,work)=>{const end=beginSpan(stage);try{return await work();}finally{end?.();}};
+    const sync=(stage,work)=>{const end=beginSpan(stage);try{return work();}finally{end?.();}};
     querySnapshotsUsed=true;await ready;
-    if(cacheQuerySnapshots&&querySnapshot)return querySnapshot;
-    if(querySnapshotPending)return querySnapshotPending;
+    if(cacheQuerySnapshots&&querySnapshot)return sync('snapshot_hit',()=>querySnapshot);
+    if(querySnapshotPending)return span('snapshot_wait',()=>querySnapshotPending);
     const loading=(async()=>{
       for(;;){
         if(cacheQuerySnapshots&&querySnapshot)return querySnapshot;
         const epoch=querySnapshotEpoch;
-        const stored=await committedArea.get({[DATABASE_STORAGE_KEY]:null});
+        const stored=await span('snapshot_read',()=>committedArea.get({[DATABASE_STORAGE_KEY]:null}));
         // A read overlapped a commit or invalidation. Never publish its older
         // result over a newer committed revision, including clear/restore.
-        if(epoch!==querySnapshotEpoch)continue;
+        if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         const raw=stored[DATABASE_STORAGE_KEY];
-        const database=raw?await validateDatabaseAsync(raw):createEmptyDatabase();
-        if(epoch!==querySnapshotEpoch)continue;
-        if(raw&&!equalDatabaseData(raw,database)){
+        let endCanonical;
+        const database=raw?await span('snapshot_validation',async()=>{
+          try{return await validateDatabaseAsync(raw,{onStage:stage=>{endCanonical?.();endCanonical=stage==='validation_canonical'?beginSpan('snapshot_canonical'):null;}});}
+          finally{endCanonical?.();}
+        }):createEmptyDatabase();
+        if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
+        if(raw&&sync('snapshot_compare',()=>!equalDatabaseData(raw,database))){
           // Legacy/repair reads may allocate persistent record/canonical refs.
           // Preserve the existing ordered migration; never expose identities
           // synthesized from a read that has not been committed. Normal active
           // refresh data is already validated and does not take this fallback.
-          await execute('getDatabase');continue;
+          await span('snapshot_migration',()=>execute('getDatabase'));continue;
         }
-        freezeQuerySnapshot(database);
+        sync('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(database)));
         if(cacheQuerySnapshots)querySnapshot=database;
         return database;
       }
@@ -105,6 +117,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     // Authorization is never cached and does not wait on a refresh mutation.
     const stored=await committedArea.get({[EXTERNAL_CLIENT_IDS_STORAGE_KEY]:[]});
     return normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+  }
+  async function getCommittedLibraryView(diagnosticLookupId){
+    const timing=globalThis.GalacticContentsPerformance.trace(diagnosticLookupId,'options');
+    const beginSpan=stage=>timing?.begin(stage);
+    const end=beginSpan('options_snapshot');
+    let database,preferences;
+    try{[database,preferences]=await Promise.all([getQueryDatabase({beginSpan}),ready.then(()=>getUiPreferences())]);}
+    finally{end?.();}
+    return {database,preferences,...(timing?{performance:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}:{})};
   }
   // Private, bounded read-only eligibility answers. No database/source snapshot
   // is reused for a write. Only the worker with change observation enables this.
@@ -1035,6 +1056,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     try { values = structuredClone(args); }
     catch { return Promise.reject(new Error('Invalid Galactic Library storage arguments.')); }
     finally {captureEnd?.();}
+    // Only this explicit read-only view bypasses the ordinary writer queue.
+    // Mutations and authoritative mutable reads retain their original ordering.
+    if(operation==='getCommittedLibraryView')return getCommittedLibraryView(...values);
     const queueEnd=timing?.begin('writer_queue');
     const result = tail.then(() => ready).then(timing ? async () => {
       queueEnd();activeTiming=timing;

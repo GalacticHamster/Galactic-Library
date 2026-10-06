@@ -14,6 +14,7 @@
   "src/lib/constants.js",
   "src/lib/contents.js",
   "src/lib/cooperative-work.js",
+  "src/lib/committed-snapshot.js",
   "src/lib/contents-quality.js",
   "src/lib/contents-performance.js",
   "src/lib/data-equality.js",

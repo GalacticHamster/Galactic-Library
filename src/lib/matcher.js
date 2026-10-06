@@ -3,6 +3,7 @@ import { identityConflicts as recordConflicts, identityEvidence, relationshipRea
 import { contentCoverage, proposeContents } from './contents.js';
 import { canonicalItemsSteps } from './models.js';
 import {finishWork,finishWorkAsync} from './cooperative-work.js';
+import {isCommittedSnapshot} from './committed-snapshot.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
@@ -10,6 +11,7 @@ const policy = globalThis.LibraryMatchingPolicy;
 // The worker alone enables this for its deeply frozen committed snapshots.
 // Cache only title/identity derivations, never entitlement, expiry or decisions.
 const immutableRecordKeys=new WeakMap();
+const committedIndexes=new WeakMap();
 const identityConflicts = (left, right, options = {}) => recordConflicts(left, right, { ...options, companion: true });
 
 // Companion checks can establish a full storefront title without merging GL's
@@ -49,18 +51,30 @@ function requestRecord(request) {
 export function matchItems(items, requestedItems, context = {}) {
   return finishWork(matchItemsSteps(items,requestedItems,context));
 }
-export function matchItemsAsync(items,requestedItems,context={},options){return finishWorkAsync(matchItemsSteps(items,requestedItems,context,options),options);}
-function* matchItemsSteps(items, requestedItems, context = {}, {cacheImmutableRecords=false}={}) {
-  yield 'matching_index';
-  const sourceItems=items;
-  items=Object.fromEntries(Object.entries(items).map(([id,item])=>[id,effectiveOwnershipRecord(item,context)]));
-  const database={...context,providerItems:items};
+export async function matchItemsAsync(items,requestedItems,context={},options={}){
+  let projection;
+  if(options.cacheCommittedProjection&&items===context.providerItems&&isCommittedSnapshot(context)){
+    options.onStage?.('matching_index');
+    let entry=committedIndexes.get(context);
+    const end=options.beginSpan?.(entry?.value?'matching_index_hit':entry?'matching_index_wait':'matching_index_build');
+    try{
+      if(!entry){
+        entry={};committedIndexes.set(context,entry);
+        entry.pending=finishWorkAsync(identityIndexSteps(items,context,options),{...options,onStage:()=>{}})
+          .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(context);throw error;});
+      }
+      projection=entry.value??await entry.pending;
+    }finally{end?.();}
+  }
+  return finishWorkAsync(matchItemsSteps(items,requestedItems,context,{...options,projection}),options);
+}
+function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpan}={}) {
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};
   const byCandidateTitle = new Map();const byPresentation = new Map();
   for(const item of all){
     yield;
-    const source=sourceItems[item.id]??item,useCache=cacheImmutableRecords&&Object.isFrozen(source);
+    const source=item,useCache=cacheImmutableRecords&&Object.isFrozen(source);
     let keys=useCache?immutableRecordKeys.get(source):null;
     if(!keys){keys={presentation:ownershipTitleKeys(item),candidate:candidateTitleKeys(item.title,item.mediaType),identity:identityEvidence(item)};if(useCache)immutableRecordKeys.set(source,keys);}
     for (const key of keys.presentation) add(byPresentation, item.mediaType + ':' + key, item);
@@ -72,7 +86,9 @@ function* matchItemsSteps(items, requestedItems, context = {}, {cacheImmutableRe
     for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
   }
   const barriers=editionBarriers(context.manualMatchDecisions,context.editionSeparations);
-  const canonical=Object.values(barriers.size?yield* canonicalItemsSteps(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??(yield* canonicalItemsSteps(items,context.manualMatchDecisions)));
+  const endCanonical=beginSpan?.('matching_canonical');let canonical;
+  try{canonical=Object.values(barriers.size?yield* canonicalItemsSteps(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??(yield* canonicalItemsSteps(items,context.manualMatchDecisions)));}
+  finally{endCanonical?.();}
   const editionByRecord=new Map(canonical.flatMap(group=>group.providerItemIds.map(id=>[id,group])));
   const graph=new Map();const negative=new Set();
   for(const decision of Object.values(context.manualMatchDecisions??{})){
@@ -87,6 +103,31 @@ function* matchItemsSteps(items, requestedItems, context = {}, {cacheImmutableRe
   }
   const history=Object.values(context.providerHistory??{}).filter(entry=>entry.reason==='missing-from-complete-scan'
     &&entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??'')&&!items[entry.item.id]);
+  return {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history};
+}
+function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
+  yield 'matching_index';
+  const sourceItems=items;
+  let projection=options.projection;
+  if(!projection){
+    items=Object.fromEntries(Object.entries(items).map(([id,item])=>[id,effectiveOwnershipRecord(item,context)]));
+    projection=yield* identityIndexSteps(items,context,options);
+  }else{
+    const resolved=new Map(),raw=items;
+    const resolve=id=>{if(!resolved.has(id))resolved.set(id,effectiveOwnershipRecord(raw[id],context));return resolved.get(id);};
+    // Lazily resolve ownership for encountered candidates. Whole-library contents
+    // coverage still enumerates this view and therefore gets fresh ownership too.
+    items=new Proxy(Object.create(null),{
+      ownKeys:()=>Reflect.ownKeys(raw),
+      getOwnPropertyDescriptor:(_target,key)=>Object.hasOwn(raw,key)?{configurable:true,enumerable:true}:undefined,
+      get:(_target,key)=>Object.hasOwn(raw,key)?resolve(key):undefined
+    });
+    const view=index=>({get:key=>index.get(key)?.map(item=>resolve(item.id))});
+    projection={...projection,...Object.fromEntries(['byTitle','byBase','byIdentifier','byAlias','byCandidateTitle','byPresentation'].map(key=>[key,view(projection[key])]))};
+  }
+  const database={...context,providerItems:items};
+  let materializedCoverage=!options.projection;
+  const {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history}=projection;
   const historicalResults=history.length?yield* matchItemsSteps(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
   yield 'matching_execution';
   const results=[];
@@ -169,6 +210,10 @@ function* matchItemsSteps(items, requestedItems, context = {}, {cacheImmutableRe
     }
     let coverage=null;const partialMatches=new Map();
     if(requested?.length){
+      // Coverage enumerates the entire library repeatedly. Materialize the
+      // fresh per-request ownership view once instead of repeatedly enumerating
+      // the lazy Proxy; never share this time-dependent view across requests.
+      if(!materializedCoverage){database.providerItems=Object.fromEntries(Object.keys(sourceItems).map(id=>[id,items[id]]));materializedCoverage=true;}
       // API v1 has no trusted parent scope. Never forward caller parent fields.
       const result=contentCoverage(database,requested,{excludeProviders:[...exclude],mediaType:query.mediaType});
       const exposed=entries=>entries.map(entry=>({...entry,evidence:entry.evidence.map(({item,review})=>({...publicMatch(item,'contains','Reviewed collected contents.'),verifiedAt:review.verifiedAt}))}));

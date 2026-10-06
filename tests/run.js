@@ -1,6 +1,7 @@
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {companionQueryConcurrencyTests} from './companion-query-concurrency.js';
 import {checkpointResponsivenessTests} from './checkpoint-responsiveness.js';
+import {committedProjectionTests} from './committed-projection.js';
 import {contentsPerformanceTests} from './contents-performance.js';
 import {kindleContentsTests} from './kindle-contents.js';
 import {kindleContentsQualityTests} from './kindle-contents-quality.js';
@@ -67,6 +68,7 @@ const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = glo
 const tests = [
   ...companionQueryConcurrencyTests,
   ...checkpointResponsivenessTests,
+  ...committedProjectionTests,
   ...kindleRefreshCases,
   ...kindleRefreshWorkerTests,
   ...numberedPrecisionCases,
