@@ -1,4 +1,5 @@
 import {createContentsScanProgress} from './contents-scan-progress.js';
+import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
 import {bookToolHelp, metadataPreview} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
@@ -965,6 +966,8 @@ document.querySelector('#export').addEventListener('click', async () => {
     backupStatus.textContent = `Export failed: ${error.message}`;
   }
 });
+
+bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summary'),status:document.querySelector('#performance-diagnostics-status'),worker:document.querySelector('#performance-diagnostics-worker'),runtime:chrome.runtime});
 
 document.querySelector('#import').addEventListener('change', async (event) => {
   const file = event.target.files?.[0];

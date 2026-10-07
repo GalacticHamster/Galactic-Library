@@ -5,8 +5,10 @@ HB and FAN send lookup timestamps on their `MATCH_ITEMS` requests independently 
 To reproduce an intermittent lookup:
 
 1. Reload GL and HB after installing diagnostic changes. Reloading clears the worker's old measurements.
-2. Keep a Kindle library tab available, without starting a scan. Repeat the HB bundle refreshes until both fast and slow results occur.
-3. In the Kindle importer, expand **Performance diagnostics**, then select **Export timing summary**. The checkbox controls Kindle acquisition tracing; HB/FAN lookup tracing does not require it. Copy/save the exported JSON promptly.
+2. Repeat the HB bundle refreshes until both fast and slow results occur.
+3. In GL Options, open **Settings → Performance diagnostics → Export timing summary**. This downloads `GL-timing-export.json` with the worker journal, companion lookups and Options timings. The worker ID/start time shown below the button belongs to that export. No Amazon page, signed-in Kindle account or acquisition checkbox is needed. Export promptly because a worker restart clears these in-memory records.
+
+The Kindle importer keeps its existing diagnostics checkbox and export for detailed acquisition debugging. That checkbox controls acquisition tracing only. Acquisition records held by that Kindle page remain available through its own export; Options exports the existing worker API data.
 
 The export's `companions` array contains handler admission, authorization, snapshot hit/read/wait/validation, index hit/build/wait, canonical work, matching execution, response dispatch and callback transport. `client` contains HB durations. `beforeSendMs` starts at content-script initialization, not browser navigation; `preparationMs` begins when that comparison starts. `postResponseMs` ends after processing and DOM annotation/summary updates (or cancellation), not browser paint. `renderOutcome` distinguishes rendered, superseded and incomplete comparisons. Nested/overlapping stages must not be added together twice.
 
@@ -26,4 +28,4 @@ copy(JSON.stringify(await chrome.runtime.sendMessage({
 }), null, 2));
 ```
 
-This copies the same worker companion/activity records and Options timings. It does not start acquisition or alter the database. Opening Options itself can create recorded reconciliation work; use the already-open Kindle exporter to minimize that activity during a reproduction.
+This copies the same worker companion/activity records and Options timings. It does not start acquisition or alter the database. Opening Options itself can create recorded reconciliation work; the export does not refresh the library or poll the worker.

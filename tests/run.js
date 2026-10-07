@@ -4,6 +4,7 @@ import {companionQueryConcurrencyTests} from './companion-query-concurrency.js';
 import {checkpointResponsivenessTests} from './checkpoint-responsiveness.js';
 import {committedProjectionTests} from './committed-projection.js';
 import {contentsPerformanceTests} from './contents-performance.js';
+import {optionsPerformanceDiagnosticsTests} from './options-performance-diagnostics.js';
 import {kindleContentsTests} from './kindle-contents.js';
 import {kindleContentsQualityTests} from './kindle-contents-quality.js';
 import {kindleManifestTests} from './kindle-manifest.js';
@@ -68,6 +69,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...optionsPerformanceDiagnosticsTests,
   ...companionQueryConcurrencyTests,
   ...checkpointResponsivenessTests,
   ...committedProjectionTests,
