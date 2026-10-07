@@ -123,7 +123,7 @@ const googleHint = { source: 'google-books', confidence: 'author-and-title-stem'
 const comicContents = { itemId: itemIds[0], sourceUrl: kindleBooks[0].metadata.detailUrl, statement: 'Collects Test Comic #1-4' };
 
 let workerNumber = 0;
-export async function withWorker(run, {accessGate = Promise.resolve(), accessError = null, storageEvents=false,concurrentQueries=false} = {}) {
+export async function withWorker(run, {accessGate = Promise.resolve(), accessError = null, storageEvents=false,concurrentQueries=false,sessionState={}} = {}) {
   const previousChrome = globalThis.chrome;
   const memory = memoryStorage();
   const listeners = [];
@@ -135,7 +135,7 @@ export async function withWorker(run, {accessGate = Promise.resolve(), accessErr
     const set=memory.area.set;memory.area.set=async updates=>{await set(updates);notifyStorageChange(Object.fromEntries(Object.entries(updates).map(([key,newValue])=>[key,{newValue}])));};
   }
   memory.area.setAccessLevel = async value => {accessLevels.push(['local',value.accessLevel]); await accessGate; if(accessError) throw accessError;};
-  const sessionValues = {};
+  const sessionValues = sessionState;
   const session = {setAccessLevel:async value => {accessLevels.push(['session',value.accessLevel]); await accessGate; if(accessError) throw accessError;},
     get:async key => ({[key]:structuredClone(sessionValues[key])}), set:async value => Object.assign(sessionValues,structuredClone(value)), remove:async key => {delete sessionValues[key];}};
   const runtime = {

@@ -17,8 +17,10 @@ import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-orig
 import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
+import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
 
-const queryDiagnostics=createQueryDiagnostics();
+let workerLifecycle;
+const queryDiagnostics=createQueryDiagnostics({onActivity:(stage,details)=>workerLifecycle?.observe(details.operation??stage)});
 
 const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
@@ -30,6 +32,7 @@ const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
+workerLifecycle=createWorkerLifecycleDiagnostics({area:chrome.storage.session,ready:storageReady,worker:queryDiagnostics.worker,startedEpochMs:queryDiagnostics.startedEpochMs});
 const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
 const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,diagnostics:queryDiagnostics});
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
@@ -44,7 +47,7 @@ const contentsProgressHub=globalThis.GalacticContentsScan.progressHub();
 const broadcastContentsProgress=()=>chrome.runtime.sendMessage({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:contentsProgressHub.list()}).catch(()=>{});
 chrome.tabs?.onRemoved?.addListener(tabId=>{storageWriter.interruptKindleContentsRefresh(tabId).catch(()=>{});if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}});
 chrome.tabs?.onUpdated?.addListener((tabId,change)=>{if(change.status==='loading'){storageWriter.interruptKindleContentsRefresh(tabId).catch(()=>{});if(contentsProgressHub.hasActive(tabId)){contentsProgressHub.interrupt(tabId);broadcastContentsProgress();}}});
-chrome.runtime.onStartup?.addListener(()=>storageWriter.interruptKindleContentsRefresh().catch(()=>{}));
+chrome.runtime.onStartup?.addListener(()=>{workerLifecycle.platformEvent('onStartup');storageWriter.interruptKindleContentsRefresh().catch(()=>{});});
 function contentsTiming(request,kind){
   const timing=contentsPerformance.trace(request?.diagnosticLookupId,kind);
   if(timing)contentsDiagnosticUntil=contentsPerformance.now()+60000;
@@ -73,7 +76,8 @@ chrome.storage.onChanged?.addListener((changes,area)=>{
 });
 chrome.runtime.onStartup?.addListener(()=>reconcileReminders());
 if(chrome.permissions)reconcileReminders();
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  workerLifecycle.platformEvent('onInstalled',details?.reason);
   chrome.runtime.openOptionsPage().catch(() => {});
 });
 
@@ -220,12 +224,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ok:true,runs:contentsProgressHub.list()});return undefined;
   }
   if(request?.type==='GL_CONTENTS_UI_TIMING'){
-    if(isOwnExtensionPage(sender.url)){const clean=contentsPerformance.clean(request.timing);if(clean?.kind==='options')contentsUiTimings.add(clean);}
+    if(isOwnExtensionPage(sender.url)){const clean=contentsPerformance.clean(request.timing);if(clean?.kind==='options'){contentsUiTimings.add(clean);workerLifecycle.observe('options_timing_received');}}
     sendResponse({ok:true});return undefined;
   }
   if(request?.type==='GET_KINDLE_CONTENTS_UI_TIMINGS'){
     if(!isProviderImportPage('kindle',sender.url)&&!isOwnExtensionPage(sender.url)){sendResponse({ok:false});return undefined;}
-    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean),activity:queryDiagnostics.report()});return undefined;
+    workerLifecycle.observe('diagnostics_export');
+    workerLifecycle.report().then(lifecycle=>sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean),activity:queryDiagnostics.report(),lifecycle}));return true;
   }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
@@ -501,6 +506,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     storageWriter.getQueryAllowedExternalClientIds().then(allowed=>{
       const original=companionCallbacks.get(id);
       if(request.apiVersion!==1||!sender.id||!allowed.includes(sender.id)||!original||original.sender!==sender.id||!Number.isFinite(callback)||callback<original.start||callback>observed+1000||observed-original.responded>60000){sendResponse({ok:false});return;}
+      workerLifecycle.observe(request.type==='MATCH_ITEMS_DIAGNOSTIC_RENDER'?'companion_diagnostic_render':'companion_diagnostic_callback');
       if(request.type==='MATCH_ITEMS_DIAGNOSTIC_RENDER'){
         if(original.rendered){sendResponse({ok:false});return;}original.rendered=true;
         companionTimings.annotate(id,[],request.diagnosticHb);sendResponse({ok:true,apiVersion:1});return;
@@ -511,6 +517,9 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     }).catch(()=>sendResponse({ok:false}));return true;
   }
   const entered=contentsPerformance.now(),sent=request?.diagnosticSentEpochMs;
+  let authorizedCompanion=false,completedCompanion=false;
+  const deliver=sendResponse;
+  sendResponse=value=>{try{deliver(value);}finally{if(authorizedCompanion&&!completedCompanion){completedCompanion=true;workerLifecycle.completed(request?.type);}}};
   const explicit=contentsPerformance.validId(request?.diagnosticLookupId);
   const diagnosticId=explicit?request.diagnosticLookupId:request?.type==='MATCH_ITEMS'&&entered<contentsDiagnosticUntil?'lookup-'+companionDiagnosticPrefix+'-'+String(++companionDiagnosticSequence).padStart(3,'0'):null;
   const timing=contentsPerformance.trace(diagnosticId,'companion',undefined,explicit&&Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000?sent:null);
@@ -535,6 +544,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         respond({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
         return null;
       }
+      authorizedCompanion=true;workerLifecycle.observe('external_started:'+request?.type);
       if(request?.type==='OPEN_REVIEW'){
         if(request.apiVersion!==1){sendResponse({ok:false,apiVersion:1,error:'Unsupported Galactic Library API version.'});return null;}
         return chrome.runtime.openOptionsPage().then(()=>sendResponse({ok:true,apiVersion:1}),()=>sendResponse({ok:false,apiVersion:1,error:'Could not open Galactic Library options.'}));

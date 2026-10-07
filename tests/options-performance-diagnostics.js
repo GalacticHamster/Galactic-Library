@@ -22,6 +22,7 @@ export const optionsPerformanceDiagnosticsTests=[
   assert.deepEqual(requests,[{type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}]);
   assert.equal(summary.records.length,0);assert.equal(summary.companions.length,1);assert.equal(summary.options.length,1);
   assert.ok(summary.activity.events.length);assert.ok(ui.worker.textContent.includes(summary.activity.worker));
+  assert.equal(summary.lifecycle.current.worker,summary.activity.worker);
   assert.match(ui.worker.textContent,/Worker at last export:/u);assert.match(ui.status.textContent,/1 companion lookups, 1 Options timings/u);
   assert.equal(ui.button.disabled,false);assert.deepEqual(memory.values,before);
  },{concurrentQueries:true})],
