@@ -58,4 +58,50 @@ export const providerProfileTests=[
    const duplicate=structuredClone(d);duplicate.providerItems.duplicate={...item};assert.throws(()=>validateDatabase(duplicate),/duplicate provider identities/);
    const history=structuredClone(d);history.providerHistory[item.recordRef]={item,profileLabel:'A',reason:'missing-from-complete-scan',missingSince:'2026-10-01'};assert.throws(()=>validateDatabase(history),/share a reference/);
  }]
-];
+ ];
+
+providerProfileTests.push(
+ ['remembered A/B baselines select offline, quick-update independently and reject stale authority',async()=>{
+   const {writer,stored}=memory(),items=[book()];
+   let scan=await writer.beginProviderScan('kindle','A','full',false,1);
+   let d=await writer.commitProviderScan('kindle',items,{syncMode:'full',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',items),scan.scanToken,1),a=activeRecord(d,'kindle','B000000001');
+   scan=await writer.beginProviderScan('kindle','B','full',true,2);
+   d=await writer.commitProviderScan('kindle',items,{syncMode:'full',fullSyncAt:'2026-10-02'},snapshotFixture('kindle',items),scan.scanToken,2);const b=activeRecord(d,'kindle','B000000001');
+   const evidence=structuredClone(d.providerItems);
+   await assert.rejects(writer.selectProviderProfile(a.profileId,b.profileId,false),/Confirm/);
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.deepEqual(d.providerItems,evidence);assert.equal(d.providers.kindle.fullSyncAt,'2026-10-01T00:00:00.000Z');
+   scan=await writer.beginProviderScan('kindle','A','incremental',false,1);assert.equal(scan.forceFull,false);assert.equal(scan.profileId,a.profileId);
+   d=await writer.commitProviderScan('kindle',[],{syncMode:'incremental',quickSyncAt:'2026-10-03'},null,scan.scanToken,1);assert(d.providerItems[a.id]&&d.providerItems[b.id]);
+   const stale=await writer.beginProviderScan('kindle','A','incremental',false,1);
+   d=await writer.selectProviderProfile(b.profileId,a.profileId,true);
+   await assert.rejects(writer.commitProviderScan('kindle',items,{syncMode:'incremental'},null,stale.scanToken,1),/superseded/);
+   assert.equal(await writer.failProviderScan('kindle',stale.scanToken,1,{code:'network'}),false);
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.equal(d.providers.kindle.quickSyncAt,'2026-10-03T00:00:00.000Z');assert.deepEqual(d.providerItems,evidence);
+   assert.equal(Object.keys(stored.galacticLibraryProviderScans).length,0);
+ }],
+ ['profile rename preserves immutable identity, baseline, history and rich evidence',async()=>{
+   const {writer}=memory();let d=await full(writer,'Personal',[book()]),a=activeRecord(d,'kindle','B000000001');
+   await writer.saveContentReview(a.id,review);await writer.saveTitleAliases(a.recordRef,['Alias']);d=await full(writer,'B',[book()]);
+   const before=structuredClone(d),b=activeRecord(d,'kindle','B000000001');d=await writer.renameProviderProfile(a.profileId,'Sean');
+   assert.deepEqual(d.providerItems,before.providerItems);assert.deepEqual(d.contentReviews,before.contentReviews);assert.deepEqual(d.titleAliases,before.titleAliases);
+   assert.equal(d.providerProfiles[a.profileId].state.fullSyncAt,before.providerProfiles[a.profileId].state.fullSyncAt);assert.equal(d.providerProfiles[a.profileId].nickname,'Sean');
+   await assert.rejects(writer.renameProviderProfile(a.profileId,'B'),/already used/);
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.equal(d.providers.kindle.profileLabel,'Sean');const scan=await writer.beginProviderScan('kindle','Sean','incremental',false,1);assert.equal(scan.forceFull,false);
+ }],
+ ['full scan missing inference and difference counts are restricted to the targeted profile',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');d=await full(writer,'B',[]);
+   assert(d.providerItems[a.id]);assert(!d.providerHistory[a.recordRef]);assert(d.providerHistory[b.recordRef]);assert.equal(d.providers.kindle.syncHealth.differences.missing,1);
+   assert.equal(d.providerProfiles[a.profileId].state.recordCount,2);assert.equal(d.providerProfiles[b.profileId].state.recordCount,0);
+ }],
+ ['purchase IDs and order fingerprints survive A/B/A without combining skip authority',async()=>{
+   const {writer}=memory();const fullProvider=async(provider,label,native,syncState)=>{const items=[{providerItemId:native,title:native}];return writer.replaceProviderItems(provider,items,{profileLabel:label,fullSyncAt:'2026-10-01',syncState},snapshotFixture(provider,items));};
+   for(const provider of ['humble','fanatical']){
+     const state=n=>provider==='humble'?{knownPurchaseIds:[`purchase-${n}`]}:{knownOrderFingerprints:[String(n).repeat(64)]};
+     let d=await fullProvider(provider,'A','x',state(1)),a=d.providers[provider].activeProfileId;d=await fullProvider(provider,'B','x',state(2));const b=d.providers[provider].activeProfileId;
+     d=await writer.selectProviderProfile(a,b,true);assert.deepEqual(d.providers[provider].syncState,state(1));
+     const scan=await writer.beginProviderScan(provider,'A','incremental',false,1);assert.equal(scan.forceFull,false);
+     d=await writer.selectProviderProfile(b,a,true);assert.deepEqual(d.providers[provider].syncState,state(2));
+   }
+ }]
+);

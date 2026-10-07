@@ -17,6 +17,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveReminderNotificationSettings',
   'reserveReminderNotification',
   'releaseReminderNotification',
+  'selectProviderProfile',
+  'renameProviderProfile',
   'beginProviderScan',
   'commitProviderScan',
   'failProviderScan',

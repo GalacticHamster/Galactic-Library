@@ -28,3 +28,19 @@ remain authoritative. Backup format 1 carries the schema-13 database; durable
 job storage remains separate from ordinary library backups.
 
 Provider nicknames are manual declarations, not verified website account IDs.
+
+## Selection and updates
+
+`selectProviderProfile(profileId, expectedActiveId, confirmed)` activates an
+existing profile offline with explicit account confirmation and a stale-state
+check. Selection leaves records and their evidence untouched, restores that
+profile's baseline and cancels outstanding provider scan authority. Rename
+changes display metadata, preserving IDs, baseline and record-owned decisions.
+
+A scan token binds the target profile ID, originating active selection, tab,
+mode and attempt. A later selection/rename/reset/restore invalidates it. A new
+account without a complete baseline needs a full scan; a remembered account
+uses its own saved baseline. Provider-specific age and coverage checks remain
+in their existing acquisition code. A full scan marks missing records only in
+its target profile. A failed new-account scan does not replace the previously
+active profile or its baseline.

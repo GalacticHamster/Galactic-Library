@@ -10,7 +10,7 @@
       const context=session.resume??session.read();session.resume=null;
       if(!context.confirmed||!context.profileLabel)throw new Error('Enter a profile label and confirm the signed-in account.');
       const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true});
-      if(result.ok)session.context={...context,scanToken:result.scanToken};
+      if(result.ok)session.context={...context,scanToken:result.scanToken,profileId:result.profileId};
       return result;
     }
     if(request.type==='IMPORT_PROVIDER_ITEMS'){
@@ -45,7 +45,7 @@
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<label>Account/profile label <input data-profile-label maxlength="100" placeholder="e.g. personal"></label><br><label><input type="checkbox" data-profile-confirm> Signed-in account matches this label</label><br><label><input type="checkbox" data-profile-switch> Switch active profile on full rescan</label>';
+      controls.innerHTML='<label>Account/profile label <input data-profile-label maxlength="100" placeholder="e.g. personal"></label><br><label><input type="checkbox" data-profile-confirm> Signed-in account matches this label</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';

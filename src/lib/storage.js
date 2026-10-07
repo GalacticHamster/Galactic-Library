@@ -19,7 +19,7 @@ export const {
   getDatabase, getCommittedLibraryView, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, saveOwnershipPolicy,
   saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
   removeCompanionFeed,
-  cancelProviderScan,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,
+  selectProviderProfile,renameProviderProfile,cancelProviderScan,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,
   getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
   saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
   acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,

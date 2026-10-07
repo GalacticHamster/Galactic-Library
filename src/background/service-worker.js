@@ -394,22 +394,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
       : getDatabase().then(database=>({database}));
-    read.then(({database,scanToken,forceFull,profileLabel}) => {
-        const state = database.providers?.[request.provider] ?? {};
-        if(request.type==='GET_PROVIDER_PROFILE'){sendResponse({ok:true,profileLabel:state.profileLabel??''});return;}
+    read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
+        const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
+        const state = database.providerProfiles?.[activeId]?.state ?? {};
+        if(request.type==='GET_PROVIDER_PROFILE'){sendResponse({ok:true,profileLabel:database.providerProfiles?.[activeId]?.nickname??'',profileId:activeId});return;}
         const knownProviderItemIds = Object.values(database.providerItems)
-          .filter((item) => item.provider === request.provider)
+          .filter((item) => item.provider === request.provider&&item.profileId===activeId)
           .map((item) => item.providerItemId)
           .filter(Boolean)
           .slice(0, 50000);
         sendResponse({
           ok: true,
-          scanToken,profileLabel,
+          scanToken,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set(Object.values(database.providerItems)
-              .filter(item=>item.provider==='humble'&&item.metadata?.entitlement==='third-party-key'
+              .filter(item=>item.provider==='humble'&&item.profileId===activeId&&item.metadata?.entitlement==='third-party-key'
                 &&(item.metadata.keyStatus!=='revealed'||item.metadata.expiresAt&&Date.parse(item.metadata.expiresAt)<=Date.now()))
               .map(item=>item.metadata.purchaseId).filter(Boolean))].slice(0,50000)}
             : request.provider === 'fanatical'
