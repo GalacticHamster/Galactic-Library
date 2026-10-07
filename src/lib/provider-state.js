@@ -6,9 +6,10 @@ export function validateProviderStates(value = {}) {
   object(value,'Provider states');
   return Object.fromEntries(PROVIDERS.filter(provider=>Object.hasOwn(value,provider)).map(provider=>{
     const state=object(value[provider],'Provider state');const result={};
-    for(const key of ['connected','itemCount','addOnCount','audiobookCount','softwareCount','bookCount','movieCount','tvCount','linkedAddOnCount','recordCount','lastSync','lastError','source','syncMode','quickSyncAt','fullSyncAt','accountLabel','profileLabel']){
+    for(const key of ['activeProfileId','connected','itemCount','addOnCount','audiobookCount','softwareCount','bookCount','movieCount','tvCount','linkedAddOnCount','recordCount','lastSync','lastError','source','syncMode','quickSyncAt','fullSyncAt','accountLabel','profileLabel']){
       if(!Object.hasOwn(state,key))continue;
-      if(key==='connected'){if(typeof state[key]!=='boolean')throw new Error('Provider connected must be boolean.');result[key]=state[key];}
+      if(key==='activeProfileId'){if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(state[key]??''))throw Error('Invalid active profile.');result[key]=state[key];}
+      else if(key==='connected'){if(typeof state[key]!=='boolean')throw new Error('Provider connected must be boolean.');result[key]=state[key];}
       else if(key.endsWith('Count'))result[key]=count(state[key],key);
       else if(['lastSync','quickSyncAt','fullSyncAt'].includes(key))result[key]=date(state[key],key);
       else result[key]=state[key]===null?null:text(state[key],key==='lastError'?600:500,key);

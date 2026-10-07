@@ -14,8 +14,8 @@ export function validateEditionSeparations(value = {}) {
   return Object.fromEntries(Object.entries(value).map(([ref,entry])=>{
     if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref))throw new Error('Invalid separation reference.');
     object(entry,'Edition separation');
-    const itemId=text(entry.itemId,550,'Separated record ID');
-    const otherItemIds=strings(entry.otherItemIds,50000,550,'Separated edition members').sort();
+    const itemId=text(entry.itemId,600,'Separated record ID');
+    const otherItemIds=strings(entry.otherItemIds,50000,600,'Separated edition members').sort();
     pairs+=otherItemIds.length;
     if(!itemId||!otherItemIds.length||otherItemIds.includes(itemId)||pairs>100000)throw new Error('Invalid edition separation members.');
     return [ref,{itemId,otherItemIds,updatedAt:date(entry.updatedAt)}];

@@ -26,9 +26,9 @@ export const ownershipPolicyTests=[
     const item=record();const old=database([item]);old.schemaVersion=11;delete old.ownershipPolicy;
     const migrated=validateDatabase(old);
     assert.deepEqual(migrated.ownershipPolicy,{allOwned:false,providers:{}});
-    assert.equal(migrated.schemaVersion,12);
+    assert.equal(migrated.schemaVersion,13);
     assert.equal(query(migrated).owned,false);
-    assert.deepEqual(migrated.providerItems[item.id],item);
+    assert.deepEqual(migrated.providerItems[item.id],{...item,profileId:migrated.providers[item.provider].activeProfileId});
   }],
   ['global override covers every provider, media type and ownership state without mutating records',()=>{
     for(const provider of PROVIDERS)for(const ownership of OWNERSHIP_STATES){

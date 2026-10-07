@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src/lib/models.js';
 import {registerCommittedSnapshot} from '../src/lib/committed-snapshot.js';
@@ -78,7 +78,7 @@ export const validationCertificateTests=[
  ['schema migration commits before issuing a current-code certificate',async()=>{
   const s=setup();await certify(s);s.db.values[DATABASE_STORAGE_KEY].schemaVersion=1;
   const result=await query(s.writer());assert.ok(result.stages.includes('snapshot_validation'));assert.ok(result.stages.includes('snapshot_migration'));
-  assert.equal(s.db.values[DATABASE_STORAGE_KEY].schemaVersion,12);assert.deepEqual(result.database,s.db.values[DATABASE_STORAGE_KEY]);await receipt(s.session);
+  assert.equal(s.db.values[DATABASE_STORAGE_KEY].schemaVersion,13);assert.deepEqual(result.database,s.db.values[DATABASE_STORAGE_KEY]);await receipt(s.session);
  }],
  ['restore/import cannot mint their own receipt and replace/clear invalidate old state',async()=>{
   const s=setup();await certify(s);const writer=s.writer();await query(writer);

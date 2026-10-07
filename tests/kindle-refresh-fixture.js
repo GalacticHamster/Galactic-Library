@@ -142,7 +142,7 @@ add('Refresh preflight validates only the current record without writing or rebu
 add('Refresh preflight retains legacy migration and full commit validation after a cheap identity check',async()=>{
  const store=memory();await store.writer.restoreDatabase(database(book(1),book(2)));const plan=await begin(store.writer),snapshot=structuredClone(store.values);
  store.values.galacticLibraryDatabase.schemaVersion=11;const migration=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-002');
- equal(await store.writer.execute('checkKindleContentsRefreshItem',[plan.refresh.runRef,plan.refresh.leaseRef,1,0],migration),{valid:true},'Legacy preflight failed');assert(migration.events.some(event=>event.stage==='read_validation'),'Legacy validation bypassed');equal(store.values.galacticLibraryDatabase.schemaVersion,12,'Legacy migration skipped');
+ equal(await store.writer.execute('checkKindleContentsRefreshItem',[plan.refresh.runRef,plan.refresh.leaseRef,1,0],migration),{valid:true},'Legacy preflight failed');assert(migration.events.some(event=>event.stage==='read_validation'),'Legacy validation bypassed');equal(store.values.galacticLibraryDatabase.schemaVersion,13,'Legacy migration skipped');
  store.values.galacticLibraryDatabase=structuredClone(snapshot.galacticLibraryDatabase);const other=plan.candidates[1];store.values.galacticLibraryDatabase.providerItems[other.id].title='';
  equal(await store.writer.checkKindleContentsRefreshItem(plan.refresh.runRef,plan.refresh.leaseRef,1,0),{valid:true},'Unrelated data blocked read-only current identity');
  const before=structuredClone(store.values);await rejects(()=>commit(store.writer,plan,[observation(plan.candidates[0])]),'Commit bypassed full database validation');equal(store.values,before,'Invalid global commit saved partial data');
@@ -200,7 +200,7 @@ add('Refresh projection invalidates at queued mutation boundaries and during an 
  const pending=check();await started;store.values.galacticLibraryDatabase.providerItems[target.id].metadata.detailUrl=target.detailUrl;store.writer.invalidateRefreshPreflight();release();
  equal(await pending,{valid:true},'Change notification during queue read reused old eligibility');store.area.get=get;
  const writes=structuredClone(store.values);store.values.galacticLibraryDatabase.schemaVersion=11;store.writer.invalidateRefreshPreflight();
- equal(await check(),{valid:true},'Observed legacy data did not take migration path');equal(store.values.galacticLibraryDatabase.schemaVersion,12,'Legacy migration skipped');equal(store.values[KINDLE_REFRESH_KEY],writes[KINDLE_REFRESH_KEY],'Migration altered queue/cursor');
+ equal(await check(),{valid:true},'Observed legacy data did not take migration path');equal(store.values.galacticLibraryDatabase.schemaVersion,13,'Legacy migration skipped');equal(store.values[KINDLE_REFRESH_KEY],writes[KINDLE_REFRESH_KEY],'Migration altered queue/cursor');
 });
 add('Refresh relies on final canonical validation without an extra rebuild while preserving identities and history',async()=>{
  const duplicate=normalizeProviderItem({provider:'humble',providerItemId:'H1',title:'Collection 1',mediaType:'book',ownership:'owned'}),store=memory(true);

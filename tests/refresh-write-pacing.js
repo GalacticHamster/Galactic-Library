@@ -113,7 +113,7 @@ export const refreshWritePacingTests=[
    const job=s.values.galacticLibraryKindleContentsRefresh,trace=perf.trace(id(2),'checkpoint');
    const summary=await writer.execute('commitKindleContentsRefresh',[s.entries.slice(0,1),job.runRef,job.leaseRef,1],trace);
    assert.equal(summary.cursor,1);assert.ok(trace.events.some(e=>e.stage==='read_validation'));assert.equal(trace.events.some(e=>e.stage==='read_committed_clone'),false);
-   if(mode==='legacy'){assert.ok(trace.events.some(e=>e.stage==='migration_write'));assert.equal(s.values.galacticLibraryDatabase.schemaVersion,12);}
+   if(mode==='legacy'){assert.ok(trace.events.some(e=>e.stage==='migration_write'));assert.equal(s.values.galacticLibraryDatabase.schemaVersion,13);}
    if(mode==='restart'){
     const next=perf.trace(id(3),'checkpoint');await writer.execute('commitKindleContentsRefresh',[s.entries.slice(1,2),job.runRef,job.leaseRef,1],next);
     assert.ok(next.events.some(e=>e.stage==='read_committed_clone'),'A successful cold commit did not publish proof for the next batch');

@@ -14,7 +14,7 @@ export function validateKindleRefresh(value) {
   if(!states.has(value.status)||!Array.isArray(value.queue)||value.queue.length>50000)throw Error('Invalid refresh checkpoint.');
   const queue=value.queue.map(entry=>{
     object(entry,'Refresh queue item');
-    if(!/^kindle:[A-Z0-9]+$/u.test(entry.id)||!/^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(entry.detailUrl))throw Error('Invalid refresh queue identity.');
+    if(!/^kindle:(?:[a-f0-9-]{36}:)?[A-Z0-9]+$/u.test(entry.id)||!/^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(entry.detailUrl))throw Error('Invalid refresh queue identity.');
     return {id:entry.id,recordRef:uuid(entry.recordRef),detailUrl:entry.detailUrl,title:text(entry.title,500,'Refresh title')};
   });
   if(new Set(queue.map(e=>e.recordRef)).size!==queue.length)throw Error('Duplicate refresh queue identity.');

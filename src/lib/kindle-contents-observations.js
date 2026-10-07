@@ -47,8 +47,8 @@ export function* kindleContentsObservationsSteps(value,records=[]) {
   for(const [ref,entry] of Object.entries(value)){
     yield;
     reference(ref);object(entry,'Contents observation record');
-    const providerItemId=text(entry.providerItemId,550,'Observation provider item');
-    if(!/^kindle:[A-Z0-9]+$/u.test(providerItemId))throw Error('Invalid observation provider item.');
+    const providerItemId=text(entry.providerItemId,600,'Observation provider item');
+    if(!/^kindle:(?:[a-f0-9-]{36}:)?[A-Z0-9]+$/u.test(providerItemId))throw Error('Invalid observation provider item.');
     const owner=owners.get(ref);
     if(owner&&(owner.provider!=='kindle'||owner.id!==providerItemId))throw Error('Contents history belongs to another provider record.');
     result.push([ref,{providerItemId,baseline:entry.baseline===null?null:validateContentsObservation(entry.baseline),

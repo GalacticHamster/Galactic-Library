@@ -318,7 +318,7 @@ function populateProviderFilter(providerEntries) {
 
 function parentRecordKey(addOn) {
   const parentId = String(addOn.metadata?.parentProviderItemId ?? '').trim();
-  return parentId ? `${addOn.provider}:${parentId}` : null;
+  return parentId ? Object.values(database.providerItems).find(item=>item.provider===addOn.provider&&item.profileId===addOn.profileId&&item.providerItemId===parentId)?.id??null : null;
 }
 
 function createAddOnList(addOns) {

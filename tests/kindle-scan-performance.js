@@ -64,7 +64,7 @@ export const kindleScanPerformanceTests=[
  }],
  ['schema/metadata migrations still persist once and legacy backups remain compatible',async()=>{
   const store=memory(true);store.values[DATABASE_STORAGE_KEY]={...createEmptyDatabase(),schemaVersion:11};delete store.values[DATABASE_STORAGE_KEY].ownershipPolicy;
-  const writer=createStorageWriter(store.area);const db=await writer.getDatabase();assert.equal(db.schemaVersion,12);assert.equal(store.writes,1);assert.equal(db.ownershipPolicy.allOwned,false);
+  const writer=createStorageWriter(store.area);const db=await writer.getDatabase();assert.equal(db.schemaVersion,13);assert.equal(store.writes,1);assert.equal(db.ownershipPolicy.allOwned,false);
   await writer.getDatabase();assert.equal(store.writes,1);assert.deepEqual(parseBackup(createBackup(db)),db);
   store.values[DATABASE_STORAGE_KEY].schemaVersion=999;await assert.rejects(writer.getDatabase(),/Unsupported database schema/);assert.equal(store.writes,1);
  }],

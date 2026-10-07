@@ -1,3 +1,4 @@
+import {migrateProviderProfiles,validateProviderProfiles,profileRef,profileItemKey} from './provider-profiles.js';
 import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } from './constants.js';
 import { normalizeGameTitle } from './normalization.js';
 import { identityConflicts, identityEvidence, sameEditionEvidence } from './identity.js';
@@ -21,6 +22,8 @@ export function createEmptyDatabase() {
   return {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers: {},
+    providerProfiles: {},
+    unresolvedProfileState: {contentReviews:{},manualMatchDecisions:{},editionSeparations:{},ownershipProposals:{},companionFeeds:{}},
     ownershipPolicy: defaultOwnershipPolicy(),
     providerItems: {},
     canonicalItems: {},
@@ -31,8 +34,8 @@ export function createEmptyDatabase() {
   };
 }
 
-export function providerItemKey(provider, providerItemId) {
-  return `${provider}:${providerItemId}`;
+export function providerItemKey(provider, providerItemId, profileId = '') {
+  return profileItemKey(provider,providerItemId,profileId);
 }
 
 export function canonicalItemKey(mediaType, normalizedTitle) {
@@ -56,7 +59,8 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
   const metadata=validateMetadata(provider,value.metadata,options);
 
   return {
-    id: providerItemKey(provider, providerItemId),
+    id: providerItemKey(provider, providerItemId, options.profileKeySpace??value.profileId??''),
+    ...(value.profileId?{profileId:profileRef(value.profileId)}:{}),
     recordRef: /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(value.recordRef ?? '') ? value.recordRef : crypto.randomUUID(),
     provider,
     providerItemId,
@@ -169,13 +173,16 @@ export function validateDatabaseAsync(value,options){return finishWorkAsync(data
 function* databaseSteps(value) {
   yield 'validation_records';
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Backup does not contain a database object.');
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, DATABASE_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error(`Unsupported database schema version: ${value.schemaVersion ?? '(missing)'}.`);
   if (!value.providerItems || typeof value.providerItems !== 'object' || Array.isArray(value.providerItems)) throw new Error('Backup is missing provider items.');
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
+  value=migrateProviderProfiles(value);
+  const providerProfiles=validateProviderProfiles(value.providerProfiles);
+  const profileFor=item=>{const p=providerProfiles[item.profileId];if(!p||p.provider!==item.provider)throw Error('Record belongs to an unknown provider profile.');return p;};
   const normalizedItems=[];
   for(const item of Object.values(value.providerItems)) {
     yield;
-    const normalized = normalizeProviderItem({...item,observedAt:item?.observedAt??null}, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString());
+    const normalized = normalizeProviderItem({...item,observedAt:item?.observedAt??null}, typeof item?.updatedAt === 'string' ? item.updatedAt : new Date().toISOString(),{profileKeySpace:profileFor(item).keySpace});
     normalizedItems.push([normalized.id, normalized]);
   }
   if(new Set(normalizedItems.map(([id])=>id)).size!==normalizedItems.length)throw new Error('Backup contains duplicate provider identities.');
@@ -186,10 +193,11 @@ function* databaseSteps(value) {
   const unavailablePurchases=new Set(Object.values(providerItems)
     .filter(item=>item.provider==='humble'&&item.metadata.entitlement==='third-party-key'
       &&['expired','unavailable'].includes(item.metadata.keyStatus)&&item.metadata.purchaseId)
-    .map(item=>JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])));
+    .map(item=>JSON.stringify([item.profileId,item.metadata.purchaseId,item.normalizedTitle])));
   for(const item of Object.values(providerItems))if(item.provider==='humble'&&item.mediaType==='game'
-    &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
+    &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.profileId,item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
   const providers = validateProviderStates(value.providers ?? {});
+  for(const [provider,state]of Object.entries(providers)){const p=providerProfiles[state.activeProfileId];if(!p||p.provider!==provider)throw Error('Invalid active provider profile.');}
   yield 'validation_history';
   object(value.providerHistory??{},'Provider history');
   if(Object.keys(value.providerHistory??{}).length>500000)throw new Error('Provider history exceeds its limit.');
@@ -198,7 +206,8 @@ function* databaseSteps(value) {
     yield;
     object(entry,'Historical record');
     if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref)||!['missing-from-complete-scan','profile-switch'].includes(entry.reason))throw new Error('Invalid historical record.');
-    const item=normalizeProviderItem({...entry.item,observedAt:entry.item?.observedAt??null},entry.item?.updatedAt);
+    const item=normalizeProviderItem({...entry.item,observedAt:entry.item?.observedAt??null},entry.item?.updatedAt,{profileKeySpace:profileFor(entry.item).keySpace});
+    if(item.recordRef!==ref)throw Error('Historical reference does not match its record.');
     historyEntries.push([ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason}]);
   }
   const providerHistory=Object.fromEntries(historyEntries);
@@ -209,6 +218,7 @@ function* databaseSteps(value) {
     if(refs.has(item.recordRef))throw new Error('Backup contains duplicate persistent record references.');
     refs.add(item.recordRef);
   }
+  for(const [ref,h]of Object.entries(providerHistory)){if(refs.has(ref))throw Error('Historical and current records share a reference.');refs.add(ref);}
   const companionFeeds=validateCompanionFeeds(value.companionFeeds);
   for(const feed of Object.values(companionFeeds))for(const entry of feed.entries)if(refs.has(entry.localRef)||Object.hasOwn(providerHistory,entry.localRef))throw new Error('A companion reminder reference collides with a library record.');
   const manualMatchDecisions = {};
@@ -220,7 +230,7 @@ function* databaseSteps(value) {
     const itemIds=[...decision.itemIds].sort();
     const [left,right]=itemIds.map(id=>providerItems[id]);
     if(left&&right&&left.mediaType!==right.mediaType)throw new Error('A saved relationship crosses media types.');
-    if(itemIds.some(id=>id.length>550))throw new Error('Saved relationship IDs exceed their bounds.');
+    if(itemIds.some(id=>id.length>600))throw new Error('Saved relationship IDs exceed their bounds.');
     manualMatchDecisions[itemIds.join('\u0000')]={decision:decision.decision,itemIds,updatedAt:date(decision.updatedAt)};
   }
   object(value.contentReviews??{},'Contents reviews');
@@ -243,7 +253,8 @@ function* databaseSteps(value) {
   const canonicalItems=yield* canonicalItemsSteps(providerItems,manualMatchDecisions,value.canonicalItems,editionSeparations);
   yield 'validation_other';
   return {
-    schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,
+    schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,providerProfiles,
+    unresolvedProfileState: validateUnresolvedProfileState(value.unresolvedProfileState),
     providers,
     ownershipPolicy,
     providerHistory,
@@ -254,6 +265,21 @@ function* databaseSteps(value) {
     canonicalItems,
     manualMatchDecisions,
     editionSeparations,
-    contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => {if(id.length>550)throw new Error('Contents review ID exceeds its bounds.');return [id, validateContentReview(review)];}))
+    contentReviews: Object.fromEntries(Object.entries(value.contentReviews ?? {}).map(([id, review]) => {if(id.length>600)throw new Error('Contents review ID exceeds its bounds.');return [id, validateContentReview(review)];}))
   };
+}
+
+function validateUnresolvedProfileState(value={}){
+  object(value,'Unresolved legacy profile state');const result={};
+  for(const key of ['contentReviews','manualMatchDecisions','editionSeparations','ownershipProposals','companionFeeds']){
+    object(value[key]??{},'Unresolved profile decisions');if(Object.keys(value[key]??{}).length>500000)throw Error('Too much unresolved legacy state.');
+    // These entries never participate in matching. Validate their old payloads
+    // through the same validators instead of retaining arbitrary backup data.
+    const entries=value[key]??{};
+    if(key==='contentReviews')result[key]=Object.fromEntries(Object.entries(entries).map(([id,r])=>{if(id.length>600)throw Error('Invalid legacy review ID.');return [id,validateContentReview(r)];}));
+    else if(key==='editionSeparations')result[key]=validateEditionSeparations(entries);
+    else if(key==='ownershipProposals')result[key]=validateOwnershipProposals(entries);
+    else if(key==='companionFeeds')result[key]=validateCompanionFeeds(entries);
+    else {result[key]={};for(const [id,d]of Object.entries(entries)){if(!['same','same-work','same-edition','different'].includes(d.decision)||!Array.isArray(d.itemIds)||d.itemIds.length!==2||d.itemIds.some(i=>typeof i!=='string'||i.length>600)||d.itemIds[0]===d.itemIds[1])throw Error('Invalid unresolved relationship.');result[key][id]={decision:d.decision,itemIds:d.itemIds,updatedAt:date(d.updatedAt)};}}
+  }return result;
 }

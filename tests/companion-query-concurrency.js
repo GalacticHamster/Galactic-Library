@@ -127,7 +127,7 @@ export const companionQueryConcurrencyTests=[
   delete values[DATABASE_STORAGE_KEY].providerItems['kindle:B000000001'].recordRef;
   const set=store.area.set;store.area.set=async()=>{throw Error('Synthetic migration write failure');};writer.invalidateQuerySnapshot();
   await assert.rejects(writer.getQueryDatabase(),/migration write failure/);assert.equal(values[DATABASE_STORAGE_KEY].schemaVersion,11,'Failed migration exposed a changed database');
-  store.area.set=set;const migrated=await writer.getQueryDatabase();assert.equal(migrated.schemaVersion,12);assert.equal(values[DATABASE_STORAGE_KEY].schemaVersion,12);
+  store.area.set=set;const migrated=await writer.getQueryDatabase();assert.equal(migrated.schemaVersion,13);assert.equal(values[DATABASE_STORAGE_KEY].schemaVersion,13);
   assert.equal(migrated.providerItems['kindle:B000000001'].recordRef,values[DATABASE_STORAGE_KEY].providerItems['kindle:B000000001'].recordRef,'Query exposed an uncommitted identity');
   const uncached=createStorageWriter(store.area);assert.equal(query(await uncached.getQueryDatabase()).results[0].owned,false);
   values[DATABASE_STORAGE_KEY].providerItems['kindle:B000000001'].ownership='owned';

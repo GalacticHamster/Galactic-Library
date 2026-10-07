@@ -1,3 +1,4 @@
+import {newProviderProfile} from '../lib/provider-profiles.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
 import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
@@ -176,13 +177,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
-  async function beginProviderScan(provider,profile,mode='full',switchProfile=false,tabId=null) {
+  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
-    const profileLabel=text(profile,100,'Account/profile label');if(!profileLabel)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
+    const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await getDatabase();const prior=database.providers[provider]?.profileLabel??'';
     const changing=Boolean(prior)&&prior!==profileLabel;
     if(changing&&(mode!=='full'||switchProfile!==true))throw new Error('A different account/profile is active. Choose Full rescan and explicitly switch profiles; the previous library will be archived.');
     const forceFull=changing||!prior||!database.providers[provider]?.fullSyncAt;
+    const profile=importProfile(database,provider,profileLabel);
+    if(!database.providers[provider]?.activeProfileId)profileState(database,profile,profile.state);
     const stored=await storageArea.get({[SCANS]:{}});const scans=stored[SCANS]??{};const scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileLabel,priorProfileLabel:prior,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
     database.providers[provider]={...database.providers[provider],syncHealth:validateSyncHealth({attemptRef:scans[provider].attemptRef,status:'running',mode:scans[provider].mode,attemptedProfileLabel:profileLabel,startedAt:scans[provider].startedAt,finishedAt:null,retryable:false})};
@@ -256,6 +259,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function persistDatabase(database,invalidate=null,extra={}) {
+    for(const [provider,state]of Object.entries(database.providers)){
+      const profile=database.providerProfiles[state.activeProfileId];if(profile){profile.state={...state};delete profile.state.activeProfileId;}
+    }
     const validated = await timedAsync('persist_validation',()=>validateForWriter(database));
     const updates={...extra,[DATABASE_STORAGE_KEY]:validated};
     if(invalidate==='all')updates[KINDLE_REFRESH_KEY]=null;
@@ -304,27 +310,36 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     for(const [key,entry]of Object.entries(database.editionSeparations))if(changed.has(entry.itemId)||entry.otherItemIds.some(id=>changed.has(id)))delete database.editionSeparations[key];
   }
 
+  function importProfile(database,provider,label){
+    label=text(label??database.providers[provider]?.profileLabel??'',100,'Profile nickname');
+    let profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===label);
+    if(!profile){profile=newProviderProfile(provider,label,!label&&!Object.values(database.providerProfiles).some(p=>p.provider===provider));database.providerProfiles[profile.profileId]=profile;}
+    return profile;
+  }
+  function profileState(database,profile,state){
+    profile.state={...state};delete profile.state.activeProfileId;
+    database.providers[profile.provider]={...state,profileLabel:profile.nickname,activeProfileId:profile.profileId};
+  }
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
     const database = await getDatabase();
     const now = new Date().toISOString();
-    const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.provider !== provider));
+    const profile=importProfile(database,provider,syncDetails.profileLabel);
+    const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
     const priorProfile=database.providers[provider]?.profileLabel??'';
     const nextProfile=syncDetails.profileLabel??priorProfile;const changing=Boolean(priorProfile)&&priorProfile!==nextProfile;
-    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===nextProfile).map(entry=>[entry.item.id,entry.item]));
+    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
     const incoming = values.map((value) => {
-      const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
+      const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source = PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item, (changing?null:database.providerItems[item.id])??historicalById.get(item.id));
+      return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const profileLabel=database.providers[provider]?.profileLabel??'';
-    const oldIds=new Set(Object.values(database.providerItems).filter(item=>item.provider===provider).map(item=>item.id));
-    for(const item of Object.values(database.providerItems))if(item.provider===provider&&(changing||!unique.has(item.id)))database.providerHistory[item.recordRef]={item,profileLabel,reason:changing?'profile-switch':'missing-from-complete-scan',missingSince:now};
-    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===nextProfile&&unique.has(entry.item.id))delete database.providerHistory[ref];
-    if(changing){for(const [id,decision]of Object.entries(database.manualMatchDecisions))if(decision.itemIds.some(id=>oldIds.has(id)))delete database.manualMatchDecisions[id];for(const id of oldIds)delete database.contentReviews[id];for(const [id,separation]of Object.entries(database.editionSeparations))if(oldIds.has(separation.itemId)||separation.otherItemIds.some(id=>oldIds.has(id)))delete database.editionSeparations[id];}
+    for(const item of Object.values(database.providerItems))if(item.profileId===profile.profileId&&!unique.has(item.id))database.providerHistory[item.recordRef]={item,profileLabel:profile.nickname,reason:'missing-from-complete-scan',missingSince:now};
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.profileId===profile.profileId&&unique.has(entry.item.id))delete database.providerHistory[ref];
     const records = [...unique.values()];
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
@@ -335,14 +350,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const tvCount = records.filter((item) => item.mediaType === 'tv').length;
     const linkedAddOnCount = records.filter((item) => {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
-      return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId));
+      return item.mediaType === 'game-addon' && parentId && unique.has(providerItemKey(item.provider, parentId,profile.keySpace));
     }).length;
     const syncHealth=successfulSyncHealth(database,provider,records,true,syncDetails,changing);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
-      ...(changing?{}:database.providers[provider]),
+      ...profile.state,
       connected: true,
       itemCount: gameCount,
       addOnCount,
@@ -358,6 +373,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       syncHealth,
       snapshotValidation: { ...snapshot, validatedAt: now }
     };
+    profileState(database,profile,database.providers[provider]);
     return persistDatabase(database,provider);
   }
 
@@ -368,10 +384,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = await getDatabase();
-    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.profileLabel===(database.providers[provider]?.profileLabel??'')).map(entry=>[entry.item.id,entry.item]));
+    const profile=importProfile(database,provider,syncDetails.profileLabel);
+    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
     const now = new Date().toISOString();
     const incoming = values.map((value) => {
-      const item = normalizeProviderItem({ ...value, provider, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false});
+      const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source = PROVIDER_SOURCES[provider];
       return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     });
@@ -379,8 +396,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
-    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.profileLabel===(database.providers[provider]?.profileLabel??'')&&unique.has(entry.item.id))delete database.providerHistory[ref];
-    const records = Object.values(database.providerItems).filter((item) => item.provider === provider);
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.has(entry.item.id))delete database.providerHistory[ref];
+    const records = Object.values(database.providerItems).filter((item) => item.profileId === profile.profileId);
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
     const softwareCount = records.filter(item=>item.mediaType==='software').length;
@@ -391,11 +408,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const providerRecords = new Map(records.map((item) => [item.id, item]));
     const linkedAddOnCount = records.filter((item) => {
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
-      return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId));
+      return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId,profile.keySpace));
     }).length;
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     database.providers[provider] = {
-      ...database.providers[provider],
+      ...profile.state,
       connected: true,
       itemCount: gameCount,
       addOnCount,
@@ -409,6 +426,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       lastError: null,
       ...syncDetails,syncHealth
     };
+    profileState(database,profile,database.providers[provider]);
     return persistDatabase(database,provider);
   }
 
@@ -842,7 +860,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function refreshLease(job,runRef,leaseRef,tabId){if(job.runRef!==runRef||job.leaseRef!==leaseRef||job.tabId!==tabId||job.status!=='running')throw Error('This refresh lease is stale; resume or start again.');}
   const refreshIdentity=(db,target)=>{
     const raw=db.providerItems[target.id];
-    const item=raw?normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined):null;
+    const item=raw?normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined,{profileKeySpace:db.providerProfiles?.[raw.profileId]?.keySpace}):null;
     return Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl);
   };
   const projectionMatches=(cache,job)=>cache&&job&&cache.runRef===job.runRef&&cache.leaseRef===job.leaseRef&&cache.tabId===job.tabId&&cache.cursor===job.cursor&&cache.profileLabel===job.profileLabel;

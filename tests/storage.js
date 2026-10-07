@@ -34,8 +34,8 @@ async function profileSafetyFixture(){
   assert.equal((await writer.getDatabase()).providers.steam.profileLabel,'personal');
   await writer.commitProviderScan('steam',[],{syncMode:'full'},snapshotFixture('steam',[]),switched.scanToken,1);
   const database=await writer.getDatabase();assert.equal(database.providers.steam.profileLabel,'other');
-  assert.equal(Object.values(database.providerHistory)[0].profileLabel,'personal');
-  assert.equal(Object.values(database.providerHistory)[0].reason,'profile-switch');
+  assert.equal(Object.values(database.providerHistory).length,0);
+  assert(Object.values(database.providerItems).some(item=>database.providerProfiles[item.profileId].nickname==='personal'));
   await assert.rejects(writer.importUnscopedProviderItems('steam',items,{syncMode:'full'},snapshot),/Reload/);
 }
 
