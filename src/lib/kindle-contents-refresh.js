@@ -5,6 +5,7 @@ import {CONTENTS_FILTER_VERSION} from './contents-quality.js';
 import {MANIFEST_INTERPRETATION_VERSION} from './kindle-manifest.js';
 
 export const KINDLE_REFRESH_KEY='galacticLibraryKindleContentsRefresh';
+export const KINDLE_REFRESH_ARCHIVES_KEY='galacticLibraryKindleContentsRefreshArchives';
 export const KINDLE_REFRESH_VERSION=1;
 const states=new Set(['running','paused','interrupted','blocked','completed','aborted']);
 const uuid=value=>{if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(value??''))throw Error('Invalid refresh reference.');return value;};
@@ -23,7 +24,20 @@ export function validateKindleRefresh(value) {
   if(Object.values(counts).reduce((a,b)=>a+b,0)!==cursor||value.status==='completed'&&cursor!==queue.length)throw Error('Inconsistent refresh checkpoint.');
   if(value.tabId!==null&&(!Number.isInteger(value.tabId)||value.tabId<0))throw Error('Invalid refresh owner.');
   return {version:KINDLE_REFRESH_VERSION,extractorVersion:value.extractorVersion,parserVersion:value.parserVersion,filterVersion:value.filterVersion,manifestVersion:value.manifestVersion,runRef:uuid(value.runRef),leaseRef:value.leaseRef?uuid(value.leaseRef):'',
-    status:value.status,profileLabel:text(value.profileLabel,100,'Refresh profile'),queue,cursor,counts,tabId:value.tabId,startedAt:date(value.startedAt),updatedAt:date(value.updatedAt),
+    ...(value.profileId?{profileId:uuid(value.profileId)}:{}),status:value.status,profileLabel:text(value.profileLabel,100,'Refresh profile'),queue,cursor,counts,tabId:value.tabId,startedAt:date(value.startedAt),updatedAt:date(value.updatedAt),
     ...(value.blockedBy?{blockedBy:['captcha','sign-in'].includes(value.blockedBy)?value.blockedBy:'unknown'}:{})};
 }
 export function kindleRefreshSummary(job){if(!job)return null;const {queue,leaseRef,...summary}=job;return {...summary,total:queue.length};}
+
+// Provenance migration uses durable record refs, never overlapping ASINs.
+export function bindKindleRefresh(raw,db){
+  if(!raw)return null;
+  const job=validateKindleRefresh(raw);
+  if(job.profileId)return job;
+  const records=new Map([...Object.values(db.providerItems),...Object.values(db.providerHistory??{}).map(h=>h.item)].map(i=>[i.recordRef,i]));
+  const owners=new Set(job.queue.map(e=>records.get(e.recordRef)?.profileId).filter(Boolean));
+  if(owners.size>1)throw Error('Refresh queue has ambiguous profile provenance.');
+  const profileId=[...owners][0]??Object.values(db.providerProfiles).find(p=>p.provider==='kindle'&&p.nickname===job.profileLabel)?.profileId;
+  if(!profileId)throw Error('Refresh queue has unknown profile provenance.');
+  return validateKindleRefresh({...job,profileId,queue:job.queue.map(e=>({...e,id:records.get(e.recordRef)?.id??e.id}))});
+}

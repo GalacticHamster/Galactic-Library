@@ -129,7 +129,7 @@ export const kindleContentsTests=[
   const writer=writerFor();await writer.restoreDatabase(database(book('B000000001')));const item=(await writer.getDatabase()).providerItems['kindle:B000000001'];
   for(const bad of [{recordRef:'stale'},{sourceUrl:'https://www.amazon.com/dp/B000000002'},{sourceUrl:'https://user@www.amazon.com/dp/B000000001'},{statement:'Arbitrary description'},{extractorVersion:KINDLE_CONTENTS_EXTRACTOR_VERSION+1},{availability:'unavailable'}])await assert.rejects(writer.saveKindleComicContents([save(item,'Contains Wool and Shift',bad)]),/Invalid/);
   assert.equal((await writer.getDatabase()).providerItems[item.id].metadata.enrichment,undefined);
-  const db=await writer.getDatabase();db.providers.kindle={...db.providers.kindle,profileLabel:'account'};await writer.restoreDatabase(db);
+  const db=await writer.getDatabase();await writer.renameProviderProfile(db.providers.kindle.activeProfileId,'account');
   await assert.rejects(writer.saveKindleComicContents([{...save(item,'Contains Wool and Shift'),recordRef:undefined}]),/Invalid/);
  }]
 ];

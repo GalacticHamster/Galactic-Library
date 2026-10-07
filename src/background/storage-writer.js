@@ -9,7 +9,7 @@ import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_SCHEMA_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import {supportedKindleContentsBook, contentsParseState, kindleContentsPlan, KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../lib/kindle-contents.js';
-import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_VERSION,validateKindleRefresh,kindleRefreshSummary} from '../lib/kindle-contents-refresh.js';
+import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh,KINDLE_REFRESH_VERSION,validateKindleRefresh,kindleRefreshSummary} from '../lib/kindle-contents-refresh.js';
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
@@ -177,11 +177,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
-  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null) {
+  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
     const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await getDatabase(),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
+    if(requestedProfileId&&existing?.profileId!==requestedProfileId)throw Error('Scan profile changed. Start a fresh confirmed scan.');
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     if(changing&&!existing&&mode!=='full')throw Error('A different account without a baseline requires a complete full scan.');
@@ -202,14 +203,31 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname};
     return syncDetails.syncMode==='full'?replaceProviderItems(provider,values,details,snapshot):mergeProviderItems(provider,values,details);
   }
+  async function kindleProfileTransition(database,oldId,newId){
+    if(oldId===newId)return {};
+    const stored=await storageArea.get({[KINDLE_REFRESH_KEY]:null,[KINDLE_REFRESH_ARCHIVES_KEY]:{}}),jobs={...stored[KINDLE_REFRESH_ARCHIVES_KEY]};
+    const raw=stored[KINDLE_REFRESH_KEY];
+    if(raw){
+      try{
+        let job=bindKindleRefresh(raw,database);
+        if(job.profileId!==oldId)throw Error('Refresh owner differs from previous selection.');
+        if(job.status==='running')job={...job,status:'interrupted',leaseRef:'',tabId:null,updatedAt:new Date().toISOString()};
+        jobs[job.profileId]=job;
+      }catch{jobs.unresolvedLegacy=raw;}
+    }
+    const next=jobs[newId]??null;delete jobs[newId];
+    return {[KINDLE_REFRESH_KEY]:next,[KINDLE_REFRESH_ARCHIVES_KEY]:jobs};
+  }
   async function selectProviderProfile(profileId,expectedActiveId,confirmed=false){
     const database=await getDatabase(),profile=database.providerProfiles[profileId];
     if(!profile)throw Error('Unknown provider profile.');
     if(confirmed!==true)throw Error('Confirm the signed-in account before selecting its profile.');
     if(database.providers[profile.provider]?.activeProfileId!==expectedActiveId)throw Error('Active profile changed. Reload before selecting.');
     cancelProfileAttempt(database,profile.provider);
+    const oldId=database.providers[profile.provider]?.activeProfileId;
+    const jobs=profile.provider==='kindle'?await kindleProfileTransition(database,oldId,profileId):{};
     profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);
-    return persistDatabase(database,profile.provider);
+    return persistDatabase(database,profile.provider,jobs);
   }
   function cancelProfileAttempt(database,provider){
     for(const profile of Object.values(database.providerProfiles))if(profile.provider===provider&&profile.state.syncHealth?.status==='running')profile.state.syncHealth={...profile.state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};
@@ -238,13 +256,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];if(!scan||scan.attemptRef!==attemptRef)throw new Error('This scan changed or already finished. Refresh the dashboard.');
     const database=await getDatabase(),profile=database.providerProfiles[scan.profileId];if(!profile)throw Error('Scan profile changed.');profile.state.syncHealth={...profile.state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);return persistDatabase(database,provider);
   }
-  function successfulSyncHealth(database,provider,records,full,details,changing=false){
+  function successfulSyncHealth(database,provider,records,full,details){
     const diagnostics=details.scanDiagnostics??{};const profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&(p.profileId===details.profileId||p.nickname===(details.profileLabel??database.providers[provider]?.profileLabel??'')));const prior=profile?.state.syncHealth;
     const failedRequestCount=diagnostics.failedRequestCount??0;
     return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full)});
   }
   async function restoreDatabase(database){
-    const restored=validateDatabase(database);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all');
+    const restored=validateDatabase(database);for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all');
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
     const database=await getDatabase();
@@ -273,6 +291,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
+      const legacyRefresh=await readKindleRefresh();
+      if(legacyRefresh&&!legacyRefresh.profileId){try{migrated[KINDLE_REFRESH_KEY]=bindKindleRefresh(legacyRefresh,database);}catch{/* Retain unresolved old checkpoint without inventing ownership. */}}
+
       if (Array.isArray(job?.queue)) {
         const byRecord = new Map(Object.values(database.canonicalItems).flatMap((entry) => entry.providerItemIds.map((id) => [id, entry.id])));
         migrated[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY] = {...job, queue: job.queue.map((id) => {
@@ -291,7 +312,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     const validated = await timedAsync('persist_validation',()=>validateForWriter(database));
     const updates={...extra,[DATABASE_STORAGE_KEY]:validated};
-    if(invalidate==='all')updates[KINDLE_REFRESH_KEY]=null;
+    if(invalidate==='all'){updates[KINDLE_REFRESH_KEY]=null;updates[KINDLE_REFRESH_ARCHIVES_KEY]={};}
     if(invalidate){const stored=await storageArea.get({[SCANS]:{}});const scans=invalidate==='all'?{}:{...stored[SCANS]};if(invalidate!=='all')delete scans[invalidate];updates[SCANS]=scans;}
     if(invalidate==='all'||invalidate==='humble')updates[FEED_UPLOAD_KEY]={};
     if(invalidate==='all')updates[NOTIFICATIONS]={enabled:false,lastNotifiedDay:''};
@@ -354,6 +375,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     validateProviderSnapshot(provider, values, snapshot);
     const database = await getDatabase();
     const now = new Date().toISOString();
+    const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
     const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
@@ -398,8 +420,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       syncHealth,
       snapshotValidation: { ...snapshot, validatedAt: now }
     };
+    const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     profileState(database,profile,database.providers[provider]);
-    return persistDatabase(database,provider);
+    return persistDatabase(database,provider,jobs);
   }
 
   // Incremental syncs must never make an entitlement disappear merely because
@@ -409,6 +432,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = await getDatabase();
+    const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
     const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
     const now = new Date().toISOString();
@@ -451,12 +475,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       lastError: null,
       ...syncDetails,syncHealth
     };
+    const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     profileState(database,profile,database.providers[provider]);
-    return persistDatabase(database,provider);
+    return persistDatabase(database,provider,jobs);
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY]);
+    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -634,20 +659,20 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!Array.isArray(entries)||!entries.length||entries.length>1000)throw new Error('Import 1–1,000 purchase evidence entries.');
     const evidence=entries.map(purchaseEvidence),database=await getDatabase(),now=new Date().toISOString();
     for(const entry of evidence){
-      const profileLabel=database.providers[entry.provider]?.profileLabel??'';
-      if(Object.values(database.ownershipProposals).some(proposal=>proposal.profileLabel===profileLabel&&JSON.stringify(proposal.evidence)===JSON.stringify(entry)))continue;
-      database.ownershipProposals[crypto.randomUUID()]={evidence:entry,profileLabel,recordRefs:purchaseCandidates(entry,database.providerItems),importedAt:now};
+      const profileId=database.providers[entry.provider]?.activeProfileId,profileLabel=database.providerProfiles[profileId]?.nickname??'';
+      if(Object.values(database.ownershipProposals).some(proposal=>proposal.profileId===profileId&&JSON.stringify(proposal.evidence)===JSON.stringify(entry)))continue;
+      database.ownershipProposals[crypto.randomUUID()]={evidence:entry,...(profileId?{profileId}:{}),profileLabel,recordRefs:profileId?purchaseCandidates(entry,database.providerItems,profileId):[],importedAt:now};
     }
     return persistDatabase(database);
   }
   async function refreshPurchaseEvidence(){
-    const database=await getDatabase();for(const proposal of Object.values(database.ownershipProposals))if(proposal.profileLabel===(database.providers[proposal.evidence.provider]?.profileLabel??''))proposal.recordRefs=purchaseCandidates(proposal.evidence,database.providerItems);return persistDatabase(database);
+    const database=await getDatabase();for(const proposal of Object.values(database.ownershipProposals))if(database.providerProfiles[proposal.profileId])proposal.recordRefs=purchaseCandidates(proposal.evidence,database.providerItems,proposal.profileId);return persistDatabase(database);
   }
   async function applyPurchaseEvidence(proposalId,ref,confirmed,expected=null){
     const database=await getDatabase(),proposal=database.ownershipProposals[proposalId];
     if(!proposal||confirmed!==true||!proposal.recordRefs.includes(ref))throw new Error('Confirm a current candidate for this receipt.');
     const item=currentOwnershipRecord(database,ref,expected),evidence=proposal.evidence;
-    if(item.provider!==evidence.provider||item.mediaType!==evidence.mediaType||proposal.profileLabel!==(database.providers[item.provider]?.profileLabel??''))throw new Error('This receipt belongs to another provider/profile.');
+    if(item.provider!==evidence.provider||item.mediaType!==evidence.mediaType||!proposal.profileId||proposal.profileId!==item.profileId)throw new Error('This receipt belongs to another provider/profile.');
     const candidate={title:evidence.title,mediaType:evidence.mediaType,metadata:{...(evidence.asin?{asin:evidence.asin}:{}),...(evidence.isbn?{isbn:[evidence.isbn]}:{})}};
     const conflicts=identityConflicts(item,candidate);
     if(evidence.asin&&/^[A-Z0-9]{10}$/iu.test(item.providerItemId)&&item.providerItemId.toUpperCase()!==evidence.asin)conflicts.push('catalog identifier');
@@ -808,7 +833,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         const url = new URL(String(entry?.sourceUrl ?? ''));
         if (url.origin === 'https://www.amazon.com' && !url.username && !url.password && /^\/dp\//u.test(url.pathname)) sourceUrl = `${url.origin}${url.pathname}`;
       } catch { /* invalid source URL remains unusable */ }
-      if (!supportedKindleContentsBook(item) || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !selection && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (selection && (entry.extractorVersion!==KINDLE_CONTENTS_EXTRACTOR_VERSION||!['statement-found','no-statement'].includes(entry.availability))) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
+      if (!supportedKindleContentsBook(item) || item.profileId!==database.providers.kindle?.activeProfileId || sourceUrl !== String(item.metadata?.detailUrl ?? '') || statement.length > 10000 || (statement && !selection && !/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(statement)) || (selection && (entry.extractorVersion!==KINDLE_CONTENTS_EXTRACTOR_VERSION||!['statement-found','no-statement'].includes(entry.availability))) || (!['statement-found','no-statement','unavailable','temporary-failure'].includes(availability)) || (availability!=='statement-found'&&statement) || (availability==='statement-found'&&!statement) || (entry.recordRef&&entry.recordRef!==item.recordRef) || (database.providers.kindle?.profileLabel&&!entry.recordRef) || entry.extractorVersion !== undefined && (!Number.isInteger(entry.extractorVersion) || entry.extractorVersion < 1 || entry.extractorVersion > KINDLE_CONTENTS_EXTRACTOR_VERSION)) {
         endValidation?.();throw new Error('Invalid Kindle contents entry.');
       }
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
@@ -849,18 +874,18 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function readKindleRefresh(){return (await timedAsync('refresh_checkpoint_read',()=>storageArea.get({[KINDLE_REFRESH_KEY]:null})))[KINDLE_REFRESH_KEY];}
-  const queueItemCurrent=(db,target)=>{const item=db.providerItems[target.id];return supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl;};
+  const queueItemCurrent=(db,target)=>{const item=db.providerItems[target.id];return supportedKindleContentsBook(item)&&item.profileId===db.providers.kindle?.activeProfileId&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl;};
   function currentRefresh(raw,db){
     return timed('refresh_checkpoint_validate',()=>{
-      const job=validateKindleRefresh(raw);
-      if(job.profileLabel!==text(db.providers.kindle?.profileLabel??'',100,'Refresh profile'))throw Error('Stale refresh profile; start a new refresh for the current library.');
+      const job=raw?.profileId?validateKindleRefresh(raw):bindKindleRefresh(raw,db);
+      if(job.profileId!==db.providers.kindle?.activeProfileId)throw Error('Stale refresh profile; start a new refresh for the current library.');
       return job;
     });
   }
   async function getKindleContentsRefresh(){
     const db=await getDatabase(),raw=await readKindleRefresh();let checkpoint=null;
     if(raw){try{checkpoint=kindleRefreshSummary(currentRefresh(raw,db));}catch{checkpoint={status:'stale'};}}
-    return {eligible:Object.values(db.providerItems).filter(supportedKindleContentsBook).length,checkpoint};
+    return {eligible:Object.values(db.providerItems).filter(i=>supportedKindleContentsBook(i)&&i.profileId===db.providers.kindle?.activeProfileId).length,checkpoint};
   }
   async function beginKindleContentsRefresh(action,tabId,otherOwnerOpen=true,closedOwnerTabId=null){
     if(!['start','resume'].includes(action)||!Number.isInteger(tabId)||tabId<0)throw Error('Invalid refresh action.');
@@ -874,7 +899,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }else{
       const queue=kindleContentsPlan(db,'rescan').candidates,now=new Date().toISOString();
       job={version:KINDLE_REFRESH_VERSION,extractorVersion:KINDLE_CONTENTS_EXTRACTOR_VERSION,parserVersion:CONTENTS_PARSER_VERSION,filterVersion:CONTENTS_FILTER_VERSION,manifestVersion:MANIFEST_INTERPRETATION_VERSION,runRef:crypto.randomUUID(),leaseRef:crypto.randomUUID(),
-        status:queue.length?'running':'completed',profileLabel:db.providers.kindle?.profileLabel??'',queue,cursor:0,counts:{found:0,empty:0,unavailable:0,failures:0,skipped:0},tabId,startedAt:now,updatedAt:now};
+        status:queue.length?'running':'completed',profileId:db.providers.kindle?.activeProfileId,profileLabel:db.providers.kindle?.profileLabel??'',queue,cursor:0,counts:{found:0,empty:0,unavailable:0,failures:0,skipped:0},tabId,startedAt:now,updatedAt:now};
     }
     job=timed('refresh_checkpoint_validate',()=>validateKindleRefresh(job));await timedAsync('refresh_checkpoint_write',()=>storageArea.set({[KINDLE_REFRESH_KEY]:job}));
     // Fresh acquisition derives its own parse. Do not reparse the historical
@@ -886,9 +911,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   const refreshIdentity=(db,target)=>{
     const raw=db.providerItems[target.id];
     const item=raw?normalizeProviderItem({...raw,observedAt:raw.observedAt??null},typeof raw.updatedAt==='string'?raw.updatedAt:undefined,{profileKeySpace:db.providerProfiles?.[raw.profileId]?.keySpace}):null;
-    return Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl);
+    return Boolean(item&&item.id===target.id&&supportedKindleContentsBook(item)&&item.profileId===db.providers.kindle?.activeProfileId&&item.recordRef===target.recordRef&&item.metadata.detailUrl===target.detailUrl);
   };
-  const projectionMatches=(cache,job)=>cache&&job&&cache.runRef===job.runRef&&cache.leaseRef===job.leaseRef&&cache.tabId===job.tabId&&cache.cursor===job.cursor&&cache.profileLabel===job.profileLabel;
+  const projectionMatches=(cache,job)=>cache&&job&&cache.runRef===job.runRef&&cache.leaseRef===job.leaseRef&&cache.tabId===job.tabId&&cache.cursor===job.cursor&&cache.profileId===job.profileId;
   const projectionEntryMatches=(entry,target)=>entry&&target&&entry.id===target.id&&entry.recordRef===target.recordRef&&entry.detailUrl===target.detailUrl;
   async function checkKindleContentsRefreshItem(runRef,leaseRef,tabId,position){
     // Queue/lease/cursor remain freshly read on every request. Reuse at most
@@ -898,7 +923,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const epoch=refreshProjectionEpoch,rawJob=await readKindleRefresh();
     let cache=refreshProjection,db;
     if(!cacheRefreshPreflight||!projectionMatches(cache,rawJob)||!projectionEntryMatches(cache.entries[position-rawJob.cursor],rawJob.queue?.[position]))cache=null;
-    if(cache)db={providers:{kindle:{profileLabel:cache.profileLabel}}};
+    if(cache)db={providers:{kindle:{activeProfileId:cache.profileId}}};
     else{
       const stored=await timedAsync('storage_read',()=>storageArea.get({[DATABASE_STORAGE_KEY]:null}));db=stored[DATABASE_STORAGE_KEY];
       if(db?.schemaVersion!==DATABASE_SCHEMA_VERSION||!db.providerItems||Array.isArray(db.providerItems)||typeof db.providerItems!=='object'||!db.providers||Array.isArray(db.providers)||typeof db.providers!=='object')db=await getDatabase();
@@ -912,7 +937,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     const valid=timed('refresh_identity_validation',()=>refreshIdentity(db,target));
     if(cacheRefreshPreflight&&epoch===refreshProjectionEpoch){
-      refreshProjection=timed('refresh_projection_build',()=>({runRef:job.runRef,leaseRef:job.leaseRef,tabId:job.tabId,cursor:job.cursor,profileLabel:job.profileLabel,entries:job.queue.slice(job.cursor,job.cursor+20).map(next=>{
+      refreshProjection=timed('refresh_projection_build',()=>({runRef:job.runRef,leaseRef:job.leaseRef,tabId:job.tabId,cursor:job.cursor,profileId:job.profileId,entries:job.queue.slice(job.cursor,job.cursor+20).map(next=>{
         const identity={id:next.id,recordRef:next.recordRef,detailUrl:next.detailUrl};
         try{return {...identity,valid:next===target?valid:refreshIdentity(db,next)};}catch(error){return {...identity,error};}
       })}));
@@ -1089,11 +1114,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!Number.isSafeInteger(value.count)||value.count<0||value.count>100000||!['complete','partial'].includes(value.coverage)||!date(value.sentAt))throw new Error('Invalid reminder feed summary.');
     const uploads=Object.fromEntries(Object.entries(await feedUploads()).filter(([key,entry])=>key!==client&&entry.expiresAt>Date.now()));
     if(Object.keys(uploads).length>=64)throw new Error('Too many active reminder uploads.');
-    const uploadToken=crypto.randomUUID();uploads[client]={uploadToken,profileLabel,count:value.count,coverage:value.coverage,sentAt:date(value.sentAt),expiresAt:Date.now()+600000,entries:[]};await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {uploadToken};
+    const uploadToken=crypto.randomUUID();uploads[client]={uploadToken,profileId:database.providers.humble.activeProfileId,profileLabel,count:value.count,coverage:value.coverage,sentAt:date(value.sentAt),expiresAt:Date.now()+600000,entries:[]};await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {uploadToken};
   }
   async function activeFeedUpload(client,token,external=false){
     await feedClient(client,external);const uploads=await feedUploads(),upload=uploads[client];if(!upload||upload.uploadToken!==token||upload.expiresAt<=Date.now())throw new Error('Reminder upload expired or was superseded. Send it again.');
-    const database=await getDatabase();if(database.providers.humble?.profileLabel!==upload.profileLabel)throw new Error('The GL Humble profile changed during reminder sharing.');return {uploads,upload,database};
+    const database=await getDatabase();if(database.providers.humble?.activeProfileId!==upload.profileId)throw new Error('The GL Humble profile changed during reminder sharing.');return {uploads,upload,database};
   }
   async function appendCompanionFeed(client,token,offset,entries,external=false){
     const {uploads,upload}=await activeFeedUpload(client,token,external);
@@ -1104,12 +1129,17 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   async function commitCompanionFeed(client,token,external=false){
     const {uploads,upload,database}=await activeFeedUpload(client,token,external);if(upload.entries.length!==upload.count)throw new Error('Reminder feed is incomplete; prior reminders retained.');
-    const previous=database.companionFeeds[client],refs=new Map(previous?.profileLabel===upload.profileLabel?previous.entries.map(entry=>[entry.itemRef,entry.localRef]):[]);
-    database.companionFeeds[client]={profileLabel:upload.profileLabel,coverage:upload.coverage,sentAt:upload.sentAt,receivedAt:new Date().toISOString(),revisionRef:crypto.randomUUID(),entries:upload.entries.map(entry=>({...entry,localRef:refs.get(entry.itemRef)??crypto.randomUUID()}))};
+    const feedKey=Object.keys(database.companionFeeds).find(key=>key.split(':')[0]===client&&database.companionFeeds[key].profileId===upload.profileId)??(database.companionFeeds[client]?`${client}:${upload.profileId}`:client);
+    const previous=database.companionFeeds[feedKey],refs=new Map(previous?.profileId===upload.profileId?previous.entries.map(entry=>[entry.itemRef,entry.localRef]):[]);
+    database.companionFeeds[feedKey]={profileId:upload.profileId,profileLabel:database.providerProfiles[upload.profileId].nickname,coverage:upload.coverage,sentAt:upload.sentAt,receivedAt:new Date().toISOString(),revisionRef:crypto.randomUUID(),entries:upload.entries.map(entry=>({...entry,localRef:refs.get(entry.itemRef)??crypto.randomUUID()}))};
     delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:upload.entries.length};
   }
-  async function removeCompanionFeed(client,external=false){
-    await feedClient(client,external);const database=await getDatabase(),uploads=await feedUploads();delete database.companionFeeds[client];delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:0};
+  async function removeCompanionFeed(key,external=false){
+    const client=String(key).split(':')[0];await feedClient(client,external);
+    const database=await getDatabase(),uploads=await feedUploads();
+    if(external){for(const [feedKey,feed]of Object.entries(database.companionFeeds))if(feedKey.split(':')[0]===client&&feed.profileId===database.providers.humble?.activeProfileId)delete database.companionFeeds[feedKey];}
+    else delete database.companionFeeds[key];
+    delete uploads[client];await storageArea.set({[DATABASE_STORAGE_KEY]:validateDatabase(database),[FEED_UPLOAD_KEY]:uploads});return {count:0};
   }
   const operations = {
     saveOwnershipPolicy,

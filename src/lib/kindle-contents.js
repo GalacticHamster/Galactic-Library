@@ -33,12 +33,12 @@ export function kindleContentsState(item, database = {}) {
     extractorOutdated:Boolean(saved?.extractorVersion && saved.extractorVersion < KINDLE_CONTENTS_EXTRACTOR_VERSION)};
 }
 
-export function kindleContentsPlan(database, mode = 'scan') {
+export function kindleContentsPlan(database, mode = 'scan', profileId=database.providers?.kindle?.activeProfileId) {
   if (!['scan','retry','rescan','reparse'].includes(mode)) throw new Error('Invalid contents discovery mode.');
   const candidates = [], reprocess = [];
   let eligible = 0, skipped = 0;
   for (const item of Object.values(database.providerItems)) {
-    if (!supportedKindleContentsBook(item)) continue;
+    if (!supportedKindleContentsBook(item)||profileId&&item.profileId!==profileId) continue;
     eligible++;
     const state = kindleContentsState(item, database);
     const saved = item.metadata?.enrichment?.kindleProductComicContents;

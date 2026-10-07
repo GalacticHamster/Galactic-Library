@@ -33,11 +33,13 @@ export function validateOwnershipProposals(value={}){
   return Object.fromEntries(Object.entries(value).map(([id,entry])=>{
     if(!uuid(id))throw new Error('Invalid purchase proposal reference.');object(entry,'Purchase proposal');
     if(!Array.isArray(entry.recordRefs)||entry.recordRefs.length>50||entry.recordRefs.some(ref=>!uuid(ref)))throw new Error('Invalid receipt candidate references.');
-    return [id,{evidence:purchaseEvidence(entry.evidence),recordRefs:[...new Set(entry.recordRefs)],profileLabel:text(entry.profileLabel??'',100,'Receipt profile'),importedAt:date(entry.importedAt)}];
+    if(entry.profileId!==undefined&&entry.profileId!==null&&!uuid(entry.profileId))throw Error('Invalid receipt profile reference.');
+    return [id,{...(entry.profileId?{profileId:entry.profileId}:{}),evidence:purchaseEvidence(entry.evidence),recordRefs:[...new Set(entry.recordRefs)],profileLabel:text(entry.profileLabel??'',100,'Receipt profile'),importedAt:date(entry.importedAt)}];
   }));
 }
-export function purchaseCandidates(evidence,items){
+export function purchaseCandidates(evidence,items,profileId){
   return Object.values(items).filter(item=>{
+    if(profileId&&item.profileId!==profileId)return false;
     if(item.provider!==evidence.provider||item.mediaType!==evidence.mediaType)return false;
     const identity=identityEvidence(item),asin=identity.asin||(/^[A-Z0-9]{10}$/iu.test(item.providerItemId)?item.providerItemId.toUpperCase():'');
     if(evidence.asin&&asin)return evidence.asin===asin;

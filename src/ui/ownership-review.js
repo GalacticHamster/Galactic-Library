@@ -42,7 +42,7 @@ export function createPurchaseEvidenceWorkbench(database,actions){
       const entries=Object.entries(database.ownershipProposals).filter(([,proposal])=>proposal.evidence.title.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase()));page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(entries.length/50)-1)));previous.disabled=page===0;next.disabled=(page+1)*50>=entries.length;list.replaceChildren();
       for(const [id,proposal]of entries.slice(page*50,(page+1)*50)){
         const entry=node('li'),evidence=proposal.evidence;entry.append(node('strong',evidence.title),node('p',`${evidence.provider} · ${proposal.profileLabel||'profile unassigned'} · ${evidence.acquiredAt} · ${evidence.asin||evidence.isbn||evidence.providerItemId||'title-only evidence'}`));
-        const current=Object.values(database.providerItems).filter(item=>proposal.recordRefs.includes(item.recordRef)&&proposal.profileLabel===(database.providers[item.provider]?.profileLabel??''));
+        const current=Object.values(database.providerItems).filter(item=>proposal.recordRefs.includes(item.recordRef)&&item.profileId===proposal.profileId);
         if(current.length){
           const choice=node('select');choice.setAttribute('aria-label','Receipt library candidate');choice.append(Object.assign(node('option','Choose the owned edition'),{value:''}));for(const item of current)choice.append(Object.assign(node('option',`${item.title} — ${item.provider}`),{value:item.recordRef}));
           const label=node('label'),confirm=input('Confirm receipt matches record','checkbox');label.append(confirm,' This receipt proves purchase of this edition in this account.');

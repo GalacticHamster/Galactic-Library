@@ -1,3 +1,7 @@
+import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh} from '../src/lib/kindle-contents-refresh.js';
+import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
+import {validateFandangoState} from '../src/background/import-state.js';
+import {libraryReminders} from '../src/lib/reminders.js';
 import assert from 'node:assert/strict';
 import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src/lib/models.js';
 import {memory} from './final-gl-features.js';
@@ -104,4 +108,78 @@ providerProfileTests.push(
      d=await writer.selectProviderProfile(b,a,true);assert.deepEqual(d.providers[provider].syncState,state(2));
    }
  }]
+);
+
+const observation=target=>({itemId:target.id,recordRef:target.recordRef,queuePosition:target.queuePosition,sourceUrl:target.detailUrl,statement:'Collects Synthetic #1-2',availability:'statement-found',extractorVersion:5});
+providerProfileTests.push(
+ ['Kindle A/B jobs preserve exact independent queues and cursors; late leases cannot commit across selection',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');
+   let plan=await writer.beginKindleContentsRefresh('start',1);
+   await writer.commitKindleContentsRefresh([observation(plan.candidates[0])],plan.refresh.runRef,plan.refresh.leaseRef,1);
+   await writer.finishKindleContentsRefresh(plan.refresh.runRef,plan.refresh.leaseRef,1,'paused');const frozen=structuredClone(stored[KINDLE_REFRESH_KEY]);
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');
+   assert.deepEqual(stored[KINDLE_REFRESH_ARCHIVES_KEY][a.profileId],frozen);assert.equal((await writer.getKindleContentsRefresh()).checkpoint,null);
+   const bp=await writer.beginKindleContentsRefresh('start',2);assert.equal(bp.eligible,1);assert.equal(bp.candidates[0].recordRef,b.recordRef);
+   await writer.commitKindleContentsRefresh([observation(bp.candidates[0])],bp.refresh.runRef,bp.refresh.leaseRef,2);const bfrozen=structuredClone(stored[KINDLE_REFRESH_KEY]);
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.deepEqual(stored[KINDLE_REFRESH_KEY],frozen);assert.deepEqual(stored[KINDLE_REFRESH_ARCHIVES_KEY][b.profileId],bfrozen);
+   const resumed=await writer.beginKindleContentsRefresh('resume',3);assert.equal(resumed.refresh.cursor,1);assert.equal(resumed.refresh.runRef,frozen.runRef);assert.equal(resumed.candidates[0].recordRef,frozen.queue[1].recordRef);
+   await assert.rejects(writer.commitKindleContentsRefresh([observation(plan.candidates[1])],plan.refresh.runRef,plan.refresh.leaseRef,1),/stale/);
+   await writer.renameProviderProfile(a.profileId,'Renamed A');assert.equal((await writer.getKindleContentsRefresh()).checkpoint.cursor,1);
+   await writer.commitKindleContentsRefresh([observation(resumed.candidates[0])],resumed.refresh.runRef,resumed.refresh.leaseRef,3);
+   assert.equal((await writer.getKindleContentsRefresh()).checkpoint.status,'completed');assert.deepEqual(stored[KINDLE_REFRESH_ARCHIVES_KEY][b.profileId],bfrozen);
+ }],
+ ['switching away interrupts active Kindle authority without discarding progress or reacquiring retained source',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');
+   const p=await writer.beginKindleContentsRefresh('start',1);await writer.commitKindleContentsRefresh([observation(p.candidates[0])],p.refresh.runRef,p.refresh.leaseRef,1);
+   const before=await writer.getDatabase();d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001'),saved=stored[KINDLE_REFRESH_ARCHIVES_KEY][a.profileId];
+   assert.equal(saved.cursor,1);assert.equal(saved.status,'interrupted');assert.equal(saved.leaseRef,'');assert.equal(saved.tabId,null);
+   await assert.rejects(writer.saveKindleComicContents([observation(p.candidates[1])]),/Invalid/);
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.deepEqual(d.providerItems[a.id],before.providerItems[a.id]);assert.deepEqual(d.kindleContentsObservations,before.kindleContentsObservations);
+   const plan=kindleContentsPlan(d,'scan');assert(!plan.candidates.some(i=>i.recordRef===p.candidates[0].recordRef));assert(!plan.candidates.some(i=>i.recordRef===b.recordRef));
+ }],
+ ['legacy Kindle checkpoint binding uses record references and never assigns another account by native product',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book()]);const a=activeRecord(d,'kindle','B000000001'),p=await writer.beginKindleContentsRefresh('start',1);
+   const legacy={...p.refresh,queue:p.candidates.map(({queuePosition,...e})=>e),counts:p.refresh.counts,tabId:1};delete legacy.total;delete legacy.profileId;
+   d=await full(writer,'B',[book()]);const bound=bindKindleRefresh(legacy,d);assert.equal(bound.profileId,a.profileId);assert.equal(bound.queue[0].recordRef,a.recordRef);
+   const other=activeRecord(d,'kindle','B000000001');assert.throws(()=>bindKindleRefresh({...legacy,queue:[...legacy.queue,{id:other.id,recordRef:other.recordRef,title:other.title,detailUrl:other.metadata.detailUrl}]},d),/ambiguous/);
+ }],
+ ['receipt proposals, companion feeds and Fandango contexts retain immutable account ownership',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');
+   await writer.importPurchaseEvidence([{provider:'kindle',title:a.title,asin:a.providerItemId,acquiredAt:'2026-10-01'}]);d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');
+   d=await writer.refreshPurchaseEvidence();const proposalId=Object.keys(d.ownershipProposals)[0];assert.equal(d.ownershipProposals[proposalId].profileId,a.profileId);assert.deepEqual(d.ownershipProposals[proposalId].recordRefs,[a.recordRef]);
+   await assert.rejects(writer.applyPurchaseEvidence(proposalId,b.recordRef,true),/candidate/);await writer.renameProviderProfile(a.profileId,'Renamed');await writer.applyPurchaseEvidence(proposalId,a.recordRef,true);
+   const client='a'.repeat(32),entry={itemRef:crypto.randomUUID(),title:'Synthetic Game',mediaType:'game',keyStatus:'unrevealed',expiresAt:null,checkedAt:'2026-10-01',purchaseEvidence:'confirmed',activationStatus:'unknown'};
+   const feed=async label=>{d=await writer.mergeProviderItems('humble',[],{profileLabel:label});const p=await writer.beginCompanionFeed(client,{profileLabel:label,count:1,coverage:'complete',sentAt:'2026-10-01'});await writer.appendCompanionFeed(client,p.uploadToken,0,[entry]);await writer.commitCompanionFeed(client,p.uploadToken);return d.providers.humble.activeProfileId;};
+   const ha=await feed('A'),hb=await feed('B');d=await writer.getDatabase();assert.equal(Object.keys(d.companionFeeds).length,2);assert.equal(libraryReminders(d).filter(r=>r.source==='humble-companion').length,2);
+   const refs=Object.values(d.companionFeeds).map(f=>f.entries[0].localRef);assert.notEqual(refs[0],refs[1]);await writer.selectProviderProfile(ha,hb,true);await writer.renameProviderProfile(ha,'Personal');
+   d=await writer.getDatabase();assert.deepEqual(Object.values(d.companionFeeds).map(f=>f.entries[0].localRef),refs);
+   const context=validateFandangoState({phase:'start',mode:'full',scanContext:{profileId:crypto.randomUUID(),profileLabel:'A',confirmed:true,scanToken:crypto.randomUUID()}});assert(context.scanContext.profileId);
+   assert.deepEqual(parseBackup(createBackup(d)).companionFeeds,d.companionFeeds);
+ }]
+);
+
+providerProfileTests.push(
+ ['all acquired source/history and record-owned human state survive A/B/A exactly',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001'),other=activeRecord(d,'kindle','B000000002');
+   await writer.saveKindleComicContents([{itemId:a.id,recordRef:a.recordRef,sourceUrl:a.metadata.detailUrl,statement:'Collects Historical #1-2',availability:'statement-found',extractorVersion:2}]);
+   await writer.saveKindleComicContents([{itemId:a.id,recordRef:a.recordRef,sourceUrl:a.metadata.detailUrl,statement:'Collects Synthetic #1-2',availability:'statement-found',extractorVersion:5}]);
+   await writer.saveContentReview(a.id,review);await writer.saveTitleAliases(a.recordRef,['Alias']);await writer.saveOwnershipReview(a.recordRef,{ownership:'owned',note:'Synthetic receipt',evidenceDate:'2026-10-01'});
+   await writer.saveReadingState(a.recordRef,{status:'reading',progress:25,access:'accessible',downloaded:true});await writer.saveReadingOrder(null,'Synthetic order',[a.recordRef,other.recordRef]);
+   await writer.saveManualMatchDecision({itemIds:[a.id,other.id]},'same-work');
+   d=await writer.getDatabase();const separation=crypto.randomUUID();d.editionSeparations[separation]={itemId:a.id,otherItemIds:[other.id],updatedAt:'2026-10-01'};
+   const er=crypto.randomUUID();d.enrichmentReviews[er]={recordRefs:[a.recordRef],source:'googleBooks',status:'no-results',reason:'Synthetic empty result',title:a.title,checkedAt:'2026-10-01',candidates:[]};
+   d.reminderReviews[`${a.recordRef}:activation`]={action:'dismissed',basis:'Synthetic',until:null,updatedAt:'2026-10-01'};await writer.restoreDatabase(d);
+   const before=await writer.getDatabase(),keys=['kindleContentsObservations','enrichmentHistory','enrichmentReviews','contentReviews','manualMatchDecisions','editionSeparations','titleAliases','ownershipReviews','readingStates','readingOrders','reminderReviews'];
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');d=await writer.selectProviderProfile(a.profileId,b.profileId,true);
+   assert.deepEqual(d.providerItems[a.id],before.providerItems[a.id]);for(const key of keys)assert.deepEqual(d[key],before[key],key);
+   assert.equal(d.kindleContentsObservations[a.recordRef].baseline.extractorVersion,2);assert.equal(d.providerItems[a.id].metadata.enrichment.kindleProductComicContents.extractorVersion,5);
+ }],
+ ['Google frozen targets remain present after account selection and do not advance as skipped',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');const job=await writer.startGoogleBooksEnrichmentJob(),run=await writer.acquireEnrichmentRun(job.jobId);
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');assert.deepEqual((await writer.getGoogleBooksEnrichmentJob()).targets,job.targets);
+   await writer.selectProviderProfile(a.profileId,b.profileId,true);await writer.selectProviderProfile(b.profileId,a.profileId,true);
+   d=await writer.getDatabase();const target=d.providerItems[a.id];await writer.commitEnrichmentBatch(job.jobId,run.runId,0,[{canonicalId:job.queue[0],status:'no-results',recordObservations:[{ref:a.recordRef,observedAt:target.observedAt,title:target.title}]}]);
+   const saved=await writer.getGoogleBooksEnrichmentJob();assert.equal(saved.cursor,1);assert.equal(saved.skipped,0);
+ }
+ ]
 );

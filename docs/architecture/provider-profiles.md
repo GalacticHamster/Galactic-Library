@@ -44,3 +44,25 @@ uses its own saved baseline. Provider-specific age and coverage checks remain
 in their existing acquisition code. A full scan marks missing records only in
 its target profile. A failed new-account scan does not replace the previously
 active profile or its baseline.
+
+## Background work and account evidence
+
+The active Kindle checkpoint remains in `galacticLibraryKindleContentsRefresh`.
+Other profiles' frozen checkpoints live in
+`galacticLibraryKindleContentsRefreshArchives[profileId]`. Only selection
+boundaries swap these stores, atomically with the database. Per-item/batch saves
+retain the existing active checkpoint path and atomic evidence/cursor write.
+Leaving a running job interrupts its lease; paused queues keep the exact cursor.
+Returning restores that profile's job; resume rotates its lease. Starting B
+cannot replace A's archived queue. Rename does not invalidate profile identity.
+Legacy checkpoints bind by durable record references; ambiguity is retained,
+never assigned from overlapping product IDs. Restore/clear still clear job
+storage under the existing separate-from-backup contract.
+
+Kindle acquisition targets only the active profile. Stored contents and normal
+matching see the combined library. Google jobs keep frozen record references;
+selection does not remove them. Fandango navigation contexts carry profile IDs
+alongside existing scan tokens. Receipt proposals and companion reminder feeds
+belong to immutable profiles. Multiple feeds from one companion can coexist;
+new B uploads preserve A's completed feed and its reminder decisions. Manual
+account confirmation remains necessary on each signed-in provider page.

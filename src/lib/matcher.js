@@ -103,7 +103,7 @@ function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpa
     for(const [left,right]of[[separation.itemId,other],[other,separation.itemId]]){const edges=graph.get(left)??[];edges.push({id:right,decision:'same-work'});graph.set(left,edges);}
   }
   const history=Object.values(context.providerHistory??{}).filter(entry=>entry.reason==='missing-from-complete-scan'
-    &&entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??'')&&!items[entry.item.id]);
+    &&(entry.item.profileId?Boolean(context.providerProfiles?.[entry.item.profileId]):entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??''))&&!items[entry.item.id]);
   return {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history};
 }
 function* matchItemsSteps(items, requestedItems, context = {}, options={}) {

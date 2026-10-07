@@ -1,10 +1,11 @@
+import {profileRef} from '../lib/provider-profiles.js';
 import { normalizeProviderItem } from '../lib/models.js';
 import { object, strings, count, url, text } from '../lib/validation.js';
 
 /** Only the minimum state needed to resume this tab's Fandango scan. */
 export function validateFandangoState(value) {
   object(value,'Fandango import state');
-  const scanContext=value.scanContext?{profileLabel:text(value.scanContext.profileLabel,100,'Profile label'),confirmed:value.scanContext.confirmed===true,switchProfile:value.scanContext.switchProfile===true,mode:value.scanContext.mode==='incremental'?'incremental':'full',scanToken:/^[a-f0-9-]{36}$/u.test(value.scanContext.scanToken??'')?value.scanContext.scanToken:null}:undefined;
+  const scanContext=value.scanContext?{...(value.scanContext.profileId?{profileId:profileRef(value.scanContext.profileId)}:{}),profileLabel:text(value.scanContext.profileLabel,100,'Profile label'),confirmed:value.scanContext.confirmed===true,switchProfile:value.scanContext.switchProfile===true,mode:value.scanContext.mode==='incremental'?'incremental':'full',scanToken:/^[a-f0-9-]{36}$/u.test(value.scanContext.scanToken??'')?value.scanContext.scanToken:null}:undefined;
   if(value.phase==='start'){
     if(!['full','incremental'].includes(value.mode))throw new Error('Invalid Fandango scan mode.');
     return {phase:'start',mode:value.mode,scanContext};

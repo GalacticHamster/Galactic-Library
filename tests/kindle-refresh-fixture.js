@@ -120,7 +120,7 @@ add('Refresh first acquisition, repeated failed attempts and profile history rem
  for(let n=0;n<3;n++){plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0],'','unavailable')]);}
  db=await store.writer.getDatabase();const history=db.kindleContentsObservations[item.recordRef];equal(history.baseline.statement,'Collects Fresh #3-4','First successful evidence not pinned');equal(history.latestAttempt.availability,'unavailable','Latest failed attempt not replaced');
  const forged=structuredClone(db);forged.kindleContentsObservations[item.recordRef].providerItemId='kindle:DIFFERENT';await rejects(()=>store.writer.restoreDatabase(forged),'History reference attached to other record');
- plan=await begin(store.writer);const changed=await store.writer.getDatabase();changed.providers.kindle={...changed.providers.kindle,profileLabel:'Another account'};store.values.galacticLibraryDatabase=changed;
+ plan=await begin(store.writer);const changed=await store.writer.getDatabase();const otherId=crypto.randomUUID();changed.providerProfiles[otherId]={...changed.providerProfiles[changed.providers.kindle.activeProfileId],profileId:otherId,keySpace:otherId,nickname:'Another account'};changed.providers.kindle={...changed.providers.kindle,activeProfileId:otherId,profileLabel:'Another account'};store.values.galacticLibraryDatabase=changed;
  await rejects(()=>store.writer.beginKindleContentsRefresh('resume',1),'Changed profile resumed');equal((await store.writer.getKindleContentsRefresh()).checkpoint.status,'stale','Changed profile not shown stale');
 });
 

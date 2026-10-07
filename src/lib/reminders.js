@@ -36,7 +36,7 @@ export function libraryReminders(database,now=Date.now(),includeHidden=false){
   }
 
   for(const [clientId,feed]of Object.entries(database.companionFeeds??{})){
-    if(feed.profileLabel!==database.providers.humble?.profileLabel)continue;
+    if(feed.profileId?!database.providerProfiles?.[feed.profileId]:feed.profileLabel!==database.providers.humble?.profileLabel)continue;
     for(const entry of feed.entries){
       const add=kind=>{
         const dueAt=kind==='activation'?null:entry.expiresAt,severity=kind==='key-unavailable'||dueAt&&Date.parse(dueAt)<=now?'attention':dueAt&&Date.parse(dueAt)<=now+7*86400000?'due-soon':'information';

@@ -391,7 +391,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     const read = request.beginScan===true
       ? (request.confirmed===true && Number.isInteger(sender.tab?.id)
-        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id)
+        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
       : getDatabase().then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
