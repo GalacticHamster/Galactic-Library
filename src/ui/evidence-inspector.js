@@ -24,7 +24,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
     root.append(element('p',`Persistent edition ID: ${canonical.id}`));
     for(const record of records){
-      const identity=identityEvidence(record);const provider=database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
+      const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
       const section=element('section','');section.append(element('h4',`${record.title} — ${record.provider}`));
       const table=element('dl','');table.className='evidence-fields';
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));

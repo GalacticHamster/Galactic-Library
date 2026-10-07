@@ -103,5 +103,11 @@
   "src/ui/series-coverage.js",
   "src/ui/sync-health.js",
   "src/ui/title-aliases.js",
-  "src/ui/ui.css"
+  "src/ui/ui.css",
+  "src/lib/provider-profiles.js",
+  "src/lib/profile-management.js",
+  "src/lib/query-diagnostics.js",
+  "src/lib/worker-lifecycle-diagnostics.js",
+  "src/lib/validation-certificate.js",
+  "src/ui/performance-diagnostics.js"
 ]

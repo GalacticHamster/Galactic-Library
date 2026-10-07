@@ -1,3 +1,8 @@
+import {handleExternalApiRequest} from '../src/lib/external-api.js';
+import {withWorker} from './storage.js';
+import {createStorageWriter} from '../src/background/storage-writer.js';
+import {PROVIDERS} from '../src/lib/constants.js';
+import {combinedProviderStates} from '../src/lib/profile-management.js';
 import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh} from '../src/lib/kindle-contents-refresh.js';
 import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
 import {validateFandangoState} from '../src/background/import-state.js';
@@ -182,4 +187,132 @@ providerProfileTests.push(
    const saved=await writer.getGoogleBooksEnrichmentJob();assert.equal(saved.cursor,1);assert.equal(saved.skipped,0);
  }
  ]
+);
+
+providerProfileTests.push(
+ ['profile enumeration reports isolated counts, successful dates, coverage, health and selection',async()=>{
+   const {writer}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');
+   let rows=await writer.getProviderProfiles('kindle');assert.equal(rows.length,2);assert.equal(rows.find(p=>p.profileId===a.profileId).recordCount,2);assert.equal(rows.find(p=>p.profileId===b.profileId).recordCount,1);
+   for(const p of rows){assert(p.baselineComplete);assert.equal(p.lastCompleteScan,'2026-10-01T00:00:00.000Z');assert(p.lastSuccessfulUpdate);assert(p.lastSelectedAt);assert.equal(p.syncHealth.status,'succeeded');}
+   assert.equal(rows.filter(p=>p.active).length,1);d=await writer.selectProviderProfile(a.profileId,b.profileId,true);rows=await writer.getProviderProfiles();assert(rows.find(p=>p.profileId===a.profileId).active);
+   assert.equal(combinedProviderStates(d).kindle.recordCount,3);assert.equal(Object.values(parseBackup(createBackup(d)).providerItems).length,3);
+ }],
+ ['resetting inactive A baseline preserves rich state, both Kindle jobs and active B scan authority',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');
+   const ap=await writer.beginKindleContentsRefresh('start',1);await writer.commitKindleContentsRefresh([observation(ap.candidates[0])],ap.refresh.runRef,ap.refresh.leaseRef,1);await writer.finishKindleContentsRefresh(ap.refresh.runRef,ap.refresh.leaseRef,1,'paused');await writer.saveContentReview(a.id,review);
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001'),bp=await writer.beginKindleContentsRefresh('start',2),bs=await writer.beginProviderScan('kindle','B','incremental',false,2);
+   const before=await writer.getDatabase(),queues=structuredClone({active:stored[KINDLE_REFRESH_KEY],archives:stored[KINDLE_REFRESH_ARCHIVES_KEY]}),scan=structuredClone(stored.galacticLibraryProviderScans);
+   await assert.rejects(writer.resetProviderProfileBaseline(a.profileId,false),/Confirm/);d=await writer.resetProviderProfileBaseline(a.profileId,true);
+   assert.deepEqual(d.providerItems,before.providerItems);assert.deepEqual(d.contentReviews,before.contentReviews);assert.deepEqual(d.enrichmentHistory,before.enrichmentHistory);assert.deepEqual(d.kindleContentsObservations,before.kindleContentsObservations);
+   assert.deepEqual({active:stored[KINDLE_REFRESH_KEY],archives:stored[KINDLE_REFRESH_ARCHIVES_KEY]},queues);assert.deepEqual(stored.galacticLibraryProviderScans,scan);
+   assert(!d.providerProfiles[a.profileId].state.fullSyncAt);assert(!d.providerProfiles[a.profileId].state.snapshotValidation);assert(d.providerProfiles[b.profileId].state.fullSyncAt);
+   await writer.commitProviderScan('kindle',[],{syncMode:'incremental'},null,bs.scanToken,2);await writer.selectProviderProfile(a.profileId,b.profileId,true);
+   const next=await writer.beginProviderScan('kindle','A','incremental',false,1);assert.equal(next.forceFull,true);assert.equal((await writer.getKindleContentsRefresh()).checkpoint.cursor,1);assert(bp.refresh.profileId===b.profileId);
+ }],
+ ['removal previews guard stale decisions and delete only A-owned endpoints while preserving B and global state',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');await writer.saveContentReview(a.id,review);await writer.saveTitleAliases(a.recordRef,['Alias A']);
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');await writer.saveTitleAliases(b.recordRef,['Alias B']);
+   d=await writer.mergeProviderItems('humble',[{providerItemId:'other',title:'Other Book',mediaType:'book',ownership:'owned'}]);const h=activeRecord(d,'humble','other');
+   await writer.saveManualMatchDecision({itemIds:[a.id,h.id]},'same-work');await writer.saveManualMatchDecision({itemIds:[b.id,h.id]},'same-work');
+   const order=await writer.saveReadingOrder(null,'Shared order',[a.recordRef,b.recordRef]);await writer.saveAllowedExternalClientIds(['a'.repeat(32)]);await writer.saveOwnershipPolicy({providers:{kindle:true}});
+   let preview=await writer.previewProviderProfileRemoval(a.profileId);assert.equal(preview.records,1);assert.equal(preview.crossProfileRelationships,1);assert.equal(preview.dependencies.contentReviews,1);assert.equal(preview.dependencies.readingOrders,1);
+   await assert.rejects(writer.removeProviderProfile(a.profileId,preview.dependencyStamp,false),/Confirm/);
+   await writer.saveTitleAliases(a.recordRef,['Changed Alias A']);await assert.rejects(writer.removeProviderProfile(a.profileId,preview.dependencyStamp,true),/changed/);
+   const before=await writer.getDatabase();preview=await writer.previewProviderProfileRemoval(a.profileId);d=await writer.removeProviderProfile(a.profileId,preview.dependencyStamp,true);
+   assert(!d.providerProfiles[a.profileId]&&!d.providerItems[a.id]);assert.deepEqual(d.providerItems[b.id],before.providerItems[b.id]);assert.deepEqual(d.titleAliases[b.recordRef],before.titleAliases[b.recordRef]);assert.deepEqual(d.providerProfiles[b.profileId],before.providerProfiles[b.profileId]);
+   assert.equal(Object.keys(d.manualMatchDecisions).length,1);assert(Object.values(d.manualMatchDecisions)[0].itemIds.includes(b.id));assert.deepEqual(d.readingOrders[order.orderRef].recordRefs,[b.recordRef]);assert.notEqual(d.readingOrders[order.orderRef].revisionRef,order.database.readingOrders[order.orderRef].revisionRef);
+   assert.deepEqual(d.ownershipPolicy,before.ownershipPolicy);assert.deepEqual(await writer.getAllowedExternalClientIds(),['a'.repeat(32)]);assert.equal(d.providers.kindle.activeProfileId,b.profileId);
+   assert.equal(matchItems(d.providerItems,[{title:b.title,mediaType:'book'}],d)[0].owned,true);assert.deepEqual(parseBackup(createBackup(d)),d);
+ }],
+ ['removing A preserves B Kindle queue/cursor and Google remaining targets without rewriting progress',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');const ap=await writer.beginKindleContentsRefresh('start',1);await writer.finishKindleContentsRefresh(ap.refresh.runRef,ap.refresh.leaseRef,1,'paused');
+   d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001'),bp=await writer.beginKindleContentsRefresh('start',2);await writer.finishKindleContentsRefresh(bp.refresh.runRef,bp.refresh.leaseRef,2,'paused');
+   const google=await writer.startGoogleBooksEnrichmentJob(),run=await writer.acquireEnrichmentRun(google.jobId),bjob=structuredClone(stored[KINDLE_REFRESH_KEY]);
+   const preview=await writer.previewProviderProfileRemoval(a.profileId);assert.equal(preview.jobs.kindle.cursor,0);assert.equal(preview.jobs.googleAffectedTargets,1);
+   d=await writer.removeProviderProfile(a.profileId,preview.dependencyStamp,true);assert.deepEqual(stored[KINDLE_REFRESH_KEY],bjob);assert(!stored[KINDLE_REFRESH_ARCHIVES_KEY][a.profileId]);
+   const after=await writer.getGoogleBooksEnrichmentJob();assert.equal(after.cursor,run.cursor);assert.equal(after.processed,run.processed);assert.equal(after.runId,null);assert.deepEqual(after.targets[google.queue[0]],[b.recordRef]);
+   const resumed=await writer.beginKindleContentsRefresh('resume',2);assert.equal(resumed.refresh.runRef,bp.refresh.runRef);assert.equal(resumed.candidates[0].recordRef,b.recordRef);
+ }],
+ ['removing active profile leaves update target unselected and never reuses a deleted legacy namespace',async()=>{
+   const {writer}=memory();let d=await writer.mergeProviderItems('kindle',[book()]);const a=activeRecord(d,'kindle','B000000001');await writer.renameProviderProfile(a.profileId,'A');d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);const p=await writer.previewProviderProfileRemoval(a.profileId);assert.equal(p.activeAfterRemoval,null);d=await writer.removeProviderProfile(a.profileId,p.dependencyStamp,true);
+   assert(!d.providers.kindle);assert(d.providerItems[b.id]);assert.equal(combinedProviderStates(d).kindle.recordCount,1);const status=handleExternalApiRequest(d,{type:'GET_STATUS'});assert.equal(status.providers.kindle.bookCount,1);assert.equal(status.providers.kindle.connected,true);assert((await writer.getProviderProfiles('kindle')).every(row=>!row.active));
+   assert.equal(matchItems(d.providerItems,[{title:b.title,mediaType:'book'}],d)[0].owned,true);d=await writer.selectProviderProfile(b.profileId,undefined,true);const pb=await writer.previewProviderProfileRemoval(b.profileId);await writer.removeProviderProfile(b.profileId,pb.dependencyStamp,true);
+   d=await writer.mergeProviderItems('kindle',[book()]);const next=activeRecord(d,'kindle','B000000001');assert.notEqual(next.id,a.id);assert.notEqual(next.profileId,a.profileId);assert.equal(d.legacyProfileNamespaces.kindle,a.profileId);
+ }],
+ ['removal cleans only A Fandango session context and preserves B independent import authority',async()=>{
+   const session={},sessionArea={get:async()=>structuredClone(session),remove:async keys=>{for(const key of keys)delete session[key];}}, {writer,stored}=memory({importSessionArea:sessionArea});
+   const items=[{providerItemId:'x',title:'Synthetic Movie',mediaType:'movie',ownership:'owned'}],f=label=>writer.replaceProviderItems('fandango-at-home',items,{profileLabel:label,fullSyncAt:'2026-10-01'},snapshotFixture('fandango-at-home',items));
+   let d=await f('A'),a=d.providers['fandango-at-home'].activeProfileId;d=await f('B');const b=d.providers['fandango-at-home'].activeProfileId;
+   session['fandango-import-1']={phase:'start',mode:'full',scanContext:{profileId:a,profileLabel:'A'}};session['fandango-import-2']={phase:'start',mode:'full',scanContext:{profileId:b,profileLabel:'B'}};
+   const scan=await writer.beginProviderScan('fandango-at-home','B','incremental',false,2),before=structuredClone(stored.galacticLibraryProviderScans);const p=await writer.previewProviderProfileRemoval(a);assert.equal(p.jobs.fandangoNavigationContexts,1);
+   await writer.removeProviderProfile(a,p.dependencyStamp,true);assert(!session['fandango-import-1']);assert(session['fandango-import-2']);assert.deepEqual(stored.galacticLibraryProviderScans,before);
+   await writer.commitProviderScan('fandango-at-home',[],{syncMode:'incremental'},null,scan.scanToken,2);
+ }],
+ ['backup restore keeps all profile evidence and baseline state but clears separate device jobs',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001'),p=await writer.beginKindleContentsRefresh('start',1);await writer.finishKindleContentsRefresh(p.refresh.runRef,p.refresh.leaseRef,1,'paused');d=await full(writer,'B',[book()]);
+   await writer.beginKindleContentsRefresh('start',2);await writer.saveContentReview(a.id,review);const backup=createBackup(await writer.getDatabase());d=await writer.restoreDatabase(parseBackup(backup));
+   assert.equal(Object.keys(d.providerProfiles).length,2);assert(d.providerItems[a.id]);assert(d.contentReviews[a.id]);assert.equal(Object.keys(stored[KINDLE_REFRESH_ARCHIVES_KEY]).length,0);assert.equal(stored[KINDLE_REFRESH_KEY],null);
+   assert.deepEqual(d,parseBackup(backup));
+ }]
+);
+
+providerProfileTests.push(
+ ['ambiguous legacy duplicate observations remain archived and are never picked or erased on reimport',async()=>{
+   const d=createEmptyDatabase();d.schemaVersion=12;delete d.providerProfiles;const a=normalizeProviderItem(book()),other=normalizeProviderItem(book());
+   for(const item of [a,other])d.providerHistory[item.recordRef]={item,profileLabel:'A',reason:'profile-switch',missingSince:'2026-10-01'};
+   d.contentReviews[a.id]=review;const migrated=validateDatabase(d);assert.equal(Object.keys(migrated.providerItems).length,0);assert.equal(Object.keys(migrated.providerHistory).length,2);assert(migrated.unresolvedProfileState.contentReviews[a.id]);
+   const {writer}=memory();await writer.restoreDatabase(migrated);const after=await full(writer,'A',[book()]),current=activeRecord(after,'kindle','B000000001');
+   assert.notEqual(current.recordRef,a.recordRef);assert.notEqual(current.recordRef,other.recordRef);assert.equal(Object.keys(after.providerHistory).length,2);assert(!after.contentReviews[current.id]);
+ }],
+ ['modern backups reject current records without immutable profile provenance',async()=>{
+   const {writer}=memory(),d=await full(writer,'A',[book()]);const bad=structuredClone(d);delete Object.values(bad.providerItems)[0].profileId;assert.throws(()=>validateDatabase(bad),/unassigned current record/);
+ }]
+);
+
+providerProfileTests.push(
+ ['all eleven providers retain independent remembered full baselines and profile-local scan authority',async()=>{
+   const {writer}=memory();
+   for(const provider of PROVIDERS){
+     const mediaType=provider==='kindle'?'book':provider==='fandango-at-home'?'movie':'game',items=[{providerItemId:'x',title:'Synthetic',mediaType}];
+     let d=await writer.replaceProviderItems(provider,items,{profileLabel:'A',fullSyncAt:'2026-10-01'},snapshotFixture(provider,items)),a=d.providers[provider].activeProfileId;
+     d=await writer.replaceProviderItems(provider,items,{profileLabel:'B',fullSyncAt:'2026-10-02'},snapshotFixture(provider,items));const b=d.providers[provider].activeProfileId;
+     d=await writer.selectProviderProfile(a,b,true);assert.equal(d.providers[provider].fullSyncAt,'2026-10-01T00:00:00.000Z');assert.equal(Object.values(d.providerItems).filter(i=>i.provider===provider).length,2);
+     const scan=await writer.beginProviderScan(provider,'A','incremental',false,1);assert.equal(scan.forceFull,false);assert.equal(scan.profileId,a);await writer.selectProviderProfile(b,a,true);
+     await assert.rejects(writer.commitProviderScan(provider,items,{syncMode:'incremental'},null,scan.scanToken,1),/superseded/);
+   }
+ }],
+ ['real worker baseline replies include only target profile catalog IDs and original coverage dates',()=>withWorker(async({pageA,dispatch})=>{
+   let d=await full(pageA,'A',[book(),book('B000000002')]),a=activeRecord(d,'kindle','B000000001');d=await full(pageA,'B',[book(),book('B000000003')]);const b=activeRecord(d,'kindle','B000000001');
+   await pageA.selectProviderProfile(a.profileId,b.profileId,true);
+   const sender={id:chrome.runtime.id,url:'https://www.amazon.com/hz/mycd/',tab:{id:1}},reply=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'kindle',beginScan:true,confirmed:true,profileLabel:'A',mode:'incremental'},sender);
+   assert(reply.ok&&reply.hasFullBaseline);assert.equal(reply.profileId,a.profileId);assert.deepEqual(reply.syncState.knownProviderItemIds,['B000000001','B000000002']);assert.equal(reply.lastSuccessfulSyncAt,'2026-10-01T00:00:00.000Z');
+ })],
+ ['DLC native parent references cannot connect across profiles',async()=>{
+   const {writer}=memory(),base={providerItemId:'1',title:'Synthetic Game',mediaType:'game',ownership:'owned'},addon={providerItemId:'2',title:'Synthetic DLC',mediaType:'game-addon',ownership:'owned',metadata:{parentProviderItemId:'1'}};
+   let d=await writer.replaceProviderItems('steam',[base,addon],{profileLabel:'A'},snapshotFixture('steam',[base,addon])),a=d.providers.steam.activeProfileId;
+   d=await writer.replaceProviderItems('steam',[addon],{profileLabel:'B'},snapshotFixture('steam',[addon]));const b=d.providers.steam.activeProfileId;
+   assert.equal(d.providerProfiles[a].state.linkedAddOnCount,1);assert.equal(d.providerProfiles[b].state.linkedAddOnCount,0);assert.equal(combinedProviderStates(d).steam.linkedAddOnCount,1);
+ }],
+ ['failed profile selection cannot partially swap the database, checkpoint or archives',async()=>{
+   const values={},area={get:async defaults=>structuredClone({...defaults,...values}),set:async patch=>{if(fail)throw Error('Synthetic storage failure');Object.assign(values,structuredClone(patch));},remove:async keys=>{for(const key of keys)delete values[key];}};let fail=false;
+   const writer=createStorageWriter(area);let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');const p=await writer.beginKindleContentsRefresh('start',1);await writer.finishKindleContentsRefresh(p.refresh.runRef,p.refresh.leaseRef,1,'paused');d=await full(writer,'B',[book()]);const b=activeRecord(d,'kindle','B000000001');
+   const before=structuredClone(values);fail=true;await assert.rejects(writer.selectProviderProfile(a.profileId,b.profileId,true),/storage failure/);assert.deepEqual(values,before);fail=false;
+   d=await writer.selectProviderProfile(a.profileId,b.profileId,true);assert.equal(d.providers.kindle.activeProfileId,a.profileId);assert.equal((await writer.getKindleContentsRefresh()).checkpoint.runRef,p.refresh.runRef);
+ }]
+);
+
+providerProfileTests.push(
+ ['native IDs containing profile delimiters cannot collide with another profile namespace',async()=>{
+   const {writer}=memory();let d=await writer.mergeProviderItems('humble',[{providerItemId:'seed',title:'Legacy seed',mediaType:'book'}]);const a=activeRecord(d,'humble','seed');await writer.renameProviderProfile(a.profileId,'A');
+   d=await writer.mergeProviderItems('humble',[{providerItemId:'x',title:'B Product',mediaType:'book'}],{profileLabel:'B'});const b=activeRecord(d,'humble','x');
+   d=await writer.mergeProviderItems('humble',[{providerItemId:`${b.profileId}:x`,title:'A Product',mediaType:'book'}],{profileId:a.profileId});
+   assert.deepEqual(d.providerItems[b.id],b);assert.equal(Object.values(d.providerItems).filter(i=>i.profileId===a.profileId).length,2);assert.equal(Object.keys(d.providerItems).length,3);
+ }],
+ ['earlier scoped-key migration rewrites reliable endpoints and active job IDs without changing cursor or refs',async()=>{
+   const {writer,stored}=memory();let d=await full(writer,'A',[book()]),a=activeRecord(d,'kindle','B000000001');await writer.saveContentReview(a.id,review);const plan=await writer.beginKindleContentsRefresh('start',1);await writer.finishKindleContentsRefresh(plan.refresh.runRef,plan.refresh.leaseRef,1,'paused');
+   d=await writer.getDatabase();const oldId=`kindle:${a.profileId}:${a.providerItemId}`;d.providerItems[oldId]={...d.providerItems[a.id],id:oldId};delete d.providerItems[a.id];d.contentReviews[oldId]=d.contentReviews[a.id];delete d.contentReviews[a.id];for(const c of Object.values(d.canonicalItems))c.providerItemIds=c.providerItemIds.map(id=>id===a.id?oldId:id);
+   stored.galacticLibraryDatabase=d;stored[KINDLE_REFRESH_KEY].queue[0].id=oldId;const before=structuredClone(stored[KINDLE_REFRESH_KEY]);d=await writer.getDatabase();
+   assert.equal(d.providerItems[a.id].recordRef,a.recordRef);assert(d.contentReviews[a.id]);assert.equal(stored[KINDLE_REFRESH_KEY].queue[0].id,a.id);assert.equal(stored[KINDLE_REFRESH_KEY].cursor,before.cursor);assert.equal(stored[KINDLE_REFRESH_KEY].runRef,before.runRef);assert.equal((await writer.getKindleContentsRefresh()).checkpoint.status,'paused');
+ }]
 );

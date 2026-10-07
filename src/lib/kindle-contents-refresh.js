@@ -15,7 +15,7 @@ export function validateKindleRefresh(value) {
   if(!states.has(value.status)||!Array.isArray(value.queue)||value.queue.length>50000)throw Error('Invalid refresh checkpoint.');
   const queue=value.queue.map(entry=>{
     object(entry,'Refresh queue item');
-    if(!/^kindle:(?:[a-f0-9-]{36}:)?[A-Z0-9]+$/u.test(entry.id)||!/^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(entry.detailUrl))throw Error('Invalid refresh queue identity.');
+    if(!/^kindle(?:@[a-fA-F0-9-]{36})?:[A-Z0-9]+$/u.test(entry.id)||!/^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(entry.detailUrl))throw Error('Invalid refresh queue identity.');
     return {id:entry.id,recordRef:uuid(entry.recordRef),detailUrl:entry.detailUrl,title:text(entry.title,500,'Refresh title')};
   });
   if(new Set(queue.map(e=>e.recordRef)).size!==queue.length)throw Error('Duplicate refresh queue identity.');
@@ -32,12 +32,13 @@ export function kindleRefreshSummary(job){if(!job)return null;const {queue,lease
 // Provenance migration uses durable record refs, never overlapping ASINs.
 export function bindKindleRefresh(raw,db){
   if(!raw)return null;
-  const job=validateKindleRefresh(raw);
-  if(job.profileId)return job;
+  const legacy=structuredClone(raw);if(Array.isArray(legacy.queue))for(const e of legacy.queue)e.id=String(e.id).replace(/^kindle:([a-f0-9-]{36}):/iu,'kindle@$1:');
+  const job=validateKindleRefresh(legacy);
   const records=new Map([...Object.values(db.providerItems),...Object.values(db.providerHistory??{}).map(h=>h.item)].map(i=>[i.recordRef,i]));
   const owners=new Set(job.queue.map(e=>records.get(e.recordRef)?.profileId).filter(Boolean));
   if(owners.size>1)throw Error('Refresh queue has ambiguous profile provenance.');
-  const profileId=[...owners][0]??Object.values(db.providerProfiles).find(p=>p.provider==='kindle'&&p.nickname===job.profileLabel)?.profileId;
+  if(job.profileId&&owners.size&&![...owners].every(id=>id===job.profileId))throw Error('Refresh queue belongs to another profile.');
+  const profileId=job.profileId??[...owners][0]??Object.values(db.providerProfiles).find(p=>p.provider==='kindle'&&p.nickname===job.profileLabel)?.profileId;
   if(!profileId)throw Error('Refresh queue has unknown profile provenance.');
   return validateKindleRefresh({...job,profileId,queue:job.queue.map(e=>({...e,id:records.get(e.recordRef)?.id??e.id}))});
 }

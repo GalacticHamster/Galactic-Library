@@ -111,7 +111,7 @@ export const securityTests = [
     assert.deepEqual(await pageA.getDatabase(),before);
     await assert.rejects(importItems('kindle',[{...valid,title:'Changed'},invalid],'incremental'),/too many/u);
     assert.deepEqual(await pageA.getDatabase(),before);
-    const backup=structuredClone(before);backup.providerItems['kindle:b']={...invalid,provider:'kindle'};
+    const backup=structuredClone(before);backup.providerItems['kindle:b']={...invalid,provider:'kindle',profileId:before.providers.kindle.activeProfileId};
     await assert.rejects(pageA.restoreDatabase(backup),/too many/u);assert.deepEqual(await pageA.getDatabase(),before);
   })],
   ['provider imports cannot inject enrichment, persistent references or observation dates', () => withWorker(async({pageA,importItems})=>{

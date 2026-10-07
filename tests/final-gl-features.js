@@ -17,7 +17,7 @@ import {libraryReminders} from '../src/lib/reminders.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from '../src/background/reminder-notifier.js';
 import {syncFailure,syncHealthRows} from '../src/lib/sync-health.js';
 
-export function memory(){const stored={},writes=[];return {stored,writes,writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));},remove:async keys=>{for(const key of keys)delete stored[key];}})};}
+export function memory(options={}){const stored={},writes=[];return {stored,writes,writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async updates=>{writes.push(structuredClone(updates));Object.assign(stored,structuredClone(updates));},remove:async keys=>{for(const key of keys)delete stored[key];}},Promise.resolve(),options)};}
 
 export const finalGlTests=[['reading and download/access states remain distinct from ownership and reject stale or inconsistent edits',async()=>{
   const {writer}=memory();await writer.mergeProviderItems('humble',[{providerItemId:'a',title:'Unread manga',mediaType:'book',ownership:'unknown'},{providerItemId:'g',title:'Game',mediaType:'game',ownership:'owned'}]);let db=await writer.getDatabase(),record=activeRecord(db,'humble','a');

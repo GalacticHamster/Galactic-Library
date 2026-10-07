@@ -1,3 +1,4 @@
+import {combinedProviderStates} from '../lib/profile-management.js';
 import {createContentsScanProgress} from './contents-scan-progress.js';
 import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
@@ -713,7 +714,7 @@ function render(timing = null) {
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   endSegment?.();endSegment=timing?.begin('options_filters');
-  const providerEntries = Object.entries(database.providers).sort(([left], [right]) => left.localeCompare(right));
+  const providerEntries = Object.entries(combinedProviderStates(database)).sort(([left], [right]) => left.localeCompare(right));
   assumeAllOwned.checked=database.ownershipPolicy.allOwned;
   document.querySelector('#ownership-provider-help').textContent=assumeAllOwned.checked
     ? 'The global checkbox covers every library. Your provider choices below are saved and apply again when you switch it off.'

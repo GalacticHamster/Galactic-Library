@@ -1,3 +1,4 @@
+import {newProviderProfile} from '../src/lib/provider-profiles.js';
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
 import {createEmptyDatabase,normalizeProviderItem,validateDatabase,validateDatabaseAsync} from '../src/lib/models.js';
@@ -52,7 +53,7 @@ export const checkpointResponsivenessTests=[
   assert.ok(yields>10);
  }],
  ['immutable title derivation reuse never caches time-dependent ownership or key expiry',async()=>{
-  const source=makeDatabase();const item=normalizeProviderItem({provider:'humble',providerItemId:'expiry-key',title:'Expiry test',mediaType:'game',ownership:'owned',metadata:{entitlement:'third-party-key',keyStatus:'unrevealed',expiresAt:'2030-01-01'}});source.providerItems[item.id]=item;
+  const source=makeDatabase();const item=normalizeProviderItem({provider:'humble',providerItemId:'expiry-key',title:'Expiry test',mediaType:'game',ownership:'owned',metadata:{entitlement:'third-party-key',keyStatus:'unrevealed',expiresAt:'2030-01-01'}});const profile=newProviderProfile('humble','',true);source.providerProfiles[profile.profileId]=profile;source.providers.humble={activeProfileId:profile.profileId};source.providerItems[item.id]={...item,profileId:profile.profileId};
   const db=validateDatabase(source),freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}};freeze(db);
   const query={type:'MATCH_ITEMS',apiVersion:1,items:[{title:'Expiry test',mediaType:'game'}]},originalNow=Date.now;
   try{

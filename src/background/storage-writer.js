@@ -1,3 +1,5 @@
+import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
+import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
@@ -38,7 +40,7 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * snapshots. Refresh can reuse their validation only after a fresh, exact
  * whole-value storage comparison, and receives a detached mutable copy.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null} = {}) {
   const certificates=createValidationCertificates(certificateArea);
   let activeTiming = null;
   let activeOperation=null;
@@ -187,7 +189,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     if(changing&&!existing&&mode!=='full')throw Error('A different account without a baseline requires a complete full scan.');
     const profile=importProfile(database,provider,profileLabel),forceFull=!profile.state.fullSyncAt;
-    if(!active)profileState(database,profile,profile.state);
+    if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
@@ -213,7 +215,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         if(job.profileId!==oldId)throw Error('Refresh owner differs from previous selection.');
         if(job.status==='running')job={...job,status:'interrupted',leaseRef:'',tabId:null,updatedAt:new Date().toISOString()};
         jobs[job.profileId]=job;
-      }catch{jobs.unresolvedLegacy=raw;}
+      }catch{const previous=jobs.unresolvedLegacy;const unresolved=previous?.runRef?{[previous.runRef]:previous}:{...previous};if(Object.keys(unresolved).length>=10000)throw Error('Too many unresolved legacy refresh jobs.');unresolved[raw.runRef??crypto.randomUUID()]=raw;jobs.unresolvedLegacy=unresolved;}
     }
     const next=jobs[newId]??null;delete jobs[newId];
     return {[KINDLE_REFRESH_KEY]:next,[KINDLE_REFRESH_ARCHIVES_KEY]:jobs};
@@ -237,10 +239,63 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database=await getDatabase(),profile=database.providerProfiles[profileId];if(!profile)throw Error('Unknown provider profile.');
     nickname=text(nickname,100,'Profile nickname');if(!nickname)throw Error('Enter a profile nickname.');
     if(Object.values(database.providerProfiles).some(p=>p.provider===profile.provider&&p.profileId!==profileId&&p.nickname===nickname))throw Error('That nickname is already used by another profile.');
-    cancelProfileAttempt(database,profile.provider);profile.nickname=nickname;profile.provenance='declared';profile.state.profileLabel=nickname;
+    const extra=await invalidateProfileScan(database,profileId);profile.nickname=nickname;profile.provenance='declared';profile.state.profileLabel=nickname;
     for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId)h.profileLabel=nickname;
     if(database.providers[profile.provider]?.activeProfileId===profileId)profileState(database,profile,profile.state);
-    return persistDatabase(database,profile.provider);
+    return persistDatabase(database,null,extra);
+  }
+  async function getProviderProfiles(provider=null){return enumerateProviderProfiles(await getDatabase(),provider);}
+  async function invalidateProfileScan(database,profileId){
+    const p=database.providerProfiles[profileId];
+    if(p.state.syncHealth?.status==='running')p.state.syncHealth={...p.state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};
+    if(database.providers[p.provider]?.activeProfileId===profileId)profileState(database,p,p.state);
+    const scans=(await storageArea.get({[SCANS]:{}}))[SCANS];if(scans[p.provider]?.profileId===profileId){delete scans[p.provider];return {[SCANS]:scans};}return {};
+  }
+  async function resetProviderProfileBaseline(profileId,confirmed=false){
+    if(confirmed!==true)throw Error('Confirm resetting this profile import baseline.');
+    const database=await getDatabase(),p=database.providerProfiles[profileId];if(!p)throw Error('Unknown provider profile.');
+    const extra=await invalidateProfileScan(database,profileId);
+    for(const key of ['lastSync','quickSyncAt','fullSyncAt','syncState','snapshotValidation','syncMode'])delete p.state[key];
+    if(database.providers[p.provider]?.activeProfileId===profileId)profileState(database,p,p.state);
+    return persistDatabase(database,null,extra);
+  }
+  async function removalPlan(database,profileId){
+    const plan=profileDependencies(database,profileId),stored=await storageArea.get({[SCANS]:{},[KINDLE_REFRESH_KEY]:null,[KINDLE_REFRESH_ARCHIVES_KEY]:{},[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null,[FEED_UPLOAD_KEY]:{}});
+    const session=importSessionArea?await importSessionArea.get(null):{},sessionKeys=Object.keys(session).filter(key=>key.startsWith('fandango-import-')&&session[key]?.scanContext?.profileId===profileId);
+    const current=stored[KINDLE_REFRESH_KEY],archived=stored[KINDLE_REFRESH_ARCHIVES_KEY]?.[profileId];
+    let currentOwner=current?.profileId;
+    if(current&&!currentOwner){try{currentOwner=bindKindleRefresh(current,database).profileId;}catch{/* Unknown jobs remain preserved. */}}
+    const kindleJob=currentOwner===profileId?current:archived;
+    const google=stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY],googleTargets=Object.entries(google?.targets??{}).filter(([,refs])=>refs.some(ref=>plan.refs.has(ref)));
+    const scan=stored[SCANS][plan.profile.provider],scanAffected=scan&&(scan.profileId===profileId||scan.activeAtStartId===profileId);
+    const uploads=Object.fromEntries(Object.entries(stored[FEED_UPLOAD_KEY]).filter(([,u])=>u.profileId===profileId));
+    plan.summary.jobs={kindle:kindleJob?{status:kindleJob.status,cursor:kindleJob.cursor,total:kindleJob.queue?.length??0}:null,googleAffectedTargets:googleTargets.length,scan:scanAffected?{attemptRef:scan.attemptRef,mode:scan.mode}:null,fandangoNavigationContexts:sessionKeys.length,pendingCompanionUploads:Object.keys(uploads).length};
+    const payload={profile:plan.profile,current:plan.current,history:plan.history,dependents:plan.dependents,canonicalItems:plan.canonicalItems,kindleJob:kindleJob??null,googleTargets,scan:scanAffected?scan:null,uploads,session:Object.fromEntries(sessionKeys.map(key=>[key,session[key]]))};
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(strictDatabaseSerialization(payload)));
+    plan.summary.dependencyStamp=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+    return {...plan,stored,currentOwner,sessionKeys,scanAffected};
+  }
+  async function previewProviderProfileRemoval(profileId){return (await removalPlan(await getDatabase(),profileId)).summary;}
+  async function removeProviderProfile(profileId,dependencyStamp,confirmed=false){
+    if(confirmed!==true)throw Error('Confirm removing this profile and its dependent state.');
+    const database=await getDatabase(),plan=await removalPlan(database,profileId);
+    if(typeof dependencyStamp!=='string'||dependencyStamp!==plan.summary.dependencyStamp)throw Error('Profile dependencies changed. Review a fresh removal preview.');
+    const updates={},jobs={...plan.stored[KINDLE_REFRESH_ARCHIVES_KEY]};delete jobs[profileId];
+    if(plan.profile.provider==='kindle'){updates[KINDLE_REFRESH_ARCHIVES_KEY]=jobs;if(plan.currentOwner===profileId)updates[KINDLE_REFRESH_KEY]=null;}
+    if(plan.scanAffected){const scans={...plan.stored[SCANS]},target=database.providerProfiles[scans[plan.profile.provider].profileId];if(target&&target.profileId!==profileId&&target.state.syncHealth?.status==='running'){target.state.syncHealth={...target.state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};if(database.providers[target.provider]?.activeProfileId===target.profileId)profileState(database,target,target.state);}delete scans[plan.profile.provider];updates[SCANS]=scans;}
+    const uploads={...plan.stored[FEED_UPLOAD_KEY]};for(const [key,u]of Object.entries(uploads))if(u.profileId===profileId)delete uploads[key];updates[FEED_UPLOAD_KEY]=uploads;
+    const google=plan.stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
+    if(google){
+      let changed=false,pendingChanged=false;
+      for(const [id,refs]of Object.entries(google.targets??{})){const next=refs.filter(ref=>!plan.refs.has(ref));if(next.length!==refs.length){changed=true;pendingChanged||=google.queue.indexOf(id)>=google.cursor;google.targets[id]=next;}}
+      if(changed){if(pendingChanged){google.runId=null;google.leaseUntil=0;}updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=normaliseGoogleBooksJob(google);}
+    }
+    removeProfileData(database,plan);
+    const result=await persistDatabase(database,null,updates);
+    // Tokens are already invalidated atomically. Session cleanup is secondary;
+    // its failure must not misreport a committed library removal as a failure.
+    if(plan.sessionKeys.length)try{await importSessionArea.remove(plan.sessionKeys);}catch{}
+    return result;
   }
   async function failProviderScan(provider,scanToken,tabId,failure={}){
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];
@@ -292,8 +347,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
       const legacyRefresh=await readKindleRefresh();
-      if(legacyRefresh&&!legacyRefresh.profileId){try{migrated[KINDLE_REFRESH_KEY]=bindKindleRefresh(legacyRefresh,database);}catch{/* Retain unresolved old checkpoint without inventing ownership. */}}
+      if(legacyRefresh){try{const bound=bindKindleRefresh(legacyRefresh,database);if(!equalDatabaseData(bound,legacyRefresh))migrated[KINDLE_REFRESH_KEY]=bound;}catch{/* Retain unresolved old checkpoint without inventing ownership. */}}
 
+      const archives=(await storageArea.get({[KINDLE_REFRESH_ARCHIVES_KEY]:{}}))[KINDLE_REFRESH_ARCHIVES_KEY];let archiveChanged=false;
+      for(const [id,raw]of Object.entries(archives))if(database.providerProfiles[id])try{const bound=bindKindleRefresh(raw,database);if(!equalDatabaseData(bound,raw)){archives[id]=bound;archiveChanged=true;}}catch{/* Preserve unresolved frozen work. */}
+      if(archiveChanged)migrated[KINDLE_REFRESH_ARCHIVES_KEY]=archives;
       if (Array.isArray(job?.queue)) {
         const byRecord = new Map(Object.values(database.canonicalItems).flatMap((entry) => entry.providerItemIds.map((id) => [id, entry.id])));
         migrated[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY] = {...job, queue: job.queue.map((id) => {
@@ -332,6 +390,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database);
   }
 
+  function historicalRecords(database,profileId){
+    const groups=new Map();for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId){const list=groups.get(h.item.id)??[];list.push(h.item);groups.set(h.item.id,list);}
+    return new Map([...groups].filter(([,items])=>items.length===1).map(([id,items])=>[id,items[0]]));
+  }
   function preserveEnrichment(incoming, previous) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     if(incoming.provider==='fanatical'){
@@ -362,7 +424,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(profileId){const p=database.providerProfiles[profileId];if(!p||p.provider!==provider)throw Error('Invalid target profile.');return p;}
     label=text(label??database.providers[provider]?.profileLabel??'',100,'Profile nickname');
     let profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===label);
-    if(!profile){profile=newProviderProfile(provider,label,!label&&!Object.values(database.providerProfiles).some(p=>p.provider===provider));database.providerProfiles[profile.profileId]=profile;}
+    if(!profile){profile=newProviderProfile(provider,label,!label&&!database.legacyProfileNamespaces?.[provider]&&!Object.values(database.providerProfiles).some(p=>p.provider===provider));database.providerProfiles[profile.profileId]=profile;}
     return profile;
   }
   function profileState(database,profile,state){
@@ -378,7 +440,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
-    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
+    const historicalById=historicalRecords(database,profile.profileId);
     const incoming = values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source = PROVIDER_SOURCES[provider];
@@ -386,7 +448,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     });
     const unique = new Map(incoming.map((item) => [item.id, item]));
     for(const item of Object.values(database.providerItems))if(item.profileId===profile.profileId&&!unique.has(item.id))database.providerHistory[item.recordRef]={item,profileLabel:profile.nickname,reason:'missing-from-complete-scan',missingSince:now};
-    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.profileId===profile.profileId&&unique.has(entry.item.id))delete database.providerHistory[ref];
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];
     const records = [...unique.values()];
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
@@ -421,6 +483,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       snapshotValidation: { ...snapshot, validatedAt: now }
     };
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
+    if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
     return persistDatabase(database,provider,jobs);
   }
@@ -434,7 +497,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    const historicalById=new Map(Object.values(database.providerHistory).filter(entry=>entry.item.profileId===profile.profileId).map(entry=>[entry.item.id,entry.item]));
+    const historicalById=historicalRecords(database,profile.profileId);
     const now = new Date().toISOString();
     const incoming = values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
@@ -445,7 +508,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
-    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.has(entry.item.id))delete database.providerHistory[ref];
+    for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];
     const records = Object.values(database.providerItems).filter((item) => item.profileId === profile.profileId);
     const gameCount = records.filter((item) => item.mediaType === 'game').length;
     const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
@@ -476,6 +539,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       ...syncDetails,syncHealth
     };
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
+    if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
     return persistDatabase(database,provider,jobs);
   }
@@ -1146,7 +1210,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
-    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
+    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, getProviderProfiles, previewProviderProfileRemoval, removeProviderProfile, resetProviderProfileBaseline, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,

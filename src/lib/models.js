@@ -23,6 +23,7 @@ export function createEmptyDatabase() {
     schemaVersion: DATABASE_SCHEMA_VERSION,
     providers: {},
     providerProfiles: {},
+    legacyProfileNamespaces: {},
     unresolvedProfileState: {contentReviews:{},manualMatchDecisions:{},editionSeparations:{},ownershipProposals:{},companionFeeds:{}},
     ownershipPolicy: defaultOwnershipPolicy(),
     providerItems: {},
@@ -178,6 +179,10 @@ function* databaseSteps(value) {
   if (Object.keys(value.providerItems).length>500000) throw new Error('The database contains too many provider records.');
   value=migrateProviderProfiles(value);
   const providerProfiles=validateProviderProfiles(value.providerProfiles);
+  object(value.legacyProfileNamespaces??{},'Legacy profile namespaces');
+  const legacyProfileNamespaces={};
+  for(const [provider,id]of Object.entries(value.legacyProfileNamespaces??{})){if(!PROVIDERS.includes(provider))throw Error('Invalid legacy namespace provider.');legacyProfileNamespaces[provider]=profileRef(id);}
+  for(const p of Object.values(providerProfiles))if(!p.keySpace){if(legacyProfileNamespaces[p.provider]&&legacyProfileNamespaces[p.provider]!==p.profileId)throw Error('Legacy namespace belongs to another profile.');legacyProfileNamespaces[p.provider]=p.profileId;}
   const profileFor=item=>{const p=providerProfiles[item.profileId];if(!p||p.provider!==item.provider)throw Error('Record belongs to an unknown provider profile.');return p;};
   const normalizedItems=[];
   for(const item of Object.values(value.providerItems)) {
@@ -197,7 +202,7 @@ function* databaseSteps(value) {
   for(const item of Object.values(providerItems))if(item.provider==='humble'&&item.mediaType==='game'
     &&item.metadata.entitlement==='direct-download'&&unavailablePurchases.has(JSON.stringify([item.profileId,item.metadata.purchaseId,item.normalizedTitle])))item.ownership='unknown';
   const providers = validateProviderStates(value.providers ?? {});
-  for(const [provider,state]of Object.entries(providers)){const p=providerProfiles[state.activeProfileId];if(!p||p.provider!==provider)throw Error('Invalid active provider profile.');}
+  for(const [provider,state]of Object.entries(providers)){const p=providerProfiles[state.activeProfileId];if(!p||p.provider!==provider)throw Error('Invalid active provider profile.');providers[provider]={...p.state,activeProfileId:p.profileId,profileLabel:p.nickname};}
   yield 'validation_history';
   object(value.providerHistory??{},'Provider history');
   if(Object.keys(value.providerHistory??{}).length>500000)throw new Error('Provider history exceeds its limit.');
@@ -220,6 +225,11 @@ function* databaseSteps(value) {
   }
   for(const [ref,h]of Object.entries(providerHistory)){if(refs.has(ref))throw Error('Historical and current records share a reference.');refs.add(ref);}
   const companionFeeds=validateCompanionFeeds(value.companionFeeds);
+  for(const feed of Object.values(companionFeeds)){
+    if(!feed.profileId)feed.profileId=Object.values(providerProfiles).find(p=>p.provider==='humble'&&p.nickname===feed.profileLabel)?.profileId;
+    const p=providerProfiles[feed.profileId];if(!p||p.provider!=='humble')throw Error('Companion feed belongs to an unknown Humble profile.');
+  }
+
   for(const feed of Object.values(companionFeeds))for(const entry of feed.entries)if(refs.has(entry.localRef)||Object.hasOwn(providerHistory,entry.localRef))throw new Error('A companion reminder reference collides with a library record.');
   const manualMatchDecisions = {};
   object(value.manualMatchDecisions??{},'Saved relationships');
@@ -249,11 +259,12 @@ function* databaseSteps(value) {
   const remaining={enrichmentReviews:validateEnrichmentReviews(value.enrichmentReviews),titleAliases:validateTitleAliases(value.titleAliases),
     readingStates:validateReadingStates(value.readingStates),readingOrders:validateReadingOrders(value.readingOrders),reminderReviews:validateReminderReviews(value.reminderReviews),
     ownershipReviews:validateOwnershipReviews(value.ownershipReviews),ownershipProposals:validateOwnershipProposals(value.ownershipProposals)};
+  for(const proposal of Object.values(remaining.ownershipProposals)){if(proposal.profileId&&providerProfiles[proposal.profileId]?.provider!==proposal.evidence.provider)throw Error('Receipt belongs to an unknown provider profile.');}
   yield 'validation_canonical';
   const canonicalItems=yield* canonicalItemsSteps(providerItems,manualMatchDecisions,value.canonicalItems,editionSeparations);
   yield 'validation_other';
   return {
-    schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,providerProfiles,
+    schemaVersion: DATABASE_SCHEMA_VERSION,companionFeeds,providerProfiles,legacyProfileNamespaces,
     unresolvedProfileState: validateUnresolvedProfileState(value.unresolvedProfileState),
     providers,
     ownershipPolicy,
