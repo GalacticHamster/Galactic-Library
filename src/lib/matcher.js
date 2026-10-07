@@ -86,8 +86,9 @@ function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpa
     for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
   }
   const barriers=editionBarriers(context.manualMatchDecisions,context.editionSeparations);
-  const endCanonical=beginSpan?.('matching_canonical');let canonical;
-  try{canonical=Object.values(barriers.size?yield* canonicalItemsSteps(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??(yield* canonicalItemsSteps(items,context.manualMatchDecisions)));}
+  const trusted=items===context.providerItems&&isCommittedSnapshot(context)&&Boolean(context.canonicalItems);
+  const endCanonical=beginSpan?.(trusted?'matching_canonical_reuse':'matching_canonical');let canonical;
+  try{canonical=Object.values(trusted?context.canonicalItems:barriers.size?yield* canonicalItemsSteps(items,context.manualMatchDecisions,context.canonicalItems,context.editionSeparations):context.canonicalItems??(yield* canonicalItemsSteps(items,context.manualMatchDecisions)));}
   finally{endCanonical?.();}
   const editionByRecord=new Map(canonical.flatMap(group=>group.providerItemIds.map(id=>[id,group])));
   const graph=new Map();const negative=new Set();

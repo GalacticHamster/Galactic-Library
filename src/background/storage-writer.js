@@ -1,4 +1,5 @@
 import {equalDatabaseData} from '../lib/data-equality.js';
+import {createValidationCertificates} from '../lib/validation-certificate.js';
 import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
@@ -36,7 +37,8 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * snapshots. Refresh can reuse their validation only after a fresh, exact
  * whole-value storage comparison, and receives a detached mutable copy.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null} = {}) {
+  const certificates=createValidationCertificates(certificateArea);
   let activeTiming = null;
   let activeOperation=null;
   const activity=(stage,details)=>diagnostics?.begin(stage,details)??(()=>{});
@@ -75,6 +77,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }}
     catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
     snapshotEvent(querySnapshot?'published':'unavailable','writer',previousSnapshot);
+    // Every authoritative DB set funnels through here after full validation.
+    // No additional snapshot copy is made solely to obtain a certificate.
+    if(querySnapshot)certificates.issue(querySnapshot);else certificates.clear();
   }
   storageArea={
     async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
@@ -92,7 +97,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     async remove(keys){
       const end=activity('storage_remove',{key:storageKey(typeof keys==='string'?[keys]:keys),operation:activeOperation});try{
       await committedArea.remove(keys);
-      if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))publishQuerySnapshot(createEmptyDatabase());
+      if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY)){publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
       }finally{end();}
     }
   };
@@ -111,13 +116,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         // result over a newer committed revision, including clear/restore.
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         const raw=stored[DATABASE_STORAGE_KEY];
+        const certified=raw&&await span('snapshot_certificate',()=>certificates.verify(raw,{beginSpan}));
+        sync(certified?'certificate_hit':'certificate_miss',()=>{});
+        if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         let endValidationStage;
-        const database=raw?await span('snapshot_validation',async()=>{
+        const database=certified?raw:raw?await span('snapshot_validation',async()=>{
           try{return await validateDatabaseAsync(raw,{onSlice:onValidationSlice,onWait:onValidationWait,onStage:stage=>{endValidationStage?.();endValidationStage=beginSpan(stage==='validation_canonical'?'snapshot_canonical':stage);}});}
           finally{endValidationStage?.();}
         }):createEmptyDatabase();
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
-        if(raw&&sync('snapshot_compare',()=>!equalDatabaseData(raw,database))){
+        if(raw&&!certified&&sync('snapshot_compare',()=>!equalDatabaseData(raw,database))){
           // Legacy/repair reads may allocate persistent record/canonical refs.
           // Preserve the existing ordered migration; never expose identities
           // synthesized from a read that has not been committed. Normal active
@@ -127,6 +135,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         sync('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(database)));
         if(cacheQuerySnapshots)querySnapshot=database;
         snapshotEvent('published','cold-read');
+        if(raw&&!certified)sync('certificate_issue',()=>certificates.issue(database));
         return database;
       }
     })();

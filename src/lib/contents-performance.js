@@ -9,6 +9,7 @@
   for(const stage of ['read_committed_compare','read_committed_clone','storage_set_dispatch','storage_set_wait','storage_change_compare'])stages.add(stage);
   stages.add('matching_yield_wait');
   stages.add('validation_yield_wait');
+  for(const stage of ['snapshot_certificate','certificate_read','certificate_serialize','certificate_hash','certificate_hit','certificate_miss','certificate_issue','matching_canonical_reuse'])stages.add(stage);
   const cleanClient=value=>({...Object.fromEntries(['beforeSendMs','localStorageMs','preparationMs','previousFlightMs','postResponseMs','pageToRenderedMs'].filter(key=>Number.isFinite(value?.[key])&&value[key]>=0&&value[key]<=300000).map(key=>[key,value[key]])),...(['rendered','superseded','incomplete'].includes(value?.renderOutcome)?{renderOutcome:value.renderOutcome}:{})});
   const cleanWork=value=>Object.fromEntries(['snapshot','index','execution'].filter(key=>value?.[key]).map(key=>[key,Object.fromEntries(['cpuMs','waitMs','maxWaitMs','yields'].filter(field=>Number.isFinite(value[key][field])&&value[key][field]>=0).map(field=>[field,value[key][field]]))]));
   const now = () => performance.timeOrigin + performance.now();

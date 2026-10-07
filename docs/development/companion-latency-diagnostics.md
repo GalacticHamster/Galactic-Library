@@ -22,6 +22,10 @@ Exported tracing is diagnostic only: no library records, source text, settings v
 
 ## Lifecycle breadcrumb across worker generations
 
+Cold queries also report certificate verification and trusted canonical reuse.
+See [the validation-certificate contract](../architecture/query-validation-certificate.md)
+for the stages, fallback rules and the 60-second idle acceptance procedure.
+
 The export's `lifecycle` field adds one tiny `storage.session` checkpoint, under `galacticLibraryWorkerLifecycleBreadcrumb`. Only two flat summaries are retained: the current worker and its immediate predecessor. A new worker replaces the older predecessor; this is not a history ring or a saved journal. It contains opaque worker IDs, startup/activity/completion timestamps, allowlisted activity/request types and actual platform event observations. It never contains library data, request payloads, titles or detailed timings, and is excluded from library backups.
 
 `previous` is the prior worker's last **successfully recorded** checkpoint. `current` contains live worker observations. Each summary includes `startedEpochMs`, `lastActivityEpochMs` / `lastActivityType`, `lastCompletedExternalEpochMs` / `lastCompletedExternalType`, and a checkpoint `recordedAtEpochMs`. The export also supplies `lastSuccessfulWriteEpochMs`, availability/write-failure status and `gapFromPreviousRecordedActivityMs` (current startup minus previous recorded activity). This gap is not a measured shutdown time or an automatic idle/active classification. Clock-order anomalies can produce a negative gap, which is preserved instead of inventing an interpretation.

@@ -3,6 +3,7 @@ import {refreshWritePacingTests} from './refresh-write-pacing.js';
 import {companionQueryConcurrencyTests} from './companion-query-concurrency.js';
 import {checkpointResponsivenessTests} from './checkpoint-responsiveness.js';
 import {committedProjectionTests} from './committed-projection.js';
+import {validationCertificateTests} from './validation-certificate.js';
 import {contentsPerformanceTests} from './contents-performance.js';
 import {optionsPerformanceDiagnosticsTests} from './options-performance-diagnostics.js';
 import {workerLifecycleDiagnosticsTests} from './worker-lifecycle-diagnostics.js';
@@ -75,6 +76,7 @@ const tests = [
   ...companionQueryConcurrencyTests,
   ...checkpointResponsivenessTests,
   ...committedProjectionTests,
+  ...validationCertificateTests,
   ...refreshWritePacingTests,
   ...kindleRefreshCases,
   ...kindleRefreshWorkerTests,

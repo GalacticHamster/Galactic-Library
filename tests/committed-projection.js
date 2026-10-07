@@ -79,11 +79,11 @@ export const committedProjectionTests=[
   const responses=await Promise.all([handleExternalApiRequestAsync(db,query,options),handleExternalApiRequestAsync(db,query,options)]);
   for(const response of responses)assert.deepEqual(response,expected);
   assert.equal(spans.filter(x=>x==='matching_index_build').length,1);
-  assert.equal(spans.filter(x=>x==='matching_canonical').length,1);
+  assert.equal(spans.filter(x=>x==='matching_canonical_reuse').length,1);
   assert.equal(spans.filter(x=>x==='matching_index_wait').length,1);
   responses[0].results[0].matches[0].title='Injected';responses[0].results[0].matches[0].evidence.authors.push('Injected');
   assert.deepEqual(await handleExternalApiRequestAsync(db,query,options),expected);
-  assert.equal(spans.filter(x=>x==='matching_canonical').length,1);
+  assert.equal(spans.filter(x=>x==='matching_canonical_reuse').length,1);
   assert.ok(spans.includes('matching_index_hit'));
   const merelyFrozen=freeze(fixture()),untrusted=[];
   await handleExternalApiRequestAsync(merelyFrozen,query,{...options,beginSpan:name=>{untrusted.push(name);}});
@@ -151,7 +151,7 @@ export const committedProjectionTests=[
   chrome.runtime.sendMessage=async()=>({ok:true});memory.values.galacticLibraryDatabase=fixture();await pageA.saveAllowedExternalClientIds([hb,fan]);
   const id='lookup-abcdef123456-007',sent=performance.timeOrigin+performance.now()-10;
   const response=await dispatchExternal({...query,diagnosticLookupId:id,diagnosticSentEpochMs:sent},{id:hb});assert.equal(response.ok,true);
-  for(const stage of ['handler_delay','snapshot_read','snapshot_validation','snapshot_canonical','matching_index_build','matching_canonical'])assert.ok(response.performance.events.some(e=>e.stage===stage),stage);
+  for(const stage of ['handler_delay','snapshot_read','snapshot_validation','snapshot_canonical','matching_index_build','matching_canonical_reuse'])assert.ok(response.performance.events.some(e=>e.stage===stage),stage);
   assert.ok(response.performance.events.some(e=>e.stage==='validation_records'));
   assert.ok(response.performance.work.snapshot.cpuMs>=0);assert.ok(response.performance.work.snapshot.waitMs>=0);
   assert.ok(response.performance.scheduling.waitMs>=0);
