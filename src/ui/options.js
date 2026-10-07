@@ -930,7 +930,9 @@ function render(timing = null) {
   } finally {endSegment?.();}
 }
 
+const optionsDiagnosticPrefix=crypto.randomUUID().replaceAll('-','').slice(0,12);let optionsDiagnosticSequence=0;
 async function refresh(diagnosticLookupId = null) {
+  diagnosticLookupId??='lookup-'+optionsDiagnosticPrefix+'-'+String(++optionsDiagnosticSequence).padStart(3,'0');
   const timing=globalThis.GalacticContentsPerformance.trace(diagnosticLookupId,'options');
   const endTotal=timing?.begin('options_total');
   let endStage=timing?.begin('options_read');

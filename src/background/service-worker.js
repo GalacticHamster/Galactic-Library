@@ -15,19 +15,23 @@ import { validateFandangoState } from './import-state.js';
 import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
 import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
+import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnostics.js';
+import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
+
+const queryDiagnostics=createQueryDiagnostics();
 
 const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
-  if(keys.includes('galacticLibraryDatabase'))storageWriter.invalidateQuerySnapshot();
+  if(keys.includes('galacticLibraryDatabase'))storageWriter.invalidateQuerySnapshot(undefined,'private-observer');
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
 const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
-const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges});
+const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,diagnostics:queryDiagnostics});
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
@@ -62,6 +66,7 @@ registerReminderEvents();
 chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==='local')for(const key of Object.keys(changes).slice(0,16))queryDiagnostics.event('storage_change',{key:diagnosticStorageKey(key),source:'observer'});
   if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();
   if(area==='local'&&changes.galacticLibraryDatabase)storageWriter.invalidateQuerySnapshot(changes.galacticLibraryDatabase.newValue);
   if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();
@@ -219,8 +224,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ok:true});return undefined;
   }
   if(request?.type==='GET_KINDLE_CONTENTS_UI_TIMINGS'){
-    if(!isProviderImportPage('kindle',sender.url)){sendResponse({ok:false});return undefined;}
-    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean)});return undefined;
+    if(!isProviderImportPage('kindle',sender.url)&&!isOwnExtensionPage(sender.url)){sendResponse({ok:false});return undefined;}
+    sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean),activity:queryDiagnostics.report()});return undefined;
   }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
@@ -362,6 +367,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request?.type === 'MATCH_ITEMS') {
+    const end=queryDiagnostics.begin('internal_query'),respond=sendResponse;
+    sendResponse=value=>{try{respond(value);}finally{end();}};
     if (!isOwnExtensionPage(sender.url)) {
       sendResponse({ok:false,error:'Library comparisons are accepted only from Galactic Library pages.'});
       return undefined;
@@ -489,12 +496,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
-  if(request?.type==='MATCH_ITEMS_DIAGNOSTIC_CALLBACK'){
+  if(['MATCH_ITEMS_DIAGNOSTIC_CALLBACK','MATCH_ITEMS_DIAGNOSTIC_RENDER'].includes(request?.type)){
     const observed=contentsPerformance.now(),callback=request.diagnosticCallbackEpochMs,id=request.diagnosticLookupId;
     storageWriter.getQueryAllowedExternalClientIds().then(allowed=>{
       const original=companionCallbacks.get(id);
       if(request.apiVersion!==1||!sender.id||!allowed.includes(sender.id)||!original||original.sender!==sender.id||!Number.isFinite(callback)||callback<original.start||callback>observed+1000||observed-original.responded>60000){sendResponse({ok:false});return;}
-      companionCallbacks.delete(id);
+      if(request.type==='MATCH_ITEMS_DIAGNOSTIC_RENDER'){
+        if(original.rendered){sendResponse({ok:false});return;}original.rendered=true;
+        companionTimings.annotate(id,[],request.diagnosticHb);sendResponse({ok:true,apiVersion:1});return;
+      }
+      if(original.callback){sendResponse({ok:false});return;}original.callback=callback;
       companionTimings.annotate(id,[{stage:'client_round_trip',attempt:0,startMs:0,durationMs:callback-original.start},{stage:'response_transport',attempt:0,startMs:original.responded-original.start,durationMs:Math.max(0,callback-original.responded)}]);
       sendResponse({ok:true,apiVersion:1});
     }).catch(()=>sendResponse({ok:false}));return true;
@@ -503,6 +514,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   const explicit=contentsPerformance.validId(request?.diagnosticLookupId);
   const diagnosticId=explicit?request.diagnosticLookupId:request?.type==='MATCH_ITEMS'&&entered<contentsDiagnosticUntil?'lookup-'+companionDiagnosticPrefix+'-'+String(++companionDiagnosticSequence).padStart(3,'0'):null;
   const timing=contentsPerformance.trace(diagnosticId,'companion',undefined,explicit&&Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000?sent:null);
+  if(timing){timing.worker=queryDiagnostics.worker;timing.workerStartedEpochMs=queryDiagnostics.startedEpochMs;timing.client=request.diagnosticHb;timing.work=Object.fromEntries(['snapshot','index','execution'].map(phase=>[phase,{cpuMs:0,waitMs:0,maxWaitMs:0,yields:0}]));}
+  if(timing&&Array.isArray(request.items)&&request.items.length<=500){timing.requestItemCount=request.items.length;timing.requestContentsCount=Math.min(20000,request.items.reduce((total,item)=>total+(Array.isArray(item?.contents)?item.contents.length:0),0));}
+  let workPhase='index',longWaitCount=0;
+  const endActivity=request?.type==='MATCH_ITEMS'?queryDiagnostics.begin('query'):()=>{};
   if(timing)timing.scheduling={yields:0,maxSliceMs:0,cpuMs:0,waitMs:0,maxWaitMs:0};
   if(timing&&timing.start<entered)timing.events.push({stage:'handler_delay',attempt:0,startMs:0,durationMs:entered-timing.start});
   let endStage=timing?.begin('query_authorization');
@@ -511,7 +526,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     const end=timing?.begin('response_dispatch');
     if(explicit&&timing){companionCallbacks.set(timing.id,{sender:sender.id,start:timing.start,responded:contentsPerformance.now()});if(companionCallbacks.size>50)companionCallbacks.delete(companionCallbacks.keys().next().value);}
     try{sendResponse(explicit&&timing?{...value,performance:contentsPerformance.clean(timing.finish())}:value);}
-    finally{end?.();if(timing)companionTimings.add(timing.finish());}
+    finally{end?.();endActivity();if(timing)companionTimings.add(timing.finish());}
   };
   storageWriter.getQueryAllowedExternalClientIds()
     .then((allowedIds) => {
@@ -531,9 +546,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       }
       endStage=timing?.begin('query_snapshot');
       const beginSpan=stage=>timing?.begin(stage);
-      return storageWriter.getQueryDatabase({beginSpan}).then(async database=>{
+      return storageWriter.getQueryDatabase({beginSpan,onValidationSlice:(duration,yielded)=>{if(timing){timing.work.snapshot.cpuMs+=duration;timing.work.snapshot.yields+=Number(yielded);}},onValidationWait:duration=>{if(timing){timing.work.snapshot.waitMs+=duration;timing.work.snapshot.maxWaitMs=Math.max(timing.work.snapshot.maxWaitMs,duration);if(duration>=50&&longWaitCount++<16)timing.events.push({stage:'validation_yield_wait',attempt:0,startMs:Math.max(0,contentsPerformance.now()-timing.start-duration),durationMs:duration});}}}).then(async database=>{
+        if(timing)timing.snapshotSequence=committedSnapshotSequence(database);
         endStage?.();endStage=null;
-        const result=await handleExternalApiRequestAsync(database,request,{cacheImmutableRecords:true,cacheCommittedProjection:true,beginSpan,onStage:stage=>{endStage?.();endStage=timing?.begin(stage);},onSlice:(duration,yielded)=>{if(timing){timing.scheduling.yields+=Number(yielded);timing.scheduling.maxSliceMs=Math.max(timing.scheduling.maxSliceMs,duration);timing.scheduling.cpuMs+=duration;}},onWait:duration=>{if(timing){timing.scheduling.waitMs+=duration;timing.scheduling.maxWaitMs=Math.max(timing.scheduling.maxWaitMs,duration);}}});
+        const result=await handleExternalApiRequestAsync(database,request,{cacheImmutableRecords:true,cacheCommittedProjection:true,beginSpan,onStage:stage=>{if(stage==='matching_execution')workPhase='execution';endStage?.();endStage=timing?.begin(stage);},onSlice:(duration,yielded)=>{if(timing){timing.scheduling.yields+=Number(yielded);timing.scheduling.maxSliceMs=Math.max(timing.scheduling.maxSliceMs,duration);timing.scheduling.cpuMs+=duration;timing.work[workPhase].cpuMs+=duration;timing.work[workPhase].yields+=Number(yielded);}},onWait:duration=>{if(timing){timing.scheduling.waitMs+=duration;timing.scheduling.maxWaitMs=Math.max(timing.scheduling.maxWaitMs,duration);timing.work[workPhase].waitMs+=duration;timing.work[workPhase].maxWaitMs=Math.max(timing.work[workPhase].maxWaitMs,duration);if(duration>=50&&longWaitCount++<16)timing.events.push({stage:'matching_yield_wait',attempt:0,startMs:Math.max(0,contentsPerformance.now()-timing.start-duration),durationMs:duration});}}});
         respond(result);
       });
     })

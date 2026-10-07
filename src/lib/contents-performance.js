@@ -1,4 +1,4 @@
-/* Local, opt-in timing only. Shared by classic content scripts and ES modules.
+/* Local diagnostic timing only. Shared by classic content scripts and ES modules.
  * Never accept arbitrary event names, payloads, error strings or library data. */
 (function attachContentsPerformance(global) {
   'use strict';
@@ -7,6 +7,10 @@
   const categories = new Set(['pending','statement-found','no-statement','unavailable','temporary-failure','captcha','sign-in','paused','save-failure','prepared','reparsed','failed','checkpointed']);
   for(const stage of ['snapshot_hit','snapshot_wait','snapshot_read','snapshot_validation','snapshot_canonical','snapshot_compare','snapshot_freeze','snapshot_clone','snapshot_retry','snapshot_migration','matching_index_build','matching_index_wait','matching_index_hit','matching_canonical','options_snapshot','client_round_trip','response_transport'])stages.add(stage);
   for(const stage of ['read_committed_compare','read_committed_clone','storage_set_dispatch','storage_set_wait','storage_change_compare'])stages.add(stage);
+  stages.add('matching_yield_wait');
+  stages.add('validation_yield_wait');
+  const cleanClient=value=>({...Object.fromEntries(['beforeSendMs','localStorageMs','preparationMs','previousFlightMs','postResponseMs','pageToRenderedMs'].filter(key=>Number.isFinite(value?.[key])&&value[key]>=0&&value[key]<=300000).map(key=>[key,value[key]])),...(['rendered','superseded','incomplete'].includes(value?.renderOutcome)?{renderOutcome:value.renderOutcome}:{})});
+  const cleanWork=value=>Object.fromEntries(['snapshot','index','execution'].filter(key=>value?.[key]).map(key=>[key,Object.fromEntries(['cpuMs','waitMs','maxWaitMs','yields'].filter(field=>Number.isFinite(value[key][field])&&value[key][field]>=0).map(field=>[field,value[key][field]]))]));
   const now = () => performance.timeOrigin + performance.now();
   const validId = id => /^lookup-[a-f0-9]{12}-\d{3,6}$/u.test(id ?? '');
   function trace(id, kind = 'network', clock = now, startAt = null) {
@@ -26,6 +30,13 @@
     if (!validId(value?.id)) return null;
     return {id:value.id,kind:['network','reparse','prepare','options','checkpoint','companion'].includes(value.kind)?value.kind:'network',startEpochMs:Number.isFinite(value.startEpochMs??value.start)?value.startEpochMs??value.start:0,totalMs:Math.max(0,Number(value.totalMs)||0),result:categories.has(value.result)?value.result:'failed',attempts:Math.min(3,Math.max(0,Number(value.attempts)||0)),batchSize:Math.min(100,Math.max(0,Number(value.batchSize)||0)),visibilityStart:['visible','hidden'].includes(value.visibilityStart)?value.visibilityStart:'unknown',visibilityEnd:['visible','hidden'].includes(value.visibilityEnd)?value.visibilityEnd:'unknown',focusStart:value.focusStart===true,focusEnd:value.focusEnd===true,
       ...(value.scheduling&&Number.isSafeInteger(value.scheduling.yields)&&value.scheduling.yields>=0&&Number.isFinite(value.scheduling.maxSliceMs)&&value.scheduling.maxSliceMs>=0&&Number.isFinite(value.scheduling.cpuMs)&&value.scheduling.cpuMs>=0?{scheduling:{yields:value.scheduling.yields,maxSliceMs:value.scheduling.maxSliceMs,cpuMs:value.scheduling.cpuMs,...(Number.isFinite(value.scheduling.waitMs)&&value.scheduling.waitMs>=0&&Number.isFinite(value.scheduling.maxWaitMs)&&value.scheduling.maxWaitMs>=0?{waitMs:value.scheduling.waitMs,maxWaitMs:value.scheduling.maxWaitMs}:{})}}:{}),
+      ...(Number.isSafeInteger(value.snapshotSequence)&&value.snapshotSequence>=0?{snapshotSequence:value.snapshotSequence}:{}),
+      ...(Number.isSafeInteger(value.requestItemCount)&&value.requestItemCount>=0&&value.requestItemCount<=500?{requestItemCount:value.requestItemCount}:{}),
+      ...(Number.isSafeInteger(value.requestContentsCount)&&value.requestContentsCount>=0&&value.requestContentsCount<=20000?{requestContentsCount:value.requestContentsCount}:{}),
+      ...(/^[a-f0-9]{12}$/u.test(value.worker??'')?{worker:value.worker}:{}),
+      ...(Number.isFinite(value.workerStartedEpochMs)?{workerStartedEpochMs:value.workerStartedEpochMs}:{}),
+      ...(value.work?{work:cleanWork(value.work)}:{}),
+      ...(value.client?{client:cleanClient(value.client)}:{}),
       events:(Array.isArray(value.events)?value.events:[]).filter(event=>stages.has(event?.stage)&&Number.isFinite(event.startMs)&&Number.isFinite(event.durationMs)&&event.startMs>=0&&event.durationMs>=0).slice(0,512).map(event=>({stage:event.stage,attempt:Number.isInteger(event.attempt)&&event.attempt>=0&&event.attempt<=3?event.attempt:0,startMs:event.startMs,durationMs:event.durationMs}))};
   }
   const sum = (record,stage) => record.events.filter(event=>event.stage===stage).reduce((total,event)=>total+event.durationMs,0);
@@ -57,10 +68,10 @@
   }
   function collector() {
     const records=[];
-    return {add(value) {const record=clean(value);if(record){records.push(record);if(records.length>LIMIT)records.shift();}return record;},annotate(id,events){const index=records.findIndex(row=>row.id===id);if(index>=0)records[index]=clean({...records[index],events:[...records[index].events,...events]});},clear(){records.length=0;},report(options=[],companions=[]) {
+    return {add(value) {const record=clean(value);if(record){records.push(record);if(records.length>LIMIT)records.shift();}return record;},annotate(id,events,client){const index=records.findIndex(row=>row.id===id);if(index>=0)records[index]=clean({...records[index],...(client?{client:{...records[index].client,...cleanClient(client)}}:{}),events:[...records[index].events,...events]});},clear(){records.length=0;},report(options=[],companions=[]) {
       const network=records.filter(record=>record.kind==='network'),ordinary=network.filter(record=>record.attempts===1&&!['temporary-failure','captcha','sign-in','paused','save-failure'].includes(record.result));
       const group=key=>Object.fromEntries([...new Set(network.map(key))].map(value=>[value,aggregate(network.filter(record=>key(record)===value))]));
-      const joinedOptions=options.map(clean).filter(Boolean).filter(record=>records.some(sample=>sample.id===record.id)).slice(-LIMIT);
+      const joinedOptions=options.map(clean).filter(Boolean).slice(-LIMIT);
       const queryRows=companions.map(clean).filter(record=>record?.kind==='companion').slice(-LIMIT);
       const companionStatsMs=Object.fromEntries(['handler_delay','query_authorization','query_snapshot','snapshot_hit','snapshot_wait','snapshot_read','snapshot_validation','snapshot_canonical','snapshot_compare','snapshot_freeze','snapshot_retry','matching_index','matching_index_build','matching_index_wait','matching_index_hit','matching_canonical','matching_execution','response_dispatch','client_round_trip','response_transport'].map(stage=>[stage,stats(queryRows.filter(record=>record.events.some(event=>event.stage===stage)).map(record=>sum(record,stage)))]));
       return {format:1,limit:LIMIT,units:'milliseconds',note:'Options rendering is asynchronous and may overlap the page lifecycle; it is reported separately. Fetch headers are not wire-level time-to-first-byte. Epoch offsets across contexts have clock precision/scheduling noise.',records:records.map(record=>({...record,timingMs:breakdown(record)})),aggregates:{network:aggregate(network),ordinary:aggregate(ordinary),retry:aggregate(network.filter(record=>record.attempts>1)),byResult:group(record=>record.result),byVisibility:group(record=>record.visibilityStart===record.visibilityEnd?record.visibilityStart:'changed'),byFocus:group(record=>record.focusStart===record.focusEnd?(record.focusStart?'focused':'unfocused'):'changed'),reparse:aggregate(records.filter(record=>record.kind==='reparse'),false),prepare:aggregate(records.filter(record=>record.kind==='prepare'),false),checkpoints:aggregate(records.filter(record=>record.kind==='checkpoint'),false)},finalCheckpointMs:records.filter(record=>record.kind==='checkpoint').reduce((total,record)=>total+record.totalMs,0),companions:queryRows,companionStatsMs,options:joinedOptions,optionsStatsMs:Object.fromEntries(['options_read','options_render','options_other','options_total','options_workbench','options_dashboards','options_filters','options_selection','options_cards','options_reviews','options_coverage'].map(stage=>[stage,stats(joinedOptions.filter(record=>record.events.some(event=>event.stage===stage)).map(record=>sum(record,stage)))]))};

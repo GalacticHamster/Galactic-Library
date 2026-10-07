@@ -1,5 +1,6 @@
 import {equalDatabaseData} from '../lib/data-equality.js';
-import {registerCommittedSnapshot} from '../lib/committed-snapshot.js';
+import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
+import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
@@ -35,8 +36,12 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
  * snapshots. Refresh can reuse their validation only after a fresh, exact
  * whole-value storage comparison, and receives a detached mutable copy.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null} = {}) {
   let activeTiming = null;
+  let activeOperation=null;
+  const activity=(stage,details)=>diagnostics?.begin(stage,details)??(()=>{});
+  const snapshotEvent=(reason,source,previousSnapshot=0)=>diagnostics?.event('snapshot_change',{reason,source,operation:activeOperation,epoch:querySnapshotEpoch,snapshot:committedSnapshotSequence(querySnapshot),previousSnapshot});
+  const storageKey=keys=>{const list=Array.isArray(keys)?keys:Object.keys(keys??{});return list.includes(DATABASE_STORAGE_KEY)?'database':list.length===1?diagnosticStorageKey(list[0]):'settings';};
   const committedArea=storageArea;
   let querySnapshot=null,querySnapshotEpoch=0,querySnapshotPending=null,querySnapshotsUsed=false;
   function freezeQuerySnapshot(value){
@@ -46,14 +51,18 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     return value;
   }
-  function invalidateQuerySnapshot(value){
+  function invalidateQuerySnapshot(value,source='observer'){
     // Chrome can deliver our own notification after the commit promise. Keep
     // an identical committed snapshot; any different/removed value is a miss.
-    try{if(value&&querySnapshot&&timed('storage_change_compare',()=>equalDatabaseData(value,querySnapshot)))return;}
+    const previousSnapshot=committedSnapshotSequence(querySnapshot),end=activity('snapshot_compare',{source,epoch:querySnapshotEpoch,snapshot:previousSnapshot});
+    try{if(value&&querySnapshot&&timed('storage_change_compare',()=>equalDatabaseData(value,querySnapshot))){snapshotEvent('retained',source,previousSnapshot);return;}}
     catch{/* A malformed change must invalidate, never retain, the snapshot. */}
+    finally{end();}
     querySnapshot=null;querySnapshotEpoch++;
+    snapshotEvent('invalidated',source,previousSnapshot);
   }
   function publishQuerySnapshot(database){
+    const previousSnapshot=committedSnapshotSequence(querySnapshot);
     querySnapshotEpoch++;
     // Only these trusted writer paths supply fully validated committed values.
     // Detach before sharing: caller-owned mutable results must not affect queries.
@@ -65,24 +74,30 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       try{querySnapshot=registerCommittedSnapshot(freezeQuerySnapshot(detached));}finally{endFreeze?.();}
     }}
     catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
+    snapshotEvent(querySnapshot?'published':'unavailable','writer',previousSnapshot);
   }
   storageArea={
-    get:defaults=>committedArea.get(defaults),
+    async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
     async set(updates){
+      const endActivity=activity('storage_set',{key:storageKey(updates),operation:activeOperation});
+      try{
       let pending;
       const dispatchEnd=activeTiming?.begin('storage_set_dispatch');
       try{pending=committedArea.set(updates);}finally{dispatchEnd?.();}
       const waitEnd=activeTiming?.begin('storage_set_wait');
       try{await pending;}finally{waitEnd?.();}
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))publishQuerySnapshot(updates[DATABASE_STORAGE_KEY]);
+      }finally{endActivity();}
     },
     async remove(keys){
+      const end=activity('storage_remove',{key:storageKey(typeof keys==='string'?[keys]:keys),operation:activeOperation});try{
       await committedArea.remove(keys);
       if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))publishQuerySnapshot(createEmptyDatabase());
+      }finally{end();}
     }
   };
-  async function getQueryDatabase({beginSpan=()=>{}}={}){
-    const span=async(stage,work)=>{const end=beginSpan(stage);try{return await work();}finally{end?.();}};
+  async function getQueryDatabase({beginSpan=()=>{},onValidationSlice=()=>{},onValidationWait=()=>{}}={}){
+    const span=async(stage,work)=>{const end=beginSpan(stage),endActivity=activity(stage);try{return await work();}finally{end?.();endActivity();}};
     const sync=(stage,work)=>{const end=beginSpan(stage);try{return work();}finally{end?.();}};
     querySnapshotsUsed=true;await ready;
     if(cacheQuerySnapshots&&querySnapshot)return sync('snapshot_hit',()=>querySnapshot);
@@ -96,10 +111,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         // result over a newer committed revision, including clear/restore.
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         const raw=stored[DATABASE_STORAGE_KEY];
-        let endCanonical;
+        let endValidationStage;
         const database=raw?await span('snapshot_validation',async()=>{
-          try{return await validateDatabaseAsync(raw,{onStage:stage=>{endCanonical?.();endCanonical=stage==='validation_canonical'?beginSpan('snapshot_canonical'):null;}});}
-          finally{endCanonical?.();}
+          try{return await validateDatabaseAsync(raw,{onSlice:onValidationSlice,onWait:onValidationWait,onStage:stage=>{endValidationStage?.();endValidationStage=beginSpan(stage==='validation_canonical'?'snapshot_canonical':stage);}});}
+          finally{endValidationStage?.();}
         }):createEmptyDatabase();
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         if(raw&&sync('snapshot_compare',()=>!equalDatabaseData(raw,database))){
@@ -111,6 +126,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         }
         sync('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(database)));
         if(cacheQuerySnapshots)querySnapshot=database;
+        snapshotEvent('published','cold-read');
         return database;
       }
     })();
@@ -124,12 +140,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
   }
   async function getCommittedLibraryView(diagnosticLookupId){
+    const endActivity=activity('options_view');
     const timing=globalThis.GalacticContentsPerformance.trace(diagnosticLookupId,'options');
     const beginSpan=stage=>timing?.begin(stage);
     const end=beginSpan('options_snapshot');
     let database,preferences;
     try{[database,preferences]=await Promise.all([getQueryDatabase({beginSpan}),ready.then(()=>getUiPreferences())]);}
-    finally{end?.();}
+    finally{end?.();endActivity();}
     return {database,preferences,...(timing?{performance:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}:{})};
   }
   // Private, bounded read-only eligibility answers. No database/source snapshot
@@ -144,9 +161,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return (async()=>{try{return await work();}finally{end();}})();
   };
   async function validateForWriter(value){
-    const timing=activeTiming;let endStage;
-    try{return await validateDatabaseAsync(value,{onStage:stage=>{endStage?.();endStage=timing?.begin(stage);}});}
-    finally{endStage?.();}
+    const timing=activeTiming;let endStage,endActivityStage;const endActivity=activity('validation',{operation:activeOperation});
+    try{return await validateDatabaseAsync(value,{onStage:stage=>{endStage?.();endActivityStage?.();endStage=timing?.begin(stage);endActivityStage=activity(stage,{operation:activeOperation});}});}
+    finally{endStage?.();endActivityStage?.();endActivity();}
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
@@ -1060,9 +1077,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   };
   let tail = Promise.resolve();
 
-  function runOperation(operation,values){
+  async function runOperation(operation,values){
     if(operation!=='checkKindleContentsRefreshItem')invalidateRefreshPreflight();
-    return operations[operation](...values);
+    const end=activity('operation',{operation});activeOperation=operation;
+    try{return await operations[operation](...values);}finally{activeOperation=null;end();}
   }
 
   function execute(operation, args = [], timing = null) {

@@ -3,6 +3,8 @@ import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src
 import {registerCommittedSnapshot} from '../src/lib/committed-snapshot.js';
 import {handleExternalApiRequest,handleExternalApiRequestAsync} from '../src/lib/external-api.js';
 import {withWorker} from './storage.js';
+import {createQueryDiagnostics} from '../src/lib/query-diagnostics.js';
+import {finishWorkAsync} from '../src/lib/cooperative-work.js';
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const fixture=()=>{
   const db=createEmptyDatabase();
@@ -23,6 +25,53 @@ const query={type:'MATCH_ITEMS',apiVersion:1,items:[
 const opts={cacheCommittedProjection:true,cacheImmutableRecords:true,budgetMs:0,yieldTask:async()=>{}};
 const hb='a'.repeat(32),fan='b'.repeat(32);
 export const committedProjectionTests=[
+ ['idle read-only HB queries reuse the same committed snapshot/index across Options, settings and identical database notifications',()=>withWorker(async({memory,pageA,dispatchExternal,dispatch,notifyStorageChange})=>{
+  chrome.runtime.sendMessage=async()=>({ok:true});memory.values.galacticLibraryDatabase=fixture();await pageA.saveAllowedExternalClientIds([hb]);
+  const requests=[];
+  for(let n=1;n<=7;n++){
+    const response=await dispatchExternal({...query,diagnosticLookupId:'lookup-abcdef123456-'+String(n).padStart(3,'0'),diagnosticSentEpochMs:performance.timeOrigin+performance.now(),diagnosticHb:{beforeSendMs:20,private:'SECRET'}},{id:hb});
+    requests.push(response);assert.deepEqual(response.results,handleExternalApiRequest(memory.values.galacticLibraryDatabase,query).results);
+    await pageA.getCommittedLibraryView();await pageA.getDatabase();await pageA.getAllowedExternalClientIds();await pageA.getGoogleBooksApiKey();await pageA.getGoogleBooksEnrichmentJob();
+    await pageA.saveAllowedExternalClientIds([hb]);
+    notifyStorageChange({galacticLibraryDatabase:{newValue:structuredClone(memory.values.galacticLibraryDatabase)}});
+  }
+  assert.equal(new Set(requests.map(row=>row.performance.snapshotSequence)).size,1);
+  assert.equal(new Set(requests.map(row=>row.performance.worker)).size,1);
+  assert.equal(requests.filter(row=>row.performance.events.some(e=>e.stage==='matching_index_build')).length,1);
+  assert.equal(requests.filter(row=>row.performance.events.some(e=>e.stage==='matching_index_hit')).length,6);
+  assert.ok(requests.slice(1).every(row=>row.performance.work.index.cpuMs===0&&row.performance.work.index.yields===0));
+  const sender={id:chrome.runtime.id,url:chrome.runtime.getURL('options.html')};
+  const report=await dispatch({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'},sender);
+  assert.equal(report.companions.length,7);assert.ok(report.activity.events.some(row=>row.stage==='snapshot_change'&&row.reason==='retained'));
+  assert.ok(report.activity.events.some(row=>row.stage==='operation'&&row.operation==='getGoogleBooksApiKey'));
+  assert.ok(!JSON.stringify(report).includes('SECRET'));assert.ok(!JSON.stringify(report).includes('"4001 AD"'));
+  const idleExport=globalThis.GalacticContentsPerformance.collector().report(report.records,report.companions);
+  assert.equal(idleExport.records.length,0);assert.equal(idleExport.companions.length,7);
+  const option=globalThis.GalacticContentsPerformance.trace('lookup-abcdef123456-099','options').finish();
+  assert.equal(globalThis.GalacticContentsPerformance.collector().report([option],report.companions).options.length,1,'Idle exports discarded unrelated Options reconciliation');
+  // Characterize (do not change) explicit identical-value database publication.
+  const unchanged=structuredClone(memory.values.galacticLibraryDatabase);
+  await pageA.saveOwnershipPolicy({allOwned:false});assert.deepEqual(memory.values.galacticLibraryDatabase,unchanged);
+  const published=await dispatchExternal({...query,diagnosticLookupId:'lookup-abcdef123456-009'},{id:hb});
+  assert.notEqual(published.performance.snapshotSequence,requests[0].performance.snapshotSequence);
+  assert.ok(published.performance.events.some(row=>row.stage==='matching_index_build'));
+  const afterPublish=await dispatch({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'},sender);
+  assert.ok(afterPublish.activity.events.some(row=>row.stage==='snapshot_change'&&row.source==='writer'&&row.operation==='saveOwnershipPolicy'&&row.reason==='published'));
+  memory.values.galacticLibraryDatabase.ownershipPolicy.allOwned=true;notifyStorageChange({galacticLibraryDatabase:{newValue:memory.values.galacticLibraryDatabase}});
+  const changed=await dispatchExternal({...query,diagnosticLookupId:'lookup-abcdef123456-008'},{id:hb});
+  assert.notEqual(changed.performance.snapshotSequence,requests[0].performance.snapshotSequence);assert.ok(changed.performance.events.some(row=>row.stage==='matching_index_build'));
+ },{storageEvents:true,concurrentQueries:true})],
+ ['worker activity diagnostics are bounded, sanitized and separate cooperative work slices from simulated suspension',async()=>{
+  let clock=1000;const journal=createQueryDiagnostics({clock:()=>clock,worker:'abcdef123456',limit:4});
+  const end=journal.begin('operation',{operation:'getDatabase',title:'SECRET'});clock+=7;journal.event('storage_change',{key:'SECRET',source:'observer'});clock+=90;end();
+  assert.equal(journal.report().events.find(row=>row.stage==='operation').durationMs,97);
+  let cpu=0,wait=0;function* steps(){clock+=3;yield;clock+=4;return 42;}
+  assert.equal(await finishWorkAsync(steps(),{clock:()=>clock,budgetMs:0,yieldTask:async()=>{clock+=80;},onSlice:duration=>cpu+=duration,onWait:duration=>wait+=duration}),42);
+  assert.equal(cpu,7);assert.equal(wait,80);
+  for(let n=0;n<10;n++)journal.event('snapshot_change',{snapshot:n,reason:'retained',source:'observer',payload:'SECRET'});
+  const result=journal.report();assert.equal(result.events.length,4);assert.ok(!JSON.stringify(result).includes('SECRET'));
+  result.events[0].snapshot=999;assert.notEqual(journal.report().events[0].snapshot,999);
+ }],
  ['committed identity projections build once, share concurrent builds and preserve exact/Possible/aliases/manual barriers without caching output',async()=>{
   const db=registerCommittedSnapshot(freeze(fixture())),spans=[];
   const options={...opts,beginSpan:name=>{spans.push(name);return ()=>{};}};
@@ -103,13 +152,20 @@ export const committedProjectionTests=[
   const id='lookup-abcdef123456-007',sent=performance.timeOrigin+performance.now()-10;
   const response=await dispatchExternal({...query,diagnosticLookupId:id,diagnosticSentEpochMs:sent},{id:hb});assert.equal(response.ok,true);
   for(const stage of ['handler_delay','snapshot_read','snapshot_validation','snapshot_canonical','matching_index_build','matching_canonical'])assert.ok(response.performance.events.some(e=>e.stage===stage),stage);
+  assert.ok(response.performance.events.some(e=>e.stage==='validation_records'));
+  assert.ok(response.performance.work.snapshot.cpuMs>=0);assert.ok(response.performance.work.snapshot.waitMs>=0);
   assert.ok(response.performance.scheduling.waitMs>=0);
   const callback={type:'MATCH_ITEMS_DIAGNOSTIC_CALLBACK',apiVersion:1,diagnosticLookupId:id,diagnosticCallbackEpochMs:performance.timeOrigin+performance.now()};
   assert.equal((await dispatchExternal(callback,{id:fan})).ok,false);
   assert.equal((await dispatchExternal(callback,{id:hb})).ok,true);
   assert.equal((await dispatchExternal(callback,{id:hb})).ok,false);
+  const render={...callback,type:'MATCH_ITEMS_DIAGNOSTIC_RENDER',diagnosticHb:{postResponseMs:12,pageToRenderedMs:55,renderOutcome:'rendered',title:'PRIVATE'}};
+  assert.equal((await dispatchExternal(render,{id:fan})).ok,false);
+  assert.equal((await dispatchExternal(render,{id:hb})).ok,true);
+  assert.equal((await dispatchExternal(render,{id:hb})).ok,false);
   const sender={id:chrome.runtime.id,url:'https://www.amazon.com/hz/mycd/',tab:{id:1}},report=await dispatch({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'},sender);
   const row=report.companions.find(x=>x.id===id);for(const stage of ['client_round_trip','response_transport'])assert.ok(row.events.some(e=>e.stage===stage));
-  assert.equal(JSON.stringify(row).includes('4001'),false);assert.equal(JSON.stringify(row).includes(hb),false);
+  assert.equal(row.client.postResponseMs,12);assert.equal(row.client.renderOutcome,'rendered');assert.ok(row.snapshotSequence>0);assert.match(row.worker,/^[a-f0-9]{12}$/u);
+  assert.equal(JSON.stringify(row).includes('"4001 AD"'),false);assert.equal(JSON.stringify(row).includes(hb),false);
  },{storageEvents:true,concurrentQueries:true})]
 ];
