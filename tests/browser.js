@@ -14,6 +14,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const firefox=process.argv.includes('--firefox');
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const importerMode=process.argv.includes('--importers');
+const uxMode=process.argv.includes('--ux');
 const candidates=firefox?[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe']:[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
 if(firefox&&process.platform==='win32'){try{const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}catch{}}
 let browser;
@@ -37,7 +38,7 @@ const server=createServer(async(request,response)=>{
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
     let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
     if(!body)throw new Error('File is absent from the validated runtime package.');
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"','src="tests/browser-fixture.js"');
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}
@@ -52,7 +53,7 @@ try{
   const exited=new Promise(resolve=>{child=execFile(browser,args,{windowsHide:true,timeout:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
   try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,20000);})]);}
-  finally{clearTimeout(timeout);child.kill();await exited;}
+  finally{clearTimeout(timeout);child?.kill();await exited;}
   assert.ok(result,'The browser did not finish the UI fixture.');
   for(const check of result.checks)console.log(`PASS ${firefox?'Firefox':'Chrome'} browser: ${check}`);
   assert.equal(result.error,undefined,result.error);

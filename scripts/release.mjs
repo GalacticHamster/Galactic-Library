@@ -12,7 +12,8 @@ function dependency(files,owner,path,root=false){
   if(path==='')return;
   if(root){if(!validPath(path)||!files.has(path))throw new Error(`Missing ${owner==='manifest.json'?'manifest runtime':'runtime'} dependency: ${owner} -> ${path}`);return;}
   if(!path||path.startsWith('#')||/^(?:https?:|data:)/u.test(path))return;
-  const target=root?path:posix.normalize(posix.join(posix.dirname(owner),path));
+  // In-page destinations do not name a different runtime asset.
+  const target=root?path:posix.normalize(posix.join(posix.dirname(owner),path.split('#')[0]));
   if(!validPath(target)||!files.has(target))throw new Error(`Missing runtime dependency: ${owner} -> ${path}`);
 }
 export function validateRuntime(files){

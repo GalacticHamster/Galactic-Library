@@ -22,9 +22,9 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
    root.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
    return {root,feedback,controls,cancel};
  }
- async function commit(d,run){
+ async function commit(d,run,message='Saved. Other remembered accounts remain in Library.'){
    if(busy)return;busy=true;for(const b of d.root.querySelectorAll('button,input'))b.disabled=true;
-   try{const next=await run();database=next;d.root.close();d.root.remove();busy=false;onDatabase(next);status.textContent='Saved. All remembered accounts remain in Library.';}
+   try{const next=await run();database=next;d.root.close();d.root.remove();busy=false;onDatabase(next);status.textContent=message;}
    catch(error){d.feedback.textContent=error.message;for(const b of d.root.querySelectorAll('button,input'))b.disabled=false;}
    finally{busy=false;}
  }
@@ -44,10 +44,12 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
    d.controls.append(button('Save nickname',()=>{if(!input.value.trim()){d.feedback.textContent='Enter an account nickname.';return;}commit(d,()=>actions.rename(p.profileId,input.value));}));d.root.showModal();input.focus();
  }
  function updateAccount(site,p,mode){
-   const permission=updateEligibility(p,database.providerProfiles[p.profileId]?.state);
+   const current=database.providerProfiles[p.profileId];
+   if(!current||database.providers[site.provider]?.activeProfileId!==p.profileId){status.textContent='The selected update account changed. Review its current controls.';return;}
+   const permission=updateEligibility({...p,nickname:current.nickname,syncHealth:current.state.syncHealth},current.state);
    const allowed=mode==='quick'?permission.quick:permission.full;
    if(!allowed){status.textContent=mode==='quick'?permission.quickReason:permission.fullReason;return;}
-   const label=mode==='quick'?'Quick Update':'Full Rescan',d=dialog(label+' · '+site.name);
+   const label=mode==='quick'?'Quick Update':'Full Rescan',d=dialog(label+' · '+site.name);p={...p,nickname:current.nickname};
    d.root.insertBefore(node('p',mode==='quick'?'Check for new items using this account’s saved import history.':'Check the complete inventory for this account. Missing items may move to earlier imports; acquired contents, reviews and other saved accounts are retained.'),d.feedback);
    d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}, check the account nickname on the Galactic Library panel and confirm the signed-in account. Then choose ${site.provider==='epic'?'Sync library':mode==='quick'?'Quick update':'Full rescan'}. Opening the site does not start an import.`),d.feedback);
    if(site.provider==='fandango-at-home'&&mode==='quick')d.root.insertBefore(node('p','Fandango Quick Update runs from its Recently Purchased View All grids. Full Rescan checks the complete My Library grids.'),d.feedback);
@@ -57,7 +59,7 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
    const d=dialog('Reset import history · '+nickname(p));
    d.root.insertBefore(node('p',`Recovery only: forget the saved update position and coverage for this ${site.name} account. Imported items, acquired contents, source history and your reviews stay saved. The next import must be a Full Rescan. No scan starts now.`),d.feedback);
    const label=node('label');label.className='ownership-choice';const confirm=node('input');confirm.type='checkbox';label.append(confirm,document.createTextNode('I understand the next import requires a complete scan.'));d.root.insertBefore(label,d.feedback);
-   d.controls.append(button('Reset import history',()=>{if(!confirm.checked){d.feedback.textContent='Confirm the reset before continuing.';return;}commit(d,()=>management.reset(p.profileId,true));}));d.root.showModal();
+   d.controls.append(button('Reset import history',()=>{if(!confirm.checked){d.feedback.textContent='Confirm the reset before continuing.';return;}commit(d,()=>management.reset(p.profileId,true),'Import history reset. Existing records and acquired evidence are retained; the next import requires a Full Rescan.');}));d.root.showModal();
  }
  async function removeAccount(site,p){
    const d=dialog('Remove saved account · '+nickname(p));d.root.insertBefore(node('p','Loading the current removal preview…'),d.feedback);d.root.showModal();
@@ -74,7 +76,7 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
      if(plan.jobs.fandangoNavigationContexts||plan.jobs.pendingCompanionUploads)deps.append(node('li','Related pending provider/companion work will be cancelled.'));
      d.root.insertBefore(deps,d.feedback);d.root.insertBefore(node('p','This deletes the account’s acquired source evidence and reviews listed above. Export a backup in Settings first if you may need them. Changes since this preview require a fresh preview.'),d.feedback);
      const label=node('label');label.className='ownership-choice';const confirm=node('input');confirm.type='checkbox';label.append(confirm,document.createTextNode('Permanently remove this account and its affected saved evidence.'));d.root.insertBefore(label,d.feedback);
-     const submit=button('Remove account permanently',()=>{if(!confirm.checked){d.feedback.textContent='Confirm permanent removal before continuing.';return;}commit(d,()=>management.remove(p.profileId,plan.dependencyStamp,true));});submit.className='danger';d.controls.append(submit);
+     const submit=button('Remove account permanently',()=>{if(!confirm.checked){d.feedback.textContent='Confirm permanent removal before continuing.';return;}commit(d,()=>management.remove(p.profileId,plan.dependencyStamp,true),'Account removed. Other accounts and their records remain saved.');});submit.className='danger';d.controls.append(submit);
    }catch(error){d.feedback.textContent='Could not load the removal preview: '+error.message;}
  }
  function update(next){
@@ -82,7 +84,7 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
    cards.replaceChildren(...providerAccounts(database).map(site=>{
      const card=node('details');card.className='tool-card provider-card';card.dataset.provider=site.provider;card.open=openCards.has(site.provider);
      const selected=site.accounts.find(p=>p.active),summary=node('summary');summary.append(node('strong',site.name),node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${site.accounts.reduce((n,p)=>n+p.recordCount,0)} items`:'Not imported'));card.append(summary);
-     card.addEventListener('toggle',()=>{if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});
+     card.addEventListener('toggle',()=>{if(!card.isConnected)return;if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});
      card.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
      const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';card.append(link);
      if(!site.accounts.length)card.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));

@@ -3,6 +3,7 @@ import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget } from '../li
 export function createWorkspaceNavigation({ readView, applyView, save, changed }) {
   let preferences = defaultUiPreferences();
   let hydrated = false;
+  let interacted = false;
   let saveTimer;
   const navigation = document.querySelector('#workspace-navigation');
   const secondary = document.querySelector('#library-navigation');
@@ -29,6 +30,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
   }
   function select(workspace) {
     workspace=workspaceTarget(workspace);if(!workspace)return;
+    interacted=true;
     if(['library','books'].includes(preferences.workspace))preferences[viewKey()] = readView();
     preferences.workspace = workspace;
     show();
@@ -48,8 +50,9 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
     hydrate(value) {
       if (hydrated) return;
       hydrated = true;
-      preferences = structuredClone(value);
-      const target=workspaceTarget(globalThis.location?.hash);if(target)preferences.workspace=target;
+      const selected=preferences.workspace;preferences = structuredClone(value);
+      const target=workspaceTarget(globalThis.location?.hash);
+      if(interacted)preferences.workspace=selected;else if(target)preferences.workspace=target;
       show();
       applyView(preferences[viewKey()]);
     },

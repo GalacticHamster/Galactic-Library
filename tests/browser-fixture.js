@@ -363,10 +363,10 @@ try{
   const diagnosticId='lookup-abcdef123456-001';
   for(const listener of contentsRuntimeListeners)listener({type:'GL_CONTENTS_TIMING_START',diagnosticLookupId:diagnosticId},{id:chrome.runtime.id});
   for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');
-  await wait(()=>contentsUiTimings.length===1,'Options refresh did not return correlated diagnostic timing.');
-  const diagnostic=contentsUiTimings[0];assert(diagnostic.id===diagnosticId&&diagnostic.kind==='options'&&['options_read','options_render','options_other','options_total','options_workbench','options_selection','options_cards','options_coverage'].every(stage=>diagnostic.events.some(event=>event.stage===stage)),'Options refresh stage/correlation missing.');
+  await wait(()=>contentsUiTimings.filter(row=>row.id===diagnosticId).length===1,'Options refresh did not return correlated diagnostic timing.');
+  const diagnostic=contentsUiTimings.find(row=>row.id===diagnosticId);assert(diagnostic.kind==='options'&&['options_read','options_render','options_other','options_total','options_workbench','options_selection','options_cards','options_coverage'].every(stage=>diagnostic.events.some(event=>event.stage===stage)),'Options refresh stage/correlation missing.');
   assert(!JSON.stringify(diagnostic).includes('Collection A')&&!JSON.stringify(diagnostic).includes('providerItems'),'Options diagnostics contain library data.');
-  for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');await pause();await pause();assert(contentsUiTimings.length===1,'Options correlation was reused by an unrelated write.');
+  for(const listener of contentsStorageListeners)listener({galacticLibraryDatabase:{}},'local');await pause();await pause();assert(contentsUiTimings.filter(row=>row.id===diagnosticId).length===1,'Options correlation was reused by an unrelated write.');
   checks.push('options diagnostics measure correlated storage refresh and rendering once without exposing library data');
   const scanState={runRef:'12345678-1234-1234-1234-123456789abc',phase:'running',mode:'scan',checked:1,total:40,found:1,empty:0,unavailable:0,failures:0,reparsed:0,durable:0,buffered:1};
   const emitProgress=run=>contentsRuntimeListeners.forEach(listener=>listener({type:'GL_KINDLE_CONTENTS_PROGRESS',runs:[run]},{id:chrome.runtime.id}));

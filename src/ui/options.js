@@ -924,10 +924,10 @@ function render(timing = null) {
   let history=document.querySelector('#provider-history');
   if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#providers-workspace').append(history);}
   const records=Object.values(database.providerHistory??{});
-  history.replaceChildren(textElement('summary',`Provider history: ${records.length} records not in the current library`));
+  history.replaceChildren(textElement('summary',`Earlier imports: ${records.length} records missing from the latest complete scan`));
   history.append(textElement('p','History preserves earlier purchase and access evidence. A missing record does not prove revocation. Earlier missing records may appear as Possible, never as confirmed current ownership.'));
   const list=document.createElement('ul');
-  for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — profile ${entry.profileLabel||'unassigned'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
+  for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — account ${entry.profileLabel||'nickname not recorded'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
   history.append(list);if(records.length>50)history.append(textElement('p',`Showing 50 of ${records.length}. All history is preserved in your backup.`));
   endSegment?.();endSegment=timing?.begin('options_coverage');
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));

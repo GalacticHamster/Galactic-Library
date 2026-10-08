@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createWorkspaceNavigation} from '../src/ui/workspaces.js';
 import {defaultUiPreferences,validateUiPreferences,workspaceTarget} from '../src/lib/ui-preferences.js';
+import {validateRuntime} from '../scripts/release.mjs';
 
 export const navigationUxTests=[
  ['Options has four primary destinations and keeps existing tools in reachable secondary homes',async()=>{
@@ -36,6 +37,15 @@ export const navigationUxTests=[
      ui.select('contents');assert.equal(library.hidden,true);assert.equal(sub.hidden,true);assert.equal(panels.find(p=>p.dataset.workspacePanel==='contents').hidden,false);
      ui.select('providers');ui.select('contents');assert.deepEqual(progress,{cursor:17,runRef:'unchanged'});
      ui.select('library');assert.equal(library.hidden,false);assert.equal(primary[0].attrs['aria-current'],'page');assert.equal(reads,1);assert.equal(changed,4);
+     const delayed=createWorkspaceNavigation({readView:()=>view,applyView(){},save:async()=>{},changed(){}});
+     delayed.select('providers');delayed.hydrate({...defaultUiPreferences(),workspace:'books'});assert.equal(delayed.workspace,'providers','Late preferences displaced user navigation.');
    }finally{globalThis.document=prior;}
+ }],
+ ['Runtime dependency validation resolves local navigation fragments and still rejects absent base files',async()=>{
+   const paths=JSON.parse(await readFile(new URL('../scripts/runtime-files.json',import.meta.url),'utf8'));
+   const files=new Map(await Promise.all(paths.map(async p=>[p,await readFile(new URL('../'+p,import.meta.url))])));
+   validateRuntime(files);
+   const missing=new Map(files);missing.set('popup.html',Buffer.from('<a href="absent.html#providers">Providers</a>'));
+   assert.throws(()=>validateRuntime(missing),/Missing runtime dependency/u);
  }]
 ];
