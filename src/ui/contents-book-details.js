@@ -50,13 +50,13 @@ export function createContentsHistory(record,database) {
     const observation=database.kindleContentsObservations?.[record.recordRef];
     const current=record.metadata?.enrichment?.kindleProductComicContents;
     const renderSource=(label,source)=>{if(!source)return;const section=text('details','');section.append(text('summary',label),text('p',`Captured: ${formatDate(source.checkedAt)}. ${source.availability==='unavailable'?'The product page was unavailable.':source.availability==='temporary-failure'?'Description retrieval failed and may be retried.':source.statement?'Captured description retained; viewing does not change your review.':'No contents statement was captured.'}`),text('blockquote',source.statement||'No contents statement captured.'));
-      const blocks=source.evidence?.blocks??source.manifest?.blocks??[];
-      for(const block of blocks)section.append(text('blockquote',block.text));root.append(section);
+      const technical=text('details','');technical.className='contents-technical-details';technical.append(text('summary','Technical details'));let shown=false;technical.addEventListener('toggle',()=>{if(!technical.open||shown)return;shown=true;technical.append(text('pre',JSON.stringify(source,null,2)));});section.append(technical);
+      root.append(section);
     };
     renderSource('Current selected source',current);renderSource('Pinned earlier source',observation?.baseline);renderSource('Latest failed or unavailable attempt',observation?.latestAttempt);
     const history=Object.values(database.enrichmentHistory??{}).filter(entry=>entry.recordRef===record.recordRef);
     const list=text('div',''),counter=text('p','');let page=0;
-    const render=()=>{counter.textContent=`${history.length} retained source selections · page ${page+1} of ${Math.max(1,Math.ceil(history.length/20))}`;list.replaceChildren();for(const entry of history.slice(page*20,(page+1)*20)){const item=text('details','');item.append(text('summary',`${entry.source||entry.kind||'Source selection'} · ${entry.changedAt||'date not recorded'}`),text('pre',JSON.stringify(entry,null,2)));list.append(item);}};
+    const render=()=>{counter.textContent=`${history.length} retained source selections · page ${page+1} of ${Math.max(1,Math.ceil(history.length/20))}`;list.replaceChildren();for(const entry of history.slice(page*20,(page+1)*20)){const item=text('details','');item.append(text('summary',`${entry.source||entry.kind||'Source selection'} · ${formatDate(entry.changedAt||entry.appliedAt)}`),text('p','Earlier saved source selection. Viewing does not undo it; use Sources and undo in Book information to restore an available predecessor.'));const technical=text('details','');technical.append(text('summary','Technical details'));technical.addEventListener('toggle',()=>{if(technical.open&&!technical.querySelector('pre'))technical.append(text('pre',JSON.stringify(entry,null,2)));});item.append(technical);list.append(item);}};
     root.append(counter,button('Previous history page',()=>{page=Math.max(0,page-1);render();}),button('Next history page',()=>{page=Math.min(Math.max(0,Math.ceil(history.length/20)-1),page+1);render();}),list);render();
     root.append(text('p',`Technical record: ${record.recordRef}`));
   });return root;

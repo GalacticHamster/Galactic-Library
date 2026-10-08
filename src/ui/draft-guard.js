@@ -8,7 +8,7 @@ export function createDraftGuard({root=document,stamp=()=>'',confirmDiscard=()=>
     if(!dirty.has(scope))dirty.set(scope,stamp(scope));changed();
   };
   root.addEventListener('input',mark,true);root.addEventListener('change',mark,true);
-  root.addEventListener('click',event=>{actionScope=scopeFor(event.target);const button=event.target?.closest?.('button');if(button&&/^(Add contents entry|Remove$|Parse statement|Load this claim|Use whole|Use newly)/u.test(button.textContent))mark(event);},true);
+  root.addEventListener('click',event=>{actionScope=scopeFor(event.target);const button=event.target?.closest?.('button');if(button&&/^(Add contents entry|Remove$|Parse statement|Replace draft|Use complete|Use newly)/u.test(button.textContent))mark(event);},true);
   function clear(scope){dirty.delete(scope);changed();}
   return {
     get dirty(){return dirty.size>0;},
