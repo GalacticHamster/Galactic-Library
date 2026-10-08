@@ -1,4 +1,4 @@
-import {accessLabel} from './formatters.js';
+import {accessLabel,formatDate} from './formatters.js';
 import {accountLabel} from './item-presentation.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {contentCoverage} from '../lib/contents.js';
@@ -49,7 +49,7 @@ export function createContentsHistory(record,database) {
     root.append(text('p','Source observations and undo history are retained separately from your human contents review. Viewing them does not select a source, reparse text or restart acquisition. Kindle retry, pause and resume belong on its signed-in page.'));
     const observation=database.kindleContentsObservations?.[record.recordRef];
     const current=record.metadata?.enrichment?.kindleProductComicContents;
-    const renderSource=(label,source)=>{if(!source)return;const section=text('details','');section.append(text('summary',label),text('p',`Availability: ${source.availability||'unknown'} · source generation: ${source.extractorVersion??'not recorded'} · parser: ${source.parserVersion??'not recorded'} · outcome: ${source.parseOutcome??'not recorded'} · captured: ${source.checkedAt||'unknown'}`),text('blockquote',source.statement||'No contents statement captured.'));
+    const renderSource=(label,source)=>{if(!source)return;const section=text('details','');section.append(text('summary',label),text('p',`Captured: ${formatDate(source.checkedAt)}. ${source.availability==='unavailable'?'The product page was unavailable.':source.availability==='temporary-failure'?'Description retrieval failed and may be retried.':source.statement?'Captured description retained; viewing does not change your review.':'No contents statement was captured.'}`),text('blockquote',source.statement||'No contents statement captured.'));
       const blocks=source.evidence?.blocks??source.manifest?.blocks??[];
       for(const block of blocks)section.append(text('blockquote',block.text));root.append(section);
     };

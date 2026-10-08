@@ -24,7 +24,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
   let populated=false;
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
     root.append(element('p','Same work keeps editions separate and supports Possible warnings for related copies. Same edition groups copies only when known identity details agree. Different works prevents that relationship and grouping. These choices do not confirm a purchase. Separating a copy keeps it in its own edition.'));
-    root.append(element('p',`Persistent edition ID: ${canonical.id}`));
+    const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'),element('p',`Persistent edition ID: ${canonical.id}`));
     for(const record of records){
       const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
       const section=element('section','');section.append(element('h4',`${record.title} — ${accountLabel(record,database)}`));
@@ -102,7 +102,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         }
         const undo=element('button','Undo relationship');undo.type='button';undo.addEventListener('click',async()=>{try{await actions.remove(id);actions.refresh();}catch(error){status.textContent=error.message;}});row.append(undo);section.append(row);
       }
-      root.append(section);
+      technical.append(section);
     }
     const status=element('p','');status.setAttribute('role','status');
     const comparison=element('div','');comparison.className='relationship-review';
@@ -128,7 +128,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         catch(error){status.textContent=`Could not save relationship: ${error.message}`;}
       });comparison.append(button);
     }
-    root.append(comparison,status);
+    root.append(comparison,status,technical);
   });
   return root;
 }

@@ -9,7 +9,7 @@ function sourcePage(value) {
 }
 export function createContentsEditor(record, review, actions, {expanded=false}={}) {
   const root=document.createElement('details');root.className='contents-editor';
-  root.append(element('summary', `Review included contents \u2014 ${record.title}`));
+  root.append(element('summary', expanded?'Review included works':`Review included contents \u2014 ${record.title}`));
   let populated=false;
   const populate=()=>{
   const help=element('details','');help.className='book-tool-help';help.append(element('summary','How contents review works'));

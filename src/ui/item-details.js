@@ -38,10 +38,10 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));
       if(entry.contents.failed)node.append(text('p','Latest description could not be retrieved. Earlier contents and reviews are retained.'));
-      const preview=createContentsReadOnly(entry.record,database);if(preview)node.append(preview);
+      const preview=createContentsReadOnly(entry.record,database,{showSource:false,showCaption:false});if(preview)node.append(preview);if(entry.contents.incomplete)node.append(text('small','Some description details still need review; this is not necessarily a complete contents list.'));
       const link=text('a','Review contents');link.href=bookHref('contents',entry.record.recordRef);link.dataset.contentsRecord=entry.record.recordRef;node.append(link);
     }
-    const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not verified. A reviewed list describes included material for that account; it does not create separate purchases of those works. Overlap and coverage comparisons are available in Contents.'));node.append(help);
+    const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not reviewed. A reviewed list describes included material for that account; it does not create separate purchases of those works. Overlap and coverage comparisons are available in Contents.'));node.append(help);
   },true);
   if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());const bulk=text('a','Bulk book information and review');bulk.href='#books';bulk.dataset.goWorkspace='books';node.append(bulk);});
   section('advanced','Advanced',node=>{

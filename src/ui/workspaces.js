@@ -24,6 +24,8 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
     if(secondary){secondary.hidden=primary!=='library';for(const button of secondary.querySelectorAll('button')){
       if(button.dataset.workspace===preferences.workspace)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
     }}
+    const catalog=document.querySelector('#library-section'),disclosure=document.querySelector('#book-catalog-disclosure');
+    if(disclosure){if(!catalog.homeSlot){catalog.homeSlot=document.createElement('div');catalog.before(catalog.homeSlot);}if(preferences.workspace==='books')disclosure.append(catalog);else catalog.homeSlot.after(catalog);}
     document.querySelector('#library-section').hidden = !['library', 'books'].includes(preferences.workspace);
     document.querySelector('#show-enrichment-actions').checked = preferences.workspace === 'books';
     document.querySelector('#library-heading').textContent = preferences.workspace === 'books' ? 'Choose a book to improve' : 'Library';
