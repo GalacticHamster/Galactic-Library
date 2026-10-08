@@ -57,14 +57,14 @@ export function createContentsWorkspace(actions={}) {
     }));
   }
   function close(){selected=null;detail.hidden=true;detail.replaceChildren();listView.hidden=false;renderList();
-    actions.closed?.();
+
     const target=[...list.children].find(node=>node.dataset.recordRef===lastOpened);target?.querySelector('button')?.focus({preventScroll:true});globalThis.scrollTo?.(0,returnScroll);
   }
   let lastOpened;
   function open(ref){
     const record=Object.values(database?.providerItems??{}).find(record=>record.recordRef===ref&&record.mediaType==='book');if(!record)return false;
     if(!selected)returnScroll=globalThis.scrollY??0;
-    selected=ref;lastOpened=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button('Back to collections',close),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
+    selected=ref;lastOpened=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button(actions.backLabel?.()??'Back to Contents results',()=>actions.back?actions.back():close()),button('Contents collection list',()=>{close();actions.collection?.();}),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
@@ -76,7 +76,7 @@ export function createContentsWorkspace(actions={}) {
     detail.tabIndex=-1;detail.focus({preventScroll:true});return true;
   }
   for(const [key,control]of Object.entries({...shared,status}))control.addEventListener(control===search?'input':'change',()=>{view[key]=control.value;view.anchor='';page=0;renderList();actions.changed?.();});
-  return {element,open,close,applyView,readView,get selected(){return selected;},
+  return {element,open,close,applyView,readView,get selected(){return selected;},get scroll(){return returnScroll;},
     update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported books · ${counts.reviewed??0} reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest source checks failed or unavailable. Identified text is a suggestion, not proof of complete contents or ownership.`;

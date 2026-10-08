@@ -108,7 +108,10 @@ const contentsReviewActions={
   remove:async(id)=>{database=await removeContentReview(id);},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({changed:()=>workspace.rememberView(),library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
+const contentsWorkspace=createContentsWorkspace({changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
+  if(!reviewOrigin)reviewOrigin={workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll,ref};
+  if(!restoringRoute)pushRoute(bookHref('contents',ref));
+},review:(record,current)=>{
   const root=document.createElement('div');
   root.append(createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true}),
     createContentsBookDetails(record,current,{enrich:ref=>inspectEnrichmentRecords([ref]),undo:async ref=>{database=await undoEnrichmentSelection(ref);render();contentsWorkspace.refreshReview();}}),
@@ -151,7 +154,7 @@ const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, gen
 const workspace = createWorkspaceNavigation({
   readView: current => current==='contents'?contentsWorkspace.readView():({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage,anchor:lastBrowseResult?.rows[0]?.canonical.id??'' }),
   applyView: (view,current) => {if(current==='contents'){if(contentsWorkspace.selected)contentsWorkspace.close();contentsWorkspace.applyView(view);return;} search.value = view.search; libraryPage = view.page; browseAnchor=view.anchor??'';librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]??'all'; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
-  save: saveUiPreferences, changed: () => { if (database) render(); }
+  save: saveUiPreferences, beforeSelect:()=>{if(!restoringRoute)rememberNavigationEntry();},navigated:name=>{reviewOrigin=null;pushRoute('#'+name);}, changed: () => { if (database) render(); }
 });
 document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
 document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
@@ -173,18 +176,35 @@ async function retryEnrichmentReview(review){
 }
 
 let initialBookRoute=bookRoute(globalThis.location?.hash);
-let contentsLibraryOrigin;
+let contentsLibraryOrigin,reviewOrigin,restoringRoute=false,lastHandledHash='';
+function currentNavigation(){return {workspace:workspace.workspace,view:workspace.workspace==='contents'?contentsWorkspace.readView():workspace.savedView,scroll:globalThis.scrollY??0,origin:reviewOrigin};}
+function rememberNavigationEntry(){if(!database)return;globalThis.history?.replaceState({gl:currentNavigation()},'',globalThis.location.hash||'#library');}
+function pushRoute(href){if(restoringRoute)return;lastHandledHash=href;const state={gl:currentNavigation()};if(globalThis.location.hash===href)globalThis.history?.replaceState(state,'',href);else globalThis.history?.pushState(state,'',href);}
+function returnFromContents(){
+  const origin=reviewOrigin??{workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll};
+  contentsWorkspace.close();workspace.select(origin.workspace,{view:origin.view,history:false});
+  if(origin.workspace==='library'||origin.workspace==='books'){
+    const ref=origin.ref,card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
+    if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});}
+    else document.querySelector('#workspace-status').textContent='The original book moved or is no longer in these results. Your browsing filters are retained.';
+  }
+  reviewOrigin=null;workspace.rememberView();pushRoute('#'+origin.workspace);globalThis.scrollTo?.(0,origin.scroll);
+}
 function openContentsRecord(ref){
-  if(['library','books'].includes(workspace.workspace))contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
-  workspace.select('contents');
-  if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';}
+  if(!restoringRoute)rememberNavigationEntry();
+  if(['library','books'].includes(workspace.workspace)){
+    workspace.rememberView();contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
+    reviewOrigin={workspace:workspace.workspace,view:{...workspace.savedView,anchor:ref},scroll:globalThis.scrollY,ref};
+  }
+  workspace.select('contents',{history:false});
+  if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';if(!restoringRoute)pushRoute('#contents');}
 }
 function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);
   if(!record){document.querySelector('#workspace-status').textContent='That record is no longer in the current library.';return;}
   const origin=returnToOrigin&&contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null;
   const findCard=()=>[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
-  workspace.select(origin?.workspace??'library');
+  workspace.select(origin?.workspace??'library',{history:false});
   if(origin){search.value=origin.search;librarySort.value=origin.sort;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))viewControls[key].value=value;render();}
   if(!findCard()){
     search.value='';for(const filter of Object.values(viewControls))filter.value='all';
@@ -194,12 +214,28 @@ function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   workspace.rememberView();
   const card=findCard();
   if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));if(section){const target=card.querySelector(`[data-item-section="${section}"]`);if(target){target.open=true;target.dispatchEvent(new Event('toggle'));}}card.tabIndex=-1;card.focus({preventScroll:true});if(origin)globalThis.scrollTo(0,origin.scroll);else card.scrollIntoView({block:'center'});}
-  globalThis.history?.replaceState(null,'',bookHref('library',ref));
+  pushRoute(bookHref('library',ref));
 }
 function visitBookRoute(route){if(route?.workspace==='contents')openContentsRecord(route.recordRef);else if(route)openLibraryRecord(route.recordRef);}
 document.addEventListener('click',event=>{const link=event.target.closest('[data-contents-record]');if(link){event.preventDefault();initialBookRoute=null;if(database)openContentsRecord(link.dataset.contentsRecord);}});
 document.querySelector('#workspace-navigation').addEventListener('click',()=>{initialBookRoute=null;});
-globalThis.addEventListener?.('hashchange',()=>{const route=bookRoute(globalThis.location?.hash);if(database)visitBookRoute(route);else initialBookRoute=route;});
+function restoreNavigation(){
+  if(lastHandledHash===globalThis.location.hash)return;lastHandledHash=globalThis.location.hash;
+  if(!database){initialBookRoute=bookRoute(globalThis.location.hash);return;}
+  restoringRoute=true;
+  try{
+    const saved=globalThis.history?.state?.gl,route=bookRoute(globalThis.location.hash);
+    reviewOrigin=saved?.origin??null;
+    if(saved)workspace.select(saved.workspace,{view:saved.view,history:false});
+    else workspace.select(route?.workspace??globalThis.location.hash,{history:false});
+    if(route?.workspace==='contents'){
+      if(!contentsWorkspace.open(route.recordRef))document.querySelector('#workspace-status').textContent='That book is no longer in the current library.';
+    }else if(route)openLibraryRecord(route.recordRef);
+    if(saved)globalThis.scrollTo?.(0,saved.scroll);
+  }finally{restoringRoute=false;}
+}
+globalThis.addEventListener?.('hashchange',restoreNavigation);
+globalThis.addEventListener?.('popstate',restoreNavigation);
 function inspectEnrichmentRecords(refs,category){
   if(category==='unparsed'){openContentsRecord(refs[0]);return;}
   if(refs[0])openLibraryRecord(refs[0],{section:'books'});
@@ -788,6 +824,7 @@ async function refresh(diagnosticLookupId = null) {
   document.querySelector('#library-load-status').hidden=true;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
+  if(globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
   endStage?.();endStage=timing?.begin('options_render');
   render(timing);
   if(initialBookRoute){const route=initialBookRoute;initialBookRoute=null;visitBookRoute(route);}

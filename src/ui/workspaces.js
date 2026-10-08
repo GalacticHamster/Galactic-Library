@@ -1,6 +1,6 @@
 import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget, browseView, rememberBrowseView, validateUiPreferences } from '../lib/ui-preferences.js';
 
-export function createWorkspaceNavigation({ readView, applyView, save, changed }) {
+export function createWorkspaceNavigation({ readView, applyView, save, changed, beforeSelect, navigated }) {
   let preferences = defaultUiPreferences();
   let hydrated = false;
   let interacted = false;
@@ -28,16 +28,20 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
     document.querySelector('#show-enrichment-actions').checked = preferences.workspace === 'books';
     document.querySelector('#library-heading').textContent = preferences.workspace === 'books' ? 'Choose a book to improve' : 'Library';
   }
-  function select(workspace) {
-    workspace=workspaceTarget(workspace);if(!workspace)return;
+  function select(workspace,{view:nextView,history=true}={}) {
+    workspace=workspaceTarget(workspace);if(!workspace)return false;
+    if(beforeSelect?.(workspace)===false)return false;
     interacted=true;
     rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace));
     preferences.workspace = workspace;
-    globalThis.history?.replaceState(null,'',`#${workspace}`);
+    if(nextView)rememberBrowseView(preferences,workspace,nextView);
+    if(history&&!navigated)globalThis.history?.replaceState(null,'',`#${workspace}`);
     show();
     applyView(view(),preferences.workspace);
     remember();
     changed();
+    if(history)navigated?.(workspace);
+    return true;
   }
   navigation.addEventListener('click', event => {
     const button = event.target.closest('button[data-workspace]');
