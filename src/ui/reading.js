@@ -1,4 +1,5 @@
 import {READING_MEDIA,readingEvidence,readingLabel} from '../lib/reading.js';
+import {accountLabel} from './item-presentation.js';
 
 function node(tag,text=''){const element=document.createElement(tag);element.textContent=text;return element;}
 function select(label,values,current){const element=node('select');element.setAttribute('aria-label',label);for(const value of values){const option=node('option',value);option.value=value;element.append(option);}element.value=current;return element;}
@@ -10,7 +11,8 @@ export function createReadingTools(records,database,actions){
     root.append(node('p','Self-reported reading, access and download states are independent of ownership. Reading or downloading never confirms a purchase.'));
     for(const item of records.filter(record=>READING_MEDIA.includes(record.mediaType))){
       const saved=database.readingStates?.[item.recordRef],evidence=readingEvidence(item,database),section=node('section'),status=node('p');status.setAttribute('role','status');
-      section.append(node('h4',`${item.provider}: ${item.title}`),node('p',readingLabel(item,database)));
+      section.dataset.readingRecord=item.recordRef;
+      section.append(node('h4',`${accountLabel(item,database)}: ${item.title}`),node('p',readingLabel(item,database)));
       const reading=select('Reading status',['unread','reading','completed'],evidence.status),access=select('Current access',['unknown','accessible','unavailable'],evidence.access);
       const progress=node('input');progress.type='number';progress.min='0';progress.max='100';progress.step='1';progress.value=evidence.progress;progress.setAttribute('aria-label','Reading percentage');
       const downloaded=node('input');downloaded.type='checkbox';downloaded.checked=evidence.downloaded;downloaded.setAttribute('aria-label','Downloaded locally');const downloadLabel=node('label','Downloaded locally ');downloadLabel.append(downloaded);

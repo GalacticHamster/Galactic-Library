@@ -1,6 +1,7 @@
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
 import { contentCoverage } from '../lib/contents.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from '../lib/ownership.js';
+import {accountLabel} from './item-presentation.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 const display=value=>Array.isArray(value)?value.join(', ')||'Unknown':value||'Unknown';
@@ -19,13 +20,14 @@ function sourceLink(url,label) {
 /** Populate on expansion so thousands of closed cards stay inexpensive. */
 export function createEvidenceInspector(canonical, records, database, actions) {
   const root=document.createElement('details');root.className='evidence-inspector';
-  root.append(element('summary','Ownership evidence and relationships'));
+  root.append(element('summary','Matching, editions and source evidence'));
   let populated=false;
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
+    root.append(element('p','Same work keeps editions separate and can support a Possible relationship. Same edition groups compatible records. Different works blocks that relationship and indirect grouping. Separating a record keeps it in its own edition. These actions change identity grouping, not purchase evidence.'));
     root.append(element('p',`Persistent edition ID: ${canonical.id}`));
     for(const record of records){
       const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
-      const section=element('section','');section.append(element('h4',`${record.title} — ${record.provider}`));
+      const section=element('section','');section.append(element('h4',`${record.title} — ${accountLabel(record,database)}`));
       const table=element('dl','');table.className='evidence-fields';
       const field=(label,value)=>table.append(element('dt',label),element('dd',display(value)));
       field('Record reference',record.recordRef);field('Ownership evidence',record.ownership);field('Evidence source',identity.source);
@@ -107,10 +109,10 @@ export function createEvidenceInspector(canonical, records, database, actions) {
     comparison.append(element('p','Review two provider records. Same work keeps editions separate; Same edition requires compatible identity evidence. Different works also blocks indirect grouping.'));
     const left=element('select','');left.setAttribute('aria-label','First relationship record');
     const right=element('select','');right.setAttribute('aria-label','Compare with library record');
-    for(const record of records){const option=element('option',`${record.title} — ${record.provider}`);option.value=record.id;left.append(option);}
+    for(const record of records){const option=element('option',`${record.title} — ${accountLabel(record,database)}`);option.value=record.id;left.append(option);}
     const empty=element('option','Choose a record to compare');empty.value='';right.append(empty);
     const choices=Object.values(database.providerItems).filter(record=>record.mediaType===canonical.mediaType).sort((a,b)=>a.title.localeCompare(b.title));
-    for(const record of choices){const option=element('option',`${record.title} — ${record.provider}`);option.value=record.id;right.append(option);}
+    for(const record of choices){const option=element('option',`${record.title} — ${accountLabel(record,database)}`);option.value=record.id;right.append(option);}
     const conflicts=element('p','');conflicts.className='identity-conflicts';
     const compare=()=>{
       const a=database.providerItems[left.value];const b=database.providerItems[right.value];

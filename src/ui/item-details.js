@@ -24,8 +24,11 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
       if(entry.acquiredAt)record.append(text('small','Acquired / added: '+new Date(entry.acquiredAt).toLocaleDateString()));
       if(entry.observedAt)record.append(text('small','Last observed: '+new Date(entry.observedAt).toLocaleDateString()));
       if(entry.reading)record.append(text('p',entry.reading));node.append(record);
+      if(entry.readingAccess!=='unknown')record.append(text('small',`Self-reported access: ${entry.readingAccess}${entry.accessCheckedAt?' · checked '+new Date(entry.accessCheckedAt).toLocaleDateString():''}`));
+      if(entry.reviewExpiresAt)record.append(text('small','Reviewed access expiry: '+new Date(entry.reviewExpiresAt).toLocaleString()));
     }
     for(const build of [tools.reading,tools.ownership])if(build)node.append(build());
+    const settings=text('a','Ownership preferences in Settings');settings.href='#settings';settings.dataset.goWorkspace='settings';node.append(settings);
   },true);
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));

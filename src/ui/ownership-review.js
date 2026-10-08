@@ -1,5 +1,6 @@
 import {parsePurchaseEvidence} from '../lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
+import {accountLabel} from './item-presentation.js';
 
 const node=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const input=(label,type='text')=>{const field=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')field.type=type;field.setAttribute('aria-label',label);return field;};
@@ -11,7 +12,7 @@ export function createOwnershipReviewTools(records,database,actions){
     if(!root.open||ready)return;ready=true;
     root.append(node('p','Record a purchase, permanent claim or temporary access with its evidence date. This keeps the provider observation intact. Reseller key status still cannot establish destination activation.'));
     for(const record of records){
-      const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.append(node('strong',`${record.title} — ${record.provider}`),node('p',`Provider: ${record.ownership}; display and matching: ${effective.ownership}${effective.ownershipOverride?' (ownership override enabled)':''}${prior?`; confirmed ${prior.confirmedAt}`:''}.`));
+      const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.dataset.ownershipRecord=record.recordRef;section.append(node('strong',`${record.title} — ${accountLabel(record,database)}`),node('p',`Provider: ${record.ownership}; display and matching: ${effective.ownership}${effective.ownershipOverride?' (ownership override enabled)':''}${prior?`; confirmed ${prior.confirmedAt}`:''}.`));
       const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of ['owned','claimed','subscription','borrowed','rental','unknown'])ownership.append(Object.assign(node('option',state),{value:state}));ownership.value=prior?.ownership??'owned';
       const evidence=input('Ownership evidence','textarea');evidence.maxLength=2000;evidence.placeholder='Receipt, order history or another checked source';evidence.value=prior?.note??'';
       const date=input('Ownership evidence date','date');date.value=(prior?.evidenceDate??new Date().toISOString()).slice(0,10);

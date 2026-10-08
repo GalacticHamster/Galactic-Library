@@ -135,6 +135,7 @@ let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
 let libraryPage = 0;
 let coverageDatabase;
+let duplicateReviewDatabase,duplicateReviewCandidates;
 const openItemDetails = new Set();
 const itemDetailContexts=new Map();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
@@ -558,7 +559,8 @@ function createReviewRow(candidate, reviewed = false) {
 }
 
 function renderDuplicateReview() {
-  const candidates = findDuplicateCandidates(database.providerItems, database.manualMatchDecisions);
+  if(duplicateReviewDatabase!==database){duplicateReviewCandidates=findDuplicateCandidates(database.providerItems,database.manualMatchDecisions);duplicateReviewDatabase=database;}
+  const candidates = duplicateReviewCandidates;
   const unresolved = candidates.filter((candidate) => !candidate.decision);
   const reviewed = candidates.filter((candidate) => candidate.decision);
   duplicateReviewSummary.textContent = unresolved.length

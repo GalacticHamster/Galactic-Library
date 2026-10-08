@@ -19,6 +19,7 @@ export function itemPresentation(canonical,records,database){
       const effective=effectiveOwnershipRecord(record,database),review=database.ownershipReviews?.[record.recordRef],reading=database.readingStates?.[record.recordRef];
       return {record,label:accountLabel(record,database),access:accessLabel(effective.ownership),observedAccess:accessLabel(record.ownership),override:Boolean(effective.ownershipOverride),reviewed:Boolean(review),
         acquiredAt:record.acquiredAt||'',observedAt:record.observedAt||'',
+        accessCheckedAt:reading?.accessCheckedAt||'',readingAccess:reading?.access??'unknown',reviewExpiresAt:review?.expiresAt||'',
         reading:['book','audiobook'].includes(record.mediaType)?reading?`${reading.status} · ${reading.progress}%${reading.downloaded?' · downloaded locally':''}`:'Reading status not saved':null,
         contents:record.mediaType==='book'?contentsSummary(record,database):null};
     })};
