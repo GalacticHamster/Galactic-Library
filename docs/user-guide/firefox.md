@@ -12,12 +12,7 @@ Load the extracted Firefox ZIP manifest from about:debugging to test manually. I
 
 ## Companion setup
 
-In GL options, allow the companions you use:
-
-- HB: `humble-comic-library@galactichamster.com`
-- Fanatical: `fanatical-library@galactichamster.com`
-
-In each companion, save `galactic-library@galactichamster.com` and test the link. These declared Gecko IDs work across profiles; the private `moz-extension` host is not a pairing ID. No native messaging helper is needed. Allowed companions open central review by sending `OPEN_REVIEW`; GL opens its own options. Older GL builds retain the companion's toolbar fallback. GL can likewise ask paired HB to open source review; older/unpaired HB builds show toolbar instructions.
+Current builds pair automatically using the existing stable Gecko IDs: HB `humble-comic-library@galactichamster.com`, GL `galactic-library@galactichamster.com`, FAN `fanatical-library@galactichamster.com`. Use **Check connection**; custom IDs remain under **Advanced / Developer pairing**. Do not substitute temporary moz-extension page UUIDs. [Pairing and release requirements](../architecture/companion-pairing.md) documents manual builds, trust, signing confirmation and installed-browser verification. Older builds may still require manual settings and toolbar review fallback.
 
 ## Verified behavior
 
