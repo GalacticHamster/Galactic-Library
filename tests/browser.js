@@ -52,7 +52,8 @@ try{
   // Native decompression and Blob I/O need real time. Virtual-time DOM dumping
   // can finish while an EPUB stream is still awaiting native completion.
   let child;
-  const url=`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}`;
+  const browseStartup=process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
+  const url=`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:''}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   const exited=new Promise(resolve=>{child=execFile(browser,args,{windowsHide:true,timeout:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;

@@ -173,7 +173,7 @@ async function retryEnrichmentReview(review){
 let initialBookRoute=bookRoute(globalThis.location?.hash);
 let contentsLibraryOrigin;
 function openContentsRecord(ref){
-  if(['library','books'].includes(workspace.workspace))contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),page:libraryPage,scroll:globalThis.scrollY};
+  if(['library','books'].includes(workspace.workspace))contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
   workspace.select('contents');
   if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';}
 }
@@ -183,11 +183,11 @@ function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   const origin=returnToOrigin&&contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null;
   const findCard=()=>[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
   workspace.select(origin?.workspace??'library');
-  if(origin){search.value=origin.search;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))viewControls[key].value=value;render();}
+  if(origin){search.value=origin.search;librarySort.value=origin.sort;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))viewControls[key].value=value;render();}
   if(!findCard()){
     search.value='';for(const filter of Object.values(viewControls))filter.value='all';
-    const canonical=Object.values(database.canonicalItems).sort((a,b)=>compareTitles(a.title,b.title));
-    libraryPage=Math.floor(canonical.findIndex(item=>item.providerItemIds.includes(record.id))/50);render();
+    const sorted=libraryBrowseResults(browseProjection(database),{sort:librarySort.value,workspace:workspace.workspace}).matches;
+    libraryPage=Math.max(0,Math.floor(sorted.findIndex(row=>row.canonical.providerItemIds.includes(record.id))/50));render();
   }
   workspace.rememberView();
   const card=findCard();
@@ -734,6 +734,7 @@ function render(timing = null) {
   const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage});
   const canonical=result.matches.map(row=>row.canonical);
   renderActiveFilters(filters);
+  document.querySelector('#library-no-results').hidden=canonical.length>0||!Object.keys(database.providerItems).length;
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const softwareCanonicalCount=canonical.filter(item=>item.mediaType==='software').length;
@@ -774,7 +775,7 @@ function render(timing = null) {
   libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
   document.querySelector("#library-previous").disabled=libraryPage===0;
   document.querySelector("#library-next").disabled=(libraryPage+1)*50>=canonical.length;
-  document.querySelector("#library-page-status").textContent=canonical.length ? "Showing "+(libraryPage*50+1)+"?"+Math.min((libraryPage+1)*50,canonical.length)+" of "+canonical.length : "No items to show";
+  document.querySelector("#library-page-status").textContent=canonical.length ? "Showing "+(libraryPage*50+1)+"–"+Math.min((libraryPage+1)*50,canonical.length)+" of "+canonical.length : "No items to show";
   items.replaceChildren(...result.rows.map((row) => {
     const canonicalItem=row.canonical;
     const node = document.createElement('li');
@@ -996,6 +997,7 @@ for(const field of [...Object.values(viewControls),librarySort])field.addEventLi
 clearFilters.addEventListener('click', () => {
   search.value='';for(const field of Object.values(viewControls)){field.value='all';delete field.dataset.pendingValue;}viewChanged();
 });
+document.querySelector('#clear-empty-library-filters').addEventListener('click',()=>clearFilters.click());
 function renderCollectionCoverage(){
   if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
