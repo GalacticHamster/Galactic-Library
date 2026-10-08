@@ -1,5 +1,5 @@
 // Bounded, tab-local form protection. No drafts or database data are persisted.
-export const DRAFT_SCOPES='.reading-tools section[data-reading-record],.ownership-review-tools [data-ownership-record],.local-metadata-tools,.title-alias-tools,.item-enrichment-review,.contents-editor';
+export const DRAFT_SCOPES='.reading-order-draft,.reading-tools section[data-reading-record],.ownership-review-tools [data-ownership-record],.local-metadata-tools,.title-alias-tools,.item-enrichment-review,.contents-editor';
 export function createDraftGuard({root=document,stamp=()=>'',confirmDiscard=()=>globalThis.confirm('Discard unsaved edits and continue?'),changed=()=>{}}={}){
   const dirty=new Map();let actionScope;
   const scopeFor=target=>target?.closest?.(DRAFT_SCOPES);
@@ -21,7 +21,7 @@ export function createDraftGuard({root=document,stamp=()=>'',confirmDiscard=()=>
       for(const [scope,original]of dirty){
         if(stamp(scope)===original)continue;stale=true;
         // Keep the draft readable/editable, but do not save a stale preview.
-        for(const button of scope.querySelectorAll('button'))if(/^(Save|Clear reading|Confirm|Accept|Queue|Undo|Dismiss)/u.test(button.textContent))button.disabled=true;
+        for(const button of scope.querySelectorAll('button'))if(/^(Save|Create reading order|Rename order|Clear reading|Confirm|Accept|Queue|Undo|Dismiss)/u.test(button.textContent))button.disabled=true;
       }
       return {dirty:dirty.size>0,stale};
     },

@@ -17,6 +17,7 @@ const medium=process.argv.includes('--medium'),width=narrow?560:medium?820:1200;
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const importerMode=process.argv.includes('--importers');
 const uxMode=process.argv.includes('--ux');
+const polishMode=process.argv.includes('--polish');
 const contentsUxMode=process.argv.includes('--contents-ux');
 const contentsDeepLinkMode=process.argv.includes('--contents-deep-link');
 const itemDetailsMode=process.argv.includes('--item-details');
@@ -44,7 +45,7 @@ const server=createServer(async(request,response)=>{
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
     let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
     if(!body)throw new Error('File is absent from the validated runtime package.');
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}

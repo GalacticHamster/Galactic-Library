@@ -95,7 +95,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       }
       for(const [id,decision]of relationships){
         const other=database.providerItems[decision.itemIds.find(itemId=>itemId!==record.id)];
-        const row=element('p',`${decisionLabel(decision.decision)}: ${other?`${other.title} — ${other.provider}`:'record no longer in current library'} · reviewed ${decision.updatedAt||'date unknown'} `);
+        const row=element('p',`${decisionLabel(decision.decision)}: ${other?`${other.title} — ${accountLabel(other,database)}`:'record no longer in current library'} · reviewed ${decision.updatedAt||'date unknown'} `);
         if(other&&decision.decision==='same-edition'){
           const conflicts=identityConflicts(record,other);
           if(conflicts.length)row.append(element('span',`Current evidence conflicts with this review: ${conflicts.join(', ')}. `));

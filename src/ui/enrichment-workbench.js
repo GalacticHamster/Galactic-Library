@@ -55,7 +55,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
         choice.addEventListener('change',()=>{choices.delete(row.id);if(choice.value!=='')choices.set(row.id,Number(choice.value));selected.delete(row.id);refresh();});node.append(choice);
         const candidate=row.review.candidates[choices.get(row.id)];
         if(candidate){
-          node.append(metadataPreview(row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean),candidate,row.review.source));
+          node.append(metadataPreview(row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean),candidate,row.review.source,database));
           node.append(text('p',`${sourceLabel(candidate.source)} · ${candidate.fileName||candidate.editionKey||candidate.volumeId||candidate.workKey||''} · retrieved ${candidate.retrievedAt||row.review.checkedAt||'unknown'}`));
           for(const field of ['series','volume','issue','run','edition','contributors','categories','statement'])if(candidate[field]?.length)node.append(text('p',`${field}: ${Array.isArray(candidate[field])?candidate[field].map(value=>typeof value==='object'?`${value.role}: ${value.name}`:value).join(', '):candidate[field]}`));
           if(candidate.sourceUrl){const link=text('a','View source');link.href=candidate.sourceUrl;link.target='_blank';link.rel='noreferrer';node.append(link);}

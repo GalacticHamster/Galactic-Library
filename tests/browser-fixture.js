@@ -19,6 +19,7 @@ const checks=[];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const pause=()=>new Promise(done=>setTimeout(done,20));
 const wait=async(predicate,message)=>{for(let n=0;n<100;n++){if(predicate())return;await pause();}throw new Error(message);};
+async function confirmRestore(){await wait(()=>document.querySelector('.confirmation-dialog[open]'),'Restore confirmation missing');button(document.querySelector('.confirmation-dialog'),'Replace library').click();}
 const button=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label);
 const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}for(const section of node?.querySelectorAll('[data-item-section]')??[]){section.open=true;section.dispatchEvent(new Event('toggle'));}return node;};
 const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
@@ -130,7 +131,7 @@ try{
   await writer.mergeProviderItems('humble',[extra]);
   // Render from the options page's own storage client, then split a real merged card.
   const transferSplit=new DataTransfer();transferSplit.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'split.json',{type:'application/json'}));
-  document.querySelector('#import').files=transferSplit.files;document.querySelector('#import').dispatchEvent(new Event('change'));
+  document.querySelector('#import').files=transferSplit.files;document.querySelector('#import').dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Split fixture import failed.');
   inspector=await open(card('Collection A').querySelector('.evidence-inspector'));
   button(inspector,'Separate this record into its own edition').click();
@@ -155,7 +156,7 @@ try{
   assert(!(await writer.getDatabase()).contentReviews['humble:a'],'Contents undo did not persist.');
   checks.push('contents confirmation undo removes coverage evidence');
   const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(backup)],'backup.json',{type:'application/json'}));
-  const input=document.querySelector('#import');input.files=transfer.files;input.dispatchEvent(new Event('change'));
+  const input=document.querySelector('#import');input.files=transfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.'&&!values.galacticLibraryDatabase.providerItems['humble:split-test'],'Backup restore failed.');
   assert((await writer.getDatabase()).contentReviews['humble:a'].entries.length===2,'Backup lost contents.');
   checks.push('actual backup import restores reviewed evidence and refreshes the UI');
@@ -173,7 +174,7 @@ try{
   checks.push('series search filters reviewed scopes');
   await writer.mergeProviderItems('humble',[{providerItemId:'review-manga',title:'Review manga Vol. 1',mediaType:'book',ownership:'unknown'}]);
   const enrichmentTransfer=new DataTransfer();enrichmentTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'enrichment.json',{type:'application/json'}));
-  document.querySelector('#import').files=enrichmentTransfer.files;document.querySelector('#import').dispatchEvent(new Event('change'));
+  document.querySelector('#import').files=enrichmentTransfer.files;document.querySelector('#import').dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>card('Review manga Vol. 1'),'Enrichment fixture did not render.');
   showWorkspace('books');
   let tools=card('Review manga Vol. 1').querySelector('details:has([data-action="google-books-search"])');
@@ -251,12 +252,12 @@ try{
 
   await writer.replaceProviderItems('humble',[],{},completeProviderSnapshot('humble',[],[completedScope('library',0,0,'reported-count',1)]));
   const historyTransfer=new DataTransfer();historyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'history.json',{type:'application/json'}));
-  document.querySelector('#backup-status').textContent='';input.files=historyTransfer.files;input.dispatchEvent(new Event('change'));
+  document.querySelector('#backup-status').textContent='';input.files=historyTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','History backup restore failed.');
   assert(document.querySelector('#provider-history').textContent.includes('Collection A')&&document.querySelector('#provider-history').textContent.includes('not observed in complete scan'),'Archived purchase evidence is missing from history.');
   checks.push('complete scan history survives backup restore and is displayed separately from current ownership');
   await writer.mergeProviderItems('humble',[{providerItemId:'software-ui',title:'Creative Tool',mediaType:'software',ownership:'owned'}]);
-  const softwareTransfer=new DataTransfer();softwareTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'software.json',{type:'application/json'}));document.querySelector('#backup-status').textContent='';input.files=softwareTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Software fixture restore failed.');
+  const softwareTransfer=new DataTransfer();softwareTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'software.json',{type:'application/json'}));document.querySelector('#backup-status').textContent='';input.files=softwareTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Software fixture restore failed.');
   showWorkspace('library');
   document.querySelector('#media-type-filter').value='software';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));assert(document.querySelectorAll('#library-items > li').length===1&&card('Creative Tool').textContent.includes('Software')&&document.querySelector('#library-summary').textContent.includes('1 software item'),'Software is missing or mixed with games in options.');
   document.querySelector('#media-type-filter').value='all';document.querySelector('#media-type-filter').dispatchEvent(new Event('change'));
@@ -270,7 +271,7 @@ try{
   button(card('Creative Tool'),'Undo ownership confirmation').click();await wait(()=>!values.galacticLibraryDatabase.ownershipReviews[softwareRef],'Ownership confirmation undo did not persist.');
   checks.push('actual dated ownership confirmation and undo preserve original provider observations');
 
-  await writer.mergeProviderItems('audible',[{providerItemId:'B000000007',title:'Receipt audiobook',mediaType:'audiobook',ownership:'subscription'}]);const receiptLibraryTransfer=new DataTransfer();receiptLibraryTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'receipt-library.json'));document.querySelector('#backup-status').textContent='';input.files=receiptLibraryTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Receipt fixture restore failed.');
+  await writer.mergeProviderItems('audible',[{providerItemId:'B000000007',title:'Receipt audiobook',mediaType:'audiobook',ownership:'subscription'}]);const receiptLibraryTransfer=new DataTransfer();receiptLibraryTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'receipt-library.json'));document.querySelector('#backup-status').textContent='';input.files=receiptLibraryTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Receipt fixture restore failed.');
   let receipts=await open(document.querySelector('#purchase-evidence-workbench'));receipts.querySelector('[aria-label="Receipt provider"]').value='audible';const receiptTransfer=new DataTransfer();receiptTransfer.items.add(new File(['Title,ASIN,Purchase Date,Customer,Redemption Key\nReceipt audiobook,B000000007,2026-09-01,PRIVATE CUSTOMER,PRIVATE KEY'],'receipts.csv',{type:'text/csv'}));const receiptInput=receipts.querySelector('input[type="file"]');receiptInput.files=receiptTransfer.files;receiptInput.dispatchEvent(new Event('change'));
   await wait(()=>Object.keys(values.galacticLibraryDatabase.ownershipProposals).length===1,'Actual local receipt input failed.');await wait(()=>document.querySelector('#purchase-evidence-workbench')!==receipts,'Receipt queue did not rerender.');receipts=await open(document.querySelector('#purchase-evidence-workbench'));const receiptChoice=receipts.querySelector('[aria-label="Receipt library candidate"]');assert(receiptChoice&&receiptChoice.value==='','Receipt skipped edition selection.');receiptChoice.value=values.galacticLibraryDatabase.providerItems['audible:B000000007'].recordRef;receipts.querySelector('[aria-label="Confirm receipt matches record"]').checked=true;button(receipts,'Confirm receipt ownership').click();
   const audioRef=values.galacticLibraryDatabase.providerItems['audible:B000000007'].recordRef;await wait(()=>values.galacticLibraryDatabase.ownershipReviews[audioRef]?.source==='local-purchase-history','Receipt approval failed.');assert(values.galacticLibraryDatabase.providerItems['audible:B000000007'].ownership==='subscription'&&!JSON.stringify(values.galacticLibraryDatabase).includes('PRIVATE CUSTOMER')&&!JSON.stringify(values.galacticLibraryDatabase).includes('PRIVATE KEY'),'Receipt leaked private columns or rewrote provider data.');
@@ -280,7 +281,7 @@ try{
   const runningDashboard=createSyncHealthView(await writer.getDatabase(),{cancel:async(...args)=>{await writer.cancelProviderScan(...args);cancelled=true;},refresh:()=>{}});runningDashboard.id='isolated-sync-dashboard';document.body.append(runningDashboard);await open(runningDashboard);button(runningDashboard,'Cancel pending scan commit').click();await wait(()=>cancelled,'Dashboard cancellation did not run.');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.status==='cancelled','Cancellation did not persist.');runningDashboard.remove();
   checks.push('actual sync dashboard displays validated coverage and freshness and cancels the selected pending commit');
   await writer.mergeProviderItems('humble',[{providerItemId:'reminder-ui',title:'Reminder key',mediaType:'game',ownership:'owned',metadata:{entitlement:'third-party-key',keyStatus:'revealed',expiresAt:'2026-09-01'}}]);
-  const reminderTransfer=new DataTransfer();reminderTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'reminders.json'));document.querySelector('#backup-status').textContent='';input.files=reminderTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Reminder fixture restore failed.');
+  const reminderTransfer=new DataTransfer();reminderTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'reminders.json'));document.querySelector('#backup-status').textContent='';input.files=reminderTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Reminder fixture restore failed.');
   let reminderView=await open(document.querySelector('#entitlement-reminders'));assert(reminderView.textContent.includes('Destination activation unconfirmed')&&reminderView.textContent.includes('Reported key expiry'),'Unified reminders did not expose actual key evidence.');
   const keyRow=[...reminderView.querySelectorAll('article')].find(row=>row.textContent.includes('Reported key expiry'));button(keyRow,'Snooze 7 days').click();await wait(()=>Object.values(values.galacticLibraryDatabase.reminderReviews).some(entry=>entry.action==='snoozed'),'Reminder snooze failed.');await wait(()=>document.querySelector('#entitlement-reminders')!==reminderView,'Reminders did not refresh.');
   reminderView=await open(document.querySelector('#entitlement-reminders'));reminderView.querySelector('select').value='hidden';reminderView.querySelector('select').dispatchEvent(new Event('change'));button(reminderView,'Restore reminder').click();await wait(()=>Object.keys(values.galacticLibraryDatabase.reminderReviews).length===0,'Reminder restore failed.');
@@ -299,7 +300,7 @@ try{
   const feedClient='a'.repeat(32);await writer.mergeProviderItems('humble',[],{profileLabel:'fixture-profile'});
   const feedUpload=await writer.beginCompanionFeed(feedClient,{profileLabel:'fixture-profile',count:1,coverage:'partial',sentAt:'2026-10-01'});
   await writer.appendCompanionFeed(feedClient,feedUpload.uploadToken,0,[{itemRef:crypto.randomUUID(),title:'HB shared synthetic key',mediaType:'game',keyStatus:'unrevealed',expiresAt:'2026-11-01',checkedAt:'2026-10-01',purchaseEvidence:'confirmed',activationStatus:'unknown'}]);await writer.commitCompanionFeed(feedClient,feedUpload.uploadToken);
-  const sharedTransfer=new DataTransfer();sharedTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'shared.json'));document.querySelector('#backup-status').textContent='';input.files=sharedTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Shared feed restore failed.');
+  const sharedTransfer=new DataTransfer();sharedTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'shared.json'));document.querySelector('#backup-status').textContent='';input.files=sharedTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Shared feed restore failed.');
   let sharedDashboard=await open(document.querySelector('#entitlement-reminders'));const sharedRow=[...sharedDashboard.querySelectorAll('article')].find(row=>row.textContent.includes('HB shared synthetic key'));assert(sharedRow&&sharedRow.textContent.includes('partial baseline')&&sharedRow.textContent.includes('does not establish ownership')&&sharedRow.textContent.includes('checked 2026-10-01'),'Shared reminder lacks dated source/baseline or ownership distinction.');button(sharedRow,'Review in Humble Comic Library').click();await wait(()=>openedOptions==='chrome://extensions/?options='+feedClient,'Shared reminder review used an unsafe route.');
   const sharedReminderRef=sharedRow.dataset.reminderRef;button(sharedRow,'Dismiss reminder').click();await wait(()=>values.galacticLibraryDatabase.reminderReviews[sharedReminderRef]?.action==='dismissed','Shared reminder dismissal failed.');await wait(()=>document.querySelector('#entitlement-reminders')!==sharedDashboard,'Shared reminder dismissal did not rerender.');sharedDashboard=await open(document.querySelector('#entitlement-reminders'));const sharedFilter=sharedDashboard.querySelector('[aria-label="Reminder filter"]');sharedFilter.value='hidden';sharedFilter.dispatchEvent(new Event('change'));const hiddenShared=[...sharedDashboard.querySelectorAll('article')].find(row=>row.dataset.reminderRef===sharedReminderRef);assert(hiddenShared,'Dismissed feed reminder not reviewable.');button(hiddenShared,'Restore reminder').click();await wait(()=>!values.galacticLibraryDatabase.reminderReviews[sharedReminderRef],'Shared reminder restore failed.');await wait(()=>document.querySelector('#entitlement-reminders')!==sharedDashboard,'Shared reminder restore did not rerender.');
   checks.push('actual shared reminder dashboard shows dated HB source and partial baseline, opens trusted source options and supports dismissal/restore');
@@ -307,7 +308,7 @@ try{
   checks.push('actual central feed removal deletes only companion reminders and preserves native provider ownership');
   showWorkspace('library');document.querySelector('#clear-filters').click();
   await writer.mergeProviderItems('humble',Array.from({length:61},(_,n)=>({providerItemId:'ui-page-'+n,title:'Pagination title '+n,mediaType:'book',ownership:'owned'})));
-  const pageTransfer=new DataTransfer();pageTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'pages.json'));document.querySelector('#backup-status').textContent='';input.files=pageTransfer.files;input.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Paging fixture import failed');
+  const pageTransfer=new DataTransfer();pageTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'pages.json'));document.querySelector('#backup-status').textContent='';input.files=pageTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Paging fixture import failed');
   assert(document.querySelectorAll('#library-items > li').length===50&&!document.querySelector('#library-next').disabled,'Library first page is unbounded or cannot advance');document.querySelector('#library-next').click();assert([...document.querySelectorAll('#library-items > li')].some(node=>node.textContent.includes('Pagination title 60')),'Library pagination drops later records');
   const search=document.querySelector('#search');search.value='Pagination title 60';search.dispatchEvent(new Event('input'));assert(document.querySelectorAll('#library-items > li').length===1&&document.querySelector('#library-previous').disabled,'Library search did not reach all pages and reset pagination');
   checks.push('compact library pagination and full-library search reach records beyond the first 50');
@@ -316,7 +317,7 @@ try{
   await writer.mergeProviderItems('kindle',[{providerItemId:'override-borrowed',title:'Override borrowed example',mediaType:'book',ownership:'borrowed',metadata:{authors:['Original Writer'],source:'amazon-kindle-content-library'}}]);
   await writer.mergeProviderItems('humble',[{providerItemId:'override-unknown',title:'Override unknown example',mediaType:'book',ownership:'unknown'}]);
   const policyTransfer=new DataTransfer();policyTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'ownership-policy-library.json'));
-  document.querySelector('#backup-status').textContent='';input.files=policyTransfer.files;input.dispatchEvent(new Event('change'));
+  document.querySelector('#backup-status').textContent='';input.files=policyTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Ownership policy fixture failed to restore.');
   const originalOwnershipRecords=JSON.stringify((await writer.getDatabase()).providerItems);
   showWorkspace('settings');
@@ -350,7 +351,7 @@ try{
   checks.push('disabling global and provider checkboxes restores their respective original ownership rules');
 
   const policyBackupTransfer=new DataTransfer();policyBackupTransfer.items.add(new File([JSON.stringify(ownershipPolicyBackup)],'ownership-policy-backup.json'));
-  showWorkspace('settings');document.querySelector('#backup-status').textContent='';input.files=policyBackupTransfer.files;input.dispatchEvent(new Event('change'));
+  showWorkspace('settings');document.querySelector('#backup-status').textContent='';input.files=policyBackupTransfer.files;input.dispatchEvent(new Event('change'));await confirmRestore();
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.','Ownership preference backup failed.');
   assert(document.querySelector('#assume-all-owned').checked&&document.querySelector('#assume-owned-kindle').checked&&document.querySelector('#assume-owned-kindle').disabled,'Backup did not restore ownership preferences.');
   assert(values.galacticLibraryDatabase.providerItems['kindle:override-borrowed'].ownership==='borrowed','Backup exported the derived override instead of source ownership.');

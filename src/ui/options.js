@@ -1,3 +1,5 @@
+import {bindBackupRestore} from './backup-restore.js';
+import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
 import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
@@ -107,6 +109,7 @@ const browseProjection=createLibraryBrowseProjection();
 const draftNotice=document.createElement('div');draftNotice.id='draft-notice';draftNotice.className='compact-notice';draftNotice.hidden=true;draftNotice.setAttribute('role','status');
 const draftMessage=document.createElement('span'),discardDrafts=document.createElement('button');discardDrafts.type='button';discardDrafts.textContent='Discard edits and reload view';draftNotice.append(draftMessage,discardDrafts);document.querySelector('#workspace-status').after(draftNotice);
 function draftStamp(scope){
+  if(scope.matches('.reading-order-draft'))return JSON.stringify(scope.dataset.readingOrder?database?.readingOrders?.[scope.dataset.readingOrder]??null:'new-order');
   const exact=scope.closest('[data-reading-record],[data-ownership-record]'),refs=exact?[exact.dataset.readingRecord??exact.dataset.ownershipRecord]:scope.closest('#contents-book-review')?[scope.closest('#contents-book-review').dataset.recordRef]:JSON.parse(scope.closest('li[data-record-refs]')?.dataset.recordRefs??'[]');
   const records=Object.values(database?.providerItems??{}).filter(record=>refs.includes(record.recordRef));
   const reading=scope.matches('[data-reading-record]'),ownership=scope.matches('[data-ownership-record]');
@@ -388,7 +391,7 @@ function createAddOnList(addOns) {
 }
 
 function reviewRecordLabel(record) {
-  return `${record.title} — ${displayProviderName(record.provider)}`;
+  return `${record.title} — ${accountLabel(record,database)}`;
 }
 
 function actionButton(label, onClick) { return reviewButton(label, "", onClick); }
@@ -489,6 +492,7 @@ function createReviewRow(candidate, reviewed = false) {
   node.append(recordList);
   node.append(textElement('p', candidate.reasons.map((reason) => reason.text).join(' ')));
   node.lastElementChild.className = 'review-reasons';
+  const feedback=textElement('p','');feedback.className='review-feedback';feedback.setAttribute('role','status');
   const actions = document.createElement('div');
   actions.className = 'review-actions';
   if (reviewed) {
@@ -498,7 +502,7 @@ function createReviewRow(candidate, reviewed = false) {
         database = await removeManualMatchDecision(candidate.id);
         render();
       } catch (error) {
-        backupStatus.textContent = `Could not undo duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not undo duplicate decision: ${error.message}`;
       }
     }));
   } else {
@@ -507,7 +511,7 @@ function createReviewRow(candidate, reviewed = false) {
         database = await saveManualMatchDecision(candidate, 'same-work');
         render();
       } catch (error) {
-        backupStatus.textContent = `Could not save duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not save duplicate decision: ${error.message}`;
       }
     }));
     actions.append(reviewButton('Same edition', 'same-edition', async () => {
@@ -515,7 +519,7 @@ function createReviewRow(candidate, reviewed = false) {
         database = await saveManualMatchDecision(candidate, 'same-edition');
         render();
       } catch (error) {
-        backupStatus.textContent = `Could not save edition decision: ${error.message}`;
+        feedback.textContent = `Could not save edition decision: ${error.message}`;
       }
     }));
     actions.append(reviewButton('Different works', 'different', async () => {
@@ -523,11 +527,11 @@ function createReviewRow(candidate, reviewed = false) {
         database = await saveManualMatchDecision(candidate, 'different');
         render();
       } catch (error) {
-        backupStatus.textContent = `Could not save duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not save duplicate decision: ${error.message}`;
       }
     }));
   }
-  node.append(actions);
+  node.append(actions,feedback);
   return node;
 }
 
@@ -707,7 +711,7 @@ function render(timing = null) {
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else receiptWorkbench.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');
   const readingWorkbench=createReadingWorkbench(database,{
-    order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'})
+    canLeave:()=>drafts.allowNavigation(),order:async(...args)=>{const result=await drafts.commit(()=>saveReadingOrder(...args));database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'})
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   endSegment?.();endSegment=timing?.begin('options_filters');
@@ -863,7 +867,7 @@ async function refresh(diagnosticLookupId = null) {
   }
 }
 
-document.querySelector('#export').addEventListener('click', async () => {
+async function exportCurrentBackup() {
   try {
     const snapshot = await getDatabase();
     const blob = new Blob([JSON.stringify(createBackup(snapshot), null, 2)], { type: 'application/json' });
@@ -874,26 +878,16 @@ document.querySelector('#export').addEventListener('click', async () => {
     backupStatus.textContent = 'Backup downloaded.';
   } catch (error) {
     backupStatus.textContent = `Export failed: ${error.message}`;
+    throw error;
   }
-});
+}
+document.querySelector('#export').addEventListener('click',()=>exportCurrentBackup().catch(()=>{}));
 
 bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summary'),status:document.querySelector('#performance-diagnostics-status'),worker:document.querySelector('#performance-diagnostics-worker'),runtime:chrome.runtime});
 
 document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();document.querySelector('#import').click();}});
 
-document.querySelector('#import').addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    await restoreDatabase(parseBackup(JSON.parse(await file.text())));
-    await refresh();
-    backupStatus.textContent = 'Backup restored.';
-  } catch (error) {
-    backupStatus.textContent = `Import failed: ${error.message}`;
-  } finally {
-    event.target.value = '';
-  }
-});
+const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh,exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation()});
 
 document.querySelector('#clear').addEventListener('click', async () => {
   if (!confirm('Clear every locally stored provider record, match, and setting?')) return;
@@ -916,19 +910,21 @@ saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
     await saveGoogleBooksApiKey(googleBooksApiKey.value);
     googleBooksApiKey.value = '';
+    document.querySelector('#book-service-status').textContent='Key saved in this browser.';
     await renderGoogleBooksEnrichment();
   } catch (error) {
-    googleBooksEnrichmentStatus.textContent = `Could not save Google Books key: ${error.message}`;
+    document.querySelector('#book-service-status').textContent='Could not save the Google Books key. Check the key and try again.';
   }
 });
 clearGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
     googleBooksPauseRequested = true;
     await saveGoogleBooksApiKey('');
+    document.querySelector('#book-service-status').textContent='Key removed.';
     googleBooksApiKey.value = '';
     await renderGoogleBooksEnrichment();
   } catch (error) {
-    googleBooksEnrichmentStatus.textContent = `Could not remove Google Books key: ${error.message}`;
+    document.querySelector('#book-service-status').textContent='Could not remove the Google Books key. Try again.';
   }
 });
 startGoogleBooksEnrichmentButton.addEventListener('click', () => {
@@ -997,7 +993,7 @@ const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,co
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) contentsScanProgress.changed();
+  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) {backupRestore.changed();contentsScanProgress.changed();}
   if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
     showEnrichmentActions.checked = workspace.workspace === 'books';
     if (database) render();
@@ -1009,7 +1005,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 chrome.runtime.onMessage?.addListener((message,sender)=>{
   if(sender.id===chrome.runtime.id&&message?.type==='GL_CONTENTS_TIMING_START'&&globalThis.GalacticContentsPerformance.validId(message.diagnosticLookupId)){contentsDiagnosticId=message.diagnosticLookupId;contentsDiagnosticExpires=Date.now()+60000;}
   if(sender.id===chrome.runtime.id&&message?.type==='GL_KINDLE_CONTENTS_PROGRESS')contentsScanProgress.accept(message.runs??[]);
-  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED)contentsScanProgress.changed();
+  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED){backupRestore.changed();contentsScanProgress.changed();}
   return false;
 });
 contentsScanProgress.initialize();

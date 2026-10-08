@@ -1,3 +1,4 @@
+import {accountLabel} from './item-presentation.js';
 const text = (tag, value) => Object.assign(document.createElement(tag), {textContent: value});
 
 export const sourceLabel = value => ({googleBooks:'Google Books',googleBooksGenreHint:'Google Books genre hint',openLibrary:'Open Library work',localMetadata:'File or publisher metadata',kindleProductComicContents:'Kindle contents',comicinfo:'ComicInfo file',epub:'EPUB file',publisher:'Publisher page','google-books':'Google Books','open-library':'Open Library'}[value] ?? value);
@@ -16,12 +17,12 @@ export function bookToolHelp({purpose,input,saves,review,example}) {
 }
 
 // A preview of a proposed source selection, not a replacement of provider data.
-export function metadataPreview(records,candidate,kind) {
+export function metadataPreview(records,candidate,kind,database={}) {
   const root = document.createElement('details'); root.className = 'metadata-preview';
   root.append(text('summary','Preview information to save'),text('p','This saves a source alongside your library details. Purchase status and original provider details stay intact. Undo is available under Sources and undo.'));
   const fields = ['title','subtitle','authors','contributors','publisher','publishers','isbn','language','series','volume','issue','unitType','run','edition','format','publishedDate','firstPublishYear','pageCount','subjects','categories','statement'];
   for (const record of records) {
-    root.append(text('strong',`${record.title} · ${record.provider}`));
+    root.append(text('strong',`${record.title} · ${accountLabel(record,database)}`));
     const table = document.createElement('table'),head = document.createElement('tr');
     for (const label of ['Field','Provider details','Saved source','Suggestion']) head.append(text('th',label)); table.append(head);
     const current = record.metadata?.enrichment?.[kind] ?? {};

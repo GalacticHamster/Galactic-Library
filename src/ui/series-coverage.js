@@ -1,3 +1,4 @@
+import {accountLabel} from './item-presentation.js';
 import {bookToolHelp} from './book-tool-help.js';
 import { contentCoverage, proposeContents, seriesCoverage } from '../lib/contents.js';
 
@@ -19,7 +20,7 @@ export function createSeriesCoverageView(database) {
       const table=element('table','');const head=element('tr','');for(const label of ['Unit','Owned through','Overlap'])head.append(element('th',label));const thead=element('thead','');thead.append(head);table.append(thead);
       const body=element('tbody','');
       for(const entry of [...group.entries].sort((a,b)=>a.number.localeCompare(b.number,undefined,{numeric:true}))){
-        const row=element('tr','');row.append(element('td',entry.number),element('td',[...new Set(entry.sources.map(source=>`${source.title} — ${source.provider}`))].join('; ')),element('td',new Set(entry.sources.map(source=>source.id)).size>1?'Yes':''));body.append(row);
+        const row=element('tr','');row.append(element('td',entry.number),element('td',[...new Set(entry.sources.map(source=>`${source.title} — ${accountLabel(database.providerItems[source.id]??source,database)}`))].join('; ')),element('td',new Set(entry.sources.map(source=>source.id)).size>1?'Yes':''));body.append(row);
       }
       table.append(body);details.append(table);
     });list.append(details);
@@ -46,7 +47,7 @@ export function createSeriesCoverageView(database) {
       if(proposal.unparsed.length)result.append(element('p',`Unparsed contents: ${proposal.unparsed.join('; ')}. The comparison does not cover this text.`));
       if(proposal.entries.some(entry=>entry.completeness==='excerpt'))result.append(element('p','Excerpt entries are excluded from full-unit ownership comparisons.'));
       if(coverage.missing.length)result.append(element('p',`Missing / unconfirmed: ${coverage.missing.map(entry=>`${entry.series} (${entry.run||'run unknown'}) ${entry.unitType} ${entry.number}`).join('; ')}`));
-      const sources=[...new Set(coverage.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${item.provider}`)))];
+      const sources=[...new Set(coverage.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
       if(sources.length)result.append(element('p',`Owned through: ${sources.join('; ')}`));
     }catch(error){result.textContent=error.message;}
   });

@@ -1,3 +1,4 @@
+import {accountLabel} from './item-presentation.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {contentCoverage} from '../lib/contents.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
@@ -14,7 +15,7 @@ export function createCollectionComparison(record,database) {
     if(!result){root.append(text('p','Review and save this collection’s contents first. Unverified suggestions are not used as confirmed coverage.'));return;}
     root.append(text('p',`${result.owned}/${result.total} entries covered through other owned records · ${result.missing.length} not established · ${result.possibleCovered.length} may overlap but need scope or identity confirmation.`));
     if(result.scopeUncertain)root.append(text('p','Series version or language is missing. Complete coverage cannot be established.'));
-    const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${item.provider}`)))];
+    const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(sources.length)root.append(text('p','Covered through: '+sources.join('; ')));
     if(result.missing.length)root.append(text('p','Not established through other records: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
     root.append(text('p','Not established does not prove an issue is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
