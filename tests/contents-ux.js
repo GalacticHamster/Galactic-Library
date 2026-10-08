@@ -1,3 +1,5 @@
+import {bookRoute,bookHref} from '../src/ui/contents-navigation.js';
+import {workspaceTarget} from '../src/lib/ui-preferences.js';
 import {collectionComparison} from '../src/ui/contents-book-details.js';
 import assert from 'node:assert/strict';
 import {contentsSummary,contentsPage,createContentsProjection} from '../src/ui/contents-overview.js';
@@ -34,4 +36,11 @@ contentsUxTests.push(['Collection overlap uses reviewed coverage without countin
   db.contentReviews.a.entries=db.contentReviews.b.entries=[{...entry,unitType:'component',number:'Named Story'}];
   const named=collectionComparison(a,db);assert.equal(named.owned,0);assert.equal(named.possibleCovered.length,1);assert.equal(named.complete,false);
   delete db.contentReviews.a;assert.equal(collectionComparison(a,db),null);
+}]);
+
+contentsUxTests.push(['Book deep links retain exact record scope and legacy workspace routes',()=>{
+  const ref='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  for(const workspace of ['contents','library']){const href=bookHref(workspace,ref);assert.deepEqual(bookRoute(href),{workspace,recordRef:ref});assert.equal(workspaceTarget(href),workspace);}
+  for(const bad of ['#contents?record=kindle:B123','#contents?record=<script>','#contents?record=undefined','#books?record='+ref])assert.equal(bookRoute(bad),null);
+  assert.equal(workspaceTarget('#books'),'books');assert.equal(workspaceTarget('#kindle'),'contents');assert.throws(()=>bookHref('contents','bad'));
 }]);

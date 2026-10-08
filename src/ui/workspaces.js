@@ -33,6 +33,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
     interacted=true;
     if(['library','books'].includes(preferences.workspace))preferences[viewKey()] = readView();
     preferences.workspace = workspace;
+    globalThis.history?.replaceState(null,'',`#${workspace}`);
     show();
     applyView(preferences[viewKey()]);
     remember();

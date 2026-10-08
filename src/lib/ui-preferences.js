@@ -4,7 +4,7 @@ export const LIBRARY_WORKSPACES = ['library', 'books', 'reading', 'ownership'];
 // Old saved views remain valid secondary Library destinations.
 export const WORKSPACES = [...PRIMARY_WORKSPACES, 'books', 'reading', 'ownership'];
 export function workspaceTarget(value) {
-  const name=String(value??'').replace(/^#/u,'').replace(/-workspace$/u,'');
+  const name=String(value??'').replace(/^#/u,'').split('?')[0].replace(/-workspace$/u,'');
   return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
 }
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', page: 0 });

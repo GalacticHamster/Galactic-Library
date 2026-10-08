@@ -1,3 +1,4 @@
+import {bookRoute,bookHref} from './contents-navigation.js';
 import {createContentsBookDetails,createContentsHistory,createCollectionComparison} from './contents-book-details.js';
 import {combinedProviderStates} from '../lib/profile-management.js';
 import {createProvidersView} from './providers-view.js';
@@ -98,7 +99,7 @@ const contentsReviewActions={
   remove:async(id)=>{database=await removeContentReview(id);},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({review:(record,current)=>{
+const contentsWorkspace=createContentsWorkspace({library:openLibraryRecord,opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
   const root=document.createElement('div');
   root.append(createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true}),
     createContentsBookDetails(record,current,{enrich:ref=>inspectEnrichmentRecords([ref]),undo:async ref=>{database=await undoEnrichmentSelection(ref);render();contentsWorkspace.refreshReview();}}),
@@ -158,6 +159,26 @@ async function retryEnrichmentReview(review){
   database=await saveEnrichmentReview({...review,candidates,status,reason});
 }
 
+let initialBookRoute=bookRoute(globalThis.location?.hash);
+function openContentsRecord(ref){
+  workspace.select('contents');
+  if(!contentsWorkspace.open(ref))document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';
+}
+function openLibraryRecord(ref){
+  const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);
+  if(!record){document.querySelector('#workspace-status').textContent='That record is no longer in the current library.';return;}
+  workspace.select('library');search.value='';for(const filter of Object.values(viewControls))filter.value='all';
+  const canonical=Object.values(database.canonicalItems).sort((a,b)=>compareTitles(a.title,b.title));
+  libraryPage=Math.floor(canonical.findIndex(item=>item.providerItemIds.includes(record.id))/50);
+  render();workspace.rememberView();
+  const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
+  if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});card.scrollIntoView({block:'center'});}
+  globalThis.history?.replaceState(null,'',bookHref('library',ref));
+}
+function visitBookRoute(route){if(route?.workspace==='contents')openContentsRecord(route.recordRef);else if(route)openLibraryRecord(route.recordRef);}
+document.addEventListener('click',event=>{const link=event.target.closest('[data-contents-record]');if(link){event.preventDefault();initialBookRoute=null;if(database)openContentsRecord(link.dataset.contentsRecord);}});
+document.querySelector('#workspace-navigation').addEventListener('click',()=>{initialBookRoute=null;});
+globalThis.addEventListener?.('hashchange',()=>{const route=bookRoute(globalThis.location?.hash);if(database)visitBookRoute(route);else initialBookRoute=route;});
 function inspectEnrichmentRecords(refs){
   workspace.select(refs.every(ref=>['book','audiobook'].includes(Object.values(database.providerItems).find(record=>record.recordRef===ref)?.mediaType))?'books':'library');search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
   const first=Object.values(database.providerItems).find(record=>refs.includes(record.recordRef));if(first){search.value=first.title;libraryPage=0;render();workspace.rememberView();}
@@ -904,6 +925,10 @@ function render(timing = null) {
       const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
       if (openLibraryTools) body.append(openLibraryTools);
     }
+    if(canonicalItem.mediaType==='book')for(const record of records){
+      const link=textElement('a',records.length>1?'Review contents ? '+(database.providerProfiles[record.profileId]?.nickname||displayProviderName(record.provider)):'Review contents in Contents');
+      link.href=bookHref('contents',record.recordRef);link.dataset.contentsRecord=record.recordRef;body.append(link,textElement('br',''));
+    }
     if (['book','game'].includes(canonicalItem.mediaType)) {
       for (const record of records) body.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));
     }
@@ -967,6 +992,7 @@ async function refresh(diagnosticLookupId = null) {
   workspace.hydrate(preferences);
   endStage?.();endStage=timing?.begin('options_render');
   render(timing);
+  if(initialBookRoute){const route=initialBookRoute;initialBookRoute=null;visitBookRoute(route);}
   endStage?.();endStage=timing?.begin('options_other');
   await Promise.all([renderCompanionExtensionLinks(), renderGoogleBooksEnrichment()]);
   } finally {

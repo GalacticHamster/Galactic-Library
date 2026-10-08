@@ -1,4 +1,5 @@
 import {CONTENTS_STATUSES,createContentsProjection,contentsPage} from './contents-overview.js';
+import {bookHref} from './contents-navigation.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return node;};
 const providerName=id=>({kindle:'Kindle',humble:'Humble Bundle',fanatical:'Fanatical',kobo:'Kobo'}[id]??id);
@@ -34,6 +35,7 @@ export function createContentsWorkspace(actions={}) {
     }));
   }
   function close(){selected=null;detail.hidden=true;detail.replaceChildren();listView.hidden=false;renderList();
+    actions.closed?.();
     const target=[...list.children].find(node=>node.dataset.recordRef===lastOpened);target?.querySelector('button')?.focus({preventScroll:true});globalThis.scrollTo?.(0,returnScroll);
   }
   let lastOpened;
@@ -46,6 +48,8 @@ export function createContentsWorkspace(actions={}) {
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));
+    if(actions.library){const link=text('a','Open this book in Library');link.href=bookHref('library',record.recordRef);link.addEventListener('click',event=>{event.preventDefault();actions.library(record.recordRef);});detail.append(link);}
+    actions.opened?.(record.recordRef);
     detail.tabIndex=-1;detail.focus({preventScroll:true});return true;
   }
   for(const control of [search,status,provider])control.addEventListener(control===search?'input':'change',()=>{page=0;renderList();});
