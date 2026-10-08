@@ -56,7 +56,7 @@ export function createContentsReadOnly(record,database,{compact=false,showSource
   if(preview.text)root.append(text('p','Collects: '+preview.text+(preview.remaining?' \u00b7 '+preview.remaining+' more entries':'')));
   else if(value.fallback)root.append(text('p','Description: '+value.fallback.slice(0,220)+(value.fallback.length>220?'\u2026':'')));
   else return null;
-  root.append(text('small',(showSource?value.source+' \u00b7 ':'')+value.basis+(value.reviewed?'':' \u00b7 Not verified')+(value.incomplete||needsReview?' \u00b7 Some description details need review':'')));
+  root.append(text('small',(showSource?value.source+' \u00b7 ':'')+value.basis+(value.reviewed?'':' \u00b7 Not reviewed')+(value.incomplete||needsReview?' \u00b7 Some description details need review':'')));
   if(!compact){
     const full=text('details','');full.append(text('summary','All known included works'+(value.entries.length?' ('+value.entries.length+' entries)':'')));let built=false;
     full.addEventListener('toggle',()=>{if(!full.open||built)return;built=true;const list=text('ul','');for(const group of value.groups)list.append(text('li',group.text));if(value.fallback)list.append(text('li',value.fallback));full.append(list);if(value.unresolved.length)full.append(text('p','Still to check: '+value.unresolved.join('; ')));});root.append(full);

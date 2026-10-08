@@ -1,5 +1,4 @@
 import {formatDate} from './formatters.js';
-import {bookToolHelp} from './book-tool-help.js';
 import { contentsStatement, validateContents } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
 import {independentContentsClaims} from '../lib/kindle-evidence-review.js';
@@ -13,8 +12,9 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   root.append(element('summary', `Review included contents \u2014 ${record.title}`));
   let populated=false;
   const populate=()=>{
-  root.append(bookToolHelp({purpose:'Review the issues, volumes or named components included in this edition.',input:'The original contents statement plus the scope and language of each proposed entry.',saves:'Parsing creates editable suggestions only. Save verified contents confirms the entries you reviewed.',review:'Check every entry and mark excerpts as excerpts. Named suggestions do not become library-title matches. Verified full entries can establish scoped coverage only when the collection is owned.',example:'Includes Wool, Shift and Dust produces named suggestions; check the original edition before confirming anything.'}));
-  root.append(element('p','Check the suggested entries and mark partial material as excerpts before saving.'));
+  const help=element('details','');help.className='book-tool-help';help.append(element('summary','How contents review works'));
+  const steps=element('ol','');for(const instruction of ['GL suggests included works from a book’s description.','Check names, numbers, series version, language and whether each entry is a full work or an excerpt. Correct anything wrong or missing.','Save the entries you reviewed. A reviewed list is not necessarily everything in the book.'])steps.append(element('li',instruction));
+  help.append(steps,element('p','Reviewing contents does not change ownership or add separate purchases of the included works. Comparisons use qualifying owned copies, including your existing ownership preferences.'));root.append(element('p','Check the suggested included works before saving.'),help);
   const evidence=record.metadata?.enrichment?.kindleProductComicContents;
   const interpretedEvidence=evidence?.manifest?manifestReviewProposal(evidence,record.title):null;
   const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
@@ -37,7 +37,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
       if(['unitType','completeness'].includes(key)){
         input=document.createElement('select');
         for(const value of key==='unitType'?['issue','volume','annual','special','component']:['full','excerpt']){
-          const option=element('option',value);option.value=value;input.append(option);
+          const option=element('option',({issue:'Issue',volume:'Volume',annual:'Annual',special:'Special',component:'Named work',full:'Full included work',excerpt:'Excerpt'})[value]);option.value=value;input.append(option);
         }
         input.value=entry[key]||(key==='unitType'?'issue':'full');
       }else{input=document.createElement('input');input.value=entry[key]??'';input.maxLength=500;}
@@ -48,7 +48,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
   if(review)status.textContent=`${review.entries.length} reviewed entries saved. Edit to correct them, or undo confirmation.`;
-  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not verified. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
+  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not reviewed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
   if(initialProposal)interpretation.textContent=`Local interpretation: ${initialProposal.outcome}; ${initialProposal.qualityReason} Context: ${initialProposal.parseBinding}. Proposal input: ${initialProposal.parseInput}`;
   if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
@@ -102,15 +102,15 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);
   root.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.entries.length} suggested entries · Not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    status.textContent=`${proposed.entries.length} suggested entries · Not reviewed. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     interpretation.textContent=`Local interpretation: ${proposed.outcome}; ${proposed.qualityReason} Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),element('p','Scroll the entry table to see every field. Series version/year and language help distinguish editions.'),tableScroll);
-  root.append(button('Save verified contents',()=>persist(async()=>{
+  root.append(button('Save reviewed contents',()=>persist(async()=>{
       const entries=[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
       await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});
   })));
-  if(review)root.append(button('Undo contents confirmation',()=>persist(()=>actions.remove(record.id))));
-  root.append(element('p','Correct an entry directly or remove a wrong suggestion before saving. Undo removes human confirmation, not captured evidence. There is no saved rejection of a captured source statement; leaving suggestions unconfirmed does not establish contents coverage.'),status);
+  if(review)root.append(button('Undo contents review',()=>persist(()=>actions.remove(record.id))));
+  root.append(element('p','Correct an entry directly or remove a wrong suggestion before saving. Undo removes human confirmation, not captured evidence. Leaving a suggestion unreviewed does not confirm that it is included.'),status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
   if(expanded){root.open=true;populated=true;populate();}

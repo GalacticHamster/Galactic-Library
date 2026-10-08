@@ -5,10 +5,10 @@ export const sourceLabel = value => ({googleBooks:'Google Books',googleBooksGenr
 export const fieldLabel = value => ({title:'Title',subtitle:'Subtitle',authors:'Authors',contributors:'Other creators',publisher:'Publisher',publishers:'Publishers',isbn:'ISBN',language:'Language',series:'Series',volume:'Volume',issue:'Issue',unitType:'Unit type',run:'Series run',edition:'Edition',format:'Format',publishedDate:'Publication date',firstPublishYear:'First publication year',pageCount:'Page count',subjects:'Subjects',categories:'Genres',statement:'Contents statement'}[value] ?? value);
 const format = value => Array.isArray(value) ? value.map(entry => typeof entry === 'object' ? `${entry.role}: ${entry.name}` : entry).join(', ') : String(value ?? '');
 
-export function bookToolHelp({purpose,input,saves,review,example}) {
+export function bookToolHelp({purpose,input,saves,review,example,heading='How book suggestions work'}) {
   const root = document.createElement('div'); root.className = 'book-tool-help';
   root.append(text('p', purpose));
-  const details = document.createElement('details'); details.append(text('summary','How this works'));
+  const details = document.createElement('details'); details.append(text('summary',heading));
   for (const [label,value] of [['Uses',input],['Saves',saves],['Your review',review],['Example',example]]) {
     if (!value) continue;
     const paragraph = document.createElement('p'); paragraph.append(text('strong',`${label}: `),document.createTextNode(value)); details.append(paragraph);

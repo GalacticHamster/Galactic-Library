@@ -5,7 +5,7 @@ import {accountLabel} from './item-presentation.js';
 
 export function createEnrichmentEvidence(records,database,undo,state={}){
   const details=document.createElement('details');details.className='enrichment-evidence';
-  const heading=document.createElement('summary');heading.textContent='Sources and undo';details.append(heading,bookToolHelp({purpose:'See where saved book details came from and restore an earlier selection.',input:'The sources already saved for this book.',saves:'Viewing changes nothing. Undo removes this selection and restores its predecessor, where one exists.',review:'Provider details and ownership are preserved. Contents confirmation has its own undo control.',example:'If an EPUB supplied the wrong series, undo that selection and choose another source.'}));
+  const heading=document.createElement('summary');heading.textContent='Sources and undo';details.append(heading,bookToolHelp({heading:'How source undo works',purpose:'See where saved book details came from and restore an earlier selection.',input:'The sources already saved for this book.',saves:'Viewing changes nothing. Undo removes this selection and restores its predecessor, where one exists.',review:'Provider details and ownership are preserved. Contents confirmation has its own undo control.',example:'If an EPUB supplied the wrong series, undo that selection and choose another source.'}));
   let built=false;
   function populate(){if(built)return;built=true;
   const fields=['title','subtitle','authors','contributors','publisher','publishers','isbn','language','series','volume','issue','unitType','run','edition','format','publishedDate','pageCount','subjects','categories','statement'];

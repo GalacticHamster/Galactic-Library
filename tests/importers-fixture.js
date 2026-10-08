@@ -199,7 +199,7 @@ try{
   const record=db.providerItems['kindle:B000000002'];let savedReview;
   const editor=createContentsEditor(record,null,{save:async(id,value)=>{savedReview=value;await writer.saveContentReview(id,value);},refresh(){}});document.body.append(editor);editor.open=true;await pause();
   const click=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label).click();
-  click(editor,'Parse statement for review');assert(editor.querySelectorAll('tbody tr').length===3,'Named works are missing from the editor.');click(editor,'Save verified contents');await wait(()=>Boolean(savedReview));
+  click(editor,'Parse statement for review');assert(editor.querySelectorAll('tbody tr').length===3,'Named works are missing from the editor.');click(editor,'Save reviewed contents');await wait(()=>Boolean(savedReview));
   assert(savedReview.entries.every(entry=>entry.unitType==='component'),'Named suggestions changed their component shape.');
   checks.push('Contents to review lists fully parsed proposals; explicit editor confirmation saves named components');
   await setMode('reparse');const before=requests.length;start.click();await finished();assert(requests.length===before,'Parser-only mode contacted Amazon.');

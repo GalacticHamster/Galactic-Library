@@ -1,3 +1,4 @@
+import {accessLabel} from './formatters.js';
 import {accountLabel} from './item-presentation.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {contentCoverage} from '../lib/contents.js';
@@ -10,15 +11,15 @@ export function collectionComparison(record,database) {
 export function createCollectionComparison(record,database) {
   const root=text('details','');root.className='contents-collection-comparison';root.append(text('summary','Overlap with other reviewed collections'));
   let built=false;root.addEventListener('toggle',()=>{if(!root.open||built)return;built=true;
-    root.append(text('p','Compares this book’s human-reviewed entries with contents confirmed through other qualifying owned records. It does not create separate digital entitlements. Proposed or uncertain overlap remains unconfirmed.'));
+    root.append(text('p','Compare the entries you reviewed with checked contents in other collections you own. Included material is not a separate purchase of each work.'));
     const result=collectionComparison(record,database);
     if(!result){root.append(text('p','Review and save this collection’s contents first. Unverified suggestions are not used as confirmed coverage.'));return;}
-    root.append(text('p',`${result.owned}/${result.total} entries covered through other owned records · ${result.missing.length} not established · ${result.possibleCovered.length} may overlap but need scope or identity confirmation.`));
-    if(result.scopeUncertain)root.append(text('p','Series version or language is missing. Complete coverage cannot be established.'));
+    root.append(text('p',`${result.owned} of ${result.total} checked entries also appear in other collections you own. ${result.missing.length} have no confirmed match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
+    if(result.scopeUncertain)root.append(text('p','Series version, language or a related match needs checking before a complete comparison can be made.'));
     const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(sources.length)root.append(text('p','Covered through: '+sources.join('; ')));
-    if(result.missing.length)root.append(text('p','Not established through other records: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
-    root.append(text('p','Not established does not prove an issue is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
+    if(result.missing.length)root.append(text('p','No confirmed match in other collections: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
+    root.append(text('p','No confirmed match does not prove the material is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
   });return root;
 }
 export function createContentsBookDetails(record,database,actions) {
@@ -35,13 +36,13 @@ export function createContentsBookDetails(record,database,actions) {
   const pending=Object.values(database.enrichmentReviews??{}).filter(review=>review.recordRefs?.includes(record.recordRef));
   if(pending.length)root.append(text('p',`${pending.length} book lookup results await review, including any failed or empty lookups. Review them in Book information.`));
   root.append(button('Open book information',()=>actions.enrich(record.recordRef)));
-  root.append(text('h4','Ownership and access'),text('p',`Imported access: ${record.ownership||'unknown'}. Contents confirmation does not create a separate entitlement to each included work. Existing ownership preferences and review rules still apply to comparisons.`));
+  root.append(text('h4','Ownership and access'),text('p',`Imported access: ${accessLabel(record.ownership)}. Contents confirmation does not create a separate entitlement to each included work. Existing ownership preferences and review rules still apply to comparisons.`));
   let built=false;
   root.addEventListener('toggle',()=>{if(!root.open||built)return;built=true;root.append(createEnrichmentEvidence([record],database,actions.undo));});
   return root;
 }
 export function createContentsHistory(record,database) {
-  const root=text('details','');root.className='contents-history';root.append(text('summary','Advanced source history and recovery'));
+  const root=text('details','');root.className='contents-history';root.append(text('summary','Earlier descriptions and technical history'));
   let built=false;
   root.addEventListener('toggle',()=>{
     if(!root.open||built)return;built=true;

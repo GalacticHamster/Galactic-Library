@@ -35,7 +35,7 @@ export function createContentsWorkspace(actions={}) {
   const list=text('ol','');list.className='library-items contents-collection-items';list.id='contents-collection-list';
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
   const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
-  listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not verified means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
+  listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not reviewed means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
   const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
   function readView(){return {...view,page,anchor:selected??result?.rows[0]?.canonical.id??view.anchor};}
@@ -96,10 +96,10 @@ export function createContentsWorkspace(actions={}) {
         }
 
       }
-      if(selected&&!rows.some(row=>row.recordRef===selected)){const notice=detail.querySelector('.contents-review-notice');notice.textContent='This book is no longer in the current library. Your open draft is retained for reference; it cannot be saved.';for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save verified contents','Undo contents confirmation'].includes(control.textContent))control.disabled=true;return;}
+      if(selected&&!rows.some(row=>row.recordRef===selected)){const notice=detail.querySelector('.contents-review-notice');notice.textContent='This book is no longer in the current library. Your open draft is retained for reference; it cannot be saved.';for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save reviewed contents','Undo contents review'].includes(control.textContent))control.disabled=true;return;}
       if(selected){const record=database.providerItems[rows.find(row=>row.recordRef===selected).id];
         if(openedEvidence!==evidenceKey(record)){const notice=detail.querySelector('.contents-review-notice');notice.replaceChildren(text('span','Saved evidence or a review changed while this editor was open. Your draft is retained. Reload before replacing a newer review. '),button('Reload saved contents',()=>open(selected)));
-          for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save verified contents','Undo contents confirmation'].includes(control.textContent))control.disabled=true;
+          for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save reviewed contents','Undo contents review'].includes(control.textContent))control.disabled=true;
         }
       }
       renderList();

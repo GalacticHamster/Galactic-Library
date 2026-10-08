@@ -23,7 +23,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
   root.append(element('summary','Matching, editions and source evidence'));
   let populated=false;
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
-    root.append(element('p','Same work keeps editions separate and can support a Possible relationship. Same edition groups compatible records. Different works blocks that relationship and indirect grouping. Separating a record keeps it in its own edition. These actions change identity grouping, not purchase evidence.'));
+    root.append(element('p','Same work keeps editions separate and supports Possible warnings for related copies. Same edition groups copies only when known identity details agree. Different works prevents that relationship and grouping. These choices do not confirm a purchase. Separating a copy keeps it in its own edition.'));
     root.append(element('p',`Persistent edition ID: ${canonical.id}`));
     for(const record of records){
       const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);

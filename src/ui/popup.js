@@ -27,7 +27,7 @@ try {
   if (movieCount) parts.push(`${uniqueMovieCount} unique movie${uniqueMovieCount === 1 ? '' : 's'} from ${movieCount} record${movieCount === 1 ? '' : 's'}`);
   if (tvCount) parts.push(`${uniqueTvCount} unique TV title${uniqueTvCount === 1 ? '' : 's'} from ${tvCount} record${tvCount === 1 ? '' : 's'}`);
   if (addOnCount) parts.push(`${addOnCount} DLC add-on${addOnCount === 1 ? '' : 's'}`);
-  summary.textContent = parts.length ? `${parts.join('; ')}.` : 'No libraries connected yet.';
+  summary.textContent = parts.length ? `${parts.join('; ')}.` : Object.keys(database.providerProfiles??{}).length?'No imported items to show. Check your saved accounts in Providers.':'No libraries imported yet.';
 } catch (error) {
   summary.textContent = `Could not load library: ${error.message}`;
 }

@@ -1,3 +1,4 @@
+import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {accountLabel} from './item-presentation.js';
@@ -886,7 +887,7 @@ document.querySelector('label[for="import"]').addEventListener('keydown',event=>
 const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh,exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation()});
 
 document.querySelector('#clear').addEventListener('click', async () => {
-  if (!confirm('Clear every locally stored provider record, match, and setting?')) return;
+  if (!confirm('Clear Galactic Library in this browser? This removes saved libraries, account labels, reviews and settings, including your Google Books key and companion links. Purchases in your stores are unaffected. The API key is not included in a library backup.')) return;
   try {
     await clearDatabase();
     await refresh();
@@ -932,6 +933,8 @@ pauseGoogleBooksEnrichmentButton.addEventListener('click', () => {
 });
 resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
   try {
+    const job=await getGoogleBooksEnrichmentJob();
+    if(job&&job.cursor<job.queue.length){const decision=createConfirmation({title:'Clear saved lookup queue?',message:job.cursor+' of '+job.queue.length+' completed. This abandons the saved lookup position. Already saved book details stay.',confirmLabel:'Clear saved lookup queue'});if(!await decision.result)return;const latest=await getGoogleBooksEnrichmentJob();if(JSON.stringify(latest)!==JSON.stringify(job))throw Error('Lookup progress changed. Review the current progress before clearing it.');}
     await clearGoogleBooksEnrichmentJob();
     await renderGoogleBooksEnrichment();
   } catch (error) {
@@ -1008,3 +1011,5 @@ contentsScanProgress.initialize();
 const loadLibrary=()=>refresh().catch(error=>{const status=document.querySelector('#library-load-status');status.hidden=false;status.querySelector('span').textContent='Could not load library: '+error.message;document.querySelector('#retry-library-load').hidden=false;});
 document.querySelector('#retry-library-load').addEventListener('click',loadLibrary);
 loadLibrary();
+
+document.querySelector('#copy-galactic-extension-id').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(chrome.runtime.id);companionExtensionLinkStatus.textContent='Galactic Library ID copied.';}catch{companionExtensionLinkStatus.textContent='Copy the Galactic Library ID shown above into the companion settings.';}});

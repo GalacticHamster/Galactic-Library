@@ -23,7 +23,7 @@ export function createContentsScanProgress({runtime, reconcile, container, clock
   }
   function render() {
     element.hidden=!runs.length;
-    status.textContent=runs.map(run=>`Kindle contents ${run.phase}: ${run.checked}/${run.total} checked; ${run.total-run.checked} remaining; ${run.found} statements found; ${run.empty} no contents; ${run.unavailable} unavailable; ${run.failures} failed; ${run.reparsed} locally reparsed. ${run.buffered} results waiting to save.`).join(' ');
+    status.textContent=runs.map(run=>`Kindle contents ${run.phase}: ${run.checked}/${run.total} checked; ${run.total-run.checked} remaining; ${run.found} statements found; ${run.empty} no contents statement found; ${run.unavailable} pages unavailable; ${run.failures} retryable failures; ${run.reparsed} locally reparsed. ${run.buffered} results waiting to save.`).join(' ');
   }
   function accept(values) {
     const wasActive=active();
