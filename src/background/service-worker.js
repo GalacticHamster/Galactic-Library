@@ -1,3 +1,4 @@
+import {allowedCompanionOperation} from '../lib/companion-identities.js';
 import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
@@ -545,6 +546,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         respond({ ok: false, error: 'This extension is not allowed to use the Galactic Library API.' });
         return null;
       }
+      if(!allowedCompanionOperation(sender.id,request?.type)){respond({ok:false,error:'Unsupported or unauthorized Galactic Library API operation.'});return null;}
       authorizedCompanion=true;workerLifecycle.observe('external_started:'+request?.type);
       if(request?.type==='OPEN_REVIEW'){
         if(request.apiVersion!==1){sendResponse({ok:false,apiVersion:1,error:'Unsupported Galactic Library API version.'});return null;}

@@ -1,3 +1,4 @@
+import {builtinCompanions,checkCompanionConnection,companionBrowser} from '../lib/companion-identities.js';
 import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
@@ -546,13 +547,17 @@ function renderDuplicateReview() {
   reviewedDuplicateItems.replaceChildren(...reviewed.map((candidate) => createReviewRow(candidate, true)));
 }
 
+const companionConnectionStatuses=new Map();
 async function renderCompanionExtensionLinks() {
+  const official=builtinCompanions(chrome.runtime);
+  document.querySelector('#official-companion-status').replaceChildren(...official.map(item=>{const row=document.createElement('li');row.textContent=item.name+': '+(companionConnectionStatuses.get(item.id)||'Automatic pairing ready; connection not yet verified.');return row;}));
+  document.querySelector('#builtin-companion-identities').replaceChildren(...official.map(item=>{const row=document.createElement('li'),code=document.createElement('code');code.textContent=item.id;row.append(item.name+' ',code);return row;}));
   const ids = await getAllowedExternalClientIds();
   galacticExtensionId.textContent = chrome.runtime.id;
   companionExtensionId.value = '';
   companionExtensionLinkStatus.textContent = ids.length
-    ? `${ids.length} companion extension${ids.length === 1 ? '' : 's'} allowed.`
-    : 'No companion extensions are allowed yet.';
+    ? `${ids.length} additional ID${ids.length===1?'':'s'} saved. Built-in trust remains separate.`
+    : 'No additional IDs saved. Official companions remain trusted.';
   allowedCompanionExtensions.replaceChildren(...ids.map((id) => {
     const row = document.createElement('li');
     const code = document.createElement('code'); code.textContent = id;
@@ -941,12 +946,18 @@ resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
     googleBooksEnrichmentStatus.textContent = `Could not reset enrichment progress: ${error.message}`;
   }
 });
+document.querySelector('#check-companion-connections').addEventListener('click',async event=>{
+  const button=event.currentTarget;button.disabled=true;
+  try{await Promise.all(builtinCompanions(chrome.runtime).map(async item=>companionConnectionStatuses.set(item.id,await checkCompanionConnection(chrome.runtime,item.id))));await renderCompanionExtensionLinks();}
+  finally{button.disabled=false;}
+});
 document.querySelector('#add-companion-extension-id').addEventListener('click', async () => {
   const id = companionExtensionId.value.trim();
   if (!isExtensionId(id)) {
     companionExtensionLinkStatus.textContent = 'Enter a valid Chrome extension ID or Firefox add-on ID.';
     return;
   }
+  if(companionBrowser(chrome.runtime)==='chrome'&&!/^[a-p]{32}$/u.test(id)){companionExtensionLinkStatus.textContent='This is a Firefox add-on ID. Existing entries are preserved; add a Chrome ID for this browser.';return;}
   try {
     await addAllowedExternalClientId(id);
     await renderCompanionExtensionLinks();
@@ -958,7 +969,7 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
   try {
     await saveAllowedExternalClientIds([]);
     await renderCompanionExtensionLinks();
-    companionExtensionLinkStatus.textContent = 'Companion extension links removed.';
+    companionExtensionLinkStatus.textContent = 'Additional IDs removed. Official companions remain trusted.';
   } catch (error) {
     companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }

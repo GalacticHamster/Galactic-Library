@@ -1,3 +1,4 @@
+import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/companion-identities.js';
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
@@ -149,7 +150,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     await ready;
     // Authorization is never cached and does not wait on a refresh mutation.
     const stored=await committedArea.get({[EXTERNAL_CLIENT_IDS_STORAGE_KEY]:[]});
-    return normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]);
+    return effectiveExternalClientIds(normaliseExternalClientIds(stored[EXTERNAL_CLIENT_IDS_STORAGE_KEY]));
   }
   async function getCommittedLibraryView(diagnosticLookupId){
     const endActivity=activity('options_view');
@@ -1171,7 +1172,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function feedUploads(){return (await storageArea.get({[FEED_UPLOAD_KEY]:{}}))[FEED_UPLOAD_KEY];}
-  async function feedClient(client,external=false){if(!isExtensionId(client))throw new Error('Invalid reminder client.');if(external&&!(await getAllowedExternalClientIds()).includes(client))throw new Error('Companion permission was revoked.');}
+  async function feedClient(client,external=false){if(!isExtensionId(client))throw new Error('Invalid reminder client.');if(external&&(!effectiveExternalClientIds(await getAllowedExternalClientIds()).includes(client)||!allowedCompanionOperation(client,'BEGIN_ENTITLEMENT_FEED')))throw new Error('Companion permission was revoked.');}
   async function beginCompanionFeed(client,value,external=false){
     await feedClient(client,external);const database=await getDatabase(),profileLabel=text(value?.profileLabel,100,'Humble profile');
     if(!profileLabel||database.providers.humble?.profileLabel!==profileLabel)throw new Error('The GL Humble profile does not match. Confirm the same account and enter its current GL profile label.');

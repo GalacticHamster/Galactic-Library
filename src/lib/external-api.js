@@ -53,7 +53,8 @@ function validMatchRequest(item) {
 /** A deliberately narrow, JSON-only API for an explicitly allow-listed
  * companion extension. It never exposes the raw Galactic Library database. */
 export function handleExternalApiRequest(database, request) {
-  if (!request || typeof request !== 'object') return { ok: false, error: 'Invalid Galactic Library API request.' };
+  if (!request || typeof request !== 'object' || Array.isArray(request)) return { ok: false, error: 'Invalid Galactic Library API request.' };
+  if(['PING','GET_STATUS'].includes(request.type)&&request.apiVersion!==undefined&&request.apiVersion!==EXTERNAL_API_VERSION)return {ok:false,apiVersion:EXTERNAL_API_VERSION,error:'Unsupported Galactic Library API version.'};
   if (request.type === 'PING') return { ok: true, apiVersion: EXTERNAL_API_VERSION, appVersion: '0.1.0' };
   if (request.type === 'GET_STATUS') return { ok: true, apiVersion: EXTERNAL_API_VERSION, ready: true, providers: providerStatus(combinedProviderStates(database)), capabilities:{mediaTypes:[...REQUEST_MEDIA_TYPES],relationships:['same-work','same-edition','contains'],reviewedContents:true,opaqueItemReferences:true,entitlementReminders:true,entitlementFeed:true,centralReview:true} };
   if(request.type==='GET_REMINDERS'){

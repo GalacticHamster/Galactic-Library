@@ -9,6 +9,7 @@
   "src/background/storage-access.js",
   "src/background/storage-messages.js",
   "src/background/storage-writer.js",
+  "src/lib/companion-identities.js",
   "src/lib/companion-entitlements.js",
   "src/lib/companion-response.js",
   "src/lib/constants.js",
