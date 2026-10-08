@@ -44,3 +44,11 @@ contentsUxTests.push(['Book deep links retain exact record scope and legacy work
   for(const bad of ['#contents?record=kindle:B123','#contents?record=<script>','#contents?record=undefined','#books?record='+ref])assert.equal(bookRoute(bad),null);
   assert.equal(workspaceTarget('#books'),'books');assert.equal(workspaceTarget('#kindle'),'contents');assert.throws(()=>bookHref('contents','bad'));
 }]);
+
+contentsUxTests.push(['Provider/local statements are visible and same-manifest parent reviews are not false new discoveries',()=>{
+  const record=book('a');record.metadata.contentsStatement='Collects Example #1';assert.equal(contentsSummary(record,{}).status,'uncertain');
+  const source={statement:'Collects Example #1',parseOutcome:'full',checkedAt:'2026-10-01',manifest:{selected:0,candidates:[{block:0,raw:'Collects Example #1',manifestRange:{start:0,end:50}},{block:0,whole:true,raw:'Collects Example #1; Other #2',manifestRange:{start:0,end:50}}]}};
+  record.metadata.enrichment.kindleProductComicContents=source;
+  const db={contentReviews:{a:{entries:[{number:'1'}],statement:'Collects Example #1; Other #2',verifiedAt:'2026-10-02'}}};
+  const row=contentsSummary(record,db);assert.equal(row.changed,false);assert.equal(row.needsReview,false);assert.equal(row.updatedAt,'2026-10-02');
+}]);

@@ -1,5 +1,5 @@
 import {bookToolHelp} from './book-tool-help.js';
-import { contentsStatement, proposeContentsForReview, validateContents } from '../lib/contents.js';
+import { contentsStatement, validateContents } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
 import {independentContentsClaims} from '../lib/kindle-evidence-review.js';
 
@@ -44,12 +44,23 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     }
     const remove=element('button','Remove');remove.type='button';remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
   };
-  const initialProposal=interpretedEvidence??(discovered?proposeContentsForReview(discovered,record.title,{series:record.metadata?.series}):null);
+  const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
   if(review)status.textContent=`${review.entries.length} human-reviewed entries saved. Edit and save to correct them, or undo confirmation. Source evidence remains unchanged.`;
-  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries — not confirmed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}`;
+  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries — not confirmed / not verified. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
+  if(initialProposal)interpretation.textContent=`Local interpretation: ${initialProposal.outcome}; ${initialProposal.qualityReason} Context: ${initialProposal.parseBinding}. Proposal input: ${initialProposal.parseInput}`;
+  if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
+  if(review&&initialProposal?.descriptionMayBeIncomplete)root.append(element('p','The captured description may be incomplete. Your human review is retained; it is not proof that the description lists everything in the book.'));
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
+  let saving=false;
+  const persist=async operation=>{
+    if(saving)return;saving=true;
+    const controls=[...root.querySelectorAll('button,input,select,textarea')].map(node=>[node,node.disabled]);for(const [node] of controls)node.disabled=true;
+    try{await operation();actions.refresh();}
+    catch(error){status.textContent=`Could not save contents: ${error.message}`;}
+    finally{saving=false;for(const [node,disabled] of controls)node.disabled=disabled;}
+  };
   let loadedClaim=null;
   const independent=independentContentsClaims(evidence,record.title);
   if(independent.claims.length){
@@ -89,16 +100,14 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   }
   root.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.entries.length} suggested entries ? not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    status.textContent=`${proposed.entries.length} suggested entries — not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     interpretation.textContent=`Local interpretation: ${proposed.outcome}; ${proposed.qualityReason} Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),table);
-  root.append(button('Save verified contents',async()=>{
-    try{
+  root.append(button('Save verified contents',()=>persist(async()=>{
       const entries=[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
-      await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});actions.refresh();
-    }catch(error){status.textContent=`Could not save contents: ${error.message}`;}
-  }));
-  if(review)root.append(button('Undo contents confirmation',async()=>{try{await actions.remove(record.id);actions.refresh();}catch(error){status.textContent=error.message;}}));
+      await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});
+  })));
+  if(review)root.append(button('Undo contents confirmation',()=>persist(()=>actions.remove(record.id))));
   root.append(element('p','Correct an entry directly or remove a wrong suggestion before saving. Undo removes human confirmation, not captured evidence. There is no saved rejection of a captured source statement; leaving suggestions unconfirmed does not establish contents coverage.'),status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});

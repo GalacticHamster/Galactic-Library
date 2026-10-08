@@ -1,3 +1,4 @@
+import {contentsStatement} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
   reviewed:'Reviewed contents', identified:'Contents identified — not reviewed',
@@ -9,17 +10,20 @@ const failed = value => ['unavailable','temporary-failure'].includes(value);
 export function contentsSummary(record, database) {
   const saved=record.metadata?.enrichment?.kindleProductComicContents;
   const local=record.metadata?.enrichment?.localMetadata;
-  const statement=saved?.statement?.trim() || local?.statement?.trim() || '';
+  const statement=contentsStatement(record);
   const review=database.contentReviews?.[record.id];
   const attempt=database.kindleContentsObservations?.[record.recordRef]?.latestAttempt ?? saved;
   const candidate=saved?.manifest?.candidates?.[saved.manifest.selected];
-  const changed=Boolean(review && statement && statement!==review.statement);
+  const parent=candidate?.manifestRange&&!candidate.whole?saved.manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange?.start===candidate.manifestRange.start&&c.manifestRange?.end===candidate.manifestRange.end):null;
+  const changed=Boolean(review && statement && statement!==review.statement && parent?.raw!==review.statement);
   const incomplete=Boolean(saved?.descriptionMayBeIncomplete || saved?.manifest?.descriptionMayBeIncomplete || candidate?.truncated);
   const outcome=saved?.parseOutcome;
-  let status=review?'reviewed':statement
+  const status=review?'reviewed':statement
     ? incomplete||outcome==='partial'?'partial':outcome==='full'?'identified':'uncertain'
     :failed(attempt?.availability)?'failed':saved?'missing':'unattempted';
   const needsReview=changed || !review&&Boolean(statement);
+  const updatedAt=[attempt?.checkedAt,review?.verifiedAt,saved?.checkedAt,local?.appliedAt||local?.retrievedAt]
+    .filter(value=>Number.isFinite(Date.parse(value))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??'';
   // A saved candidate's count may describe a child span, not the review input.
   // Count reviewed entries only; obtain exact proposed counts lazily in the editor.
   return {id:record.id,recordRef:record.recordRef,title:record.title,provider:record.provider,
@@ -27,7 +31,7 @@ export function contentsSummary(record, database) {
     status,label:CONTENTS_STATUSES[status],needsReview,changed,incomplete,
     failed:failed(attempt?.availability),retained:Boolean(failed(attempt?.availability)&&(statement||review)),
     attempt:attempt?.availability??'never-checked',count:review?.entries?.length??null,
-    updatedAt:attempt?.checkedAt||review?.verifiedAt||saved?.checkedAt||local?.retrievedAt||'',
+    updatedAt,
     reviewedAt:review?.verifiedAt||'',hasStatement:Boolean(statement)};
 }
 export function createContentsProjection() {
@@ -42,7 +46,7 @@ export function createContentsProjection() {
 }
 export function contentsPage(rows,{query='',status='all',provider='all',page=0,size=50}={}) {
   const text=query.trim().toLocaleLowerCase();
-  const filtered=rows.filter(row=>(status==='all'||status==='review'?row.needsReview||status==='all':status==='failure'?row.failed:row.status===status)
+  const filtered=rows.filter(row=>(status==='all'?true:status==='review'?row.needsReview:status==='failure'?row.failed:row.status===status)
     && (provider==='all'||row.provider===provider)
     && `${row.title} ${row.nickname}`.toLocaleLowerCase().includes(text));
   const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.max(0,Math.min(page,pages-1));

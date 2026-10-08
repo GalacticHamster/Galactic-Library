@@ -86,3 +86,5 @@ Settings contains ownership preferences (global and per provider), book-service
 setup, companion links, backup export/restore and performance diagnostics.
 Provider accounts and import controls are in Providers. Older saved book,
 reading and ownership views remain valid Library destinations.
+
+Contents discovery, integrated review and collection comparison are described in [Contents workspace](contents-workspace.md).

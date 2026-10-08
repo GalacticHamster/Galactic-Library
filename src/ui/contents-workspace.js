@@ -29,7 +29,7 @@ export function createContentsWorkspace(actions={}) {
       const node=text('li','');node.dataset.recordRef=row.recordRef;
       node.append(text('strong',row.title),text('small',`${providerName(row.provider)} · ${row.nickname}`),text('p',`${row.label}${row.count!==null?` · ${row.count} reviewed entries`:''}${row.needsReview?' · Review needed':''}`));
       if(row.failed)node.append(text('p',row.retained?'Latest source check failed or was unavailable. Earlier contents and any human review are retained.':'The source could not be acquired. Retry or recovery belongs on the signed-in Kindle page.'));
-      if(row.changed)node.append(text('p','New discovery differs from your review. Saved decisions remain unchanged.'));
+      if(row.changed)node.append(text('p','Captured contents differ from your review. Saved decisions remain unchanged.'));
       if(row.updatedAt)node.append(text('small','Last contents activity: '+new Date(row.updatedAt).toLocaleString()));
       node.append(button('Inspect contents',()=>open(row.recordRef)));return node;
     }));
@@ -46,6 +46,7 @@ export function createContentsWorkspace(actions={}) {
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
+    if(summary.failed)detail.append(text('p',summary.retained?'Latest source acquisition failed or was unavailable; the earlier evidence below is retained. Retry belongs on the signed-in Kindle page.':'Source acquisition failed or was unavailable. Use the signed-in Kindle page for retry or recovery, or review a source you have checked yourself.'));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));
     if(actions.library){const link=text('a','Open this book in Library');link.href=bookHref('library',record.recordRef);link.addEventListener('click',event=>{event.preventDefault();actions.library(record.recordRef);});detail.append(link);}
@@ -57,6 +58,10 @@ export function createContentsWorkspace(actions={}) {
     update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported books · ${counts.reviewed??0} reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest source checks failed or unavailable. Identified text is a suggestion, not proof of complete contents or ownership.`;
+        for(const option of status.options){const key=option.value;
+          const count=key==='all'?rows.length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
+          const label=key==='all'?'All imported books':key==='review'?'Needs human review':key==='failure'?'Latest source failed or unavailable':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
+        }
         const chosen=provider.value;provider.replaceChildren(Object.assign(text('option','All providers'),{value:'all'}),...[...new Set(rows.map(r=>r.provider))].sort().map(id=>Object.assign(text('option',providerName(id)),{value:id})));provider.value=[...provider.options].some(o=>o.value===chosen)?chosen:'all';
       }
       if(selected&&!rows.some(row=>row.recordRef===selected)){close();overview.textContent='This book is no longer in the current library. Other saved collections remain available.';}

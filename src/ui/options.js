@@ -162,7 +162,7 @@ async function retryEnrichmentReview(review){
 let initialBookRoute=bookRoute(globalThis.location?.hash);
 function openContentsRecord(ref){
   workspace.select('contents');
-  if(!contentsWorkspace.open(ref))document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';
+  if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';}
 }
 function openLibraryRecord(ref){
   const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);

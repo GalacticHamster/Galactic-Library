@@ -61,3 +61,7 @@ input, select, button, .button-like { font: inherit; border-radius: 5px; padding
 .contents-filters input { flex:1 1 240px; }
 #contents-book-review { margin-top:16px; }
 #contents-book-review .contents-editor { padding:12px; background:#1f2937; border-radius:6px; }
+
+.contents-source-details,.contents-advanced,.contents-book-information,.contents-history,.contents-collection-comparison { margin:12px 0; }
+.contents-history pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.contents-review-notice:not(:empty) { padding:12px; border:1px solid #d4b45c; border-radius:6px; }
