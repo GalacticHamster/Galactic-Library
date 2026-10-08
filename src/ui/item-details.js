@@ -14,7 +14,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     const node=text('details','');node.dataset.itemSection=key;node.append(text('summary',label));let built=false;
     const populate=()=>{if(built)return;built=true;build(node);};
     node.addEventListener('toggle',()=>{if(!node.isConnected)return;if(node.open){state.sections.add(key);populate();}else state.sections.delete(key);});
-    if(state.sections.has(key)||defaultOpen){node.open=true;state.sections.add(key);populate();}root.append(node);return node;
+    if(state.sections.has(key)||defaultOpen&&!state.initialized){node.open=true;state.sections.add(key);populate();}root.append(node);return node;
   }
   section('library','Your library',node=>{
     node.append(text('p','Each account below supplies its own access observation. Grouping the item does not create ownership in another account.'));
@@ -29,6 +29,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     }
     for(const build of [tools.reading,tools.ownership])if(build)node.append(build());
     const settings=text('a','Ownership preferences in Settings');settings.href='#settings';settings.dataset.goWorkspace='settings';node.append(settings);
+    for(const [target,label]of [['reading','Reading orders and progress'],['ownership','Ownership duplicates, purchase evidence and reminders']]){const link=text('a',label);link.href='#'+target;link.dataset.goWorkspace=target;const paragraph=text('p','');paragraph.append(link);node.append(paragraph);}
   },true);
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));
@@ -37,11 +38,11 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     }
     node.append(text('p','Contents suggestions do not establish separate ownership of included works. Detailed review and comparisons are in Contents.'));
   },true);
-  if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());});
+  if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());const bulk=text('a','Bulk book information and review');bulk.href='#books';bulk.dataset.goWorkspace='books';node.append(bulk);});
   section('advanced','Advanced',node=>{
     node.append(text('p','Inspect matching, edition grouping, source provenance and recovery. Identity decisions are separate from ownership confirmations.'));
     if(tools.advanced)node.append(tools.advanced());
   });
   if(tools.extras)root.append(tools.extras());
-  return root;
+  state.initialized=true;return root;
 }

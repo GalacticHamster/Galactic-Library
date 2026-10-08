@@ -100,7 +100,7 @@ const contentsReviewActions={
   remove:async(id)=>{database=await removeContentReview(id);},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({library:openLibraryRecord,opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
+const contentsWorkspace=createContentsWorkspace({library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
   const root=document.createElement('div');
   root.append(createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true}),
     createContentsBookDetails(record,current,{enrich:ref=>inspectEnrichmentRecords([ref]),undo:async ref=>{database=await undoEnrichmentSelection(ref);render();contentsWorkspace.refreshReview();}}),
@@ -136,7 +136,6 @@ let enrichmentWorkbench;
 let libraryPage = 0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
-const openItemDetails = new Set();
 const itemDetailContexts=new Map();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
 const workspace = createWorkspaceNavigation({
@@ -163,19 +162,27 @@ async function retryEnrichmentReview(review){
 }
 
 let initialBookRoute=bookRoute(globalThis.location?.hash);
+let contentsLibraryOrigin;
 function openContentsRecord(ref){
+  if(['library','books'].includes(workspace.workspace))contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),page:libraryPage,scroll:globalThis.scrollY};
   workspace.select('contents');
   if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';}
 }
-function openLibraryRecord(ref){
+function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);
   if(!record){document.querySelector('#workspace-status').textContent='That record is no longer in the current library.';return;}
-  workspace.select('library');search.value='';for(const filter of Object.values(viewControls))filter.value='all';
-  const canonical=Object.values(database.canonicalItems).sort((a,b)=>compareTitles(a.title,b.title));
-  libraryPage=Math.floor(canonical.findIndex(item=>item.providerItemIds.includes(record.id))/50);
-  render();workspace.rememberView();
-  const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
-  if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});card.scrollIntoView({block:'center'});}
+  const origin=returnToOrigin&&contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null;
+  const findCard=()=>[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
+  workspace.select(origin?.workspace??'library');
+  if(origin){search.value=origin.search;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))viewControls[key].value=value;render();}
+  if(!findCard()){
+    search.value='';for(const filter of Object.values(viewControls))filter.value='all';
+    const canonical=Object.values(database.canonicalItems).sort((a,b)=>compareTitles(a.title,b.title));
+    libraryPage=Math.floor(canonical.findIndex(item=>item.providerItemIds.includes(record.id))/50);render();
+  }
+  workspace.rememberView();
+  const card=findCard();
+  if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));if(section){const target=card.querySelector(`[data-item-section="${section}"]`);if(target){target.open=true;target.dispatchEvent(new Event('toggle'));}}card.tabIndex=-1;card.focus({preventScroll:true});if(origin)globalThis.scrollTo(0,origin.scroll);else card.scrollIntoView({block:'center'});}
   globalThis.history?.replaceState(null,'',bookHref('library',ref));
 }
 function visitBookRoute(route){if(route?.workspace==='contents')openContentsRecord(route.recordRef);else if(route)openLibraryRecord(route.recordRef);}
@@ -184,10 +191,7 @@ document.querySelector('#workspace-navigation').addEventListener('click',()=>{in
 globalThis.addEventListener?.('hashchange',()=>{const route=bookRoute(globalThis.location?.hash);if(database)visitBookRoute(route);else initialBookRoute=route;});
 function inspectEnrichmentRecords(refs,category){
   if(category==='unparsed'){openContentsRecord(refs[0]);return;}
-  workspace.select(refs.every(ref=>['book','audiobook'].includes(Object.values(database.providerItems).find(record=>record.recordRef===ref)?.mediaType))?'books':'library');search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
-  const first=Object.values(database.providerItems).find(record=>refs.includes(record.recordRef));if(first){search.value=first.title;libraryPage=0;render();workspace.rememberView();}
-  const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').some(ref=>refs.includes(ref)));
-  if(card){card.tabIndex=-1;card.scrollIntoView({block:'center'});card.focus();const root=card.querySelector('.item-details');root.open=true;root.dispatchEvent(new Event('toggle'));for(const details of card.querySelectorAll('details'))details.open=true;}
+  if(refs[0])openLibraryRecord(refs[0],{section:'books'});
 }
 
 function displayProviderName(provider) {
@@ -726,13 +730,13 @@ function render(timing = null) {
   const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
   if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#providers-workspace').append(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
-    removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
+    removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'}),
     requestPermission:()=>requestReminderPermissions(chrome),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
   if(priorReminders)priorReminders.replaceWith(reminderDashboard);else receiptWorkbench.after(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');
   const readingWorkbench=createReadingWorkbench(database,{
-    order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref])
+    order:async(...args)=>{const result=await saveReadingOrder(...args);database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'})
   },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   endSegment?.();endSegment=timing?.begin('options_filters');
@@ -866,9 +870,9 @@ function render(timing = null) {
     const details=document.createElement("details");details.className="item-details";details.dataset.canonicalId=canonicalItem.id;
     details.append(textElement("summary",workspace.workspace==="books"?"Book details and tools":"Details"));
     const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;
-    const build=()=>{if(built)return;built=true;
-    const context=records.map(record=>itemDetailContexts.get(record.recordRef)).find(value=>value&&records.some(record=>record.recordRef===value.anchor))??{anchor:records[0].recordRef,sections:new Set()};
+    const context=records.map(record=>itemDetailContexts.get(record.recordRef)).find(value=>value&&records.some(record=>record.recordRef===value.anchor))??{anchor:records[0].recordRef,sections:new Set(),open:false};
     for(const record of records)itemDetailContexts.set(record.recordRef,context);
+    const build=()=>{if(built)return;built=true;
     body.append(createItemDetailsBody(canonicalItem,records,database,{
       reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render}):null,
       ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render}),
@@ -888,8 +892,8 @@ function render(timing = null) {
     },context));
 
     };
-    details.addEventListener("toggle",()=>{if(details.open){build();openItemDetails.add(canonicalItem.id);}else if(details.isConnected)openItemDetails.delete(canonicalItem.id);});
-    if(openItemDetails.has(canonicalItem.id)){details.open=true;build();}
+    details.addEventListener("toggle",()=>{if(!details.isConnected)return;context.open=details.open;if(details.open)build();});
+    if(context.open){details.open=true;build();}
     node.append(details);
     return node;
   }));
