@@ -63,7 +63,7 @@ export function createEnrichmentWorkbench(actions){
         const index=choices.get(row.id),dismissOnly=choice&&(index===undefined||row.conflicts[index]?.length);
         check.addEventListener('change',()=>{if(check.checked)selected.add(row.id);else selected.delete(row.id);refresh();});label.append(check,row.category==='undo'?' Undo this source selection':dismissOnly?' Select review for dismissal':choice?` I checked the source and it describes this ${row.review.source==='openLibrary'?'work':'edition'}.`:' Dismiss this lookup result');node.append(label);
       }
-      const inspect=button('Review library item',()=>actions.inspect(row.recordRefs));inspect.disabled=busy;node.append(inspect);
+      const inspect=button('Review library item',()=>actions.inspect(row.recordRefs,row.category));inspect.disabled=busy;node.append(inspect);
       if(row.review&&row.category==='failed'&&row.review.source!=='localMetadata'){const retry=button('Retry lookup',()=>perform(()=>actions.retry(row.review)));retry.disabled=busy;node.append(retry);}
       list.append(node);
     }

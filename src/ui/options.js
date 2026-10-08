@@ -1,3 +1,4 @@
+import {createItemDetailsBody} from './item-details.js';
 import {bookRoute,bookHref} from './contents-navigation.js';
 import {createContentsBookDetails,createContentsHistory,createCollectionComparison} from './contents-book-details.js';
 import {combinedProviderStates} from '../lib/profile-management.js';
@@ -135,6 +136,7 @@ let enrichmentWorkbench;
 let libraryPage = 0;
 let coverageDatabase;
 const openItemDetails = new Set();
+const itemDetailContexts=new Map();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
 const workspace = createWorkspaceNavigation({
   readView: () => ({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), page: libraryPage }),
@@ -179,7 +181,8 @@ function visitBookRoute(route){if(route?.workspace==='contents')openContentsReco
 document.addEventListener('click',event=>{const link=event.target.closest('[data-contents-record]');if(link){event.preventDefault();initialBookRoute=null;if(database)openContentsRecord(link.dataset.contentsRecord);}});
 document.querySelector('#workspace-navigation').addEventListener('click',()=>{initialBookRoute=null;});
 globalThis.addEventListener?.('hashchange',()=>{const route=bookRoute(globalThis.location?.hash);if(database)visitBookRoute(route);else initialBookRoute=route;});
-function inspectEnrichmentRecords(refs){
+function inspectEnrichmentRecords(refs,category){
+  if(category==='unparsed'){openContentsRecord(refs[0]);return;}
   workspace.select(refs.every(ref=>['book','audiobook'].includes(Object.values(database.providerItems).find(record=>record.recordRef===ref)?.mediaType))?'books':'library');search.value='';for(const filter of [providerFilter,mediaTypeFilter,ownershipFilter,dlcFilter,genreFilter])filter.value='all';render();
   const first=Object.values(database.providerItems).find(record=>refs.includes(record.recordRef));if(first){search.value=first.title;libraryPage=0;render();workspace.rememberView();}
   const card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').some(ref=>refs.includes(ref)));
@@ -890,49 +893,21 @@ function render(timing = null) {
     details.append(textElement("summary",workspace.workspace==="books"?"Book details and tools":"Details"));
     const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;
     const build=()=>{if(built)return;built=true;
-    const metadataText = displayMediaMetadata(records, canonicalItem.mediaType);
-    if (metadataText) {
-      const metadata = textElement('div', metadataText);
-      metadata.className = 'library-item-metadata';
-      body.append(metadata);
-    }
-    const genreTags = createGenreTags(records);
-    if (genreTags) body.append(genreTags);
-    const comicMangaCandidateTag = createComicMangaCandidateTag(records);
-    if (comicMangaCandidateTag) body.append(comicMangaCandidateTag);
-    const comicContents = createComicContents(records);
-    if (comicContents) body.append(comicContents);
-
-      if(canonicalItem.mediaType==="book"&&workspace.workspace!=="books"){const improve=actionButton("Improve book information",()=>{workspace.select("books");search.value=canonicalItem.title;libraryPage=0;render();workspace.rememberView();const target=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||"[]").some(ref=>records.some(record=>record.recordRef===ref)));if(target){const detail=target.querySelector(".item-details");detail.open=true;detail.dispatchEvent(new Event("toggle"));target.scrollIntoView({block:"center"});}});body.append(improve);}
-    body.append(createEvidenceInspector(canonicalItem,records,database,{
-      split:async id=>{database=await separateEdition(id);},
-      undoSplit:async ref=>{database=await undoEditionSeparation(ref);},
-      save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},
-      remove:async(id)=>{database=await removeManualMatchDecision(id);},
-      refresh:render
-    }));
-    body.append(createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
-    body.append(createOwnershipReviewTools(records,database,{
-      save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render
-    }));
-    if(['book','audiobook'].includes(canonicalItem.mediaType))body.append(createReadingTools(records,database,{
-      save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render
-    }));
-    if (canonicalItem.mediaType === 'book' && workspace.workspace === 'books') {
-      body.append(createGoogleBooksTools(canonicalItem,records));
-      body.append(createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
-      body.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);workspace.select('books');enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;backupStatus.textContent='Metadata lookup saved in the enrichment workbench for review.';}}));
-      const openLibraryTools = createOpenLibraryTools(canonicalItem, records);
-      if (openLibraryTools) body.append(openLibraryTools);
-    }
-    if(canonicalItem.mediaType==='book')for(const record of records){
-      const link=textElement('a',records.length>1?'Review contents ? '+(database.providerProfiles[record.profileId]?.nickname||displayProviderName(record.provider)):'Review contents in Contents');
-      link.href=bookHref('contents',record.recordRef);link.dataset.contentsRecord=record.recordRef;body.append(link,textElement('br',''));
-    }
-    if (['book','game'].includes(canonicalItem.mediaType)) {
-      for (const record of records) body.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));
-    }
-    if (linkedAddOns.length) body.append(createAddOnList(linkedAddOns));
+    const context=records.map(record=>itemDetailContexts.get(record.recordRef)).find(value=>value&&records.some(record=>record.recordRef===value.anchor))??{anchor:records[0].recordRef,sections:new Set()};
+    for(const record of records)itemDetailContexts.set(record.recordRef,context);
+    body.append(createItemDetailsBody(canonicalItem,records,database,{
+      reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render}):null,
+      ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render}),
+      books:()=>{const root=document.createElement('div');
+        if(workspace.workspace!=='books'){root.append(actionButton('Improve book information',()=>inspectEnrichmentRecords(records.map(record=>record.recordRef))));return root;}
+        root.append(createGoogleBooksTools(canonicalItem,records),createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}),createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;}}));
+        const open=createOpenLibraryTools(canonicalItem,records);if(open)root.append(open);return root;
+      },
+      advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
+        if(canonicalItem.mediaType==='game')for(const record of records)root.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));return root;
+      },
+      extras:()=>{const root=document.createElement('div');for(const create of [()=>createGenreTags(records),()=>createComicMangaCandidateTag(records)]){const value=create();if(value)root.append(value);}if(linkedAddOns.length)root.append(createAddOnList(linkedAddOns));return root;}
+    },context));
 
     };
     details.addEventListener("toggle",()=>{if(details.open){build();openItemDetails.add(canonicalItem.id);}else if(details.isConnected)openItemDetails.delete(canonicalItem.id);});

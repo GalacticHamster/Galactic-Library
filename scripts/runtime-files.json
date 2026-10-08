@@ -116,5 +116,7 @@
   "src/ui/contents-overview.js",
   "src/ui/contents-workspace.js",
   "src/ui/contents-book-details.js",
-  "src/ui/contents-navigation.js"
+  "src/ui/contents-navigation.js",
+  "src/ui/item-presentation.js",
+  "src/ui/item-details.js"
 ]
