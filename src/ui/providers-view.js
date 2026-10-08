@@ -86,6 +86,7 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
      card.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
      const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';card.append(link);
      if(!site.accounts.length)card.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));
+     else card.append(node('p','To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Start a Full Rescan; these remembered accounts remain saved.'));
      for(const p of site.accounts){
        const account=node('article');account.className='saved-account';account.dataset.account=p.profileId;
        account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${p.recordCount} imported items · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Complete import and coverage recorded.':p.lastCompleteScan?'A previous full import is saved; coverage details were not recorded.':'A first complete import is needed before quick updates.'));

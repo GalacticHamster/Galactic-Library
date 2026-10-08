@@ -45,7 +45,7 @@
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<label>Account/profile label <input data-profile-label maxlength="100" placeholder="e.g. personal"></label><br><label><input type="checkbox" data-profile-confirm> Signed-in account matches this label</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
+      controls.innerHTML='<label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal"></label><p>A name you choose for the account signed in on this site. GL does not sign you in or verify your login. Name an existing unnamed import in Providers to keep its saved update history.</p><label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';

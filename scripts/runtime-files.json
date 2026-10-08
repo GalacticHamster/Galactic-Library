@@ -111,5 +111,6 @@
   "src/lib/validation-certificate.js",
   "src/ui/performance-diagnostics.js",
   "src/ui/provider-accounts.js",
-  "src/ui/providers-view.js"
+  "src/ui/providers-view.js",
+  "src/ui/onboarding.js"
 ]

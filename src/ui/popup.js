@@ -4,6 +4,7 @@ const summary = document.querySelector('#summary');
 try {
   const database = await getDatabase();
   const records = Object.values(database.providerItems);
+  document.querySelector('#add-library-link').hidden=records.length>0;
   const total = records.filter((item) => item.mediaType === 'game').length;
   const addOnCount = records.filter((item) => item.mediaType === 'game-addon').length;
   const audiobookCount = records.filter((item) => item.mediaType === 'audiobook').length;

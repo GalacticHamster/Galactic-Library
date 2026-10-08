@@ -1,5 +1,6 @@
 import {combinedProviderStates} from '../lib/profile-management.js';
 import {createProvidersView} from './providers-view.js';
+import {renderOnboarding} from './onboarding.js';
 import {selectProviderProfile,renameProviderProfile,previewProviderProfileRemoval,removeProviderProfile,resetProviderProfileBaseline} from '../lib/storage.js';
 import {createContentsScanProgress} from './contents-scan-progress.js';
 import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
@@ -689,6 +690,7 @@ function render(timing = null) {
   let endSegment=timing?.begin('options_workbench');
   try {
   providerAccountsView.update(database);
+  renderOnboarding(database);
   if(!enrichmentWorkbench){
     enrichmentWorkbench=createEnrichmentWorkbench({
       apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},
@@ -947,6 +949,7 @@ async function refresh(diagnosticLookupId = null) {
   const {database:loadedDatabase,preferences,performance:workerTiming}=await getCommittedLibraryView(diagnosticLookupId);
   globalThis.GalacticContentsPerformance.merge(timing,workerTiming);
   database = loadedDatabase;
+  document.querySelector('#library-load-status').hidden=true;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
   endStage?.();endStage=timing?.begin('options_render');
@@ -1109,4 +1112,6 @@ chrome.runtime.onMessage?.addListener((message,sender)=>{
   return false;
 });
 contentsScanProgress.initialize();
-refresh().catch((error) => { backupStatus.textContent = `Could not load library: ${error.message}`; });
+const loadLibrary=()=>refresh().catch(error=>{const status=document.querySelector('#library-load-status');status.hidden=false;status.querySelector('span').textContent='Could not load library: '+error.message;document.querySelector('#retry-library-load').hidden=false;});
+document.querySelector('#retry-library-load').addEventListener('click',loadLibrary);
+loadLibrary();
