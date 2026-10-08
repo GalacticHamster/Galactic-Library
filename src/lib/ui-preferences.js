@@ -1,5 +1,12 @@
 export const UI_PREFERENCES_KEY = 'galacticLibraryUiPreferences';
-export const WORKSPACES = ['library', 'books', 'reading', 'ownership', 'settings'];
+export const PRIMARY_WORKSPACES = ['library', 'providers', 'contents', 'settings'];
+export const LIBRARY_WORKSPACES = ['library', 'books', 'reading', 'ownership'];
+// Old saved views remain valid secondary Library destinations.
+export const WORKSPACES = [...PRIMARY_WORKSPACES, 'books', 'reading', 'ownership'];
+export function workspaceTarget(value) {
+  const name=String(value??'').replace(/^#/u,'').replace(/-workspace$/u,'');
+  return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
+}
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', page: 0 });
 export const defaultUiPreferences = () => ({ workspace: 'library', library: emptyLibraryView(), books: emptyLibraryView() });
 

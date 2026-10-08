@@ -702,7 +702,7 @@ function render(timing = null) {
   if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else document.querySelector('#ownership-workspace').append(receiptWorkbench);
   const syncDashboard=createSyncHealthView(database,{cancel:async(...args)=>{database=await cancelProviderScan(...args);},refresh:render});
   const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
-  if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#settings-workspace').append(syncDashboard);
+  if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#providers-workspace').append(syncDashboard);
   const reminderDashboard=createRemindersView(database,{
     removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>inspectEnrichmentRecords([ref]),
     requestPermission:()=>requestReminderPermissions(chrome),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
@@ -915,10 +915,10 @@ function render(timing = null) {
   }
   renderDuplicateReview();
   let history=document.querySelector('#provider-history');
-  if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#ownership-workspace').append(history);}
+  if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#providers-workspace').append(history);}
   const records=Object.values(database.providerHistory??{});
   history.replaceChildren(textElement('summary',`Provider history: ${records.length} records not in the current library`));
-  history.append(textElement('p','History preserves earlier purchase and access evidence. A missing record does not prove revocation. Records from the active profile may appear as Possible, never as confirmed current ownership.'));
+  history.append(textElement('p','History preserves earlier purchase and access evidence. A missing record does not prove revocation. Earlier missing records may appear as Possible, never as confirmed current ownership.'));
   const list=document.createElement('ul');
   for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — profile ${entry.profileLabel||'unassigned'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
   history.append(list);if(records.length>50)history.append(textElement('p',`Showing 50 of ${records.length}. All history is preserved in your backup.`));
@@ -1084,7 +1084,7 @@ clearFilters.addEventListener('click', () => {
   genreFilter.value = 'all';
   render();
 });
-const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('main'),reconcile:()=>refresh(recentContentsDiagnosticId())});
+const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('#contents-progress-slot'),reconcile:()=>refresh(recentContentsDiagnosticId())});
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};
 chrome.storage.onChanged.addListener((changes, areaName) => {

@@ -1,3 +1,4 @@
+import {navigationUxTests} from './navigation-ux.js';
 import {providerProfileTests} from './provider-profiles.js';
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {refreshWritePacingTests} from './refresh-write-pacing.js';
@@ -72,6 +73,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...navigationUxTests,
   ...providerProfileTests,
   ...workerLifecycleDiagnosticsTests,
   ...optionsPerformanceDiagnosticsTests,
