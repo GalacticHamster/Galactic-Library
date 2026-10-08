@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
 import {validateUiPreferences} from '../src/lib/ui-preferences.js';
+import {resultProviderSummary} from '../src/ui/library-result.js';
 const record=(id,title,metadata={},extra={})=>({id,recordRef:id,provider:'kobo',profileId:'personal',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata,...extra});
 const database=records=>({providerItems:Object.fromEntries(records.map(record=>[record.id,record])),canonicalItems:Object.fromEntries(records.map(record=>[record.id,{id:record.id,title:record.title,mediaType:record.mediaType,providerItemIds:[record.id]}])),providerProfiles:{personal:{nickname:'Personal'}},titleAliases:{},readingStates:{},contentReviews:{},enrichmentReviews:{}});
 const results=(db,query,options={})=>libraryBrowseResults(createLibraryBrowseProjection()(db),{query,...options}).matches.map(row=>row.canonical.id);
@@ -21,6 +22,9 @@ export const libraryBrowseTests=[
 ];
 export {record as browseRecord,database as browseDatabase};
 libraryBrowseTests.push(
+ ['Result provider summaries count accounts rather than duplicating canonical results or purchase observations',()=>{
+   assert.equal(resultProviderSummary([{record:{provider:'kindle',profileId:'a'}},{record:{provider:'kindle',profileId:'a'}},{record:{provider:'kindle',profileId:'b'}},{record:{provider:'kobo',profileId:'c'}}]),'Kindle (2 accounts) · Kobo');
+ }],
  ['Combined canonical filters qualify one record, never different account/access observations',()=>{
    const a=record('a','Shared',{authors:['Writer'],series:['One']},{provider:'kindle',ownership:'owned'}),b=record('b','Shared',{authors:['Writer'],series:['Two']},{provider:'kindle',profileId:'family',ownership:'borrowed'}),db=database([a,b]);db.canonicalItems={shared:{id:'shared',title:'Shared',mediaType:'book',providerItemIds:['a','b']}};
    assert.deepEqual(results(db,'',{filters:{provider:'kindle',account:'personal',ownership:'borrowed'}}),[]);assert.deepEqual(results(db,'',{filters:{provider:'kindle',account:'family',ownership:'borrowed',series:'Two'}}),['shared']);assert.deepEqual(results(db,'',{filters:{account:'family',series:'One'}}),[]);

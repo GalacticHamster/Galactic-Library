@@ -1,3 +1,4 @@
+import {createLibraryResultSummary} from './library-result.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
 import {bookRoute,bookHref} from './contents-navigation.js';
@@ -217,33 +218,6 @@ function displayMediaType(mediaType) {
   if (mediaType === 'movie') return 'Movie';
   if (mediaType === 'tv') return 'TV show';
   return 'Game';
-}
-
-function providerSourceDetails(records) {
-  const byProvider = new Map();
-  for (const record of records) {
-    const providerRecords = byProvider.get(record.provider) ?? [];
-    providerRecords.push(effectiveOwnershipRecord(record,database));
-    byProvider.set(record.provider, providerRecords);
-  }
-  return [...byProvider].map(([provider, providerRecords]) => {
-    const count = providerRecords.length;
-    const name = displayProviderName(provider);
-    const ownerships = [...new Set(providerRecords.map((record) => record.ownership))];
-    const ownership = ownerships.length === 1 ? ownerships[0] : '';
-    const ownershipLabel = ownership === 'unknown'
-      ? 'ownership unconfirmed'
-      : ownership === 'subscription'
-        ? 'subscription access'
-        : ownership === 'borrowed'
-          ? 'borrowed'
-        : ownership === 'rental'
-          ? 'rental'
-          : ownership === 'claimed'
-            ? 'claimed'
-            : ownership === 'owned' ? 'Owned' : '';
-    return { label: count === 1 ? name : `${name} (${count} records)`, ownershipLabel };
-  }).sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function genreTagLabels(records) {
@@ -801,28 +775,16 @@ function render(timing = null) {
   document.querySelector("#library-previous").disabled=libraryPage===0;
   document.querySelector("#library-next").disabled=(libraryPage+1)*50>=canonical.length;
   document.querySelector("#library-page-status").textContent=canonical.length ? "Showing "+(libraryPage*50+1)+"?"+Math.min((libraryPage+1)*50,canonical.length)+" of "+canonical.length : "No items to show";
-  items.replaceChildren(...canonical.slice(libraryPage*50,(libraryPage+1)*50).map((canonicalItem) => {
+  items.replaceChildren(...result.rows.map((row) => {
+    const canonicalItem=row.canonical;
     const node = document.createElement('li');
     const records = canonicalItem.providerItemIds.map((id) => database.providerItems[id]);
     node.dataset.recordRefs=JSON.stringify(records.map(record=>record.recordRef));
     const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
     node.className = 'library-item';
-    const header = document.createElement('div');
-    header.className = 'library-item-header';
-    header.append(textElement('strong', canonicalItem.title), textElement('span', displayMediaType(canonicalItem.mediaType)));
-    node.append(header);
-    const providerSources = document.createElement('div');
-    providerSources.className = 'library-item-providers';
-    providerSources.replaceChildren(...providerSourceDetails(records).map(({ label, ownershipLabel }) => {
-      const source = document.createElement('span');
-      source.className = 'library-item-provider';
-      source.append(textElement('strong', label));
-      if (ownershipLabel) source.append(textElement('small', ownershipLabel));
-      return source;
-    }));
-    node.append(providerSources);
+    node.append(createLibraryResultSummary(row,database,{filtered:Object.entries(filters).some(([key,value])=>key!=='mediaType'&&value!=='all'),information:filters.information,series:value=>{seriesFilter.value=value;search.value='';librarySort.value='series';viewChanged();}}));
     const details=document.createElement("details");details.className="item-details";details.dataset.canonicalId=canonicalItem.id;
-    details.append(textElement("summary",workspace.workspace==="books"?"Book details and tools":"Details"));
+    details.append(textElement("summary","Details"));
     const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;
     const context=records.map(record=>itemDetailContexts.get(record.recordRef)).find(value=>value&&records.some(record=>record.recordRef===value.anchor))??{anchor:records[0].recordRef,sections:new Set(),open:false};
     for(const record of records)itemDetailContexts.set(record.recordRef,context);
