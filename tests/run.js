@@ -1,4 +1,5 @@
 import {navigationUxTests} from './navigation-ux.js';
+import {providersUxTests} from './providers-ux.js';
 import {providerProfileTests} from './provider-profiles.js';
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {refreshWritePacingTests} from './refresh-write-pacing.js';
@@ -74,6 +75,7 @@ const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = glo
 
 const tests = [
   ...navigationUxTests,
+  ...providersUxTests,
   ...providerProfileTests,
   ...workerLifecycleDiagnosticsTests,
   ...optionsPerformanceDiagnosticsTests,

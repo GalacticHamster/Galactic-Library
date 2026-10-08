@@ -47,3 +47,12 @@ input, select, button, .button-like { font: inherit; border-radius: 5px; padding
 .ownership-choice input { width:16px; height:16px; margin:0; flex-shrink:0; accent-color:#7c3aed; }
 .provider { flex-wrap:wrap; align-items:center; }
 .provider .ownership-provider-choice { flex-basis:100%; }
+.secondary-navigation { margin-top:8px; font-size:.9rem; }
+.provider-cards { display:grid; gap:12px; }
+.provider-card > summary { align-items:center; }
+.provider-card > p:first-of-type { margin-top:12px; }
+.saved-account { margin-top:16px; padding:12px; border:1px solid #46516a; border-radius:6px; }
+.saved-account h4 { margin:0 0 8px; }
+.saved-account p { font-size:.9rem; }
+.account-dialog { width:min(540px,calc(100% - 48px)); max-height:85vh; overflow:auto; background:#1f2937; color:#e5e7eb; border:1px solid #a78bfa; border-radius:8px; padding:20px; }
+.account-dialog::backdrop { background:#0009; }

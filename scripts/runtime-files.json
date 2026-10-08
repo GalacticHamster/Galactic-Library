@@ -109,5 +109,7 @@
   "src/lib/query-diagnostics.js",
   "src/lib/worker-lifecycle-diagnostics.js",
   "src/lib/validation-certificate.js",
-  "src/ui/performance-diagnostics.js"
+  "src/ui/performance-diagnostics.js",
+  "src/ui/provider-accounts.js",
+  "src/ui/providers-view.js"
 ]

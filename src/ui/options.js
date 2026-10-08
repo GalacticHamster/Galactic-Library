@@ -1,4 +1,6 @@
 import {combinedProviderStates} from '../lib/profile-management.js';
+import {createProvidersView} from './providers-view.js';
+import {selectProviderProfile,renameProviderProfile} from '../lib/storage.js';
 import {createContentsScanProgress} from './contents-scan-progress.js';
 import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
@@ -88,6 +90,8 @@ const companionExtensionLinkStatus = document.querySelector('#companion-extensio
 const allowedCompanionExtensions = document.querySelector('#allowed-companion-extensions');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
+const providerAccountsView=createProvidersView({select:selectProviderProfile,rename:renameProviderProfile,onDatabase:next=>{database=next;render();}});
+document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
 async function changeOwnershipPolicy(patch) {
   const focusId=document.activeElement?.id;
   assumeAllOwned.disabled=true;
@@ -684,6 +688,7 @@ async function runGoogleBooksEnrichment() {
 function render(timing = null) {
   let endSegment=timing?.begin('options_workbench');
   try {
+  providerAccountsView.update(database);
   if(!enrichmentWorkbench){
     enrichmentWorkbench=createEnrichmentWorkbench({
       apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},
