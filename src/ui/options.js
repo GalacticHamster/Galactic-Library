@@ -65,6 +65,11 @@ const search = document.querySelector('#search');
 const downloadComixologyListButton = document.querySelector('#download-comixology-list');
 const showEnrichmentActions = document.querySelector('#show-enrichment-actions');
 const providerFilter = document.querySelector('#provider-filter');
+const accountFilter=document.querySelector('#account-filter');
+const readingFilter=document.querySelector('#reading-filter');
+const seriesFilter=document.querySelector('#series-filter');
+const informationFilter=document.querySelector('#information-filter');
+const librarySort=document.querySelector('#library-sort');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
 const ownershipFilter = document.querySelector('#ownership-filter');
 const dlcFilter = document.querySelector('#dlc-filter');
@@ -139,10 +144,10 @@ let libraryPage = 0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
-const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
+const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter, account:accountFilter, reading:readingFilter, series:seriesFilter, information:informationFilter };
 const workspace = createWorkspaceNavigation({
-  readView: () => ({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), page: libraryPage }),
-  applyView: view => { search.value = view.search; libraryPage = view.page; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
+  readView: () => ({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage }),
+  applyView: view => { search.value = view.search; libraryPage = view.page;librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
   save: saveUiPreferences, changed: () => { if (database) render(); }
 });
 document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; render(); workspace.rememberView(); });
@@ -301,15 +306,7 @@ function comixologyReviewMarkdown(providerItems, sourceLabel) {
   return lines.join('\n') + '\n';
 }
 
-function selectedFilters() {
-  return {
-    provider: providerFilter.value,
-    mediaType: mediaTypeFilter.value,
-    ownership: ownershipFilter.value,
-    dlc: dlcFilter.value,
-    genre: genreFilter.value
-  };
-}
+function selectedFilters() {return Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value||'all']));}
 
 function providerMatches(record, provider) {
   return provider === 'all' || record.provider === provider;
@@ -319,8 +316,23 @@ function ownershipMatches(record, ownership) {
   return ownership === 'all' || effectiveOwnershipRecord(record,database).ownership === ownership;
 }
 
-function filtersAreActive(filters, query) {
-  return Boolean(query) || filters.provider !== 'all' || filters.mediaType !== 'all' || filters.ownership !== 'all' || filters.dlc !== 'all' || filters.genre !== 'all';
+function filtersAreActive(filters, query) {return Boolean(query)||Object.values(filters).some(value=>value!=='all');}
+
+let browseFacetDatabase;
+function populateBrowseFilters(browse){
+  if(browseFacetDatabase===browse.database)return;browseFacetDatabase=browse.database;
+  for(const [field,all,options]of [[accountFilter,'All accounts',browse.accountOptions],[seriesFilter,'Any series',browse.seriesOptions.map(value=>({value,label:value}))],[genreFilter,'Any genre',browse.genreOptions.map(value=>({value,label:value}))]]){
+    const selected=field.dataset.pendingValue??field.value;
+    field.replaceChildren(...[{value:'all',label:all},...options].map(({value,label})=>Object.assign(textElement('option',label),{value})));
+    field.value=selected;if(!field.value)field.value='all';
+  }
+}
+function renderActiveFilters(filters){
+  const root=document.querySelector('#library-active-filters');root.replaceChildren();
+  if(search.value.trim())root.append(actionButton('Search: '+search.value.trim()+' - clear',()=>{search.value='';viewChanged();}));
+  const labels={provider:'Provider',mediaType:'Media',account:'Account',genre:'Genre',ownership:'Access',reading:'Reading',series:'Series',information:'Information',dlc:'DLC'};
+  for(const [key,value]of Object.entries(filters))if(value!=='all'){const field=viewControls[key];root.append(actionButton(labels[key]+': '+field.selectedOptions[0]?.textContent+' - clear',()=>{field.value='all';viewChanged();}));}
+  root.hidden=!root.children.length;
 }
 
 function populateProviderFilter(providerEntries) {
@@ -710,7 +722,7 @@ function render(timing = null) {
     ? 'The global checkbox covers every library. Your provider choices below are saved and apply again when you switch it off.'
     : 'To apply this to one library, use its checkbox below.';
   populateProviderFilter(providerEntries);
-  populateGenreFilter(Object.values(database.providerItems));
+  const browse=browseProjection(database);populateBrowseFilters(browse);
   for(const field of Object.values(viewControls))if(field.dataset.pendingValue){field.value=field.dataset.pendingValue;if(!field.value)field.value="all";delete field.dataset.pendingValue;}
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
@@ -740,14 +752,14 @@ function render(timing = null) {
 
   endSegment?.();endSegment=timing?.begin('options_selection');
   const allRecords = Object.values(database.providerItems);
-  const browse=browseProjection(database);
   const addOns=browse.addOns.map(value=>value.record);
   const addOnsByParent=new Map([...browse.addOnsByParent].map(([id,values])=>[id,values.map(value=>value.record)]));
   const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
   const filters = selectedFilters();
-  const result=libraryBrowseResults(browse,{query,filters,workspace:workspace.workspace,page:libraryPage});
+  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage});
   const canonical=result.matches.map(row=>row.canonical);
+  renderActiveFilters(filters);
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const softwareCanonicalCount=canonical.filter(item=>item.mediaType==='software').length;
@@ -1018,19 +1030,9 @@ showEnrichmentActions.addEventListener('change', async () => {
     backupStatus.textContent = `Could not save the enrichment action setting: ${error.message}`;
   }
 });
-providerFilter.addEventListener('change', viewChanged);
-mediaTypeFilter.addEventListener('change', viewChanged);
-ownershipFilter.addEventListener('change', viewChanged);
-dlcFilter.addEventListener('change', viewChanged);
-genreFilter.addEventListener('change', viewChanged);
+for(const field of [...Object.values(viewControls),librarySort])field.addEventListener('change',viewChanged);
 clearFilters.addEventListener('click', () => {
-  search.value = '';
-  providerFilter.value = 'all';
-  mediaTypeFilter.value = 'all';
-  ownershipFilter.value = 'all';
-  dlcFilter.value = 'all';
-  genreFilter.value = 'all';
-  render();
+  search.value='';for(const field of Object.values(viewControls)){field.value='all';delete field.dataset.pendingValue;}viewChanged();
 });
 function renderCollectionCoverage(){
   if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;

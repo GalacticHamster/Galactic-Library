@@ -18,6 +18,7 @@ const uxMode=process.argv.includes('--ux');
 const contentsUxMode=process.argv.includes('--contents-ux');
 const contentsDeepLinkMode=process.argv.includes('--contents-deep-link');
 const itemDetailsMode=process.argv.includes('--item-details');
+const libraryBrowseMode=process.argv.includes('--library-browse');
 const candidates=firefox?[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe']:[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
 if(firefox&&process.platform==='win32'){try{const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}catch{}}
 let browser;
@@ -41,7 +42,7 @@ const server=createServer(async(request,response)=>{
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
     let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
     if(!body)throw new Error('File is absent from the validated runtime package.');
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}

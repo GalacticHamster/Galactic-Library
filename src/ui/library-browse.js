@@ -3,6 +3,8 @@ import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {libraryBroadGenreValues} from '../lib/genre-hints.js';
 import {compareTitles} from '../lib/title-sort.js';
 import {providerLabel,accountLabel} from './item-presentation.js';
+import {contentsSummary} from './contents-overview.js';
+export const LIBRARY_SORTS=['title-asc','title-desc','added','updated','creator','series'];
 
 // Retrieval keys only: never identity or ownership evidence.
 export const searchKey=value=>String(value??'').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu,' ').trim().replace(/\s+/gu,' ');
@@ -14,6 +16,7 @@ export function createLibraryBrowseProjection(){
   let current,projection;
   return database=>{
     if(database===current)return projection;
+    const pending=new Set(Object.values(database.enrichmentReviews??{}).flatMap(review=>review.recordRefs));
     const project=record=>{
       const identity=identityEvidence(record),metadata=record.metadata??{};
       const series=['book','audiobook'].includes(record.mediaType)?identity.series:strings(metadata.series);
@@ -25,7 +28,10 @@ export function createLibraryBrowseProjection(){
       const fields=distinct([...titles,...aliases,...identity.authors,...identity.contributors.map(value=>value.name),...strings(metadata.narrators),...series,
         identity.unit,identity.unit?`${identity.unitType} ${identity.unit}`:'',metadata.volume?`volume ${metadata.volume}`:'',metadata.issue?`issue ${metadata.issue}`:'',identity.edition,identity.publisher,identity.language,...identifiers,...genres,...names]);
       return {record,identity,series,genres,titles:titles.map(searchKey),aliases:aliases.map(searchKey),search:fields.map(searchKey).join(' '),
-        identifiers:identifiers.map(value=>searchKey(value).replace(/\s/gu,'')),added:stamp(record.acquiredAt),updated:stamp(record.updatedAt)};
+        identifiers:identifiers.map(value=>searchKey(value).replace(/\s/gu,'')),added:stamp(record.acquiredAt),updated:stamp(record.updatedAt),
+        reading:['book','audiobook'].includes(record.mediaType)?database.readingStates?.[record.recordRef]?.status??'not-saved':null,
+        missing:record.mediaType==='book'&&(!identity.authors.length||!identifiers.some(id=>identity.isbn.includes(id)||id===identity.asin&&Boolean(id))),
+        review:pending.has(record.recordRef)||record.mediaType==='book'&&contentsSummary(record,database).needsReview};
     };
     const records=new Map(Object.values(database.providerItems).map(record=>[record.id,project(record)]));
     const native=new Map([...records.values()].map(value=>[[value.record.provider,value.record.profileId??'',value.record.providerItemId].join('\0'),value]));
@@ -35,7 +41,10 @@ export function createLibraryBrowseProjection(){
       if(parent?.record.mediaType!=='game')continue;const list=addOnsByParent.get(parent.record.id)??[];list.push(value);addOnsByParent.set(parent.record.id,list);linkedAddOnIds.add(record.id);
     }
     const rows=Object.values(database.canonicalItems).map(canonical=>({canonical,title:searchKey(canonical.title),records:canonical.providerItemIds.map(id=>records.get(id)).filter(Boolean)}));
-    current=database;projection={database,rows,records,addOns,addOnsByParent,linkedAddOnIds};return projection;
+    const accountOptions=distinct([...records.values()].map(value=>value.record.profileId)).map(id=>({value:id,label:accountLabel([...records.values()].find(value=>value.record.profileId===id).record,database)})).sort((a,b)=>compareTitles(a.label,b.label));
+    const seriesOptions=distinct([...records.values()].flatMap(value=>value.series)).sort(compareTitles);
+    const genreOptions=distinct([...records.values()].flatMap(value=>value.genres)).sort(compareTitles);
+    current=database;projection={database,rows,records,addOns,addOnsByParent,linkedAddOnIds,accountOptions,seriesOptions,genreOptions};return projection;
   };
 }
 
@@ -54,10 +63,34 @@ export function recordQualifies(value,filters,database){
   const record=value.record;
   return (!filters.provider||filters.provider==='all'||record.provider===filters.provider)
     &&(!filters.ownership||filters.ownership==='all'||effectiveOwnershipRecord(record,database).ownership===filters.ownership)
+    &&(!filters.account||filters.account==='all'||record.profileId===filters.account)
+    &&(!filters.reading||filters.reading==='all'||value.reading===filters.reading)
+    &&(!filters.series||filters.series==='all'||value.series.includes(filters.series))
+    &&(!filters.information||filters.information==='all'||filters.information==='missing'&&value.missing||filters.information==='review'&&value.review)
     &&(!filters.genre||filters.genre==='all'||value.genres.some(genre=>genre.toLocaleLowerCase()===filters.genre.toLocaleLowerCase()));
 }
 
-export function libraryBrowseResults(projection,{query='',filters={},workspace='library',page=0,size=50}={}){
+export function compareBrowseRows(a,b,sort='title-asc'){
+  const title=()=>compareTitles(a.canonical.title,b.canonical.title)||a.canonical.id.localeCompare(b.canonical.id);
+  if(sort==='title-desc')return -title();
+  if(['added','updated'].includes(sort)){
+    const date=row=>{const dates=row.qualifying.map(value=>value[sort]).filter(value=>value!==null);return dates.length?Math.max(...dates):null;};
+    const left=date(a),right=date(b);if(left===null||right===null)return left===right?title():left===null?1:-1;
+    return right-left||title();
+  }
+  if(sort==='creator'){
+    const creator=row=>distinct(row.qualifying.flatMap(value=>value.identity.authors)).sort(compareTitles)[0]??'';
+    const left=creator(a),right=creator(b);return left&&right?compareTitles(left,right)||title():left?-1:right?1:title();
+  }
+  if(sort==='series'){
+    const series=row=>row.qualifying.flatMap(value=>value.series.map(series=>({series,run:value.identity.run,unit:['book','audiobook'].includes(value.record.mediaType)?value.identity.unit:'',kind:value.identity.unitType}))).sort((a,b)=>compareTitles(a.series,b.series)||compareTitles(a.run,b.run)||compareTitles(a.kind,b.kind)||compareTitles(a.unit,b.unit))[0];
+    const left=series(a),right=series(b);if(!left||!right)return left?-1:right?1:title();
+    return compareTitles(left.series,right.series)||compareTitles(left.run,right.run)||compareTitles(left.kind,right.kind)||(left.unit&&right.unit?compareTitles(left.unit,right.unit):left.unit?-1:right.unit?1:0)||title();
+  }
+  return title();
+}
+
+export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50}={}){
   const key=searchKey(query),matches=[];
   for(const row of projection.rows){
     if(workspace==='books'&&!['book','audiobook'].includes(row.canonical.mediaType))continue;
@@ -68,7 +101,7 @@ export function libraryBrowseResults(projection,{query='',filters={},workspace='
     const ranks=[...qualifying.map(value=>recordSearchRank(value,key,row.title)),...addons.map(value=>recordSearchRank(value,key))].filter(rank=>rank!==null);
     if(ranks.length)matches.push({...row,qualifying,rank:Math.min(...ranks)});
   }
-  matches.sort((a,b)=>a.rank-b.rank||compareTitles(a.canonical.title,b.canonical.title)||a.canonical.id.localeCompare(b.canonical.id));
+  matches.sort((a,b)=>a.rank-b.rank||compareBrowseRows(a,b,sort));
   const pages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,pages-1));
   return {matches,rows:matches.slice(page*size,(page+1)*size),total:matches.length,page,pages};
 }
