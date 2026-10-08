@@ -31,7 +31,7 @@ export function createContentsWorkspace(actions={}) {
   const clear=button('Clear search and filters',()=>{view={...emptyBrowseView(),sort:view.sort,status:'all'};applyView(view);renderList();actions.changed?.();});
   const searchLabel=text('label','Search collection');searchLabel.append(search);controls.append(searchLabel,primary,clear,more,activeFilters);
   const counter=text('p','');counter.setAttribute('role','status');
-  const list=text('ol','');list.className='review-items';list.id='contents-collection-list';
+  const list=text('ol','');list.className='library-items contents-collection-items';list.id='contents-collection-list';
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
   const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
   listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not verified means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
@@ -49,13 +49,14 @@ export function createContentsWorkspace(actions={}) {
     previous.disabled=page===0;next.disabled=page===result.pages-1;
     counter.textContent=result.total?`${result.total} catalog books · ${result.matches.reduce((n,row)=>n+row.qualifying.length,0)} matching accounts · page ${page+1} of ${result.pages}`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
     list.replaceChildren(...shown.map(row=>{
-      const node=text('li','');node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
-      node.append(text('strong',row.title),text('small',`${providerName(row.provider)} · ${row.nickname}`),text('p',`${row.label}${row.count!==null?` · ${row.count} reviewed entries`:''}${row.needsReview?' · Review needed':''}`));
-      const preview=createContentsReadOnly(database.providerItems[row.id],database,{compact:true});if(preview)node.append(preview);
+      const node=text('li','');node.className='library-item contents-collection-card';node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
+      node.append(Object.assign(text('h3',row.title),{className:'contents-card-title'}),Object.assign(text('p',`${providerName(row.provider)} — ${row.nickname}`),{className:'contents-card-account'}));
+      const preview=createContentsReadOnly(database.providerItems[row.id],database,{compact:true,showSource:false,needsReview:row.incomplete||['partial','uncertain'].includes(row.status)});
+      if(preview)node.append(preview);
+      else if(!row.failed)node.append(Object.assign(text('p',row.label),{className:'contents-card-status'}));
       if(row.failed)node.append(text('p',row.retained?'Could not retrieve the latest description. Earlier contents and reviews are retained.':'Could not retrieve contents. Retry from the Kindle library page.'));
       if(row.changed)node.append(text('p','Description changed since your review. Your review is retained.'));
-      if(row.updatedAt)node.append(text('small','Last contents activity: '+new Date(row.updatedAt).toLocaleString()));
-      node.append(button('Inspect contents',()=>open(row.recordRef)));return node;
+      const inspect=button('Inspect contents',()=>open(row.recordRef));inspect.className='contents-inspect';node.append(inspect);return node;
     }));
   }
   function close(){if(actions.canLeave?.()===false)return false;selected=null;detail.hidden=true;detail.replaceChildren();listView.hidden=false;renderList();
@@ -71,6 +72,7 @@ export function createContentsWorkspace(actions={}) {
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
+    if(summary.updatedAt)detail.append(text('small','Last contents activity: '+new Date(summary.updatedAt).toLocaleString()));
     if(summary.failed)detail.append(text('p',summary.retained?'Could not retrieve the latest description. Earlier contents below are retained. Retry on the Kindle library page.':'Could not retrieve contents. Retry on the Kindle library page, or enter contents from a source you checked.'));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));

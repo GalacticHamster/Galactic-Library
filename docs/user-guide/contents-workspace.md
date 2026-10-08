@@ -4,6 +4,8 @@ Open **Contents** to see included works for books from every remembered account.
 
 Pages follow the same canonical ordering as Library, fifty groups per page, with separate rows for qualifying accounts. The same product in two accounts keeps its own descriptions and reviews. Switching follows the current item/first visible group, and clamps the saved page when that item no longer qualifies. See [Library browsing](library-browsing.md) for exact filter and position semantics.
 
+Results use the same rounded card treatment as Library. Each card shows its title, provider/account, included works when available, and one verification/uncertainty caption. **Inspect contents** is a compact keyboard-accessible action. Latest retrieval failures and changed descriptions remain visible; **Last contents activity** is available inside inspection instead of on every card.
+
 Choose **Inspect contents** to review the exact account record. **Back to Library results** or **Back to Contents results** returns to the actual origin with filters, sort, item/page and scroll. **Contents collection list** opens that list explicitly. Common preferences and contents status survive Options reloads; the current tab's browser history also retains a review's return context. Copied direct links default to Contents results when no origin exists.
 
 ## What the statuses mean

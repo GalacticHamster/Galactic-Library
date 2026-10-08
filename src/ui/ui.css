@@ -7,7 +7,7 @@ body { margin: 0; } .page { max-width: 880px; margin: 0 auto; padding: 32px 20px
 .compact-notice { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; padding:10px; border:1px solid #46516a; border-radius:6px; }
 .compact-notice button { padding:5px 8px; }
 .item-details { margin-top:8px; }
-.item-details > summary { color:#c4b5fd; cursor:pointer; width:fit-content; }
+.item-details > summary,.contents-inspect { color:#c4b5fd; cursor:pointer; width:fit-content; }
 .item-details > .item-details-body { margin-top:12px; border-top:1px solid #46516a; padding-top:12px; }
 .item-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 #library-pagination { align-items:center; justify-content:space-between; }
@@ -95,7 +95,14 @@ input, select, button, .button-like { font: inherit; border-radius: 5px; padding
 .library-result-access { color:#e6c88c; }
 .library-result-scope { color:#aab6c8; }
 .library-result-summary .library-item-header span { color:#aab6c8; font-size:.85rem; white-space:nowrap; }
-#library-items > li.library-item { padding:10px 12px; }
+#library-items > li.library-item,.contents-collection-items > li.library-item { padding:10px 12px; }
+.contents-collection-items { margin-top:12px; }
+.contents-card-title { margin:0; font-size:1rem; }
+.contents-card-account,.contents-card-status { margin:4px 0; font-size:.85rem; color:#b5bfcf; }
+.contents-collection-card > p:not(.contents-card-account):not(.contents-card-status) { margin:6px 0; font-size:.85rem; color:#e6c88c; }
+.contents-inspect { display:block; max-width:100%; background:transparent; padding:0; margin-top:8px; text-align:left; font-size:.9rem; }
+.contents-inspect::after { content:' ▸'; }
+.contents-inspect:hover { text-decoration:underline; text-underline-offset:3px; }
 @media(max-width:600px) { .library-search-row > label { width:100%; } .library-result-summary .library-item-header { flex-direction:row; } .library-result-summary .library-item-header strong { overflow-wrap:anywhere; } }
 
 /* Shared catalog presentation; controls outside the issue table never scroll away. */
@@ -115,10 +122,10 @@ summary { cursor:pointer; }
 .context-help > summary { color:#c4b5fd; }
 .context-help p { margin:8px 0; }
 .tool-card { margin-bottom:12px; }
-.contents-filters { display:grid; gap:12px; }
+.contents-filters { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
 .contents-filters > input,.contents-filters > label input { width:100%; min-width:0; }
-.contents-filters label { display:grid; gap:4px; font-size:.85rem; color:#c4b5fd; min-width:0; }
-.contents-filters select { max-width:100%; }
+.contents-filters label { display:grid; gap:4px; font-size:.85rem; color:#c4b5fd; min-width:0; max-width:100%; }
+.contents-filters select { min-width:0; max-width:100%; }
 .contents-filters > button { justify-self:start; }
 .contents-filters details .library-filters { margin:12px 0; }
 .contents-read-only { margin:8px 0; font-size:.85rem; overflow-wrap:anywhere; }

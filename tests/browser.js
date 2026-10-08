@@ -12,6 +12,8 @@ import {metadataZip,containerXml,opfXml} from './metadata-fixtures.js';
 // No personal profile, installed extensions, provider sessions or remote services.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const firefox=process.argv.includes('--firefox');
+const narrow=process.argv.includes('--narrow');
+const medium=process.argv.includes('--medium'),width=narrow?560:medium?820:1200;
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const importerMode=process.argv.includes('--importers');
 const uxMode=process.argv.includes('--ux');
@@ -54,8 +56,9 @@ try{
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
   const url=`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:''}`;
-  const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',process.argv.includes('--narrow')?'--window-size=560,900':'--window-size=1200,1000','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
-  const exited=new Promise(resolve=>{child=execFile(browser,args,{windowsHide:true,timeout:30000,maxBuffer:4*1024*1024},resolve);});
+  const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
+  const env={...process.env,...(firefox&&(narrow||medium)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
+  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
   try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,20000);})]);}
   finally{clearTimeout(timeout);child?.kill();await exited;}
