@@ -56,3 +56,8 @@ input, select, button, .button-like { font: inherit; border-radius: 5px; padding
 .saved-account p { font-size:.9rem; }
 .account-dialog { width:min(540px,calc(100% - 48px)); max-height:85vh; overflow:auto; background:#1f2937; color:#e5e7eb; border:1px solid #a78bfa; border-radius:8px; padding:20px; }
 .account-dialog::backdrop { background:#0009; }
+
+.contents-filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.contents-filters input { flex:1 1 240px; }
+#contents-book-review { margin-top:16px; }
+#contents-book-review .contents-editor { padding:12px; background:#1f2937; border-radius:6px; }

@@ -112,5 +112,7 @@
   "src/ui/performance-diagnostics.js",
   "src/ui/provider-accounts.js",
   "src/ui/providers-view.js",
-  "src/ui/onboarding.js"
+  "src/ui/onboarding.js",
+  "src/ui/contents-overview.js",
+  "src/ui/contents-workspace.js"
 ]
