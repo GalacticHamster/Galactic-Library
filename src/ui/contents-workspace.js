@@ -1,3 +1,4 @@
+import {presentAction} from './form-presentation.js';
 import {formatDate} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {CONTENTS_STATUSES,createContentsProjection} from './contents-overview.js';
@@ -5,7 +6,7 @@ import {createLibraryBrowseProjection,libraryBrowseResults} from './library-brow
 import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return node;};
+const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return presentAction(node);};
 const providerName=id=>({kindle:'Kindle',humble:'Humble Bundle',fanatical:'Fanatical',kobo:'Kobo'}[id]??id);
 export function createContentsWorkspace(actions={}) {
   const element=text('div','');element.id='contents-collections';

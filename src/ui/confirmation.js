@@ -4,7 +4,7 @@ export function createConfirmation({title,message,confirmLabel,extraLabel,extraA
   const dialog=node('dialog');dialog.className='account-dialog confirmation-dialog';dialog.setAttribute('aria-label',title);
   const status=node('p');status.setAttribute('role','status');
   const actions=node('p');actions.className='actions';
-  const cancel=node('button','Cancel'),confirm=node('button',confirmLabel);cancel.type=confirm.type='button';confirm.className='danger';
+  const cancel=node('button','Cancel'),confirm=node('button',confirmLabel);cancel.type=confirm.type='button';cancel.className='secondary';confirm.className='danger';
   let finish,settled=false;const result=new Promise(resolve=>{finish=resolve;});
   const close=value=>{if(settled)return;settled=true;dialog.close();dialog.remove();finish(value);};
   cancel.addEventListener('click',()=>close(false));confirm.addEventListener('click',()=>close(true));

@@ -1,3 +1,4 @@
+import {presentAction} from './form-presentation.js';
 import {formatDate} from './formatters.js';
 import {bookToolHelp,fieldLabel,sourceLabel} from './book-tool-help.js';
 import {identityKey,names} from '../lib/identity.js';
@@ -19,7 +20,7 @@ export function createEnrichmentEvidence(records,database,undo,state={}){
         const conflict=Boolean(provider&&JSON.stringify(names(provider).map(identityKey).sort())!==JSON.stringify(names(entry[field]).map(identityKey).sort()));
         for(const value of [fieldLabel(field),format(provider),format(entry[field]),conflict?'Review differing evidence':'']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}table.append(row);
       }details.append(table);
-      if(database.enrichmentHistory[entry.selectionRef]){const button=document.createElement('button');button.type='button';button.textContent=`Undo ${sourceLabel(kind)} selection`;button.addEventListener('click',async()=>{button.disabled=true;try{await undo(entry.selectionRef);}catch(error){source.textContent=error.message;button.disabled=false;}});details.append(button);}
+      if(database.enrichmentHistory[entry.selectionRef]){const button=document.createElement('button');button.type='button';button.textContent=`Undo ${sourceLabel(kind)} selection`;presentAction(button);button.addEventListener('click',async()=>{button.disabled=true;try{await undo(entry.selectionRef);}catch(error){source.textContent=error.message;button.disabled=false;}});details.append(button);}
     }
   }
   }

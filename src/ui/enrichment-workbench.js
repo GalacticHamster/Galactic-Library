@@ -1,3 +1,5 @@
+import {labeledControl} from './form-presentation.js';
+import {presentAction} from './form-presentation.js';
 import {formatDate} from './formatters.js';
 import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
 import {enrichmentWorkbenchRows} from '../lib/enrichment-workbench.js';
@@ -14,10 +16,10 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
   const search=document.createElement('input');search.type='search';search.placeholder='Filter enrichment titles';search.setAttribute('aria-label','Filter enrichment titles');
   const status=text('p','');status.setAttribute('role','status');const counter=text('p','');
   const list=document.createElement('ol');list.className='review-items';
-  const controls=document.createElement('p');controls.className='actions';body.append(category,search,controls,status,counter,list);
-  if(item){category.hidden=true;search.hidden=true;controls.hidden=true;}
+  const controls=document.createElement('p');controls.className='actions';const categoryLabel=labeledControl('Suggestions to show',category),searchLabel=labeledControl('Find a title',search);body.append(categoryLabel,searchLabel,controls,status,counter,list);
+  if(item){categoryLabel.hidden=true;searchLabel.hidden=true;controls.hidden=true;}
   const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;let database,dirty=false;
-  const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return node;};
+  const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return presentAction(node);};
   const perform=async operation=>{if(busy)return;busy=true;refresh();try{await operation();selected.clear();status.textContent='Saved.';await actions.refresh();}catch(error){status.textContent=error.message;}finally{busy=false;refresh();}};
   const apply=button('Apply selected candidates',()=>perform(()=>{
     const selections=rows.filter(row=>selected.has(row.id)&&row.review).map(row=>({reviewId:row.id,candidateIndex:choices.get(row.id),confirmed:true}));

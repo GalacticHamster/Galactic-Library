@@ -1,3 +1,4 @@
+import {labeledControl,presentAction} from './form-presentation.js';
 import {providerLabel,accessLabel,formatDate} from './formatters.js';
 import {parsePurchaseEvidence} from '../lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
@@ -5,7 +6,7 @@ import {accountLabel} from './item-presentation.js';
 
 const node=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const input=(label,type='text')=>{const field=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')field.type=type;field.setAttribute('aria-label',label);return field;};
-const button=(title,run)=>{const result=node('button',title);result.type='button';result.addEventListener('click',run);return result;};
+const button=(title,run)=>{const result=node('button',title);result.type='button';result.addEventListener('click',run);return presentAction(result);};
 
 export function createOwnershipReviewTools(records,database,actions){
   const root=node('details');root.className='ownership-review-tools';root.append(node('summary','Confirm ownership with dated evidence'));let ready=false;
@@ -22,7 +23,7 @@ export function createOwnershipReviewTools(records,database,actions){
       const label=node('label'),confirm=input('Confirm checked ownership evidence','checkbox');label.append(confirm,' I checked this evidence for this record and account.');
       const status=node('p');status.setAttribute('role','status');
       const save=button('Save ownership confirmation',async()=>{if(!confirm.checked){status.textContent='Check the evidence confirmation first.';return;}save.disabled=true;try{await actions.save(record.recordRef,{ownership:ownership.value,note:evidence.value,evidenceDate:date.value,sourceUrl:source.value,expiresAt:expiry.value?new Date(expiry.value).toISOString():null},prior?.reviewRef??null);actions.refresh();}catch(error){status.textContent=error.message;save.disabled=false;}});
-      section.append(ownership,evidence,date,source,node('label','Temporary access expiry (leave blank for permanent ownership)'),expiry,label,save,status);
+      section.append(labeledControl('Confirmed access',ownership),labeledControl('Evidence you checked',evidence),labeledControl('Evidence date',date),labeledControl('Evidence URL (optional)',source),labeledControl('Temporary access expiry (blank for permanent ownership)',expiry),label,save,status);
       if(prior)section.append(button('Undo ownership confirmation',async()=>{try{await actions.remove(record.recordRef,prior.reviewRef);actions.refresh();}catch(error){status.textContent=error.message;}}));root.append(section);
     }
   });return root;
@@ -37,8 +38,8 @@ export function createPurchaseEvidenceWorkbench(database,actions){
     const source=input('Purchase evidence source label');source.maxLength=100;source.value='Local purchase history';
     const file=input('Local purchase history file','file');file.accept='.json,.csv,application/json,text/csv';const status=node('p');status.setAttribute('role','status');
     file.addEventListener('change',async()=>{const selected=file.files?.[0];if(!selected)return;file.disabled=true;try{if(selected.size>5*1024*1024)throw new Error('Choose a file under 5 MB.');await actions.import(parsePurchaseEvidence(await selected.text(),{provider:provider.value,sourceLabel:source.value}));actions.refresh();}catch(error){status.textContent=error.message;file.disabled=false;}});
-    root.append(provider,source,file,button('Refresh receipt candidates',async()=>{try{await actions.retry();actions.refresh();}catch(error){status.textContent=error.message;}}),status);
-    const filter=input('Filter receipt titles','search');root.append(filter);const list=node('ol');list.className='review-items';root.append(list);let page=0;
+    root.append(labeledControl('Store / provider',provider),labeledControl('Source label',source),labeledControl('Purchase history file',file),button('Refresh receipt candidates',async()=>{try{await actions.retry();actions.refresh();}catch(error){status.textContent=error.message;}}),status);
+    const filter=input('Filter receipt titles','search');root.append(labeledControl('Find a receipt',filter));const list=node('ol');list.className='review-items';root.append(list);let page=0;
     const paging=node('p'),previous=button('Previous receipt page',()=>{page--;render();}),next=button('Next receipt page',()=>{page++;render();});paging.append(previous,next);root.append(paging);
     function render(){
       const entries=Object.entries(database.ownershipProposals).filter(([,proposal])=>proposal.evidence.title.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase()));page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(entries.length/50)-1)));previous.disabled=page===0;next.disabled=(page+1)*50>=entries.length;list.replaceChildren();
@@ -48,7 +49,7 @@ export function createPurchaseEvidenceWorkbench(database,actions){
         if(current.length){
           const choice=node('select');choice.setAttribute('aria-label','Receipt library candidate');choice.append(Object.assign(node('option','Choose the matching account copy'),{value:''}));for(const item of current)choice.append(Object.assign(node('option',`${item.title} — ${accountLabel(item,database)}`),{value:item.recordRef}));
           const label=node('label'),confirm=input('Confirm receipt matches record','checkbox');label.append(confirm,' This receipt proves purchase of this edition in this account.');
-          entry.append(choice,label,button('Confirm receipt ownership',async()=>{try{const selected=current.find(item=>item.recordRef===choice.value);if(!selected||!confirm.checked)throw new Error('Choose and confirm the matching edition.');await actions.apply(id,selected.recordRef,true,database.ownershipReviews[selected.recordRef]?.reviewRef??null);actions.refresh();}catch(error){status.textContent=error.message;}}));
+          entry.append(labeledControl('Matching account copy',choice),label,button('Confirm receipt ownership',async()=>{try{const selected=current.find(item=>item.recordRef===choice.value);if(!selected||!confirm.checked)throw new Error('Choose and confirm the matching edition.');await actions.apply(id,selected.recordRef,true,database.ownershipReviews[selected.recordRef]?.reviewRef??null);actions.refresh();}catch(error){status.textContent=error.message;}}));
         }else entry.append(node('p','No matching copy is available in this saved account, or the receipt has no assigned account. Check the selected provider account, update it if needed, then refresh receipt suggestions. Evidence without an account stays pending; a title match alone cannot confirm it.'));
         entry.append(button('Dismiss receipt proposal',async()=>{try{await actions.dismiss(id);actions.refresh();}catch(error){status.textContent=error.message;}}));list.append(entry);
       }

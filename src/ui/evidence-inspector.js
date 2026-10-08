@@ -1,3 +1,4 @@
+import {labeledControl,presentAction} from './form-presentation.js';
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
 import { contentCoverage } from '../lib/contents.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from '../lib/ownership.js';
@@ -83,13 +84,13 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       }else section.append(element('p','No confirmed contents. Title or category hints do not establish collected coverage.'));
       const relationships=Object.entries(database.manualMatchDecisions??{}).filter(([,decision])=>decision.itemIds.includes(record.id));
       if(records.length>1){
-        const split=element('button','Separate this record into its own edition');split.type='button';
+        const split=element('button','Separate this record into its own edition');split.type='button';presentAction(split);
         split.addEventListener('click',async()=>{try{await actions.split(record.id);actions.refresh();}catch(error){status.textContent=error.message;}});
         section.append(split);
       }
       for(const [ref,separation]of Object.entries(database.editionSeparations??{}).filter(([,value])=>value.itemId===record.id)){
         const row=element('p',`Edition kept separate from ${separation.otherItemIds.length} other record(s) · reviewed ${separation.updatedAt||'date unknown'} `);
-        const undo=element('button','Undo edition separation');undo.type='button';
+        const undo=element('button','Undo edition separation');undo.type='button';presentAction(undo);
         undo.addEventListener('click',async()=>{try{await actions.undoSplit(ref);actions.refresh();}catch(error){status.textContent=error.message;}});
         row.append(undo);section.append(row);
       }
@@ -120,7 +121,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       const differences=identityConflicts(a,b);
       conflicts.textContent=differences.length?`Known differences: ${differences.join(', ')}. These prevent a same-edition merge.`:'No known conflicting fields. Missing evidence still needs human review.';
     };
-    left.addEventListener('change',compare);right.addEventListener('change',compare);comparison.append(left,right,conflicts);compare();
+    left.addEventListener('change',compare);right.addEventListener('change',compare);comparison.append(labeledControl('This account copy',left),labeledControl('Compare with',right),conflicts);compare();
     for(const value of ['same-work','same-edition','different']){
       const button=element('button',decisionLabel(value));button.type='button';button.addEventListener('click',async()=>{
         if(!right.value||left.value===right.value){status.textContent='Choose two different records.';return;}

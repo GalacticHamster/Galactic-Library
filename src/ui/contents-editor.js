@@ -1,3 +1,4 @@
+import {labeledControl,presentAction} from './form-presentation.js';
 import {createContentsInterpretation} from './contents-interpretation.js';
 import {formatDate} from './formatters.js';
 import { contentsStatement, validateContents } from '../lib/contents.js';
@@ -22,7 +23,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   const sourceDetails=document.createElement('details');sourceDetails.className='contents-source-details';
-  sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),element('label','Description / contents statement'),statement,element('label','Source page'),source);
+  sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),labeledControl('Description / contents statement',statement),labeledControl('Source page',source));
   sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; Captured: ${formatDate(evidence?.checkedAt)}. ${review?'Human review saved: '+(formatDate(review.verifiedAt))+'.':''}`));
   const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
   const interpretation=element('div','');advanced.append(interpretation);
@@ -32,8 +33,8 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const table=document.createElement('table');const head=document.createElement('thead');const heading=document.createElement('tr');
   for(const title of ['Series or collection','Series version / year','Type','Number / name','Language','Extent',''])heading.append(element('th',title));
   head.append(heading);table.append(head);const body=document.createElement('tbody');table.append(body);
-  const addRow=(entry={})=>{
-    const row=document.createElement('tr');
+  let nextRow=0;const addRow=(entry={})=>{
+    const rowNumber=++nextRow,row=document.createElement('tr');
     for(const key of ['series','run','unitType','number','language','completeness']){
       const cell=document.createElement('td');let input;
       if(['unitType','completeness'].includes(key)){
@@ -43,9 +44,9 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
         }
         input.value=entry[key]||(key==='unitType'?'issue':'full');
       }else{input=document.createElement('input');input.value=entry[key]??'';input.maxLength=500;}
-      input.dataset.contentsField=key;input.setAttribute('aria-label',key);cell.append(input);row.append(cell);
+      input.dataset.contentsField=key;input.setAttribute('aria-label',({series:'Series or collection',run:'Series version or year',unitType:'Included work type',number:'Issue/volume number or work name',language:'Language',completeness:'Full work or excerpt'})[key]+' for entry '+rowNumber);cell.append(input);row.append(cell);
     }
-    const remove=element('button','Remove');remove.type='button';remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
+    const remove=element('button','Remove');remove.type='button';presentAction(remove);remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
   };
   const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
@@ -55,7 +56,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   if(initialProposal)showInterpretation(initialProposal);
   if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
   if(review&&initialProposal?.descriptionMayBeIncomplete)root.append(element('p','The captured description may be incomplete. Your human review is retained; it is not proof that the description lists everything in the book.'));
-  const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
+  const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return presentAction(node);};
   let saving=false;
   const persist=async operation=>{
     if(saving)return;saving=true;

@@ -1,9 +1,10 @@
+import {presentAction} from './form-presentation.js';
 import {accessLabel,formatDate} from './formatters.js';
 import {accountLabel} from './item-presentation.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
 import {contentCoverage} from '../lib/contents.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return node;};
+const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return presentAction(node);};
 export function collectionComparison(record,database) {
   const review=database.contentReviews?.[record.id];if(!review)return null;
   return contentCoverage(database,review.entries,{excludeItemIds:[record.id],mediaType:record.mediaType});

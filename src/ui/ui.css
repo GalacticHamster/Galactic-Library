@@ -166,3 +166,23 @@ summary { cursor:pointer; }
  .contents-editor th { font-size:.8rem; }
  .item-cover { width:80px; height:120px; }
 }
+
+/* Compact visible labels and action hierarchy for secondary tools. */
+.form-field { display:grid; gap:4px; margin:8px 0; font-size:.85rem; color:#c4b5fd; min-width:0; max-width:100%; }
+.form-field > input,.form-field > select,.form-field > textarea { min-width:0; max-width:100%; width:100%; color:#e5e7eb; }
+.reading-order-draft { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.reading-order-draft .form-field { flex:1 1 200px; }
+button.secondary { background:#253147; border:1px solid #46516a; }
+button.secondary:hover { background:#38465f; }
+button.danger { background:#b91c1c; }
+.contents-technical-details pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:.85rem; }
+.contents-interpretation > h4 { margin:12px 0 4px; font-size:.9rem; }
+.contents-interpretation blockquote { margin:8px 0; padding-left:12px; border-left:2px solid #46516a; }
+.provider .ownership-provider-choice { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:600px) { .provider .ownership-provider-choice { flex-basis:auto; width:100%; align-self:stretch; } }
+
+.reading-tools section[data-reading-record],.ownership-review-tools [data-ownership-record] { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px 12px; align-items:end; }
+.reading-tools section > h4,.reading-tools section > p,.ownership-review-tools [data-ownership-record] > strong,.ownership-review-tools [data-ownership-record] > p { grid-column:1 / -1; }
+.reading-tools section > button,.ownership-review-tools [data-ownership-record] > button { justify-self:start; max-width:100%; }
+.form-field textarea { background:#111827; color:#e5e7eb; font:inherit; padding:8px; border:1px solid #6b7280; border-radius:5px; }
+#book-catalog-disclosure > summary { margin:12px 0; color:#c4b5fd; }
