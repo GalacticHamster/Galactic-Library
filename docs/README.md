@@ -4,6 +4,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 
 ## Using the extension
 
+- [Library browsing, search, filters and sorting](user-guide/library-browsing.md)
 - [Library item details and enrichment](user-guide/item-details.md)
 - [Contents workspace](user-guide/contents-workspace.md)
 - [Providers and saved accounts](user-guide/providers-and-accounts.md)

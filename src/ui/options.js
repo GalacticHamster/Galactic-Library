@@ -1,5 +1,5 @@
 import {createLibraryResultSummary} from './library-result.js';
-import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
+import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
 import {bookRoute,bookHref} from './contents-navigation.js';
 import {createContentsBookDetails,createContentsHistory,createCollectionComparison} from './contents-book-details.js';
@@ -11,7 +11,7 @@ import {createContentsWorkspace} from './contents-workspace.js';
 import {createContentsScanProgress} from './contents-scan-progress.js';
 import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
-import {bookToolHelp, metadataPreview} from './book-tool-help.js';
+import {bookToolHelp} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
 import { getCommittedLibraryView, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
@@ -45,7 +45,7 @@ import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
-import { identityEvidence, identityConflicts, editionEnrichmentConflicts } from '../lib/identity.js';
+import { identityEvidence } from '../lib/identity.js';
 import {PRIVATE_STORAGE_CHANGED,isFirefoxRuntime} from '../background/private-storage.js';
 
 async function reviewCompanionSource(clientId){
@@ -142,6 +142,7 @@ let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
 let libraryPage = 0;
+let unlinkedPage=0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
@@ -255,10 +256,6 @@ function textElement(tag, text) {
   return node;
 }
 
-function itemMatchesQuery(item, query) {
-  return !query || item.title.toLocaleLowerCase().includes(query) || item.normalizedTitle.includes(query);
-}
-
 function comixologyReviewMarkdown(providerItems, sourceLabel) {
   const records = Object.values(providerItems)
     .filter((item) => item.provider === 'kindle' && item.metadata?.originType?.toLocaleLowerCase() === 'comixology')
@@ -281,14 +278,6 @@ function comixologyReviewMarkdown(providerItems, sourceLabel) {
 }
 
 function selectedFilters() {return Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value||'all']));}
-
-function providerMatches(record, provider) {
-  return provider === 'all' || record.provider === provider;
-}
-
-function ownershipMatches(record, ownership) {
-  return ownership === 'all' || effectiveOwnershipRecord(record,database).ownership === ownership;
-}
 
 function filtersAreActive(filters, query) {return Boolean(query)||Object.values(filters).some(value=>value!=='all');}
 
@@ -324,11 +313,6 @@ function populateProviderFilter(providerEntries) {
   providerFilter.value = options.some(([value]) => value === selected) ? selected : 'all';
 }
 
-function parentRecordKey(addOn) {
-  const parentId = String(addOn.metadata?.parentProviderItemId ?? '').trim();
-  return parentId ? Object.values(database.providerItems).find(item=>item.provider===addOn.provider&&item.profileId===addOn.profileId&&item.providerItemId===parentId)?.id??null : null;
-}
-
 function createAddOnList(addOns) {
   const group = document.createElement('div');
   const label = textElement('strong', `DLC (${addOns.length})`);
@@ -354,32 +338,6 @@ function reviewButton(label, className, onClick) {
   button.className = className;
   button.addEventListener('click', onClick);
   return button;
-}
-
-function populateGenreFilter(records) {
-  const selected = genreFilter.value;
-  const byKey = new Map();
-  for (const value of records.flatMap(libraryBroadGenreValues)) {
-    const key = value.toLocaleLowerCase();
-    if (!byKey.has(key)) byKey.set(key, value);
-  }
-  const options = [
-    ['all', 'Any genre'],
-    ...[...byKey.values()].sort((left, right) => left.localeCompare(right)).map((value) => [value, value])
-  ];
-  genreFilter.replaceChildren(...options.map(([value, label]) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    return option;
-  }));
-  genreFilter.value = options.some(([value]) => value === selected) ? selected : 'all';
-}
-
-function genreMatches(records, genre) {
-  if (genre === 'all') return true;
-  const key = genre.toLocaleLowerCase();
-  return records.some((record) => libraryBroadGenreValues(record).some((value) => value.toLocaleLowerCase() === key));
 }
 
 async function searchOpenLibrary(canonicalItem, records) {
@@ -725,8 +683,6 @@ function render(timing = null) {
   }) : [Object.assign(document.createElement('p'), { textContent: 'No libraries connected.' })]));
 
   endSegment?.();endSegment=timing?.begin('options_selection');
-  const allRecords = Object.values(database.providerItems);
-  const addOns=browse.addOns.map(value=>value.record);
   const addOnsByParent=new Map([...browse.addOnsByParent].map(([id,values])=>[id,values.map(value=>value.record)]));
   const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
@@ -735,41 +691,14 @@ function render(timing = null) {
   const canonical=result.matches.map(row=>row.canonical);
   renderActiveFilters(filters);
   document.querySelector('#library-no-results').hidden=canonical.length>0||!Object.keys(database.providerItems).length;
-  const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
-  const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
-  const softwareCanonicalCount=canonical.filter(item=>item.mediaType==='software').length;
-  const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
-  const movieCanonicalCount = canonical.filter((item) => item.mediaType === 'movie').length;
-  const tvCanonicalCount = canonical.filter((item) => item.mediaType === 'tv').length;
-  const visibleRecords = result.matches.flatMap(row=>row.qualifying.map(value=>value.record));
-  const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
-  const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
-  const bookRecordCount = visibleRecords.filter((item) => item.mediaType === 'book').length;
-  const movieRecordCount = visibleRecords.filter((item) => item.mediaType === 'movie').length;
-  const tvRecordCount = visibleRecords.filter((item) => item.mediaType === 'tv').length;
-  const summaryParts = [];
-  if(softwareCanonicalCount)summaryParts.push(`${softwareCanonicalCount} unique software products`);
-  const suffix = filtersAreActive(filters, query) ? ' matching filters' : '';
-  if (gameCanonicalCount || (!softwareCanonicalCount && !audiobookCanonicalCount && !bookCanonicalCount && !movieCanonicalCount && !tvCanonicalCount)) summaryParts.push(`${gameCanonicalCount} unique game${gameCanonicalCount === 1 ? '' : 's'}`);
-  if (audiobookCanonicalCount) summaryParts.push(`${audiobookCanonicalCount} unique audiobook${audiobookCanonicalCount === 1 ? '' : 's'}`);
-  if (bookCanonicalCount) summaryParts.push(`${bookCanonicalCount} unique book${bookCanonicalCount === 1 ? '' : 's'}`);
-  if (movieCanonicalCount) summaryParts.push(`${movieCanonicalCount} unique movie${movieCanonicalCount === 1 ? '' : 's'}`);
-  if (tvCanonicalCount) summaryParts.push(`${tvCanonicalCount} unique TV title${tvCanonicalCount === 1 ? '' : 's'}`);
-  if (gameRecordCount) summaryParts.push(`${gameRecordCount} game record${gameRecordCount === 1 ? '' : 's'}`);
-  if (audiobookRecordCount) summaryParts.push(`${audiobookRecordCount} audiobook record${audiobookRecordCount === 1 ? '' : 's'}`);
-  if (bookRecordCount) summaryParts.push(`${bookRecordCount} book record${bookRecordCount === 1 ? '' : 's'}`);
-  if (movieRecordCount) summaryParts.push(`${movieRecordCount} movie record${movieRecordCount === 1 ? '' : 's'}`);
-  if (tvRecordCount) summaryParts.push(`${tvRecordCount} TV record${tvRecordCount === 1 ? '' : 's'}`);
-  const canShowAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc !== 'without';
-  const visibleAddOnCount = canShowAddOns ? addOns.filter((addOn) => {
-    const parentKey = parentRecordKey(addOn);
-    const parent = parentKey ? database.providerItems[parentKey] : null;
-    return providerMatches(addOn, filters.provider)
-      && ownershipMatches(addOn, filters.ownership)
-      && (itemMatchesQuery(addOn, query) || (parent && itemMatchesQuery(parent, query)));
-  }).length : 0;
-  if (visibleAddOnCount) summaryParts.push(`${visibleAddOnCount} DLC add-on${visibleAddOnCount === 1 ? '' : 's'}`);
-  summary.textContent = summaryParts.length ? `${summaryParts.join(' · ')}${suffix}.` : `No library items${suffix}.`;
+  const visibleRecords=result.matches.flatMap(row=>row.qualifying);
+  const types=new Map();for(const item of canonical)types.set(item.mediaType,(types.get(item.mediaType)??0)+1);
+  const labels={game:'game',software:'software item',audiobook:'audiobook',book:'book',movie:'movie',tv:'TV title'};
+  const counts=[...types].map(([type,count])=>count+' '+(labels[type]??type)+(count===1?'':'s'));
+  const canShowAddOns=(filters.mediaType==='all'||filters.mediaType==='game')&&filters.dlc!=='without';
+  const orphanValues=(workspace.workspace==='library'&&canShowAddOns?browse.addOns:[]).filter(value=>!linkedAddOnIds.has(value.record.id)&&recordQualifies(value,filters,database)&&recordSearchRank(value,searchKey(query))!==null).sort((a,b)=>compareTitles(a.record.title,b.record.title));
+  const visibleAddOnCount=canShowAddOns?new Set([...result.matches.flatMap(row=>row.addons),...orphanValues].map(value=>value.record.id)).size:0;
+  summary.textContent=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' account records qualifying for filters':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
 
   endSegment?.();endSegment=timing?.begin('options_cards');
   libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
@@ -818,22 +747,13 @@ function render(timing = null) {
   }));
 
   endSegment?.();endSegment=timing?.begin('options_reviews');
-  const canShowUnlinkedAddOns = (filters.mediaType === 'all' || filters.mediaType === 'game') && filters.dlc === 'all';
-  const unlinked = canShowUnlinkedAddOns
-    ? addOns.filter((addOn) => !linkedAddOnIds.has(addOn.id) && providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership) && itemMatchesQuery(addOn, query))
-      .sort((left, right) => compareTitles(left.title, right.title))
-    : [];
-  unlinkedAddOnsSection.hidden = workspace.workspace !== 'library' || unlinked.length === 0;
-  if (unlinked.length) {
-    unlinkedAddOnsSummary.textContent = 'The provider did not return a parent game record for these add-ons.';
-    unlinkedAddOns.replaceChildren(...unlinked.map((addOn) => {
-      const node = document.createElement('li');
-      node.append(textElement('strong', addOn.title), textElement('span', displayProviderName(addOn.provider)));
-      return node;
-    }));
-  } else {
-    unlinkedAddOns.replaceChildren();
-  }
+  unlinkedAddOnsSection.hidden=workspace.workspace!=='library'||!orphanValues.length;
+  unlinkedPage=Math.max(0,Math.min(unlinkedPage,Math.max(0,Math.ceil(orphanValues.length/50)-1)));
+  unlinkedAddOnsSummary.textContent='The provider did not return a parent game record for these add-ons. Showing '+(unlinkedPage*50+1)+'-'+Math.min((unlinkedPage+1)*50,orphanValues.length)+' of '+orphanValues.length+'.';
+  document.querySelector('#unlinked-previous').disabled=unlinkedPage===0;
+  document.querySelector('#unlinked-next').disabled=(unlinkedPage+1)*50>=orphanValues.length;
+  document.querySelector('#unlinked-pagination').hidden=orphanValues.length<=50;
+  unlinkedAddOns.replaceChildren(...orphanValues.slice(unlinkedPage*50,(unlinkedPage+1)*50).map(({record})=>{const node=document.createElement('li');node.append(textElement('strong',record.title),textElement('span',displayProviderName(record.provider)));return node;}));
   renderDuplicateReview();
   let history=document.querySelector('#provider-history');
   if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#providers-workspace').append(history);}
@@ -980,7 +900,7 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
     companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }
 });
-const viewChanged=()=>{libraryPage=0;render();workspace.rememberView();};
+const viewChanged=()=>{libraryPage=0;unlinkedPage=0;render();workspace.rememberView();};
 search.addEventListener('input', viewChanged);
 showEnrichmentActions.addEventListener('change', async () => {
   const checked = showEnrichmentActions.checked;
@@ -997,6 +917,8 @@ for(const field of [...Object.values(viewControls),librarySort])field.addEventLi
 clearFilters.addEventListener('click', () => {
   search.value='';for(const field of Object.values(viewControls)){field.value='all';delete field.dataset.pendingValue;}viewChanged();
 });
+document.querySelector('#unlinked-previous').addEventListener('click',()=>{unlinkedPage--;render();});
+document.querySelector('#unlinked-next').addEventListener('click',()=>{unlinkedPage++;render();});
 document.querySelector('#clear-empty-library-filters').addEventListener('click',()=>clearFilters.click());
 function renderCollectionCoverage(){
   if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;

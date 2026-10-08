@@ -2,6 +2,8 @@
 
 Open **Details** on a Library result. The main navigation remains **Library | Providers | Contents | Settings**. Missing artwork, authors or edition identifiers do not prevent inspection.
 
+For result search, combined account filters, sorting and remembered browsing position, see [Library browsing](library-browsing.md).
+
 The overview shows the saved title, media type, available creator and cover, and known series, volume/issue, edition, language, publisher, publication and ISBN information. Audiobooks also show recorded narrators. Several saved values can be shown when accounts differ; they are not silently reduced to a newly inferred edition. Artwork uses the existing provider image URL, loads only when inspecting the item, and disappears if loading fails.
 
 ## Your library
@@ -16,7 +18,7 @@ Expand **Confirm ownership with dated evidence** to record or undo an existing s
 
 Each book account shows its saved contents status and number of human-reviewed entries, if any. These counts are not a guessed complete enumeration. A latest failed acquisition can coexist with earlier useful evidence.
 
-**Review contents** opens that exact provider record in Contents. The detailed book contents editor exists there, rather than being duplicated in Library. **Open this book in Library** returns to the originating search, filters, page and scroll position within this Options tab. Direct/reloaded links open the exact current record; if the originating filtered result no longer exists, Library falls back to locating it without filters.
+**Review contents** opens that exact provider record in Contents. The detailed book contents editor exists there, rather than being duplicated in Library. **Open this book in Library** returns to the originating search, filters, sort, page and scroll position within this Options tab. Direct/reloaded links open the exact current record; if the originating filtered result no longer exists, Library falls back to locating it without filters under the selected sort.
 
 ## Book information
 

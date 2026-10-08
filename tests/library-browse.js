@@ -22,6 +22,22 @@ export const libraryBrowseTests=[
 ];
 export {record as browseRecord,database as browseDatabase};
 libraryBrowseTests.push(
+ ['Cached browsing reevaluates access expiry even when the committed record and projection are unchanged',()=>{
+   const db=database([record('temporary','Loan',{}, {ownership:'borrowed'})]);db.ownershipReviews={temporary:{ownership:'borrowed',expiresAt:'2026-10-08'}};
+   const original=Date.now,project=createLibraryBrowseProjection()(db);try{Date.now=()=>Date.parse('2026-10-07');assert.equal(libraryBrowseResults(project,{filters:{ownership:'borrowed'}}).total,1);Date.now=()=>Date.parse('2026-10-09');assert.equal(libraryBrowseResults(project,{filters:{ownership:'borrowed'}}).total,0);assert.equal(libraryBrowseResults(project,{filters:{ownership:'unknown'}}).total,1);}finally{Date.now=original;}
+ }],
+ ['Linked DLC searches and counts preserve account boundaries and parent metadata filtering',()=>{
+   const db=database([record('parent','Base Game',{series:['Saved game series']},{provider:'steam',providerItemId:'1',mediaType:'game'}),record('dlc','Extra Story',{parentProviderItemId:'1'},{provider:'steam',mediaType:'game-addon'}),record('other','Unrelated Extra',{parentProviderItemId:'1'},{provider:'steam',profileId:'family',mediaType:'game-addon'})]);delete db.canonicalItems.dlc;delete db.canonicalItems.other;
+   const project=createLibraryBrowseProjection()(db);assert.deepEqual(libraryBrowseResults(project,{query:'Extra Story',filters:{provider:'steam',account:'personal',series:'Saved game series',dlc:'with'}}).rows.map(row=>row.canonical.id),['parent']);assert.equal(project.linkedAddOnIds.has('other'),false);assert.equal(libraryBrowseResults(project,{query:'Unrelated Extra'}).total,0);
+ }],
+ ['All stored series editions stay distinct during retrieval rather than becoming new canonical groups',()=>{
+   const db=database([record('first','Same Series Volume 2',{series:['Same Series'],volume:'2',edition:'First'}),record('second','Same Series Volume 2 Revised',{series:['Same Series'],volume:'2',edition:'Revised'})]);assert.deepEqual(results(db,'',{filters:{series:'Same Series'},sort:'series'}),['first','second']);assert.equal(Object.keys(db.canonicalItems).length,2);
+ }],
+ ['A 14,081-record / 13,175-canonical browse projection stays bounded, reusable and source-parser independent',()=>{
+   const records=Array.from({length:14081},(_,n)=>{const group=n%13175;return record(String(n),'Catalog '+group,{authors:['Writer '+group%20],series:['Series '+group%30],volume:String(group),unitType:'volume',enrichment:{kindleProductComicContents:{statement:'Collects Example #1-2',manifest:{candidates:[],get blocks(){throw Error('Browsing interpreted source');}}}}});});const db=database(records);db.canonicalItems={};for(const value of records){const group=Number(value.id)%13175,item=db.canonicalItems[group]??{id:String(group),title:value.title,mediaType:'book',providerItemIds:[]};item.providerItemIds.push(value.id);db.canonicalItems[group]=item;}
+   const project=createLibraryBrowseProjection(),view=project(db);assert.equal(view.rows.length,13175);for(const sort of ['title-asc','title-desc','creator','series','added','updated']){const result=libraryBrowseResults(view,{sort,page:1});assert.equal(result.rows.length,50);assert.equal(result.total,13175);}
+   assert.equal(project(db),view);assert.equal(libraryBrowseResults(view,{query:'Catalog 13174'}).rows[0].canonical.id,'13174');
+ }],
  ['Result provider summaries count accounts rather than duplicating canonical results or purchase observations',()=>{
    assert.equal(resultProviderSummary([{record:{provider:'kindle',profileId:'a'}},{record:{provider:'kindle',profileId:'a'}},{record:{provider:'kindle',profileId:'b'}},{record:{provider:'kobo',profileId:'c'}}]),'Kindle (2 accounts) · Kobo');
  }],

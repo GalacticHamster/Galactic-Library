@@ -85,6 +85,8 @@ input, select, button, .button-like { font: inherit; border-radius: 5px; padding
 #library-more-filters > p { font-size:.85rem; margin:0; }
 .library-active-filters { display:flex; flex-wrap:wrap; gap:6px; }
 .library-active-filters button { background:#253147; border:1px solid #46516a; padding:4px 8px; font-size:.8rem; }
+.library-controls label,.library-controls select { min-width:0; max-width:100%; }
+.library-active-filters button,.library-result-series button { max-width:100%; overflow-wrap:anywhere; }
 .library-result-summary p { margin:4px 0 0; font-size:.85rem; }
 .library-result-identity,.library-result-creators { color:#d1d5db; }
 .library-result-summary .library-item-providers { display:block; color:#b5bfcf; }
