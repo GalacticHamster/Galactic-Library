@@ -17,7 +17,8 @@ export function createContentsWorkspace(actions={}) {
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
   const previous=button('Previous page',()=>{page--;renderList();}),next=button('Next page',()=>{page++;renderList();});paging.append(previous,next);
   listView.append(controls,counter,paging,list);element.append(overview,listView,detail);
-  const project=createContentsProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0;
+  const project=createContentsProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='';
+  const evidenceKey=record=>JSON.stringify([database.contentReviews?.[record.id],record.metadata?.enrichment?.kindleProductComicContents,record.metadata?.enrichment?.localMetadata]);
   function renderList(){
     if(!database||!active||selected)return;
     const result=contentsPage(rows,{query:search.value,status:status.value,provider:provider.value,page});page=result.page;
@@ -40,6 +41,8 @@ export function createContentsWorkspace(actions={}) {
     const record=Object.values(database?.providerItems??{}).find(record=>record.recordRef===ref&&record.mediaType==='book');if(!record)return false;
     if(!selected)returnScroll=globalThis.scrollY??0;
     selected=ref;lastOpened=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button('Back to collections',close),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
+    openedEvidence=evidenceKey(record);
+    const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));
@@ -53,6 +56,11 @@ export function createContentsWorkspace(actions={}) {
         const chosen=provider.value;provider.replaceChildren(Object.assign(text('option','All providers'),{value:'all'}),...[...new Set(rows.map(r=>r.provider))].sort().map(id=>Object.assign(text('option',providerName(id)),{value:id})));provider.value=[...provider.options].some(o=>o.value===chosen)?chosen:'all';
       }
       if(selected&&!rows.some(row=>row.recordRef===selected)){close();overview.textContent='This book is no longer in the current library. Other saved collections remain available.';}
+      if(selected){const record=database.providerItems[rows.find(row=>row.recordRef===selected).id];
+        if(openedEvidence!==evidenceKey(record)){const notice=detail.querySelector('.contents-review-notice');notice.replaceChildren(text('span','Saved evidence or a review changed while this editor was open. Your draft is retained. Reload before replacing a newer review. '),button('Reload saved contents',()=>open(selected)));
+          for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save verified contents','Undo contents confirmation'].includes(control.textContent))control.disabled=true;
+        }
+      }
       renderList();
     },refreshReview(){if(selected)open(selected);}
   };

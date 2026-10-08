@@ -92,7 +92,12 @@ const companionExtensionLinkStatus = document.querySelector('#companion-extensio
 const allowedCompanionExtensions = document.querySelector('#allowed-companion-extensions');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
-const contentsWorkspace=createContentsWorkspace();
+const contentsReviewActions={
+  save:async(id,value)=>{database=await saveContentReview(id,value);},
+  remove:async(id)=>{database=await removeContentReview(id);},
+  refresh:()=>{render();contentsWorkspace.refreshReview();}
+};
+const contentsWorkspace=createContentsWorkspace({review:(record,current)=>createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true})});
 document.querySelector('#contents-collections-slot').append(contentsWorkspace.element);
 const providerAccountsView=createProvidersView({select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
 document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
@@ -892,11 +897,7 @@ function render(timing = null) {
       if (openLibraryTools) body.append(openLibraryTools);
     }
     if (['book','game'].includes(canonicalItem.mediaType)) {
-      for (const record of records) body.append(createContentsEditor(record,database.contentReviews?.[record.id],{
-        save:async(id,value)=>{database=await saveContentReview(id,value);},
-        remove:async(id)=>{database=await removeContentReview(id);},
-        refresh:render
-      }));
+      for (const record of records) body.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));
     }
     if (linkedAddOns.length) body.append(createAddOnList(linkedAddOns));
 

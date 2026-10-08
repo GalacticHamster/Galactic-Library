@@ -7,7 +7,7 @@ const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent
 function sourcePage(value) {
   try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?`${url.origin}${url.pathname}`:'';}catch{return '';}
 }
-export function createContentsEditor(record, review, actions) {
+export function createContentsEditor(record, review, actions, {expanded=false}={}) {
   const root=document.createElement('details');root.className='contents-editor';
   root.append(element('summary', `Review included contents \u2014 ${record.title}`));
   let populated=false;
@@ -39,7 +39,11 @@ export function createContentsEditor(record, review, actions) {
     }
     const remove=element('button','Remove');remove.type='button';remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
   };
-  for(const entry of review?.entries??[])addRow(entry);
+  const initialProposal=interpretedEvidence??(discovered?proposeContentsForReview(discovered,record.title,{series:record.metadata?.series}):null);
+  for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
+  if(review)status.textContent=`${review.entries.length} human-reviewed entries saved. Edit and save to correct them, or undo confirmation. Source evidence remains unchanged.`;
+  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries — not confirmed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}`;
+  else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return node;};
   let loadedClaim=null;
   const independent=independentContentsClaims(evidence,record.title);
@@ -93,5 +97,6 @@ export function createContentsEditor(record, review, actions) {
   root.append(status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
+  if(expanded){root.open=true;populated=true;populate();}
   return root;
 }
