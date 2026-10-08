@@ -446,14 +446,14 @@ async function searchOpenLibrary(canonicalItem, records) {
   render();
 }
 
-function createOpenLibraryTools(canonicalItem, records) {
+function createOpenLibraryTools(canonicalItem, records, {enabled=showEnrichmentActions.checked}={}) {
   const enrichment = records.map((record) => record.metadata?.enrichment?.openLibrary).find(Boolean);
-  if (!showEnrichmentActions.checked && !enrichment?.workKey) return null;
+  if (!enabled && !enrichment?.workKey) return null;
   const container = document.createElement('div');
   container.className = 'open-library-tools';
   container.append(bookToolHelp({purpose:'Find the work behind this book, including authors and subjects.',input:'Its ISBN when known, otherwise title and author. Open Library needs no API key.',saves:'Nothing until you select a work. Work information describes a book across editions; its ISBN list is not evidence for your edition.',review:'Choose only the same work. Use edition lookup or reviewed contents for issue and volume coverage. Undo the selection under Sources and undo.',example:'A work for a manga volume may have paperback and digital editions; it does not establish what your omnibus collects.'}));
   const searchState = openLibrarySearches.get(canonicalItem.id);
-  if (showEnrichmentActions.checked) {
+  if (enabled) {
     const button = reviewButton(enrichment ? 'Find another Open Library work' : 'Find Open Library work', 'open-library-search', () => {
       searchOpenLibrary(canonicalItem, records).catch(() => {});
     });
@@ -468,7 +468,7 @@ function createOpenLibraryTools(canonicalItem, records) {
     source.textContent = 'View Open Library record';
     container.append(source);
   }
-  if (!showEnrichmentActions.checked || !searchState) return container;
+  if (!enabled || !searchState) return container;
   if (searchState.loading) {
     container.append(textElement('span', 'Searching Open Library…'));
     return container;
@@ -481,35 +481,17 @@ function createOpenLibraryTools(canonicalItem, records) {
     container.append(textElement('span', 'No Open Library candidates found.'));
     return container;
   }
-  const results = document.createElement('ul');
-  results.className = 'open-library-results';
-  for (const candidate of searchState.candidates) {
-    const result = document.createElement('li');
-    result.append(textElement('span', openLibraryCandidateLabel(candidate)),metadataPreview(records,openLibraryEnrichment(candidate),'openLibrary'));
-    const apply = reviewButton('Save this work', 'open-library-apply', async () => {
-      try {
-        database = await saveOpenLibraryEnrichment(canonicalItem.providerItemIds, openLibraryEnrichment(candidate),records.map(record=>record.recordRef));
-        openLibrarySearches.delete(canonicalItem.id);
-        render();
-      } catch (error) {
-        openLibrarySearches.set(canonicalItem.id, { loading: false, error: error.message, candidates: searchState.candidates });
-        render();
-      }
-    });
-    result.append(apply);
-    results.append(result);
-  }
-  container.append(results);
+  container.append(textElement('p',`${searchState.candidates.length} work suggestions saved. Preview and confirm them in Review suggestions for this item below.`));
   return container;
 }
 
-function createGoogleBooksTools(canonical,records){
+function createGoogleBooksTools(canonical,records,{enabled=showEnrichmentActions.checked}={}){
   const container=document.createElement('details');const heading=document.createElement('summary');
   const stages=enrichmentStages(records,database);
   heading.textContent='Find details for this edition';
   container.append(heading,bookToolHelp({purpose:'Look up edition details in Google Books, then choose the result that describes your copy.',input:'Its ISBN, or title and known authors. The Google Books API key is configured in Settings.',saves:'Manual searches save suggestions for review. They do not automatically apply edition metadata.',review:'Preview the fields, check the edition, then confirm before applying. Conflicting editions cannot be applied. Undo restores the previous source selection.',example:'A second edition may be related to your first edition, but should not supply its language, ISBN or page count.'}));
   const available=Object.entries(stages).filter(([,done])=>done).map(([stage])=>({genre:'genres',work:'work information',edition:'edition information',creators:'creators',contents:'reviewed contents',contentsLookup:'contents lookup'}[stage]));container.append(textElement('p',available.length?'Already available: '+available.join(', ')+'.':'No added book information yet.'));
-  if(!showEnrichmentActions.checked)return container;
+  if(!enabled)return container;
   const search=reviewButton('Find Google Books candidates','google-books-search',async()=>{
     googleBooksSearches.set(canonical.id,{loading:true,candidates:[]});render();
     try{const response=await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query:bibliographicQuery(canonical,records)});if(!response?.ok)throw new Error(response?.error??'Search unavailable.');googleBooksSearches.set(canonical.id,{loading:false,candidates:response.candidates??[]});database=await saveEnrichmentReview({recordRefs:records.map(record=>record.recordRef),source:'googleBooks',status:response.candidates?.length?'candidates':'no-results',title:canonical.title,reason:'Manual candidate discovery; confirm an edition before applying.',candidates:(response.candidates??[]).map(candidate=>googleBooksEnrichment(candidate))});}
@@ -519,17 +501,7 @@ function createGoogleBooksTools(canonical,records){
   const state=googleBooksSearches.get(canonical.id)??(pending?{loading:false,candidates:pending.candidates,error:pending.status==='failed'?pending.reason:''}:null);search.disabled=Boolean(state?.loading);container.append(search);
   if(state?.error)container.append(textElement('p',state.error));
   if(state&&!state.loading&&!state.candidates.length&&!state.error)container.append(textElement('p','No results. Try another source or add identifiers through local metadata.'));
-  for(const candidate of state?.candidates??[]){
-    const row=document.createElement('div');row.append(textElement('p',[candidate.title,candidate.subtitle,candidate.authors?.join(', '),candidate.publisher,candidate.language,candidate.isbn?.join(', ')].filter(Boolean).join(' · ')));
-    row.append(metadataPreview(records,googleBooksEnrichment(candidate),'googleBooks'));
-    const conflicts=records.flatMap(record=>editionEnrichmentConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate}));
-    if(conflicts.length){row.append(textElement('p',`Edition conflicts: ${[...new Set(conflicts)].join(', ')}. Review the source; this candidate cannot supply this edition's metadata.`));container.append(row);continue;}
-    const label=document.createElement('label');const confirm=document.createElement('input');confirm.type='checkbox';label.append(confirm,' I checked the source and this is the edition in my library.');
-    const apply=reviewButton('Apply edition metadata','google-books-apply',async()=>{
-      try{database=await saveGoogleBooksEnrichments([{itemIds:canonical.providerItemIds,recordRefs:records.map(record=>record.recordRef),enrichment:{...googleBooksEnrichment(candidate),approved:true,matchBasis:'user-selected-edition'}}]);googleBooksSearches.delete(canonical.id);render();}
-      catch(error){googleBooksSearches.set(canonical.id,{...state,error:error.message});render();}
-    });apply.disabled=true;confirm.addEventListener('change',()=>{apply.disabled=!confirm.checked;});row.append(label,apply);container.append(row);
-  }
+  if(state?.candidates?.length)container.append(textElement('p',`${state.candidates.length} edition suggestions saved. Preview and confirm them below.`));
   return container;
 }
 
@@ -898,10 +870,14 @@ function render(timing = null) {
     body.append(createItemDetailsBody(canonicalItem,records,database,{
       reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render}):null,
       ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render}),
-      books:()=>{const root=document.createElement('div');
-        if(workspace.workspace!=='books'){root.append(actionButton('Improve book information',()=>inspectEnrichmentRecords(records.map(record=>record.recordRef))));return root;}
-        root.append(createGoogleBooksTools(canonicalItem,records),createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}),createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);enrichmentWorkbench.showTitle(review.title);},refresh:()=>{render();enrichmentWorkbench.element.open=true;}}));
-        const open=createOpenLibraryTools(canonicalItem,records);if(open)root.append(open);return root;
+      books:()=>{
+        const root=document.createElement('div');
+        root.append(textElement('p','Provider metadata and external bibliographic suggestions are separate. Lookup results require review; accepting book details does not confirm ownership or included contents.'),createGoogleBooksTools(canonicalItem,records,{enabled:true}));
+        const open=createOpenLibraryTools(canonicalItem,records,{enabled:true});if(open)root.append(open);
+        root.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);},refresh:render}));
+        const review=createEnrichmentWorkbench({apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},undo:async refs=>{database=await undoEnrichmentSelections(refs);},retry:retryEnrichmentReview,refresh:render},{recordRefs:records.map(record=>record.recordRef),item:true});
+        review.element.open=true;review.update(database);root.append(review.element,createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
+        return root;
       },
       advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
         if(canonicalItem.mediaType==='game')for(const record of records)root.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));return root;

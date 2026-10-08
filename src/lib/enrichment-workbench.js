@@ -8,8 +8,9 @@ export function candidateConflicts(records,source,candidate){
   return [...new Set(records.flatMap(record=>editionEnrichmentConflicts(record,{title:[candidate.title,candidate.subtitle].filter(Boolean).join(': '),mediaType:'book',metadata:candidate})))];
 }
 
-export function enrichmentWorkbenchRows(database){
-  const records=new Map(Object.values(database.providerItems).filter(item=>item.mediaType==='book').map(item=>[item.recordRef,item]));
+export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContents=true,includeMissing=true}={}){
+  const scope=recordRefs?new Set(recordRefs):null;
+  const records=new Map(Object.values(database.providerItems).filter(item=>item.mediaType==='book'&&(!scope||scope.has(item.recordRef))).map(item=>[item.recordRef,item]));
   const rows=[];
   for(const [id,review]of Object.entries(database.enrichmentReviews)){
     const current=review.recordRefs.map(ref=>records.get(ref));if(current.some(item=>!item))continue;
@@ -17,16 +18,16 @@ export function enrichmentWorkbenchRows(database){
     const category=review.status==='failed'||review.status==='no-results'?'failed':review.status==='conflict'||conflicts.some(fields=>fields.length)?'conflicts':'candidates';
     rows.push({id,category,title:review.title||current[0].title,recordRefs:review.recordRefs,review,conflicts,reason:review.reason});
   }
-  for(const canonical of Object.values(database.canonicalItems)){
+  for(const canonical of includeMissing?Object.values(database.canonicalItems):[]){
     if(canonical.mediaType!=='book')continue;
-    const current=canonical.providerItemIds.map(id=>database.providerItems[id]);const stages=enrichmentStages(current,database);
+    const current=canonical.providerItemIds.map(id=>database.providerItems[id]);if(scope&&current.some(item=>!records.has(item.recordRef)))continue;const stages=enrichmentStages(current,database);
     const missing=['genre','work','edition','creators'].filter(stage=>!stages[stage]);
     if(missing.length)rows.push({id:`missing:${canonical.id}`,category:'missing',title:canonical.title,recordRefs:current.map(item=>item.recordRef),reason:`Missing: ${missing.join(', ')}`});
   }
   for(const record of records.values()){
     const statement=contentsStatement(record);
     const review = database.contentReviews[record.id];
-    if (statement && (!review || statement !== review.statement)) {
+    if (includeContents && statement && (!review || statement !== review.statement)) {
       const saved=record.metadata.enrichment?.kindleProductComicContents;
       const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);
       const status = proposal.outcome==='filtered' ? 'Filtered non-containment; original evidence retained' : proposal.outcome==='uncertain' ? 'Uncertain candidate; context needs review' : !proposal.entries.length ? 'Unresolved containment statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';

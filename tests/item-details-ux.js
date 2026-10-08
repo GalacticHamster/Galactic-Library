@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {itemPresentation,artworkUrl} from '../src/ui/item-presentation.js';
+import {enrichmentWorkbenchRows} from '../src/lib/enrichment-workbench.js';
 const a={id:'kindle:a',recordRef:'a',profileId:'personal',provider:'kindle',title:'Example',mediaType:'book',ownership:'owned',metadata:{authors:['Writer'],series:['Example'],volume:'2'}};
 const b={...a,id:'kindle:b',recordRef:'b',profileId:'family',ownership:'borrowed'};
 const canonical={title:'Example',mediaType:'book'};
@@ -17,3 +18,7 @@ export const itemDetailsUxTests=[
    assert.equal(artworkUrl('javascript:alert(1)'),'');assert.equal(artworkUrl('https://user:pass@example.com/image'),'');assert.equal(artworkUrl('https://example.com/image'),'https://example.com/image');
  }]
 ];
+itemDetailsUxTests.push(['Scoped enrichment rows cannot reach another account and do not interpret contents or unrelated canonicals',()=>{
+  const db={providerItems:{a,b},enrichmentReviews:{one:{recordRefs:['a'],source:'googleBooks',candidates:[],status:'no-results'},two:{recordRefs:['b'],source:'googleBooks',candidates:[],status:'failed'}},contentReviews:{},enrichmentHistory:{},get canonicalItems(){throw Error('Unnecessary canonical projection');}};
+  const rows=enrichmentWorkbenchRows(db,{recordRefs:['a'],includeContents:false,includeMissing:false});assert.equal(rows.length,1);assert.equal(rows[0].id,'one');
+}]);

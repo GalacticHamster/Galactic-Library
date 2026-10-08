@@ -179,12 +179,14 @@ try{
   let tools=card('Review manga Vol. 1').querySelector('details:has([data-action="google-books-search"])');
   if(!tools)tools=[...card('Review manga Vol. 1').querySelectorAll('details')].find(node=>button(node,'Find Google Books candidates'));
   await open(tools);button(tools,'Find Google Books candidates').click();
-  await wait(()=>button(card('Review manga Vol. 1'),'Apply edition metadata'),'Authorless candidates did not render.');
-  const apply=button(card('Review manga Vol. 1'),'Apply edition metadata');assert(apply.disabled,'Candidate skipped human approval.');
-  const preview=apply.parentElement.querySelector('.metadata-preview');assert(preview&&preview.textContent.includes('Provider details')&&preview.textContent.includes('Saved source')&&preview.textContent.includes('9780140328721'),'Edition field preview missing.');
+  await wait(()=>button(card('Review manga Vol. 1'),'Accept suggestion'),'Authorless candidates did not render.');
+  let itemRow=card('Review manga Vol. 1').querySelector('.item-enrichment-review [data-review-id]');let itemChoice=itemRow.querySelector('select');itemChoice.value='0';itemChoice.dispatchEvent(new Event('change'));
+  itemRow=card('Review manga Vol. 1').querySelector('.item-enrichment-review [data-review-id]');
+  const apply=button(itemRow,'Accept suggestion');assert(apply.disabled,'Candidate skipped human approval.');
+  const preview=itemRow.querySelector('.metadata-preview');assert(preview&&preview.textContent.includes('Provider details')&&preview.textContent.includes('Saved source')&&preview.textContent.includes('9780140328721'),'Edition field preview missing.');
   assert(card('Review manga Vol. 1').textContent.includes('Manual searches save suggestions for review')&&document.querySelector('#book-lookup-card').textContent.includes('Saves automatically'),'Manual and automatic lookup boundaries missing.');
   checks.push('book tools explain save boundaries and preview source fields before edition approval');
-  const approval=apply.parentElement.querySelector('input[type="checkbox"]');approval.checked=true;approval.dispatchEvent(new Event('change'));apply.click();
+  const approval=itemRow.querySelector('input[type="checkbox"]');approval.checked=true;approval.dispatchEvent(new Event('change'));button(card('Review manga Vol. 1').querySelector('.item-enrichment-review [data-review-id]'),'Accept suggestion').click();
   await wait(()=>values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks?.approved,'Approved candidate did not persist.');
   await wait(()=>button(card('Review manga Vol. 1'),'Undo Google Books selection'),'Undo control did not render.');
   assert(card('Review manga Vol. 1').textContent.includes('Publisher')&&card('Review manga Vol. 1').textContent.includes('user-selected-edition'),'Field provenance missing.');
