@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
-import {validateUiPreferences} from '../src/lib/ui-preferences.js';
+import {validateUiPreferences,browseView,rememberBrowseView,mergeUiPreferences} from '../src/lib/ui-preferences.js';
 import {resultProviderSummary} from '../src/ui/library-result.js';
 const record=(id,title,metadata={},extra={})=>({id,recordRef:id,provider:'kobo',profileId:'personal',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata,...extra});
 const database=records=>({providerItems:Object.fromEntries(records.map(record=>[record.id,record])),canonicalItems:Object.fromEntries(records.map(record=>[record.id,{id:record.id,title:record.title,mediaType:record.mediaType,providerItemIds:[record.id]}])),providerProfiles:{personal:{nickname:'Personal'}},titleAliases:{},readingStates:{},contentReviews:{},enrichmentReviews:{}});
@@ -62,6 +62,18 @@ libraryBrowseTests.push(
    const db=database(Array.from({length:65},(_,n)=>record(String(n),'Book '+n,{series:['Series']}))),projection=createLibraryBrowseProjection()(db);const result=libraryBrowseResults(projection,{query:'Book',filters:{series:'Series'},sort:'title-desc',page:1});assert.equal(result.total,65);assert.equal(result.rows.length,15);assert.equal(result.rows[0].canonical.id,'14');assert.equal(libraryBrowseResults(projection,{filters:{series:'Absent'},page:99}).page,0);
  }],
  ['Extended private browse preferences accept old views and reject unsupported sorts and reading states',()=>{
-   assert.equal(validateUiPreferences({library:{search:'Example',page:2}}).library.sort,'title-asc');const view={sort:'series',account:'family',reading:'not-saved',series:'Long series',information:'review'};assert.deepEqual(Object.fromEntries(Object.keys(view).map(key=>[key,validateUiPreferences({library:view}).library[key]])),view);assert.throws(()=>validateUiPreferences({library:{sort:'magic'}}));assert.throws(()=>validateUiPreferences({library:{reading:'assumed-unread'}}));
+   assert.equal(validateUiPreferences({library:{search:'Example',page:2}}).browse.sort,'title-asc');const view={sort:'series',account:'family',reading:'not-saved',series:'Long series',information:'review'};assert.deepEqual(Object.fromEntries(Object.keys(view).map(key=>[key,({...validateUiPreferences({library:view}).browse,...validateUiPreferences({library:view}).library})[key]])),view);assert.throws(()=>validateUiPreferences({library:{sort:'magic'}}));assert.throws(()=>validateUiPreferences({library:{reading:'assumed-unread'}}));
  }]
 );
+
+libraryBrowseTests.push(['Shared Library and Contents state migrates old views once and keeps specialized filters separate',()=>{
+ const prefs=validateUiPreferences({library:{search:'Batman',provider:'kindle',sort:'added',page:1,information:'missing'},books:{search:'Other'}});
+ assert.equal(prefs.browse.search,'Batman');assert.deepEqual(prefs.library,{information:'missing',dlc:'all'});
+ rememberBrowseView(prefs,'contents',{...browseView(prefs,'contents'),search:'Detective',status:'partial',anchor:'same-record'});
+ assert.equal(browseView(prefs,'library').search,'Detective');assert.equal(browseView(prefs,'library').information,'missing');assert.equal(prefs.contents.status,'partial');assert.equal(prefs.books.search,'Other');
+ const saved=mergeUiPreferences(prefs,{browse:{sort:'series'}});assert.equal(saved.browse.anchor,'same-record');assert.equal(saved.browse.search,'Detective');assert(!('search' in saved.library));
+}],['Canonical anchor follows an item when Contents has a different eligible population and expands account records without losing scope',()=>{
+ const db=database(Array.from({length:70},(_,n)=>record(String(n),'Book '+n)));const other=record('other','Book 55',{}, {profileId:'family'});db.providerItems.other=other;db.canonicalItems['55'].providerItemIds.push('other');const project=createLibraryBrowseProjection()(db);
+ const result=libraryBrowseResults(project,{anchor:'55',recordFilter:r=>Number(r.id)>=40||r.id==='other'});assert.equal(result.page,0);assert(result.rows.some(r=>r.canonical.id==='55'&&r.qualifying.length===2));
+ assert.equal(libraryBrowseResults(project,{anchor:'missing',page:99}).page,1);assert.equal(libraryBrowseResults(project,{filters:{account:'family'},anchor:'55'}).rows[0].qualifying[0].record.id,'other');
+}]);

@@ -108,7 +108,7 @@ const contentsReviewActions={
   remove:async(id)=>{database=await removeContentReview(id);},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
+const contentsWorkspace=createContentsWorkspace({changed:()=>workspace.rememberView(),library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>globalThis.history?.replaceState(null,'',bookHref('contents',ref)),closed:()=>{if(workspace.workspace==='contents')globalThis.history?.replaceState(null,'','#contents');},review:(record,current)=>{
   const root=document.createElement('div');
   root.append(createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true}),
     createContentsBookDetails(record,current,{enrich:ref=>inspectEnrichmentRecords([ref]),undo:async ref=>{database=await undoEnrichmentSelection(ref);render();contentsWorkspace.refreshReview();}}),
@@ -142,18 +142,19 @@ let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
 let libraryPage = 0;
+let browseAnchor='',lastBrowseResult;
 let unlinkedPage=0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter, account:accountFilter, reading:readingFilter, series:seriesFilter, information:informationFilter };
 const workspace = createWorkspaceNavigation({
-  readView: () => ({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage }),
-  applyView: view => { search.value = view.search; libraryPage = view.page;librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
+  readView: current => current==='contents'?contentsWorkspace.readView():({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage,anchor:lastBrowseResult?.rows[0]?.canonical.id??'' }),
+  applyView: (view,current) => {if(current==='contents'){if(contentsWorkspace.selected)contentsWorkspace.close();contentsWorkspace.applyView(view);return;} search.value = view.search; libraryPage = view.page; browseAnchor=view.anchor??'';librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]??'all'; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
   save: saveUiPreferences, changed: () => { if (database) render(); }
 });
-document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; render(); workspace.rememberView(); });
-document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; render(); workspace.rememberView(); });
+document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
+document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
 document.querySelector("#open-active-book-job").addEventListener("click", () => workspace.select("books"));
 document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book?"; });
 
@@ -687,7 +688,8 @@ function render(timing = null) {
   const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
   const filters = selectedFilters();
-  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage});
+  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage,anchor:browseAnchor});
+  browseAnchor='';lastBrowseResult=result;libraryPage=result.page;
   const canonical=result.matches.map(row=>row.canonical);
   renderActiveFilters(filters);
   document.querySelector('#library-no-results').hidden=canonical.length>0||!Object.keys(database.providerItems).length;
@@ -900,7 +902,7 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
     companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }
 });
-const viewChanged=()=>{libraryPage=0;unlinkedPage=0;render();workspace.rememberView();};
+const viewChanged=()=>{browseAnchor='';libraryPage=0;unlinkedPage=0;render();workspace.rememberView();};
 search.addEventListener('input', viewChanged);
 showEnrichmentActions.addEventListener('change', async () => {
   const checked = showEnrichmentActions.checked;

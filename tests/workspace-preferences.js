@@ -17,9 +17,9 @@ export const workspacePreferenceTests = [
       writer.saveUiPreferences({ library: { provider: 'humble' }, books: { search: 'Manga', ownership: 'unknown' }, workspace: 'books' })
     ]);
     const saved = await writer.getUiPreferences();
-    assert.equal(saved.library.search, 'Volume 2');
-    assert.equal(saved.library.provider, 'humble');
-    assert.equal(saved.library.page, 1);
+    assert.equal(saved.browse.search, 'Volume 2');
+    assert.equal(saved.browse.provider, 'humble');
+    assert.equal(saved.browse.page, 1);
     assert.equal(saved.books.search, 'Manga');
     assert.equal(saved.workspace, 'books');
     const before = structuredClone(values);

@@ -6,7 +6,7 @@ import {createValidationCertificates} from '../lib/validation-certificate.js';
 import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
-import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences } from '../lib/ui-preferences.js';
+import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences, mergeUiPreferences } from '../lib/ui-preferences.js';
 import {validateOwnershipPolicy} from '../lib/ownership.js';
 import { DATABASE_SCHEMA_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
@@ -1102,7 +1102,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function saveUiPreferences(patch) {
     validateUiPreferences(patch);
     const current = await getUiPreferences();
-    const next = validateUiPreferences({ ...current, ...patch, library: { ...current.library, ...patch.library }, books: { ...current.books, ...patch.books } });
+    const next = mergeUiPreferences(current, patch);
     await storageArea.set({ [UI_PREFERENCES_KEY]: next });
     return next;
   }

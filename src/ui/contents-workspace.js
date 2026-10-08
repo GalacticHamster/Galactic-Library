@@ -1,4 +1,6 @@
 import {CONTENTS_STATUSES,createContentsProjection,contentsPage} from './contents-overview.js';
+import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
+import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return node;};
@@ -11,22 +13,42 @@ export function createContentsWorkspace(actions={}) {
   const search=text('input','');search.type='search';search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
   const status=text('select','');status.setAttribute('aria-label','Contents status');
   for(const [value,label] of [['all','All imported books'],['review','Needs human review'],['failure','Latest source failed or unavailable'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
-  const provider=text('select','');provider.setAttribute('aria-label','Contents provider');
-  controls.append(search,status,provider,button('Clear contents filters',()=>{search.value='';status.value='all';provider.value='all';page=0;renderList();}));
+  const shared={search};
+  const primary=text('div','');primary.className='library-filters';
+  const more=text('details','');more.append(text('summary','More filters'));const extra=text('div','');extra.className='library-filters';more.append(extra);
+  for(const [key,label,options]of [
+    ['sort','Sort',[['title-asc','Title A-Z'],['title-desc','Title Z-A'],['added','Date added / acquired'],['updated','Last record update'],['creator','Creator / author'],['series','Series and issue / volume']]],
+    ['mediaType','Media',[['all','All media'],['book','Books'],['audiobook','Audiobooks'],['game','Games'],['software','Software'],['movie','Movies'],['tv','TV']]],
+    ['provider','Provider',[['all','All providers']]],['account','Saved account',[['all','All accounts']]],
+    ['series','Series',[['all','Any series']]],['genre','Genre',[['all','Any genre']]],
+    ['ownership','Access',[['all','Any access'],['owned','Owned'],['claimed','Permanently claimed'],['borrowed','Borrowed'],['subscription','Subscription access'],['rental','Rented'],['unknown','Ownership unconfirmed']]],
+    ['reading','Reading',[['all','Any reading state'],['not-saved','No saved reading status'],['unread','Explicitly unread'],['reading','Reading'],['completed','Completed']]]
+  ]){const field=text('select','');field.id='contents-'+key;field.setAttribute('aria-label','Contents '+label.toLowerCase());for(const [value,label]of options)field.append(Object.assign(text('option',label),{value}));const wrapper=text('label',label);wrapper.append(field);( ['series','genre','ownership','reading'].includes(key)?extra:primary).append(wrapper);shared[key]=field;}
+  const provider=shared.provider;
+  const statusLabel=text('label','Contents status');statusLabel.append(status);primary.append(statusLabel);
+  const activeFilters=text('div','');activeFilters.className='library-active-filters';activeFilters.id='contents-active-filters';
+  const clear=button('Clear search and filters',()=>{view={...emptyBrowseView(),sort:view.sort,status:'all'};applyView(view);renderList();actions.changed?.();});
+  controls.append(search,primary,clear,more,activeFilters);
   const counter=text('p','');counter.setAttribute('role','status');
   const list=text('ol','');list.className='review-items';list.id='contents-collection-list';
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
-  const previous=button('Previous page',()=>{page--;renderList();}),next=button('Next page',()=>{page++;renderList();});paging.append(previous,next);
+  const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
   listView.append(controls,counter,paging,list);element.append(overview,listView,detail);
-  const project=createContentsProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='';
+  const project=createContentsProjection(),browse=createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
+  function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
+  function readView(){return {...view,page,anchor:result?.rows[0]?.canonical.id??view.anchor};}
+  const qualifies=row=>view.status==='all'||(view.status==='review'?row.needsReview:view.status==='failure'?row.failed:row.status===view.status);
   const evidenceKey=record=>JSON.stringify([database.contentReviews?.[record.id],record.metadata?.enrichment?.kindleProductComicContents,record.metadata?.enrichment?.localMetadata]);
   function renderList(){
     if(!database||!active||selected)return;
-    const result=contentsPage(rows,{query:search.value,status:status.value,provider:provider.value,page});page=result.page;
+    const summaries=new Map(rows.map(row=>[row.id,row]));
+    result=libraryBrowseResults(browse(database),{query:view.search,filters:view,sort:view.sort,page,anchor:view.anchor,recordFilter:record=>record.mediaType==='book'&&qualifies(summaries.get(record.id))});page=result.page;view.anchor='';
+    const shown=result.rows.flatMap(row=>row.qualifying.map(value=>({...summaries.get(value.record.id),canonicalId:row.canonical.id})));
+    activeFilters.replaceChildren();for(const [key,field]of Object.entries({...shared,status}))if(key!=='sort'&&field.value&&field.value!=='all'){const label=key==='search'?'Search: '+field.value:field.selectedOptions[0]?.textContent;activeFilters.append(button((key==='status'?'Contents only: ':'')+label,()=>{field.value=key==='search'?'':'all';field.dispatchEvent(new Event(key==='search'?'input':'change'));}));}
     previous.disabled=page===0;next.disabled=page===result.pages-1;
     counter.textContent=result.total?`${result.total} books · page ${page+1} of ${result.pages}`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
-    list.replaceChildren(...result.rows.map(row=>{
-      const node=text('li','');node.dataset.recordRef=row.recordRef;
+    list.replaceChildren(...shown.map(row=>{
+      const node=text('li','');node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
       node.append(text('strong',row.title),text('small',`${providerName(row.provider)} · ${row.nickname}`),text('p',`${row.label}${row.count!==null?` · ${row.count} reviewed entries`:''}${row.needsReview?' · Review needed':''}`));
       if(row.failed)node.append(text('p',row.retained?'Latest source check failed or was unavailable. Earlier contents and any human review are retained.':'The source could not be acquired. Retry or recovery belongs on the signed-in Kindle page.'));
       if(row.changed)node.append(text('p','Captured contents differ from your review. Saved decisions remain unchanged.'));
@@ -53,8 +75,8 @@ export function createContentsWorkspace(actions={}) {
     actions.opened?.(record.recordRef);
     detail.tabIndex=-1;detail.focus({preventScroll:true});return true;
   }
-  for(const control of [search,status,provider])control.addEventListener(control===search?'input':'change',()=>{page=0;renderList();});
-  return {element,open,close,get selected(){return selected;},
+  for(const [key,control]of Object.entries({...shared,status}))control.addEventListener(control===search?'input':'change',()=>{view[key]=control.value;view.anchor='';page=0;renderList();actions.changed?.();});
+  return {element,open,close,applyView,readView,get selected(){return selected;},
     update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported books · ${counts.reviewed??0} reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest source checks failed or unavailable. Identified text is a suggestion, not proof of complete contents or ownership.`;
@@ -62,7 +84,11 @@ export function createContentsWorkspace(actions={}) {
           const count=key==='all'?rows.length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
           const label=key==='all'?'All imported books':key==='review'?'Needs human review':key==='failure'?'Latest source failed or unavailable':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
         }
-        const chosen=provider.value;provider.replaceChildren(Object.assign(text('option','All providers'),{value:'all'}),...[...new Set(rows.map(r=>r.provider))].sort().map(id=>Object.assign(text('option',providerName(id)),{value:id})));provider.value=[...provider.options].some(o=>o.value===chosen)?chosen:'all';
+        const projection=browse(database);
+        for(const [key,options]of [['provider',[...new Set([...projection.records.values()].map(v=>v.record.provider))].sort().map(id=>({value:id,label:providerName(id)}))],['account',projection.accountOptions],['series',projection.seriesOptions.map(value=>({value,label:value}))],['genre',projection.genreOptions.map(value=>({value,label:value}))]]){
+          const field=shared[key];field.replaceChildren(Object.assign(text('option','All '+key),{value:'all'}),...options.map(option=>Object.assign(text('option',option.label),{value:option.value})));field.value=view[key];if(!field.value){field.value='all';view[key]='all';}delete field.dataset.pendingValue;
+        }
+
       }
       if(selected&&!rows.some(row=>row.recordRef===selected)){close();overview.textContent='This book is no longer in the current library. Other saved collections remain available.';}
       if(selected){const record=database.providerItems[rows.find(row=>row.recordRef===selected).id];

@@ -30,13 +30,13 @@ export const navigationUxTests=[
    const nav={querySelectorAll:()=>primary,addEventListener:(k,fn)=>{listeners.primary=fn;}},sub={querySelectorAll:()=>secondary,addEventListener:(k,fn)=>{listeners.secondary=fn;}};
    const library={},enrich={},heading={},status={},progress={cursor:17,runRef:'unchanged'};
    globalThis.document={querySelector:s=>({'#workspace-navigation':nav,'#library-navigation':sub,'#workspace-status':status,'#library-section':library,'#show-enrichment-actions':enrich,'#library-heading':heading})[s],querySelectorAll:()=>panels,addEventListener(){}};
-   let changed=0,reads=0;const view=defaultUiPreferences().library;
+   let changed=0,reads=0;const view=defaultUiPreferences().browse;
    try{
      const ui=createWorkspaceNavigation({readView:()=>{reads++;return view;},applyView(){},save:async()=>{},changed:()=>changed++});
      ui.hydrate({...defaultUiPreferences(),workspace:'books'});assert.equal(primary[0].attrs['aria-current'],'page');assert.equal(secondary[1].attrs['aria-current'],'page');
      ui.select('contents');assert.equal(library.hidden,true);assert.equal(sub.hidden,true);assert.equal(panels.find(p=>p.dataset.workspacePanel==='contents').hidden,false);
      ui.select('providers');ui.select('contents');assert.deepEqual(progress,{cursor:17,runRef:'unchanged'});
-     ui.select('library');assert.equal(library.hidden,false);assert.equal(primary[0].attrs['aria-current'],'page');assert.equal(reads,1);assert.equal(changed,4);
+     ui.select('library');assert.equal(library.hidden,false);assert.equal(primary[0].attrs['aria-current'],'page');assert.equal(reads,4);assert.equal(changed,4);
      const delayed=createWorkspaceNavigation({readView:()=>view,applyView(){},save:async()=>{},changed(){}});
      delayed.select('providers');delayed.hydrate({...defaultUiPreferences(),workspace:'books'});assert.equal(delayed.workspace,'providers','Late preferences displaced user navigation.');
    }finally{globalThis.document=prior;}

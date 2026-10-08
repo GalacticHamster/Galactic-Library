@@ -8,31 +8,43 @@ export function workspaceTarget(value) {
   return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
 }
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', sort:'title-asc', page: 0 });
-export const defaultUiPreferences = () => ({ workspace: 'library', library: emptyLibraryView(), books: emptyLibraryView() });
-
-export function validateUiPreferences(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['workspace', 'library', 'books'].includes(key))) throw Error('Invalid library display preferences.');
-  const output = defaultUiPreferences();
-  if (value.workspace !== undefined) {
-    if (!WORKSPACES.includes(value.workspace)) throw Error('Unknown library workspace.');
-    output.workspace = value.workspace;
+export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
+export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
+export const defaultUiPreferences = () => ({workspace:'library',browse:emptyBrowseView(),library:{information:'all',dlc:'all'},contents:{status:'all'},books:emptyLibraryView()});
+function validateView(view,defaults){
+  if(!view||typeof view!=='object'||Array.isArray(view)||Object.keys(view).some(key=>!Object.hasOwn(defaults,key)))throw Error('Invalid library filters.');
+  const output={...defaults,...view};
+  for(const [key,value]of Object.entries(output)){
+    if(key==='page'){if(!Number.isSafeInteger(value)||value<0||value>1000000)throw Error('Invalid library page.');}
+    else if(typeof value!=='string'||value.length>(['search','series'].includes(key)?500:200))throw Error('Invalid library filter.');
   }
-  for (const key of ['library', 'books']) {
-    if (value[key] === undefined) continue;
-    const view = value[key];
-    if (!view || typeof view !== 'object' || Array.isArray(view) || Object.keys(view).some(field => !Object.hasOwn(output[key], field))) throw Error('Invalid library filters.');
-    for (const [field, entry] of Object.entries(view)) {
-      if (field === 'page') {
-        if (!Number.isSafeInteger(entry) || entry < 0 || entry > 1000000) throw Error('Invalid library page.');
-      } else if (typeof entry !== 'string' || entry.length > (['search','series'].includes(field) ? 500 : 200)) throw Error('Invalid library filter.');
-      output[key][field] = entry;
-    }
-    if (!['all', 'game', 'software', 'book', 'audiobook', 'movie', 'tv'].includes(output[key].mediaType)
-      || !['all', 'owned', 'claimed', 'unknown', 'rental', 'borrowed', 'subscription'].includes(output[key].ownership)
-      || !['all', 'with', 'without'].includes(output[key].dlc)
-      || !['all','not-saved','unread','reading','completed'].includes(output[key].reading)
-      || !['all','missing','review'].includes(output[key].information)
-      || !['title-asc','title-desc','added','updated','creator','series'].includes(output[key].sort)) throw Error('Unknown library filter.');
-  }
+  const enums={mediaType:['all','game','software','book','audiobook','movie','tv'],ownership:['all','owned','claimed','unknown','rental','borrowed','subscription'],dlc:['all','with','without'],reading:['all','not-saved','unread','reading','completed'],information:['all','missing','review'],sort:['title-asc','title-desc','added','updated','creator','series'],status:['all','review','failure','reviewed','identified','partial','uncertain','missing','unattempted','failed']};
+  for(const [key,choices]of Object.entries(enums))if(key in output&&!choices.includes(output[key]))throw Error('Unknown library filter.');
   return output;
+}
+export function validateUiPreferences(value){
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
+  const output=defaultUiPreferences();
+  if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=value.workspace;}
+  // Migrate old Library fields once. Shared state is authoritative thereafter.
+  const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();
+  output.browse=validateView(value.browse??Object.fromEntries(SHARED_BROWSE_FIELDS.filter(key=>key!=='anchor').map(key=>[key,legacy[key]])),emptyBrowseView());
+  output.library={information:legacy.information,dlc:legacy.dlc};
+  if(value.contents)output.contents=validateView(value.contents,output.contents);
+  if(value.books)output.books=validateView(value.books,output.books);
+  return output;
+}
+export function mergeUiPreferences(current,patch){
+  validateUiPreferences(patch);
+  const sharedPatch={...Object.fromEntries(Object.entries(patch.library??{}).filter(([key])=>SHARED_BROWSE_FIELDS.includes(key))),...patch.browse};
+  return validateUiPreferences({...current,...patch,browse:{...current.browse,...sharedPatch},library:{...current.library,...patch.library},contents:{...current.contents,...patch.contents},books:{...current.books,...patch.books}});
+}
+export function browseView(preferences,workspace){
+  return workspace==='books'?preferences.books:{...preferences.browse,...preferences[workspace==='contents'?'contents':'library']};
+}
+export function rememberBrowseView(preferences,workspace,view){
+  if(workspace==='books'){preferences.books={...preferences.books,...Object.fromEntries(Object.entries(view).filter(([key])=>key in preferences.books))};return;}
+  if(!['library','contents'].includes(workspace))return;
+  for(const key of SHARED_BROWSE_FIELDS)if(key in view)preferences.browse[key]=view[key];
+  const local=preferences[workspace];for(const key of Object.keys(local))if(key in view)local[key]=view[key];
 }

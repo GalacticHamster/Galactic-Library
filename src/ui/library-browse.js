@@ -91,18 +91,20 @@ export function compareBrowseRows(a,b,sort='title-asc'){
   return title();
 }
 
-export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50}={}){
+export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50,anchor='',recordFilter=()=>true}={}){
   const key=searchKey(query),matches=[];
   for(const row of projection.rows){
     if(workspace==='books'&&!['book','audiobook'].includes(row.canonical.mediaType))continue;
     if(filters.mediaType&&filters.mediaType!=='all'&&row.canonical.mediaType!==filters.mediaType)continue;
-    const qualifying=row.records.filter(value=>recordQualifies(value,filters,projection.database));if(!qualifying.length)continue;
+    const qualifying=row.records.filter(value=>recordQualifies(value,filters,projection.database)&&recordFilter(value.record));if(!qualifying.length)continue;
     const addons=qualifying.flatMap(value=>projection.addOnsByParent.get(value.record.id)??[]).filter(value=>recordQualifies(value,{provider:filters.provider,account:filters.account,ownership:filters.ownership},projection.database));
     if(filters.dlc&&filters.dlc!=='all'&&(row.canonical.mediaType!=='game'||(filters.dlc==='with')!==Boolean(addons.length)))continue;
     const ranks=[...qualifying.map(value=>recordSearchRank(value,key,row.title)),...addons.map(value=>recordSearchRank(value,key))].filter(rank=>rank!==null);
     if(ranks.length)matches.push({...row,qualifying,addons,rank:Math.min(...ranks)});
   }
   matches.sort((a,b)=>a.rank-b.rank||compareBrowseRows(a,b,sort));
+  const anchored=anchor?matches.findIndex(row=>row.canonical.id===anchor||row.records.some(value=>value.record.recordRef===anchor)):-1;
+  if(anchored>=0)page=Math.floor(anchored/size);
   const pages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,pages-1));
   return {matches,rows:matches.slice(page*size,(page+1)*size),total:matches.length,page,pages};
 }

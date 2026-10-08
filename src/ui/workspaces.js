@@ -1,4 +1,4 @@
-import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget } from '../lib/ui-preferences.js';
+import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget, browseView, rememberBrowseView, validateUiPreferences } from '../lib/ui-preferences.js';
 
 export function createWorkspaceNavigation({ readView, applyView, save, changed }) {
   let preferences = defaultUiPreferences();
@@ -8,7 +8,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
   const navigation = document.querySelector('#workspace-navigation');
   const secondary = document.querySelector('#library-navigation');
   const status = document.querySelector('#workspace-status');
-  const viewKey = () => preferences.workspace === 'books' ? 'books' : 'library';
+  const view = () => browseView(preferences,preferences.workspace);
   const remember = () => {
     clearTimeout(saveTimer);
     const snapshot = structuredClone(preferences);
@@ -31,11 +31,11 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
   function select(workspace) {
     workspace=workspaceTarget(workspace);if(!workspace)return;
     interacted=true;
-    if(['library','books'].includes(preferences.workspace))preferences[viewKey()] = readView();
+    rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace));
     preferences.workspace = workspace;
     globalThis.history?.replaceState(null,'',`#${workspace}`);
     show();
-    applyView(preferences[viewKey()]);
+    applyView(view(),preferences.workspace);
     remember();
     changed();
   }
@@ -51,14 +51,14 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed }
     hydrate(value) {
       if (hydrated) return;
       hydrated = true;
-      const selected=preferences.workspace;preferences = structuredClone(value);
+      const selected=preferences.workspace;preferences = validateUiPreferences(value);
       const target=workspaceTarget(globalThis.location?.hash);
       if(interacted)preferences.workspace=selected;else if(target)preferences.workspace=target;
       show();
-      applyView(preferences[viewKey()]);
+      applyView(view(),preferences.workspace);
     },
     select,
-    rememberView() { preferences[viewKey()] = readView(); remember(); },
-    get savedView() { return preferences[viewKey()]; }
+    rememberView() { rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace)); remember(); },
+    get savedView() { return view(); }
   };
 }
