@@ -13,7 +13,7 @@ export function createEnrichmentWorkbench(actions){
   const status=text('p','');status.setAttribute('role','status');const counter=text('p','');
   const list=document.createElement('ol');list.className='review-items';
   const controls=document.createElement('p');controls.className='actions';body.append(category,search,controls,status,counter,list);
-  const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;
+  const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;let database,dirty=false;
   const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return node;};
   const perform=async operation=>{if(busy)return;busy=true;refresh();try{await operation();selected.clear();status.textContent='Saved.';await actions.refresh();}catch(error){status.textContent=error.message;}finally{busy=false;refresh();}};
   const apply=button('Apply selected candidates',()=>perform(()=>{
@@ -30,7 +30,12 @@ export function createEnrichmentWorkbench(actions){
   const paging=document.createElement('p');paging.className='actions';body.append(paging);
   const previous=button('Previous page',()=>{page--;refresh();}),next=button('Next page',()=>{page++;refresh();});paging.append(previous,next);
   function refresh(){
-    if(!element.open)return;
+    if(!element.open||element.closest('[data-workspace-panel]')?.hidden)return;
+    if(dirty){
+      currentRecords=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database);
+      const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);
+      heading.textContent=`Review book suggestions — ${rows.filter(row=>row.review||row.category==='unparsed').length} pending`;dirty=false;
+    }
     const filtered=rows.filter(row=>(category.value==='all'||row.category===category.value)&&row.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()));
     page=Math.min(Math.max(page,0),Math.max(0,Math.ceil(filtered.length/50)-1));previous.disabled=busy||page===0;next.disabled=busy||(page+1)*50>=filtered.length;
     for(const node of [apply,dismiss,undo])node.disabled=busy||!selected.size||selected.size>50;
@@ -64,5 +69,5 @@ export function createEnrichmentWorkbench(actions){
     }
   }
   category.addEventListener('change',()=>{page=0;refresh();});search.addEventListener('input',()=>{page=0;refresh();});element.addEventListener('toggle',refresh);
-  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(database){currentRecords=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database);const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);heading.textContent=`Review book suggestions ? ${rows.filter(row=>row.review||row.category==='unparsed').length} pending`;refresh();}};
+  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(next){if(database!==next){database=next;dirty=true;heading.textContent='Review book suggestions';}refresh();}};
 }

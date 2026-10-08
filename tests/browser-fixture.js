@@ -158,8 +158,8 @@ try{
   await wait(()=>document.querySelector('#backup-status').textContent==='Backup restored.'&&!values.galacticLibraryDatabase.providerItems['humble:split-test'],'Backup restore failed.');
   assert((await writer.getDatabase()).contentReviews['humble:a'].entries.length===2,'Backup lost contents.');
   checks.push('actual backup import restores reviewed evidence and refreshes the UI');
-  showWorkspace('reading');
-  document.querySelector('#series-coverage-panel').open=true;
+  showWorkspace('contents');
+  await open(document.querySelector('#series-coverage-panel'));
   const group=await open(document.querySelector('.series-groups details'));
   assert(group.textContent.includes('2, 4')&&group.textContent.includes('Collection A — humble')&&group.textContent.includes('Collection B — kindle')&&group.textContent.includes('Yes'),'Union, gaps or overlap missing.');
   checks.push('series dashboard shows gaps, overlap and union across providers');

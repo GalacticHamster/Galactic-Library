@@ -1,3 +1,4 @@
+import {createContentsBookDetails,createContentsHistory,createCollectionComparison} from './contents-book-details.js';
 import {combinedProviderStates} from '../lib/profile-management.js';
 import {createProvidersView} from './providers-view.js';
 import {renderOnboarding} from './onboarding.js';
@@ -97,7 +98,13 @@ const contentsReviewActions={
   remove:async(id)=>{database=await removeContentReview(id);},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({review:(record,current)=>createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true})});
+const contentsWorkspace=createContentsWorkspace({review:(record,current)=>{
+  const root=document.createElement('div');
+  root.append(createContentsEditor(record,current.contentReviews?.[record.id],contentsReviewActions,{expanded:true}),
+    createContentsBookDetails(record,current,{enrich:ref=>inspectEnrichmentRecords([ref]),undo:async ref=>{database=await undoEnrichmentSelection(ref);render();contentsWorkspace.refreshReview();}}),
+    createCollectionComparison(record,current),createContentsHistory(record,current));
+  return root;
+}});
 document.querySelector('#contents-collections-slot').append(contentsWorkspace.element);
 const providerAccountsView=createProvidersView({select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
 document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
@@ -125,6 +132,7 @@ let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
 let libraryPage = 0;
+let coverageDatabase;
 const openItemDetails = new Set();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter };
 const workspace = createWorkspaceNavigation({
@@ -935,7 +943,7 @@ function render(timing = null) {
   for(const entry of records.slice(0,50))list.append(textElement('li',`${entry.item.title} — ${displayProviderName(entry.item.provider)} — account ${entry.profileLabel||'nickname not recorded'} — ${entry.reason==='profile-switch'?'previous profile':'not observed in complete scan'} since ${entry.missingSince||'unknown'}; last observed ${entry.item.observedAt||'unknown'}.`));
   history.append(list);if(records.length>50)history.append(textElement('p',`Showing 50 of ${records.length}. All history is preserved in your backup.`));
   endSegment?.();endSegment=timing?.begin('options_coverage');
-  document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));
+  renderCollectionCoverage();
   const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
   const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+duplicateReviewItems.children.length;
   if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
@@ -1097,6 +1105,11 @@ clearFilters.addEventListener('click', () => {
   genreFilter.value = 'all';
   render();
 });
+function renderCollectionCoverage(){
+  if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;
+  document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
+}
+document.querySelector('#series-coverage-panel').addEventListener('toggle',renderCollectionCoverage);
 const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('#contents-progress-slot'),reconcile:()=>refresh(recentContentsDiagnosticId())});
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};

@@ -1,3 +1,4 @@
+import {collectionComparison} from '../src/ui/contents-book-details.js';
 import assert from 'node:assert/strict';
 import {contentsSummary,contentsPage,createContentsProjection} from '../src/ui/contents-overview.js';
 const book=(id,source)=>({id,recordRef:id,profileId:'a',title:'Collection '+id,provider:'kindle',mediaType:'book',metadata:{enrichment:source?{kindleProductComicContents:source}:{}}});
@@ -24,3 +25,13 @@ export const contentsUxTests=[
    assert.notEqual(project({...db}),rows);
  }]
 ];
+
+contentsUxTests.push(['Collection overlap uses reviewed coverage without counting itself or confirming named matches',()=>{
+  const a={...book('a'),ownership:'owned'},b={...book('b'),ownership:'owned'};
+  const entry={series:'Example',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'};
+  const db={providerItems:{a,b},contentReviews:{a:{entries:[entry,{...entry,number:'2'}]},b:{entries:[entry]}}};
+  const before=JSON.stringify(db),result=collectionComparison(a,db);assert.equal(result.owned,1);assert.equal(result.missing.length,1);assert.equal(JSON.stringify(db),before);
+  db.contentReviews.a.entries=db.contentReviews.b.entries=[{...entry,unitType:'component',number:'Named Story'}];
+  const named=collectionComparison(a,db);assert.equal(named.owned,0);assert.equal(named.possibleCovered.length,1);assert.equal(named.complete,false);
+  delete db.contentReviews.a;assert.equal(collectionComparison(a,db),null);
+}]);

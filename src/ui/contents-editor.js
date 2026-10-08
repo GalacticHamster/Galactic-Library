@@ -19,10 +19,15 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
   const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
-  root.append(element('label','Original contents statement'),statement,element('label','Evidence source'),source);
+  const sourceDetails=document.createElement('details');sourceDetails.className='contents-source-details';
+  sourceDetails.append(element('summary','Source evidence and interpretation'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),element('label','Original contents statement'),statement,element('label','Evidence source'),source);
+  sourceDetails.append(element('p',`Source: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; last acquired: ${evidence?.checkedAt||'not recorded'}. ${review?'Human review saved: '+(review.verifiedAt||'date not recorded')+'.':''}`));
+  const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
+  const interpretation=element('p','');advanced.append(interpretation);
+  root.append(sourceDetails,advanced);
   const status=element('p','');status.setAttribute('role','status');
   const table=document.createElement('table');const head=document.createElement('thead');const heading=document.createElement('tr');
-  for(const title of ['Series','Run / year','Type','Number / name','Language','Extent',''])heading.append(element('th',title));
+  for(const title of ['Series or collection','Series version / year','Type','Number / name','Language','Extent',''])heading.append(element('th',title));
   head.append(heading);table.append(head);const body=document.createElement('tbody');table.append(body);
   const addRow=(entry={})=>{
     const row=document.createElement('tr');
@@ -61,7 +66,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
         status.textContent='One separate claim loaded. Parse and check it before saving. Editor rows were cleared; your saved verified contents remain unchanged. Other claims have not been combined.';
       }));claims.append(section);
     }
-    root.append(claims);
+    advanced.append(claims);
   }
   if(evidence?.manifest){
     const details=document.createElement('details');details.append(element('summary','Discovered manifest evidence (unverified)'));
@@ -76,16 +81,16 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
       details.append(element('p',`${index===evidence.manifest.selected?'Selected':'Additional'}: ${candidate.whole?(candidate.truncated?'bounded portion of source manifest; ':'whole source manifest; '):candidate.manifestRange?'segment of one source manifest; ':''}local parse ${candidate.outcome}; ${candidate.binding}.`),element('blockquote',candidate.raw));
       if(candidate.parserInput!==candidate.raw)details.append(element('p','Contextual input used for the proposal:'),element('blockquote',candidate.parserInput));
     }
-    root.append(details);
+    advanced.append(details);
   }
   if (review && discovered && discovered !== review.statement) {
-    root.append(element('p','New discovery differs from your reviewed statement. Your verified entries remain unchanged.'),element('blockquote',discovered),
+    sourceDetails.append(element('p','New discovery differs from your reviewed statement. Your verified entries remain unchanged.'),element('blockquote',discovered),
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; existing verification has not changed.';}));
   }
   root.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.outcome==='filtered'?'Filtered non-containment':proposed.outcome==='uncertain'?'Uncertain candidate':proposed.outcome==='full'?'Structurally parsed proposal; not verified':proposed.outcome==='partial'?'Partially parsed proposal':'Unresolved containment'}. ${proposed.qualityReason} ${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.entries.length} proposed entries. ${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
-    if(proposed.parseBinding!=='explicit-statement')status.textContent+=` Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
+    status.textContent=`${proposed.entries.length} suggested entries ? not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    interpretation.textContent=`Local interpretation: ${proposed.outcome}; ${proposed.qualityReason} Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),table);
   root.append(button('Save verified contents',async()=>{
     try{
@@ -94,7 +99,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     }catch(error){status.textContent=`Could not save contents: ${error.message}`;}
   }));
   if(review)root.append(button('Undo contents confirmation',async()=>{try{await actions.remove(record.id);actions.refresh();}catch(error){status.textContent=error.message;}}));
-  root.append(status);
+  root.append(element('p','Correct an entry directly or remove a wrong suggestion before saving. Undo removes human confirmation, not captured evidence. There is no saved rejection of a captured source statement; leaving suggestions unconfirmed does not establish contents coverage.'),status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
   if(expanded){root.open=true;populated=true;populate();}

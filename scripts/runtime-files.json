@@ -114,5 +114,6 @@
   "src/ui/providers-view.js",
   "src/ui/onboarding.js",
   "src/ui/contents-overview.js",
-  "src/ui/contents-workspace.js"
+  "src/ui/contents-workspace.js",
+  "src/ui/contents-book-details.js"
 ]
