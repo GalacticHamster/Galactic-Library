@@ -1,5 +1,5 @@
 import {createContentsReadOnly} from './contents-display.js';
-import {CONTENTS_STATUSES,createContentsProjection,contentsPage} from './contents-overview.js';
+import {CONTENTS_STATUSES,createContentsProjection} from './contents-overview.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
@@ -11,7 +11,7 @@ export function createContentsWorkspace(actions={}) {
   const overview=text('p','Loading saved books…');overview.setAttribute('role','status');
   const listView=text('div',''),detail=text('div','');detail.hidden=true;detail.id='contents-book-review';
   const controls=text('div','');controls.className='contents-filters';
-  const search=text('input','');search.type='search';search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
+  const search=text('input','');search.type='search';search.maxLength=500;search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
   const status=text('select','');status.setAttribute('aria-label','Contents status');
   for(const [value,label] of [['all','All imported books'],['review','Needs contents review'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
   const shared={search};
@@ -29,15 +29,15 @@ export function createContentsWorkspace(actions={}) {
   const statusLabel=text('label','Contents status');statusLabel.append(status);primary.append(statusLabel);
   const activeFilters=text('div','');activeFilters.className='library-active-filters';activeFilters.id='contents-active-filters';
   const clear=button('Clear search and filters',()=>{view={...emptyBrowseView(),sort:view.sort,status:'all'};applyView(view);renderList();actions.changed?.();});
-  controls.append(search,primary,clear,more,activeFilters);
+  const searchLabel=text('label','Search collection');searchLabel.append(search);controls.append(searchLabel,primary,clear,more,activeFilters);
   const counter=text('p','');counter.setAttribute('role','status');
   const list=text('ol','');list.className='review-items';list.id='contents-collection-list';
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
   const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
   listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not verified means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
-  const project=createContentsProjection(),browse=createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
+  const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
-  function readView(){return {...view,page,anchor:result?.rows[0]?.canonical.id??view.anchor};}
+  function readView(){return {...view,page,anchor:selected??result?.rows[0]?.canonical.id??view.anchor};}
   const qualifies=row=>view.status==='all'||(view.status==='review'?row.needsReview:view.status==='failure'?row.failed:row.status===view.status);
   const evidenceKey=record=>JSON.stringify([database.contentReviews?.[record.id],record.metadata?.enrichment?.kindleProductComicContents,record.metadata?.enrichment?.localMetadata]);
   function renderList(){
@@ -58,7 +58,7 @@ export function createContentsWorkspace(actions={}) {
       node.append(button('Inspect contents',()=>open(row.recordRef)));return node;
     }));
   }
-  function close(){selected=null;detail.hidden=true;detail.replaceChildren();listView.hidden=false;renderList();
+  function close(){if(actions.canLeave?.()===false)return false;selected=null;detail.hidden=true;detail.replaceChildren();listView.hidden=false;renderList();
 
     const target=[...list.children].find(node=>node.dataset.recordRef===lastOpened);target?.querySelector('button')?.focus({preventScroll:true});globalThis.scrollTo?.(0,returnScroll);
   }
@@ -66,7 +66,8 @@ export function createContentsWorkspace(actions={}) {
   function open(ref){
     const record=Object.values(database?.providerItems??{}).find(record=>record.recordRef===ref&&record.mediaType==='book');if(!record)return false;
     if(!selected)returnScroll=globalThis.scrollY??0;
-    selected=ref;lastOpened=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button(actions.backLabel?.()??'Back to Contents results',()=>actions.back?actions.back():close()),button('Contents collection list',()=>{close();actions.collection?.();}),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
+    if(actions.canLeave?.()===false)return false;
+    selected=ref;lastOpened=ref;detail.dataset.recordRef=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button(actions.backLabel?.()??'Back to Contents results',()=>actions.back?actions.back():close()),button('Contents collection list',()=>{if(close()!==false)actions.collection?.();}),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
@@ -88,11 +89,11 @@ export function createContentsWorkspace(actions={}) {
         }
         const projection=browse(database);
         for(const [key,options]of [['provider',[...new Set([...projection.records.values()].map(v=>v.record.provider))].sort().map(id=>({value:id,label:providerName(id)}))],['account',projection.accountOptions],['series',projection.seriesOptions.map(value=>({value,label:value}))],['genre',projection.genreOptions.map(value=>({value,label:value}))]]){
-          const field=shared[key];field.replaceChildren(Object.assign(text('option','All '+key),{value:'all'}),...options.map(option=>Object.assign(text('option',option.label),{value:option.value})));field.value=view[key];if(!field.value){field.value='all';view[key]='all';}delete field.dataset.pendingValue;
+          const field=shared[key];field.replaceChildren(Object.assign(text('option',({provider:'All providers',account:'All accounts',series:'Any series',genre:'Any genre'})[key]),{value:'all'}),...options.map(option=>Object.assign(text('option',option.label),{value:option.value})));field.value=view[key];if(!field.value){field.value='all';view[key]='all';}delete field.dataset.pendingValue;
         }
 
       }
-      if(selected&&!rows.some(row=>row.recordRef===selected)){close();overview.textContent='This book is no longer in the current library. Other saved collections remain available.';}
+      if(selected&&!rows.some(row=>row.recordRef===selected)){const notice=detail.querySelector('.contents-review-notice');notice.textContent='This book is no longer in the current library. Your open draft is retained for reference; it cannot be saved.';for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save verified contents','Undo contents confirmation'].includes(control.textContent))control.disabled=true;return;}
       if(selected){const record=database.providerItems[rows.find(row=>row.recordRef===selected).id];
         if(openedEvidence!==evidenceKey(record)){const notice=detail.querySelector('.contents-review-notice');notice.replaceChildren(text('span','Saved evidence or a review changed while this editor was open. Your draft is retained. Reload before replacing a newer review. '),button('Reload saved contents',()=>open(selected)));
           for(const control of detail.querySelectorAll('.contents-editor button'))if(['Save verified contents','Undo contents confirmation'].includes(control.textContent))control.disabled=true;

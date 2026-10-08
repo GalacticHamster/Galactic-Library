@@ -48,7 +48,7 @@ export const optionsPerformanceDiagnosticsTests=[
  }],
  ['Options diagnostics section explains independent collection and worker restart loss without another enable checkbox',async()=>{
   const html=await readFile(new URL('../options.html',import.meta.url),'utf8');
-  const article=html.match(/<article id="performance-diagnostics"[\s\S]*?<\/article>/u)?.[0];assert.ok(article);
+  const article=html.match(/<(?:article|details) id="performance-diagnostics"[\s\S]*?<\/(?:article|details)>/u)?.[0];assert.ok(article);
   assert.ok(html.indexOf(article)>html.indexOf('id="settings-workspace"'));
   for(const id of ['export-timing-summary','performance-diagnostics-worker','performance-diagnostics-status'])assert.ok(article.includes(`id="${id}"`));
   assert.match(article,/lost when the Galactic Library service worker restarts/u);assert.match(article,/collected automatically/u);assert.match(article,/no Amazon page/u);

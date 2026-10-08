@@ -116,7 +116,7 @@ summary { cursor:pointer; }
 .context-help p { margin:8px 0; }
 .tool-card { margin-bottom:12px; }
 .contents-filters { display:grid; gap:12px; }
-.contents-filters > input { width:100%; min-width:0; }
+.contents-filters > input,.contents-filters > label input { width:100%; min-width:0; }
 .contents-filters label { display:grid; gap:4px; font-size:.85rem; color:#c4b5fd; min-width:0; }
 .contents-filters select { max-width:100%; }
 .contents-filters > button { justify-self:start; }

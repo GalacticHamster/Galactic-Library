@@ -17,6 +17,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 ## Architecture
 
 - [Matching policy](architecture/matching-policy.md) and [matching philosophy](../MATCHING_PHILOSOPHY.md)
+- [Shared browsing context and draft protection](architecture/browsing-context.md)
 - [Contents evidence and identity boundaries](architecture/contents-evidence.md)
 - [Companion API](architecture/companion-api.md)
 - [Metadata validation](architecture/metadata-validation.md)

@@ -1,0 +1,17 @@
+# Library and Contents browsing context
+
+This is private UI state, separate from schema-13 library data, identity, access, source history and backups.
+
+`ui-preferences.js` defines one authoritative `browse` object: search, media, provider, account, genre, access, reading, series, sort, canonical page and item anchor. `library` contains only information/DLC filters; `contents` contains only contents status. The bulk `books` maintenance view remains independent. Validation migrates old full Library preferences once, and the preference writer merges partial shared updates without restoring a second common state.
+
+Both collection views reuse the loaded committed snapshot and the same `library-browse.js` projection/query/sort functions. All common record predicates must qualify one provider record. Contents adds book eligibility and its status predicate before grouping/sorting; account rows stay distinct. Search relevance precedes the selected sort. Each page covers fifty canonical groups; Contents expands their qualifying account records, so its account-row count can exceed fifty.
+
+Switching views anchors to the inspected exact record when available, otherwise the first visible canonical group. The destination finds that anchor in its own filtered canonical ordering. Equal populations/order therefore have equal page boundaries. If the anchor no longer qualifies, the previous page is clamped to the destination range, or zero for an empty result. Workspace-specific filters are retained and identified, not translated into another meaning.
+
+Origin-aware reviews retain a bounded view, item reference and scroll in the current tab's history entry. Back restores the real Library or Contents origin; the collection list remains an explicit separate destination. History Back/Forward and reload restore that context. A copied record fragment without origin defaults to Contents results. UI history stores no source text or record objects. It does not invent access, a shared review or a transaction.
+
+`contents-display.js` reads human entries or interprets only an already saved bounded parser-input string for a visible book. A 200-record cache is scoped to the database object and clears on snapshot replacement. It never selects a new source, visits manifest blocks, scans the full corpus or supplies matching/index evidence. Unsupported interpretations fall back to saved text. Compression preserves series, run, language, unit kind and excerpt/full scope; numeric component names remain literal. A canonical preview names its selected qualifying account, preferring reviewed material; Details exposes every account separately.
+
+`draft-guard.js` retains tab-local form DOM and guards consequential navigation. A successful operation clears only its initiating form. A failed operation retains it. Reconciliation compares relevant saved inputs; stale actions are blocked until explicit discard/reload. Library rebuilding is deferred while item drafts remain open. Contents also retains orphaned editors for reference when their record disappears. The existing authoritative writer still validates every save; this is not a new database compare-and-swap protocol. Drafts are neither backed up nor crash recoverable. Browser unload prompts depend on platform user-activation rules.
+
+See [Library browsing](../user-guide/library-browsing.md), [Contents](../user-guide/contents-workspace.md) and [item Details](../user-guide/item-details.md).

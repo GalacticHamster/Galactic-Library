@@ -1,3 +1,4 @@
+import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
 import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
@@ -103,12 +104,30 @@ const allowedCompanionExtensions = document.querySelector('#allowed-companion-ex
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
 const browseProjection=createLibraryBrowseProjection();
+const draftNotice=document.createElement('div');draftNotice.id='draft-notice';draftNotice.className='compact-notice';draftNotice.hidden=true;draftNotice.setAttribute('role','status');
+const draftMessage=document.createElement('span'),discardDrafts=document.createElement('button');discardDrafts.type='button';discardDrafts.textContent='Discard edits and reload view';draftNotice.append(draftMessage,discardDrafts);document.querySelector('#workspace-status').after(draftNotice);
+function draftStamp(scope){
+  const exact=scope.closest('[data-reading-record],[data-ownership-record]'),refs=exact?[exact.dataset.readingRecord??exact.dataset.ownershipRecord]:scope.closest('#contents-book-review')?[scope.closest('#contents-book-review').dataset.recordRef]:JSON.parse(scope.closest('li[data-record-refs]')?.dataset.recordRefs??'[]');
+  const records=Object.values(database?.providerItems??{}).filter(record=>refs.includes(record.recordRef));
+  const reading=scope.matches('[data-reading-record]'),ownership=scope.matches('[data-ownership-record]');
+  const values=records.map(record=>{
+    if(reading)return [record.id,record.recordRef,record.title,record.profileId,database.readingStates?.[record.recordRef]];
+    const metadata=record.metadata??{},enrichment=metadata.enrichment??{},source=enrichment.kindleProductComicContents;
+    const identity=[record.id,record.recordRef,record.title,record.profileId,record.ownership,metadata.authors,metadata.series,metadata.isbn,metadata.language,metadata.edition,metadata.volume,metadata.issue,enrichment.googleBooks,enrichment.openLibrary,enrichment.localMetadata];
+    return ownership?[identity,database.ownershipReviews?.[record.recordRef],database.ownershipPolicy]:[identity,source?.statement,source?.parseInput,source?.checkedAt,database.contentReviews?.[record.id],database.titleAliases?.[record.recordRef]];
+  });
+  return JSON.stringify([values,reading||ownership?null:Object.values(database?.canonicalItems??{}).filter(item=>item.providerItemIds.some(id=>records.some(record=>record.id===id))).map(item=>[item.id,item.providerItemIds]),reading||ownership?null:Object.values(database?.enrichmentReviews??{}).filter(review=>review.recordRefs?.some(ref=>refs.includes(ref)))]);
+
+}
+const drafts=createDraftGuard({stamp:draftStamp});
+discardDrafts.addEventListener('click',()=>{if(drafts.allowNavigation()){if(contentsWorkspace.selected)contentsWorkspace.refreshReview();render();}});
+globalThis.addEventListener?.('beforeunload',event=>{if(drafts.dirty){event.preventDefault();event.returnValue='';}});
 const contentsReviewActions={
-  save:async(id,value)=>{database=await saveContentReview(id,value);},
-  remove:async(id)=>{database=await removeContentReview(id);},
+  save:async(id,value)=>{database=await drafts.commit(()=>saveContentReview(id,value));},
+  remove:async(id)=>{database=await drafts.commit(()=>removeContentReview(id));},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
+const contentsWorkspace=createContentsWorkspace({projection:browseProjection,canLeave:()=>drafts.allowNavigation(),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
   if(!reviewOrigin)reviewOrigin={workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll,ref};
   if(!restoringRoute)pushRoute(bookHref('contents',ref));
 },review:(record,current)=>{
@@ -145,19 +164,19 @@ let googleBooksRunning = false;
 let googleBooksPauseRequested = false;
 let enrichmentWorkbench;
 let libraryPage = 0;
-let browseAnchor='',lastBrowseResult;
+let browseAnchor='',lastBrowseResult,selectedBrowseRef;
 let unlinkedPage=0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
 const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter, account:accountFilter, reading:readingFilter, series:seriesFilter, information:informationFilter };
 const workspace = createWorkspaceNavigation({
-  readView: current => current==='contents'?contentsWorkspace.readView():({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage,anchor:lastBrowseResult?.rows[0]?.canonical.id??'' }),
+  readView: current => current==='contents'?contentsWorkspace.readView():({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage,anchor:lastBrowseResult?.rows.some(row=>row.records.some(value=>value.record.recordRef===selectedBrowseRef))?selectedBrowseRef:lastBrowseResult?.rows[0]?.canonical.id??'' }),
   applyView: (view,current) => {if(current==='contents'){if(contentsWorkspace.selected)contentsWorkspace.close();contentsWorkspace.applyView(view);return;} search.value = view.search; libraryPage = view.page; browseAnchor=view.anchor??'';librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]??'all'; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
-  save: saveUiPreferences, beforeSelect:()=>{if(!restoringRoute)rememberNavigationEntry();},navigated:name=>{reviewOrigin=null;pushRoute('#'+name);}, changed: () => { if (database) render(); }
+  save: saveUiPreferences, beforeSelect:()=>{if(!drafts.allowNavigation())return false;if(!restoringRoute)rememberNavigationEntry();},navigated:name=>{reviewOrigin=null;pushRoute('#'+name);}, changed: () => { if (database) render(); }
 });
-document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
-document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
+document.querySelector("#library-previous").addEventListener("click", () => { if(!drafts.allowNavigation())return;libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
+document.querySelector("#library-next").addEventListener("click", () => { if(!drafts.allowNavigation())return;libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
 document.querySelector("#open-active-book-job").addEventListener("click", () => workspace.select("books"));
 document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book…"; });
 
@@ -182,6 +201,7 @@ function rememberNavigationEntry(){if(!database)return;globalThis.history?.repla
 function pushRoute(href){if(restoringRoute)return;lastHandledHash=href;const state={gl:currentNavigation()};if(globalThis.location.hash===href)globalThis.history?.replaceState(state,'',href);else globalThis.history?.pushState(state,'',href);}
 function returnFromContents(){
   const origin=reviewOrigin??{workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll};
+  if(!drafts.allowNavigation())return;
   contentsWorkspace.close();workspace.select(origin.workspace,{view:origin.view,history:false});
   if(origin.workspace==='library'||origin.workspace==='books'){
     const ref=origin.ref,card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
@@ -191,21 +211,23 @@ function returnFromContents(){
   reviewOrigin=null;workspace.rememberView();pushRoute('#'+origin.workspace);globalThis.scrollTo?.(0,origin.scroll);
 }
 function openContentsRecord(ref){
+  if(!drafts.allowNavigation())return;
   if(!restoringRoute)rememberNavigationEntry();
   if(['library','books'].includes(workspace.workspace)){
     workspace.rememberView();contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
     reviewOrigin={workspace:workspace.workspace,view:{...workspace.savedView,anchor:ref},scroll:globalThis.scrollY,ref};
   }
-  workspace.select('contents',{history:false});
+  if(!workspace.select('contents',{history:false}))return;
   if(!contentsWorkspace.open(ref)){contentsWorkspace.close();document.querySelector('#workspace-status').textContent='That book is no longer in the current library. Search saved collections below.';if(!restoringRoute)pushRoute('#contents');}
 }
 function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);
   if(!record){document.querySelector('#workspace-status').textContent='That record is no longer in the current library.';return;}
-  const origin=returnToOrigin&&contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null;
+  const restoredOrigin=reviewOrigin?.ref===ref&&['library','books'].includes(reviewOrigin.workspace)?{ref,workspace:reviewOrigin.workspace,search:reviewOrigin.view.search,filters:reviewOrigin.view,sort:reviewOrigin.view.sort,page:reviewOrigin.view.page,scroll:reviewOrigin.scroll}:null;
+  const origin=returnToOrigin?(restoredOrigin??(contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null)):null;
   const findCard=()=>[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
-  workspace.select(origin?.workspace??'library',{history:false});
-  if(origin){search.value=origin.search;librarySort.value=origin.sort;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))viewControls[key].value=value;render();}
+  if(!workspace.select(origin?.workspace??'library',{history:false}))return;
+  if(origin){search.value=origin.search;librarySort.value=origin.sort;libraryPage=origin.page;for(const [key,value]of Object.entries(origin.filters))if(viewControls[key])viewControls[key].value=value;render();}
   if(!findCard()){
     search.value='';for(const filter of Object.values(viewControls))filter.value='all';
     const sorted=libraryBrowseResults(browseProjection(database),{sort:librarySort.value,workspace:workspace.workspace}).matches;
@@ -220,7 +242,9 @@ function visitBookRoute(route){if(route?.workspace==='contents')openContentsReco
 document.addEventListener('click',event=>{const link=event.target.closest('[data-contents-record]');if(link){event.preventDefault();initialBookRoute=null;if(database)openContentsRecord(link.dataset.contentsRecord);}});
 document.querySelector('#workspace-navigation').addEventListener('click',()=>{initialBookRoute=null;});
 function restoreNavigation(){
-  if(lastHandledHash===globalThis.location.hash)return;lastHandledHash=globalThis.location.hash;
+  if(lastHandledHash===globalThis.location.hash)return;
+  if(!drafts.allowNavigation()){globalThis.history?.pushState({gl:currentNavigation()},'',lastHandledHash||'#'+workspace.workspace);return;}
+  lastHandledHash=globalThis.location.hash;
   if(!database){initialBookRoute=bookRoute(globalThis.location.hash);return;}
   restoringRoute=true;
   try{
@@ -650,6 +674,8 @@ async function runGoogleBooksEnrichment() {
 }
 
 function render(timing = null) {
+  const draftState=drafts.reconcile();draftNotice.hidden=!draftState.dirty;
+  if(draftState.dirty){draftMessage.textContent=draftState.stale?'Saved information changed. Your edits are retained; reload before saving.':'Your unsaved edits are retained. Finish them or discard to update this view.';contentsWorkspace.update(database,workspace.workspace==='contents');return;}
   contentsWorkspace.update(database,workspace.workspace==='contents');
   let endSegment=timing?.begin('options_workbench');
   try {
@@ -657,9 +683,9 @@ function render(timing = null) {
   renderOnboarding(database);
   if(!enrichmentWorkbench){
     enrichmentWorkbench=createEnrichmentWorkbench({
-      apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},
-      dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},
-      undo:async refs=>{database=await undoEnrichmentSelections(refs);},
+      apply:async selections=>{database=await drafts.commit(()=>applyReviewedEnrichments(selections));googleBooksSearches.clear();openLibrarySearches.clear();},
+      dismiss:async refs=>{database=await drafts.commit(()=>dismissEnrichmentReviews(refs));googleBooksSearches.clear();openLibrarySearches.clear();},
+      undo:async refs=>{database=await drafts.commit(()=>undoEnrichmentSelections(refs));},
       retry:retryEnrichmentReview,inspect:inspectEnrichmentRecords,refresh:render
     });document.querySelector('#books-workspace').append(enrichmentWorkbench.element);
   }
@@ -758,27 +784,27 @@ function render(timing = null) {
     for(const record of records)itemDetailContexts.set(record.recordRef,context);
     const build=()=>{if(built)return;built=true;
     body.append(createItemDetailsBody(canonicalItem,records,database,{
-      reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await saveReadingState(...args);},remove:async(...args)=>{database=await removeReadingState(...args);},refresh:render}):null,
-      ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render}),
+      reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await drafts.commit(()=>saveReadingState(...args));},remove:async(...args)=>{database=await drafts.commit(()=>removeReadingState(...args));},refresh:render}):null,
+      ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await drafts.commit(()=>saveOwnershipReview(...args));},remove:async(...args)=>{database=await drafts.commit(()=>removeOwnershipReview(...args));},refresh:render}),
       books:()=>{
         const root=document.createElement('div');
         const known=records.map(identityEvidence);const missing=[['authors','Creator'],['isbn','ISBN'],['edition','Edition'],['language','Language']].filter(([field])=>!known.some(value=>Array.isArray(value[field])?value[field].length:value[field])).map(([,label])=>label);
         if(missing.length)root.append(textElement('p','Not recorded: '+missing.join(', ')+'. You can still inspect this book.'));
         root.append(textElement('p','Find book details or review saved suggestions below.'),createGoogleBooksTools(canonicalItem,records,{enabled:true}));
         const open=createOpenLibraryTools(canonicalItem,records,{enabled:true});if(open)root.append(open);
-        root.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);},refresh:render}));
-        const review=createEnrichmentWorkbench({apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},undo:async refs=>{database=await undoEnrichmentSelections(refs);},retry:retryEnrichmentReview,refresh:render},{recordRefs:records.map(record=>record.recordRef),item:true});
+        const local=createLocalMetadataTools(records,{queue:async review=>{database=await drafts.commit(()=>saveEnrichmentReview(review),local);},refresh:render});root.append(local);
+        const review=createEnrichmentWorkbench({apply:async selections=>{database=await drafts.commit(()=>applyReviewedEnrichments(selections));googleBooksSearches.clear();openLibrarySearches.clear();},dismiss:async refs=>{database=await drafts.commit(()=>dismissEnrichmentReviews(refs));googleBooksSearches.clear();openLibrarySearches.clear();},undo:async refs=>{database=await drafts.commit(()=>undoEnrichmentSelections(refs));},retry:retryEnrichmentReview,refresh:render},{recordRefs:records.map(record=>record.recordRef),item:true});
         review.element.open=true;review.update(database);root.append(review.element,createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();},context));
         return root;
       },
-      advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));
+      advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await drafts.commit(()=>saveTitleAliases(...args));render();}));
         if(canonicalItem.mediaType==='game')for(const record of records)root.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));return root;
       },
       extras:()=>{const root=document.createElement('div');for(const create of [()=>createGenreTags(records),()=>createComicMangaCandidateTag(records)]){const value=create();if(value)root.append(value);}if(linkedAddOns.length)root.append(createAddOnList(linkedAddOns));return root;}
     },context));
 
     };
-    details.addEventListener("toggle",()=>{if(!details.isConnected)return;context.open=details.open;if(details.open)build();});
+    details.addEventListener("toggle",()=>{if(!details.isConnected)return;context.open=details.open;if(details.open){selectedBrowseRef=context.anchor;build();}});
     if(context.open){details.open=true;build();}
     node.append(details);
     return node;
@@ -942,7 +968,7 @@ document.querySelector('#clear-companion-extension-ids').addEventListener('click
     companionExtensionLinkStatus.textContent = `Could not remove companion extensions: ${error.message}`;
   }
 });
-const viewChanged=()=>{browseAnchor='';libraryPage=0;unlinkedPage=0;render();workspace.rememberView();};
+const viewChanged=()=>{if(!drafts.allowNavigation()){const view=workspace.savedView;search.value=view.search;librarySort.value=view.sort;for(const [key,field]of Object.entries(viewControls))field.value=view[key]??'all';return;}browseAnchor='';libraryPage=0;unlinkedPage=0;render();workspace.rememberView();};
 search.addEventListener('input', viewChanged);
 showEnrichmentActions.addEventListener('change', async () => {
   const checked = showEnrichmentActions.checked;

@@ -2,7 +2,7 @@
 
 Library is a catalog of your imported collection. Each result is an existing canonical item; several provider/account records can appear together. Browse results never make new matching, ownership or contents decisions.
 
-Results show title, known edition/volume/issue, saved series links, creator when available, media and a compact provider summary such as **Kindle (2 accounts) · Kobo**. There is no repeated Owned badge. Borrowed, subscription, rented or unconfirmed access and active ownership preferences remain visible. Covers stay inside item Details; missing artwork leaves no empty result block. **Details** opens the existing item workflow for all associated accounts, including those outside your filters.
+Results show title, known edition/volume/issue, saved series links, creator when available, media, a read-only contents preview when available, and a compact provider summary such as **Kindle (2 accounts) · Kobo**. There is no repeated Owned badge. Borrowed, subscription, rented or unconfirmed access and active ownership preferences remain visible. Covers stay inside item Details; missing artwork leaves no empty result block. **Details** opens the existing item workflow for all associated accounts, including those outside your filters.
 
 ## Search
 
@@ -36,7 +36,7 @@ Missing dates sort after known dates. Date and creator ties use Title A–Z and 
 
 Media, Provider and Saved account are in the primary row. **More filters** contains Genre, Access, Reading, Series, Book information and Game DLC. Active filters remain visible as removable buttons even when More filters is collapsed.
 
-Provider, account, access, genre, reading, series and information conditions must qualify **one provider record**. For example, **Kindle + Family + Borrowed** cannot borrow an Owned observation from Personal or a Borrowed observation from Kobo. A canonical item appears once when any record qualifies. Its compact provider summary still lists every associated provider; **Accounts qualifying for filters** identifies the subset. Details retains the full account list.
+Provider, account, access, genre, reading, series and information conditions must qualify **one provider record**. For example, **Kindle + Family + Borrowed** cannot borrow an Owned observation from Personal or a Borrowed observation from Kobo. A canonical item appears once when any record qualifies. Its compact provider summary still lists every associated provider; **Matching accounts** identifies the subset. Details retains the full account list.
 
 - **Access** uses the existing effective ownership policy, human decisions and expiry rules. Browsing does not rewrite source access.
 - **Reading** applies to books/audiobooks. **No saved reading status** is separate from **Explicitly unread**; a never-tracked item is not classified as unread. Several accounts may qualify the same item for different reading filters.
@@ -55,14 +55,28 @@ Catalog count refers to canonical results. The account-record count refers to re
 
 Opening and closing inline Details preserves the list. An exact account's **Review contents** link opens Contents; **Open this book in Library** restores the originating workspace, search, filters, sort, page and scroll in this Options tab. Exact/reloaded record links escape incompatible filters and locate the target under the selected sort. If a record is no longer current, the existing unavailable-record notice applies.
 
-Library and bulk Book information retain separate search/filter/sort/page preferences in the existing private UI settings across Options reloads. Dynamic account, genre and series choices hydrate after the snapshot loads. A removed choice falls back to All. These preferences are excluded from library backups and do not alter imported state. Open Details, drafts, scroll and unlinked-DLC page are not separately persisted across reloads; item/return context remains local to the tab.
+Library and Contents share one authoritative search/filter/sort/position preference in the existing private UI settings across Options reloads. Bulk Book information retains its separate maintenance view. Library-only information/DLC filters and Contents-only status filters remain separate. Dynamic account, genre and series choices hydrate after the snapshot loads. A removed choice falls back to All. These preferences are excluded from library backups and do not alter imported state. Open Details, drafts, scroll and unlinked-DLC page are not separately persisted across reloads; item/return context remains local to the tab.
 
 ## Performance and boundaries
 
 A lightweight browse projection is built from the loaded validated Options snapshot and reused until that object changes. Search keys, known metadata, aliases, series, reading and saved review status reuse that projection; access is reevaluated at query time so expiry and ownership preferences do not become stale. Only fifty result rows and requested item editors are constructed. Dynamic facets reuse the unchanged snapshot; add-on parent lookup is indexed rather than scanning the full library for each add-on.
 
-Browsing makes no per-filter database read, external lookup, provider acquisition, source parsing or canonical matching reconstruction. The explicit bulk review keeps its existing behavior. Synthetic tests cover 14,081 provider records, 13,175 canonical items, multiple accounts and guarded source blocks. Their responsiveness measurements are controls, not a live benchmark of your personal library.
+Retrieval makes no per-filter database read, external lookup, provider acquisition, full-source parsing or canonical matching reconstruction. Visible contents summaries use reviewed entries or a bounded cache of the saved parser input; they do not visit captured source blocks or interpret the entire library. The explicit bulk review keeps its existing behavior. Synthetic tests cover 14,081 provider records, 13,175 canonical items, multiple accounts and guarded source blocks. Their responsiveness measurements are controls, not a live benchmark of your personal library.
 
 The existing database schema, profile identity, ownership classifier, matching rules, parser, contents coverage, acquisition, history, backup and companion API are unchanged. Contents remains responsible for reviewed included works and coverage/gap comparisons; Library does not invent a complete series bibliography.
 
 See [item details](item-details.md), [Contents](contents-workspace.md), and [saved accounts](providers-and-accounts.md).
+
+## Moving between Library and Contents
+
+Search, media, provider, saved account, genre, access, reading, series and sort are shared. Contents lists books only: selecting Games does not silently become Books, and an empty Contents list explains the narrower result. Active Contents status filters say Contents only. Library's information and DLC filters retain their own meaning and remain visible when returning.
+
+Both views order the same canonical groups using the same relevance and sort rules. Contents shows each qualifying account separately inside that ordering. A page covers fifty canonical groups; it can therefore show more than fifty account rows. When eligible populations agree, page boundaries agree. Switching follows the inspected record if available, otherwise the first visible canonical item. The destination locates that anchor in its filtered ordering. If the anchor no longer qualifies, the saved canonical page is clamped to the destination's range; an empty destination starts at page one. No matching item or equivalent population is invented.
+
+Review contents remembers its actual origin. Back to Library results restores the original filters, sort, anchored page, scroll and inspected Details. Back to Contents results restores that list. Contents collection list is a separate explicit action. Browser Back/Forward uses bounded UI context stored in the current tab's history entry; reloading the same entry can restore the review's origin. A copied direct link has no invented origin and defaults to Contents results. Disappearing records are reported rather than silently replaced with another account.
+
+## Collected works and unsaved edits
+
+A canonical preview names the particular account supplying its contents and prefers a qualifying reviewed copy. Details shows each copy separately. Human reviewed and Not verified are distinct. Consecutive numbered entries compress only within the same series, version, language, unit type and full/excerpt scope. Remaining-entry counts refer to hidden entries, not a guessed complete book total. All known included works expands a full read-only list; Review contents remains the editing action. Missing structured interpretation falls back to quoted saved description text.
+
+In-progress item reading, ownership, alias, metadata/suggestion and contents forms are retained during background reconciliation. If their saved inputs change, stale save actions are blocked with a reload notice. Ordinary navigation asks before discarding edits. Saving one form clears that form's guard, not another form's draft. Discard edits and reload view is explicit. This is tab-local protection, not a new database transaction or a persistent draft backup. Closing/reloading relies on the browser's unsaved-changes prompt; crashes do not preserve drafts. While drafts are open, Library rebuilding is deferred, so finish or discard edits to see pending saved changes.

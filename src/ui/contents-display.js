@@ -33,7 +33,7 @@ export function groupContents(entries){
   return [...groups.values()].map(group=>{
     const numbers=[...new Set(group.numbers)].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})),parts=[];
     for(let n=0;n<numbers.length;n++){
-      let end=n;while(/^\d+$/u.test(numbers[n])&&end+1<numbers.length&&/^\d+$/u.test(numbers[end+1])&&Number(numbers[end+1])===Number(numbers[end])+1)end++;
+      let end=n;while(group.unitType!=='component'&&/^\d+$/u.test(numbers[n])&&end+1<numbers.length&&/^\d+$/u.test(numbers[end+1])&&Number(numbers[end+1])===Number(numbers[end])+1)end++;
       parts.push({text:end>n?numbers[n]+'\u2013'+numbers[end]:numbers[n],count:end-n+1});n=end;
     }
     const kind={issue:'#',volume:'vol. ',annual:'Annual #',special:'Special ',component:''}[group.unitType]??'';

@@ -63,3 +63,8 @@ contentsUxTests.push(['Read-only contents compress reviewed ranges while retaini
 }],['Contents display truthfully falls back to saved text when structured interpretation is unavailable',()=>{
  const record=book('a',{statement:'Includes named essays',parseOutcome:'uncertain'}),value=createContentsDisplay()(record,{});assert.equal(value.entries.length,0);assert.equal(value.fallback,'Includes named essays');assert.equal(value.reviewed,false);
 }]);
+
+contentsUxTests.push(['Numeric named-component titles stay literal and long omnibus previews count all hidden entries accurately',()=>{
+ const record=book('a'),entries=Array.from({length:7},(_,n)=>({series:'Series '+n,run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}));entries.push({series:'Names',unitType:'component',number:'1',completeness:'full'},{series:'Names',unitType:'component',number:'2',completeness:'full'});
+ const value=createContentsDisplay()(record,{contentReviews:{a:{entries}}});assert.equal(contentsPreview(value).remaining,6);assert.equal(value.groups.at(-1).parts.length,2);assert(!value.groups.at(-1).text.includes('1\u20132'));
+}]);

@@ -4,7 +4,7 @@ Open **Details** on a Library result. The main navigation remains **Library | Pr
 
 For result search, combined account filters, sorting and remembered browsing position, see [Library browsing](library-browsing.md).
 
-The overview shows the saved title, media type, available creator and cover, and known series, volume/issue, edition, language, publisher, publication and ISBN information. Audiobooks also show recorded narrators. Several saved values can be shown when accounts differ; they are not silently reduced to a newly inferred edition. Artwork uses the existing provider image URL, loads only when inspecting the item, and disappears if loading fails.
+The collapsed row shows title, media, creator and series. **Edition details and artwork** keeps the full saved overview, cover and known volume/issue, edition, language, publisher, publication and ISBN information available without repeating it throughout the default Details view. Audiobooks also show recorded narrators. Several saved values can be shown when accounts differ; they are not silently reduced to a newly inferred edition. Artwork uses the existing provider image URL, loads only when inspecting the item, and disappears if loading fails.
 
 ## Your library
 
@@ -16,7 +16,7 @@ Expand **Confirm ownership with dated evidence** to record or undo an existing s
 
 ## Contents
 
-Each book account shows its saved contents status and number of human-reviewed entries, if any. These counts are not a guessed complete enumeration. A latest failed acquisition can coexist with earlier useful evidence.
+Each book account shows its saved contents status and readable included works, with a bounded preview and expandable full list. Reviewed and unreviewed descriptions remain distinctly labeled. These counts are not a guessed complete enumeration. A latest failed acquisition can coexist with earlier useful evidence.
 
 **Review contents** opens that exact provider record in Contents. The detailed book contents editor exists there, rather than being duplicated in Library. **Open this book in Library** returns to the originating search, filters, sort, page and scroll position within this Options tab. Direct/reloaded links open the exact current record; if the originating filtered result no longer exists, Library falls back to locating it without filters under the selected sort.
 
@@ -66,6 +66,6 @@ Canonical identity decisions are not ownership confirmations. Contents source hi
 
 Library still renders fifty results per page. Opening it constructs no item editors or external searches. Overview and Your library are built for an inspected item; Book information, Advanced, inner editors and source tables build on demand. The loaded committed Options snapshot supplies each card without another database read. Duplicate candidate presentation is reused for that unchanged snapshot. Normal Library navigation does not interpret every Kindle manifest; the explicit bulk review may still process its saved cross-library contents queue.
 
-Expanded item sections are remembered by a durable record anchor through in-tab reconciliation and regrouping, not across an Options reload. Unsaved individual enrichment/reading/ownership form drafts can be lost on reconciliation, as before; this phase adds no transaction or draft store. The Contents draft guard remains in place. Ordinary metadata lookup remains book-specific; audiobook reading and available provider metadata remain accessible. No schema, profile, matching, ownership, acquisition, history or backup semantics changed.
+Expanded item sections are remembered by a durable record anchor through in-tab reconciliation and regrouping, not across an Options reload. Unsaved individual reading, ownership, metadata/suggestion, alias and contents drafts are protected in the current tab. Background reconciliation retains their DOM; changed saved information blocks stale saving. Navigation asks before discarding edits, and explicit discard/reload loads the current snapshot. Saving one form does not discard another. No draft store or new transaction protocol is introduced. Browser closing/reloading relies on its unsaved-changes prompt; crashes cannot recover these drafts. Ordinary metadata lookup remains book-specific; audiobook reading and available provider metadata remain accessible. No schema, profile, matching, ownership, acquisition, history or backup semantics changed.
 
 See [Contents](contents-workspace.md), [book enrichment](comic-manga-enrichment.md), and [ownership and reading tools](library-tools.md).
