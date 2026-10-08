@@ -18,6 +18,28 @@ export function providerAccounts(database){
  const profiles=enumerateProviderProfiles(database);
  return PROVIDER_SITES.map(site=>({...site,accounts:profiles.filter(p=>p.provider===site.provider)}));
 }
+export function updateEligibility(profile,state={},now=Date.now()){
+ const fullReason=!profile.active?'Select this account for updates first.':!profile.nickname?'Name this saved account before updating it.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
+ let quickReason=fullReason;
+ if(!quickReason&&profile.provider==='epic')quickReason='Epic supports complete imports only. Use Full Rescan.';
+ if(!quickReason&&!state.fullSyncAt)quickReason='Run a first Full Rescan to establish this account’s import history.';
+ if(!quickReason&&profile.provider==='amazon-games'){
+   const age=now-Date.parse(state.quickSyncAt??state.fullSyncAt??'');
+   if(!Number.isFinite(age)||age>70*24*60*60*1000)quickReason='Amazon Games needs a Full Rescan after more than 70 days without an update.';
+ }
+ return {quick:!quickReason,full:!fullReason,quickReason,fullReason};
+}
+export function createProfileManagementActions({read,preview,remove,reset}){
+ return {
+   preview:profileId=>preview(profileId),
+   async remove(profileId,dependencyStamp,confirmed){
+     if(confirmed!==true)throw Error('Confirm removal of this account and its saved evidence.');
+     if(!read().providerProfiles[profileId])throw Error('This account is no longer available.');
+     return remove(profileId,dependencyStamp,true);
+   },
+   async reset(profileId,confirmed){if(confirmed!==true)throw Error('Confirm resetting this account’s import history.');return reset(profileId,true);}
+ };
+}
 // This controller carries no account storage. Every operation uses the
 // privileged writer and its immutable identity/stale-selection checks.
 export function createAccountActions({read,select,rename}){

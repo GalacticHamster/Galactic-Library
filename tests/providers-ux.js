@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {providerAccounts,createAccountActions,PROVIDER_SITES} from '../src/ui/provider-accounts.js';
+import {providerAccounts,createAccountActions,PROVIDER_SITES,updateEligibility,createProfileManagementActions} from '../src/ui/provider-accounts.js';
 import {memory} from './final-gl-features.js';
 import {snapshotFixture} from './storage.js';
 const record={providerItemId:'B000000001',title:'Synthetic Collection',mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B000000001'}};
@@ -23,3 +23,27 @@ export const providersUxTests=[
    const scan=await writer.beginProviderScan('kindle','Personal','incremental',false,1);assert.equal(scan.forceFull,false);
  }]
 ];
+providersUxTests.push(
+ ['Provider update eligibility respects selected/named accounts, missing history, Epic and Amazon age restrictions',()=>{
+   const p={provider:'kindle',active:true,nickname:'A'},state={fullSyncAt:'2026-10-01'};
+   assert(updateEligibility(p,state).quick);assert(!updateEligibility({...p,active:false},state).full);assert(!updateEligibility({...p,nickname:''},state).quick);
+   assert(!updateEligibility(p,{}).quick);assert(updateEligibility(p,{}).full);
+   assert(!updateEligibility({...p,provider:'epic'},state).quick);assert(updateEligibility({...p,provider:'epic'},state).full);
+   const now=Date.parse('2026-10-07');assert(!updateEligibility({...p,provider:'amazon-games'},{fullSyncAt:'2026-01-01'},now).quick);
+   assert(updateEligibility({...p,provider:'amazon-games'},{fullSyncAt:'2026-01-01',quickSyncAt:'2026-10-01'},now).quick);
+   assert(!updateEligibility({...p,syncHealth:{status:'running'}},state).full);
+ }],
+ ['Management UI requires explicit confirmation and writer-checked fresh preview; reset preserves reviewed contents',async()=>{
+   const {writer}=memory();let d=await writer.replaceProviderItems('kindle',[record],{profileLabel:'A',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[record]));
+   const a=d.providers.kindle.activeProfileId,id=Object.keys(d.providerItems)[0];
+   d=await writer.saveContentReview(id,{entries:[{series:'Synthetic',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}],statement:'Collects Synthetic #1',source:'manual-review',sourceUrl:'',verifiedAt:'2026-10-01'});
+   const review=structuredClone(d.contentReviews);d=await writer.replaceProviderItems('kindle',[record],{profileLabel:'B',fullSyncAt:'2026-10-02'},snapshotFixture('kindle',[record]));const b=d.providers.kindle.activeProfileId;
+   const management=createProfileManagementActions({read:()=>d,preview:(...v)=>writer.previewProviderProfileRemoval(...v),remove:async(...v)=>{d=await writer.removeProviderProfile(...v);return d;},reset:async(...v)=>{d=await writer.resetProviderProfileBaseline(...v);return d;}});
+   await assert.rejects(management.reset(a,false),/Confirm/);await management.reset(a,true);assert.deepEqual(d.contentReviews,review);assert(d.providerItems[id]);assert(!d.providerProfiles[a].state.fullSyncAt);
+   const plan=await management.preview(a);assert.equal(plan.dependencies.contentReviews,1);
+   await assert.rejects(management.remove(a,plan.dependencyStamp,false),/Confirm/);
+   d=await writer.renameProviderProfile(a,'A renamed');await assert.rejects(management.remove(a,plan.dependencyStamp,true),/dependencies changed/);
+   const fresh=await management.preview(a),bRecords=Object.values(d.providerItems).filter(i=>i.profileId===b);await management.remove(a,fresh.dependencyStamp,true);
+   assert(!d.providerProfiles[a]);assert(d.providerProfiles[b]);for(const i of bRecords)assert.deepEqual(d.providerItems[i.id],i);
+ }]
+);
