@@ -1,3 +1,4 @@
+import {formatDate} from './formatters.js';
 import {bookToolHelp,fieldLabel,sourceLabel} from './book-tool-help.js';
 import {identityKey,names} from '../lib/identity.js';
 import {accountLabel} from './item-presentation.js';
@@ -10,7 +11,7 @@ export function createEnrichmentEvidence(records,database,undo,state={}){
   const fields=['title','subtitle','authors','contributors','publisher','publishers','isbn','language','series','volume','issue','unitType','run','edition','format','publishedDate','pageCount','subjects','categories','statement'];
   for(const record of records){
     for(const [kind,entry]of Object.entries(record.metadata?.enrichment??{})){
-      const source=document.createElement('p');source.textContent=`${record.title} · ${accountLabel(record,database)} · ${sourceLabel(kind)} · ${entry.approved?'human approved':'source/automatic evidence'} · ${entry.matchBasis??'legacy basis unknown'} · retrieved ${entry.retrievedAt??entry.checkedAt??entry.appliedAt??'unknown'}`;
+      const source=document.createElement('p');source.textContent=`${record.title} · ${accountLabel(record,database)} · ${sourceLabel(kind)} · ${entry.approved?'human approved':'source/automatic evidence'} · ${entry.matchBasis??'legacy basis unknown'} · retrieved ${formatDate(entry.retrievedAt??entry.checkedAt??entry.appliedAt)}`;
       if(entry.sourceUrl){const link=document.createElement('a');link.textContent=' View source';link.href=entry.sourceUrl;link.target='_blank';link.rel='noreferrer';source.append(link);}details.append(source);
       const table=document.createElement('table');const head=document.createElement('tr');for(const label of ['Field','Provider value','Source value','Conflict']){const cell=document.createElement('th');cell.textContent=label;head.append(cell);}table.append(head);
       for(const field of fields){if(entry[field]===undefined||entry[field]===null||Array.isArray(entry[field])&&!entry[field].length||entry[field]==='')continue;

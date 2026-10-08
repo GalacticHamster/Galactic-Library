@@ -1,7 +1,8 @@
+import {formatDate} from './formatters.js';
 import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions} from './provider-accounts.js';
 
 const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
-const date=value=>value?new Date(value).toLocaleString():'Not yet';
+const date=value=>value?formatDate(value):'Not yet';
 const nickname=p=>p.nickname||'Unnamed account';
 const health=p=>({running:'Update in progress',succeeded:'Last update completed',failed:'Last update failed',partial:'Last update incomplete',cancelled:'Update cancelled'})[p.syncHealth?.status]??'No recent update details';
 

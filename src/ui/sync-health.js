@@ -1,3 +1,4 @@
+import {providerLabel,formatDate} from './formatters.js';
 import {syncHealthRows} from '../lib/sync-health.js';
 
 const node=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
@@ -8,7 +9,7 @@ export function createSyncHealthView(database,actions){
     if(!root.open||ready)return;ready=true;root.append(node('p','Full scans establish the observed snapshot. Quick checks refresh only their reported scope. A recent quick check does not make the whole library fresh. Failure details use safe categories, never raw responses or purchase IDs.'));
     const status=node('p');status.setAttribute('role','status');root.append(status);
     for(const {provider,state,health,fullAgeDays,historicalCount,longRunning}of syncHealthRows(database)){
-      const section=node('section');section.append(node('h4',provider),node('p',`Selected update account: ${state.profileLabel||'Unnamed account'}; ${state.recordCount??0} imported items; ${historicalCount} historical records.`),node('p',`Last full scan: ${state.fullSyncAt||'never'}${fullAgeDays===null?'':` (${fullAgeDays} days ago)`}; last quick check: ${state.quickSyncAt||'never'}.`));
+      const section=node('section');section.append(node('h4',providerLabel(provider)),node('p',`Selected update account: ${state.profileLabel||'Unnamed account'}; ${state.recordCount??0} imported items; ${historicalCount} historical records.`),node('p',`Last full scan: ${state.fullSyncAt?formatDate(state.fullSyncAt):'never'}${fullAgeDays===null?'':` (${fullAgeDays} days ago)`}; last quick check: ${state.quickSyncAt?formatDate(state.quickSyncAt):'never'}.`));
       if(health){
         section.append(node('p',`Last attempt: ${health.status}, ${health.mode}, profile ${health.attemptedProfileLabel||'unassigned'}; started ${health.startedAt||'unknown'}; finished ${health.finishedAt||'not reported'}.`));
         if(longRunning)section.append(node('p','This attempt has been running for over ten minutes. Check the provider tab; it may still be scanning or may have been interrupted.'));
@@ -20,7 +21,7 @@ export function createSyncHealthView(database,actions){
         }
       }else section.append(node('p','No attempt diagnostics have been recorded.'));
       const snapshot=state.snapshotValidation;
-      if(snapshot){section.append(node('p',`Last validated full coverage: ${snapshot.itemCount} records; validated ${snapshot.validatedAt}.`));const scopes=node('ul');for(const scope of snapshot.scopes)scopes.append(node('li',`${scope.id}: ${scope.readCount}/${scope.expectedCount??'unknown total'} source entries, ${scope.pagesRead} page(s), reached ${scope.end}.`));section.append(scopes);}
+      if(snapshot){section.append(node('p',`Last validated full coverage: ${snapshot.itemCount} records; validated ${formatDate(snapshot.validatedAt)}.`));const scopes=node('ul');for(const scope of snapshot.scopes)scopes.append(node('li',`${scope.id}: ${scope.readCount}/${scope.expectedCount??'unknown total'} source entries, ${scope.pagesRead} page(s), reached ${scope.end}.`));section.append(scopes);}
       const link=node('a','Open provider to sync or retry');link.href=urls[provider];link.target='_blank';link.rel='noreferrer';section.append(link);root.append(section);
     }
   });return root;

@@ -1,3 +1,4 @@
+import {providerLabel,formatDate} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
@@ -268,12 +269,7 @@ function inspectEnrichmentRecords(refs,category){
   if(refs[0])openLibraryRecord(refs[0],{section:'books'});
 }
 
-function displayProviderName(provider) {
-  if (provider === 'gog') return 'GOG';
-  if (provider === 'amazon-games') return 'Amazon Games';
-  if (provider === 'amazon-video') return 'Amazon Video';
-  if (provider === 'fandango-at-home') return 'Fandango at Home';
-  return provider[0].toUpperCase() + provider.slice(1);
+function displayProviderName(provider) {return providerLabel(provider);
 }
 
 function displayMediaType(mediaType) {
@@ -654,7 +650,7 @@ async function runGoogleBooksEnrichment() {
         const canonicalId=job.queue[cursor+count];const records=(job.targets[canonicalId]??[]).map(ref=>byRef.get(ref));
         if(!records.length||records.some(record=>!record||record.mediaType!=='book'||record.metadata.enrichment?.googleBooks?.volumeId)){outcomes.push({canonicalId,status:'skipped'});continue;}
         const canonical=database.canonicalItems[canonicalId]??{title:records[0].title};const query=enrichmentQuery(canonical,records);
-        googleBooksEnrichmentStatus.textContent=googleBooksStatusText(job)+' Looking up ?'+canonical.title+'??';
+        googleBooksEnrichmentStatus.textContent=googleBooksStatusText(job)+' Looking up “'+canonical.title+'”…';
         try{
           const response=await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query});if(!response?.ok)throw new Error(response?.error??'Google Books lookup failed.');
           const candidates=response.candidates??[];const candidate=highConfidenceGoogleBooksCandidate(query,candidates);
@@ -735,7 +731,7 @@ function render(timing = null) {
     if (state.tvCount) providerParts.push(`${state.tvCount} TV titles`);
     if (state.addOnCount) providerParts.push(`${state.addOnCount} DLC`);
     if (!providerParts.length) providerParts.push('0 items');
-    if (state.lastSync) providerParts.push(`synced ${new Date(state.lastSync).toLocaleString()}`);
+    if (state.lastSync) providerParts.push(`synced ${formatDate(state.lastSync)}`);
     const providerSummary = providerParts.join(' · ');
     node.append(textElement('strong', displayProviderName(id)), textElement('span', providerSummary));
     const choice=document.createElement('label');choice.className='ownership-choice ownership-provider-choice';

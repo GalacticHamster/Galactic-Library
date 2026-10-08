@@ -1,3 +1,4 @@
+import {formatDate} from './formatters.js';
 import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
 import {enrichmentWorkbenchRows} from '../lib/enrichment-workbench.js';
 import {accountLabel} from './item-presentation.js';
@@ -56,7 +57,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
         const candidate=row.review.candidates[choices.get(row.id)];
         if(candidate){
           node.append(metadataPreview(row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean),candidate,row.review.source,database));
-          node.append(text('p',`${sourceLabel(candidate.source)} · ${candidate.fileName||candidate.editionKey||candidate.volumeId||candidate.workKey||''} · retrieved ${candidate.retrievedAt||row.review.checkedAt||'unknown'}`));
+          node.append(text('p',`${sourceLabel(candidate.source)} · ${candidate.fileName||candidate.editionKey||candidate.volumeId||candidate.workKey||''} · retrieved ${formatDate(candidate.retrievedAt||row.review.checkedAt)}`));
           for(const field of ['series','volume','issue','run','edition','contributors','categories','statement'])if(candidate[field]?.length)node.append(text('p',`${field}: ${Array.isArray(candidate[field])?candidate[field].map(value=>typeof value==='object'?`${value.role}: ${value.name}`:value).join(', '):candidate[field]}`));
           if(candidate.sourceUrl){const link=text('a','View source');link.href=candidate.sourceUrl;link.target='_blank';link.rel='noreferrer';node.append(link);}
           if(row.conflicts[choices.get(row.id)]?.length)node.append(text('p',`Cannot apply: conflicting ${row.conflicts[choices.get(row.id)].join(', ')}. Inspect or undo existing evidence first.`));

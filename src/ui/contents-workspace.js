@@ -1,3 +1,4 @@
+import {formatDate} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {CONTENTS_STATUSES,createContentsProjection} from './contents-overview.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
@@ -72,7 +73,7 @@ export function createContentsWorkspace(actions={}) {
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
-    if(summary.updatedAt)detail.append(text('small','Last contents activity: '+new Date(summary.updatedAt).toLocaleString()));
+    if(summary.updatedAt)detail.append(text('small','Last contents activity: '+formatDate(summary.updatedAt)));
     if(summary.failed)detail.append(text('p',summary.retained?'Could not retrieve the latest description. Earlier contents below are retained. Retry on the Kindle library page.':'Could not retrieve contents. Retry on the Kindle library page, or enter contents from a source you checked.'));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));

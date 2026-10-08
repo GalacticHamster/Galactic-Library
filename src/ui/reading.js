@@ -1,10 +1,11 @@
+import {readingAccessLabel} from './formatters.js';
 import {readingSummary,readingStatusLabel} from './reading-presentation.js';
 import {createConfirmation} from './confirmation.js';
 import {READING_MEDIA,readingEvidence} from '../lib/reading.js';
 import {accountLabel} from './item-presentation.js';
 
 function node(tag,text=''){const element=document.createElement(tag);element.textContent=text;return element;}
-function select(label,values,current){const element=node('select');element.setAttribute('aria-label',label);for(const value of values){const option=node('option',value);option.value=value;element.append(option);}element.value=current;return element;}
+function select(label,values,current){const element=node('select');element.setAttribute('aria-label',label);for(const value of values){const option=node('option',({'all':'All reading states','not-saved':'Reading status not saved',unread:'Unread',reading:'Reading',completed:'Completed',downloaded:'Downloaded locally',...Object.fromEntries(['unknown','accessible','unavailable'].map(v=>[v,readingAccessLabel(v)]))})[value]??value);option.value=value;element.append(option);}element.value=current;return element;}
 function button(label,action){const element=node('button',label);element.type='button';element.addEventListener('click',action);return element;}
 function lazy(root,build){root.addEventListener('toggle',()=>{if(root.open&&!root.dataset.loaded){root.dataset.loaded='true';build();}});return root;}
 export function createReadingTools(records,database,actions){

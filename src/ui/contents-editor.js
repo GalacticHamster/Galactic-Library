@@ -1,3 +1,4 @@
+import {formatDate} from './formatters.js';
 import {bookToolHelp} from './book-tool-help.js';
 import { contentsStatement, validateContents } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
@@ -21,7 +22,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   const sourceDetails=document.createElement('details');sourceDetails.className='contents-source-details';
   sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),element('label','Description / contents statement'),statement,element('label','Source page'),source);
-  sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; last acquired: ${evidence?.checkedAt||'not recorded'}. ${review?'Human review saved: '+(review.verifiedAt||'date not recorded')+'.':''}`));
+  sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; Captured: ${formatDate(evidence?.checkedAt)}. ${review?'Human review saved: '+(formatDate(review.verifiedAt))+'.':''}`));
   const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
   const interpretation=element('p','');advanced.append(interpretation);
   root.append(sourceDetails,advanced);

@@ -1,10 +1,8 @@
+import {providerLabel,mediaLabel,accountLabel,accessLabel} from './formatters.js';
+export {providerLabel,mediaLabel,accountLabel,accessLabel} from './formatters.js';
 import {identityEvidence} from '../lib/identity.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {contentsSummary} from './contents-overview.js';
-export const providerLabel=id=>({steam:'Steam',gog:'GOG',epic:'Epic',kindle:'Kindle',audible:'Audible',kobo:'Kobo',humble:'Humble Bundle',fanatical:'Fanatical','amazon-games':'Amazon Games','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home'}[id]??id);
-export const mediaLabel=id=>({book:'Book',audiobook:'Audiobook',game:'Game',software:'Software',movie:'Movie',tv:'TV show'}[id]??id);
-export const accountLabel=(record,db)=>`${providerLabel(record.provider)} — ${db.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`;
-export const accessLabel=value=>({owned:'Owned',claimed:'Permanently claimed',borrowed:'Borrowed',subscription:'Subscription access',rental:'Rented',unknown:'Ownership unconfirmed'}[value]??'Access unconfirmed');
 export function artworkUrl(value){try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?url.href:'';}catch{return '';}}
 export function itemPresentation(canonical,records,database){
   const identities=records.map(identityEvidence);

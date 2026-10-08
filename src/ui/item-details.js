@@ -1,3 +1,4 @@
+import {formatDate} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {itemPresentation} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
@@ -24,11 +25,11 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     for(const entry of presentation.records){const record=text('div','');record.className='item-account';record.dataset.itemRecord=entry.record.recordRef;
       record.append(text('strong',entry.label),text('p',entry.access+(entry.override?' — user ownership preference':entry.reviewed?' — human ownership review':'')));
       if(entry.override||entry.reviewed)record.append(text('small','Original provider observation: '+entry.observedAccess));
-      if(entry.acquiredAt)record.append(text('small','Acquired / added: '+new Date(entry.acquiredAt).toLocaleDateString()));
-      if(entry.observedAt)record.append(text('small','Last observed: '+new Date(entry.observedAt).toLocaleDateString()));
+      if(entry.acquiredAt)record.append(text('small','Acquired / added: '+formatDate(entry.acquiredAt,{time:false})));
+      if(entry.observedAt)record.append(text('small','Last observed: '+formatDate(entry.observedAt,{time:false})));
       if(entry.reading)record.append(text('p',entry.reading));node.append(record);
-      if(entry.readingAccess!=='unknown')record.append(text('small',`Self-reported access: ${entry.readingAccess}${entry.accessCheckedAt?' · checked '+new Date(entry.accessCheckedAt).toLocaleDateString():''}`));
-      if(entry.reviewExpiresAt)record.append(text('small','Reviewed access expiry: '+new Date(entry.reviewExpiresAt).toLocaleString()));
+      if(entry.readingAccess!=='unknown')record.append(text('small',`Self-reported access: ${entry.readingAccess}${entry.accessCheckedAt?' · checked '+formatDate(entry.accessCheckedAt,{time:false}):''}`));
+      if(entry.reviewExpiresAt)record.append(text('small','Reviewed access expiry: '+formatDate(entry.reviewExpiresAt)));
     }
     for(const build of [tools.reading,tools.ownership])if(build)node.append(build());
     const settings=text('a','Ownership preferences in Settings');settings.href='#settings';settings.dataset.goWorkspace='settings';node.append(settings);

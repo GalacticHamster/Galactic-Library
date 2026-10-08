@@ -1,3 +1,4 @@
+import {providerLabel,accessLabel,formatDate} from './formatters.js';
 import {parsePurchaseEvidence} from '../lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {accountLabel} from './item-presentation.js';
@@ -12,8 +13,8 @@ export function createOwnershipReviewTools(records,database,actions){
     if(!root.open||ready)return;ready=true;
     root.append(node('p','Record a purchase, permanent claim or temporary access with its evidence date. This keeps the provider observation intact. Reseller key status still cannot establish destination activation.'));
     for(const record of records){
-      const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.dataset.ownershipRecord=record.recordRef;section.append(node('strong',`${record.title} — ${accountLabel(record,database)}`),node('p',`Provider: ${record.ownership}; display and matching: ${effective.ownership}${effective.ownershipOverride?' (ownership override enabled)':''}${prior?`; confirmed ${prior.confirmedAt}`:''}.`));
-      const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of ['owned','claimed','subscription','borrowed','rental','unknown'])ownership.append(Object.assign(node('option',state),{value:state}));ownership.value=prior?.ownership??'owned';
+      const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.dataset.ownershipRecord=record.recordRef;section.append(node('strong',`${record.title} — ${accountLabel(record,database)}`),node('p',`Provider: ${accessLabel(record.ownership)}; display and matching: ${accessLabel(effective.ownership)}${effective.ownershipOverride?' (ownership override enabled)':''}${prior?`; confirmed ${formatDate(prior.confirmedAt)}`:''}.`));
+      const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of ['owned','claimed','subscription','borrowed','rental','unknown'])ownership.append(Object.assign(node('option',accessLabel(state)),{value:state}));ownership.value=prior?.ownership??'owned';
       const evidence=input('Ownership evidence','textarea');evidence.maxLength=2000;evidence.placeholder='Receipt, order history or another checked source';evidence.value=prior?.note??'';
       const date=input('Ownership evidence date','date');date.value=(prior?.evidenceDate??new Date().toISOString()).slice(0,10);
       const source=input('Ownership evidence URL','url');source.placeholder='Optional source URL';source.value=prior?.sourceUrl??'';
@@ -32,7 +33,7 @@ export function createPurchaseEvidenceWorkbench(database,actions){
   root.addEventListener('toggle',()=>{
     if(!root.open||ready)return;ready=true;
     root.append(node('p','Import a local CSV/JSON export with title, purchase date and optional ASIN/ISBN/catalog ID. Choose Kindle for Comixology receipts or Audible for audiobooks. Customer, payment and redemption fields are discarded. Every candidate needs review. Unmatched receipts stay pending; sync the relevant provider and refresh candidates.'));
-    const provider=node('select');provider.setAttribute('aria-label','Receipt provider');for(const value of ['kindle','audible','humble','fanatical','kobo'])provider.append(Object.assign(node('option',value==='kindle'?'Kindle / Comixology':value),{value}));
+    const provider=node('select');provider.setAttribute('aria-label','Receipt provider');for(const value of ['kindle','audible','humble','fanatical','kobo'])provider.append(Object.assign(node('option',value==='kindle'?'Kindle / Comixology':providerLabel(value)),{value}));
     const source=input('Purchase evidence source label');source.maxLength=100;source.value='Local purchase history';
     const file=input('Local purchase history file','file');file.accept='.json,.csv,application/json,text/csv';const status=node('p');status.setAttribute('role','status');
     file.addEventListener('change',async()=>{const selected=file.files?.[0];if(!selected)return;file.disabled=true;try{if(selected.size>5*1024*1024)throw new Error('Choose a file under 5 MB.');await actions.import(parsePurchaseEvidence(await selected.text(),{provider:provider.value,sourceLabel:source.value}));actions.refresh();}catch(error){status.textContent=error.message;file.disabled=false;}});
@@ -42,7 +43,7 @@ export function createPurchaseEvidenceWorkbench(database,actions){
     function render(){
       const entries=Object.entries(database.ownershipProposals).filter(([,proposal])=>proposal.evidence.title.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase()));page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(entries.length/50)-1)));previous.disabled=page===0;next.disabled=(page+1)*50>=entries.length;list.replaceChildren();
       for(const [id,proposal]of entries.slice(page*50,(page+1)*50)){
-        const entry=node('li'),evidence=proposal.evidence;entry.append(node('strong',evidence.title),node('p',`${evidence.provider} · ${proposal.profileLabel||'profile unassigned'} · ${evidence.acquiredAt} · ${evidence.asin||evidence.isbn||evidence.providerItemId||'title-only evidence'}`));
+        const entry=node('li'),evidence=proposal.evidence;entry.append(node('strong',evidence.title),node('p',`${providerLabel(evidence.provider)} · ${proposal.profileLabel||'profile unassigned'} · ${formatDate(evidence.acquiredAt)} · ${evidence.asin||evidence.isbn||evidence.providerItemId||'title-only evidence'}`));
         const current=Object.values(database.providerItems).filter(item=>proposal.recordRefs.includes(item.recordRef)&&item.profileId===proposal.profileId);
         if(current.length){
           const choice=node('select');choice.setAttribute('aria-label','Receipt library candidate');choice.append(Object.assign(node('option','Choose the owned edition'),{value:''}));for(const item of current)choice.append(Object.assign(node('option',`${item.title} — ${accountLabel(item,database)}`),{value:item.recordRef}));
