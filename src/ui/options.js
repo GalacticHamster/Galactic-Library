@@ -159,7 +159,7 @@ const workspace = createWorkspaceNavigation({
 document.querySelector("#library-previous").addEventListener("click", () => { libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
 document.querySelector("#library-next").addEventListener("click", () => { libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
 document.querySelector("#open-active-book-job").addEventListener("click", () => workspace.select("books"));
-document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book?"; });
+document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book…"; });
 
 async function retryEnrichmentReview(review){
   const byRef=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));
@@ -736,7 +736,7 @@ function render(timing = null) {
   const canShowAddOns=(filters.mediaType==='all'||filters.mediaType==='game')&&filters.dlc!=='without';
   const orphanValues=(workspace.workspace==='library'&&canShowAddOns?browse.addOns:[]).filter(value=>!linkedAddOnIds.has(value.record.id)&&recordQualifies(value,filters,database)&&recordSearchRank(value,searchKey(query))!==null).sort((a,b)=>compareTitles(a.record.title,b.record.title));
   const visibleAddOnCount=canShowAddOns?new Set([...result.matches.flatMap(row=>row.addons),...orphanValues].map(value=>value.record.id)).size:0;
-  summary.textContent=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' account records qualifying for filters':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
+  summary.textContent=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' matching account records':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
 
   endSegment?.();endSegment=timing?.begin('options_cards');
   libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
@@ -763,8 +763,8 @@ function render(timing = null) {
       books:()=>{
         const root=document.createElement('div');
         const known=records.map(identityEvidence);const missing=[['authors','Creator'],['isbn','ISBN'],['edition','Edition'],['language','Language']].filter(([field])=>!known.some(value=>Array.isArray(value[field])?value[field].length:value[field])).map(([,label])=>label);
-        if(missing.length)root.append(textElement('p','Not recorded: '+missing.join(', ')+'. Missing details do not prevent inspection or prove a different edition.'));
-        root.append(textElement('p','Provider metadata and external bibliographic suggestions are separate. Lookup results require review; accepting book details does not confirm ownership or included contents.'),createGoogleBooksTools(canonicalItem,records,{enabled:true}));
+        if(missing.length)root.append(textElement('p','Not recorded: '+missing.join(', ')+'. You can still inspect this book.'));
+        root.append(textElement('p','Find book details or review saved suggestions below.'),createGoogleBooksTools(canonicalItem,records,{enabled:true}));
         const open=createOpenLibraryTools(canonicalItem,records,{enabled:true});if(open)root.append(open);
         root.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);},refresh:render}));
         const review=createEnrichmentWorkbench({apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},undo:async refs=>{database=await undoEnrichmentSelections(refs);},retry:retryEnrichmentReview,refresh:render},{recordRefs:records.map(record=>record.recordRef),item:true});

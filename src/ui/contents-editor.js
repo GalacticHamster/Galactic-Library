@@ -13,15 +13,15 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   let populated=false;
   const populate=()=>{
   root.append(bookToolHelp({purpose:'Review the issues, volumes or named components included in this edition.',input:'The original contents statement plus the scope and language of each proposed entry.',saves:'Parsing creates editable suggestions only. Save verified contents confirms the entries you reviewed.',review:'Check every entry and mark excerpts as excerpts. Named suggestions do not become library-title matches. Verified full entries can establish scoped coverage only when the collection is owned.',example:'Includes Wool, Shift and Dust produces named suggestions; check the original edition before confirming anything.'}));
-  root.append(element('p','Discovery and parsing do not verify contents. Check every name or number. Excerpts cannot establish full-unit ownership; missing run or language prevents complete coverage.'));
+  root.append(element('p','Check the suggested entries and mark partial material as excerpts before saving.'));
   const evidence=record.metadata?.enrichment?.kindleProductComicContents;
   const interpretedEvidence=evidence?.manifest?manifestReviewProposal(evidence,record.title):null;
   const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
   const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   const sourceDetails=document.createElement('details');sourceDetails.className='contents-source-details';
-  sourceDetails.append(element('summary','Source evidence and interpretation'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),element('label','Original contents statement'),statement,element('label','Evidence source'),source);
-  sourceDetails.append(element('p',`Source: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; last acquired: ${evidence?.checkedAt||'not recorded'}. ${review?'Human review saved: '+(review.verifiedAt||'date not recorded')+'.':''}`));
+  sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),element('label','Description / contents statement'),statement,element('label','Source page'),source);
+  sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; last acquired: ${evidence?.checkedAt||'not recorded'}. ${review?'Human review saved: '+(review.verifiedAt||'date not recorded')+'.':''}`));
   const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
   const interpretation=element('p','');advanced.append(interpretation);
   root.append(sourceDetails,advanced);
@@ -46,8 +46,8 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   };
   const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
-  if(review)status.textContent=`${review.entries.length} human-reviewed entries saved. Edit and save to correct them, or undo confirmation. Source evidence remains unchanged.`;
-  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries — not confirmed / not verified. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
+  if(review)status.textContent=`${review.entries.length} reviewed entries saved. Edit to correct them, or undo confirmation.`;
+  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not verified. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
   if(initialProposal)interpretation.textContent=`Local interpretation: ${initialProposal.outcome}; ${initialProposal.qualityReason} Context: ${initialProposal.parseBinding}. Proposal input: ${initialProposal.parseInput}`;
   if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
@@ -80,7 +80,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     advanced.append(claims);
   }
   if(evidence?.manifest){
-    const details=document.createElement('details');details.append(element('summary','Discovered manifest evidence (unverified)'));
+    const details=document.createElement('details');details.append(element('summary','Captured collection text (not verified)'));
     details.append(element('p','Full means the selected source manifest was parsed without unresolved text; it does not establish complete book contents or ownership. Windows linked to one explicit collection clause are interpreted using their parent source statement. Other independent clauses remain separate and unverified.'));
     const interpreted=manifestReviewProposal(evidence,record.title);
     if(interpreted.manifestEvidence){
@@ -100,7 +100,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   }
   root.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.entries.length} suggested entries — not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    status.textContent=`${proposed.entries.length} suggested entries · Not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     interpretation.textContent=`Local interpretation: ${proposed.outcome}; ${proposed.qualityReason} Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
   }),button('Add contents entry',()=>addRow()),table);
   root.append(button('Save verified contents',()=>persist(async()=>{

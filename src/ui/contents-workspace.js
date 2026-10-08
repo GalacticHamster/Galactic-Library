@@ -13,7 +13,7 @@ export function createContentsWorkspace(actions={}) {
   const controls=text('div','');controls.className='contents-filters';
   const search=text('input','');search.type='search';search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
   const status=text('select','');status.setAttribute('aria-label','Contents status');
-  for(const [value,label] of [['all','All imported books'],['review','Needs human review'],['failure','Latest source failed or unavailable'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
+  for(const [value,label] of [['all','All imported books'],['review','Needs contents review'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
   const shared={search};
   const primary=text('div','');primary.className='library-filters';
   const more=text('details','');more.append(text('summary','More filters'));const extra=text('div','');extra.className='library-filters';more.append(extra);
@@ -34,7 +34,7 @@ export function createContentsWorkspace(actions={}) {
   const list=text('ol','');list.className='review-items';list.id='contents-collection-list';
   const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
   const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
-  listView.append(controls,counter,paging,list);element.append(overview,listView,detail);
+  listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not verified means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
   const project=createContentsProjection(),browse=createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
   function readView(){return {...view,page,anchor:result?.rows[0]?.canonical.id??view.anchor};}
@@ -47,13 +47,13 @@ export function createContentsWorkspace(actions={}) {
     const shown=result.rows.flatMap(row=>row.qualifying.map(value=>({...summaries.get(value.record.id),canonicalId:row.canonical.id})));
     activeFilters.replaceChildren();for(const [key,field]of Object.entries({...shared,status}))if(key!=='sort'&&field.value&&field.value!=='all'){const label=key==='search'?'Search: '+field.value:field.selectedOptions[0]?.textContent;activeFilters.append(button((key==='status'?'Contents only: ':'')+label,()=>{field.value=key==='search'?'':'all';field.dispatchEvent(new Event(key==='search'?'input':'change'));}));}
     previous.disabled=page===0;next.disabled=page===result.pages-1;
-    counter.textContent=result.total?`${result.total} books · page ${page+1} of ${result.pages}`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
+    counter.textContent=result.total?`${result.total} catalog books · ${result.matches.reduce((n,row)=>n+row.qualifying.length,0)} matching accounts · page ${page+1} of ${result.pages}`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
     list.replaceChildren(...shown.map(row=>{
       const node=text('li','');node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
       node.append(text('strong',row.title),text('small',`${providerName(row.provider)} · ${row.nickname}`),text('p',`${row.label}${row.count!==null?` · ${row.count} reviewed entries`:''}${row.needsReview?' · Review needed':''}`));
       const preview=createContentsReadOnly(database.providerItems[row.id],database,{compact:true});if(preview)node.append(preview);
-      if(row.failed)node.append(text('p',row.retained?'Latest source check failed or was unavailable. Earlier contents and any human review are retained.':'The source could not be acquired. Retry or recovery belongs on the signed-in Kindle page.'));
-      if(row.changed)node.append(text('p','Captured contents differ from your review. Saved decisions remain unchanged.'));
+      if(row.failed)node.append(text('p',row.retained?'Could not retrieve the latest description. Earlier contents and reviews are retained.':'Could not retrieve contents. Retry from the Kindle library page.'));
+      if(row.changed)node.append(text('p','Description changed since your review. Your review is retained.'));
       if(row.updatedAt)node.append(text('small','Last contents activity: '+new Date(row.updatedAt).toLocaleString()));
       node.append(button('Inspect contents',()=>open(row.recordRef)));return node;
     }));
@@ -70,7 +70,7 @@ export function createContentsWorkspace(actions={}) {
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
-    if(summary.failed)detail.append(text('p',summary.retained?'Latest source acquisition failed or was unavailable; the earlier evidence below is retained. Retry belongs on the signed-in Kindle page.':'Source acquisition failed or was unavailable. Use the signed-in Kindle page for retry or recovery, or review a source you have checked yourself.'));
+    if(summary.failed)detail.append(text('p',summary.retained?'Could not retrieve the latest description. Earlier contents below are retained. Retry on the Kindle library page.':'Could not retrieve contents. Retry on the Kindle library page, or enter contents from a source you checked.'));
     if(actions.review)detail.append(actions.review(record,database));
     else detail.append(text('p','Saved contents evidence belongs to this account’s library record.'));
     if(actions.library){const link=text('a','Open this book in Library');link.href=bookHref('library',record.recordRef);link.addEventListener('click',event=>{event.preventDefault();actions.library(record.recordRef);});detail.append(link);}
@@ -81,10 +81,10 @@ export function createContentsWorkspace(actions={}) {
   return {element,open,close,applyView,readView,get selected(){return selected;},get scroll(){return returnScroll;},
     update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
-        overview.textContent=`${rows.length} imported books · ${counts.reviewed??0} reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest source checks failed or unavailable. Identified text is a suggestion, not proof of complete contents or ownership.`;
+        overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest retrievals failed.`;
         for(const option of status.options){const key=option.value;
           const count=key==='all'?rows.length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
-          const label=key==='all'?'All imported books':key==='review'?'Needs human review':key==='failure'?'Latest source failed or unavailable':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
+          const label=key==='all'?'All imported books':key==='review'?'Needs contents review':key==='failure'?'Latest retrieval failed':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
         }
         const projection=browse(database);
         for(const [key,options]of [['provider',[...new Set([...projection.records.values()].map(v=>v.record.provider))].sort().map(id=>({value:id,label:providerName(id)}))],['account',projection.accountOptions],['series',projection.seriesOptions.map(value=>({value,label:value}))],['genre',projection.genreOptions.map(value=>({value,label:value}))]]){

@@ -1,10 +1,10 @@
 import {contentsStatement} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
-  reviewed:'Reviewed contents', identified:'Contents identified — not reviewed',
-  partial:'Contents partially identified', uncertain:'Contents need review',
-  missing:'No usable contents in captured source', unattempted:'Acquisition not attempted',
-  failed:'Source failed or unavailable'
+  reviewed:'Contents reviewed', identified:'Contents found · Not verified',
+  partial:'Some contents found · Not verified', uncertain:'Contents need review',
+  missing:'No contents found in description', unattempted:'Not checked yet',
+  failed:"Couldn't retrieve contents"
 };
 const failed = value => ['unavailable','temporary-failure'].includes(value);
 export function contentsSummary(record, database) {

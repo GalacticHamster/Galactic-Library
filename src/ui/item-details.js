@@ -19,7 +19,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     if(state.sections.has(key)||defaultOpen&&!state.initialized){node.open=true;state.sections.add(key);populate();}root.append(node);return node;
   }
   section('library','Your library',node=>{
-    node.append(text('p','Each account below supplies its own access observation. Grouping the item does not create ownership in another account.'));
+    const help=text('details','');help.className='context-help';help.append(text('summary','How account access works'),text('p','Access belongs to each account separately. Grouping copies does not grant access to another account. Ownership preferences and human reviews are labeled; the original observation remains available.'));node.append(help);
     for(const entry of presentation.records){const record=text('div','');record.className='item-account';record.dataset.itemRecord=entry.record.recordRef;
       record.append(text('strong',entry.label),text('p',entry.access+(entry.override?' — user ownership preference':entry.reviewed?' — human ownership review':'')));
       if(entry.override||entry.reviewed)record.append(text('small','Original provider observation: '+entry.observedAccess));
@@ -35,11 +35,11 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
   },true);
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));
-      if(entry.contents.failed)node.append(text('p','Latest source check failed or was unavailable. Any earlier evidence and human review are retained.'));
+      if(entry.contents.failed)node.append(text('p','Latest description could not be retrieved. Earlier contents and reviews are retained.'));
       const preview=createContentsReadOnly(entry.record,database);if(preview)node.append(preview);
       const link=text('a','Review contents');link.href=bookHref('contents',entry.record.recordRef);link.dataset.contentsRecord=entry.record.recordRef;node.append(link);
     }
-    node.append(text('p','Contents suggestions do not establish separate ownership of included works. Detailed review and comparisons are in Contents.'));
+    const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not verified. A reviewed list describes included material for that account; it does not create separate purchases of those works. Overlap and coverage comparisons are available in Contents.'));node.append(help);
   },true);
   if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());const bulk=text('a','Bulk book information and review');bulk.href='#books';bulk.dataset.goWorkspace='books';node.append(bulk);});
   section('advanced','Advanced',node=>{

@@ -39,7 +39,7 @@ try{
   const qualityEditor=createContentsEditor(qualityRecord,null,{save:async()=>{},refresh(){}});
   qualityEditor.open=true;qualityEditor.dispatchEvent(new Event('toggle'));button(qualityEditor,'Parse statement for review').click();
   assert(qualityEditor.querySelector('textarea').value==='Collects Comic #1-3 Read More','Parsing destroyed original Read More evidence.');
-  assert(qualityEditor.textContent.includes('description may have been incomplete')&&qualityEditor.textContent.includes('not verified'),'Hydration warning or unverified status missing.');
+  assert(qualityEditor.textContent.includes('description may have been incomplete')&&qualityEditor.textContent.includes('Not verified'),'Hydration warning or unverified status missing.');
   assert(qualityEditor.querySelectorAll('tbody tr').length===3,'Captured issue range did not produce review proposals.');
   const mixedQuality=proposeContentsForReview('Collects A #1-2 and material from B #3','Quality collection');
   assert(mixedQuality.entries.filter(e=>e.completeness==='full').length===2&&mixedQuality.entries.filter(e=>e.completeness==='excerpt').length===1,'Packaged mixed extent regression.');
