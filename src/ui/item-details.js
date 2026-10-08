@@ -5,12 +5,13 @@ const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:v
 export function createItemDetailsBody(canonical,records,database,tools,state={sections:new Set()}){
   const root=text('div','');root.className='catalog-item-details';
   const presentation=itemPresentation(canonical,records,database);
+  const catalog=text('details','');catalog.className='item-overview-details';catalog.append(text('summary','Edition details and artwork'));root.append(catalog);
   const overview=text('div','');overview.className='item-overview';
   if(presentation.cover){const image=document.createElement('img');image.className='item-cover';image.src=presentation.cover;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove());overview.append(image);}
   const identity=text('div','');identity.append(text('h3',presentation.title),text('p',presentation.media));
   if(presentation.creators.length)identity.append(text('p','By '+presentation.creators.join(', ')));
   else if(['book','audiobook'].includes(canonical.mediaType))identity.append(text('p','Creator information is not recorded yet.'));
-  const facts=text('dl','');facts.className='item-catalog-facts';for(const entry of presentation.details)facts.append(text('dt',entry.label),text('dd',entry.values.join(' · ')));identity.append(facts);overview.append(identity);root.append(overview);
+  const facts=text('dl','');facts.className='item-catalog-facts';for(const entry of presentation.details)facts.append(text('dt',entry.label),text('dd',entry.values.join(' · ')));identity.append(facts);overview.append(identity);catalog.append(overview);
   if(presentation.details.some(entry=>entry.values.length>1))identity.append(text('small','Several saved values are shown. Inspect account sources in Advanced before deciding which describes your copy.'));
   function section(key,label,build,defaultOpen=false){
     const node=text('details','');node.dataset.itemSection=key;node.append(text('summary',label));let built=false;

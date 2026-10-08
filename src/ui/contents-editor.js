@@ -98,11 +98,12 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     sourceDetails.append(element('p','New discovery differs from your reviewed statement. Your verified entries remain unchanged.'),element('blockquote',discovered),
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; existing verification has not changed.';}));
   }
+  const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);
   root.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
     status.textContent=`${proposed.entries.length} suggested entries · Not verified. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     interpretation.textContent=`Local interpretation: ${proposed.outcome}; ${proposed.qualityReason} Context: ${proposed.parseBinding}. Proposal input: ${proposed.parseInput}`;
-  }),button('Add contents entry',()=>addRow()),table);
+  }),button('Add contents entry',()=>addRow()),element('p','Scroll the entry table to see every field. Series version/year and language help distinguish editions.'),tableScroll);
   root.append(button('Save verified contents',()=>persist(async()=>{
       const entries=[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
       await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});

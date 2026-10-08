@@ -853,6 +853,8 @@ document.querySelector('#export').addEventListener('click', async () => {
 
 bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summary'),status:document.querySelector('#performance-diagnostics-status'),worker:document.querySelector('#performance-diagnostics-worker'),runtime:chrome.runtime});
 
+document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();document.querySelector('#import').click();}});
+
 document.querySelector('#import').addEventListener('change', async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
