@@ -1,3 +1,4 @@
+import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
 import {bookRoute,bookHref} from './contents-navigation.js';
 import {createContentsBookDetails,createContentsHistory,createCollectionComparison} from './contents-book-details.js';
@@ -95,6 +96,7 @@ const companionExtensionLinkStatus = document.querySelector('#companion-extensio
 const allowedCompanionExtensions = document.querySelector('#allowed-companion-extensions');
 const galacticExtensionId = document.querySelector('#galactic-extension-id');
 let database;
+const browseProjection=createLibraryBrowseProjection();
 const contentsReviewActions={
   save:async(id,value)=>{database=await saveContentReview(id,value);},
   remove:async(id)=>{database=await removeContentReview(id);},
@@ -738,43 +740,21 @@ function render(timing = null) {
 
   endSegment?.();endSegment=timing?.begin('options_selection');
   const allRecords = Object.values(database.providerItems);
-  const addOns = allRecords.filter((item) => item.mediaType === 'game-addon');
-  const addOnsByParent = new Map();
-  const linkedAddOnIds = new Set();
-  for (const addOn of addOns) {
-    const parentKey = parentRecordKey(addOn);
-    if (!parentKey) continue;
-    const existing = addOnsByParent.get(parentKey) ?? [];
-    existing.push(addOn);
-    addOnsByParent.set(parentKey, existing);
-    if (database.providerItems[parentKey]?.mediaType === 'game') linkedAddOnIds.add(addOn.id);
-  }
-
+  const browse=browseProjection(database);
+  const addOns=browse.addOns.map(value=>value.record);
+  const addOnsByParent=new Map([...browse.addOnsByParent].map(([id,values])=>[id,values.map(value=>value.record)]));
+  const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
   const filters = selectedFilters();
-  const canonical = Object.values(database.canonicalItems)
-    .filter((item) => {
-      const records = item.providerItemIds.map((id) => database.providerItems[id]);
-      const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
-      const matchesProviderAndOwnership = records.some((record) => providerMatches(record, filters.provider) && ownershipMatches(record, filters.ownership));
-      const matchesMediaType = filters.mediaType === 'all' || item.mediaType === filters.mediaType;
-      const matchingLinkedAddOns = linkedAddOns.filter((addOn) => providerMatches(addOn, filters.provider) && ownershipMatches(addOn, filters.ownership));
-      const hasDlc = matchingLinkedAddOns.length > 0;
-      const matchesDlc = filters.dlc === 'all' || (item.mediaType === 'game' && (filters.dlc === 'with' ? hasDlc : !hasDlc));
-      const matchesGenre = genreMatches(records, filters.genre);
-      const matchesSearch = itemMatchesQuery(item, query)
-        || matchingLinkedAddOns.some((addOn) => itemMatchesQuery(addOn, query));
-      return (workspace.workspace !== 'books' || ['book','audiobook'].includes(item.mediaType)) && matchesProviderAndOwnership && matchesMediaType && matchesDlc && matchesGenre && matchesSearch;
-    })
-    .sort((left, right) => compareTitles(left.title, right.title));
+  const result=libraryBrowseResults(browse,{query,filters,workspace:workspace.workspace,page:libraryPage});
+  const canonical=result.matches.map(row=>row.canonical);
   const gameCanonicalCount = canonical.filter((item) => item.mediaType === 'game').length;
   const audiobookCanonicalCount = canonical.filter((item) => item.mediaType === 'audiobook').length;
   const softwareCanonicalCount=canonical.filter(item=>item.mediaType==='software').length;
   const bookCanonicalCount = canonical.filter((item) => item.mediaType === 'book').length;
   const movieCanonicalCount = canonical.filter((item) => item.mediaType === 'movie').length;
   const tvCanonicalCount = canonical.filter((item) => item.mediaType === 'tv').length;
-  const visibleRecords = canonical.flatMap((item) => item.providerItemIds.map((id) => database.providerItems[id]))
-    .filter((record) => providerMatches(record, filters.provider) && ownershipMatches(record, filters.ownership));
+  const visibleRecords = result.matches.flatMap(row=>row.qualifying.map(value=>value.record));
   const gameRecordCount = visibleRecords.filter((item) => item.mediaType === 'game').length;
   const audiobookRecordCount = visibleRecords.filter((item) => item.mediaType === 'audiobook').length;
   const bookRecordCount = visibleRecords.filter((item) => item.mediaType === 'book').length;

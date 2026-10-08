@@ -1,3 +1,4 @@
+import {libraryBrowseTests} from './library-browse.js';
 import {itemDetailsUxTests} from './item-details-ux.js';
 import {contentsUxTests} from './contents-ux.js';
 import {navigationUxTests} from './navigation-ux.js';
@@ -77,7 +78,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
-  ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
+  ...libraryBrowseTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,

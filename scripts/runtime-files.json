@@ -118,5 +118,6 @@
   "src/ui/contents-book-details.js",
   "src/ui/contents-navigation.js",
   "src/ui/item-presentation.js",
-  "src/ui/item-details.js"
+  "src/ui/item-details.js",
+  "src/ui/library-browse.js"
 ]
