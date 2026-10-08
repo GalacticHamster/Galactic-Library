@@ -22,3 +22,10 @@ itemDetailsUxTests.push(['Scoped enrichment rows cannot reach another account an
   const db={providerItems:{a,b},enrichmentReviews:{one:{recordRefs:['a'],source:'googleBooks',candidates:[],status:'no-results'},two:{recordRefs:['b'],source:'googleBooks',candidates:[],status:'failed'}},contentReviews:{},enrichmentHistory:{},get canonicalItems(){throw Error('Unnecessary canonical projection');}};
   const rows=enrichmentWorkbenchRows(db,{recordRefs:['a'],includeContents:false,includeMissing:false});assert.equal(rows.length,1);assert.equal(rows[0].id,'one');
 }]);
+itemDetailsUxTests.push(['Item access presentation retains original observations under ownership preferences and expired human reviews',()=>{
+  const original=JSON.stringify(b),override=itemPresentation(canonical,[b],{ownershipPolicy:{allOwned:true,providers:{}}});assert.equal(override.records[0].access,'Owned');assert.equal(override.records[0].observedAccess,'Borrowed');assert(override.records[0].override);
+  const expired=itemPresentation(canonical,[b],{ownershipReviews:{b:{ownership:'borrowed',expiresAt:'2020-01-01',source:'manual',confirmedAt:'2019-01-01'}}});assert.equal(expired.records[0].access,'Ownership unconfirmed');assert.equal(expired.records[0].reviewExpiresAt,'2020-01-01');assert.equal(JSON.stringify(b),original);
+}]);
+itemDetailsUxTests.push(['Catalog facts show known ISBNs and audiobook narration without manufacturing missing fields',()=>{
+  const record={...a,mediaType:'audiobook',metadata:{isbn:'9780306406157',narrators:['Narrator']}};const view=itemPresentation({title:'Example',mediaType:'audiobook'},[record],{});assert.deepEqual(view.details.find(field=>field.label==='ISBN').values,['9780306406157']);assert.deepEqual(view.details.find(field=>field.label==='Narrated by').values,['Narrator']);assert(!view.details.some(field=>field.label==='Publication'));
+}]);

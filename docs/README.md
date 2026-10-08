@@ -4,6 +4,9 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 
 ## Using the extension
 
+- [Library item details and enrichment](user-guide/item-details.md)
+- [Contents workspace](user-guide/contents-workspace.md)
+- [Providers and saved accounts](user-guide/providers-and-accounts.md)
 - [Library tools, ownership review and reading](user-guide/library-tools.md)
 - [Comic/manga enrichment and metadata review](user-guide/comic-manga-enrichment.md)
 - [Kindle contents discovery](user-guide/kindle-contents-discovery.md)

@@ -10,6 +10,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
   if(presentation.creators.length)identity.append(text('p','By '+presentation.creators.join(', ')));
   else if(['book','audiobook'].includes(canonical.mediaType))identity.append(text('p','Creator information is not recorded yet.'));
   const facts=text('dl','');facts.className='item-catalog-facts';for(const entry of presentation.details)facts.append(text('dt',entry.label),text('dd',entry.values.join(' · ')));identity.append(facts);overview.append(identity);root.append(overview);
+  if(presentation.details.some(entry=>entry.values.length>1))identity.append(text('small','Several saved values are shown. Inspect account sources in Advanced before deciding which describes your copy.'));
   function section(key,label,build,defaultOpen=false){
     const node=text('details','');node.dataset.itemSection=key;node.append(text('summary',label));let built=false;
     const populate=()=>{if(built)return;built=true;build(node);};

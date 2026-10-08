@@ -22,7 +22,7 @@ List counts refer to saved human-reviewed entries, not a guessed total number of
 
 ## Inspect and correct contents
 
-The existing contents editor is shared with Library. Suggestions appear as editable rows; they are not automatically confirmed. Check series/collection, series version or year, unit type, number or name, language, and full versus excerpt extent. Unresolved source material stays visible.
+Contents is the authoritative book contents editor; Library item details provide a summary and exact-account link. Suggestions appear as editable rows; they are not automatically confirmed. Check series/collection, series version or year, unit type, number or name, language, and full versus excerpt extent. Unresolved source material stays visible.
 
 - Correct a row or remove a wrong suggestion before **Save verified contents**.
 - Use **Add contents entry** for material you checked yourself.
@@ -54,7 +54,7 @@ Book lookup metadata, contents suggestions, human corrections and ownership/acce
 
 Only the signed-in Kindle page controls acquisition, Refresh All, Pause/Resume, account confirmation and retry. Contents displays existing progress and links to that page. Navigation and account selection never start acquisition. Profile-owned queues, cursors, leases and histories are unchanged.
 
-Library item Details includes **Review contents in Contents**, with account-specific links when a card contains several records. Contents includes **Open this book in Library**. These links preserve the durable record reference in a local URL fragment; reloading a valid book link opens that exact record. Legacy Library editors and workspace links remain available.
+Library item Details includes **Review contents**, with account-specific links when a card contains several records. Contents includes **Open this book in Library**. These links preserve the durable record reference in a local URL fragment; reloading a valid book link opens that exact record. Returning through that link restores the originating Library search, filters, page and scroll position within this Options tab. Legacy workspace links remain available; game contents tools remain under Advanced in Library.
 
 The overview reuses the loaded committed database, caches lightweight rows for that object and creates only fifty list cards. Source parsing, editors, history and comparisons are deferred to the requested book/panel. No extra database read populates the overview. The existing book-suggestion workbench also defers its full source interpretation until opened and visible.
 

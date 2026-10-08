@@ -10,7 +10,8 @@ export function itemPresentation(canonical,records,database){
   const identities=records.map(identityEvidence);
   const values=key=>[...new Set(identities.flatMap(identity=>Array.isArray(identity[key])?identity[key]:identity[key]?[identity[key]]:[]))];
   const details=[];
-  for(const [key,label] of [['series','Series'],['unit','Volume / issue'],['edition','Edition'],['run','Series version'],['language','Language'],['publisher','Publisher']]){const known=values(key);if(known.length)details.push({label,values:known});}
+  for(const [key,label] of [['series','Series'],['unit','Volume / issue'],['edition','Edition'],['run','Series version'],['language','Language'],['publisher','Publisher'],['isbn','ISBN']]){const known=values(key);if(known.length)details.push({label,values:known});}
+  if(canonical.mediaType==='audiobook'){const narrators=[...new Set(records.flatMap(record=>record.metadata?.narrators??[]))];if(narrators.length)details.push({label:'Narrated by',values:narrators});}
   const dates=[...new Set(records.flatMap(record=>[record.metadata?.publicationDate,record.metadata?.enrichment?.googleBooks?.publishedDate,record.metadata?.enrichment?.localMetadata?.approved?record.metadata.enrichment.localMetadata.publishedDate:null]).filter(Boolean))];
   if(dates.length)details.push({label:'Publication',values:dates});
   return {title:canonical.title,media:mediaLabel(canonical.mediaType),creators:values('authors'),details,

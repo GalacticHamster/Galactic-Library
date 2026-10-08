@@ -30,7 +30,7 @@ import {cancelProviderScan} from '../lib/storage.js';
 import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
-import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveManualMatchDecision, saveOpenLibraryEnrichment, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
+import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
@@ -159,6 +159,7 @@ async function retryEnrichmentReview(review){
     status=candidates.length?'candidates':'no-results';reason='Retried lookup; confirm the source before applying.';
   }catch(error){reason=error.message;}
   database=await saveEnrichmentReview({...review,candidates,status,reason});
+  googleBooksSearches.clear();openLibrarySearches.clear();
 }
 
 let initialBookRoute=bookRoute(globalThis.location?.hash);
@@ -238,27 +239,6 @@ function providerSourceDetails(records) {
   }).sort((left, right) => left.label.localeCompare(right.label));
 }
 
-function metadataValues(records, key) {
-  return [...new Set(records.flatMap((record) => {
-    const value = record.metadata?.[key];
-    return Array.isArray(value) ? value : value ? [value] : [];
-  }).map(String).filter(Boolean))];
-}
-
-function displayMediaMetadata(records, mediaType) {
-  if (mediaType !== 'book' && mediaType !== 'audiobook') return '';
-  const parts = [];
-  const authors = metadataValues(records, 'authors');
-  const series = metadataValues(records, 'series');
-  if (authors.length) parts.push(`By ${authors.join(', ')}`);
-  if (series.length) parts.push(`Series: ${series.join(', ')}`);
-  if (mediaType === 'audiobook') {
-    const narrators = metadataValues(records, 'narrators');
-    if (narrators.length) parts.push(`Narrated by ${narrators.join(', ')}`);
-  }
-  return parts.join(' · ');
-}
-
 function genreTagLabels(records) {
   const values = records.flatMap(libraryBroadGenreValues).map((genre) => `Genre: ${genre}`);
   return [...new Set(values)];
@@ -285,17 +265,6 @@ function createComicMangaCandidateTag(records) {
   tag.className = 'genre-tag';
   tag.title = `Evidence: ${sources.join(', ')}`;
   node.append(tag);
-  return node;
-}
-
-function createComicContents(records) {
-  const statements = [...new Set(records
-    .map((record) => String(record.metadata?.enrichment?.kindleProductComicContents?.statement ?? '').trim())
-    .filter(Boolean))];
-  if (!statements.length) return null;
-  const node = document.createElement('div');
-  node.className = 'library-item-metadata';
-  node.textContent = statements.map((statement) => `Contents found: ${statement}`).join(' · ');
   return node;
 }
 
@@ -423,13 +392,6 @@ function genreMatches(records, genre) {
   if (genre === 'all') return true;
   const key = genre.toLocaleLowerCase();
   return records.some((record) => libraryBroadGenreValues(record).some((value) => value.toLocaleLowerCase() === key));
-}
-
-function openLibraryCandidateLabel(candidate) {
-  const parts = [candidate.title];
-  if (candidate.authors?.length) parts.push(`by ${candidate.authors.join(', ')}`);
-  if (candidate.firstPublishYear) parts.push(String(candidate.firstPublishYear));
-  return parts.join(' — ');
 }
 
 async function searchOpenLibrary(canonicalItem, records) {
@@ -878,11 +840,13 @@ function render(timing = null) {
       ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await saveOwnershipReview(...args);},remove:async(...args)=>{database=await removeOwnershipReview(...args);},refresh:render}),
       books:()=>{
         const root=document.createElement('div');
+        const known=records.map(identityEvidence);const missing=[['authors','Creator'],['isbn','ISBN'],['edition','Edition'],['language','Language']].filter(([field])=>!known.some(value=>Array.isArray(value[field])?value[field].length:value[field])).map(([,label])=>label);
+        if(missing.length)root.append(textElement('p','Not recorded: '+missing.join(', ')+'. Missing details do not prevent inspection or prove a different edition.'));
         root.append(textElement('p','Provider metadata and external bibliographic suggestions are separate. Lookup results require review; accepting book details does not confirm ownership or included contents.'),createGoogleBooksTools(canonicalItem,records,{enabled:true}));
         const open=createOpenLibraryTools(canonicalItem,records,{enabled:true});if(open)root.append(open);
         root.append(createLocalMetadataTools(records,{queue:async review=>{database=await saveEnrichmentReview(review);},refresh:render}));
         const review=createEnrichmentWorkbench({apply:async selections=>{database=await applyReviewedEnrichments(selections);googleBooksSearches.clear();openLibrarySearches.clear();},dismiss:async refs=>{database=await dismissEnrichmentReviews(refs);googleBooksSearches.clear();openLibrarySearches.clear();},undo:async refs=>{database=await undoEnrichmentSelections(refs);},retry:retryEnrichmentReview,refresh:render},{recordRefs:records.map(record=>record.recordRef),item:true});
-        review.element.open=true;review.update(database);root.append(review.element,createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();}));
+        review.element.open=true;review.update(database);root.append(review.element,createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();},context));
         return root;
       },
       advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision)=>{database=await saveManualMatchDecision(candidate,decision);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await saveTitleAliases(...args);render();}));

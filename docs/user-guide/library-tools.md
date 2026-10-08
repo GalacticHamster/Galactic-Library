@@ -1,5 +1,7 @@
 # Remaining Galactic Library features
 
+Individual reading, ownership, book enrichment and identity actions are organized in [Library item details](item-details.md). Cross-library workbenches remain available through Library's Book information, Reading, and Ownership and access routes. Detailed book contents review lives in [Contents](contents-workspace.md).
+
 ## Unicode and alternate titles (GL-17)
 
 Comparison keys preserve Unicode letters, combining marks, Japanese voicing and composed Korean. Latin accent simplification remains available without deleting script-specific marks. Stored original titles are unchanged.

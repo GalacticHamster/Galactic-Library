@@ -188,6 +188,7 @@ try{
   checks.push('book tools explain save boundaries and preview source fields before edition approval');
   const approval=itemRow.querySelector('input[type="checkbox"]');approval.checked=true;approval.dispatchEvent(new Event('change'));button(card('Review manga Vol. 1').querySelector('.item-enrichment-review [data-review-id]'),'Accept suggestion').click();
   await wait(()=>values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks?.approved,'Approved candidate did not persist.');
+  await open(card('Review manga Vol. 1').querySelector('.enrichment-evidence'));
   await wait(()=>button(card('Review manga Vol. 1'),'Undo Google Books selection'),'Undo control did not render.');
   assert(card('Review manga Vol. 1').textContent.includes('Publisher')&&card('Review manga Vol. 1').textContent.includes('user-selected-edition'),'Field provenance missing.');
   checks.push('authorless Google Books discovery requires edition approval and exposes source field evidence');
@@ -216,6 +217,7 @@ try{
   assert(row.textContent.includes('ComicInfo.xml')&&row.textContent.includes('penciller: Artist')&&row.textContent.includes('2024'),'Local source evidence missing.');
   let check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Apply selected candidates').click();
   await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment?.localMetadata?.approved,'Workbench did not apply reviewed local metadata.');
+  await open(card('Review manga Vol. 1').querySelector('.enrichment-evidence'));
   await wait(()=>card('Review manga Vol. 1').textContent.includes('Undo File or publisher metadata selection'),'Source evidence did not refresh after approval.');
   assert(values.galacticLibraryDatabase.providerItems[queuedRecord.id].ownership==='unknown'&&!values.galacticLibraryDatabase.contentReviews[queuedRecord.id],'Local import overclaimed ownership or contents.');
   queueFilter.value='unparsed';queueFilter.dispatchEvent(new Event('change'));assert(workbench.textContent.includes('Collects Review manga Vol. One'),'Unparsed statement absent from queue.');
