@@ -1,3 +1,4 @@
+import {createContentsDisplay,contentsPreview} from '../src/ui/contents-display.js';
 import {bookRoute,bookHref} from '../src/ui/contents-navigation.js';
 import {workspaceTarget} from '../src/lib/ui-preferences.js';
 import {collectionComparison} from '../src/ui/contents-book-details.js';
@@ -51,4 +52,14 @@ contentsUxTests.push(['Provider/local statements are visible and same-manifest p
   record.metadata.enrichment.kindleProductComicContents=source;
   const db={contentReviews:{a:{entries:[{number:'1'}],statement:'Collects Example #1; Other #2',verifiedAt:'2026-10-02'}}};
   const row=contentsSummary(record,db);assert.equal(row.changed,false);assert.equal(row.needsReview,false);assert.equal(row.updatedAt,'2026-10-02');
+}]);
+
+contentsUxTests.push(['Read-only contents compress reviewed ranges while retaining run, language, extent and named components',()=>{
+ const record=book('a'),entry={series:'Example',run:'2020',unitType:'issue',language:'en',completeness:'full'};
+ const entries=Array.from({length:38},(_,n)=>({...entry,number:String(n+1)}));entries.push({...entry,unitType:'annual',number:'1'},{...entry,unitType:'annual',number:'2'},{...entry,number:'39',completeness:'excerpt'},{...entry,unitType:'component',number:'Bonus story'});
+ const db={contentReviews:{a:{entries}}},value=createContentsDisplay()(record,db),preview=contentsPreview(value);assert.equal(value.groups.length,4);assert(preview.text.includes('#1\u201338'));assert(preview.text.includes('Annual #1\u20132'));assert(preview.text.includes('excerpts'));assert.equal(preview.remaining,1);assert(value.reviewed);
+}],['Visible unreviewed contents reuse a bounded saved-input projection without visiting source blocks or making reviews',()=>{
+ const record=book('a',{statement:'Collects Example #1-2',parseInput:'Collects Example #1-2',parseOutcome:'full',manifest:{get blocks(){throw Error('Full source parse');}}});let calls=0;const project=createContentsDisplay({interpret:()=>{calls++;return {entries:[{series:'Example',unitType:'issue',number:'1',completeness:'full'},{series:'Example',unitType:'issue',number:'2',completeness:'full'}],unparsed:[]};}}),db={};const a=project(record,db);assert.equal(project(record,db),a);assert.equal(calls,1);assert.equal(a.reviewed,false);assert.equal(a.entries.length,2);assert(!db.contentReviews);project(record,{...db});assert.equal(calls,2);
+}],['Contents display truthfully falls back to saved text when structured interpretation is unavailable',()=>{
+ const record=book('a',{statement:'Includes named essays',parseOutcome:'uncertain'}),value=createContentsDisplay()(record,{});assert.equal(value.entries.length,0);assert.equal(value.fallback,'Includes named essays');assert.equal(value.reviewed,false);
 }]);

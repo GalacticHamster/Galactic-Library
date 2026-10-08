@@ -120,5 +120,6 @@
   "src/ui/item-presentation.js",
   "src/ui/item-details.js",
   "src/ui/library-browse.js",
-  "src/ui/library-result.js"
+  "src/ui/library-result.js",
+  "src/ui/contents-display.js"
 ]

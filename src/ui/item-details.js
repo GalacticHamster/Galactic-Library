@@ -1,3 +1,4 @@
+import {createContentsReadOnly} from './contents-display.js';
 import {itemPresentation} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
@@ -35,6 +36,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));
       if(entry.contents.failed)node.append(text('p','Latest source check failed or was unavailable. Any earlier evidence and human review are retained.'));
+      const preview=createContentsReadOnly(entry.record,database);if(preview)node.append(preview);
       const link=text('a','Review contents');link.href=bookHref('contents',entry.record.recordRef);link.dataset.contentsRecord=entry.record.recordRef;node.append(link);
     }
     node.append(text('p','Contents suggestions do not establish separate ownership of included works. Detailed review and comparisons are in Contents.'));

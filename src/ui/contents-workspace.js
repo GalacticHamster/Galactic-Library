@@ -1,3 +1,4 @@
+import {createContentsReadOnly} from './contents-display.js';
 import {CONTENTS_STATUSES,createContentsProjection,contentsPage} from './contents-overview.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {emptyBrowseView} from '../lib/ui-preferences.js';
@@ -50,6 +51,7 @@ export function createContentsWorkspace(actions={}) {
     list.replaceChildren(...shown.map(row=>{
       const node=text('li','');node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
       node.append(text('strong',row.title),text('small',`${providerName(row.provider)} · ${row.nickname}`),text('p',`${row.label}${row.count!==null?` · ${row.count} reviewed entries`:''}${row.needsReview?' · Review needed':''}`));
+      const preview=createContentsReadOnly(database.providerItems[row.id],database,{compact:true});if(preview)node.append(preview);
       if(row.failed)node.append(text('p',row.retained?'Latest source check failed or was unavailable. Earlier contents and any human review are retained.':'The source could not be acquired. Retry or recovery belongs on the signed-in Kindle page.'));
       if(row.changed)node.append(text('p','Captured contents differ from your review. Saved decisions remain unchanged.'));
       if(row.updatedAt)node.append(text('small','Last contents activity: '+new Date(row.updatedAt).toLocaleString()));

@@ -176,7 +176,7 @@ async function retryEnrichmentReview(review){
 }
 
 let initialBookRoute=bookRoute(globalThis.location?.hash);
-let contentsLibraryOrigin,reviewOrigin,restoringRoute=false,lastHandledHash='';
+let contentsLibraryOrigin,reviewOrigin,restoringRoute=false,lastHandledHash='',navigationHydrated=false;
 function currentNavigation(){return {workspace:workspace.workspace,view:workspace.workspace==='contents'?contentsWorkspace.readView():workspace.savedView,scroll:globalThis.scrollY??0,origin:reviewOrigin};}
 function rememberNavigationEntry(){if(!database)return;globalThis.history?.replaceState({gl:currentNavigation()},'',globalThis.location.hash||'#library');}
 function pushRoute(href){if(restoringRoute)return;lastHandledHash=href;const state={gl:currentNavigation()};if(globalThis.location.hash===href)globalThis.history?.replaceState(state,'',href);else globalThis.history?.pushState(state,'',href);}
@@ -824,7 +824,8 @@ async function refresh(diagnosticLookupId = null) {
   document.querySelector('#library-load-status').hidden=true;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
-  if(globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
+  if(!navigationHydrated&&globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
+  navigationHydrated=true;
   endStage?.();endStage=timing?.begin('options_render');
   render(timing);
   if(initialBookRoute){const route=initialBookRoute;initialBookRoute=null;visitBookRoute(route);}
