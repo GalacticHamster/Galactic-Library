@@ -40,7 +40,7 @@ export async function checkIndependentEvidence(fixtures,{ui=false}={}){
    const saved=selectManifest(r.blocks,r.title),record={id:r.id,title:r.title,metadata:{detailUrl:r.url,enrichment:{kindleProductComicContents:{...saved,sourceUrl:r.url}}}},review={statement:'Verified prior statement',entries:[{series:'Prior Verified',unitType:'issue',number:'1',completeness:'full'}]};
    let writes=0;const old=JSON.stringify(record),verified=JSON.stringify(review),editor=createContentsEditor(record,review,{save:async()=>{writes++;},refresh(){}});document.body.append(editor);editor.open=true;await new Promise(resolve=>setTimeout(resolve,0));
    const panel=editor.querySelector('.contents-independent-evidence');assert(panel&&!panel.open,'Independent evidence panel absent or forced open');
-   assert(panel.querySelector('summary').textContent.includes('(1)')&&panel.textContent.includes('Full applies only to the primary claim'),'Secondary visibility/completeness warning missing');
+   assert(panel.querySelector('summary').textContent.includes('(1)')&&panel.textContent.includes('parsing one statement does not account for the others'),'Secondary visibility/completeness warning missing');
    assert(panel.textContent.includes('Saving a different claim replaces that review'),'Single-review replacement behavior concealed');
    assert(editor.querySelector('textarea').value===review.statement&&editor.querySelectorAll('tbody tr').length===1,'Saved verification was replaced on opening');
    panel.querySelector('button').click();const claim=independentContentsClaims(saved,r.title).claims[0];

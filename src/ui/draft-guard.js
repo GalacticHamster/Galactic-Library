@@ -21,7 +21,7 @@ export function createDraftGuard({root=document,stamp=()=>'',confirmDiscard=()=>
       for(const [scope,original]of dirty){
         if(stamp(scope)===original)continue;stale=true;
         // Keep the draft readable/editable, but do not save a stale preview.
-        for(const button of scope.querySelectorAll('button'))if(/^(Save|Create reading order|Rename order|Clear reading|Confirm|Accept|Queue|Undo|Dismiss)/u.test(button.textContent))button.disabled=true;
+        for(const button of scope.querySelectorAll('button'))if(/^(Save|Create reading order|Rename order|Add publisher suggestion|Clear reading|Confirm|Accept|Queue|Undo|Dismiss)/u.test(button.textContent))button.disabled=true;
       }
       return {dirty:dirty.size>0,stale};
     },

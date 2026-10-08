@@ -1,5 +1,5 @@
 import {createConfirmation} from './confirmation.js';
-import {providerLabel,formatDate} from './formatters.js';
+import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
@@ -724,12 +724,12 @@ function render(timing = null) {
     const node = document.createElement('article');
     node.className = 'provider';
     const providerParts = [];
-    if (state.itemCount) providerParts.push(`${state.itemCount} games`);
-    if (state.audiobookCount) providerParts.push(`${state.audiobookCount} audiobooks`);
-    if(state.softwareCount)providerParts.push(`${state.softwareCount} software products`);
-    if (state.bookCount) providerParts.push(`${state.bookCount} books`);
-    if (state.movieCount) providerParts.push(`${state.movieCount} movies`);
-    if (state.tvCount) providerParts.push(`${state.tvCount} TV titles`);
+    if (state.itemCount) providerParts.push(countLabel(state.itemCount,'game'));
+    if (state.audiobookCount) providerParts.push(countLabel(state.audiobookCount,'audiobook'));
+    if(state.softwareCount)providerParts.push(countLabel(state.softwareCount,'software product'));
+    if (state.bookCount) providerParts.push(countLabel(state.bookCount,'book'));
+    if (state.movieCount) providerParts.push(countLabel(state.movieCount,'movie'));
+    if (state.tvCount) providerParts.push(countLabel(state.tvCount,'TV title'));
     if (state.addOnCount) providerParts.push(`${state.addOnCount} DLC`);
     if (!providerParts.length) providerParts.push('0 items');
     if (state.lastSync) providerParts.push(`synced ${formatDate(state.lastSync)}`);

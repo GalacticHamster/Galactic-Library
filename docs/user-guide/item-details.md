@@ -37,7 +37,7 @@ Open Library work information describes a work across editions; its aggregate IS
 
 ## Advanced
 
-Expand **Advanced**, then **Matching, editions and source evidence** to inspect identifiers, observations, provenance, relationships and edition separation. The controls retain their actual semantics:
+Expand **Advanced**, then **Matching, editions and source evidence** to review the consequences and choose account copies. **Account sources and technical evidence** keeps identifiers, observations and provenance available beneath the relationship controls. The controls retain their actual semantics:
 
 | Existing operation | Meaning |
 | --- | --- |

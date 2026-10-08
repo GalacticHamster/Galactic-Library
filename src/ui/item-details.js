@@ -1,4 +1,4 @@
-import {formatDate} from './formatters.js';
+import {formatDate,readingAccessLabel} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {itemPresentation} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
@@ -28,7 +28,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
       if(entry.acquiredAt)record.append(text('small','Acquired / added: '+formatDate(entry.acquiredAt,{time:false})));
       if(entry.observedAt)record.append(text('small','Last observed: '+formatDate(entry.observedAt,{time:false})));
       if(entry.reading)record.append(text('p',entry.reading));node.append(record);
-      if(entry.readingAccess!=='unknown')record.append(text('small',`Self-reported access: ${entry.readingAccess}${entry.accessCheckedAt?' · checked '+formatDate(entry.accessCheckedAt,{time:false}):''}`));
+      if(entry.readingAccess!=='unknown')record.append(text('small',`Self-reported access: ${readingAccessLabel(entry.readingAccess)}${entry.accessCheckedAt?' · checked '+formatDate(entry.accessCheckedAt,{time:false}):''}`));
       if(entry.reviewExpiresAt)record.append(text('small','Reviewed access expiry: '+formatDate(entry.reviewExpiresAt)));
     }
     for(const build of [tools.reading,tools.ownership])if(build)node.append(build());

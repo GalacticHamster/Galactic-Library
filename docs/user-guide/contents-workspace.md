@@ -13,12 +13,12 @@ Choose **Inspect contents** to review the exact account record. **Back to Librar
 | Status | Meaning |
 | --- | --- |
 | Contents reviewed | Human-reviewed entries are saved for this record. This does not assert that every part of the book has been enumerated. |
-| Contents found · Not verified | The saved interpretation accounted for the selected source text. Entries remain suggestions; a parsed description does not prove complete book contents. |
-| Some contents found · Not verified | Saved interpretation left unresolved text, or the captured description may be incomplete. |
+| Contents found · Not reviewed | The saved interpretation accounted for the selected source text. Entries remain suggestions; a parsed description does not prove complete book contents. |
+| Some contents found · Not reviewed | Saved interpretation left unresolved text, or the captured description may be incomplete. |
 | Contents need review | A statement exists but its interpretation is uncertain, unsuccessful, filtered, or not recorded. |
-| No contents found in description | An acquisition is stored without a contents statement. This does not mean the book contains no works. |
+| No contents statement found | An acquisition is stored without a contents statement. This does not mean the book contains no works. |
 | Not checked yet | No acquired contents source is recorded. Automated acquisition currently supports eligible Kindle books only; manual review is available for other books. |
-| Couldn't retrieve contents | Acquisition did not produce usable source evidence. Retry/recovery belongs on the signed-in Kindle page. |
+| Couldn't retrieve description | Acquisition did not produce usable source evidence. Retry/recovery belongs on the signed-in Kindle page. |
 
 The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Needs contents review** finds unconfirmed statements and statements that differ from the saved review. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
 
@@ -28,10 +28,10 @@ List counts refer to saved human-reviewed entries, not a guessed total number of
 
 Contents is the authoritative book contents editor; Library cards and Details provide read-only included works and an exact-account editing link. Suggestions appear as editable rows; they are not automatically confirmed. Check series/collection, series version or year, unit type, number or name, language, and full versus excerpt extent. Unresolved source material stays visible.
 
-- Correct a row or remove a wrong suggestion before **Save verified contents**.
+- Correct a row or remove a wrong suggestion before **Save reviewed contents**.
 - Use **Add contents entry** for material you checked yourself.
 - Under **Where this information came from**, inspect/edit the statement and source URL. **Parse statement for review** replaces draft rows with suggestions from that input.
-- **Undo contents confirmation** removes the human review while preserving captured source evidence.
+- **Undo contents review** removes the human review while preserving captured source evidence.
 
 These are the existing authoritative review operations. There is one saved contents review per provider record. No persistent rejection of an acquired statement exists: leaving it unconfirmed is not confirmed coverage. Saving requires at least one valid entry; undo is the supported way to remove confirmation.
 
@@ -43,8 +43,8 @@ Default review shows included entries, uncertainty and actions. Expand:
 
 - **Where this information came from** for the original statement, source, acquisition date and review date.
 - **Book information and enrichment** for provider metadata, external work/edition information, pending lookup status, ownership/access context, and the existing Sources and undo controls. **Open book information** opens the existing Library book tools for optional lookups and suggestions; routine contents review stays here.
-- **Advanced contents evidence** for manifest windows and independent captured claims. Loading an independent claim changes the draft only. Saving it replaces the single review; claims are never automatically combined.
-- **Advanced source history and recovery** for the current source, pinned earlier observation, latest failed attempt, source/parser versions and paged retained selections. History is read-only here; existing selection undo remains under Sources and undo.
+- **Advanced contents evidence** for manifest windows and independent captured claims. **Original description**, **Suggested included works**, review status and unresolved material come first; raw parser classifications, source coordinates and retained JSON are under **Technical details**. **Replace draft with this statement** clears unsaved rows and loads only that statement; saved reviews stay unchanged until Save. Saving it replaces the single review; claims are never automatically combined.
+- **Earlier descriptions and technical history** for the current source, pinned earlier observation, latest failed attempt, source/parser versions and paged retained selections. History is read-only here; existing selection undo remains under Sources and undo.
 
 Book lookup metadata, contents suggestions, human corrections and ownership/access evidence are distinct. Adding bibliographic information never confirms a purchase. No new external provider is enabled by this interface.
 

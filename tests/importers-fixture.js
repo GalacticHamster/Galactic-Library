@@ -11,6 +11,7 @@ import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 
 // Real content-script controls, with signed-in fetches replaced by fixtures.
 // Content scripts have no direct storage access; the worker owns this hidden area.
+function providerRecord(database,provider,nativeId){const records=Object.values(database.providerItems).filter(r=>r.provider===provider&&r.providerItemId===nativeId);assert(records.length===1,'Expected one account-scoped fixture record for '+provider+':'+nativeId);return records[0];}
 const checks=[]; const values={}; const writer=createStorageWriter({get:async defaults=>Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])])),set:async updates=>Object.assign(values,structuredClone(updates))},Promise.resolve(),{cacheRefreshPreflight:true});
 const shadows=[]; const attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
@@ -75,9 +76,9 @@ try{
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
     }
-    if(provider==='gog'){
+    if(provider==='gog'){const beforeFailure=JSON.stringify(values.galacticLibraryDatabase.providerItems);
       globalThis.GalacticGog.fetchGogGames=async()=>{throw new Error('Network failure on page 7: PRIVATE_TOKEN');};const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="full"]').click();
-      await wait(()=>values.galacticLibraryDatabase.providers.gog.syncHealth.status==='failed');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.failedPages[0]===7&&!JSON.stringify(values).includes('PRIVATE_TOKEN'),'Failure report lost its page or leaked raw errors.');assert(values.galacticLibraryDatabase.providerItems['gog:fixture-123'],'Failed scan destroyed prior records.');checks.push('actual GOG failure reports safe dashboard diagnostics and preserves the prior snapshot');
+      await wait(()=>values.galacticLibraryDatabase.providers.gog.syncHealth.status==='failed');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.failedPages[0]===7&&!JSON.stringify(values).includes('PRIVATE_TOKEN'),'Failure report lost its page or leaked raw errors.');const retained=providerRecord(values.galacticLibraryDatabase,'gog','fixture-123');assert(retained.id!=='gog:fixture-123'&&retained.profileId,'Named-account record lost profile scope.');assert(retained.title===items[0].title&&JSON.stringify(values.galacticLibraryDatabase.providerItems)===beforeFailure,'Failed scan destroyed prior records.');checks.push('actual GOG failure reports safe dashboard diagnostics and preserves the prior snapshot');
     }
   }
   // Contents controls and DOM extraction use fixture pages, never Amazon.
@@ -92,11 +93,11 @@ try{
   ]);
   let db=await writer.getDatabase();
   await writer.saveKindleComicContents([
-    {itemId:'kindle:B000000001',recordRef:db.providerItems['kindle:B000000001'].recordRef,sourceUrl:urls('B000000001'),statement:'Collects Example #1?2',availability:'statement-found'},
-    {itemId:'kindle:B000000004',recordRef:db.providerItems['kindle:B000000004'].recordRef,sourceUrl:urls('B000000004'),statement:'',availability:'unavailable',extractorVersion:2}
+    {itemId:providerRecord(db,'kindle','B000000001').id,recordRef:providerRecord(db,'kindle','B000000001').recordRef,sourceUrl:urls('B000000001'),statement:'Collects Example #1-2',availability:'statement-found'},
+    {itemId:providerRecord(db,'kindle','B000000004').id,recordRef:providerRecord(db,'kindle','B000000004').recordRef,sourceUrl:urls('B000000004'),statement:'',availability:'unavailable',extractorVersion:2}
   ]);
   // Simulate a backup predating extractor/parser versions.
-  db=await writer.getDatabase();const legacy=db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents;delete legacy.extractorVersion;delete legacy.parserVersion;delete legacy.parseOutcome;await writer.restoreDatabase(db);
+  db=await writer.getDatabase();const legacy=providerRecord(db,'kindle','B000000001').metadata.enrichment.kindleProductComicContents;delete legacy.extractorVersion;delete legacy.parserVersion;delete legacy.parseOutcome;await writer.restoreDatabase(db);
   // The production adapter enforces Amazon origin; this localhost fixture uses
   // its real DOM extractor behind a fixture-only product fetch implementation.
   globalThis.GalacticKindle.fetchKindleProductComicContents=async (url,{signal,timing,requestPacer}={})=>{
@@ -134,7 +135,7 @@ try{
     requestStarts.push(performance.now());
     if(transientOnce){transientOnce=false;throw Error('Network failure PRIVATE_REQUEST_SECRET');}
     if(hold||requests.length===holdAtRequest)return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Paused','AbortError')),{once:true}));
-    const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1?2.';
+    const description=String(input).endsWith('B000000003')?'An ordinary novel.':String(input).endsWith('B000000002')?'Includes Wool, Shift and Dust.':'Contains Example #1-2.';
     return new Response(captcha?'<input id="captchacharacters">':'<div id="bookDescription_feature_div">'+description+'</div>',{status:200});
   };
   // Reload the actual content script with a deliberately delayed saved queue.
@@ -187,16 +188,16 @@ try{
   const runRefresh=async()=>{confirmRestart=true;const before=contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length;newRefresh.click();await wait(()=>contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length>before);};
   await setMode('scan');start.click();await finished();db=await writer.getDatabase();
   assert(requests.length===2&&!requests.some(url=>url.endsWith('B000000004')),'Normal scan fetched saved or unavailable pages.');
-  assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.parserVersion===CONTENTS_PARSER_VERSION,'Saved text was not locally reparsed.');
-  assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
-  assert(db.providerItems['kindle:B000000002'].metadata.enrichment.kindleProductComicContents.parseOutcome==='full'&&!Object.keys(db.contentReviews).length,'Named proposal disappeared or became verified.');
+  assert(providerRecord(db,'kindle','B000000001').metadata.enrichment.kindleProductComicContents.parserVersion===CONTENTS_PARSER_VERSION,'Saved text was not locally reparsed.');
+  assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents statement found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
+  assert(providerRecord(db,'kindle','B000000002').metadata.enrichment.kindleProductComicContents.parseOutcome==='full'&&!Object.keys(db.contentReviews).length,'Named proposal disappeared or became verified.');
   checks.push('Kindle contents controls scan prose, locally reparse legacy text and skip unavailable pages');
   assert(!contentsMessages.some(request=>request.diagnosticLookupId),'Disabled diagnostics sent timing requests.');
   kindleShadow.querySelector('[data-contents-diagnostics]').checked=true;
   const workbench=createEnrichmentWorkbench({inspect(){},refresh(){}});document.body.append(workbench.element);workbench.update(db);workbench.element.open=true;await pause();
   const queue=workbench.element.querySelector('[aria-label="Enrichment queue"]');queue.value='unparsed';queue.dispatchEvent(new Event('change'));
   assert(workbench.element.querySelectorAll('li').length===2,'Fully parsed statements are hidden from Contents to review.');
-  const record=db.providerItems['kindle:B000000002'];let savedReview;
+  const record=providerRecord(db,'kindle','B000000002');let savedReview;
   const editor=createContentsEditor(record,null,{save:async(id,value)=>{savedReview=value;await writer.saveContentReview(id,value);},refresh(){}});document.body.append(editor);editor.open=true;await pause();
   const click=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label).click();
   click(editor,'Parse statement for review');assert(editor.querySelectorAll('tbody tr').length===3,'Named works are missing from the editor.');click(editor,'Save reviewed contents');await wait(()=>Boolean(savedReview));
@@ -205,7 +206,7 @@ try{
   await setMode('reparse');const before=requests.length;start.click();await finished();assert(requests.length===before,'Parser-only mode contacted Amazon.');
   checks.push('Kindle parser-only mode makes zero requests');
   captcha=true;await setMode('rescan');await runRefresh();await finished();assert(requests.length===before+1&&/Stopped:.*CAPTCHA/i.test(status.textContent),'CAPTCHA did not stop the queue.');
-  db=await writer.getDatabase();assert(db.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement==='Collects Example #1?2','Failed refresh erased saved text.');
+  db=await writer.getDatabase();assert(providerRecord(db,'kindle','B000000001').metadata.enrichment.kindleProductComicContents.statement==='Collects Example #1-2','Failed refresh erased saved text.');
   captcha=false;await setMode('retry');start.click();await finished();assert(requests.length===before+2,'Retry did not target just the incomplete result.');
   checks.push('Kindle CAPTCHA stops sequential rescan; retry preserves and refreshes the saved statement');
   await writer.mergeProviderItems('kindle',[{providerItemId:'B000000005',title:'Fresh ordinary book',mediaType:'book',metadata:{detailUrl:urls('B000000005'),originType:'Purchase'}}]);
@@ -226,15 +227,15 @@ try{
     {providerItemId:'B000000007',title:'Pause buffer second',mediaType:'book',metadata:{detailUrl:urls('B000000007'),originType:'Purchase'}}
   ]);
   holdAtRequest=requests.length+2;await setMode('scan');start.click();await wait(()=>requests.length===holdAtRequest);
-  assert(!values.galacticLibraryDatabase.providerItems['kindle:B000000006'].metadata.enrichment?.kindleProductComicContents,'A buffered result wrote the database immediately.');
+  assert(!providerRecord(values.galacticLibraryDatabase,'kindle','B000000006').metadata.enrichment?.kindleProductComicContents,'A buffered result wrote the database immediately.');
   stop.click();await finished();db=await writer.getDatabase();
-  assert(db.providerItems['kindle:B000000006'].metadata.enrichment.kindleProductComicContents.statement&&!db.providerItems['kindle:B000000007'].metadata.enrichment?.kindleProductComicContents,'Pause did not flush only completed results.');
+  assert(providerRecord(db,'kindle','B000000006').metadata.enrichment.kindleProductComicContents.statement&&!providerRecord(db,'kindle','B000000007').metadata.enrichment?.kindleProductComicContents,'Pause did not flush only completed results.');
   holdAtRequest=0;const resumedAt=requests.length;start.click();await finished();assert(requests.length===resumedAt+1&&requests.at(-1).endsWith('B000000007'),'Pause/resume repeated an acknowledged buffered result.');
   checks.push('actual Kindle Pause flushes buffered completed results and resume checks only the interrupted page');
 
   // Exercise the actual refresh controls and frozen position, not just the
   // writer API. Keep the synthetic queue tiny and all product fetches mocked.
-  const refreshDb=await writer.getDatabase();refreshDb.providerItems=Object.fromEntries(Object.entries(refreshDb.providerItems).filter(([id])=>['kindle:B000000001','kindle:B000000002','kindle:B000000003'].includes(id)));refreshDb.canonicalItems={};await writer.restoreDatabase(refreshDb);
+  const refreshDb=await writer.getDatabase();refreshDb.providerItems=Object.fromEntries(Object.entries(refreshDb.providerItems).filter(([,record])=>record.provider==='kindle'&&['B000000001','B000000002','B000000003'].includes(record.providerItemId)));refreshDb.canonicalItems={};await writer.restoreDatabase(refreshDb);
   // The editor fixtures above change document scrollbars; compare transitions
   // in the current viewport, not coordinates from before those unrelated UIs.
   primaryRect=rect(start);restartRect=rect(newRefresh);

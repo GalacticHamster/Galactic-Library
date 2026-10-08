@@ -186,3 +186,5 @@ button.danger { background:#b91c1c; }
 .reading-tools section > button,.ownership-review-tools [data-ownership-record] > button { justify-self:start; max-width:100%; }
 .form-field textarea { background:#111827; color:#e5e7eb; font:inherit; padding:8px; border:1px solid #6b7280; border-radius:5px; }
 #book-catalog-disclosure > summary { margin:12px 0; color:#c4b5fd; }
+
+.source-selection-technical pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:.85rem; }

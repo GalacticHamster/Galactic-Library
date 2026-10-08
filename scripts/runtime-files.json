@@ -122,5 +122,11 @@
   "src/ui/library-browse.js",
   "src/ui/library-result.js",
   "src/ui/contents-display.js",
-  "src/ui/draft-guard.js"
+  "src/ui/draft-guard.js",
+  "src/ui/confirmation.js",
+  "src/ui/backup-restore.js",
+  "src/ui/reading-presentation.js",
+  "src/ui/formatters.js",
+  "src/ui/contents-interpretation.js",
+  "src/ui/form-presentation.js"
 ]

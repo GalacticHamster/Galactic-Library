@@ -27,7 +27,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; Captured: ${formatDate(evidence?.checkedAt)}. ${review?'Human review saved: '+(formatDate(review.verifiedAt))+'.':''}`));
   const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
   const interpretation=element('div','');advanced.append(interpretation);
-  const showInterpretation=proposal=>interpretation.replaceChildren(createContentsInterpretation({statement:proposal.manifestEvidence||statement.value,proposal,reviewed:Boolean(review),capturedAt:evidence?.checkedAt,technical:{capturedEvidence:evidence}}));
+  const showInterpretation=(proposal,input=statement.value)=>interpretation.replaceChildren(createContentsInterpretation({statement:proposal.manifestEvidence||input,proposal,reviewed:Boolean(review),capturedAt:evidence?.checkedAt,technical:{capturedEvidence:evidence}}));
   root.append(sourceDetails,advanced);
   const status=element('p','');status.setAttribute('role','status');
   const table=document.createElement('table');const head=document.createElement('thead');const heading=document.createElement('tr');
@@ -53,7 +53,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   if(review)status.textContent=`${review.entries.length} reviewed entries saved. Edit to correct them, or undo the review.`;
   else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not reviewed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
-  if(initialProposal)showInterpretation(initialProposal);
+  if(initialProposal)showInterpretation(initialProposal,discovered);
   if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
   if(review&&initialProposal?.descriptionMayBeIncomplete)root.append(element('p','The captured description may be incomplete. Your human review is retained; it is not proof that the description lists everything in the book.'));
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return presentAction(node);};
@@ -69,7 +69,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const independent=independentContentsClaims(evidence,record.title);
   if(independent.claims.length){
     const claims=document.createElement('details');claims.className='contents-independent-evidence';
-    claims.append(element('summary',`Other captured claims to review (${independent.claims.length})`),element('p','These candidates come from separate source claims. They may describe contents, supplements, credits or unrelated prose. Full applies only to the primary claim; it does not account for these other claims or prove complete book contents. Claims are not combined or verified.'));
+    claims.append(element('summary',`Other captured claims to review (${independent.claims.length})`),element('p','These statements come from separate parts of the captured description. They may describe included works, excerpts, credits or unrelated text. Check each on its own; parsing one statement does not account for the others or establish everything in the book. Statements are not combined or reviewed automatically.'));
     claims.append(element('p','Each library item has one saved contents review. Saving a different claim replaces that review; it does not add to it. Replace draft clears unsaved entry rows and loads that statement. Your saved review stays unchanged until Save.'));
     for(const claim of independent.claims){
       const section=document.createElement('section');section.dataset.claimIndex=String(claim.index);section.dataset.sourceBlock=String(claim.block);section.dataset.sourceStart=String(claim.start);section.dataset.sourceEnd=String(claim.end);

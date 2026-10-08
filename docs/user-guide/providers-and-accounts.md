@@ -12,7 +12,7 @@ expand a provider and open its website. Sign in, enter a recognizable **Account
 nickname** on the Galactic Library panel, and confirm that it describes the
 signed-in account. Start **Full rescan** for the first import, or **Sync library**
 on Epic. Keep the provider tab open until the import finishes. Return to Library
-to browse the saved items.
+to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
 importer records the access the provider reports; loans and subscriptions are
