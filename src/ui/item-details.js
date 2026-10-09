@@ -1,3 +1,4 @@
+import {createProductDetails} from './product-details.js';
 import {formatDate,readingAccessLabel} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {itemPresentation} from './item-presentation.js';
@@ -16,6 +17,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     for(const {record,entry}of classification){const line=text('p',`${presentation.records.find(value=>value.record===record)?.label??record.provider} · ${entry.source.replace(/-/gu,' ')} · ${entry.confidence}: ${entry.evidence}`);if(entry.conflict)line.append(text('small',' '+entry.conflict));evidence.append(line);}
     root.append(evidence);
   }
+  const productDetails=createProductDetails(records,database);if(productDetails)root.append(productDetails);
   const catalog=text('details','');catalog.className='item-overview-details';catalog.append(text('summary','Edition details and artwork'));root.append(catalog);
   const overview=text('div','');overview.className='item-overview';
   if(presentation.cover){const image=document.createElement('img');image.className='item-cover';image.src=presentation.cover;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove());overview.append(image);}

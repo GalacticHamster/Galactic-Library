@@ -28,3 +28,13 @@ export function checkProductDetailsCapture(parse){
   checks.push('Product Details: '+fixture.name);
  }return checks;
 }
+
+export async function checkProductDetailsUi(parse){
+ const {createProductDetails}=await import('../src/ui/product-details.js');
+ const evidence=globalThis.GalacticKindle.kindleProductDetails(parse(productDetailsFixtures[0].html),'https://www.amazon.com/dp/B08KHXKTKQ');
+ const record={provider:'kindle',mediaType:'book',title:'Example',metadata:{isbn:'9780306406157',enrichment:{kindleProductComicContents:{productDetailsEvidence:evidence}}}};
+ const before=JSON.stringify(record),section=createProductDetails([record],{});document.body.append(section);section.style.maxWidth='300px';
+ if(!section.textContent.includes('unverified edition relationship')||!section.textContent.includes('Saved edition:')||section.querySelector('details').open||!section.textContent.includes('118 pages'))throw Error('Product Details UX/provenance incomplete');
+ if(JSON.stringify(record)!==before)throw Error('Presentation mutated source');
+ if(section.scrollWidth>section.clientWidth+2)throw Error('Product Details overflow');section.remove();return ['Product Details UI: observational ISBN, conflicts, collapsed source evidence and narrow wrapping'];
+}

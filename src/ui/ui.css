@@ -188,3 +188,6 @@ button.danger { background:#b91c1c; }
 #book-catalog-disclosure > summary { margin:12px 0; color:#c4b5fd; }
 
 .source-selection-technical pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:.85rem; }
+
+.product-details,.product-details dd,.product-details small { min-width:0; overflow-wrap:anywhere; }
+.product-details small { display:block; }

@@ -46,3 +46,9 @@ kindleProductDetailsTests.push(['Existing acquisition captures Product Details f
  const result=await globalThis.GalacticKindle.fetchKindleProductComicContents(capture().sourceUrl);assert.equal(calls,1);assert.deepEqual(result.productDetailsEvidence,capture());assert.equal(result.extractorVersion,5);assert.equal(result.availability,'no-statement');
  }finally{Object.assign(globalThis,previous);}
 }]);
+
+import {productDetailsView} from '../src/ui/product-details.js';
+kindleProductDetailsTests.push(['Product Details presentation labels conflicts, edition ISBN uncertainty, omits matching saved facts and leaves inputs unchanged',()=>{
+ const record={provider:'kindle',providerItemId:'B08KHXKTKQ',mediaType:'book',title:'Example',metadata:{publisher:'BOOM! Studios',isbn:'9780306406157',enrichment:{kindleProductComicContents:{productDetailsEvidence:capture()}}}};const before=JSON.stringify(record),view=productDetailsView(record);
+ assert(!view.facts.some(f=>f.field==='publisher'));assert(view.facts.find(f=>f.field==='isbn13').conflict);assert.equal(JSON.stringify(record),before);assert.equal(productDetailsView({...record,provider:'kobo'}),null);
+}]);
