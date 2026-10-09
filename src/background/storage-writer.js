@@ -752,7 +752,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     // category deletion. Never transplant labels across different source IDs;
     // reviewed replacement/undo/restore use their existing explicit paths.
     const previous=database.providerItems[id]?.metadata?.enrichment?.[kind];
-    if(preserveMissingCategories&&kind==='googleBooks'&&value.volumeId&&previous?.volumeId===value.volumeId&&previous.categories?.length&&(value.categories===undefined||Array.isArray(value.categories)&&!value.categories.length))value={...value,categories:previous.categories};
+    if(preserveMissingCategories&&kind==='googleBooks'&&value.volumeId&&previous?.categories?.length){
+      let sameVolume=previous.volumeId===value.volumeId;
+      // Sparse category-only recovery deliberately omits identity fields. Its
+      // validated catalogue URL can still prove an identical source for this
+      // omission guard; do not promote that URL's ID into matching evidence.
+      if(!previous.volumeId&&previous.sourceUrl)try{const source=new URL(previous.sourceUrl);sameVolume=source.origin==='https://books.google.com'&&source.searchParams.get('id')===value.volumeId;}catch{/* No positive source association. */}
+      if(sameVolume&&(value.categories===undefined||Array.isArray(value.categories)&&!value.categories.length))value={...value,categories:previous.categories};
+    }
     const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
     const observations=kind==='kindleProductComicContents'&&database.kindleContentsObservations?.[item.recordRef];
     if(observations){
