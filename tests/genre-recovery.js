@@ -73,3 +73,7 @@ genreRecoveryTests.push(['Recovery retains hint/work source provenance without h
  assert(!record.metadata.enrichment.openLibrary.workKey);assert(!record.metadata.enrichment.openLibrary.authors);assert.equal(record.metadata.enrichment.googleBooksGenreHint.candidateVolumeId,'hint');assert.equal(record.metadata.enrichment.openLibrary.sourceUrl,'https://openlibrary.org/works/OL1W');
  for(const key of Object.keys(checked.database).filter(k=>k!=='providerItems'))assert.deepEqual(candidate.database[key],checked.database[key],key);
 }]);
+
+genreRecoveryTests.push(['Recovery raw category counts handle object-prototype labels as ordinary source strings',async()=>{
+ const {old,current}=await recoveryFixture();Object.values(old.database.providerItems)[0].metadata.enrichment.googleBooks.categories=['constructor','__proto__'];const result=previewGenreRecovery(old,current);assert.equal(result.categoriesAfter.raw.constructor,1);assert.equal(result.categoriesAfter.raw.__proto__,1);
+}]);

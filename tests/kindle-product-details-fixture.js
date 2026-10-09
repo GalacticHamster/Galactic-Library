@@ -20,6 +20,7 @@ export const productDetailsFixtures=[
  {name:'unknown technical and commercial omitted',html:page(table([['Best Sellers Rank','100'],['Review count','100'],['Accessibility','Screen reader supported'],['Guided View','Enabled']])),expected:{accessibility:'Screen reader supported',guidedView:'Enabled'},count:2},
  {name:'publisher duplicates across representations',html:page(bullets([['Publisher','BOOM! Studios (December 1, 2020)'],['Publisher','BOOM! Studios']])),expected:{publisher:'BOOM! Studios',publicationDate:'2020-12-01'},count:2},
  {name:'malformed table without value',html:page('<table id="productDetails_detailBullets_sections1"><tr><th>Language</table>'),empty:true},
+ {name:'unknown inherited-object label ignored',html:page(bullets([['constructor','Unexpected label']])),empty:true},
  {name:'impossible date',html:page(table([['Publication date','February 30, 2020']])),expected:{publicationDate:''}}
 ];
 export function checkProductDetailsCapture(parse){

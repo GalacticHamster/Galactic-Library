@@ -10,7 +10,7 @@ const kinds={googleBooks:'categories',googleBooksGenreHint:'categories',openLibr
 const key=record=>record?.provider&&typeof record.providerItemId==='string'&&record.providerItemId.trim()?record.provider+'\0'+record.providerItemId:null;
 function index(records){const found=new Map();for(const record of records){const id=key(record);if(id)found.set(id,[...(found.get(id)??[]),record]);}return found;}
 const labels=(record,kind)=>record.metadata?.enrichment?.[kind]?.[kinds[kind]]??[];
-function counts(records){const raw={},broad={};for(const record of records){for(const label of new Set(Object.keys(kinds).flatMap(kind=>labels(record,kind))))raw[label]=(raw[label]??0)+1;for(const label of libraryBroadGenreValues(record))broad[label]=(broad[label]??0)+1;}return {raw,broad};}
+function counts(records){const raw=Object.create(null),broad=Object.create(null);for(const record of records){for(const label of new Set(Object.keys(kinds).flatMap(kind=>labels(record,kind))))raw[label]=(raw[label]??0)+1;for(const label of libraryBroadGenreValues(record))broad[label]=(broad[label]??0)+1;}return {raw,broad};}
 function reviewedConflict(record,categories){
  const local=record.metadata?.enrichment?.localMetadata;if(!local?.approved||!local.categories?.length)return false;
  const manual=local.categories.flatMap(normalizedLibraryCategories),proposed=categories.flatMap(normalizedLibraryCategories);

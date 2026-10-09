@@ -262,7 +262,7 @@
     const seriesUrl=raw=>{try{const u=new URL(raw,'https://www.amazon.com');return u.origin==='https://www.amazon.com'&&!u.username&&!u.password&&/^\/(?:dp|gp\/product|kindle-dbs|series)\//u.test(u.pathname)?u.origin+u.pathname:'';}catch{return '';}};
     function add(label,raw,selector,link=''){
       label=detailText(label).replace(/[:?]+$/u,'').trim();raw=detailText(raw);
-      const key=label.toLowerCase().replace(/[^a-z0-9]+/gu,' ').trim(),field=labels[key];
+      const key=label.toLowerCase().replace(/[^a-z0-9]+/gu,' ').trim(),field=Object.hasOwn(labels,key)?labels[key]:null;
       if(!field||!raw||label.length>100||raw.length>500||observations.length>=40)return;
       let values=[raw];if(field.startsWith('isbn'))values=raw.match(/97[89](?:[\s-]*\d){10}|(?:\d[\s-]*){9}[\dXx]/gu)??[raw];
       for(const original of values.slice(0,8)){
