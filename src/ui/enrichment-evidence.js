@@ -1,4 +1,5 @@
 import {presentAction} from './form-presentation.js';
+import {performAction} from './operation-feedback.js';
 import {formatDate} from './formatters.js';
 import {bookToolHelp,fieldLabel,sourceLabel} from './book-tool-help.js';
 import {identityKey,names} from '../lib/identity.js';
@@ -20,7 +21,7 @@ export function createEnrichmentEvidence(records,database,undo,state={}){
         const conflict=Boolean(provider&&JSON.stringify(names(provider).map(identityKey).sort())!==JSON.stringify(names(entry[field]).map(identityKey).sort()));
         for(const value of [fieldLabel(field),format(provider),format(entry[field]),conflict?'Review differing evidence':'']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}table.append(row);
       }details.append(table);const technical=document.createElement('details');technical.className='source-selection-technical';const summary=document.createElement('summary');summary.textContent='Technical details';technical.append(summary);technical.addEventListener('toggle',()=>{if(technical.open&&!technical.querySelector('pre')){const raw=document.createElement('pre');raw.textContent=JSON.stringify(entry,null,2);technical.append(raw);}});details.append(technical);
-      if(database.enrichmentHistory[entry.selectionRef]){const button=document.createElement('button');button.type='button';button.textContent=`Undo ${sourceLabel(kind)} selection`;presentAction(button);button.addEventListener('click',async()=>{button.disabled=true;try{await undo(entry.selectionRef);}catch(error){source.textContent=error.message;button.disabled=false;}});details.append(button);}
+      if(database.enrichmentHistory[entry.selectionRef]){const button=document.createElement('button'),status=document.createElement('p');button.type='button';button.textContent=`Undo ${sourceLabel(kind)} selection`;presentAction(button);button.addEventListener('click',()=>performAction({button,status,name:'Restoring the previous source selection...',task:()=>undo(entry.selectionRef)}).catch(()=>{}));details.append(button,status);}
     }
   }
   }

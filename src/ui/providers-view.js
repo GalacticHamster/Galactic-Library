@@ -1,4 +1,5 @@
 import {formatDate} from './formatters.js';
+import {afterFeedbackPaint} from './operation-feedback.js';
 import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions} from './provider-accounts.js';
 
 const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
@@ -25,9 +26,10 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
  }
  async function commit(d,run,message='Saved. Other remembered accounts remain in Library.'){
    if(busy)return;busy=true;for(const b of d.root.querySelectorAll('button,input'))b.disabled=true;
-   try{const next=await run();database=next;d.root.close();d.root.remove();busy=false;onDatabase(next);status.textContent=message;}
+   d.feedback.textContent='Saving account changes...';d.feedback.setAttribute('aria-busy','true');d.feedback.classList.add('operation-status');
+   try{await afterFeedbackPaint();const next=await run();database=next;d.root.close();d.root.remove();busy=false;onDatabase(next);status.textContent=message;}
    catch(error){d.feedback.textContent=error.message;for(const b of d.root.querySelectorAll('button,input'))b.disabled=false;}
-   finally{busy=false;}
+   finally{busy=false;d.feedback.setAttribute('aria-busy','false');}
  }
  function selectAccount(site,p){
    const expected=database.providers[site.provider]?.activeProfileId;

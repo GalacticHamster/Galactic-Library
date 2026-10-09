@@ -31,7 +31,7 @@ export const optionsPerformanceDiagnosticsTests=[
   bindPerformanceDiagnostics({...ui,runtime:{sendMessage:()=>{count++;return new Promise(done=>resolve=done);}},download:()=>{downloaded=true;}});
   const pending=ui.click();assert.equal(ui.button.disabled,true);await ui.click();assert.equal(count,1);
   resolve({ok:false});await pending;assert.equal(ui.button.disabled,false);assert.equal(downloaded,false);assert.match(ui.status.textContent,/Export failed/u);
-  const retry=ui.click();resolve({ok:true,records:[],companions:[]});await retry;
+  const retry=ui.click();await Promise.resolve();resolve({ok:true,records:[],companions:[]});await retry;
   assert.equal(downloaded,true);assert.equal(count,2);assert.equal(ui.worker.textContent,'Worker details are unavailable.');
   const broken=controls();bindPerformanceDiagnostics({...broken,runtime:{sendMessage:async()=>{throw Error('Disconnected');}},download:()=>assert.fail('Downloaded after transport failure')});
   await broken.click();assert.equal(broken.button.disabled,false);assert.match(broken.status.textContent,/Disconnected/u);

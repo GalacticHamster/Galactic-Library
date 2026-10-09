@@ -1,3 +1,4 @@
+import {performAction} from './operation-feedback.js';
 import {labeledControl,presentAction} from './form-presentation.js';
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
 import { contentCoverage } from '../lib/contents.js';
@@ -85,13 +86,13 @@ export function createEvidenceInspector(canonical, records, database, actions) {
       const relationships=Object.entries(database.manualMatchDecisions??{}).filter(([,decision])=>decision.itemIds.includes(record.id));
       if(records.length>1){
         const split=element('button','Separate this record into its own edition');split.type='button';presentAction(split);
-        split.addEventListener('click',async()=>{try{await actions.split(record.id);actions.refresh();}catch(error){status.textContent=error.message;}});
+        split.addEventListener('click',async()=>{try{await performAction({status,name:'Separating this edition...',task:()=>actions.split(record.id)});actions.refresh();}catch(error){status.textContent=error.message;}});
         section.append(split);
       }
       for(const [ref,separation]of Object.entries(database.editionSeparations??{}).filter(([,value])=>value.itemId===record.id)){
         const row=element('p',`Edition kept separate from ${separation.otherItemIds.length} other record(s) · reviewed ${separation.updatedAt||'date unknown'} `);
         const undo=element('button','Undo edition separation');undo.type='button';presentAction(undo);
-        undo.addEventListener('click',async()=>{try{await actions.undoSplit(ref);actions.refresh();}catch(error){status.textContent=error.message;}});
+        undo.addEventListener('click',async()=>{try{await performAction({status,name:'Undoing edition separation...',task:()=>actions.undoSplit(ref)});actions.refresh();}catch(error){status.textContent=error.message;}});
         row.append(undo);section.append(row);
       }
       for(const [id,decision]of relationships){
@@ -101,7 +102,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
           const conflicts=identityConflicts(record,other);
           if(conflicts.length)row.append(element('span',`Current evidence conflicts with this review: ${conflicts.join(', ')}. `));
         }
-        const undo=element('button','Undo relationship');undo.type='button';undo.addEventListener('click',async()=>{try{await actions.remove(id);actions.refresh();}catch(error){status.textContent=error.message;}});row.append(undo);section.append(row);
+        const undo=element('button','Undo relationship');undo.type='button';undo.addEventListener('click',async()=>{try{await performAction({status,name:'Removing saved relationship...',task:()=>actions.remove(id)});actions.refresh();}catch(error){status.textContent=error.message;}});row.append(undo);section.append(row);
       }
       technical.append(section);
     }
@@ -125,7 +126,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
     for(const value of ['same-work','same-edition','different']){
       const button=element('button',decisionLabel(value));button.type='button';button.addEventListener('click',async()=>{
         if(!right.value||left.value===right.value){status.textContent='Choose two different records.';return;}
-        try{const itemIds=[left.value,right.value].sort();await actions.save({id:itemIds.join('\u0000'),itemIds},value);actions.refresh();}
+        try{const itemIds=[left.value,right.value].sort();await performAction({status,name:'Saving title relationship...',task:()=>actions.save({id:itemIds.join('\u0000'),itemIds},value)});actions.refresh();}
         catch(error){status.textContent=`Could not save relationship: ${error.message}`;}
       });comparison.append(button);
     }

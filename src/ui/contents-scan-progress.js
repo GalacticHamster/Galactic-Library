@@ -1,4 +1,5 @@
 import '../lib/kindle-contents-scan.js';
+import {performAction} from './operation-feedback.js';
 
 // This view receives counts only. Library reads/renders stay at bounded
 // reconciliation boundaries rather than competing with every page lookup.
@@ -8,13 +9,13 @@ export function createContentsScanProgress({runtime, reconcile, container, clock
   const element=document.createElement('section');element.id='kindle-contents-progress';element.hidden=true;
   const status=document.createElement('p');status.setAttribute('role','status');
   const refresh=document.createElement('button');refresh.type='button';refresh.textContent='Refresh library now';
-  element.append(status,refresh);container.prepend(element);
+  const feedback=document.createElement('p');feedback.setAttribute('role','status');element.append(status,refresh,feedback);container.prepend(element);
   let runs=[],dirty=false,lastFull=clock(),refreshing=null,timer=null,changedDuringRefresh=false;
   const active=()=>runs.some(tools.active);
   function fullRefresh() {
     if(refreshing)return refreshing;
     dirty=false;changedDuringRefresh=false;lastFull=clock();
-    refreshing=Promise.resolve().then(reconcile).catch(()=>{dirty=true;}).finally(()=>{
+    refreshing=performAction({button:refresh,status:feedback,name:'Updating the Library view...',task:reconcile,success:'Library view updated.'}).catch(()=>{dirty=true;}).finally(()=>{
       refreshing=null;
       if(changedDuringRefresh&&!active())fullRefresh();
       else if(dirty&&!active()&&timer===null)timer=schedule(poll,30000);
@@ -36,9 +37,9 @@ export function createContentsScanProgress({runtime, reconcile, container, clock
   }
   async function poll() {
     timer=null;
-    try{const response=await runtime.sendMessage({type:'GET_KINDLE_CONTENTS_SCAN_PROGRESS'});accept(response?.ok?response.runs??[]:[]);}catch{
-      // Worker/tab interruption must not leave the Library view stale forever.
-      accept([]);
+    try{const response=await runtime.sendMessage({type:'GET_KINDLE_CONTENTS_SCAN_PROGRESS'});if(!response?.ok)throw Error('Scan status unavailable');accept(response.runs??[]);}catch{
+      // Preserve last-known counters; an unavailable worker is not scan completion.
+      element.hidden=false;feedback.textContent='Could not check scan progress. These are the last reported counts; refresh to try again.';dirty=true;
     }
     if(dirty&&clock()-lastFull>=120000)fullRefresh();
   }

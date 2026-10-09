@@ -1,4 +1,5 @@
 import {labeledControl} from './form-presentation.js';
+import {performAction} from './operation-feedback.js';
 import {presentAction} from './form-presentation.js';
 import {formatDate} from './formatters.js';
 import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
@@ -20,7 +21,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
   if(item){categoryLabel.hidden=true;searchLabel.hidden=true;controls.hidden=true;}
   const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;let database,dirty=false;
   const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return presentAction(node);};
-  const perform=async operation=>{if(busy)return;busy=true;refresh();try{await operation();selected.clear();status.textContent='Saved.';await actions.refresh();}catch(error){status.textContent=error.message;}finally{busy=false;refresh();}};
+  const perform=async operation=>{if(busy)return;busy=true;refresh();try{await performAction({status,name:'Saving selected book suggestions...',task:async()=>{await operation();selected.clear();await actions.refresh();}});}catch{/* Shared status retains the error. */}finally{busy=false;refresh();}};
   const apply=button('Apply selected candidates',()=>perform(()=>{
     const selections=rows.filter(row=>selected.has(row.id)&&row.review).map(row=>({reviewId:row.id,candidateIndex:choices.get(row.id),confirmed:true}));
     if(selections.length!==selected.size)throw new Error('Select candidate reviews only to apply metadata.');return actions.apply(selections);

@@ -1,4 +1,5 @@
 import {labeledControl,presentAction} from './form-presentation.js';
+import {performAction} from './operation-feedback.js';
 import {createContentsInterpretation} from './contents-interpretation.js';
 import {formatDate} from './formatters.js';
 import { contentsStatement, validateContents } from '../lib/contents.js';
@@ -61,7 +62,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const persist=async operation=>{
     if(saving)return;saving=true;
     const controls=[...root.querySelectorAll('button,input,select,textarea')].map(node=>[node,node.disabled]);for(const [node] of controls)node.disabled=true;
-    try{await operation();actions.refresh();}
+    try{await performAction({status,controls:[],name:'Saving reviewed contents...',task:async()=>{await operation();actions.refresh();}});}
     catch(error){status.textContent=`Could not save contents: ${error.message}`;}
     finally{saving=false;for(const [node,disabled] of controls)node.disabled=disabled;}
   };

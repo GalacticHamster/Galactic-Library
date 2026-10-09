@@ -1,4 +1,5 @@
 import {labeledControl,presentAction} from './form-presentation.js';
+import {performAction} from './operation-feedback.js';
 import {readingAccessLabel} from './formatters.js';
 import {readingSummary,readingStatusLabel} from './reading-presentation.js';
 import {createConfirmation} from './confirmation.js';
@@ -21,7 +22,7 @@ export function createReadingTools(records,database,actions){
       const progress=node('input');progress.type='number';progress.min='0';progress.max='100';progress.step='1';progress.value=evidence.progress;progress.setAttribute('aria-label','Reading percentage');
       const downloaded=node('input');downloaded.type='checkbox';downloaded.checked=evidence.downloaded;downloaded.setAttribute('aria-label','Downloaded locally');const downloadLabel=node('label','Downloaded locally ');downloadLabel.append(downloaded);
       reading.addEventListener('change',()=>{if(reading.value==='completed')progress.value='100';else if(reading.value==='unread')progress.value='0';else if(progress.value==='100')progress.value='0';});
-      const run=async operation=>{try{await operation();actions.refresh();}catch(error){status.textContent=error.message;}};
+      const run=operation=>performAction({status,name:'Saving reading state...',task:async()=>{await operation();actions.refresh();}}).catch(()=>{});
       section.append(labeledControl('Reading status',reading),labeledControl('Progress (%)',progress),labeledControl('Current access',access),downloadLabel,button('Save reading state',()=>run(()=>actions.save(item.recordRef,{status:reading.value,progress:Number(progress.value),access:access.value,downloaded:downloaded.checked},saved?.revisionRef??null))));
       if(saved)section.append(button('Clear reading state',()=>run(()=>actions.remove(item.recordRef,saved.revisionRef))));section.append(status);root.append(section);
     }
@@ -32,7 +33,7 @@ export function createReadingWorkbench(database,actions,selectedOrder=''){
   return lazy(root,()=>{
     root.append(node('p','Build your own reading order. The list does not infer a publisher chronology or ownership. Historical entries retain progress and are marked outside the current library.'));
     const status=node('p');status.setAttribute('role','status');root.append(status);
-    const run=async operation=>{try{await operation();actions.refresh();}catch(error){status.textContent=error.message;}};
+    const run=operation=>performAction({status,name:'Updating reading order...',task:async()=>{await operation();actions.refresh();}}).catch(()=>{});
     const title=node('input');title.maxLength=200;title.setAttribute('aria-label','Reading order title');
     const createDraft=node('div');createDraft.className='reading-order-draft';root.append(createDraft);createDraft.append(labeledControl('New order title',title),button('Create reading order',()=>run(async()=>{const result=await actions.order(null,title.value,[],null);root.dataset.selectedOrder=result.orderRef;})));
     const orders=node('select');orders.setAttribute('aria-label','Selected reading order');const empty=node('option','Choose an order');empty.value='';orders.append(empty);

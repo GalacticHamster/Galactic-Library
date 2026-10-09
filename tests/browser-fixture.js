@@ -390,21 +390,21 @@ try{
   const scope=document.createElement('div');
   const progressView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:async()=>{fullReconciliations++;},clock:()=>clock,schedule:callback=>{pollCallback=callback;return 1;},cancel(){}});
   progressView.accept([scanState]);progressView.changed();await pause();assert(fullReconciliations===0,'Active scan performed an immediate full refresh.');
-  clock=120001;progressView.accept([scanState]);await pause();assert(fullReconciliations===1,'Bounded periodic reconciliation is missing.');
-  progressView.changed();await pollCallback();await pause();assert(fullReconciliations===2&&!progressView.running,'Worker restart left the Library stale.');progressView.dispose();
+  clock=120001;progressView.accept([scanState]);await wait(()=>fullReconciliations===1,'Periodic reconciliation did not dispatch');assert(fullReconciliations===1,'Bounded periodic reconciliation is missing.');
+  progressView.changed();await pollCallback();await wait(()=>fullReconciliations===2,'Restart reconciliation did not dispatch');assert(fullReconciliations===2&&!progressView.running,'Worker restart left the Library stale.');progressView.dispose();
   checks.push('Options reconciles at a bounded interval and detects interrupted/restarted scan workers');
 
   let finishRefresh,refreshCount=0;
   const finishingView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:()=>{refreshCount++;return refreshCount===1?new Promise(done=>{finishRefresh=done;}):Promise.resolve();},schedule:()=>1,cancel(){}});
-  finishingView.accept([scanState]);button(finishingView.element,'Refresh library now').click();await pause();
-  finishingView.accept([{...scanState,phase:'completed'}]);finishRefresh();await pause();
+  finishingView.accept([scanState]);button(finishingView.element,'Refresh library now').click();await wait(()=>finishRefresh,'Manual reconciliation did not dispatch');
+  finishingView.accept([{...scanState,phase:'completed'}]);finishRefresh();await wait(()=>refreshCount===2,'Completion reconciliation did not dispatch');
   assert(refreshCount===2,'Completion during an in-flight refresh lost its final reconciliation.');finishingView.dispose();
   checks.push('scan completion during an in-flight Options refresh performs a final reconciliation');
 
   let retryRefreshes=0,retryCallback;
   const retryView=createContentsScanProgress({container:scope,runtime:{sendMessage:async()=>({ok:true,runs:[]})},reconcile:async()=>{if(++retryRefreshes===1)throw Error('Synthetic read interruption');},schedule:callback=>{retryCallback=callback;return 1;},cancel(){}});
-  retryView.changed();await pause();assert(retryRefreshes===1&&retryCallback,'Failed reconciliation did not schedule a bounded retry.');
-  await retryCallback();await pause();assert(retryRefreshes===2,'Idle Options stayed stale after a transient reconciliation failure.');retryView.dispose();
+  retryView.changed();await wait(()=>retryRefreshes===1&&retryCallback,'Failed reconciliation did not settle');assert(retryRefreshes===1&&retryCallback,'Failed reconciliation did not schedule a bounded retry.');
+  await retryCallback();await wait(()=>retryRefreshes===2,'Retry reconciliation did not dispatch');assert(retryRefreshes===2,'Idle Options stayed stale after a transient reconciliation failure.');retryView.dispose();
   checks.push('Options retries a failed final reconciliation without requiring another scan or storage event');
 
   checks.push(...await checkParentScopedComponents());

@@ -11,5 +11,5 @@ export function createLibraryLoader({panel,message,retry,content,load,paint}) {
       panel.hidden=false;retry.hidden=false;message.textContent='Could not load library: '+error.message;throw error;
     }).finally(()=>content?.setAttribute?.('aria-busy','false'));
   }
-  return {refresh,get busy(){return operation.busy;}};
+  return {refresh,async reload(){if(operation.busy)await operation.run(()=>{}).catch(()=>{});return refresh();},get busy(){return operation.busy;}};
 }

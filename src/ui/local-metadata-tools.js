@@ -1,4 +1,5 @@
 import {bookToolHelp} from './book-tool-help.js';
+import {afterFeedbackPaint,performAction} from './operation-feedback.js';
 import {localMetadataFromFile} from '../lib/local-metadata.js';
 import {identityEvidence,validIsbn} from '../lib/identity.js';
 
@@ -9,11 +10,13 @@ export function createLocalMetadataTools(records,actions){
     const queue=async candidate=>{await actions.queue({recordRefs:records.map(record=>record.recordRef),source:'localMetadata',status:'candidates',title:records[0].title,reason:'Confirm this source describes the edition in your library.',candidates:[candidate]});status.textContent='Suggestion queued. Choose it in Review book suggestions and preview the fields before applying.';actions.refresh();};
     const label=document.createElement('label');label.textContent='Choose ComicInfo.xml, an EPUB, or extracted OPF metadata. Files stay in this browser. ';
     const file=document.createElement('input');file.type='file';file.accept='.xml,.epub,.opf';file.setAttribute('aria-label','Local comic or EPUB metadata');label.append(file);root.append(bookToolHelp({heading:'How file metadata is used',purpose:'Fill gaps using metadata from a file you have.',input:'ComicInfo.xml, an EPUB, or an extracted OPF file selected below. The file is read in this browser and is not uploaded.',saves:'A suggestion in Review book suggestions; no book details change on upload.',review:'Choose the queued suggestion and compare its edition before applying. A contents statement still needs separate contents confirmation.',example:'ComicInfo.xml can supply the writer, series and issue number that a bundle title omitted.'}),label);
-    file.addEventListener('change',async()=>{const selected=file.files?.[0];if(!selected)return;file.disabled=true;try{await queue(await localMetadataFromFile(selected));}catch(error){status.textContent=`Metadata import failed: ${error.message}`;}finally{file.value='';file.disabled=false;}});
+    file.addEventListener('change',async()=>{if(file.disabled)return;const selected=file.files?.[0];if(!selected)return;try{await performAction({button:file,status,name:'Reading local metadata and preparing a suggestion...',task:async()=>queue(await localMetadataFromFile(selected)),success:'Suggestion queued. Review it before applying.'});}catch{/* Status retains the error. */}finally{file.value='';}});
     const evidence=identityEvidence(records[0]);
     const editionLookup=document.createElement('button');editionLookup.type='button';editionLookup.textContent='Find Open Library edition by ISBN';editionLookup.disabled=!evidence.isbn.length;
     editionLookup.addEventListener('click',async()=>{
+      if(editionLookup.disabled)return;
       editionLookup.disabled=true;
+      status.textContent='Finding Open Library edition...';await afterFeedbackPaint();
       try{const response=await chrome.runtime.sendMessage({type:'SEARCH_OPEN_LIBRARY_EDITION',isbn:evidence.isbn[0]});if(!response?.ok)throw new Error(response?.error??'Edition lookup failed.');await queue(response.candidate);}
       catch(error){status.textContent=error.message;try{await actions.queue({recordRefs:records.map(record=>record.recordRef),source:'localMetadata',status:'failed',title:records[0].title,reason:'Open Library edition lookup failed. Review the library item to retry its ISBN lookup.',candidates:[]});actions.refresh();}catch(failure){status.textContent=failure.message;}}
       finally{editionLookup.disabled=false;}
@@ -24,12 +27,13 @@ export function createLocalMetadataTools(records,actions){
       const label=document.createElement('label');label.textContent=title;const input=document.createElement(field==='statement'?'textarea':'input');input.setAttribute('aria-label',title);input.maxLength=field==='statement'?10000:500;if(field==='sourceUrl')input.type='url';label.append(input);root.append(label);inputs[field]=input;
     }
     const publisher=document.createElement('button');publisher.type='button';publisher.textContent='Add publisher suggestion';publisher.addEventListener('click',async()=>{
+      if(publisher.disabled)return;publisher.disabled=true;status.textContent='Preparing publisher suggestion...';await afterFeedbackPaint();
       try{
         const value=Object.fromEntries(Object.entries(inputs).map(([key,input])=>[key,input.value.trim()]));let url;try{url=new URL(value.sourceUrl);}catch{throw new Error('Enter the publisher source page URL.');}
         if(!value.title||!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error('Enter an edition title and an HTTP(S) publisher page.');
         const isbn=validIsbn(value.isbn);if(value.isbn&&!isbn)throw new Error('The ISBN checksum is invalid.');
         await queue({...value,source:'publisher',sourceUrl:`${url.origin}${url.pathname}`,sourceId:`${url.origin}${url.pathname}`,authors:value.authors.split(/\s*;\s*/u).filter(Boolean),isbn:isbn?[isbn]:[],series:value.series?[value.series]:[],unitType:value.volume?'volume':value.issue?'issue':'',approved:false,matchBasis:'publisher-evidence-proposal',retrievedAt:new Date().toISOString()});
-      }catch(error){status.textContent=error.message;}
+      }catch(error){status.textContent=error.message;}finally{publisher.disabled=false;}
     });root.append(publisher,status);
   });return root;
 }

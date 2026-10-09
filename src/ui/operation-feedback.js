@@ -4,7 +4,9 @@ export function afterFeedbackPaint() {
   return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
 }
 
+let sequence=0;
 export function createOperation({id,name,scope=id,status,controls=[],paint=afterFeedbackPaint,changed=()=>{}}) {
+  const token=++sequence;
   let state={id,name,scope,state:'idle',startedAt:null},pending=null,active=false;
   const publish=patch=>{
     state={...state,...patch};
@@ -15,6 +17,7 @@ export function createOperation({id,name,scope=id,status,controls=[],paint=after
       status.textContent=state.message||state.phase||state.name;
     }
     changed({...state});
+    if(globalThis.document?.dispatchEvent&&typeof CustomEvent==='function')document.dispatchEvent(new CustomEvent('gl-operation-state',{detail:{token,id,name,scope,state:state.state,message:state.message,startedAt:state.startedAt}}));
   };
   function run(task,{message=name,success='Done.'}={}){
     if(active)return pending??Promise.reject(Error('This operation is already starting.'));
@@ -42,11 +45,23 @@ export function createOperation({id,name,scope=id,status,controls=[],paint=after
   return {run,get busy(){return active;},get state(){return {...state};}};
 }
 
+export function bindOperationSummary(element,root=document){
+  const active=new Map();let latest;
+  root.addEventListener('gl-operation-state',({detail})=>{
+    if(detail.id==='library-load')return;
+    if(['starting','running'].includes(detail.state))active.set(detail.token,detail);
+    else{active.delete(detail.token);latest=detail;}
+    element.hidden=!active.size&&!latest;
+    element.textContent=active.size?[...active.values()].map(value=>value.message||value.name).join(' '):latest.message;
+    element.setAttribute('aria-busy',String(active.size>0));element.dataset.operationState=active.size?'running':latest.state;
+  });
+}
+
 const scopedOperations=new WeakMap();
 // Forms sharing a status also share a submission guard, even if rerendered.
-export function performAction({button,status,name='Saving changes...',task,success='Saved.',paint}){
+export function performAction({button,status,controls,name='Saving changes...',task,success='Saved.',paint}){
   const scope=status??button;
   let operation=scopedOperations.get(scope);
-  if(!operation||!operation.busy){operation=createOperation({id:name,name,status,controls:button?[button]:[],paint});scopedOperations.set(scope,operation);}
+  if(!operation||!operation.busy){operation=createOperation({id:name,name,status,controls:controls??(button?[button]:[...status?.parentElement?.querySelectorAll('button')??[]]),paint});scopedOperations.set(scope,operation);}
   return operation.run(task,{message:name,success});
 }

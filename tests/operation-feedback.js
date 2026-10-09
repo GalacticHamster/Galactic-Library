@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createOperation,performAction,afterFeedbackPaint} from '../src/ui/operation-feedback.js';
+import {createOperation,performAction,afterFeedbackPaint,bindOperationSummary} from '../src/ui/operation-feedback.js';
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const control=()=>({disabled:false,setAttribute(){},removeAttribute(){}});
 export const operationFeedbackTests=[
@@ -27,4 +27,12 @@ export const operationFeedbackTests=[
   const previous=globalThis.requestAnimationFrame,frames=[];globalThis.requestAnimationFrame=callback=>frames.push(callback);
   try{let painted=false;const pending=afterFeedbackPaint().then(()=>painted=true);assert.equal(frames.length,1);frames.shift()();assert.equal(painted,false);frames.shift()();await pending;assert.equal(painted,true);}finally{globalThis.requestAnimationFrame=previous;}
  }]
-];
+ ];
+operationFeedbackTests.push(['Operation summary survives workspace navigation and retains failure without stacking notices',()=>{
+ let listener;const element={hidden:true,textContent:'',dataset:{},setAttribute(){}};
+ bindOperationSummary(element,{addEventListener:(name,callback)=>listener=callback});
+ const send=(token,state,message)=>listener({detail:{token,id:'save',state,message}});
+ send(1,'starting','Saving contents...');send(2,'running','Preparing export...');assert.match(element.textContent,/Saving.*Preparing/);
+ send(1,'failed','Contents write failed');assert.equal(element.textContent,'Preparing export...');send(2,'succeeded','Download handed to browser');assert.equal(element.textContent,'Download handed to browser');
+ send(3,'failed','Storage unavailable');assert.equal(element.hidden,false);assert.equal(element.dataset.operationState,'failed');assert.equal(element.textContent,'Storage unavailable');
+}]);

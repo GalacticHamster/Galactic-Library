@@ -4,7 +4,7 @@ import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {createLibraryLoader} from './library-loading.js';
 import {createBackupExporter,handoffDownload} from './backup-export.js';
-import {createOperation} from './operation-feedback.js';
+import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} from './operation-feedback.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
@@ -69,6 +69,7 @@ async function reviewCompanionSource(clientId){
 }
 
 const providers = document.querySelector('#providers');
+bindOperationSummary(document.querySelector('#application-operation-status'));
 const assumeAllOwned = document.querySelector('#assume-all-owned');
 const ownershipPolicyStatus = document.querySelector('#ownership-policy-status');
 const search = document.querySelector('#search');
@@ -130,7 +131,7 @@ function draftStamp(scope){
 }
 const drafts=createDraftGuard({stamp:draftStamp});
 discardDrafts.addEventListener('click',()=>{if(drafts.allowNavigation()){if(contentsWorkspace.selected)contentsWorkspace.refreshReview();render();}});
-globalThis.addEventListener?.('beforeunload',event=>{if(drafts.dirty){event.preventDefault();event.returnValue='';}});
+globalThis.addEventListener?.('beforeunload',event=>{if(drafts.dirty||backupRestore.saving){event.preventDefault();event.returnValue='';}});
 const contentsReviewActions={
   save:async(id,value)=>{database=await drafts.commit(()=>saveContentReview(id,value));},
   remove:async(id)=>{database=await drafts.commit(()=>removeContentReview(id));},
@@ -149,12 +150,15 @@ const contentsWorkspace=createContentsWorkspace({projection:browseProjection,can
 document.querySelector('#contents-collections-slot').append(contentsWorkspace.element);
 const providerAccountsView=createProvidersView({select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
 document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
+let ownershipPolicySaving=false;
 async function changeOwnershipPolicy(patch) {
+  if(ownershipPolicySaving)return;ownershipPolicySaving=true;
   const focusId=document.activeElement?.id;
   assumeAllOwned.disabled=true;
   for(const checkbox of providers.querySelectorAll('[data-ownership-provider]'))checkbox.disabled=true;
   ownershipPolicyStatus.textContent='Saving ownership preference…';
   try{
+    await afterFeedbackPaint();
     database=await saveOwnershipPolicy(patch);
     render();
     ownershipPolicyStatus.textContent='Saved. Refresh open HB/FAN bundle pages to run matching with this preference.';
@@ -162,6 +166,7 @@ async function changeOwnershipPolicy(patch) {
     render();
     ownershipPolicyStatus.textContent='Could not save ownership preference: '+error.message;
   }finally{
+    ownershipPolicySaving=false;
     assumeAllOwned.disabled=false;
     if(focusId)document.getElementById(focusId)?.focus();
   }
@@ -500,7 +505,7 @@ function createReviewRow(candidate, reviewed = false) {
     actions.append(textElement('span', candidate.decision === 'different' ? 'Marked as different works.' : candidate.decision==='same-edition'?'Marked as the same edition.':'Marked as the same work; editions stay separate.'));
     actions.append(reviewButton('Undo decision', 'undo', async () => {
       try {
-        database = await removeManualMatchDecision(candidate.id);
+        database = await performAction({status:feedback,name:'Removing duplicate decision...',task:()=>removeManualMatchDecision(candidate.id)});
         render();
       } catch (error) {
         feedback.textContent = `Could not undo duplicate decision: ${error.message}`;
@@ -509,7 +514,7 @@ function createReviewRow(candidate, reviewed = false) {
   } else {
     actions.append(reviewButton('Same work', 'same', async () => {
       try {
-        database = await saveManualMatchDecision(candidate, 'same-work');
+        database = await performAction({status:feedback,name:'Saving same-work decision...',task:()=>saveManualMatchDecision(candidate, 'same-work')});
         render();
       } catch (error) {
         feedback.textContent = `Could not save duplicate decision: ${error.message}`;
@@ -517,7 +522,7 @@ function createReviewRow(candidate, reviewed = false) {
     }));
     actions.append(reviewButton('Same edition', 'same-edition', async () => {
       try {
-        database = await saveManualMatchDecision(candidate, 'same-edition');
+        database = await performAction({status:feedback,name:'Saving same-edition decision...',task:()=>saveManualMatchDecision(candidate, 'same-edition')});
         render();
       } catch (error) {
         feedback.textContent = `Could not save edition decision: ${error.message}`;
@@ -525,7 +530,7 @@ function createReviewRow(candidate, reviewed = false) {
     }));
     actions.append(reviewButton('Different works', 'different', async () => {
       try {
-        database = await saveManualMatchDecision(candidate, 'different');
+        database = await performAction({status:feedback,name:'Saving different-works decision...',task:()=>saveManualMatchDecision(candidate, 'different')});
         render();
       } catch (error) {
         feedback.textContent = `Could not save duplicate decision: ${error.message}`;
@@ -644,6 +649,10 @@ function stopsGoogleBooksEnrichment(message) {
 
 async function runGoogleBooksEnrichment() {
   if(googleBooksRunning)return;googleBooksRunning=true;googleBooksPauseRequested=false;
+  startGoogleBooksEnrichmentButton.disabled=true;resetGoogleBooksEnrichmentButton.disabled=true;
+  googleBooksEnrichmentStatus.classList.add('operation-status');googleBooksEnrichmentStatus.setAttribute('aria-busy','true');
+  googleBooksEnrichmentStatus.textContent='Preparing saved book lookup progress...';
+  await afterFeedbackPaint();
   let job;let lastError='';
   try{
     if(!await getGoogleBooksApiKey())throw new Error('Save a Google Books API key before starting enrichment.');
@@ -677,7 +686,7 @@ async function runGoogleBooksEnrichment() {
   }catch(error){lastError=error.message;}
   finally{
     if(job?.runId)try{job=await finishEnrichmentRun(job.jobId,job.runId,lastError);}catch(error){lastError=error.message;}
-    googleBooksRunning=false;pauseGoogleBooksEnrichmentButton.hidden=true;await renderGoogleBooksEnrichment();
+    googleBooksRunning=false;googleBooksEnrichmentStatus.setAttribute('aria-busy','false');pauseGoogleBooksEnrichmentButton.hidden=true;await renderGoogleBooksEnrichment();
     if(lastError)googleBooksEnrichmentStatus.textContent='Google Books enrichment paused: '+lastError;
   }
 }
@@ -884,24 +893,21 @@ bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summar
 
 document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();if(!document.querySelector('#import').disabled)document.querySelector('#import').click();}});
 
-const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh,exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
+const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh:()=>libraryLoader.reload(),exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
 
 const clearOperation=createOperation({id:'library-clear',name:'Clearing local library...',status:backupStatus,controls:[document.querySelector('#clear'),document.querySelector('#import'),document.querySelector('#export')]});
 document.querySelector('#clear').addEventListener('click', async () => {
   if(clearOperation.busy||backupRestore.busy||backupExporter.busy)return;
   if (!confirm('Clear Galactic Library in this browser? This removes saved libraries, account labels, reviews and settings, including your Google Books key and companion links. Purchases in your stores are unaffected. The API key is not included in a library backup.')) return;
-  clearOperation.run(async context=>{await clearDatabase();await context.phase('Reloading cleared Library...');try{await refresh();}catch(error){throw Error('Library cleared, but its view could not reload: '+error.message);}}, {success:'Local library cleared.'}).catch(()=>{});
+  clearOperation.run(async context=>{await clearDatabase();await context.phase('Reloading cleared Library...');try{await libraryLoader.reload();}catch(error){throw Error('Library cleared, but its view could not reload: '+error.message);}}, {success:'Local library cleared.'}).catch(()=>{});
 });
-downloadComixologyListButton.addEventListener('click', () => {
+downloadComixologyListButton.addEventListener('click', () => performAction({button:downloadComixologyListButton,status:backupStatus,name:'Preparing Comixology review list...',success:'Review list download handed to your browser.',task:() => {
   const blob = new Blob([comixologyReviewMarkdown(database.providerItems, 'Current Galactic Library')], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const link = Object.assign(document.createElement('a'), { href: url, download: 'comixology-ownership-review.md' });
-  link.click();
-  URL.revokeObjectURL(url);
-});
+  handoffDownload(blob,'comixology-ownership-review.md');
+}}).catch(()=>{}));
 saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
-    await saveGoogleBooksApiKey(googleBooksApiKey.value);
+    await performAction({button:saveGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Saving book service key...',task:()=>saveGoogleBooksApiKey(googleBooksApiKey.value)});
     googleBooksApiKey.value = '';
     document.querySelector('#book-service-status').textContent='Key saved in this browser.';
     await renderGoogleBooksEnrichment();
@@ -912,7 +918,7 @@ saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
 clearGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
     googleBooksPauseRequested = true;
-    await saveGoogleBooksApiKey('');
+    await performAction({button:clearGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Removing book service key...',task:()=>saveGoogleBooksApiKey('')});
     document.querySelector('#book-service-status').textContent='Key removed.';
     googleBooksApiKey.value = '';
     await renderGoogleBooksEnrichment();
@@ -927,20 +933,16 @@ pauseGoogleBooksEnrichmentButton.addEventListener('click', () => {
   googleBooksPauseRequested = true;
   googleBooksEnrichmentStatus.textContent = 'Pausing after the current book…';
 });
-resetGoogleBooksEnrichmentButton.addEventListener('click', async () => {
-  try {
+const lookupResetOperation=createOperation({id:'lookup-queue-reset',name:'Checking saved lookup queue...',status:googleBooksEnrichmentStatus,controls:[resetGoogleBooksEnrichmentButton]});
+resetGoogleBooksEnrichmentButton.addEventListener('click', () => lookupResetOperation.run(async context=>{
     const job=await getGoogleBooksEnrichmentJob();
-    if(job&&job.cursor<job.queue.length){const decision=createConfirmation({title:'Clear saved lookup queue?',message:job.cursor+' of '+job.queue.length+' completed. This abandons the saved lookup position. Already saved book details stay.',confirmLabel:'Clear saved lookup queue'});if(!await decision.result)return;const latest=await getGoogleBooksEnrichmentJob();if(JSON.stringify(latest)!==JSON.stringify(job))throw Error('Lookup progress changed. Review the current progress before clearing it.');}
+    if(job&&job.cursor<job.queue.length){const decision=createConfirmation({title:'Clear saved lookup queue?',message:job.cursor+' of '+job.queue.length+' completed. This abandons the saved lookup position. Already saved book details stay.',confirmLabel:'Clear saved lookup queue'});if(!await decision.result)return {cancelled:true};const latest=await getGoogleBooksEnrichmentJob();if(JSON.stringify(latest)!==JSON.stringify(job))throw Error('Lookup progress changed. Review the current progress before clearing it.');}
+    await context.phase('Clearing saved lookup position...');
     await clearGoogleBooksEnrichmentJob();
     await renderGoogleBooksEnrichment();
-  } catch (error) {
-    googleBooksEnrichmentStatus.textContent = `Could not reset enrichment progress: ${error.message}`;
-  }
-});
+}, {success:result=>result?.cancelled?'Queue clearing cancelled. Saved progress is unchanged.':'Saved lookup position cleared; acquired metadata is retained.'}).catch(()=>{}));
 document.querySelector('#check-companion-connections').addEventListener('click',async event=>{
-  const button=event.currentTarget;button.disabled=true;
-  try{await Promise.all(builtinCompanions(chrome.runtime).map(async item=>companionConnectionStatuses.set(item.id,await checkCompanionConnection(chrome.runtime,item.id))));await renderCompanionExtensionLinks();}
-  finally{button.disabled=false;}
+  await performAction({button:event.currentTarget,status:companionExtensionLinkStatus,name:'Checking companion connections...',task:async()=>{await Promise.all(builtinCompanions(chrome.runtime).map(async item=>companionConnectionStatuses.set(item.id,await checkCompanionConnection(chrome.runtime,item.id))));await renderCompanionExtensionLinks();},success:'Connection checks completed; see each companion result.'}).catch(()=>{});
 });
 document.querySelector('#add-companion-extension-id').addEventListener('click', async () => {
   const id = companionExtensionId.value.trim();
@@ -950,7 +952,7 @@ document.querySelector('#add-companion-extension-id').addEventListener('click', 
   }
   if(companionBrowser(chrome.runtime)==='chrome'&&!/^[a-p]{32}$/u.test(id)){companionExtensionLinkStatus.textContent='This is a Firefox add-on ID. Existing entries are preserved; add a Chrome ID for this browser.';return;}
   try {
-    await addAllowedExternalClientId(id);
+    await performAction({button:document.querySelector('#add-companion-extension-id'),status:companionExtensionLinkStatus,name:'Saving companion link...',task:()=>addAllowedExternalClientId(id)});
     await renderCompanionExtensionLinks();
   } catch (error) {
     companionExtensionLinkStatus.textContent = `Could not save the allowed extension: ${error.message}`;
@@ -958,7 +960,7 @@ document.querySelector('#add-companion-extension-id').addEventListener('click', 
 });
 document.querySelector('#clear-companion-extension-ids').addEventListener('click', async () => {
   try {
-    await saveAllowedExternalClientIds([]);
+    await performAction({button:document.querySelector('#clear-companion-extension-ids'),status:companionExtensionLinkStatus,name:'Removing additional companion IDs...',task:()=>saveAllowedExternalClientIds([])});
     await renderCompanionExtensionLinks();
     companionExtensionLinkStatus.textContent = 'Additional IDs removed. Official companions remain trusted.';
   } catch (error) {
