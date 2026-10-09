@@ -235,6 +235,78 @@
     return paths;
   }
 
+  // Product details are observations, never bibliographic identity. Scope to
+  // product sections; ignore commercial/ranking/navigation text entirely.
+  const detailText=value=>String(value??'').replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu,'').replace(/\s+/gu,' ').trim();
+  function detailDate(raw){
+    const months=['january','february','march','april','may','june','july','august','september','october','november','december'];
+    let year,month,day;const iso=/^(\d{4})-(\d{2})-(\d{2})$/u.exec(raw),forward=/^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(\d{4})$/iu.exec(raw),reverse=/^(\d{1,2})\s+([A-Za-z]+)[,]?\s+(\d{4})$/u.exec(raw);
+    if(iso)[,year,month,day]=iso;
+    else if(forward){year=forward[3];month=months.indexOf(forward[1].toLowerCase())+1;day=forward[2];}
+    else if(reverse){year=reverse[3];month=months.indexOf(reverse[2].toLowerCase())+1;day=reverse[1];}
+    else return '';
+    const date=new Date(Date.UTC(Number(year),Number(month)-1,Number(day)));
+    return Number(year)>=1000&&date.getUTCFullYear()===Number(year)&&date.getUTCMonth()===Number(month)-1&&date.getUTCDate()===Number(day)?date.toISOString().slice(0,10):'';
+  }
+  function detailIsbn(raw,length){
+    const value=raw.toUpperCase().replace(/[\s-]/gu,'');
+    if(length===13&&/^97[89]\d{10}$/u.test(value)&&[...value].reduce((n,d,i)=>n+Number(d)*(i%2?3:1),0)%10===0)return value;
+    if(length===10&&/^\d{9}[\dX]$/u.test(value)&&[...value].reduce((n,d,i)=>n+(d==='X'?10:Number(d))*(10-i),0)%11===0)return value;
+    return '';
+  }
+  function kindleProductDetails(document,sourceUrl){
+    let url;try{url=new URL(sourceUrl);}catch{return null;}
+    if(url.origin!=='https://www.amazon.com'||!/^\/dp\/[A-Z0-9]{10}$/u.test(url.pathname)||!document.querySelector('#productTitle, #ebooksProductTitle'))return null;
+    const asin=url.pathname.split('/').at(-1),observations=[],seen=new Set();
+    const labels={asin:'asin',publisher:'publisher','publication date':'publicationDate',language:'language','isbn 13':'isbn13','isbn 10':'isbn10','print length':'pageCount','paperback':'pageCount','hardcover':'pageCount',series:'series','book series':'series',edition:'edition','file size':'fileSize','guided view':'guidedView','enhanced typesetting':'enhancedTypesetting','x ray':'xRay','word wise':'wordWise','page flip':'pageFlip',accessibility:'accessibility'};
+    const seriesUrl=raw=>{try{const u=new URL(raw,'https://www.amazon.com');return u.origin==='https://www.amazon.com'&&!u.username&&!u.password&&/^\/(?:dp|gp\/product|kindle-dbs|series)\//u.test(u.pathname)?u.origin+u.pathname:'';}catch{return '';}};
+    function add(label,raw,selector,link=''){
+      label=detailText(label).replace(/[:?]+$/u,'').trim();raw=detailText(raw);
+      const key=label.toLowerCase().replace(/[^a-z0-9]+/gu,' ').trim(),field=labels[key];
+      if(!field||!raw||label.length>100||raw.length>500||observations.length>=40)return;
+      let values=[raw];if(field.startsWith('isbn'))values=raw.match(/97[89](?:[\s-]*\d){10}|(?:\d[\s-]*){9}[\dXx]/gu)??[raw];
+      for(const original of values.slice(0,8)){
+        let value=original,status='observed';
+        if(field==='isbn13'||field==='isbn10'){value=detailIsbn(original,field==='isbn13'?13:10);status=value?'valid-checksum':'invalid';}
+        else if(field==='publicationDate'){value=detailDate(original);status=value?'parsed':'unparsed';}
+        else if(field==='pageCount'){value=/^([\d,]+)\s*(?:pages?)?$/iu.exec(original)?.[1]?.replace(/,/gu,'')??'';if(!/^\d{1,7}$/u.test(value)||Number(value)<1||Number(value)>1000000)value='';status=value?'parsed':'unparsed';}
+        else if(field==='asin'){value=original.toUpperCase();if(!/^[A-Z0-9]{10}$/u.test(value)){value='';status='invalid';}}
+        const reference=field==='series'?seriesUrl(link):'',dedupe=[field,value||original,reference].join('\0');
+        if(seen.has(dedupe))continue;seen.add(dedupe);observations.push({field,label,raw:original,value,status,selector,...(reference?{url:reference}:{})});
+        if(observations.length>=40)return;
+        if(field==='publisher'){
+          const date=/\s*\(([^()]+)\)\s*$/u.exec(original);
+          if(date&&detailDate(date[1])){observations.at(-1).value=original.slice(0,date.index).trim();add('Publication date',date[1],selector);}
+        }
+      }
+    }
+    for(const selector of ['#detailBullets_feature_div','#detailBulletsWrapper_feature_div'])for(const container of document.querySelectorAll(selector))for(const row of [...container.querySelectorAll('li')].slice(0,80)){
+      const label=row.querySelector('.a-text-bold, b, strong');if(!label)continue;
+      const raw=detailText(row.textContent),prefix=detailText(label.textContent);if(!raw.startsWith(prefix))continue;
+      add(prefix,raw.slice(prefix.length).replace(/^\s*[:?]\s*/u,''),selector,row.querySelector('a')?.getAttribute('href'));
+    }
+    for(const selector of ['#productDetails_detailBullets_sections1','#productDetails_techSpec_section_1','#productDetails_techSpec_section_2'])for(const table of document.querySelectorAll(selector))for(const row of [...table.querySelectorAll('tr')].slice(0,80)){
+      const label=row.querySelector('th'),value=row.querySelector('td');if(label&&value)add(label.textContent,value.textContent,selector,value.querySelector('a')?.getAttribute('href'));
+    }
+    const attributes={publisher:'Publisher',publication_date:'Publication date',language:'Language',isbn13:'ISBN-13',isbn10:'ISBN-10',print_length:'Print length',edition:'Edition',series_content:'Series'};
+    for(const [name,label]of Object.entries(attributes)){
+      const selector='#rpi-attribute-book_details-'+name;for(const node of document.querySelectorAll(selector)){const value=node.querySelector('.rpi-attribute-value');if(value)add(label,value.textContent,selector,value.querySelector('a')?.getAttribute('href'));}
+    }
+    for(const node of document.querySelectorAll('#seriesBulletWidget_feature_div'))for(const anchor of [...node.querySelectorAll('a')].slice(0,8))add('Series',anchor.textContent,'#seriesBulletWidget_feature_div',anchor.getAttribute('href'));
+    for(const script of [...document.querySelectorAll('script[type="application/ld+json"]')].slice(0,4)){
+      if(script.textContent.length>20000)continue;let data;try{data=JSON.parse(script.textContent);}catch{continue;}
+      const entries=Array.isArray(data)?data:Array.isArray(data?.['@graph'])?data['@graph']:[data];
+      for(const item of entries.slice(0,20)){
+        if(!item||!['Book','Product'].includes(item['@type']))continue;
+        const page=seriesUrl(item.url??'');if(item.asin!==asin&&item.sku!==asin&&page!==url.origin+url.pathname)continue;
+        for(const [key,label]of [['asin','ASIN'],['publisher','Publisher'],['datePublished','Publication date'],['inLanguage','Language'],['numberOfPages','Print length'],['bookEdition','Edition']]){const v=item[key];if(typeof v==='string'||typeof v==='number'||key==='publisher'&&typeof v?.name==='string')add(label,key==='publisher'&&v?.name?v.name:v,'product-json-ld');}
+        for(const isbn of (Array.isArray(item.isbn)?item.isbn:[item.isbn]).slice(0,8))if(typeof isbn==='string')add(isbn.replace(/[\s-]/gu,'').length===10?'ISBN-10':'ISBN-13',isbn,'product-json-ld');
+        if(typeof item.isPartOf?.name==='string')add('Series',item.isPartOf.name,'product-json-ld',item.isPartOf.url);
+      }
+    }
+    return observations.length?{version:1,asin,sourceUrl:url.origin+url.pathname,observations}:null;
+  }
+
   async function fetchKindleProductComicContents(detailUrl, {signal,timing,requestPacer} = {}) {
     const url = new URL(detailUrl, global.location?.origin ?? 'https://www.amazon.com');
     if (url.origin !== (global.location?.origin ?? 'https://www.amazon.com') || !/^\/dp\//u.test(url.pathname)) throw new Error('Kindle did not provide a usable Amazon product-page URL.');
@@ -379,5 +451,5 @@
     return { items, diagnostics, snapshot };
   }
 
-  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, kindleDescriptionBlocks, kindleCategoryPaths, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };
+  global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, kindleDescriptionBlocks, kindleCategoryPaths, kindleProductDetails, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };
 }(globalThis));

@@ -276,7 +276,9 @@ try{
   checks.push('Actual contents controls keep every request start at least 1000 ms apart across retries, CAPTCHA, Pause/Resume and checkpoints');
 
 
-  const {checkKindleCategoryCapture}=await import('./kindle-category-fixture.js');
+  const {checkProductDetailsCapture}=await import('./kindle-product-details-fixture.js');
+checks.push(...checkProductDetailsCapture(html=>new DOMParser().parseFromString(html,'text/html')));
+const {checkKindleCategoryCapture}=await import('./kindle-category-fixture.js');
   checks.push(...checkKindleCategoryCapture(html=>new DOMParser().parseFromString(html,'text/html')));
   const {checkKindleSourceCapture}=await import('./kindle-source-capture-fixture.js');
   const captureFixtures=await (await originalFetch('/tests/fixtures/kindle/kindle-source-capture.json')).json();

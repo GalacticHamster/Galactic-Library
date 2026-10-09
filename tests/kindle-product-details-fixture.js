@@ -1,0 +1,30 @@
+import '../src/providers/kindle.js';
+const page=body=>'<h1 id="productTitle">A Kindle book</h1>'+body;
+const bullets=rows=>'<div id="detailBullets_feature_div"><ul>'+rows.map(([label,value])=>`<li><span class="a-text-bold">${label}:</span> ${value}</li>`).join('')+'</ul></div>';
+const table=rows=>'<table id="productDetails_detailBullets_sections1">'+rows.map(([label,value])=>`<tr><th>${label}</th><td>${value}</td></tr>`).join('')+'</table>';
+export const productDetailsFixtures=[
+ {name:'SIKTC supplied bibliographic example',html:page(bullets([['ASIN','B08KHXKTKQ'],['Publisher','BOOM! Studios (December 1, 2020)'],['Language','English'],['ISBN-13','9781646680450'],['Print length','118 pages'],['Series','<a href="/kindle-dbs/product/B08KHXKTKQ">Something is Killing the Children</a>']])),expected:{publisher:'BOOM! Studios',publicationDate:'2020-12-01',isbn13:'9781646680450',pageCount:'118',series:'Something is Killing the Children'}},
+ {name:'table unicode and ISBN10',html:page(table([['\u200eISBN-10\u200f','0-306-40615-2'],['Publication date','1 December 2020'],['Language','English&nbsp;'],['Edition','2nd edition'],['File size','10 MB'],['Price','$10'],['Customer rating','5']])),expected:{isbn10:'0306406152',publicationDate:'2020-12-01',edition:'2nd edition',fileSize:'10 MB'}},
+ {name:'partial and duplicate labels',html:page(bullets([['Language','English'],['Language','English']])),expected:{language:'English'},count:1},
+ {name:'localized date retained without guess',html:page(table([['Publication date','1 Dezember 2020']])),expected:{publicationDate:''}},
+ {name:'invalid ISBN retained',html:page(bullets([['ISBN-13','9781646680451']])),expected:{isbn13:''}},
+ {name:'conflicting multiple ISBNs',html:page(bullets([['ISBN-13','9781646680450; 9780306406157']])),expected:{isbn13:'9781646680450'},count:2},
+ {name:'RPI responsive layout',html:page('<div id="rpi-attribute-book_details-print_length"><span class="rpi-attribute-value">1,118 pages</span></div>'),expected:{pageCount:'1118'}},
+ {name:'multiple series and unsafe link',html:page('<div id="seriesBulletWidget_feature_div"><a href="/kindle-dbs/product/B08KHXKTKQ">First series</a><a href="https://evil.example/series/1">Second series</a></div>'),expected:{series:'First series'},count:2},
+ {name:'scoped JSONLD',html:page('<script type="application/ld+json">'+JSON.stringify({'@graph':[{'@type':'Book',sku:'B08KHXKTKQ',publisher:{name:'Publisher'},numberOfPages:99,isbn:'9780306406157'},{'@type':'Book',sku:'B000000001',publisher:'Wrong recommendation'}]})+'</script>'),expected:{publisher:'Publisher',pageCount:'99',isbn13:'9780306406157'}},
+ {name:'malformed JSON',html:page('<script type="application/ld+json">{bad</script>'),empty:true},
+ {name:'no details',html:page('<p>Description only</p>'),empty:true},
+ {name:'nonproduct page',html:bullets([['Publisher','Should not be captured']]),empty:true},
+ {name:'series without link and breadcrumb',html:page(bullets([['Series','A series']])+'<div id="wayfinding-breadcrumbs_feature_div"><ul><li>Kindle Store</li><li>Kindle eBooks</li><li>History</li></ul></div>'),expected:{series:'A series'}},
+ {name:'conflicting ASIN remains evidence',html:page(bullets([['ASIN','B000000001']])),expected:{asin:'B000000001'}},
+ {name:'unknown technical and commercial omitted',html:page(table([['Best Sellers Rank','100'],['Review count','100'],['Accessibility','Screen reader supported'],['Guided View','Enabled']])),expected:{accessibility:'Screen reader supported',guidedView:'Enabled'},count:2},
+ {name:'impossible date',html:page(table([['Publication date','February 30, 2020']])),expected:{publicationDate:''}}
+];
+export function checkProductDetailsCapture(parse){
+ const checks=[];for(const fixture of productDetailsFixtures){
+  const result=globalThis.GalacticKindle.kindleProductDetails(parse(fixture.html),'https://www.amazon.com/dp/B08KHXKTKQ');
+  if(fixture.empty){if(result!==null)throw Error(fixture.name+' captured unsupported evidence');}
+  else{if(result?.asin!=='B08KHXKTKQ')throw Error(fixture.name+' lost product association');for(const [field,value]of Object.entries(fixture.expected))if(!result.observations.some(o=>o.field===field&&o.value===value))throw Error(fixture.name+' incorrect '+field);if(fixture.count&&result.observations.length!==fixture.count)throw Error(fixture.name+' incorrect count');if(result.observations.some(o=>o.url?.includes('evil')||['price','rating','rank'].includes(o.field)))throw Error('Unsafe field/link');}
+  checks.push('Product Details: '+fixture.name);
+ }return checks;
+}

@@ -1,0 +1,7 @@
+# Kindle Product Details evidence
+
+Product Details extraction is scoped to recognized product sections in the existing Amazon response: detail bullets/wrapper, bibliographic/technical tables, responsive RPI attributes, series widget, and product-associated Book/Product JSON-LD. A product title and canonical Amazon `/dp/` URL are required. Representative synthetic layouts are tested against a real DOM in the disposable Chrome/Firefox importer checks; these are not assertions about every live Amazon layout.
+
+The extractor retains bounded labels, raw values, normalized values and selectors. It recognizes ASIN, publisher, publication date, language, ISBN-10/13, print length, series/link, explicit edition and optional technical/accessibility labels. Unicode direction marks and whitespace are removed. English full dates and ISO dates are normalized with calendar validation; other localized/ambiguous dates remain unparsed. ISBN checksums are validated without converting ISBN-10 into ISBN-13. Duplicate observations collapse; competing observations remain separate. Commercial data and unrelated structured recommendations are excluded.
+
+These values are observations about a product page. A Kindle page ISBN can describe a print edition. No extracted field enters canonical identity, matching or ownership. The page association identifies an Amazon product, not a universal work. No additional requests or hydration waits are introduced.
