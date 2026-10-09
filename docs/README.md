@@ -5,6 +5,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 ## Using the extension
 
 - [Library browsing, search, filters and sorting](user-guide/library-browsing.md)
+- [Loading, saving and backup feedback](user-guide/loading-and-operation-feedback.md)
 - [Library item details and enrichment](user-guide/item-details.md)
 - [Contents workspace](user-guide/contents-workspace.md)
 - [Providers and saved accounts](user-guide/providers-and-accounts.md)
@@ -18,6 +19,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 
 - [Matching policy](architecture/matching-policy.md) and [matching philosophy](../MATCHING_PHILOSOPHY.md)
 - [Shared browsing context and draft protection](architecture/browsing-context.md)
+- [Operation feedback architecture and inventory](architecture/operation-feedback.md)
 - [Contents evidence and identity boundaries](architecture/contents-evidence.md)
 - [Companion API](architecture/companion-api.md)
 - [Metadata validation](architecture/metadata-validation.md)
