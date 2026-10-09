@@ -1,3 +1,4 @@
+import {themeTests} from './theme.js';
 import {enrichmentIntegrityTests} from './enrichment-integrity.js';
 import {genreRecoveryTests} from './genre-recovery.js';
 import {operationFeedbackTests} from './operation-feedback.js';
@@ -97,7 +98,7 @@ const tests = [
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,
-  ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...paginationTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
+  ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...paginationTests,...themeTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,

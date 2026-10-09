@@ -136,5 +136,10 @@
   "src/ui/sync-health.js",
   "src/ui/title-aliases.js",
   "src/ui/ui.css",
-  "src/ui/workspaces.js"
+  "src/ui/workspaces.js",
+  "shared/theme.js",
+  "shared/theme.css",
+  "shared/theme-app.css",
+  "src/background/appearance.js",
+  "shared/theme-overlays.css"
 ]

@@ -56,7 +56,7 @@
       chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider}).then(result=>{if(result.ok&&!input.value)input.value=result.profileLabel??'';}).catch(()=>{});
     }
     const style = document.createElement('style');
-    style.textContent = '.panel { position:relative; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid #a78bfa; border-radius:7px; background:#312e81; box-shadow:0 8px 30px #0008; color:#f5f3ff; cursor:pointer; font:14px/1.4 system-ui,sans-serif; padding:7px 10px; }';
+    style.textContent = ':host { color-scheme:var(--gh-color-scheme); } .panel { position:relative; } button:hover:not(:disabled) { background:var(--gh-accent-hover); } button:active:not(:disabled) { background:var(--gh-accent-pressed); } button:disabled { background:var(--gh-disabled); color:var(--gh-disabled-text); cursor:default; } input,select,textarea { background:var(--gh-input); color:var(--gh-text); border:1px solid var(--gh-input-border); accent-color:var(--gh-accent); font:inherit; max-width:100%; } button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--gh-focus); outline-offset:3px; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid var(--gh-border); border-radius:7px; background:var(--gh-accent); box-shadow:var(--gh-shadow); color:var(--gh-on-accent); cursor:pointer; font:14px/1.4 var(--gh-font); padding:7px 10px; }';
     const minimize = document.createElement('button');
     minimize.type = 'button';
     minimize.className = 'galactic-panel-minimize';

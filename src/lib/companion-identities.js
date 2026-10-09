@@ -16,7 +16,7 @@ export function builtinCompanions(runtime=globalThis.chrome?.runtime){
 export function effectiveExternalClientIds(manual=[],runtime){
   return [...new Set([...builtinCompanions(runtime).map(item=>item.id),...manual])];
 }
-const reads=new Set(['PING','GET_STATUS','MATCH_ITEMS','GET_REMINDERS','OPEN_REVIEW','MATCH_ITEMS_DIAGNOSTIC_CALLBACK','MATCH_ITEMS_DIAGNOSTIC_RENDER']);
+const reads=new Set(['PING','GET_STATUS','GET_APPEARANCE','MATCH_ITEMS','GET_REMINDERS','OPEN_REVIEW','MATCH_ITEMS_DIAGNOSTIC_CALLBACK','MATCH_ITEMS_DIAGNOSTIC_RENDER']);
 const feeds=new Set(['BEGIN_ENTITLEMENT_FEED','APPEND_ENTITLEMENT_FEED','COMMIT_ENTITLEMENT_FEED','REMOVE_ENTITLEMENT_FEED']);
 export function allowedCompanionOperation(id,type,runtime=globalThis.chrome?.runtime){
   // Caller must FIRST authorize the identity against the effective allowlist.

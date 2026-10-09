@@ -1,4 +1,5 @@
 import {allowedCompanionOperation} from '../lib/companion-identities.js';
+import {createAppearanceService} from './appearance.js';
 import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
@@ -36,6 +37,8 @@ storageReady.catch(() => {});
 workerLifecycle=createWorkerLifecycleDiagnostics({area:chrome.storage.session,ready:storageReady,worker:queryDiagnostics.worker,startedEpochMs:queryDiagnostics.startedEpochMs});
 const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
 const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
+const appearanceService=createAppearanceService(privateArea,storageWriter,chrome.runtime,storageReady);
+globalThis.GalacticHamsterTheme.register(appearanceService,chrome.runtime);
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
@@ -548,6 +551,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       }
       if(!allowedCompanionOperation(sender.id,request?.type)){respond({ok:false,error:'Unsupported or unauthorized Galactic Library API operation.'});return null;}
       authorizedCompanion=true;workerLifecycle.observe('external_started:'+request?.type);
+      if(request?.type==='GET_APPEARANCE'){
+        if(request.apiVersion!==1){respond({ok:false,apiVersion:1,error:'Unsupported Galactic Library API version.'});return null;}
+        return appearanceService.get().then(value=>{respond({ok:true,apiVersion:1,appearance:{mode:value.appearance.mode}});return null;});
+      }
       if(request?.type==='OPEN_REVIEW'){
         if(request.apiVersion!==1){sendResponse({ok:false,apiVersion:1,error:'Unsupported Galactic Library API version.'});return null;}
         return chrome.runtime.openOptionsPage().then(()=>sendResponse({ok:true,apiVersion:1}),()=>sendResponse({ok:false,apiVersion:1,error:'Could not open Galactic Library options.'}));

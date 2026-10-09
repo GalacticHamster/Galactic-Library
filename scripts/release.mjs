@@ -7,7 +7,7 @@ export const projectRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function crc32(bytes){let crc=0xffffffff;for(const byte of bytes){crc^=byte;for(let bit=0;bit<8;bit++)crc=crc&1?0xedb88320^(crc>>>1):crc>>>1;}return (crc^0xffffffff)>>>0;}
 function validPath(path){return typeof path==='string'&&path.length<240&&!path.includes('\\')&&!path.startsWith('/')&&path===posix.normalize(path)&&!path.split('/').some(part=>part==='..'||part==='.'||!part)&&/^[a-zA-Z0-9_./-]+$/u.test(path);}
-function runtimePath(path){return ['manifest.json','options.html','popup.html'].includes(path)||path.startsWith('src/')&&['.js','.css','.png'].includes(extname(path));}
+function runtimePath(path){return ['manifest.json','options.html','popup.html','shared/theme.js','shared/theme.css','shared/theme-app.css','shared/theme-overlays.css'].includes(path)||path.startsWith('src/')&&['.js','.css','.png'].includes(extname(path));}
 function dependency(files,owner,path,root=false){
   if(path==='')return;
   if(root){if(!validPath(path)||!files.has(path))throw new Error(`Missing ${owner==='manifest.json'?'manifest runtime':'runtime'} dependency: ${owner} -> ${path}`);return;}
