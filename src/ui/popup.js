@@ -1,9 +1,11 @@
 import {countLabel} from './formatters.js';
-import { getDatabase } from '../lib/storage.js';
+import { getCommittedLibraryView } from '../lib/storage.js';
+import {afterFeedbackPaint} from './operation-feedback.js';
 
 const summary = document.querySelector('#summary');
 try {
-  const database = await getDatabase();
+  await afterFeedbackPaint();
+  const {database} = await getCommittedLibraryView();
   const records = Object.values(database.providerItems);
   document.querySelector('#add-library-link').hidden=records.length>0;
   const total = records.filter((item) => item.mediaType === 'game').length;
@@ -30,4 +32,4 @@ try {
   summary.textContent = parts.length ? `${parts.join('; ')}.` : Object.keys(database.providerProfiles??{}).length?'No imported items to show. Check your saved accounts in Providers.':'No libraries imported yet.';
 } catch (error) {
   summary.textContent = `Could not load library: ${error.message}`;
-}
+} finally {summary.setAttribute('aria-busy','false');}

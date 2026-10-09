@@ -2,6 +2,7 @@ import {builtinCompanions,checkCompanionConnection,companionBrowser} from '../li
 import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
+import {createLibraryLoader} from './library-loading.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
@@ -680,6 +681,7 @@ async function runGoogleBooksEnrichment() {
 }
 
 function render(timing = null) {
+  if(!database)return;
   const draftState=drafts.reconcile();draftNotice.hidden=!draftState.dirty;
   if(draftState.dirty){draftMessage.textContent=draftState.stale?'Saved information changed. Your edits are retained; reload before saving.':'Your unsaved edits are retained. Finish them or discard to update this view.';contentsWorkspace.update(database,workspace.workspace==='contents');return;}
   contentsWorkspace.update(database,workspace.workspace==='contents');
@@ -844,7 +846,7 @@ function render(timing = null) {
 }
 
 const optionsDiagnosticPrefix=crypto.randomUUID().replaceAll('-','').slice(0,12);let optionsDiagnosticSequence=0;
-async function refresh(diagnosticLookupId = null) {
+async function refreshView(context,diagnosticLookupId = null) {
   diagnosticLookupId??='lookup-'+optionsDiagnosticPrefix+'-'+String(++optionsDiagnosticSequence).padStart(3,'0');
   const timing=globalThis.GalacticContentsPerformance.trace(diagnosticLookupId,'options');
   const endTotal=timing?.begin('options_total');
@@ -853,12 +855,12 @@ async function refresh(diagnosticLookupId = null) {
   const {database:loadedDatabase,preferences,performance:workerTiming}=await getCommittedLibraryView(diagnosticLookupId);
   globalThis.GalacticContentsPerformance.merge(timing,workerTiming);
   database = loadedDatabase;
-  document.querySelector('#library-load-status').hidden=true;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
   if(!navigationHydrated&&globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
   navigationHydrated=true;
   endStage?.();endStage=timing?.begin('options_render');
+  await context.phase('Preparing your Library view...');
   render(timing);
   if(initialBookRoute){const route=initialBookRoute;initialBookRoute=null;visitBookRoute(route);}
   endStage?.();endStage=timing?.begin('options_other');
@@ -868,6 +870,9 @@ async function refresh(diagnosticLookupId = null) {
     if(timing)chrome.runtime.sendMessage({type:'GL_CONTENTS_UI_TIMING',timing:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}).catch(()=>{});
   }
 }
+
+const libraryLoader=createLibraryLoader({panel:document.querySelector('#library-load-status'),message:document.querySelector('#library-load-status span'),retry:document.querySelector('#retry-library-load'),content:document.querySelector('#library-section'),load:refreshView});
+const refresh=(...args)=>libraryLoader.refresh(...args);
 
 async function exportCurrentBackup() {
   try {
@@ -1019,7 +1024,7 @@ chrome.runtime.onMessage?.addListener((message,sender)=>{
   return false;
 });
 contentsScanProgress.initialize();
-const loadLibrary=()=>refresh().catch(error=>{const status=document.querySelector('#library-load-status');status.hidden=false;status.querySelector('span').textContent='Could not load library: '+error.message;document.querySelector('#retry-library-load').hidden=false;});
+const loadLibrary=()=>refresh().catch(()=>{});
 document.querySelector('#retry-library-load').addEventListener('click',loadLibrary);
 loadLibrary();
 
