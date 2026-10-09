@@ -1,3 +1,4 @@
+import {createPurchaseHandoff} from './purchase-handoff.js';
 import {allowedCompanionOperation} from '../lib/companion-identities.js';
 import {createAppearanceService} from './appearance.js';
 import '../lib/kindle-contents-scan.js';
@@ -39,6 +40,7 @@ const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension
 const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
 const appearanceService=createAppearanceService(privateArea,storageWriter,chrome.runtime,storageReady);
 globalThis.GalacticHamsterTheme.register(appearanceService,chrome.runtime);
+createPurchaseHandoff({runtime:chrome.runtime,area:privateArea,writer:storageWriter}).register();
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
@@ -506,6 +508,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  if(request?.type?.startsWith('GH_PURCHASE_'))return false;
   if(['MATCH_ITEMS_DIAGNOSTIC_CALLBACK','MATCH_ITEMS_DIAGNOSTIC_RENDER'].includes(request?.type)){
     const observed=contentsPerformance.now(),callback=request.diagnosticCallbackEpochMs,id=request.diagnosticLookupId;
     storageWriter.getQueryAllowedExternalClientIds().then(allowed=>{

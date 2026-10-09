@@ -1,3 +1,13 @@
 # Frozen evidence hashes should not depend on a checkout's line-ending setting.
 tests/fixtures/kindle/*.snapshot.txt text eol=lf
 tests/fixtures/kindle/*.json text eol=lf
+
+# Keep GalacticHamster runtime mirrors byte-identical across Windows checkouts.
+shared/purchase-snapshot.js text eol=lf
+shared/purchase-transfer.js text eol=lf
+shared/purchase-adapters.js text eol=lf
+shared/purchase-handoff-ui.js text eol=lf
+shared/theme.js text eol=lf
+shared/theme.css text eol=lf
+shared/theme-app.css text eol=lf
+shared/theme-overlays.css text eol=lf

@@ -1,6 +1,7 @@
 export const STORAGE_MESSAGE_TYPE = 'LIBRARY_STORAGE_OPERATION';
 
 export const STORAGE_OPERATIONS = Object.freeze([
+  'importPurchaseSnapshot',
   'getDatabase',
   'getCommittedLibraryView',
   'saveOwnershipPolicy',

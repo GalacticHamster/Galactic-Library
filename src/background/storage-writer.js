@@ -1,3 +1,4 @@
+import {applyPurchaseSnapshot} from './purchase-handoff.js';
 import {mergeProductDetailsEvidence} from '../lib/kindle-product-details.js';
 import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/companion-identities.js';
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
@@ -392,6 +393,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       providers:{...database.ownershipPolicy.providers,...patch.providers}});
     return persistDatabase(database);
   }
+
+  async function importPurchaseSnapshot(data,target){const scans=(await storageArea.get({[SCANS]:{}}))[SCANS];if(scans[data.provider])throw Error('Wait for the provider scan to finish before importing saved purchases.');const database=await getDatabase(),stats=await applyPurchaseSnapshot(database,data,target);if(stats.added||stats.updated||target?.newLabel)await persistDatabase(database);return stats;}
 
   function historicalRecords(database,profileId){
     const groups=new Map();for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId){const list=groups.get(h.item.id)??[];list.push(h.item);groups.set(h.item.id,list);}
@@ -1231,7 +1234,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
-    getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, getProviderProfiles, previewProviderProfileRemoval, removeProviderProfile, resetProviderProfileBaseline, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
+    importPurchaseSnapshot,getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, getProviderProfiles, previewProviderProfileRemoval, removeProviderProfile, resetProviderProfileBaseline, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,

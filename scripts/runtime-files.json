@@ -141,5 +141,10 @@
   "shared/theme.css",
   "shared/theme-app.css",
   "src/background/appearance.js",
-  "shared/theme-overlays.css"
+  "shared/theme-overlays.css",
+  "shared/purchase-snapshot.js",
+  "shared/purchase-transfer.js",
+  "shared/purchase-adapters.js",
+  "shared/purchase-handoff-ui.js",
+  "src/background/purchase-handoff.js"
 ]
