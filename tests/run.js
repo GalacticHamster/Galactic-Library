@@ -1,5 +1,6 @@
 import {enrichmentIntegrityTests} from './enrichment-integrity.js';
 import {genreRecoveryTests} from './genre-recovery.js';
+import {operationFeedbackTests} from './operation-feedback.js';
 import {kindleProductDetailsTests} from './kindle-product-details.js';
 import {kindleCategoryTests} from './kindle-categories.js';
 import {genreClassificationTests} from './genre-classification.js';
@@ -96,6 +97,7 @@ const tests = [
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,
+  ...operationFeedbackTests,
   ...workerLifecycleDiagnosticsTests,
   ...optionsPerformanceDiagnosticsTests,
   ...companionQueryConcurrencyTests,
