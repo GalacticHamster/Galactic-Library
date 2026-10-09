@@ -289,13 +289,21 @@ export const storageTests = [
     for (const key of [EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) assert.equal(memory.values[key], undefined);
     assert.equal(await pageB.getShowEnrichmentActions(), true);
   })],
-  ['restore and clear take effect at their exact positions in the shared queue', () => withWorker(async ({ pageA, pageB }) => {
+  ['admitted replacements retain queue position while competing restore and clear requests reject', () => withWorker(async ({ pageA, pageB }) => {
     const backup = createEmptyDatabase();
     const record = normalizeProviderItem({ ...game('1'), provider: 'steam' });
     backup.providerItems[record.id] = record;
-    await Promise.all([pageA.restoreDatabase(backup), pageB.clearDatabase()]);
+    const restored=pageA.restoreDatabase(backup),restoredRead=pageB.getDatabase();
+    await assert.rejects(pageB.clearDatabase(),/replacement is already in progress/u);
+    await restored;
+    assert.ok((await restoredRead).providerItems['steam:1']);
+    await pageB.clearDatabase();
     assert.deepEqual(await pageA.getDatabase(), createEmptyDatabase());
-    await Promise.all([pageA.clearDatabase(), pageB.restoreDatabase(backup)]);
+    const cleared=pageA.clearDatabase(),clearedRead=pageB.getDatabase();
+    await assert.rejects(pageB.restoreDatabase(backup),/replacement is already in progress/u);
+    await cleared;
+    assert.deepEqual(await clearedRead,createEmptyDatabase());
+    await pageB.restoreDatabase(backup);
     assert.ok((await pageA.getDatabase()).providerItems['steam:1']);
   })],
   ['stale enrichment and review requests after clear cannot recreate removed records', () => withWorker(async ({ memory, pageA, pageB, importItems }) => {

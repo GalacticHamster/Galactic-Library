@@ -8,7 +8,10 @@ import {createRelease,projectRoot,readRuntimeZip,validateRuntime} from '../scrip
 
 export const releaseTests=[['release ZIP contains only the explicit runtime, validates dependencies and is deterministic across line endings and file times',async()=>{
   const first=await createRelease(),second=await createRelease();assert.deepEqual(first.zip,second.zip);assert.deepEqual(first.report,second.report);
-  assert.equal(first.files.size,first.report.files.length);assert(first.files.has('src/ui/library-icon.png'));assert(![...first.files.keys()].some(path=>/^(?:tests|scripts|docs|dist)\//u.test(path)||path!=='src/ui/backup-restore.js'&&/backup|start\.txt|package\.json|README|recommendations/iu.test(path)));
+  assert.equal(first.files.size,first.report.files.length);assert(first.files.has('src/ui/library-icon.png'));
+  const backupRuntime=new Set(['src/ui/backup-restore.js','src/ui/backup-export.js']);
+  assert([...backupRuntime].every(path=>first.files.has(path)));
+  assert(![...first.files.keys()].some(path=>/^(?:tests|scripts|docs|dist)\//u.test(path)||!backupRuntime.has(path)&&/backup|start\.txt|package\.json|README|recommendations/iu.test(path)));
   const root=await mkdtemp(join(tmpdir(),'gl-release-test-'));
   try{
     for(const [path,bytes]of first.files){const target=join(root,path);await mkdir(dirname(target),{recursive:true});await writeFile(target,['.js','.css','.json','.html'].includes(extname(path))?bytes.toString().replaceAll('\n','\r\n'):bytes);await utimes(target,new Date('2001-01-01'),new Date('2026-10-01'));}
