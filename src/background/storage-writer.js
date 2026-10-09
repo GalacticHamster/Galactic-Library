@@ -904,6 +904,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       }
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
       const paths=entry.categoryPaths===undefined?[]:validateKindleCategoryPaths(entry.categoryPaths);
+      if(paths.length&&!['statement-found','no-statement'].includes(availability))throw new Error('Category capture requires a successfully retrieved product page.');
       const categoryMetadata=paths.length?{categoryPaths:paths,categoriesCheckedAt:updatedAt}:previous?.categoryPaths?.length?{categoryPaths:previous.categoryPaths,categoriesCheckedAt:previous.categoriesCheckedAt}:{};
       const result = {source:'amazon-product-page',sourceUrl,statement,availability,
         ...categoryMetadata,

@@ -1,0 +1,23 @@
+﻿import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {writeFile} from 'node:fs/promises';
+import {outputPath} from './audit-artifacts.mjs';
+import {rebuildCanonicalItems} from '../src/lib/models.js';
+import {classificationRecords,COMICS} from '../tests/genre-classification.js';
+import {libraryBroadGenreValues,libraryCategoryEvidence} from '../src/lib/genre-hints.js';
+import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
+const beforeSource=execFileSync('git',['show','a924189:src/lib/genre-hints.js'],{encoding:'utf8',windowsHide:true});
+const before=await import('data:text/javascript;base64,'+Buffer.from(beforeSource).toString('base64'));
+const records=classificationRecords();
+const canonical=rebuildCanonicalItems(Object.fromEntries(records.map(r=>[r.id,r])));
+const counts=(records,classify)=>Object.fromEntries([...new Set(records.flatMap(classify))].sort().map(category=>[category,records.filter(record=>classify(record).includes(category)).length]));
+const batman=records.filter(record=>/batman/iu.test(record.title));
+const report={baseline:'a924189',fixtures:records.length,categoryCountsBefore:counts(records,before.libraryBroadGenreValues),categoryCountsAfter:counts(records,libraryBroadGenreValues),canonicalCountBefore:Object.keys(canonical).length,canonicalCountAfter:Object.keys(canonical).length,ownershipCountsBeforeAfter:Object.fromEntries([...new Set(records.map(r=>r.ownership))].map(state=>[state,records.filter(r=>r.ownership===state).length])),batman:{total:batman.length,before:batman.filter(r=>before.libraryBroadGenreValues(r).includes(COMICS)).length,after:batman.filter(r=>libraryBroadGenreValues(r).includes(COMICS)).length,records:batman.map(r=>({id:r.providerItemId,before:before.libraryBroadGenreValues(r),after:libraryBroadGenreValues(r),evidence:libraryCategoryEvidence(r).map(({source,confidence,categories,conflict})=>({source,confidence,categories,...(conflict?{conflict}:{})}))}))}};
+const base=records.find(r=>r.providerItemId==='stored-google'),large=Array.from({length:14081},(_,i)=>({...base,id:'kindle:synthetic-'+i,recordRef:'synthetic-'+i,title:'Synthetic Book '+i,providerItemId:'synthetic-'+i}));
+const database={providerItems:Object.fromEntries(large.map(r=>[r.id,r])),canonicalItems:Object.fromEntries(large.map(r=>[r.id,{id:r.id,title:r.title,mediaType:'book',providerItemIds:[r.id]}]))};
+const project=createLibraryBrowseProjection(),start=performance.now(),projection=project(database),built=performance.now();
+const iterations=20,readStart=performance.now();let total=0;
+for(let i=0;i<iterations;i++){assert.equal(project(database),projection);total+=libraryBrowseResults(projection,{query:'Synthetic',filters:{genre:'Technology & Computing'},page:i%10}).total;}
+assert.equal(total,14081*iterations);assert.equal(Object.keys(database.canonicalItems).length,14081);
+report.performance={records:14081,projectionBuildMs:built-start,repeatedQueryMeanMs:(performance.now()-readStart)/iterations,queries:iterations,classificationEvaluationsPerFilterInteraction:0};
+const path=await outputPath(new URL('../audit-artifacts/genres/genre-synthetic-results-2026-10-08.json',import.meta.url),'unused');await writeFile(path,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
