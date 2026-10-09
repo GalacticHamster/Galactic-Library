@@ -1,0 +1,7 @@
+# Offline historical category recovery
+
+The preview compares two valid GL backups without writing either input. Linkage requires a unique provider/native identifier on both sides, unchanged literal validated title and equal book/audiobook media. Duplicate IDs across profiles are ambiguous. Changed titles, missing IDs, changed media and reviewed contradictory format labels are skipped. Independent subjects can coexist; this does not attempt a general ontology conflict engine.
+
+Only absent Google Books categories/genre hints or Open Library subjects are proposed. Existing nonempty category lists are preserved in full. A populated newer catalogue identifier conflicts with a different historical catalogue source. Newly created sparse envelopes contain source, category labels, source URL/capture dates and an explicit historical category-only matchBasis. Genre-hint confidence/candidate label may be retained as nonidentity provenance. Historical ISBN, authors, publisher, work/edition IDs, ownership, access, contents and decisions are excluded. Existing envelopes retain all their current fields.
+
+Fingerprints cover original backup JSON with sorted object keys. Preview counts and patches are deterministic; old profile migration generates no candidate state. Report examples are opt-in to avoid printing private titles. Broad-facet counts use the same read-only classification functions as Library.
