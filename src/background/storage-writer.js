@@ -1243,6 +1243,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences
   };
   let tail = Promise.resolve();
+  let replacementPending=false;
 
   async function runOperation(operation,values){
     if(operation!=='checkKindleContentsRefreshItem')invalidateRefreshPreflight();
@@ -1254,6 +1255,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!STORAGE_OPERATIONS.includes(operation) || !Array.isArray(args)) {
       return Promise.reject(new Error('Unsupported Galactic Library storage operation.'));
     }
+    // Cross-page admission guard; persistence transactions/order are unchanged.
+    const replacement=operation==='restoreDatabase'||operation==='clearDatabase';
+    if(replacementPending&&(replacement||operation==='removeProviderProfile'))return Promise.reject(Error('A library replacement is already in progress. Wait for it to finish.'));
     // Capture the request at admission, before callers can mutate it.
     let values;
     const captureEnd=timing?.begin('writer_capture');
@@ -1263,6 +1267,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     // Only this explicit read-only view bypasses the ordinary writer queue.
     // Mutations and authoritative mutable reads retain their original ordering.
     if(operation==='getCommittedLibraryView')return getCommittedLibraryView(...values);
+    if(replacement)replacementPending=true;
     const queueEnd=timing?.begin('writer_queue');
     const result = tail.then(() => ready).then(timing ? async () => {
       queueEnd();activeTiming=timing;
@@ -1270,7 +1275,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     } : async () => {try{return await runOperation(operation,values);}catch(error){invalidateRefreshPreflight();throw error;}});
     // A rejected operation never poisons the queue; later requests still run.
     tail = result.catch(() => {});
-    return result;
+    return replacement?result.finally(()=>{replacementPending=false;}):result;
   }
 
   return Object.freeze({

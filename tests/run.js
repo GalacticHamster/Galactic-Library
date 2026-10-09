@@ -3,6 +3,7 @@ import {genreRecoveryTests} from './genre-recovery.js';
 import {operationFeedbackTests} from './operation-feedback.js';
 import {libraryLoadingTests} from './library-loading.js';
 import {backupExportTests} from './backup-export.js';
+import {backupRestoreFeedbackTests} from './backup-restore-feedback.js';
 import {kindleProductDetailsTests} from './kindle-product-details.js';
 import {kindleCategoryTests} from './kindle-categories.js';
 import {genreClassificationTests} from './genre-classification.js';
@@ -102,6 +103,7 @@ const tests = [
   ...operationFeedbackTests,
   ...libraryLoadingTests,
   ...backupExportTests,
+  ...backupRestoreFeedbackTests,
   ...workerLifecycleDiagnosticsTests,
   ...optionsPerformanceDiagnosticsTests,
   ...companionQueryConcurrencyTests,

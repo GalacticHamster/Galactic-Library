@@ -4,6 +4,7 @@ import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {createLibraryLoader} from './library-loading.js';
 import {createBackupExporter,handoffDownload} from './backup-export.js';
+import {createOperation} from './operation-feedback.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
@@ -875,25 +876,21 @@ async function refreshView(context,diagnosticLookupId = null) {
 const libraryLoader=createLibraryLoader({panel:document.querySelector('#library-load-status'),message:document.querySelector('#library-load-status span'),retry:document.querySelector('#retry-library-load'),content:document.querySelector('#library-section'),load:refreshView});
 const refresh=(...args)=>libraryLoader.refresh(...args);
 
-const backupExporter=createBackupExporter({button:document.querySelector('#export'),status:backupStatus,read:getDatabase});
+const backupExporter=createBackupExporter({button:document.querySelector('#export'),status:backupStatus,read:getDatabase,canStart:()=>!backupRestore.saving&&!clearOperation.busy});
 const exportCurrentBackup=()=>backupExporter.run();
 document.querySelector('#export').addEventListener('click',()=>exportCurrentBackup().catch(()=>{}));
 
 bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summary'),status:document.querySelector('#performance-diagnostics-status'),worker:document.querySelector('#performance-diagnostics-worker'),runtime:chrome.runtime});
 
-document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();document.querySelector('#import').click();}});
+document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();if(!document.querySelector('#import').disabled)document.querySelector('#import').click();}});
 
-const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh,exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation()});
+const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh,exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
 
+const clearOperation=createOperation({id:'library-clear',name:'Clearing local library...',status:backupStatus,controls:[document.querySelector('#clear'),document.querySelector('#import'),document.querySelector('#export')]});
 document.querySelector('#clear').addEventListener('click', async () => {
+  if(clearOperation.busy||backupRestore.busy||backupExporter.busy)return;
   if (!confirm('Clear Galactic Library in this browser? This removes saved libraries, account labels, reviews and settings, including your Google Books key and companion links. Purchases in your stores are unaffected. The API key is not included in a library backup.')) return;
-  try {
-    await clearDatabase();
-    await refresh();
-    backupStatus.textContent = 'Local library cleared.';
-  } catch (error) {
-    backupStatus.textContent = `Clear failed: ${error.message}`;
-  }
+  clearOperation.run(async context=>{await clearDatabase();await context.phase('Reloading cleared Library...');try{await refresh();}catch(error){throw Error('Library cleared, but its view could not reload: '+error.message);}}, {success:'Local library cleared.'}).catch(()=>{});
 });
 downloadComixologyListButton.addEventListener('click', () => {
   const blob = new Blob([comixologyReviewMarkdown(database.providerItems, 'Current Galactic Library')], { type: 'text/markdown' });
