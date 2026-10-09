@@ -68,7 +68,7 @@ try{
     assert.equal((await evaluate('return chrome.runtime.sendMessage({type:"GH_GET_APPEARANCE"});')).appearance.mode,'system');checks.push(role+': fresh native installation defaults to System');
     if(role==='gl'){
       await evaluate(`const S=await import('./src/lib/storage.js');await S.mergeProviderItems('gog',[{providerItemId:'synthetic-theme',title:'Synthetic owned theme control',mediaType:'game',ownership:'owned'}]);await S.mergeProviderItems('kindle',[{providerItemId:'synthetic-theme-book',title:'Synthetic collection',mediaType:'book',ownership:'owned'}]);await S.addAllowedExternalClientId(${JSON.stringify(installed.hb.id)});await S.addAllowedExternalClientId(${JSON.stringify(installed.fan.id)});return true;`);
-      await wait('document.querySelector("#library-load-status").hidden');
+      await wait('document.querySelector("#library-load-status").hidden&&document.querySelector("#library-items").children.length===2&&!document.querySelector("#kindle-contents-progress > button").disabled');
       protectedState[role]=await evaluate('const S=await import("./src/lib/storage.js");return JSON.stringify(await S.getDatabase());');
       await evaluate('document.querySelector("[data-workspace=settings]").click();return true;');
     }else{
