@@ -29,7 +29,7 @@ export function checkProductDetailsCapture(parse){
   if(fixture.empty){if(result!==null)throw Error(fixture.name+' captured unsupported evidence');}
   else{if(result?.asin!=='B08KHXKTKQ')throw Error(fixture.name+' lost product association');for(const [field,value]of Object.entries(fixture.expected))if(!result.observations.some(o=>o.field===field&&o.value===value))throw Error(fixture.name+' incorrect '+field);if(fixture.count&&result.observations.length!==fixture.count)throw Error(fixture.name+' incorrect count');if(result.observations.some(o=>o.url?.includes('evil')||['price','rating','rank'].includes(o.field)))throw Error('Unsafe field/link');}
   checks.push('Product Details: '+fixture.name);
- }return checks;
+ }if(globalThis.document?.createElement){const document=parse(productDetailsFixtures[0].html),start=performance.now();for(let i=0;i<1000;i++)globalThis.GalacticKindle.kindleProductDetails(document,'https://www.amazon.com/dp/B08KHXKTKQ');checks.push('Product Details real DOM extraction: 1000 iterations '+(performance.now()-start).toFixed(2)+' ms (HTML parsing excluded)');}return checks;
 }
 
 export async function checkProductDetailsUi(parse){
