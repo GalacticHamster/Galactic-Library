@@ -1,3 +1,4 @@
+import {identityEvidence} from '../src/lib/identity.js';
 import {createHash} from 'node:crypto';
 import {parseBackup} from '../src/lib/storage.js';
 import {validateEnrichment} from '../src/lib/metadata-validation.js';
@@ -53,4 +54,41 @@ export function previewGenreRecovery(oldBackup,currentBackup,{examples=false}={}
  const result={format:1,oldFingerprint:fingerprint(oldBackup),currentFingerprint:fingerprint(currentBackup),titleRule:'Literal unchanged validated title; no fuzzy matching or article/edition normalization.',summary,skipped,categoriesBefore:counts(currentRecords),categoriesAfter:counts(Object.values(projected.providerItems)),patches};
  if(examples)result.examples=patches.slice(0,10).map(p=>({provider:p.provider,title:currentIndex.get(p.provider+'\0'+p.providerItemId)[0].title,kind:p.kind,categories:p.after[p.field]}));
  return result;
+}
+
+function normalizedCurrent(backup){const database=parseBackup(backup);if(stable(database)!==stable(backup.database))throw Error('Current backup needs a fresh normalized GL export; candidate generation must not migrate or normalize unrelated state.');return database;}
+function checkedPatch(patch){
+ if(!Object.hasOwn(kinds,patch.kind)||patch.field!==kinds[patch.kind])throw Error('Invalid category-only patch.');
+ if(stable(validateEnrichment(patch.kind,patch.after))!==stable(patch.after))throw Error('Invalid recovered evidence.');
+ if(patch.before){const { [patch.field]:oldLabels,...before }=patch.before,{[patch.field]:newLabels,...after}=patch.after;
+  if(stable(before)!==stable(after)||oldLabels?.length)throw Error('Recovery patch changes noncategory/current populated fields.');
+ }else{const permitted=['source','sourceUrl','retrievedAt','appliedAt','matchBasis',patch.field,...(patch.kind==='googleBooksGenreHint'?['confidence','candidateTitle','candidateVolumeId']:[])];
+  if(Object.keys(patch.after).some(key=>!permitted.includes(key))||patch.after.matchBasis!=='historical-category-only-recovery')throw Error('Recovery patch contains unrelated historical fields.');
+ }
+ if(!patch.after[patch.field]?.length)throw Error('Empty recovery patch.');return patch;
+}
+function patchTarget(database,patch){const record=database.providerItems[patch.itemId];if(!record||record.recordRef!==patch.recordRef||record.profileId!==patch.profileId||record.provider!==patch.provider||record.providerItemId!==patch.providerItemId)throw Error('Recovery target changed.');return record;}
+function inverse(database,patches){const restored=structuredClone(database);
+ for(const patch of [...patches].reverse()){checkedPatch(patch);const record=patchTarget(restored,patch);
+  if(stable(record.metadata.enrichment?.[patch.kind]??null)!==stable(patch.after))throw Error('Recovered field changed since recovery; undo refused to overwrite newer evidence.');
+  if(patch.before)record.metadata.enrichment[patch.kind]=structuredClone(patch.before);else delete record.metadata.enrichment[patch.kind];
+  if(!patch.hadEnrichment&&!Object.keys(record.metadata.enrichment).length)delete record.metadata.enrichment;
+ }return restored;
+}
+export function createGenreRecoveryCandidate(oldBackup,currentBackup){
+ const current=normalizedCurrent(currentBackup),preview=previewGenreRecovery(oldBackup,currentBackup),candidate=structuredClone(currentBackup);
+ for(const patch of preview.patches){checkedPatch(patch);const record=patchTarget(candidate.database,patch);if(stable(record.metadata.enrichment?.[patch.kind]??null)!==stable(patch.before))throw Error('Recovery target is stale.');record.metadata.enrichment={...record.metadata.enrichment,[patch.kind]:structuredClone(patch.after)};}
+ const checked=parseBackup(candidate);if(stable(checked)!==stable(candidate.database))throw Error('Candidate validation changed unrelated state.');
+ if(stable(inverse(checked,preview.patches))!==stable(current))throw Error('Category-only preservation check failed.');
+ for(const [id,record]of Object.entries(current.providerItems))if(stable(identityEvidence(record))!==stable(identityEvidence(checked.providerItems[id])))throw Error('Recovery changed identity evidence.');
+ candidate.recoveryManifest={format:1,operation:'historical-category-only',oldFingerprint:preview.oldFingerprint,currentFingerprint:preview.currentFingerprint,candidateDatabaseFingerprint:fingerprint(checked),patchFingerprint:fingerprint(preview.patches),summary:preview.summary,patches:preview.patches};
+ return {candidate,preview};
+}
+/** Undo only exact category patch targets. New records/unrelated fields can
+ * coexist; changed recovered envelopes are refused rather than rolled back. */
+export function undoGenreRecovery(currentBackup,manifest){
+ const database=normalizedCurrent(currentBackup);
+ if(manifest?.format!==1||manifest.operation!=='historical-category-only'||!Array.isArray(manifest.patches)||manifest.patchFingerprint!==fingerprint(manifest.patches))throw Error('Invalid recovery manifest.');
+ const restored=inverse(database,manifest.patches),candidate={...structuredClone(currentBackup),database:restored};delete candidate.recoveryManifest;
+ if(stable(parseBackup(candidate))!==stable(restored))throw Error('Undo validation changed unrelated state.');return candidate;
 }

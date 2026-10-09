@@ -33,3 +33,29 @@ genreRecoveryTests.push(['Preview remains deterministic on legacy backups, rejec
  assert.equal(stable(previewGenreRecovery(old,legacy)),stable(previewGenreRecovery(old,legacy)));
  const corrupt=structuredClone(current);Object.values(corrupt.database.providerItems)[0].providerItemId='';assert.throws(()=>previewGenreRecovery(old,corrupt));
 }]);
+
+import {createGenreRecoveryCandidate,undoGenreRecovery} from '../scripts/genre-recovery.mjs';
+import {parseBackup} from '../src/lib/storage.js';
+import {matchItems} from '../src/lib/matcher.js';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+genreRecoveryTests.push(['Candidate recovery validates exact state/identity/matching, is idempotent and undo preserves later unrelated activity but refuses stale categories',async()=>{
+ const {old,current}=await recoveryFixture(),before=stable({old,current}),{candidate,preview}=createGenreRecoveryCandidate(old,current),db=parseBackup(candidate);
+ assert.equal(preview.patches.length,1);assert.equal(stable({old,current}),before);
+ const query=Object.values(current.database.providerItems).map(record=>({title:record.title,mediaType:record.mediaType}));assert.deepEqual(matchItems(db.providerItems,query,db),matchItems(current.database.providerItems,query,current.database));
+ for(const key of Object.keys(current.database).filter(key=>key!=='providerItems'))assert.deepEqual(db[key],current.database[key],key);
+ assert.equal(createGenreRecoveryCandidate(old,candidate).preview.patches.length,0);
+ assert.equal(stable(undoGenreRecovery(candidate,candidate.recoveryManifest).database),stable(current.database));
+ const later=structuredClone(candidate);Object.values(later.database.providerItems)[0].metadata.publisher='Newly saved publisher';const undone=undoGenreRecovery(later,candidate.recoveryManifest);assert.equal(Object.values(undone.database.providerItems)[0].metadata.publisher,'Newly saved publisher');
+ const stale=structuredClone(candidate);stale.database.providerItems[preview.patches[0].itemId].metadata.enrichment.googleBooks.categories=['History'];assert.throws(()=>undoGenreRecovery(stale,candidate.recoveryManifest),/changed since/);
+ const forged=structuredClone(candidate.recoveryManifest);forged.patches[0].before={isbn:['9780306406157']};assert.throws(()=>undoGenreRecovery(candidate,forged));
+ const legacy=structuredClone(current);legacy.database.schemaVersion=12;assert.throws(()=>createGenreRecoveryCandidate(old,legacy),/fresh normalized/);
+}],['Recovery CLI requires confirmation, exclusive new output and leaves inputs intact; candidate and inverse validate',async()=>{
+ const directory=mkdtempSync(join(tmpdir(),'gl-category-recovery-'));try{const {old,current}=await recoveryFixture(),oldPath=join(directory,'old.json'),currentPath=join(directory,'current.json'),output=join(directory,'candidate.json'),undo=join(directory,'undo.json');writeFileSync(oldPath,JSON.stringify(old));writeFileSync(currentPath,JSON.stringify(current));const before=[readFileSync(oldPath,'utf8'),readFileSync(currentPath,'utf8')];
+ const run=args=>execFileSync(process.execPath,['scripts/recover-historical-categories.mjs',...args],{windowsHide:true,stdio:'pipe'});
+ assert.throws(()=>run([oldPath,currentPath,'--output',output]));assert.throws(()=>run([oldPath,currentPath,'--output',currentPath,'--confirm']));run([oldPath,currentPath,'--output',output,'--confirm']);assert.throws(()=>run([oldPath,currentPath,'--output',output,'--confirm']));const saved=JSON.parse(readFileSync(output));parseBackup(saved);
+ run(['--undo',output,output,'--output',undo,'--confirm']);assert.deepEqual(parseBackup(JSON.parse(readFileSync(undo))),current.database);assert.deepEqual([readFileSync(oldPath,'utf8'),readFileSync(currentPath,'utf8')],before);
+ }finally{rmSync(directory,{recursive:true});}
+}]);
