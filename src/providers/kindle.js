@@ -271,8 +271,10 @@
         else if(field==='publicationDate'){value=detailDate(original);status=value?'parsed':'unparsed';}
         else if(field==='pageCount'){value=/^([\d,]+)\s*(?:pages?)?$/iu.exec(original)?.[1]?.replace(/,/gu,'')??'';if(!/^\d{1,7}$/u.test(value)||Number(value)<1||Number(value)>1000000)value='';status=value?'parsed':'unparsed';}
         else if(field==='asin'){value=original.toUpperCase();if(!/^[A-Z0-9]{10}$/u.test(value)){value='';status='invalid';}}
+        const publisherDate=field==='publisher'?/\s*\(([^()]+)\)\s*$/u.exec(original):null;
+        if(publisherDate&&detailDate(publisherDate[1]))value=original.slice(0,publisherDate.index).trim();
         const reference=field==='series'?seriesUrl(link):'',dedupe=[field,value||original,reference].join('\0');
-        if(seen.has(dedupe))continue;seen.add(dedupe);observations.push({field,label,raw:original,value,status,selector,...(reference?{url:reference}:{})});
+        if(seen.has(dedupe)){if(publisherDate&&detailDate(publisherDate[1]))add('Publication date',publisherDate[1],selector);continue;}seen.add(dedupe);observations.push({field,label,raw:original,value,status,selector,...(reference?{url:reference}:{})});
         if(observations.length>=40)return;
         if(field==='publisher'){
           const date=/\s*\(([^()]+)\)\s*$/u.exec(original);

@@ -59,3 +59,17 @@ genreRecoveryTests.push(['Candidate recovery validates exact state/identity/matc
  run(['--undo',output,output,'--output',undo,'--confirm']);assert.deepEqual(parseBackup(JSON.parse(readFileSync(undo))),current.database);assert.deepEqual([readFileSync(oldPath,'utf8'),readFileSync(currentPath,'utf8')],before);
  }finally{rmSync(directory,{recursive:true});}
 }]);
+
+genreRecoveryTests.push(['Recovery retains hint/work source provenance without historic identity and preserves human/source history exactly',async()=>{
+ const {old,current}=await recoveryFixture(),source=Object.values(old.database.providerItems)[0],target=Object.values(current.database.providerItems)[0],now='2026-10-08T00:00:00.000Z';
+ source.metadata.enrichment.googleBooksGenreHint={source:'google-books',confidence:'author-and-title-stem',candidateVolumeId:'hint',candidateTitle:'Historical candidate',categories:['History'],sourceUrl:'https://books.google.com/books?id=hint'};
+ source.metadata.enrichment.openLibrary={source:'open-library',workKey:'/works/OL1W',title:'Old work',authors:['Old author'],isbn:['9780306406157'],subjects:['Computers'],sourceUrl:'https://openlibrary.org/works/OL1W'};
+ current.database.contentReviews[target.id]={entries:[{series:'Example',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}],statement:'Collects Example #1',source:'manual-review',sourceUrl:'',verifiedAt:now};
+ current.database.ownershipReviews[target.recordRef]={ownership:'owned',source:'manual-confirmation',reviewRef:crypto.randomUUID(),note:'Synthetic receipt',evidenceDate:now,confirmedAt:now,expiresAt:null,sourceUrl:''};
+ current.database.readingStates[target.recordRef]={revisionRef:crypto.randomUUID(),status:'reading',progress:25,downloaded:false,access:'accessible',accessCheckedAt:now,updatedAt:now};
+ const history=crypto.randomUUID();current.database.enrichmentHistory[history]={recordRef:target.recordRef,kind:'googleBooks',selectionRef:history,previous:null,changedAt:now};
+ const second=Object.values(current.database.providerItems)[3],pair=[target.id,second.id].sort();current.database.manualMatchDecisions[pair.join('\0')]={itemIds:pair,decision:'same-work',updatedAt:now};
+ const checked=createBackup(current.database),{candidate}=createGenreRecoveryCandidate(createBackup(old.database),checked),record=candidate.database.providerItems[target.id];
+ assert(!record.metadata.enrichment.openLibrary.workKey);assert(!record.metadata.enrichment.openLibrary.authors);assert.equal(record.metadata.enrichment.googleBooksGenreHint.candidateVolumeId,'hint');assert.equal(record.metadata.enrichment.openLibrary.sourceUrl,'https://openlibrary.org/works/OL1W');
+ for(const key of Object.keys(checked.database).filter(k=>k!=='providerItems'))assert.deepEqual(candidate.database[key],checked.database[key],key);
+}]);

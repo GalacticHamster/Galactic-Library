@@ -41,6 +41,7 @@ export function validateEnrichment(kind, value) {
     else if (['pageCount','firstPublishYear'].includes(key)) result[key]=value[key]===null?null:count(value[key],key,key==='pageCount'?1000000:9999);
     else result[key]=text(value[key],['statement','parseInput'].includes(key)?10000:key==='source'?100:500,`Enrichment ${key}`);
   }
+  if(kind==='kindleProductComicContents'&&result.productDetailsEvidence&&result.productDetailsEvidence.sourceUrl!==result.sourceUrl)throw Error('Product Details and contents source association disagree.');
   // A generation-5 selected clause is exact bounded source evidence, including
   // DOM lines. Restore it only after validating both the text bounds and its
   // independently recomputed source-backed window. Parser copies stay compact;

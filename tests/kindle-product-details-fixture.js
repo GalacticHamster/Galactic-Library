@@ -18,6 +18,8 @@ export const productDetailsFixtures=[
  {name:'series without link and breadcrumb',html:page(bullets([['Series','A series']])+'<div id="wayfinding-breadcrumbs_feature_div"><ul><li>Kindle Store</li><li>Kindle eBooks</li><li>History</li></ul></div>'),expected:{series:'A series'}},
  {name:'conflicting ASIN remains evidence',html:page(bullets([['ASIN','B000000001']])),expected:{asin:'B000000001'}},
  {name:'unknown technical and commercial omitted',html:page(table([['Best Sellers Rank','100'],['Review count','100'],['Accessibility','Screen reader supported'],['Guided View','Enabled']])),expected:{accessibility:'Screen reader supported',guidedView:'Enabled'},count:2},
+ {name:'publisher duplicates across representations',html:page(bullets([['Publisher','BOOM! Studios (December 1, 2020)'],['Publisher','BOOM! Studios']])),expected:{publisher:'BOOM! Studios',publicationDate:'2020-12-01'},count:2},
+ {name:'malformed table without value',html:page('<table id="productDetails_detailBullets_sections1"><tr><th>Language</table>'),empty:true},
  {name:'impossible date',html:page(table([['Publication date','February 30, 2020']])),expected:{publicationDate:''}}
 ];
 export function checkProductDetailsCapture(parse){
@@ -33,8 +35,11 @@ export async function checkProductDetailsUi(parse){
  const {createProductDetails}=await import('../src/ui/product-details.js');
  const evidence=globalThis.GalacticKindle.kindleProductDetails(parse(productDetailsFixtures[0].html),'https://www.amazon.com/dp/B08KHXKTKQ');
  const record={provider:'kindle',mediaType:'book',title:'Example',metadata:{isbn:'9780306406157',enrichment:{kindleProductComicContents:{productDetailsEvidence:evidence}}}};
- const before=JSON.stringify(record),section=createProductDetails([record],{});document.body.append(section);section.style.maxWidth='300px';
+ const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('../src/ui/ui.css',import.meta.url).href;await new Promise((resolve,reject)=>{css.onload=resolve;css.onerror=reject;document.head.append(css);});
+ const before=JSON.stringify(record),started=performance.now(),section=createProductDetails([record],{});document.body.append(section);section.style.maxWidth='300px';
  if(!section.textContent.includes('unverified edition relationship')||!section.textContent.includes('Saved edition:')||section.querySelector('details').open||!section.textContent.includes('118 pages'))throw Error('Product Details UX/provenance incomplete');
  if(JSON.stringify(record)!==before)throw Error('Presentation mutated source');
- if(section.scrollWidth>section.clientWidth+2)throw Error('Product Details overflow');section.remove();return ['Product Details UI: observational ISBN, conflicts, collapsed source evidence and narrow wrapping'];
+ if(section.scrollWidth>section.clientWidth+2)throw Error('Product Details overflow');const milliseconds=performance.now()-started;section.remove();
+ const long=structuredClone(record);long.metadata.enrichment.kindleProductComicContents.productDetailsEvidence.observations.find(o=>o.field==='publisher').value='LongPublisher'.repeat(30);const wrapped=createProductDetails([long],{});document.body.append(wrapped);wrapped.style.maxWidth='300px';if(wrapped.scrollWidth>wrapped.clientWidth+2)throw Error('Long publisher overflow');wrapped.remove();css.remove();
+ return ['Product Details UI: observational ISBN, conflicts, collapsed source evidence and long narrow wrapping; render '+milliseconds.toFixed(2)+' ms'];
 }

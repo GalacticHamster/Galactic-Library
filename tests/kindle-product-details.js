@@ -52,3 +52,8 @@ kindleProductDetailsTests.push(['Product Details presentation labels conflicts, 
  const record={provider:'kindle',providerItemId:'B08KHXKTKQ',mediaType:'book',title:'Example',metadata:{publisher:'BOOM! Studios',isbn:'9780306406157',enrichment:{kindleProductComicContents:{productDetailsEvidence:capture()}}}};const before=JSON.stringify(record),view=productDetailsView(record);
  assert(!view.facts.some(f=>f.field==='publisher'));assert(view.facts.find(f=>f.field==='isbn13').conflict);assert.equal(JSON.stringify(record),before);assert.equal(productDetailsView({...record,provider:'kobo'}),null);
 }]);
+
+import {validateEnrichment} from '../src/lib/metadata-validation.js';
+kindleProductDetailsTests.push(['Restored Product Details must have the same product association as their enclosing source evidence',()=>{
+ assert.throws(()=>validateEnrichment('kindleProductComicContents',{sourceUrl:'https://www.amazon.com/dp/B000000001',productDetailsEvidence:capture()}),/association disagree/);
+}]);
