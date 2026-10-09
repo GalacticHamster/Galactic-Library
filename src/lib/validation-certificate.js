@@ -4,7 +4,7 @@ import {isCommittedSnapshot} from './committed-snapshot.js';
 export const VALIDATION_CERTIFICATE_KEY='galacticLibraryValidationCertificate';
 // Bump whenever database validation, normalization, source interpretation or
 // canonical identity rules change. Schema compatibility alone is not proof.
-export const VALIDATION_ALGORITHM_VERSION='database-validation-2026-10-06-profiles-v4';
+export const VALIDATION_ALGORITHM_VERSION='database-validation-2026-10-08-product-details-v1';
 export function strictDatabaseSerialization(value){
   // JSON zero follows the validator's existing numerical equality (0 === -0).
   // Reject lossy values instead of JSON's undefined/null/omission conversions.

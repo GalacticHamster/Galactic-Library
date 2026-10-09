@@ -1,3 +1,4 @@
+import {mergeProductDetailsEvidence} from '../lib/kindle-product-details.js';
 import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/companion-identities.js';
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
@@ -905,9 +906,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
       const paths=entry.categoryPaths===undefined?[]:validateKindleCategoryPaths(entry.categoryPaths);
       if(paths.length&&!['statement-found','no-statement'].includes(availability))throw new Error('Category capture requires a successfully retrieved product page.');
+      if(entry.productDetailsEvidence&&!['statement-found','no-statement'].includes(availability))throw Error('Product Details require a successfully retrieved product page.');
+      const productDetailsEvidence=mergeProductDetailsEvidence(previous?.productDetailsEvidence,entry.productDetailsEvidence,sourceUrl,updatedAt);
       const categoryMetadata=paths.length?{categoryPaths:paths,categoriesCheckedAt:updatedAt}:previous?.categoryPaths?.length?{categoryPaths:previous.categoryPaths,categoriesCheckedAt:previous.categoriesCheckedAt}:{};
       const result = {source:'amazon-product-page',sourceUrl,statement,availability,
-        ...categoryMetadata,
+        ...categoryMetadata, ...(productDetailsEvidence?{productDetailsEvidence}:{}),
         ...(selection?{manifest:selection.manifest}:{}),extractorVersion:entry.extractorVersion ?? 1,
         ...(availability==='temporary-failure'?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
       endValidation?.();

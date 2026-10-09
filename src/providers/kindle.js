@@ -330,7 +330,8 @@
     if(document.querySelector('#ap_email,form[name="signIn"]'))throw new Error('Sign in again before retrying the Kindle contents lookup.');
     }finally{checksEnd?.();}
     const extractEnd=timing?.begin('extraction',timing.attempts);
-    let statement,descriptionBlocks,categoryPaths;try{
+    let statement,descriptionBlocks,categoryPaths,productDetailsEvidence;try{
+      productDetailsEvidence=kindleProductDetails(document,`${url.origin}${url.pathname}`);
       categoryPaths=kindleCategoryPaths(document);
       descriptionBlocks=kindleDescriptionBlocks(document);
       statement=descriptionBlocks.map(block=>explicitContentsStatement(block.text)).find(Boolean)??'';
@@ -338,7 +339,7 @@
       // the existing review parser, including no-trigger structural discovery.
       if(!statement)statement=descriptionBlocks.find(b=>/\bissues?\s*#?\d|#\s*\d|\bContents\s*:/iu.test(b.text))?.text.slice(0,2000)??'';
     }finally{extractEnd?.();}
-    return { sourceUrl: `${url.origin}${url.pathname}`, statement, descriptionBlocks,...(categoryPaths.length?{categoryPaths}:{}), availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
+    return { sourceUrl: `${url.origin}${url.pathname}`, statement, descriptionBlocks,...(productDetailsEvidence?{productDetailsEvidence}:{}),...(categoryPaths.length?{categoryPaths}:{}), availability: statement?'statement-found':'no-statement', extractorVersion:contentsExtractorVersion };
   }
 
   function ownershipItemsFromResponse(response) {

@@ -1,3 +1,4 @@
+import {validateProductDetailsEvidence} from './kindle-product-details.js';
 import { object, text, strings, date, url, count } from './validation.js';
 import {validatePurchaseOrigins} from './purchase-origins.js';
 import {validateManifest} from './kindle-manifest.js';
@@ -21,14 +22,15 @@ export function validateEnrichment(kind, value) {
     openLibrary:['source','workKey','sourceUrl','title','authors','publishers','approved','matchBasis','subjects','firstPublishYear','isbn','editionKeys','appliedAt'],
     googleBooks:['source','volumeId','sourceUrl','title','subtitle','authors','categories','isbn','publisher','publishedDate','pageCount','language','appliedAt','approved','matchBasis'],
     googleBooksGenreHint:['source','confidence','candidateVolumeId','candidateTitle','sourceUrl','categories','appliedAt'],
-    kindleProductComicContents:['source','sourceUrl','statement','manifest','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','parseBinding','parseInput','failureCode','checkedAt','categoryPaths','categoriesCheckedAt'],
+    kindleProductComicContents:['source','sourceUrl','statement','manifest','availability','parseStatus','parseOutcome','parserVersion','extractorVersion','filterVersion','quality','qualityReason','descriptionMayBeIncomplete','parseBinding','parseInput','failureCode','checkedAt','categoryPaths','categoriesCheckedAt','productDetailsEvidence'],
     localMetadata:['source','sourceId','sourceUrl','fileName','editionKey','workKey','title','authors','contributors','isbn','publisher','series','volume','issue','unitType','run','edition','language','format','categories','publishedDate','pageCount','statement','approved','matchBasis','retrievedAt']
   }[kind];
   if (!fields) throw new Error('Unsupported enrichment source.');
   const result = {};
   for (const key of [...fields,'selectionRef','retrievedAt','approved','matchBasis']) {
     if (!Object.hasOwn(value,key)) continue;
-    if(key==='categoryPaths')result[key]=validateKindleCategoryPaths(value[key]);
+    if(key==='productDetailsEvidence')result[key]=validateProductDetailsEvidence(value[key]);
+    else if(key==='categoryPaths')result[key]=validateKindleCategoryPaths(value[key]);
     else if(key==='manifest')result[key]=validateManifest(value[key]);
     else if (['authors','publishers','series','subjects','categories','isbn','editionKeys'].includes(key)) result[key]=strings(value[key],50,key==='isbn'?32:500,`Enrichment ${key}`);
     else if(key==='contributors'){if(!Array.isArray(value[key])||value[key].length>50)throw new Error('Invalid enrichment contributors.');result[key]=value[key].map(entry=>{object(entry,'Contributor');return {name:text(entry.name,500,'Name'),role:text(entry.role,80,'Role')};});}

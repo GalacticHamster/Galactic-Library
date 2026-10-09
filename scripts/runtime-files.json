@@ -32,6 +32,7 @@
   "src/lib/identity.js",
   "src/lib/kindle-contents.js",
   "src/lib/kindle-categories.js",
+  "src/lib/kindle-product-details.js",
   "src/lib/kindle-contents-observations.js",
   "src/lib/kindle-contents-refresh.js",
   "src/lib/kindle-manifest.js",
