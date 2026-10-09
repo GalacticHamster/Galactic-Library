@@ -7,7 +7,7 @@ export function validateProductDetailsEvidence(input){
  object(input,'Product Details');if(input.version!==1)throw Error('Unsupported Product Details version.');
  const asin=text(input.asin,10,'Product ASIN'),sourceUrl=text(input.sourceUrl,100,'Product URL');
  if(!/^[A-Z0-9]{10}$/u.test(asin)||sourceUrl!==`https://www.amazon.com/dp/${asin}`)throw Error('Invalid Product Details association.');
- if(!Array.isArray(input.observations)||!input.observations.length||input.observations.length>40)throw Error('Product Details must have 1?40 observations.');
+ if(!Array.isArray(input.observations)||!input.observations.length||input.observations.length>40)throw Error('Product Details must have 1-40 observations.');
  const result={version:1,asin,sourceUrl,observations:input.observations.map(entry=>{
   object(entry,'Product observation');const field=text(entry.field,30),label=text(entry.label,100),raw=text(entry.raw,500),value=text(entry.value,500),status=text(entry.status,20),selector=text(entry.selector,100);
   if(!PRODUCT_DETAIL_FIELDS.includes(field)||!label||!raw||!['observed','parsed','unparsed','invalid','valid-checksum'].includes(status)||!selectors.includes(selector)&&!rpi.test(selector))throw Error('Invalid Product Details observation.');
