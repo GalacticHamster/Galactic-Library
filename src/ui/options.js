@@ -3,6 +3,7 @@ import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
 import {createLibraryLoader} from './library-loading.js';
+import {createBackupExporter,handoffDownload} from './backup-export.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
@@ -874,20 +875,8 @@ async function refreshView(context,diagnosticLookupId = null) {
 const libraryLoader=createLibraryLoader({panel:document.querySelector('#library-load-status'),message:document.querySelector('#library-load-status span'),retry:document.querySelector('#retry-library-load'),content:document.querySelector('#library-section'),load:refreshView});
 const refresh=(...args)=>libraryLoader.refresh(...args);
 
-async function exportCurrentBackup() {
-  try {
-    const snapshot = await getDatabase();
-    const blob = new Blob([JSON.stringify(createBackup(snapshot), null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = Object.assign(document.createElement('a'), { href: url, download: 'galactic-library-backup-v1.json' });
-    link.click();
-    URL.revokeObjectURL(url);
-    backupStatus.textContent = 'Backup downloaded.';
-  } catch (error) {
-    backupStatus.textContent = `Export failed: ${error.message}`;
-    throw error;
-  }
-}
+const backupExporter=createBackupExporter({button:document.querySelector('#export'),status:backupStatus,read:getDatabase});
+const exportCurrentBackup=()=>backupExporter.run();
 document.querySelector('#export').addEventListener('click',()=>exportCurrentBackup().catch(()=>{}));
 
 bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summary'),status:document.querySelector('#performance-diagnostics-status'),worker:document.querySelector('#performance-diagnostics-worker'),runtime:chrome.runtime});
