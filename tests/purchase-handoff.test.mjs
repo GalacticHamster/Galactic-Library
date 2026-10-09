@@ -114,3 +114,9 @@ test('A GL manual non-owned access review is not promoted into companion book ow
  const item=normalizeProviderItem({provider:'humble',profileId:profile.profileId,providerItemId:'purchase:product:1',title:'Reviewed book',mediaType:'book',ownership:'owned',metadata:{purchaseId:'purchase'}});database.providerItems[item.id]=item;database.ownershipReviews[item.recordRef]={ownership:'borrowed'};
  assert.equal((await purchaseSnapshot(database,'humble',profile.profileId)).records.length,0);
 });
+
+test('GL destination stamp survives native storage property reordering but rejects actual changed profile facts',async()=>{
+ const d=createEmptyDatabase(),p=newProviderProfile('fanatical','Personal');d.providerProfiles[p.profileId]=p;const target=(await purchaseAccounts(d,'fanatical'))[0];const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).reverse().map(([key,value])=>[key,reorder(value)])):value;
+ d.providerProfiles[p.profileId]=reorder(p);assert.notEqual(JSON.stringify(d.providerProfiles[p.profileId]),JSON.stringify(p));assert.equal((await applyPurchaseSnapshot(d,snapshot(),target)).added,1);
+ const next=(await purchaseAccounts(d,'fanatical'))[0];d.providerProfiles[p.profileId].nickname='Changed';await assert.rejects(applyPurchaseSnapshot(d,snapshot(),next),/Destination account changed/);
+});
