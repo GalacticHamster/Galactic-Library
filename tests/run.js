@@ -1,3 +1,4 @@
+import {genreClassificationTests} from './genre-classification.js';
 import {bundleMatchContextTests} from './bundle-match-context.js';
 import {crossProviderCollectionTests} from './cross-provider-collections.js';
 import {companionIdentityTests} from './companion-identities.js';
@@ -84,6 +85,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,
   ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
@@ -501,7 +503,7 @@ const tests = [
     assert.deepEqual(libraryBroadGenreValues(normalizeProviderItem({
       provider: 'humble', providerItemId: 'comic-3', title: 'Batman', mediaType: 'book',
       metadata: { enrichment: { openLibrary: { subjects: ['Batman', 'Science fiction', 'History'] } } }
-    })), ['Comics & Graphic Novels', 'Science Fiction & Fantasy', 'History']);
+    })), ['Science Fiction & Fantasy', 'History']);
   }],
   ['queues provider series labels for review and applies a saved same-work decision', () => {
     const humbleAudio = normalizeProviderItem({

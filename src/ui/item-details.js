@@ -2,10 +2,20 @@ import {formatDate,readingAccessLabel} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {itemPresentation} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
+import {libraryBroadGenreValues,libraryCategoryEvidence} from '../lib/genre-hints.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 export function createItemDetailsBody(canonical,records,database,tools,state={sections:new Set()}){
   const root=text('div','');root.className='catalog-item-details';
   const presentation=itemPresentation(canonical,records,database);
+  const categories=[...new Set(records.flatMap(libraryBroadGenreValues))];
+  if(categories.length)root.append(text('p','Categories: '+categories.join(' · ')));
+  const classification=records.flatMap(record=>libraryCategoryEvidence(record).map(entry=>({record,entry})));
+  if(classification.length){
+    const evidence=text('details','');evidence.className='classification-sources';evidence.append(text('summary','Source classification'));
+    evidence.append(text('p','Categories describe the book or its subject. Inferred categories help browsing; they do not confirm ownership, identity or collected contents. Uncertain series suggestions are not filters.'));
+    for(const {record,entry}of classification){const line=text('p',`${presentation.records.find(value=>value.record===record)?.label??record.provider} · ${entry.source.replace(/-/gu,' ')} · ${entry.confidence}: ${entry.evidence}`);if(entry.conflict)line.append(text('small',' '+entry.conflict));evidence.append(line);}
+    root.append(evidence);
+  }
   const catalog=text('details','');catalog.className='item-overview-details';catalog.append(text('summary','Edition details and artwork'));root.append(catalog);
   const overview=text('div','');overview.className='item-overview';
   if(presentation.cover){const image=document.createElement('img');image.className='item-cover';image.src=presentation.cover;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.addEventListener('error',()=>image.remove());overview.append(image);}
