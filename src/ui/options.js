@@ -695,10 +695,11 @@ function render(timing = null) {
   if(!database)return;
   const draftState=drafts.reconcile();draftNotice.hidden=!draftState.dirty;
   if(draftState.dirty){draftMessage.textContent=draftState.stale?'Saved information changed. Your edits are retained; reload before saving.':'Your unsaved edits are retained. Finish them or discard to update this view.';contentsWorkspace.update(database,workspace.workspace==='contents');return;}
-  contentsWorkspace.update(database,workspace.workspace==='contents');
+  let endContents=timing?.begin('options_contents');
+  contentsWorkspace.update(database,workspace.workspace==='contents');endContents?.();
   let endSegment=timing?.begin('options_workbench');
   try {
-  providerAccountsView.update(database);
+  if(workspace.workspace==='providers')providerAccountsView.update(database);
   renderOnboarding(database);
   if(!enrichmentWorkbench){
     enrichmentWorkbench=createEnrichmentWorkbench({
@@ -736,7 +737,8 @@ function render(timing = null) {
     ? 'The global checkbox covers every library. Your provider choices below are saved and apply again when you switch it off.'
     : 'To apply this to one library, use its checkbox below.';
   populateProviderFilter(providerEntries);
-  const browse=browseProjection(database);populateBrowseFilters(browse);
+  const endProjection=timing?.begin('options_projection');const browse=browseProjection(database);endProjection?.();
+  const endFilters=timing?.begin('options_filter_controls');populateBrowseFilters(browse);endFilters?.();
   for(const field of Object.values(viewControls))if(field.dataset.pendingValue){field.value=field.dataset.pendingValue;if(!field.value)field.value="all";delete field.dataset.pendingValue;}
   providers.replaceChildren(...(providerEntries.length ? providerEntries.map(([id, state]) => {
     const node = document.createElement('article');
@@ -837,7 +839,7 @@ function render(timing = null) {
   document.querySelector('#unlinked-next').disabled=(unlinkedPage+1)*50>=orphanValues.length;
   document.querySelector('#unlinked-pagination').hidden=orphanValues.length<=50;
   unlinkedAddOns.replaceChildren(...orphanValues.slice(unlinkedPage*50,(unlinkedPage+1)*50).map(({record})=>{const node=document.createElement('li');node.append(textElement('strong',record.title),textElement('span',displayProviderName(record.provider)));return node;}));
-  renderDuplicateReview();
+  if(workspace.workspace==='ownership')renderDuplicateReview();
   let history=document.querySelector('#provider-history');
   if(!history){history=document.createElement('details');history.id='provider-history';document.querySelector('#providers-workspace').append(history);}
   const records=Object.values(database.providerHistory??{});
@@ -849,7 +851,7 @@ function render(timing = null) {
   endSegment?.();endSegment=timing?.begin('options_coverage');
   renderCollectionCoverage();
   const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
-  const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+duplicateReviewItems.children.length;
+  const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+(duplicateReviewDatabase===database?duplicateReviewItems.children.length:0);
   if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
   if(ownershipCount)alerts.append(actionButton(ownershipCount+' ownership reviews',()=>workspace.select('ownership')));
   alerts.hidden=!alerts.children.length;
@@ -871,7 +873,7 @@ async function refreshView(context,diagnosticLookupId = null) {
   if(!navigationHydrated&&globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
   navigationHydrated=true;
   endStage?.();endStage=timing?.begin('options_render');
-  await context.phase('Preparing your Library view...');
+  const endPaint=timing?.begin('options_feedback_paint');await context.phase('Preparing your Library view...');endPaint?.();
   render(timing);
   if(initialBookRoute){const route=initialBookRoute;initialBookRoute=null;visitBookRoute(route);}
   endStage?.();endStage=timing?.begin('options_other');

@@ -49,3 +49,11 @@ Backups retain full validation and existing writer transactions. Restoration ret
 9. Normal suite, package/hygiene checks, user documentation and measured report.
 
 Timing fixtures and run reports remain in ignored `audit-artifacts/operation-feedback/`. Neither private backups nor the recovery candidate are inputs to this task.
+
+## Measured startup boundary
+
+The synthetic 14k/13k Library control contains 3,000 G5 manifests/source baselines, 600 contents reviews and four remembered provider profiles. It measures page rendering against the real writer/validator with an in-page storage/clone transport fixture, not native extension storage or the user's production corpus. Initial results showed eager hidden Contents preparation and duplicate review before visible results. Contents sorting/filter preparation and provider-card/duplicate-review preparation now wait for their workspace. The shared Library retrieval projection remains required and is still built once per detached database view. Ownership/expiry and authoritative validation are not cached away.
+
+Diagnostics separate `options_contents`, `options_projection`, `options_filter_controls` and `options_feedback_paint` from existing read/validation/canonical/render stages. Nested stages overlap and must not be summed as independent work. A synthetic worker shares the page thread, so its frame gaps cannot establish real background-worker/UI contention. Cold initialization includes validation; a warm same-worker view uses its existing committed snapshot. Extension reload/native transport costs require a live timing export and are not inferred from these controls.
+
+Reproduce controls with `node tests/browser.js --operation-feedback --size=14000 --output=audit-artifacts/operation-feedback/run.json`; `--eager-ui-control` serves the pre-deferral UI at the local fixture boundary. It restores only the three measured eager work paths and does not alter production files or stored data.

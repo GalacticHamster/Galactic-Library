@@ -1,7 +1,7 @@
 import {presentAction} from './form-presentation.js';
 import {formatDate} from './formatters.js';
 import {createContentsReadOnly} from './contents-display.js';
-import {CONTENTS_STATUSES,createContentsProjection} from './contents-overview.js';
+import {CONTENTS_STATUSES,createContentsProjection,contentsSummary} from './contents-overview.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
@@ -73,7 +73,7 @@ export function createContentsWorkspace(actions={}) {
     selected=ref;lastOpened=ref;detail.dataset.recordRef=ref;listView.hidden=true;detail.hidden=false;detail.replaceChildren(button(actions.backLabel?.()??'Back to Contents results',()=>actions.back?actions.back():close()),button('Contents collection list',()=>{if(close()!==false)actions.collection?.();}),text('h3',record.title),text('p',`${providerName(record.provider)} · ${database.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`));
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
-    const summary=rows.find(row=>row.recordRef===ref);detail.append(text('p',summary.label));
+    const summary=contentsSummary(record,database);detail.append(text('p',summary.label));
     if(summary.updatedAt)detail.append(text('small','Last contents activity: '+formatDate(summary.updatedAt)));
     if(summary.failed)detail.append(text('p',summary.retained?'Could not retrieve the latest description. Earlier contents below are retained. Retry on the Kindle library page.':'Could not retrieve contents. Retry on the Kindle library page, or enter contents from a source you checked.'));
     if(actions.review)detail.append(actions.review(record,database));
@@ -84,7 +84,7 @@ export function createContentsWorkspace(actions={}) {
   }
   for(const [key,control]of Object.entries({...shared,status}))control.addEventListener(control===search?'input':'change',()=>{view[key]=control.value;view.anchor='';page=0;renderList();actions.changed?.();});
   return {element,open,close,applyView,readView,get selected(){return selected;},get scroll(){return returnScroll;},
-    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;const projected=project(database);
+    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;if(!active&&!selected)return;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest retrievals failed.`;
         for(const option of status.options){const key=option.value;
