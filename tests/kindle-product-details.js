@@ -57,3 +57,8 @@ import {validateEnrichment} from '../src/lib/metadata-validation.js';
 kindleProductDetailsTests.push(['Restored Product Details must have the same product association as their enclosing source evidence',()=>{
  assert.throws(()=>validateEnrichment('kindleProductComicContents',{sourceUrl:'https://www.amazon.com/dp/B000000001',productDetailsEvidence:capture()}),/association disagree/);
 }]);
+
+kindleProductDetailsTests.push(['Unicode ISBN digit forms normalize consistently while retaining readable original source evidence',()=>{
+ const isbn='9781646680450',wide=[...isbn].map(char=>String.fromCodePoint(char.charCodeAt(0)+0xfee0)).join('');const evidence=globalThis.GalacticKindle.kindleProductDetails(productDocument(productDetailsFixtures[0].html.replace(isbn,wide)),capture().sourceUrl);
+ const observation=evidence.observations.find(o=>o.field==='isbn13');assert.equal(observation.raw,wide);assert.equal(observation.value,isbn);assert.equal(observation.status,'valid-checksum');assert.deepEqual(validateEnrichment('kindleProductComicContents',{sourceUrl:evidence.sourceUrl,productDetailsEvidence:evidence}).productDetailsEvidence,evidence);
+}]);

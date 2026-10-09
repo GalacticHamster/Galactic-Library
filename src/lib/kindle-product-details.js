@@ -11,7 +11,7 @@ export function validateProductDetailsEvidence(input){
  const result={version:1,asin,sourceUrl,observations:input.observations.map(entry=>{
   object(entry,'Product observation');const field=text(entry.field,30),label=text(entry.label,100),raw=text(entry.raw,500),value=text(entry.value,500),status=text(entry.status,20),selector=text(entry.selector,100);
   if(!PRODUCT_DETAIL_FIELDS.includes(field)||!label||!raw||!['observed','parsed','unparsed','invalid','valid-checksum'].includes(status)||!selectors.includes(selector)&&!rpi.test(selector))throw Error('Invalid Product Details observation.');
-  if(field==='isbn10'||field==='isbn13'){const normalized=raw.toUpperCase().replace(/[\s-]/gu,'');const valid=normalized.length===(field==='isbn10'?10:13)&&validIsbn(normalized);if(valid?value!==normalized||status!=='valid-checksum':value!==''||status!=='invalid')throw Error('Invalid ISBN observation checksum.');}
+  if(field==='isbn10'||field==='isbn13'){const normalized=raw.normalize('NFKC').toUpperCase().replace(/[\s-]/gu,'');const valid=normalized.length===(field==='isbn10'?10:13)&&validIsbn(normalized);if(valid?value!==normalized||status!=='valid-checksum':value!==''||status!=='invalid')throw Error('Invalid ISBN observation checksum.');}
   if(field==='pageCount'&&value&&(!/^\d+$/u.test(value)||Number(value)<1||Number(value)>1000000))throw Error('Invalid page count.');
   if(field==='publicationDate'&&value){date(value);if(!/^\d{4}-\d{2}-\d{2}$/u.test(value))throw Error('Invalid publication date.');}
   if(field==='asin'&&value&&!/^[A-Z0-9]{10}$/u.test(value))throw Error('Invalid observed ASIN.');

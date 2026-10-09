@@ -249,7 +249,7 @@
     return Number(year)>=1000&&date.getUTCFullYear()===Number(year)&&date.getUTCMonth()===Number(month)-1&&date.getUTCDate()===Number(day)?date.toISOString().slice(0,10):'';
   }
   function detailIsbn(raw,length){
-    const value=raw.toUpperCase().replace(/[\s-]/gu,'');
+    const value=raw.normalize('NFKC').toUpperCase().replace(/[\s-]/gu,'');
     if(length===13&&/^97[89]\d{10}$/u.test(value)&&[...value].reduce((n,d,i)=>n+Number(d)*(i%2?3:1),0)%10===0)return value;
     if(length===10&&/^\d{9}[\dX]$/u.test(value)&&[...value].reduce((n,d,i)=>n+(d==='X'?10:Number(d))*(10-i),0)%11===0)return value;
     return '';
