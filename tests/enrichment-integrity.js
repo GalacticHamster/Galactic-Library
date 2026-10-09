@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import {createStorageWriter} from '../src/background/storage-writer.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {snapshotFixture} from './storage.js';
+export const enrichmentIntegrityTests=[['Same-source routine catalogue acquisition preserves omitted categories; new-source replacement and explicit undo remain functional',async()=>{
+ const state={},writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...state}),set:async values=>Object.assign(state,structuredClone(values)),remove:async keys=>{for(const key of keys)delete state[key];}});
+ const items=[{providerItemId:'B000000001',title:'Example',mediaType:'book',ownership:'owned',metadata:{authors:['Author']}}];let db=await writer.mergeProviderItems('kindle',items);const record=Object.values(db.providerItems)[0];
+ const save=enrichment=>writer.saveGoogleBooksEnrichments([{itemIds:[record.id],recordRefs:[record.recordRef],enrichment:{source:'google-books',volumeId:'same',title:'Example',authors:['Author'],...enrichment}}]);
+ await save({categories:['History']});await save({});db=await save({categories:[]});assert.deepEqual(db.providerItems[record.id].metadata.enrichment.googleBooks.categories,['History']);
+ db=await save({volumeId:'different',categories:[]});assert.deepEqual(db.providerItems[record.id].metadata.enrichment.googleBooks.categories,[]);await writer.undoEnrichmentSelection(db.providerItems[record.id].metadata.enrichment.googleBooks.selectionRef);db=await writer.getDatabase();assert.deepEqual(db.providerItems[record.id].metadata.enrichment.googleBooks.categories,['History']);
+ const baseline=structuredClone(db.providerItems[record.id].metadata.enrichment);
+ db=await writer.mergeProviderItems('kindle',[{...items[0],metadata:{enrichment:{googleBooks:{source:'google-books',categories:[]}}}}]);assert.deepEqual(db.providerItems[record.id].metadata.enrichment,baseline,'Untrusted importer enrichment must not replace trusted enrichment');
+ db=await writer.replaceProviderItems('kindle',items,{},snapshotFixture('kindle',items));assert.deepEqual(db.providerItems[record.id].metadata.enrichment,baseline);
+ db=await writer.replaceProviderItems('kindle',[],{},snapshotFixture('kindle',[]));assert.deepEqual(db.providerHistory[record.recordRef].item.metadata.enrichment,baseline,'Missing full-scan records retain enrichment in history');
+ db=await writer.replaceProviderItems('kindle',items,{},snapshotFixture('kindle',items));assert.deepEqual(db.providerItems[record.id].metadata.enrichment,baseline,'Same profile reappearance restores enrichment');
+ await writer.resetProviderProfileBaseline(record.profileId,true);assert.deepEqual((await writer.getDatabase()).providerItems[record.id].metadata.enrichment,baseline);
+ const without=structuredClone(await writer.getDatabase());delete without.providerItems[record.id].metadata.enrichment;await writer.restoreDatabase(parseBackup(createBackup(without)));assert(!((await writer.getDatabase()).providerItems[record.id].metadata.enrichment),'Explicit full restore must remain a replacement');
+ await writer.clearDatabase();assert.equal(Object.keys((await writer.getDatabase()).providerItems).length,0);
+}]];

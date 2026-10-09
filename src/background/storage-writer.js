@@ -653,7 +653,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const observations=outcome.recordObservations;
       const changed=outcome.status!=='skipped'&&(!Array.isArray(observations)||observations.length!==records.length||records.some((item,index)=>item&&(observations[index]?.ref!==item.recordRef||observations[index]?.observedAt!==item.observedAt||observations[index]?.title!==item.title)));
       if(!records.length||changed||records.some(item=>!item||item.mediaType!=='book'||item.metadata.enrichment?.googleBooks?.volumeId)||outcome.status==='skipped'){job.skipped++;}
-      else if(outcome.enrichment){for(const record of records)selectEnrichment(database,record.id,'googleBooks',outcome.enrichment,now);job.matched++;}
+      else if(outcome.enrichment){for(const record of records)selectEnrichment(database,record.id,'googleBooks',outcome.enrichment,now,true);job.matched++;}
       else{
         if(outcome.hint){for(const record of records)selectEnrichment(database,record.id,'googleBooksGenreHint',outcome.hint,now);job.genreHints++;}
         else if(outcome.status==='failed')job.errors++;else{job.noMatch++;if(outcome.status==='no-results')job.zeroResults++;else if(outcome.status==='title-variant')job.titleVariant++;else if(outcome.status==='author-variant')job.authorVariant++;}
@@ -747,7 +747,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     database.ownershipReviews[ref]=validateOwnershipReview({ownership:'owned',source:'local-purchase-history',reviewRef:crypto.randomUUID(),note:`${evidence.sourceLabel}: ${evidence.title}`,evidenceDate:evidence.acquiredAt,confirmedAt:new Date().toISOString(),expiresAt:null});delete database.ownershipProposals[proposalId];return persistDatabase(database);
   }
   async function dismissPurchaseEvidence(proposalId){const database=await getDatabase();delete database.ownershipProposals[proposalId];return persistDatabase(database);}
-  function selectEnrichment(database,id,kind,value,now){
+  function selectEnrichment(database,id,kind,value,now,preserveMissingCategories=false){
+    // Routine reacquisition of the same catalogue item is not an explicit
+    // category deletion. Never transplant labels across different source IDs;
+    // reviewed replacement/undo/restore use their existing explicit paths.
+    const previous=database.providerItems[id]?.metadata?.enrichment?.[kind];
+    if(preserveMissingCategories&&kind==='googleBooks'&&value.volumeId&&previous?.volumeId===value.volumeId&&previous.categories?.length&&(value.categories===undefined||Array.isArray(value.categories)&&!value.categories.length))value={...value,categories:previous.categories};
     const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
     const observations=kind==='kindleProductComicContents'&&database.kindleContentsObservations?.[item.recordRef];
     if(observations){
@@ -853,7 +858,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       }
       for (const id of ids) {
         const item = database.providerItems[id];
-        selectEnrichment(database,id,'googleBooks',entry.enrichment,updatedAt);
+        selectEnrichment(database,id,'googleBooks',entry.enrichment,updatedAt,true);
       }
     }
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
