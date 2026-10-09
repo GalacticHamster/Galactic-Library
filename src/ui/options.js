@@ -1,4 +1,4 @@
-import {builtinCompanions,checkCompanionConnection,companionBrowser} from '../lib/companion-identities.js';
+import {builtinCompanions,companionBrowser} from '../lib/companion-identities.js';
 import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore} from './backup-restore.js';
@@ -946,7 +946,7 @@ resetGoogleBooksEnrichmentButton.addEventListener('click', () => lookupResetOper
     await renderGoogleBooksEnrichment();
 }, {success:result=>result?.cancelled?'Queue clearing cancelled. Saved progress is unchanged.':'Saved lookup position cleared; acquired metadata is retained.'}).catch(()=>{}));
 document.querySelector('#check-companion-connections').addEventListener('click',async event=>{
-  await performAction({button:event.currentTarget,status:companionExtensionLinkStatus,name:'Checking companion connections...',task:async()=>{await Promise.all(builtinCompanions(chrome.runtime).map(async item=>companionConnectionStatuses.set(item.id,await checkCompanionConnection(chrome.runtime,item.id))));await renderCompanionExtensionLinks();},success:'Connection checks completed; see each companion result.'}).catch(()=>{});
+  await performAction({button:event.currentTarget,status:companionExtensionLinkStatus,name:'Checking companion connections...',task:async()=>{await Promise.all(builtinCompanions(chrome.runtime).map(async item=>{const provider=item.role==='hb'?'humble':'fanatical';try{const value=await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'connection',provider});companionConnectionStatuses.set(item.id,value?.ok?value.status+' '+(value.peerId===item.id?'Published ID.':'Authorized development ID: '+value.peerId):value?.error||'Unexpected connection response.');}catch(error){companionConnectionStatuses.set(item.id,'Connection not verified: '+error.message);}}));await renderCompanionExtensionLinks();},success:'Connection checks completed; see each companion result.'}).catch(()=>{});
 });
 document.querySelector('#add-companion-extension-id').addEventListener('click', async () => {
   const id = companionExtensionId.value.trim();
@@ -1025,3 +1025,5 @@ document.querySelector('#retry-library-load').addEventListener('click',loadLibra
 loadLibrary();
 
 document.querySelector('#copy-galactic-extension-id').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(chrome.runtime.id);companionExtensionLinkStatus.textContent='Galactic Library ID copied.';}catch{companionExtensionLinkStatus.textContent='Copy the Galactic Library ID shown above into the companion settings.';}});
+
+document.addEventListener('gh-purchase-open',event=>{if(['humble','fanatical'].includes(event.detail?.provider))workspace.select('providers');});

@@ -1,3 +1,4 @@
+import {purchaseRepairTests} from './purchase-repair.js';
 import {themeTests} from './theme.js';
 import {enrichmentIntegrityTests} from './enrichment-integrity.js';
 import {genreRecoveryTests} from './genre-recovery.js';
@@ -97,7 +98,7 @@ const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = glo
 const tests = [
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
-  ...companionIdentityTests,
+  ...companionIdentityTests,...purchaseRepairTests,
   ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...paginationTests,...themeTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
   ...providersUxTests,
   ...onboardingUxTests,

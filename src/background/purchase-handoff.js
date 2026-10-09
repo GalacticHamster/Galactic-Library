@@ -1,14 +1,15 @@
 import '../../shared/purchase-snapshot.js';
 import '../../shared/purchase-transfer.js';
 import '../../shared/purchase-adapters.js';
-import {builtinCompanions} from '../lib/companion-identities.js';
+import {builtinCompanions,resolvePurchasePeer} from '../lib/companion-identities.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {PROVIDER_SOURCES} from '../lib/metadata-validation.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
 import {normalizeProviderItem,providerItemKey,rebuildCanonicalItems} from '../lib/models.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 const S=globalThis.GalacticPurchaseSnapshot,A=globalThis.GalacticPurchaseAdapters;
-export async function purchaseAccounts(database,provider){if(!['humble','fanatical'].includes(provider))throw Error('Unsupported purchase provider.');return Promise.all(Object.values(database.providerProfiles).filter(p=>p.provider===provider).map(async p=>({accountRef:p.profileId,label:p.nickname,active:database.providers[provider]?.activeProfileId===p.profileId,count:Object.values(database.providerItems).filter(i=>i.profileId===p.profileId).length,stamp:await S.hash(JSON.stringify(p))})));}
+export async function purchaseAccounts(database,provider){if(!['humble','fanatical'].includes(provider))throw Error('Unsupported purchase provider.');const grouped=new Map();for(const item of Object.values(database.providerItems)){const rows=grouped.get(item.profileId)??[];rows.push(item);grouped.set(item.profileId,rows);}return Promise.all(Object.values(database.providerProfiles).filter(p=>p.provider===provider).map(async p=>{const rows=grouped.get(p.profileId)??[],eligible=rows.filter(item=>transferableItem(item,database)&&!(provider==='humble'&&!item.metadata.purchaseId));return {accountRef:p.profileId,label:p.nickname,active:database.providers[provider]?.activeProfileId===p.profileId,count:rows.length,eligibleCount:eligible.length,limitations:eligible.length<rows.length?[(rows.length-eligible.length)+' records lack supported underlying purchase evidence and cannot be transferred.']:[],stamp:await S.hash(JSON.stringify(p))};}));}
+function transferableItem(item,database){return ['book','audiobook','game','software'].includes(item.mediaType)&&((item.ownership==='owned'&&effectiveOwnershipRecord(item,database,Date.now(),{ignoreOverride:true}).ownership==='owned')||(item.provider==='humble'&&item.metadata.entitlement==='third-party-key'&&item.metadata.purchaseId));}
 export async function purchaseSnapshot(database,provider,ref){const profile=database.providerProfiles[ref];if(!profile||profile.provider!==provider)throw Error('Saved provider account is unavailable.');const records=[],limitations=[];
  for(const item of Object.values(database.providerItems).filter(i=>i.profileId===ref)){
  if((item.ownership!=='owned'||effectiveOwnershipRecord(item,database,Date.now(),{ignoreOverride:true}).ownership!=='owned')&&!(provider==='humble'&&item.metadata.entitlement==='third-party-key'&&item.metadata.purchaseId)||!['book','audiobook','game','software'].includes(item.mediaType)){limitations.push('Records without supported underlying owned-purchase evidence were excluded; display ownership overrides are not exported.');continue;}
@@ -45,9 +46,14 @@ export function createPurchaseHandoff({runtime,area,writer}){
  const role=provider=>provider==='humble'?'hb':provider==='fanatical'?'fan':null;
  const allowed=()=>writer.getQueryAllowedExternalClientIds();
  const builtin=provider=>builtinCompanions(runtime).find(item=>item.role===role(provider))?.id;
- async function peer(provider,id){if(!role(provider))throw Error('Wrong purchase provider.');const target=id||builtin(provider);if(!(await allowed()).includes(target))throw Error('Allow this companion ID using existing Advanced pairing first.');return target;}
- const service=GalacticPurchaseTransfer.createService({runtime,area,
- peer,bind:async(id,provider)=>{if(id===builtin(provider))return;const value=(await area.get({[bindingKey]:{}}))[bindingKey];const next={...value,[provider]:id};if(JSON.stringify(value)!==JSON.stringify(next))await area.set({[bindingKey]:next});},
- authorize:async(id,provider)=>Boolean(role(provider))&&(await allowed()).includes(id)&&(id===builtin(provider)||(await area.get({[bindingKey]:{}}))[bindingKey][provider]===id),
+ async function peer(provider,id){if(!role(provider))throw Error('Wrong purchase provider.');return resolvePurchasePeer(runtime,provider,await allowed(),(await area.get({[bindingKey]:{}}))[bindingKey],id);}
+ let pairingWrites=Promise.resolve();
+ function bind(id,provider){const work=async()=>{if(id===builtin(provider))return;const value=(await area.get({[bindingKey]:{}}))[bindingKey];const next={...value,[provider]:id};if(JSON.stringify(value)!==JSON.stringify(next))await area.set({[bindingKey]:next});};const pending=pairingWrites.then(work,work);pairingWrites=pending.catch(()=>{});return pending;}
+ async function authorize(id,provider){if(!role(provider)||(await allowed()).includes(id)===false)return false;if(id===builtin(provider))return true;
+ const bindings=(await area.get({[bindingKey]:{}}))[bindingKey];if(bindings[provider]===id)return true;if(Object.entries(bindings).some(([other,peerId])=>other!==provider&&peerId===id))return false;
+ // Already authorized incoming development peers may initialize their role only
+ // through a reverse PING to the actual sender ID, never a payload-supplied ID.
+ try{await resolvePurchasePeer(runtime,provider,await allowed(),{},id);await bind(id,provider);return true;}catch{return false;}}
+ const service=GalacticPurchaseTransfer.createService({runtime,area,peer,bind,authorize,
  accounts:async provider=>purchaseAccounts(await writer.getQueryDatabase(),provider),snapshot:async(provider,ref)=>purchaseSnapshot(await writer.getQueryDatabase(),provider,ref),commit:(data,target)=>writer.importPurchaseSnapshot(data,target)});
  return service;}

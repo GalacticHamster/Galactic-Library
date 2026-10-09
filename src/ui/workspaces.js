@@ -52,7 +52,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
     if (button) select(button.dataset.workspace);
   });
   secondary?.addEventListener('click',event=>{const button=event.target.closest('button[data-workspace]');if(button)select(button.dataset.workspace);});
-  document.addEventListener('click',event=>{const link=event.target.closest('[data-go-workspace]');if(link){event.preventDefault();select(link.dataset.goWorkspace);}});
+  document.addEventListener('click',event=>{const link=event.target.closest('[data-go-workspace]');if(link){event.preventDefault();if(select(link.dataset.goWorkspace)&&['humble','fanatical'].includes(link.dataset.purchaseProvider)){const section=document.querySelector('#purchase-sharing-'+link.dataset.purchaseProvider);if(section){section.open=true;section.querySelector('summary')?.focus();section.scrollIntoView?.({block:'start'});}}}});
   show();
   return {
     get workspace() { return preferences.workspace; },

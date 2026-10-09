@@ -57,7 +57,7 @@ test('Concurrent receiver attempts admit one import, and a failed commit is retr
  const first=b.services.gl.local(request);await ready;await assert.rejects(b.services.gl.local(request),/already importing/);release();await first;assert.equal(b.commits.length,1);
 });
 test('Source offer is not a commit; interrupted receiver requires new validation and commit',async()=>{
- const b=bus();const sent=await b.services.fan.local({action:'send',provider:'fanatical',accountRef:'source-profile'});assert.equal(sent.offered,true);assert.equal(b.commits.length,0);
+ const b=bus();const sent=await b.services.fan.local({action:'send',provider:'fanatical',accountRef:'source-profile',confirmed:true,target:{accountRef:'source-profile'}});assert.equal(sent.offered,true);assert.equal(b.commits.length,0);
  const offer=b.states.gl.galacticPurchaseOffer;
  const result=await b.services.gl.local({action:'import',provider:'fanatical',accountRef:'source-profile',useOffer:true,offerToken:offer.manifest.token,confirmed:true,target:{accountRef:'destination'}});assert.equal(result.acknowledged,true);assert.equal(b.commits.length,1);assert.equal(b.states.gl.galacticPurchaseOffer,null);
  await assert.rejects(b.services.fan.external({type:'GH_PURCHASE_CHUNK',provider:'fanatical',protocolVersion:1,token:offer.manifest.token,index:0},{id:'gl'}),/expired/);
@@ -73,7 +73,7 @@ test('Failed atomic GL storage write leaves both stored libraries and the sender
 });
 
 test('Persistent offer survives browser/worker restart but stale in-memory grant cannot import',async()=>{
- const first=bus();await first.services.fan.local({action:'send',provider:'fanatical',accountRef:'source-profile'});const saved=structuredClone(first.states.gl);
+ const first=bus();await first.services.fan.local({action:'send',provider:'fanatical',accountRef:'source-profile',confirmed:true,target:{accountRef:'source-profile'}});const saved=structuredClone(first.states.gl);
  const restarted=bus();Object.assign(restarted.states.gl??={},saved);const request={action:'import',provider:'fanatical',accountRef:'source-profile',useOffer:true,offerToken:saved.galacticPurchaseOffer.manifest.token,confirmed:true,target:{accountRef:'destination'}};
  await assert.rejects(restarted.services.gl.local(request),/expired|restarted/);assert.equal(restarted.commits.length,0);assert.equal(restarted.states.gl.galacticPurchaseOffer,null,'Failed stale offers must not trap Refresh/retry for ten minutes');
  assert.equal((await restarted.services.gl.local({...request,useOffer:false})).received,1);
