@@ -1,4 +1,4 @@
-import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget, browseView, rememberBrowseView, validateUiPreferences } from '../lib/ui-preferences.js';
+import { defaultUiPreferences, LIBRARY_WORKSPACES, workspaceTarget, browseView, rememberBrowseView, validateUiPreferences,validPageSize } from '../lib/ui-preferences.js';
 
 export function createWorkspaceNavigation({ readView, applyView, save, changed, beforeSelect, navigated }) {
   let preferences = defaultUiPreferences();
@@ -11,7 +11,9 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
   const view = () => browseView(preferences,preferences.workspace);
   const remember = () => {
     clearTimeout(saveTimer);
-    const snapshot = structuredClone(preferences);
+    // View navigation must not overwrite a newer page-size choice from another
+    // page. Only the explicit selector saves the shared pageSize field.
+    const {pageSize,...snapshot} = structuredClone(preferences);
     saveTimer = setTimeout(() => save(snapshot).catch(() => { status.textContent = 'Could not remember this view. Your library is unchanged.'; }), 180);
   };
   function show() {
@@ -64,6 +66,17 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
       applyView(view(),preferences.workspace);
     },
     select,
+    get pageSize(){return preferences.pageSize;},
+    setPageSize(size){
+      if(!validPageSize(size))return false;
+      rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace));
+      preferences.pageSize=size;preferences.browse.page=0;preferences.browse.anchor='';preferences.books.page=0;
+      applyView(view(),preferences.workspace);changed();
+      // Persist this deliberate preference immediately, even if the page closes
+      // before the existing view debounce. The queued writer merges the patch.
+      save({pageSize:size}).catch(()=>{status.textContent='Could not remember items per page. Your library is unchanged.';});
+      remember();return true;
+    },
     rememberView() { rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace)); remember(); },
     get savedView() { return view(); }
   };

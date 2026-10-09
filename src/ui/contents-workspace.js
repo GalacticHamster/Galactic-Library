@@ -5,6 +5,7 @@ import {CONTENTS_STATUSES,createContentsProjection,contentsSummary} from './cont
 import {createLibraryBrowseProjection,libraryBrowseResults} from './library-browse.js';
 import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
+import {createPagination} from './pagination.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return presentAction(node);};
 const providerName=id=>({kindle:'Kindle',humble:'Humble Bundle',fanatical:'Fanatical',kobo:'Kobo'}[id]??id);
@@ -34,22 +35,25 @@ export function createContentsWorkspace(actions={}) {
   const searchLabel=text('label','Search collection');searchLabel.append(search);controls.append(searchLabel,primary,clear,more,activeFilters);
   const counter=text('p','');counter.setAttribute('role','status');
   const list=text('ol','');list.className='library-items contents-collection-items';list.id='contents-collection-list';
-  const paging=text('nav','');paging.className='actions';paging.setAttribute('aria-label','Contents pages');
-  const previous=button('Previous page',()=>{page--;view.anchor='';renderList();actions.changed?.();}),next=button('Next page',()=>{page++;view.anchor='';renderList();actions.changed?.();});paging.append(previous,next);
-  listView.append(controls,counter,paging,list);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not reviewed means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
-  const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
+  const paging=createPagination({name:'Contents',loading:true,ids:{size:'contents-items-per-page'},onPage:next=>{if(actions.canLeave?.()===false)return false;page=next;view.anchor='';renderList();actions.changed?.();},onSize:size=>actions.pageSizeChanged?actions.pageSizeChanged(size):(setPageSize(size,{reset:true}),renderList())});
+  paging.select.disabled=true;
+  const header=text('div','');header.className='results-header';header.append(counter,paging.sizeContainer);
+  listView.append(controls,header,paging.top,list,paging.bottom);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not reviewed means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
+  const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,pageSize=50,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
+  function setPageSize(size,{reset=false}={}){pageSize=size;if(reset){page=0;view.page=0;view.anchor='';}}
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
-  function readView(){return {...view,page,anchor:selected??result?.rows[0]?.canonical.id??view.anchor};}
+  function readView(){return {...view,page,anchor:selected??result?.rows[0]?.qualifying[0]?.record.recordRef??view.anchor};}
   const qualifies=row=>view.status==='all'||(view.status==='review'?row.needsReview:view.status==='failure'?row.failed:row.status===view.status);
   const evidenceKey=record=>JSON.stringify([database.contentReviews?.[record.id],record.metadata?.enrichment?.kindleProductComicContents,record.metadata?.enrichment?.localMetadata]);
   function renderList(){
     if(!database||!active||selected)return;
     const summaries=new Map(rows.map(row=>[row.id,row]));
-    result=libraryBrowseResults(browse(database),{query:view.search,filters:view,sort:view.sort,page,anchor:view.anchor,recordFilter:record=>record.mediaType==='book'&&qualifies(summaries.get(record.id))});page=result.page;view.anchor='';
+    result=libraryBrowseResults(browse(database),{query:view.search,filters:view,sort:view.sort,page,size:pageSize,anchor:view.anchor,paginateRecords:true,recordFilter:record=>record.mediaType==='book'&&qualifies(summaries.get(record.id))});page=result.page;view.anchor='';
     const shown=result.rows.flatMap(row=>row.qualifying.map(value=>({...summaries.get(value.record.id),canonicalId:row.canonical.id})));
     activeFilters.replaceChildren();for(const [key,field]of Object.entries({...shared,status}))if(key!=='sort'&&field.value&&field.value!=='all'){const label=key==='search'?'Search: '+field.value:field.selectedOptions[0]?.textContent;activeFilters.append(button((key==='status'?'Contents only: ':'')+label,()=>{field.value=key==='search'?'':'all';field.dispatchEvent(new Event(key==='search'?'input':'change'));}));}
-    previous.disabled=page===0;next.disabled=page===result.pages-1;
-    counter.textContent=result.total?`${result.total} catalog books · ${result.matches.reduce((n,row)=>n+row.qualifying.length,0)} matching accounts · page ${page+1} of ${result.pages}`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
+    paging.update({total:result.total,page,size:pageSize});
+    const message=result.total?`${result.catalogTotal} catalog books · ${result.total} matching account records`:rows.length?'No books match these filters. Clear filters to see saved books.':'No imported books yet. Add a library in Providers or restore a backup in Settings.';
+    if(counter.textContent!==message)counter.textContent=message;
     list.replaceChildren(...shown.map(row=>{
       const node=text('li','');node.className='library-item contents-collection-card';node.dataset.recordRef=row.recordRef;node.dataset.canonicalId=row.canonicalId;
       node.append(Object.assign(text('h3',row.title),{className:'contents-card-title'}),Object.assign(text('p',`${providerName(row.provider)} — ${row.nickname}`),{className:'contents-card-account'}));
@@ -83,8 +87,8 @@ export function createContentsWorkspace(actions={}) {
     detail.tabIndex=-1;detail.focus({preventScroll:true});return true;
   }
   for(const [key,control]of Object.entries({...shared,status}))control.addEventListener(control===search?'input':'change',()=>{view[key]=control.value;view.anchor='';page=0;renderList();actions.changed?.();});
-  return {element,open,close,applyView,readView,get selected(){return selected;},get scroll(){return returnScroll;},
-    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;if(!active&&!selected)return;const projected=project(database);
+  return {element,open,close,applyView,readView,setPageSize,get selected(){return selected;},get scroll(){return returnScroll;},
+    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;paging.select.disabled=!database;if(!active&&!selected)return;const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest retrievals failed.`;
         for(const option of status.options){const key=option.value;

@@ -24,6 +24,8 @@ const contentsDeepLinkMode=process.argv.includes('--contents-deep-link');
 const itemDetailsMode=process.argv.includes('--item-details');
 const libraryBrowseMode=process.argv.includes('--library-browse');
 const operationMode=process.argv.includes('--operation-feedback');
+const paginationMode=process.argv.includes('--pagination');
+const largeFixtureMode=operationMode||paginationMode;
 const candidates=firefox?[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe']:[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
 if(firefox&&process.platform==='win32'){try{const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}catch{}}
 let browser;
@@ -52,7 +54,7 @@ const server=createServer(async(request,response)=>{
       if(pathname==='/src/ui/options.js')body=body.toString().replace("if(workspace.workspace==='providers')providerAccountsView.update(database);",'providerAccountsView.update(database);').replace("if(workspace.workspace==='ownership')renderDuplicateReview();",'renderDuplicateReview();');
       if(pathname==='/src/ui/contents-workspace.js')body=body.toString().replace('if(!active&&!selected)return;','');
     }
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}
@@ -68,9 +70,9 @@ try{
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
-  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:operationMode?180000:importerMode?90000:30000,maxBuffer:4*1024*1024},resolve);});
+  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:largeFixtureMode?180000:importerMode?90000:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
-  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,operationMode?150000:importerMode?60000:20000);})]);}
+  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,largeFixtureMode?150000:importerMode?60000:20000);})]);}
   finally{clearTimeout(timeout);child?.kill();await exited;}
   assert.ok(result,'The browser did not finish the UI fixture.');
   const requestedOutput=process.argv.find(value=>value.startsWith('--output='))?.slice(9);

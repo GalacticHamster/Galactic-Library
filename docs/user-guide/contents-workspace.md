@@ -2,7 +2,7 @@
 
 Open **Contents** to see included works for books from every remembered account. Library and Contents share search, media, provider, saved account, genre, access, reading, series and sorting. Contents-specific status filters remain separate and clearly marked. Contents is book-only; an incompatible media filter produces an honest empty result, not a reinterpreted selection.
 
-Pages follow the same canonical ordering as Library, fifty groups per page, with separate rows for qualifying accounts. The same product in two accounts keeps its own descriptions and reviews. Switching follows the current item/first visible group, and clamps the saved page when that item no longer qualifies. See [Library browsing](library-browsing.md) for exact filter and position semantics.
+Pages follow the same catalog ordering as Library, with separate cards for qualifying accounts and a shared adjustable page size. The same product in two accounts keeps its own descriptions and reviews. Switching follows the current item/first visible group, and clamps the saved page when that item no longer qualifies. See [Library browsing](library-browsing.md) for exact filter and position semantics.
 
 Results use the same rounded card treatment as Library. Each card shows its title, provider/account, included works when available, and one verification/uncertainty caption. **Inspect contents** is a compact keyboard-accessible action. Latest retrieval failures and changed descriptions remain visible; **Last contents activity** is available inside inspection instead of on every card.
 
@@ -60,6 +60,12 @@ Only the signed-in Kindle page controls acquisition, Refresh All, Pause/Resume, 
 
 Library item Details includes **Review contents**, with account-specific links when a card contains several records. Contents includes **Open this book in Library**. These links preserve the durable record reference in a local URL fragment; reloading a valid book link opens that exact record. Returning through that link restores the originating Library search, filters, sort, page and scroll position within this Options tab. Legacy workspace links remain available; game contents tools remain under Advanced in Library.
 
-The overview reuses the loaded committed database, caches lightweight rows for that object and creates only the account rows belonging to fifty visible canonical groups. Cached bounded-input suggestions serve visible previews; full-source interpretation, editors, history and comparisons remain deferred to a requested book/panel. No extra database read populates the overview. The existing book-suggestion workbench also defers its full source interpretation until opened and visible.
+The overview reuses the loaded committed database, caches lightweight rows for that object and creates only the selected page of book/account cards. Cached bounded-input suggestions serve visible previews; full-source interpretation, editors, history and comparisons remain deferred to a requested book/panel. No extra database read populates the overview. The existing book-suggestion workbench also defers its full source interpretation until opened and visible.
 
 See [Kindle discovery](kindle-contents-discovery.md), [book enrichment](comic-manga-enrichment.md), and the [contents identity contract](../architecture/contents-evidence.md) for the unchanged evidence rules.
+
+## Pagination
+
+Contents uses the same top/bottom pagination controls and **Items per page** preference as Library: 20, 50, 100 or 200 (default 50). Each Contents card represents one qualifying book/account record, so a page contains at most the selected number of cards even when several accounts share one catalog item. The header keeps catalog and account totals separate; the displayed range counts the account cards.
+
+Changing page size starts at page one and updates both rows. Search/filter/sort also reset the page. Page navigation scrolls back to the upper results controls after rendering. The choice survives reopening but is excluded from backups. See [Library pages](library-browsing.md#pages-and-items-per-page).

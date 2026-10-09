@@ -4,6 +4,7 @@ import {libraryBroadGenreValues} from '../lib/genre-hints.js';
 import {compareTitles} from '../lib/title-sort.js';
 import {providerLabel,accountLabel} from './item-presentation.js';
 import {contentsSummary} from './contents-overview.js';
+import {paginationState} from './pagination.js';
 export const LIBRARY_SORTS=['title-asc','title-desc','added','updated','creator','series'];
 
 // Retrieval keys only: never identity or ownership evidence.
@@ -91,7 +92,7 @@ export function compareBrowseRows(a,b,sort='title-asc'){
   return title();
 }
 
-export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50,anchor='',recordFilter=()=>true}={}){
+export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50,anchor='',recordFilter=()=>true,paginateRecords=false}={}){
   const key=searchKey(query),matches=[];
   for(const row of projection.rows){
     if(workspace==='books'&&!['book','audiobook'].includes(row.canonical.mediaType))continue;
@@ -103,8 +104,10 @@ export function libraryBrowseResults(projection,{query='',filters={},sort='title
     if(ranks.length)matches.push({...row,qualifying,addons,rank:Math.min(...ranks)});
   }
   matches.sort((a,b)=>a.rank-b.rank||compareBrowseRows(a,b,sort));
-  const anchored=anchor?matches.findIndex(row=>row.canonical.id===anchor||row.records.some(value=>value.record.recordRef===anchor)):-1;
+  const entries=paginateRecords?matches.flatMap(row=>row.qualifying.map(value=>({...row,qualifying:[value]}))):matches;
+  size=paginationState(entries.length,page,size).size;
+  const anchored=anchor?entries.findIndex(row=>row.canonical.id===anchor||row.qualifying.some(value=>value.record.recordRef===anchor)):-1;
   if(anchored>=0)page=Math.floor(anchored/size);
-  const pages=Math.max(1,Math.ceil(matches.length/size));page=Math.max(0,Math.min(page,pages-1));
-  return {matches,rows:matches.slice(page*size,(page+1)*size),total:matches.length,page,pages};
+  const state=paginationState(entries.length,page,size);page=state.page;
+  return {matches,rows:entries.slice(page*size,(page+1)*size),total:entries.length,catalogTotal:matches.length,page,pages:state.pages};
 }

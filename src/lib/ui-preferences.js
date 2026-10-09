@@ -1,4 +1,6 @@
 export const UI_PREFERENCES_KEY = 'galacticLibraryUiPreferences';
+export const PAGE_SIZES = Object.freeze([20,50,100,200]);
+export const validPageSize = value => PAGE_SIZES.includes(value);
 export const PRIMARY_WORKSPACES = ['library', 'providers', 'contents', 'settings'];
 export const LIBRARY_WORKSPACES = ['library', 'books', 'reading', 'ownership'];
 // Old saved views remain valid secondary Library destinations.
@@ -10,7 +12,7 @@ export function workspaceTarget(value) {
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
 export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
-export const defaultUiPreferences = () => ({workspace:'library',browse:emptyBrowseView(),library:{information:'all',dlc:'all'},contents:{status:'all'},books:emptyLibraryView()});
+export const defaultUiPreferences = () => ({workspace:'library',pageSize:50,browse:emptyBrowseView(),library:{information:'all',dlc:'all'},contents:{status:'all'},books:emptyLibraryView()});
 function validateView(view,defaults){
   if(!view||typeof view!=='object'||Array.isArray(view)||Object.keys(view).some(key=>!Object.hasOwn(defaults,key)))throw Error('Invalid library filters.');
   const output={...defaults,...view};
@@ -23,8 +25,9 @@ function validateView(view,defaults){
   return output;
 }
 export function validateUiPreferences(value){
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','pageSize','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
   const output=defaultUiPreferences();
+  if(value.pageSize!==undefined){if(!validPageSize(value.pageSize))throw Error('Invalid items per page.');output.pageSize=value.pageSize;}
   if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=value.workspace;}
   // Migrate old Library fields once. Shared state is authoritative thereafter.
   const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();

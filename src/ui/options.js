@@ -8,6 +8,7 @@ import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} f
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
+import {createPagination} from './pagination.js';
 import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
 import {bookRoute,bookHref} from './contents-navigation.js';
@@ -137,7 +138,7 @@ const contentsReviewActions={
   remove:async(id)=>{database=await drafts.commit(()=>removeContentReview(id));},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({projection:browseProjection,canLeave:()=>drafts.allowNavigation(),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
+const contentsWorkspace=createContentsWorkspace({projection:browseProjection,canLeave:()=>drafts.allowNavigation(),pageSizeChanged:size=>changePageSize(size),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
   if(!reviewOrigin)reviewOrigin={workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll,ref};
   if(!restoringRoute)pushRoute(bookHref('contents',ref));
 },review:(record,current)=>{
@@ -189,8 +190,9 @@ const workspace = createWorkspaceNavigation({
   applyView: (view,current) => {if(current==='contents'){if(contentsWorkspace.selected)contentsWorkspace.close();contentsWorkspace.applyView(view);return;} search.value = view.search; libraryPage = view.page; browseAnchor=view.anchor??'';librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]??'all'; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
   save: saveUiPreferences, beforeSelect:()=>{if(!drafts.allowNavigation())return false;if(!restoringRoute)rememberNavigationEntry();},navigated:name=>{reviewOrigin=null;pushRoute('#'+name);}, changed: () => { if (database) render(); }
 });
-document.querySelector("#library-previous").addEventListener("click", () => { if(!drafts.allowNavigation())return;libraryPage--; browseAnchor='';render(); workspace.rememberView(); });
-document.querySelector("#library-next").addEventListener("click", () => { if(!drafts.allowNavigation())return;libraryPage++; browseAnchor='';render(); workspace.rememberView(); });
+function changePageSize(size){if(!drafts.allowNavigation())return false;return workspace.setPageSize(size);}
+const libraryPaging=createPagination({name:'Library',loading:true,top:document.querySelector('#library-pagination'),bottom:document.querySelector('#library-pagination-bottom'),sizeContainer:document.querySelector('#library-page-size'),ids:{previous:'library-previous',next:'library-next',status:'library-page-status',size:'library-items-per-page'},onSize:changePageSize,onPage:page=>{if(!drafts.allowNavigation())return false;libraryPage=page;browseAnchor='';render();workspace.rememberView();}});
+libraryPaging.select.disabled=true;
 document.querySelector("#open-active-book-job").addEventListener("click", () => workspace.select("books"));
 document.querySelector("#pause-active-book-job").addEventListener("click", () => { googleBooksPauseRequested = true; document.querySelector("#active-book-job-status").textContent = "Pausing after the current book…"; });
 
@@ -245,7 +247,7 @@ function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   if(!findCard()){
     search.value='';for(const filter of Object.values(viewControls))filter.value='all';
     const sorted=libraryBrowseResults(browseProjection(database),{sort:librarySort.value,workspace:workspace.workspace}).matches;
-    libraryPage=Math.max(0,Math.floor(sorted.findIndex(row=>row.canonical.providerItemIds.includes(record.id))/50));render();
+    libraryPage=Math.max(0,Math.floor(sorted.findIndex(row=>row.canonical.providerItemIds.includes(record.id))/workspace.pageSize));render();
   }
   workspace.rememberView();
   const card=findCard();
@@ -692,7 +694,9 @@ async function runGoogleBooksEnrichment() {
 }
 
 function render(timing = null) {
+  contentsWorkspace.setPageSize(workspace.pageSize);
   if(!database)return;
+  libraryPaging.select.disabled=false;
   const draftState=drafts.reconcile();draftNotice.hidden=!draftState.dirty;
   if(draftState.dirty){draftMessage.textContent=draftState.stale?'Saved information changed. Your edits are retained; reload before saving.':'Your unsaved edits are retained. Finish them or discard to update this view.';contentsWorkspace.update(database,workspace.workspace==='contents');return;}
   let endContents=timing?.begin('options_contents');
@@ -771,7 +775,7 @@ function render(timing = null) {
   const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
   const filters = selectedFilters();
-  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage,anchor:browseAnchor});
+  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage,size:workspace.pageSize,anchor:browseAnchor});
   browseAnchor='';lastBrowseResult=result;libraryPage=result.page;
   const canonical=result.matches.map(row=>row.canonical);
   renderActiveFilters(filters);
@@ -783,13 +787,11 @@ function render(timing = null) {
   const canShowAddOns=(filters.mediaType==='all'||filters.mediaType==='game')&&filters.dlc!=='without';
   const orphanValues=(workspace.workspace==='library'&&canShowAddOns?browse.addOns:[]).filter(value=>!linkedAddOnIds.has(value.record.id)&&recordQualifies(value,filters,database)&&recordSearchRank(value,searchKey(query))!==null).sort((a,b)=>compareTitles(a.record.title,b.record.title));
   const visibleAddOnCount=canShowAddOns?new Set([...result.matches.flatMap(row=>row.addons),...orphanValues].map(value=>value.record.id)).size:0;
-  summary.textContent=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' matching account records':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
+  const summaryText=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' matching account records':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
+  if(summary.textContent!==summaryText)summary.textContent=summaryText;
 
   endSegment?.();endSegment=timing?.begin('options_cards');
-  libraryPage=Math.max(0,Math.min(libraryPage,Math.max(0,Math.ceil(canonical.length/50)-1)));
-  document.querySelector("#library-previous").disabled=libraryPage===0;
-  document.querySelector("#library-next").disabled=(libraryPage+1)*50>=canonical.length;
-  document.querySelector("#library-page-status").textContent=canonical.length ? "Showing "+(libraryPage*50+1)+"–"+Math.min((libraryPage+1)*50,canonical.length)+" of "+canonical.length : "No items to show";
+  libraryPaging.update({total:result.total,page:libraryPage,size:workspace.pageSize});
   items.replaceChildren(...result.rows.map((row) => {
     const canonicalItem=row.canonical;
     const node = document.createElement('li');
@@ -1010,7 +1012,11 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 chrome.runtime.onMessage?.addListener((message,sender)=>{
   if(sender.id===chrome.runtime.id&&message?.type==='GL_CONTENTS_TIMING_START'&&globalThis.GalacticContentsPerformance.validId(message.diagnosticLookupId)){contentsDiagnosticId=message.diagnosticLookupId;contentsDiagnosticExpires=Date.now()+60000;}
   if(sender.id===chrome.runtime.id&&message?.type==='GL_KINDLE_CONTENTS_PROGRESS')contentsScanProgress.accept(message.runs??[]);
-  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED){backupRestore.changed();contentsScanProgress.changed();}
+  if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED&&Array.isArray(message.keys)){
+    if(message.keys.includes(DATABASE_STORAGE_KEY)){backupRestore.changed();contentsScanProgress.changed();}
+    if(message.keys.includes(SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY)){showEnrichmentActions.checked=workspace.workspace==='books';if(database)render();}
+    if(!googleBooksRunning&&(message.keys.includes(GOOGLE_BOOKS_API_KEY_STORAGE_KEY)||message.keys.includes(GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY)))renderGoogleBooksEnrichment().catch(()=>{});
+  }
   return false;
 });
 contentsScanProgress.initialize();

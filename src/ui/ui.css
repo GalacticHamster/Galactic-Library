@@ -10,10 +10,17 @@ body { margin: 0; } .page { max-width: 880px; margin: 0 auto; padding: 32px 20px
 .item-details > summary,.contents-inspect { color:#c4b5fd; cursor:pointer; width:fit-content; }
 .item-details > .item-details-body { margin-top:12px; border-top:1px solid #46516a; padding-top:12px; }
 .item-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
-#library-pagination { align-items:center; justify-content:space-between; }
-#library-page-status { font-size:.85rem; color:#cbd5e1; }
+.pagination { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; margin:12px 0; scroll-margin-block-start:12px; }
+.pagination button { min-width:116px; min-height:40px; font-size:.85rem; }
+.pagination button:disabled { background:#4b5563; }
+.pagination-info { font-size:.85rem; color:#cbd5e1; text-align:center; overflow-wrap:anywhere; }
+.results-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; }
+.results-header > p { flex:1 1 240px; margin:0; }
+.results-header > div { margin-inline-start:auto; }
+.page-size-control { display:inline-flex; align-items:center; gap:8px; font-size:.85rem; color:#c4b5fd; }
+.page-size-control select { min-width:76px; }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline:2px solid #c4b5fd; outline-offset:3px; }
-@media(max-width:600px) { .workspace-navigation button { flex:1 1 110px; } #library-pagination { justify-content:flex-start; } }
+@media(max-width:600px) { .workspace-navigation button { flex:1 1 110px; } }
 h1, h2, p { margin-top: 0; } h1 { color: #d8b4fe; } h2 { font-size: 1.1rem; } section { border-top: 1px solid #374151; padding: 24px 0; }
 .muted { color: #9ca3af; } .providers { display: grid; gap: 8px; } .provider, .library-items > li { display: flex; justify-content: space-between; gap: 16px; padding: 12px; background: #1f2937; border-radius: 6px; }
 .provider span, .library-items span { color: #c4b5fd; } .library-controls { display: grid; gap: 12px; margin-bottom: 16px; } input[type="search"] { min-width: 240px; }

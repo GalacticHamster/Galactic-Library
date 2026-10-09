@@ -14,6 +14,7 @@ import {uiFormattingTests} from './ui-formatting.js';
 import {uxSafetyTests} from './ux-safety.js';
 import {draftGuardTests} from './draft-guard.js';
 import {libraryBrowseTests} from './library-browse.js';
+import {paginationTests} from './pagination.js';
 import {itemDetailsUxTests} from './item-details-ux.js';
 import {contentsUxTests} from './contents-ux.js';
 import {navigationUxTests} from './navigation-ux.js';
@@ -96,7 +97,7 @@ const tests = [
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,
-  ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
+  ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...paginationTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,
