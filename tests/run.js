@@ -1,3 +1,4 @@
+import {kindleCategoryTests} from './kindle-categories.js';
 import {genreClassificationTests} from './genre-classification.js';
 import {bundleMatchContextTests} from './bundle-match-context.js';
 import {crossProviderCollectionTests} from './cross-provider-collections.js';
@@ -85,7 +86,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
-  ...genreClassificationTests,
+  ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,
   ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,

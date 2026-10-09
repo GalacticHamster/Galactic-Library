@@ -2,6 +2,8 @@
 import {libraryBroadGenreValues as genres,libraryCategoryEvidence,isConfirmedComicManga} from '../src/lib/genre-hints.js';
 import {normalizeProviderItem,createEmptyDatabase,rebuildCanonicalItems,validateDatabase} from '../src/lib/models.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
+import {createStorageWriter} from '../src/background/storage-writer.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {matchItems} from '../src/lib/matcher.js';
 export const COMICS='Comics & Graphic Novels';
 export const classificationFixture=(id,title,metadata={},extra={})=>({provider:'kindle',providerItemId:id,title,mediaType:'book',ownership:'owned',metadata,...extra});
@@ -35,6 +37,10 @@ export const classificationFixtures=[
  ['game','Batman #2',{originType:'Comixology' },[],{mediaType:'game'}],
  ['software','Marvel Omnibus Software',{bundleTitle:'Comics Bundle'},[],{provider:'fanatical',mediaType:'software'}],
  ['ordinary-novel','Ordinary Novel Vol. 2',{},[]],
+ ['ambiguous-myth','Thor Vol. 2',{publisher:'University Press'},[]],
+ ['noncomic-subject','Batman Vol. 2',open(['Novels']),[]],
+ ['comic-with-fiction','Batman Vol. 2',google(['Fiction']),[COMICS,'Fiction & Literature']],
+ ['comic-history-subject','A Scholarly Book',open(['Comics history']),['History']],
  ['publisher-only','An Unknown Book',{publisher:'Image Comics'},[]],
  ['publisher-structure','A New Collection Vol. 1',{publisher:'Image Comics'},[COMICS]],
  ['catalogue-character','A Book',open(['Batman']),[]],
@@ -62,4 +68,16 @@ genreClassificationTests.push(['Classification projection preserves exact matchi
  const records=classificationRecords();assert(libraryCategoryEvidence(records.find(r=>r.providerItemId==='catalogue-conflict')).some(e=>e.conflict));
  const manual=normalizeProviderItem(classificationFixture('m','Batman Vol. 1',{enrichment:{googleBooks:{categories:['Graphic Novels']},localMetadata:{source:'epub',approved:true,categories:['Prose fiction']}}}));
  assert(!genres(manual).includes(COMICS));assert.deepEqual(manual.metadata.enrichment.googleBooks.categories,['Graphic Novels']);assert(libraryCategoryEvidence(manual).some(e=>e.conflict));
+}]);
+
+genreClassificationTests.push(['Saved catalogue categories survive schema/profile migration, restore, quick sync and trusted separation from importer data',async()=>{
+ const stored={},writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async values=>Object.assign(stored,structuredClone(values))});
+ const incoming=classificationFixture('B000000002','Computing Book',{originType:'Purchase'});let db=await writer.mergeProviderItems('kindle',[incoming]);const record=Object.values(db.providerItems)[0];
+ await writer.saveGoogleBooksEnrichments([{itemIds:[record.id],recordRefs:[record.recordRef],enrichment:{source:'google-books',volumeId:'synthetic',title:record.title,categories:['Computers','Nonfiction']}}]);
+ await writer.saveOpenLibraryEnrichment([record.id],{source:'open-library',workKey:'/works/OL123W',title:record.title,subjects:['Science fiction']},[record.recordRef]);
+ db=await writer.getDatabase();const legacy=structuredClone(db);legacy.schemaVersion=1;delete legacy.providerProfiles;delete legacy.legacyProfileNamespaces;
+ const migrated=validateDatabase(legacy);assert.deepEqual(Object.values(migrated.providerItems)[0].metadata.enrichment.googleBooks.categories,['Computers','Nonfiction']);
+ await writer.restoreDatabase(parseBackup(createBackup(db)));db=await writer.mergeProviderItems('kindle',[{...incoming,metadata:{originType:'Purchase',enrichment:{googleBooks:{source:'google-books',categories:['Horror']}}}}]);
+ const saved=db.providerItems[record.id];assert.deepEqual(saved.metadata.enrichment.googleBooks.categories,['Computers','Nonfiction']);assert.deepEqual(saved.metadata.enrichment.openLibrary.subjects,['Science fiction']);
+ assert(libraryBrowseResults(createLibraryBrowseProjection()(db),{filters:{genre:'Technology & Computing'}}).total===1);
 }]);

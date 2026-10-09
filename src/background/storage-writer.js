@@ -25,6 +25,7 @@ import { PROVIDER_SOURCES } from '../lib/metadata-validation.js';
 import { text } from '../lib/validation.js';
 import {needsGoogleBooksEnrichment} from '../lib/enrichment.js';
 import {validateEnrichment} from '../lib/metadata-validation.js';
+import {validateKindleCategoryPaths} from '../lib/kindle-categories.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
@@ -902,7 +903,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         endValidation?.();throw new Error('Invalid Kindle contents entry.');
       }
       const previous = item.metadata?.enrichment?.kindleProductComicContents;
+      const paths=entry.categoryPaths===undefined?[]:validateKindleCategoryPaths(entry.categoryPaths);
+      const categoryMetadata=paths.length?{categoryPaths:paths,categoriesCheckedAt:updatedAt}:previous?.categoryPaths?.length?{categoryPaths:previous.categoryPaths,categoriesCheckedAt:previous.categoriesCheckedAt}:{};
       const result = {source:'amazon-product-page',sourceUrl,statement,availability,
+        ...categoryMetadata,
         ...(selection?{manifest:selection.manifest}:{}),extractorVersion:entry.extractorVersion ?? 1,
         ...(availability==='temporary-failure'?{failureCode:['captcha','sign-in','http','network'].includes(entry.failureCode)?entry.failureCode:'unknown'}:{}),checkedAt:updatedAt};
       endValidation?.();

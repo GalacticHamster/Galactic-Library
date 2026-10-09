@@ -1,3 +1,5 @@
+import {kindleBroadCategory} from './kindle-categories.js';
+
 function compactText(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
 }
@@ -121,7 +123,8 @@ export const BROAD_GENRE_RULES = [
 
 const COMICS='Comics & Graphic Novels';
 // Retrieval vocabulary, never identity, ownership or scan-eligibility evidence.
-const COMIC_SERIES=/\b(?:batman|superman|spider[ -]?man|x[ -]?men|avengers|fantastic four|hulk|iron man|thor|daredevil|moon knight|teenage mutant ninja turtles|tmnt|spawn|hellboy|hellblazer|judge dredd|the walking dead|something is killing the children|transformers)\b/iu;
+const AMBIGUOUS_COMIC_SERIES=/\b(?:avengers|hulk|thor|spawn|transformers)\b/iu;
+const DISTINCT_COMIC_SERIES=/\b(?:batman|superman|spider[ -]?man|x[ -]?men|fantastic four|iron man|daredevil|moon knight|teenage mutant ninja turtles|tmnt|hellboy|hellblazer|judge dredd|the walking dead|something is killing the children)\b/iu;
 const COMIC_PUBLISHER=/^(?:marvel(?: comics| entertainment)?|dc(?: comics)?|image(?: comics)?|dark horse(?: comics)?|idw(?: publishing)?|valiant(?: entertainment)?|boom!? studios|dynamite(?: entertainment)?|archie(?: comics)?|oni press|fantagraphics(?: books)?|first second)$/iu;
 const COMIC_STRUCTURE=/(?:#\s*\d|\b(?:annual|one[ -]shot|miniseries|trade paperback|tpb|omnibus|collected edition)\b)/iu;
 const VOLUME=/\b(?:vol(?:ume)?\.?\s*\d|collected\s+(?:issues?|volumes?))\b/iu;
@@ -145,6 +148,10 @@ export function libraryCategoryEvidence(record) {
   const manual=enrichment.localMetadata?.approved?enrichment.localMetadata.categories:[];
   add('approved-local-metadata',1,'user-reviewed',manual);
   add('provider-format',2,'provider-explicit',[metadata.format,metadata.contentType]);
+  if(record.provider==='kindle')for(const path of enrichment.kindleProductComicContents?.categoryPaths??[]){
+    const broad=kindleBroadCategory(path);
+    entries.push({source:'amazon-kindle-breadcrumb',authority:2,confidence:broad?'provider-category':'incomplete-path',evidence:path.nodes.map(node=>node.label+(node.nodeId?' ['+node.nodeId+']':'')).join(' → '),classificationLabel:broad,categories:broad?normalizedLibraryCategories(broad):[],nodes:path.nodes,sourceUrl:enrichment.kindleProductComicContents.sourceUrl,checkedAt:enrichment.kindleProductComicContents.categoriesCheckedAt});
+  }
   if(record.mediaType==='book')for(const hint of kindleComicMangaHints(record))add(hint.source,2,hint.confidence,hint.evidence);
   // Comixology/ComicsUnlimited is explicit source-format evidence even though
   // the origin string itself is not a literary category.
@@ -153,7 +160,7 @@ export function libraryCategoryEvidence(record) {
   add('google-books-genre-hint',3,'related-work-hint',enrichment.googleBooksGenreHint?.categories);
   add('open-library-subject',3,'catalogue-subject',enrichment.openLibrary?.subjects);
   const manualRejects=distinctText(manual).some(negativeLabel);
-  const contrary=NON_COMIC.test(record.title)||entries.some(entry=>negativeLabel(entry.evidence));
+  const contrary=NON_COMIC.test(record.title)||entries.some(entry=>negativeLabel(entry.classificationLabel??entry.evidence));
   const explicitComic=entries.some(entry=>entry.categories.includes(COMICS));
   if(manualRejects)for(const entry of entries)if(entry.authority>1&&entry.categories.includes(COMICS)){
     entry.categories=entry.categories.filter(category=>category!==COMICS);entry.conflict='Reviewed non-comic format takes precedence.';
@@ -168,8 +175,8 @@ export function libraryCategoryEvidence(record) {
       if(categories.length||/\b(?:comics?|manga|graphic novels?)\b/iu.test(bundle))entries.push({source:record.provider+'-bundle-name',authority:4,confidence:'acquisition-context',evidence:bundle,categories,...(contrary?{conflict:'Item-level non-comic evidence blocks comic bundle inference.'}:{})});
     }
     const names=[record.title,...distinctText(metadata.series)].join(' · '),publisher=compactText(metadata.publisher||enrichment.googleBooks?.publisher||(enrichment.localMetadata?.approved?enrichment.localMetadata.publisher:'')||enrichment.openLibrary?.publishers?.[0]);
-    const knownSeries=COMIC_SERIES.test(names),knownPublisher=COMIC_PUBLISHER.test(publisher);
-    const structural=COMIC_STRUCTURE.test(record.title)||(knownPublisher||knownSeries)&&(VOLUME.test(record.title)||/^\d+(?:\.\d+)?$/u.test(String(metadata.volume??metadata.issue??'')));
+    const knownSeries=DISTINCT_COMIC_SERIES.test(names)||AMBIGUOUS_COMIC_SERIES.test(names),knownPublisher=COMIC_PUBLISHER.test(publisher);
+    const structural=COMIC_STRUCTURE.test(record.title)||(knownPublisher||DISTINCT_COMIC_SERIES.test(names))&&(VOLUME.test(record.title)||/^\d+(?:\.\d+)?$/u.test(String(metadata.volume??metadata.issue??'')));
     if(!contrary&&/\b(?:graphic novel|comic book|manga)\b/iu.test(record.title))entries.push({source:'explicit-title-format',authority:5,confidence:'explicit-format-label',evidence:record.title,categories:[COMICS]});
     if(!contrary&&!explicitComic&&structural&&(knownSeries||knownPublisher))entries.push({source:'comic-publication-pattern',authority:5,confidence:'corroborated-inference',evidence:[record.title,publisher,...distinctText(metadata.series)].filter(Boolean).join(' · '),categories:[COMICS]});
     else if(!explicitComic&&knownSeries&&!contrary&&!entries.some(entry=>entry.categories.includes(COMICS)))entries.push({source:'comic-series-suggestion',authority:6,confidence:'uncertain',evidence:record.title,categories:[]});
