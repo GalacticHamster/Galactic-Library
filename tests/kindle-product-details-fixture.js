@@ -21,6 +21,7 @@ export const productDetailsFixtures=[
  {name:'publisher duplicates across representations',html:page(bullets([['Publisher','BOOM! Studios (December 1, 2020)'],['Publisher','BOOM! Studios']])),expected:{publisher:'BOOM! Studios',publicationDate:'2020-12-01'},count:2},
  {name:'malformed table without value',html:page('<table id="productDetails_detailBullets_sections1"><tr><th>Language</table>'),empty:true},
  {name:'unknown inherited-object label ignored',html:page(bullets([['constructor','Unexpected label']])),empty:true},
+ {name:'Unicode ISBN digits',html:page(bullets([['ISBN-13',[...'9781646680450'].map(char=>String.fromCodePoint(char.charCodeAt(0)+0xfee0)).join('')]])),expected:{isbn13:'9781646680450'}},
  {name:'impossible date',html:page(table([['Publication date','February 30, 2020']])),expected:{publicationDate:''}}
 ];
 export function checkProductDetailsCapture(parse){
