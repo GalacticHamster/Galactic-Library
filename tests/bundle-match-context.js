@@ -25,3 +25,10 @@ test('known identities only, never titles/account inference; missing and protect
  for(const extra of [{libraryKey:null},{libraryKey:'other-account'},{protected:true},{strength:'strong'}])assert.equal(reconcile({complete:true,offers:[original,offer('sequel',[candidate('related','weak',extra)])]}).results.get('sequel').deferred.length,0);
 });
 test('all identity/ownership states are outside the engine contract',()=>{const original=offer('original',[candidate('exact','strong')]);for(const ownership of ['owned','subscription','borrowed','unknown'])assert.equal(reconcile({complete:true,offers:[{...original,ownership},offer('sequel',[candidate('related')])]}).results.get('sequel').deferred.length,1);});
+
+test('large candidate lists retain stable relevance order without removing independent claims',()=>{
+ const candidates=Array.from({length:10000},(_,i)=>candidate(String(i),'weak',{relevance:i%2?'contents':'related'}));
+ const before=JSON.stringify(candidates),r=reconcile({complete:true,offers:[offer('only',candidates)]}).results.get('only');
+ assert.equal(r.primary.length,10000);assert.equal(r.deferred.length,0);
+ assert.deepEqual(Array.from(r.primary.slice(0,3)),['1','3','5']);assert.equal(r.primary[5000],'0');assert.equal(JSON.stringify(candidates),before);
+});

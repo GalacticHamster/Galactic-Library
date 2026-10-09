@@ -1,4 +1,5 @@
 import {bundleMatchContextTests} from './bundle-match-context.js';
+import {crossProviderCollectionTests} from './cross-provider-collections.js';
 import {companionIdentityTests} from './companion-identities.js';
 import {uiFormattingTests} from './ui-formatting.js';
 import {uxSafetyTests} from './ux-safety.js';
@@ -83,6 +84,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...crossProviderCollectionTests,
   ...companionIdentityTests,
   ...uiFormattingTests, ...uxSafetyTests, ...draftGuardTests, ...libraryBrowseTests, ...itemDetailsUxTests, ...contentsUxTests, ...navigationUxTests,
   ...providersUxTests,

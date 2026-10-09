@@ -1,5 +1,5 @@
 import { titleKey } from './normalization.js';
-import { identityConflicts as recordConflicts, identityEvidence, relationshipReason, sameEditionEvidence } from './identity.js';
+import { identityConflicts as recordConflicts, identityEvidence, relationshipReason, sameEditionEvidence, titleIdentity } from './identity.js';
 import { contentCoverage, proposeContents } from './contents.js';
 import { canonicalItemsSteps } from './models.js';
 import {finishWork,finishWorkAsync} from './cooperative-work.js';
@@ -190,7 +190,13 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
     const discovered = new Set(candidateTitleKeys(query.title, query.mediaType).flatMap(key => byCandidateTitle.get(query.mediaType + ':' + key) ?? []));
     for (const item of discovered) {
       if (exact.has(item.id) || possible.has(item.id) || identityConflicts(query, item, { edition: false }).some(field => ['media type', 'authors', 'run', 'unit', 'unitType'].includes(field))) continue;
-      const reason = possibleTitleRelation(query.title, item.title, query.mediaType);
+      // A numbered issue in this exact complete series is a related item, not
+      // proof that the unnumbered offer contains it or has a complete manifest.
+      const numbered=titleIdentity(item.title,item.mediaType);
+      const seriesItem=query.mediaType==='book' && !evidence.unit && numbered.unit
+        && presentationTitle(numbered.series,'book')===presentationTitle(query.title,'book');
+      const reason = seriesItem ? 'Numbered series item related to this title; collection membership and completeness are unconfirmed.'
+        : possibleTitleRelation(query.title, item.title, query.mediaType);
       if (reason) {
         const differences = identityConflicts(query, item);
         candidate(item, reason + (differences.length ? ' Differences: ' + differences.join(', ') + '.' : ''));

@@ -1,0 +1,19 @@
+# Cross-provider/collection investigation — pre-implementation design
+
+Synthetic baseline uses the production GL external API and companion classification adapters. No user library or provider page is accessed. Generated traces live under ignored audit-artifacts/cross-provider-collections.
+
+## Demonstrated causes
+
+GL discovery candidate indexes encounter Rite of Spring #1/#2, but possibleTitleRelation rejects them: its generic subtitle comparison sees a differing subtitle containing a numeric issue. The collection query is unnumbered and has no explicit manifest. Consequently no issue candidates or coverage are returned. Original-title candidates are returned first. GL public relationships only distinguish same-edition, same-work and contains; weak same-work here is similarity, not a persistent identity assertion.
+
+HB and FAN normally omit locally owned offers from GL queries. Strong local originals cannot anchor a different opaque Kindle provider reference. Even manually same-edition GL canonical groups are private and public itemRef remains record-scoped. Inferring cross-record identity by equal titles would be unsafe. GL can already establish direct identity between the original offered title and its Kindle record using the unchanged API; the missing query, rather than a new identity model, is the bounded correction.
+
+GL titleIdentity parses decimal Book/Volume/# numbering but not English Book One/Two/Three. Canonical interpretation must not be changed casually. The generic record has no affirmative contents/extent evidence; it cannot be assigned to Book One or discarded for Books Two/Three. Current candidate cards emphasize purchased access without explaining unknown volume relevance. Contents candidates appear after weaker title candidates. Verified coverage requires reviewed entries AND owned access; subscription reviews intentionally never become owned coverage. Available actual book extents remain unknown.
+
+## Bounded implementation and invariants
+
+1. Add only cautious numbered-item discovery when a book query has no unit and the candidate's explicit trailing numbered series stem equals the complete queried title under existing normalization. Retain known author/run/unit/manual barriers. Return Possible with an explicit unconfirmed membership/completeness reason, never exact/verified coverage. No union, manifests, parser, canonical identity, ownership policy, schema or API changes.
+2. For a demonstrably complete multi-product bundle, include locally exact-owned top-level offers in existing batched GL identity checks. Feed those read results separately into the reconciler as context anchors; do not use them to override local ownership. Distinct provider/account records remain distinct. Only a direct same-edition GL result can anchor its own opaque record. Missing/failed context disables deferral. No provider acquisition or network request is introduced; extra bounded companion query items are cached/batched normally.
+3. Use shared deterministic presentation relevance categories: direct identities, reviewed contents, explicit numbered items of the queried complete series, generic unnumbered candidates for numbered books, other similarity. Display strict Book One/Two/Three/decimal/Roman labels without changing authoritative identity parsing. Explain that generic titles have unknown volume/contents relevance. Preserve all candidates/access states, guards, classifications, counts and pricing; new discovered issue suggestions can legitimately replace an otherwise New with Possible, never Owned/Partial.
+
+Canonical-group references are deferred: the existing exact companion query provides necessary cross-provider evidence without exposing account/profile IDs or private canonical IDs. No protocol change is required for the bounded examples. Supporting hidden cross-record equivalence beyond direct matches would require a separate additive opaque identity contract and review.
