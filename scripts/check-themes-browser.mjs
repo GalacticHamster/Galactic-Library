@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {outputPath} from './audit-artifacts.mjs';
+function contrast(a,b){const luminance=value=>{const rgb=value.match(/\d+/g).slice(0,3).map(value=>{const n=Number(value)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
 import {createRelease,projectRoot} from './release.mjs';
 import {chromePipe,freePort,firefoxMarionette} from '../tests/native-protocol.mjs';
 
@@ -83,6 +84,7 @@ try{
         await size(width);await pause(50);
         const result=await evaluate(`const root=document.documentElement,button=document.querySelector('button:not(:disabled)'),input=document.querySelector('#appearance-mode');input.focus();return {theme:root.dataset.ghTheme,bg:getComputedStyle(root).backgroundColor,text:getComputedStyle(root).color,button:getComputedStyle(button).backgroundColor,focus:getComputedStyle(input).outlineWidth,overflow:root.scrollWidth>innerWidth+1,width:innerWidth};`);
         assert.equal(result.theme,palette);assert.equal(result.overflow,false,role+' '+palette+' '+width+' overflow');assert(parseFloat(result.focus)>=2);
+        if(role==='gl'){const navigation=await evaluate('return [...document.querySelectorAll(".workspace-navigation button")].map(node=>({label:node.textContent,color:getComputedStyle(node).color,background:getComputedStyle(node).backgroundColor}));');for(const button of navigation)assert(contrast(button.color,button.background)>=4.5,palette+' navigation '+button.label);}
         if(role==='gl'){const tour=await evaluate('const results=[];for(const workspace of ["library","providers","contents","settings"]){document.querySelector("[data-workspace="+workspace+"]").click();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));results.push({workspace,overflow:document.documentElement.scrollWidth>innerWidth+1});if(workspace==="library"){const details=document.querySelector(".item-details");if(details){details.open=true;details.dispatchEvent(new Event("toggle"));}}}return results;');for(const step of tour)assert.equal(step.overflow,false,step.workspace+" overflow "+width);}
 
         if(width===1200){const image=await driver.send(firefox?'WebDriver:TakeScreenshot':'Page.captureScreenshot',firefox?{}:{format:'png'},firefox?undefined:session);const path=await outputPath('audit-artifacts/themes/'+kind+'/'+role+'-'+palette+'.png');await writeFile(path,Buffer.from(firefox?image.value:image.data,'base64'));screenshots.push(path);}

@@ -2,8 +2,8 @@
 body { margin: 0; } .page { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; } .popup main { width: 260px; padding: 16px; }
 [hidden] { display:none !important; }
 .workspace-navigation { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-.workspace-navigation button { background:var(--gh-surface-raised); border:1px solid var(--gh-border); }
-.workspace-navigation button[aria-current="page"] { background:var(--gh-accent); border-color:var(--gh-focus); }
+.workspace-navigation button { color:var(--gh-text); background:var(--gh-surface-raised); border:1px solid var(--gh-border); }
+.workspace-navigation button[aria-current="page"] { color:var(--gh-on-accent); background:var(--gh-accent); border-color:var(--gh-focus); }
 .compact-notice { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; padding:10px; border:1px solid var(--gh-border); border-radius:6px; }
 .compact-notice button { padding:5px 8px; }
 .item-details { margin-top:8px; }
@@ -127,8 +127,8 @@ button:disabled,.button-like[aria-disabled="true"] { opacity:.65; cursor:default
 #workspace-navigation button { font-size:1rem; font-weight:650; min-height:44px; padding:10px 18px; }
 #library-navigation button { font-size:.9rem; font-weight:500; min-height:38px; padding:8px 12px; }
 .workspace-navigation { gap:8px; align-items:stretch; }
-.workspace-navigation button:hover { background:var(--gh-surface-hover); }
-.workspace-navigation button[aria-current="page"]:hover { background:var(--gh-accent-hover); }
+.workspace-navigation button:hover:not(:disabled) { background:var(--gh-surface-hover); }
+.workspace-navigation button[aria-current="page"]:hover:not(:disabled) { background:var(--gh-accent-hover); }
 button:disabled { cursor:default; opacity:.6; }
 input:focus-visible,select:focus-visible,textarea:focus-visible,.button-like:focus-visible { outline:2px solid var(--gh-link); outline-offset:3px; }
 section { padding:18px 0; }
@@ -207,3 +207,7 @@ button.danger { background:var(--gh-danger-fill); }
 
 .product-details,.product-details dd,.product-details small { min-width:0; overflow-wrap:anywhere; }
 .product-details small { display:block; }
+
+/* Neutral controls need their paired foreground in both palettes. */
+:is(.library-filters button,.review-actions .different,.review-actions .undo,.open-library-results .open-library-apply,.library-active-filters button) { color:var(--gh-text); }
+:is(.library-filters button,.review-actions .different,.review-actions .undo,.open-library-results .open-library-apply,.library-active-filters button):hover:not(:disabled) { background:var(--gh-surface-hover); color:var(--gh-text); }
