@@ -39,7 +39,7 @@ export function bindBackupRestore({input,status,parse,read,restore,refresh,expor
         await refresh();return {message:'Backup restored.'};
       }catch(error){
         if(committed)throw Error('Backup was restored, but the Library view could not reload: '+error.message+'. Try loading the Library again; do not repeat the restore.');
-        const prefix={read:'Could not read backup',validation:'Backup validation failed',comparison:'Could not check current library',persistence:'Restore did not complete'}[phase];
+        const prefix={read:'Could not read backup',validation:'Backup validation failed',comparison:'Could not check current library',persistence:'Restore completion could not be confirmed; reload the Library to check its state before retrying'}[phase];
         throw Error(prefix+': '+error.message);
       }
     },{success:result=>result?.message??'Restoration cancelled.'}).catch(()=>{}).finally(()=>{

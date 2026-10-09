@@ -31,8 +31,14 @@ export const operationFeedbackTests=[
 operationFeedbackTests.push(['Operation summary survives workspace navigation and retains failure without stacking notices',()=>{
  let listener;const element={hidden:true,textContent:'',dataset:{},setAttribute(){}};
  bindOperationSummary(element,{addEventListener:(name,callback)=>listener=callback});
- const send=(token,state,message)=>listener({detail:{token,id:'save',state,message}});
+ const send=(token,state,message)=>listener({detail:{token,id:'save-'+token,state,message}});
  send(1,'starting','Saving contents...');send(2,'running','Preparing export...');assert.match(element.textContent,/Saving.*Preparing/);
- send(1,'failed','Contents write failed');assert.equal(element.textContent,'Preparing export...');send(2,'succeeded','Download handed to browser');assert.equal(element.textContent,'Download handed to browser');
+ send(1,'failed','Contents write failed');assert.match(element.textContent,/Contents write failed.*Preparing export/);send(2,'succeeded','Download handed to browser');assert.equal(element.textContent,'Contents write failed');
  send(3,'failed','Storage unavailable');assert.equal(element.hidden,false);assert.equal(element.dataset.operationState,'failed');assert.equal(element.textContent,'Storage unavailable');
+}]);
+operationFeedbackTests.push(['Cancellation uses only a supported callback and waits for operation acknowledgement',async()=>{
+ const held=deferred();let requested=0;const status={textContent:''};
+ const operation=createOperation({id:'supported',name:'Running...',status,paint:async()=>{},cancel:()=>requested++});
+ assert.equal(operation.cancel(),false);const pending=operation.run(()=>held.promise);await Promise.resolve();operation.cancel();assert.equal(requested,1);assert.equal(operation.busy,true);
+ held.resolve({cancelled:true});await pending;assert.equal(operation.state.state,'cancelled');assert.equal(status.textContent,'Cancelled.');
 }]);

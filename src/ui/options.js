@@ -909,7 +909,7 @@ downloadComixologyListButton.addEventListener('click', () => performAction({butt
 }}).catch(()=>{}));
 saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
-    await performAction({button:saveGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Saving book service key...',task:()=>saveGoogleBooksApiKey(googleBooksApiKey.value)});
+    await performAction({button:saveGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Saving book service key...',task:async()=>{try{await saveGoogleBooksApiKey(googleBooksApiKey.value);}catch{throw Error('Could not save the Google Books key. Check the key and try again.');}}});
     googleBooksApiKey.value = '';
     document.querySelector('#book-service-status').textContent='Key saved in this browser.';
     await renderGoogleBooksEnrichment();
@@ -920,7 +920,7 @@ saveGoogleBooksApiKeyButton.addEventListener('click', async () => {
 clearGoogleBooksApiKeyButton.addEventListener('click', async () => {
   try {
     googleBooksPauseRequested = true;
-    await performAction({button:clearGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Removing book service key...',task:()=>saveGoogleBooksApiKey('')});
+    await performAction({button:clearGoogleBooksApiKeyButton,status:document.querySelector('#book-service-status'),name:'Removing book service key...',task:async()=>{try{await saveGoogleBooksApiKey('');}catch{throw Error('Could not remove the Google Books key. Try again.');}}});
     document.querySelector('#book-service-status').textContent='Key removed.';
     googleBooksApiKey.value = '';
     await renderGoogleBooksEnrichment();

@@ -14,7 +14,7 @@ import {metadataZip,containerXml,opfXml} from './metadata-fixtures.js';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const firefox=process.argv.includes('--firefox');
 const narrow=process.argv.includes('--narrow');
-const medium=process.argv.includes('--medium'),width=narrow?560:medium?820:1200;
+const medium=process.argv.includes('--medium'),tiny=process.argv.includes('--tiny'),width=tiny?420:narrow?560:medium?820:1200;
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const importerMode=process.argv.includes('--importers');
 const uxMode=process.argv.includes('--ux');
@@ -30,6 +30,7 @@ let browser;
 for(const candidate of candidates){try{await access(candidate);browser=candidate;break;}catch{}}
 if(!browser)throw new Error('Set CHROME_BIN or FIREFOX_BIN to a browser executable to run the UI checks.');
 const profile=await mkdtemp(join(tmpdir(),'gl-browser-test-'));
+if(firefox&&process.argv.includes('--reduced-motion'))await writeFile(join(profile,'user.js'),'user_pref("ui.prefersReducedMotion", 1);\n');
 let result;
 let complete;
 const fixtureFinished=new Promise(resolve=>{complete=resolve;});
@@ -62,10 +63,11 @@ try{
   // can finish while an EPUB stream is still awaiting native completion.
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
-  const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000):'';
+  const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):'';
   const url=`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
-  const env={...process.env,...(firefox&&(narrow||medium)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
+  if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
+  const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
   const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:operationMode?180000:importerMode?90000:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
   try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,operationMode?150000:importerMode?60000:20000);})]);}

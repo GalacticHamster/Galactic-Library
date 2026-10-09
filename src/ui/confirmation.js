@@ -11,7 +11,7 @@ export function createConfirmation({title,message,confirmLabel,extraLabel,extraA
   dialog.addEventListener('cancel',event=>{event.preventDefault();close(false);});
   dialog.addEventListener('close',()=>close(false));
   actions.append(cancel);
-  if(extraAction){const extra=node('button',extraLabel);extra.type='button';extra.className='secondary';extra.addEventListener('click',async()=>{if(extra.disabled)return;extra.disabled=true;try{await extraAction();status.textContent='Current backup download handed to your browser. You can still cancel restoration.';}catch{status.textContent='Could not export the current backup. Cancel restoration and try exporting again.';}finally{extra.disabled=false;}});actions.append(extra);}
+  if(extraAction){const extra=node('button',extraLabel);extra.type='button';extra.className='secondary';extra.addEventListener('click',async()=>{if(extra.disabled)return;extra.disabled=true;confirm.disabled=true;status.textContent='Preparing current backup...';try{await extraAction();status.textContent='Current backup download handed to your browser. You can still cancel restoration.';}catch{status.textContent='Could not export the current backup. Cancel restoration and try exporting again.';}finally{extra.disabled=false;confirm.disabled=false;}});actions.append(extra);}
   actions.append(confirm);dialog.append(node('h3',title),node('p',message),status,actions);document.body.append(dialog);dialog.showModal();cancel.focus();
   return {result,cancel:()=>close(false)};
 }

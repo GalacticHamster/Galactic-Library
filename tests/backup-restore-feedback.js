@@ -22,7 +22,7 @@ export const backupRestoreFeedbackTests=[
   for(const stage of ['read','parse','restore','refresh']){
    const config={};if(stage==='parse')config.parse=()=>{throw Error('Invalid schema');};if(stage==='restore')config.restore=async()=>{throw Error('Write rejected');};if(stage==='refresh')config.refresh=async()=>{throw Error('Worker restarted');};
    const f=fixture(config),run=f.choose(stage==='read'?async()=>{throw Error('File unreadable');}:undefined);await tick();if(stage==='restore'||stage==='refresh')f.answer(true);await run;
-   assert.equal(f.input.disabled,false);assert.equal(f.clear.disabled,false);assert.match(f.status.textContent,stage==='refresh'?/was restored.*do not repeat/:stage==='restore'?/Restore did not complete/:stage==='parse'?/validation failed/:/read backup/);
+   assert.equal(f.input.disabled,false);assert.equal(f.clear.disabled,false);assert.match(f.status.textContent,stage==='refresh'?/was restored.*do not repeat/:stage==='restore'?/completion could not be confirmed/:stage==='parse'?/validation failed/:/read backup/);
   }
  }],
  ['Actual writer rejects duplicate cross-page replacement requests until success or failure settles',async()=>{
