@@ -40,6 +40,12 @@ test('GL preview uses disposable state and existing legacy/unsupported/ambiguous
 test('GL diagnostic inventory ordering survives equivalent native storage dictionary reordering',async()=>{
  const db=database(),p=Object.values(db.providerProfiles)[0],first=Object.values(db.providerItems)[0],second=normalizeProviderItem({...first,providerItemId:'purchase_1:product:next',metadata:{...first.metadata,purchaseId:'purchase_1'}},undefined,{profileKeySpace:p.keySpace});db.providerItems[second.id]=second;const original=await humbleInventory(db,p.profileId);db.providerItems=Object.fromEntries(Object.entries(db.providerItems).reverse());assert.deepEqual(await humbleInventory(db,p.profileId),original);
 });
+test('GL preview reports additional delivery records separately from new saved names without changing data',async()=>{
+ const db=database(),target=(await purchaseAccounts(db,'humble'))[0],before=JSON.stringify(db),raw=snapshot();
+ const extra=await previewPurchaseSnapshot(db,{...raw,records:[{...raw.records[0],providerItemId:'purchase_0:product:other'},{...raw.records[0],title:'New title',providerItemId:'purchase_0:product:new'}]},target);
+ assert.equal(extra.added,2);assert.equal(extra.newTitleNames,1);assert.equal(extra.additionalRecords,1);assert.equal(extra.updateBreakdownKnown,true);assert.equal(JSON.stringify(db),before);
+ const same=await previewPurchaseSnapshot(db,raw,target);assert.equal(same.newTitleNames,0);assert.equal(same.additionalRecords,0);assert.equal(same.enrichment+same.observationOnly,same.updated);assert.equal(JSON.stringify(db),before);
+});
 test('Read-only authorized pulls and both preview directions create no offer, storage write or import',async()=>{
  const services={},writes=[],commits=[];
  for(const role of ['hb','gl']){const runtime={sendMessage:async(id,message)=>({ok:true,protocolVersion:1,...await services[id].external(message,{id:role})})};services[role]=T.createService({runtime,area:{get:async d=>d,set:async v=>writes.push(v)},authorize:async id=>id!==role&&['hb','gl'].includes(id),peer:async()=>role==='hb'?'gl':'hb',accounts:async()=>[],inventory:async()=>inventory(role,[observation(0)]),snapshot:async()=>({...snapshot(),accountRef:role+'-account'}),preview:async data=>({readOnly:true,sourceRecords:data.records.length}),commit:async data=>commits.push(data)});}
