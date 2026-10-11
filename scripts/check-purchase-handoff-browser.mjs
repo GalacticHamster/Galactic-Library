@@ -1,3 +1,4 @@
+import {seedSimplePurchases,simplePurchaseSetupChecks} from './simple-purchase-setup-browser.mjs';
 import {automaticPurchaseChecks} from './automatic-purchase-browser.mjs';
 // Offline native extension checks. Own disposable profiles; no user libraries.
 import assert from 'node:assert/strict';
@@ -14,9 +15,9 @@ import {chromePipe,freePort,firefoxMarionette} from '../tests/native-protocol.mj
 const firefox=process.argv.includes('--firefox'),kind=firefox?'firefox':'chrome';
 const hbRoot=resolve(projectRoot,'../HB'),fanRoot=resolve(projectRoot,'../Fanatical');
 const temporary=await mkdtemp(join(tmpdir(),'gh-purchase-check-'));
-const automatic=process.argv.includes('--automatic');
+const automatic=process.argv.includes('--automatic'),simple=process.argv.includes('--simple-setup'),reverse=process.argv.includes('--reverse');
 const guided=process.argv.includes('--guided'),readable=process.argv.includes('--readable');
-const artifacts=automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
+const artifacts=simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
 const output=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/results.json');
 const checks=[],screenshots=[];let child,driver,exited;
 try{
@@ -30,7 +31,7 @@ try{
   const args=firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe',`--user-data-dir=${profile}`,'about:blank'];
   child=spawn(binary,args,{windowsHide:true,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});
   driver=firefox?await firefoxMarionette(port):chromePipe(child);
-  if(firefox)await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox'}}});
+  if(firefox)await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox',...(simple?{unhandledPromptBehavior:'ignore'}:{})}}});
   async function load(root,role){
     let archive,manifest,stage;
     if(role==='hb'){
@@ -47,8 +48,11 @@ try{
     const result=await driver.send(firefox?'Addon:Install':'Extensions.loadUnpacked',firefox?{path:archive,temporary:true}:{path:stage});
     return {id:firefox?(result.value??result):result.id,manifest,role};
   }
-  const installed={gl:await load(projectRoot,'gl'),hb:await load(hbRoot,'hb'),fan:await load(fanRoot,'fan')};
-  let session;
+  const installed={};let session;
+  for(const role of simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
+    installed[role]=await load(role==='gl'?projectRoot:role==='hb'?hbRoot:fanRoot,role);
+    if(simple&&(reverse?role==='gl':role!=='gl')){await navigate(role);await seedSimplePurchases(role,evaluate);}
+  }
   async function navigate(role,popup=false){
     const item=installed[role],path=popup?item.manifest.action.default_popup:item.manifest.options_page;
     if(firefox){await driver.send('Marionette:SetContext',{value:'chrome'});const response=await driver.send('WebDriver:ExecuteScript',{script:'return WebExtensionPolicy.getByID(arguments[0]).getURL(arguments[1]);',args:[item.id,path],newSandbox:true});await driver.send('Marionette:SetContext',{value:'content'});await driver.send('WebDriver:Navigate',{url:response.value??response});}
@@ -59,7 +63,7 @@ try{
     if(firefox){const response=await driver.send('WebDriver:ExecuteAsyncScript',{script:'(async()=>{'+script+'})().then(arguments[arguments.length-1],error=>arguments[arguments.length-1]({_scriptFailure:error.message+"\\n"+error.stack}));',args:[],newSandbox:false});const value=response.value??response;assert.equal(value?._scriptFailure,undefined,value?._scriptFailure);return value;}
     const response=await driver.send('Runtime.evaluate',{expression:'(async()=>{'+script+'})()',awaitPromise:true,returnByValue:true},session);assert.equal(response.exceptionDetails,undefined,JSON.stringify(response.exceptionDetails));return response.result.value;
   }
-  async function wait(expression){for(let attempt=0;attempt<(automatic?2000:250);attempt++){try{if(await evaluate('return '+expression+';'))return;}catch{}await pause(30);}throw Error('Timed out: '+expression+' '+JSON.stringify(await evaluate('return {url:location.href,id:chrome.runtime.id,hosts:[...document.querySelectorAll("[data-purchase-handoff]")].map(node=>({provider:node.dataset.provider,busy:node.getAttribute("aria-busy"),status:node.querySelector("[role=status]")?.textContent,syncState:node.querySelector("[data-purchase-sync] pre")?.textContent,syncAncestors:(()=>{const rows=[];for(let n=node.querySelector("[data-sync-consent]");n;n=n.parentElement)rows.push({tag:n.tagName,id:n.id,hidden:n.hidden,display:getComputedStyle(n).display,open:n.open});return rows;})(),remote:node.querySelector("[data-purchase-status=remote]")?.textContent,choices:[...node.querySelectorAll("select")].map(s=>({value:s.value,options:s.options.length}))}))};')));}
+  async function wait(expression){for(let attempt=0;attempt<(automatic||simple?2000:250);attempt++){try{if(await evaluate('return '+expression+';'))return;}catch{}await pause(30);}throw Error('Timed out: '+expression+' '+JSON.stringify(await evaluate('return {url:location.href,id:chrome.runtime.id,hosts:[...document.querySelectorAll("[data-purchase-handoff]")].map(node=>({provider:node.dataset.provider,busy:node.getAttribute("aria-busy"),status:node.querySelector("[role=status]")?.textContent,syncState:node.querySelector("[data-purchase-sync] pre")?.textContent,syncAncestors:(()=>{const rows=[];for(let n=node.querySelector("[data-sync-consent]");n;n=n.parentElement)rows.push({tag:n.tagName,id:n.id,hidden:n.hidden,display:getComputedStyle(n).display,open:n.open});return rows;})(),remote:node.querySelector("[data-purchase-status=remote]")?.textContent,choices:[...node.querySelectorAll("select")].map(s=>({value:s.value,options:s.options.length}))}))};')));}
   async function restart(role){if(firefox){await navigate(role==='gl'?'hb':'gl');await driver.send('Marionette:SetContext',{value:'chrome'});const result=await driver.send('WebDriver:ExecuteAsyncScript',{script:'const done=arguments[arguments.length-1],id=arguments[0];const {AddonManager}=ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs");AddonManager.getAddonByID(id).then(addon=>addon.reload()).then(()=>done(true),error=>done({error:error.message}));',args:[installed[role].id],newSandbox:true});assert.equal(result.value??result,true);await driver.send('Marionette:SetContext',{value:'content'});}else{await driver.send('ServiceWorker.enable',{},session);await driver.send('ServiceWorker.stopAllWorkers',{},session);}await pause(100);}
   async function readableScreenshot(role,name){if(!readable)return;for(const palette of ['light','dark'])for(const width of [1200,420]){await evaluate(`await chrome.runtime.sendMessage({type:'GH_SET_APPEARANCE',mode:${JSON.stringify(palette)},followGl:false});await GalacticHamsterTheme.page.load();return true;`);if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height:1000});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false},session);for(const expanded of [false,true]){await evaluate(`const h=document.querySelector('[data-purchase-handoff]'),d=h.querySelector('[data-purchase-technical]');d.open=${expanded};h.querySelector('[data-purchase-status=diagnostic]').scrollIntoView();return true;`);if(expanded)await wait('document.querySelector("[data-purchase-technical] pre").textContent.length>0');const result=await evaluate(`const h=document.querySelector('[data-purchase-handoff]'),r=h.querySelector('[data-purchase-status=diagnostic]'),copy=r.cloneNode(true);copy.querySelectorAll('details').forEach(d=>d.remove());return {primary:copy.textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,technical:r.querySelector('details').open};`);assert.equal(result.overflow,false,role+' '+name+' '+palette+' '+width+' overflow');assert(!/\b(observation|enrichment|correspondence|canonical|identity conflict|scoped record|provenance|hydration|purchase origin)s?\b/i.test(result.primary));assert(result.primary.includes('No library data was changed')||result.primary.includes('Nothing has been imported yet'));const image=await driver.send(firefox?'WebDriver:TakeScreenshot':'Page.captureScreenshot',firefox?{}:{format:'png'},firefox?undefined:session);const path=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/'+role+'-'+name+'-'+palette+'-'+width+(expanded?'-technical':'')+'.png');await writeFile(path,Buffer.from(firefox?image.value:image.data,'base64'));screenshots.push(path);}}}
   const measurements=[];
@@ -70,7 +74,7 @@ try{
     await navigate(role);await evaluate(`await chrome.runtime.sendMessage({type:${JSON.stringify(role==='hb'?'HCL_STORE':'FANATICAL_STORE')},operation:'patch',args:[{galacticLibraryExtensionId:${JSON.stringify(installed.gl.id)}}]});return true;`);
 
   }
-  if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
+  if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
     await navigate('gl');await evaluate('document.querySelector("#check-companion-connections").click();return true;');
     await pause(6500);
     const connections=await evaluate('const C=await import("./src/lib/companion-identities.js");return Promise.all(C.builtinCompanions(chrome.runtime).map(async c=>({role:c.role,id:c.id,result:await C.checkCompanionConnection(chrome.runtime,c.id)})));');

@@ -4,7 +4,7 @@ This design extends purchase handoff version 1; it does not replace its transpor
 
 ## Consent and account identity
 
-Extension authorization permits communication, not automatic imports. Enabling synchronization requires standing consent in each extension's own Options page. The first confirmation proposes an account relationship; the other extension confirms that relationship once. Later imports require neither offers nor receiver interaction. An external message can propose setup but cannot approve it.
+Extension authorization permits communication, not automatic imports. One explicit confirmation in the initiating extension's own Options page grants standing permission for both sides. An authenticated ACCEPT checks a reverse read of that actual initiating extension's locally saved setup ticket, exact account UUIDs and purchase fingerprints; a payload claim cannot approve a relationship. Prior pairing, inert PROPOSE messages and old incomplete setups are not silently enabled. If both accounts have purchases, setup requires an explicit same-account confirmation. Multiple accounts require explicit selection; empty GL installations receive an unnamed default through the serialized validated writer. No nickname matching is used.
 
 GL account identifiers are persistent provider-profile UUIDs. Companions keep device-local UUIDs separately from backup data, translating those UUIDs to fresh handoff account references at execution time. Nicknames are labels, never proof of identity. Rename preserves a UUID; restore/clear replaces the registry and suspends old relationships. Deleted or missing accounts suspend synchronization. Changing the companion's configured GL target suspends both ends immediately; restoring the same authorized target can reconnect the existing confirmed mapping without approving a new account. New destinations are created through the existing validated empty-snapshot import before confirmation.
 
@@ -12,7 +12,7 @@ GL account identifiers are persistent provider-profile UUIDs. Companions keep de
 
 Each provider has at most one automatic relationship per extension in this initial version. Its small persisted state includes relationship UUID, actual authorized peer ID, local/remote stable account IDs, both confirmations, pending intent, completed fingerprint pair, last success, retry count/deadline, and bounded error/skip details. It contains no duplicate purchase library.
 
-States are disconnected, confirmation needed, pending, syncing, synced, waiting for companion, and attention required. A remote proposal is inert until local confirmation. Disconnect clears consent and pending work locally and asks the peer to disable the same relationship. Every operation checks consent, actual sender, provider and relationship UUID again; late responses cannot reactivate a disconnected mapping.
+States are disconnected, confirmation needed, pending, syncing, synced, waiting for companion, and attention required. Legacy remote proposals are inert; ACCEPT verifies a live local setup ticket at the actual initiating peer before consent can be persisted. Disconnect clears consent and pending work locally and asks the peer to disable the same relationship. Every operation checks consent, actual sender, provider and relationship UUID again; late responses cannot reactivate a disconnected mapping.
 
 GL pulls the mapped companion snapshot through the existing chunk/hash validation and guarded atomic import, then asks the companion to pull GL's committed snapshot through that same importer. Account references/stamps are freshly resolved on each leg. Completion follows both confirmed commits, never an offer or transport acknowledgment alone.
 
@@ -26,4 +26,4 @@ Conflicts follow existing adapters. Automatic imports additionally skip contradi
 
 ## UI and validation
 
-Normal UI shows connection, mapped accounts, standing approval, status, last success, Sync now, Change mapping and Disconnect. The former direction/preview/offer/import workflow remains under Advanced. Validation covers synthetic account lifecycles, all four propagation directions, replay/no-change storage growth, actual packaged Chrome/Firefox messaging, and restart/retry handling. Real installed extensions and personal backups are never used as test destinations.
+Normal UI shows connection, mapped accounts, one setup confirmation, status, last success, Sync now, Change mapping and Disconnect. The former direction/preview/offer/import workflow remains under Advanced. Validation covers synthetic account lifecycles, all four propagation directions, replay/no-change storage growth, actual packaged Chrome/Firefox messaging, and restart/retry handling. Real installed extensions and personal backups are never used as test destinations.

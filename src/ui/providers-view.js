@@ -4,7 +4,7 @@ import {providerAccounts,createAccountActions,updateEligibility,createProfileMan
 
 const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const date=value=>value?formatDate(value):'Not yet';
-const nickname=p=>p.nickname||'Unnamed account';
+const nickname=p=>p.nickname||(['humble','fanatical'].includes(p.provider)?'Default account':'Unnamed account');
 const health=p=>({running:'Update in progress',succeeded:'Last update completed',failed:'Last update failed',partial:'Last update incomplete',cancelled:'Update cancelled'})[p.syncHealth?.status]??'No recent update details';
 
 export function createProvidersView({select,rename,preview,remove,reset,openProvider,onDatabase}){
@@ -88,14 +88,21 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
      const card=node('details');card.className='tool-card provider-card';card.dataset.provider=site.provider;card.open=openCards.has(site.provider);
      const selected=site.accounts.find(p=>p.active),summary=node('summary');summary.append(node('strong',site.name),node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${site.accounts.reduce((n,p)=>n+p.recordCount,0)} items`:'Not imported'));card.append(summary);
      card.addEventListener('toggle',()=>{if(!card.isConnected)return;if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});
-     card.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
-     const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';card.append(link);
-     if(!site.accounts.length)card.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));
-     else card.append(node('p','To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Start a Full Rescan; these remembered accounts remain saved.'));
+     const companion=['humble','fanatical'].includes(site.provider),accountTools=node('details');
+     if(companion){
+       card.append(node('p','Connect your companion extension to sync saved purchases. Nicknames are optional; no website scan is needed.'));
+       const connect=button('Connect and sync',()=>document.dispatchEvent(new CustomEvent('gh-purchase-connect',{detail:{provider:site.provider}})));connect.dataset.purchaseConnect=site.provider;card.append(connect);
+       accountTools.append(node('summary','Advanced: saved accounts and store scans'));card.append(accountTools);
+     }
+     const accountHost=companion?accountTools:card;
+     accountHost.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
+     const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';accountHost.append(link);
+     if(!site.accounts.length)accountHost.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));
+     else accountHost.append(node('p','To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Start a Full Rescan; these remembered accounts remain saved.'));
      for(const p of site.accounts){
        const account=node('article');account.className='saved-account';account.dataset.account=p.profileId;
        account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${p.recordCount} imported items · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Full import saved.':p.lastCompleteScan?'Earlier full import saved.':'Import this account once before using quick updates.'));
-       const controls=node('p');controls.className='actions';if(!p.active)controls.append(button('Select for updates',()=>selectAccount(site,p)));controls.append(button(p.nickname?'Rename account':'Name this account',()=>renameAccount(site,p)));account.append(controls);card.append(account);
+       const controls=node('p');controls.className='actions';if(!p.active)controls.append(button('Select for updates',()=>selectAccount(site,p)));controls.append(button(p.nickname?'Rename account':'Name this account',()=>renameAccount(site,p)));account.append(controls);accountHost.append(account);
        const eligibility=updateEligibility(p,database.providerProfiles[p.profileId].state),updates=node('p');updates.className='actions';
        const quick=button('Quick Update',()=>updateAccount(site,p,'quick')),full=button('Full Rescan',()=>updateAccount(site,p,'full'));
        quick.disabled=!eligibility.quick;full.disabled=!eligibility.full;updates.append(quick,full);account.append(updates);

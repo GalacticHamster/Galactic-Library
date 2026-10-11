@@ -42,7 +42,7 @@ const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefres
 const appearanceService=createAppearanceService(privateArea,storageWriter,chrome.runtime,storageReady);
 globalThis.GalacticHamsterTheme.register(appearanceService,chrome.runtime);
 const purchaseHandoff=createPurchaseHandoff({runtime:chrome.runtime,area:privateArea,writer:storageWriter});purchaseHandoff.register();
-purchaseSync=chrome.alarms?GalacticPurchaseSync.createCoordinator({runtime:chrome.runtime,area:privateArea,alarms:chrome.alarms,service:purchaseHandoff,role:'gl',catalog:async provider=>(await purchaseAccounts(await storageWriter.getQueryDatabase(),provider)).map(a=>({...a,stableId:a.accountRef})),busy:async provider=>Boolean((await privateArea.get({galacticLibraryProviderScans:{}})).galacticLibraryProviderScans[provider]),onActive:async()=>{purchaseSyncActive=true;await observePurchaseSync(undefined,true);}}):null;
+purchaseSync=chrome.alarms?GalacticPurchaseSync.createCoordinator({runtime:chrome.runtime,area:privateArea,alarms:chrome.alarms,service:purchaseHandoff,role:'gl',ensureAccount:provider=>storageWriter.ensurePurchaseAccount(provider),catalog:async provider=>(await purchaseAccounts(await storageWriter.getQueryDatabase(),provider)).map(a=>({...a,stableId:a.accountRef})),busy:async provider=>Boolean((await privateArea.get({galacticLibraryProviderScans:{}})).galacticLibraryProviderScans[provider]),onActive:async()=>{purchaseSyncActive=true;await observePurchaseSync(undefined,true);}}):null;
 purchaseSync?.register();
 let purchaseSignatures={},purchaseSyncActive=false;
 async function observePurchaseSync(database,initialize=false){

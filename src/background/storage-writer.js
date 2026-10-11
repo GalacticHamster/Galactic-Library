@@ -394,6 +394,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database);
   }
 
+  async function ensurePurchaseAccount(provider){
+    if(!['humble','fanatical'].includes(provider))throw Error('Unsupported purchase provider.');
+    const database=await getDatabase(),existing=Object.values(database.providerProfiles).filter(p=>p.provider===provider);if(existing.length)return existing.map(p=>p.profileId);
+    const profile=newProviderProfile(provider);database.providerProfiles[profile.profileId]=profile;profileState(database,profile,profile.state);await persistDatabase(database);return [profile.profileId];
+  }
   async function importPurchaseSnapshot(data,target){const scans=(await storageArea.get({[SCANS]:{}}))[SCANS];if(scans[data.provider])throw Error('Wait for the provider scan to finish before importing saved purchases.');const database=await getDatabase();const guard=()=>GalacticPurchaseSync.assertCommit(storageArea,data.provider,target,target?.accountRef);await guard();const stats=await applyPurchaseSnapshot(database,data,target);if(stats.added||stats.updated||target?.newLabel)await persistDatabase(database,null,{},guard);return stats;}
 
   function historicalRecords(database,profileId){
@@ -1234,7 +1239,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,
-    importPurchaseSnapshot,getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, getProviderProfiles, previewProviderProfileRemoval, removeProviderProfile, resetProviderProfileBaseline, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
+    ensurePurchaseAccount,importPurchaseSnapshot,getDatabase, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, beginProviderScan, commitProviderScan, selectProviderProfile, renameProviderProfile, getProviderProfiles, previewProviderProfileRemoval, removeProviderProfile, resetProviderProfileBaseline, importUnscopedProviderItems,failProviderScan,cancelProviderScan,
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
