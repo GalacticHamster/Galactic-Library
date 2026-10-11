@@ -1,15 +1,18 @@
+import {acquisitionHistory,createAcquisitionHistory} from './library-acquisitions.js';
 import {createContentsReadOnly} from './contents-display.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {providerLabel,accountLabel,mediaLabel,accessLabel} from './item-presentation.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const unique=values=>[...new Set(values.filter(Boolean))];
 export function resultProviderSummary(values){
-  const groups=new Map();for(const {record}of values){const accounts=groups.get(record.provider)??new Set();accounts.add(record.profileId??record.recordRef);groups.set(record.provider,accounts);}
+  const groups=new Map();for(const {record}of values){const accounts=groups.get(record.provider)??new Set();accounts.add(record.profileId??'');groups.set(record.provider,accounts);}
   return [...groups].map(([provider,accounts])=>providerLabel(provider)+(accounts.size>1?` (${accounts.size} accounts)`:'')).join(' · ');
 }
 export function createLibraryResultSummary(row,database,{series:visitSeries,filtered=false,information='all'}={}){
   const root=text('div','');root.className='library-result-summary';
   const header=text('div','');header.className='library-item-header';header.append(text('strong',row.canonical.title),text('span',mediaLabel(row.canonical.mediaType)));root.append(header);
+  const history=acquisitionHistory([...row.records.map(value=>value.record),...(row.historyRecords??[])],database);
+  if(history.label)header.append(Object.assign(text('small',history.label),{className:'library-acquisition-count'}));
   const values=row.qualifying;
   const editions=unique(values.map(value=>value.identity.edition)),units=['book','audiobook'].includes(row.canonical.mediaType)?unique(values.map(value=>value.identity.unit?`${value.unitType||'Volume / issue'} ${value.identity.unit}`:'')):[];
   if(editions.length||units.length)root.append(Object.assign(text('p',[...units,...editions].join(' · ')),{className:'library-result-identity'}));
@@ -24,5 +27,6 @@ export function createLibraryResultSummary(row,database,{series:visitSeries,filt
   if(exceptions.length)root.append(Object.assign(text('p',exceptions.slice(0,3).join('; ')+(exceptions.length>3?` +${exceptions.length-3} access exceptions in Details`:'')),{className:'library-result-access'}));
   if(information==='missing')root.append(Object.assign(text('p','Book information is missing a creator or edition identifier. See Details.'),{className:'library-result-scope'}));
   if(information==='review')root.append(Object.assign(text('p','Saved suggestions or contents await review. See Details.'),{className:'library-result-scope'}));
+  if(history.entries.length)root.append(createAcquisitionHistory(history));
   return root;
 }

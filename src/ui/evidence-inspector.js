@@ -26,7 +26,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
   let populated=false;
   root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
     root.append(element('p','Same work keeps editions separate and supports Possible warnings for related copies. Same edition groups copies only when known identity details agree. Different works prevents that relationship and grouping. These choices do not confirm a purchase. Separating a copy keeps it in its own edition.'));
-    const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'),element('p',`Persistent edition ID: ${canonical.id}`));
+    const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'),element('p',`Persistent edition IDs: ${(canonical.sourceCanonicalIds??[canonical.id]).join(', ')}`));
     for(const record of records){
       const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
       const section=element('section','');section.append(element('h4',`${record.title} — ${accountLabel(record,database)}`));

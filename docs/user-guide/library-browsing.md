@@ -1,8 +1,18 @@
 # Browsing and searching your Library
 
-Library is a catalog of your imported collection. Each result is an existing canonical item; several provider/account records can appear together. Browse results never make new matching, ownership or contents decisions.
+Library is a catalog of your imported collection. Each result groups records for the same item or edition; several purchases and provider/account records can appear together. This grouping is for browsing only and does not merge saved records. Browse results never make new matching, ownership or contents decisions.
 
 Results show title, known edition/volume/issue, saved series links, creator when available, media, a read-only contents preview when available, and a compact provider summary such as **Kindle (2 accounts) · Kobo**. There is no repeated Owned badge. Borrowed, subscription, rented or unconfirmed access and active ownership preferences remain visible. Covers stay inside item Details; missing artwork leaves no empty result block. **Details** opens the existing item workflow for all associated accounts, including those outside your filters.
+
+## Repeat purchases and purchase history
+
+Identical full titles can share one library entry when the existing identity checks find no conflicting volume, run, edition, creator or identifier. Presentation differences already recognized by exact-title matching are allowed. Possible matches and explicitly separated editions stay separate. Missing information cannot bridge two known conflicting editions.
+
+When distinct, identified purchases establish ownership more than once, the entry shows **Owned twice** or the corresponding count. Open **Purchase and access history** to see the original bundle/product title, provider, saved account, reported acquisition date and access state. These details stay collapsed until you open them. Earlier records no longer returned by a complete provider scan can appear in history, but do not add currently owned copies.
+
+Repeated observations of the same Humble order or Fanatical purchase occurrence count once, including synchronized copies. Accounts retain their separate scope. A provider catalog record without a purchase origin appears as a library record, not an invented extra purchase; activation of a game on another provider does not prove another transaction. Consequently, purchase counts can be incomplete where the provider did not supply order information.
+
+GL currently does not retain bundle prices or currency. Bundle history therefore says **Total bundle price: not recorded**, rather than inventing an individual book price or reconstructing an order total. Missing dates and other purchase details are also identified as not recorded. The underlying records, matching results, synchronization and backups remain unchanged.
 
 ## Search
 
@@ -36,7 +46,7 @@ Missing dates sort after known dates. Date and creator ties use Title A–Z and 
 
 Media, Provider and Saved account are in the primary row. **More filters** contains Genre, Access, Reading, Series, Book information and Game DLC. Active filters remain visible as removable buttons even when More filters is collapsed.
 
-Provider, account, access, genre, reading, series and information conditions must qualify **one provider record**. For example, **Kindle + Family + Borrowed** cannot borrow an Owned observation from Personal or a Borrowed observation from Kobo. A canonical item appears once when any record qualifies. Its compact provider summary still lists every associated provider; **Matching accounts** identifies the subset. Details retains the full account list.
+Provider, account, access, genre, reading, series and information conditions must qualify **one provider record**. For example, **Kindle + Family + Borrowed** cannot borrow an Owned observation from Personal or a Borrowed observation from Kobo. A consolidated entry appears once when any record qualifies. Its compact provider summary still lists every associated provider; **Matching accounts** identifies the subset. Details retains the full account list.
 
 - **Access** uses the existing effective ownership policy, human decisions and expiry rules. Browsing does not rewrite source access.
 - **Reading** applies to books/audiobooks. **No saved reading status** is separate from **Explicitly unread**; a never-tracked item is not classified as unread. Several accounts may qualify the same item for different reading filters.
@@ -49,7 +59,7 @@ Unlinked DLC remains a separate list when the provider did not return its parent
 
 ## Counts, pages and returning
 
-Catalog count refers to canonical results. The account-record count refers to records qualifying for the selected filters inside those results, not independent titles. Media counts describe that same result set. Filtering and search happen first, sorting next, and pagination using the selected page size last. Changing a filter/search/sort resets the main list to a valid first page.
+Catalog count refers to consolidated library entries. The account-record count refers to records qualifying for the selected filters inside those results, not independent titles. Media counts describe that same result set. Filtering and search happen first, sorting next, and pagination using the selected page size last. Changing a filter/search/sort resets the main list to a valid first page.
 
 **Clear filters** removes search and all filters but keeps your chosen sort. Individual active-filter buttons remove only that condition. Empty results explain the active narrowing and offer **Clear search and filters**. A genuinely empty imported library still uses Providers onboarding instead of claiming your filters caused it.
 
@@ -71,7 +81,7 @@ See [item details](item-details.md), [Contents](contents-workspace.md), and [sav
 
 Search, media, provider, saved account, genre, access, reading, series and sort are shared. Contents lists books only: selecting Games does not silently become Books, and an empty Contents list explains the narrower result. Active Contents status filters say Contents only. Library's information and DLC filters retain their own meaning and remain visible when returning.
 
-Both views order the same canonical groups using the same relevance and sort rules. Contents shows each qualifying account separately inside that ordering, and its page size counts those account cards. Library's page size counts canonical catalog items. Page boundaries agree for equivalent one-record populations but can differ when several accounts share an item. Switching follows the inspected record if available, otherwise the first visible catalog item or account record. The destination locates that anchor in its filtered ordering. If the anchor no longer qualifies, the saved page is clamped to the destination's range; an empty destination starts at page one. No matching item or equivalent population is invented.
+Both views order the same item groups using the same relevance and sort rules. Contents shows each qualifying account separately inside that ordering, and its page size counts those account cards. Library's page size counts consolidated library entries. Page boundaries agree for equivalent one-record populations but can differ when several accounts share an item. Switching follows the inspected record if available, otherwise the first visible catalog item or account record. The destination locates that anchor in its filtered ordering. If the anchor no longer qualifies, the saved page is clamped to the destination's range; an empty destination starts at page one. No matching item or equivalent population is invented.
 
 Review contents remembers its actual origin. Back to Library results restores the original filters, sort, anchored page, scroll and inspected Details. Back to Contents results restores that list. Contents collection list is a separate explicit action. Browser Back/Forward uses bounded UI context stored in the current tab's history entry; reloading the same entry can restore the review's origin. A copied direct link has no invented origin and defaults to Contents results. Disappearing records are reported rather than silently replaced with another account.
 

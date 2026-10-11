@@ -30,6 +30,9 @@ try{
  await writer.mergeProviderItems('audible',[{providerItemId:'audio',title:'Example Narration',mediaType:'audiobook',ownership:'owned',metadata:{authors:['Audio Writer'],narrators:['Narrator']}}]);
  await writer.mergeProviderItems('amazon-video',[{providerItemId:'movie',title:'Example Movie',mediaType:'movie',ownership:'rental'},{providerItemId:'tv',title:'Example Show',mediaType:'tv',ownership:'owned'}]);
  await writer.saveTitleAliases(personal.recordRef,['Alternate collection'],'Synthetic alias');await writer.saveReadingState(personal.recordRef,{status:'unread',progress:0,access:'unknown',downloaded:false},null);
+ await writer.mergeProviderItems('humble',[1,2].flatMap(volume=>[
+  {providerItemId:'old:product:'+volume,title:'The Autumnlands Vol. '+volume,mediaType:'book',ownership:'owned',acquiredAt:'2022-12-25T12:00:00Z',metadata:{purchaseId:'old',sourceBundle:'Image Comics 30th Anniversary: The 10s'}},
+  {providerItemId:'new:product:'+volume,title:'The Autumnlands Vol. '+volume,mediaType:'book',ownership:'owned',acquiredAt:'2025-12-17T12:00:00Z',metadata:{purchaseId:'new',sourceBundle:'Image Comics in the 10s'}}]),{profileLabel:'Personal'});
  const startup=location.search;const current=await writer.getDatabase();const kobo=Object.values(current.providerItems).find(record=>record.provider==='kobo');
  if(startup==='?review-origin'){
    const ref=Object.values(current.providerItems).find(record=>record.title==='Batman Collection 60').recordRef;
@@ -45,6 +48,12 @@ try{
  } else {
  assert(titles().length===50&&!document.querySelector('#library-items .catalog-item-details'),'Initial results are not bounded/lazy');checks.push('Library starts with fifty compact lazy results'); const mainStyle=getComputedStyle(document.querySelector('#workspace-navigation button')),secondaryStyle=getComputedStyle(document.querySelector('#library-navigation button'));assert(parseFloat(mainStyle.fontSize)>=parseFloat(secondaryStyle.fontSize)&&parseFloat(mainStyle.minHeight)>=parseFloat(secondaryStyle.minHeight),'Navigation hierarchy inverted');assert(document.documentElement.scrollWidth<=innerWidth+1,'Library overflows window');const keyboardControl=document.querySelector('#workspace-navigation button');keyboardControl.focus();assert(document.activeElement===keyboardControl,'Primary navigation not keyboard focusable');checks.push('Primary navigation hierarchy, keyboard focus and responsive Library bounds');
 
+ change('search','Autumnlands','input');assert(titles().length===2,'Repeat purchases did not consolidate by volume');
+ for(const card of document.querySelectorAll('#library-items > li')){
+  assert(card.querySelector('.library-acquisition-count').textContent==='Owned twice','Independent purchases were not counted');const history=card.querySelector('.library-purchase-history');assert(!history.open&&history.querySelectorAll('li').length===0,'Purchase history was not collapsed/lazy');open(history);
+  assert(history.querySelectorAll('li').length===2&&history.textContent.includes('30th Anniversary')&&history.textContent.includes('Image Comics in the 10s')&&history.textContent.includes('2022')&&history.textContent.includes('2025')&&history.textContent.includes('Total bundle price: not recorded'),'Purchase history lost original provenance');
+ }
+ checks.push('Autumnlands has one card per volume, Owned twice, and collapsed original purchase history without modifying records');
  change('search','Shared Collection','input');assert(titles()[0]==='Shared Collection'&&titles().includes('Metadata hit'),'Exact title ranking lost');
  const summary=document.querySelector('#library-items > li .library-result-summary');assert(summary.textContent.includes('Kindle (2 accounts)')&&summary.textContent.includes('Kobo')&&summary.textContent.includes('Borrowed')&&!summary.textContent.includes('Owned')&&!summary.querySelector('img'),'Compact result dominated by owned badges or empty artwork');checks.push('Grouped result presents account counts and access exceptions without repetitive Owned labels or missing-cover blocks');
  change('search','Alternate collection','input');assert(titles().length===1&&titles()[0]==='Shared Collection','Alias search failed');change('search','978-0-306-40615-7','input');assert(titles()[0]==='Shared Collection','Identifier search failed');change('search','Example Writer','input');assert(titles().length===50,'Creator search did not reach the full library');checks.push('Title, aliases, identifiers and creators are retrieved with title relevance first');

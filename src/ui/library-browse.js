@@ -1,3 +1,4 @@
+import {consolidateLibraryRows} from './library-acquisitions.js';
 import {identityEvidence} from '../lib/identity.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {libraryBroadGenreValues} from '../lib/genre-hints.js';
@@ -41,7 +42,7 @@ export function createLibraryBrowseProjection(){
     for(const value of addOns){const record=value.record,parent=native.get([record.provider,record.profileId??'',record.metadata?.parentProviderItemId].join('\0'));
       if(parent?.record.mediaType!=='game')continue;const list=addOnsByParent.get(parent.record.id)??[];list.push(value);addOnsByParent.set(parent.record.id,list);linkedAddOnIds.add(record.id);
     }
-    const rows=Object.values(database.canonicalItems).map(canonical=>({canonical,title:searchKey(canonical.title),records:canonical.providerItemIds.map(id=>records.get(id)).filter(Boolean)}));
+    const rows=consolidateLibraryRows(Object.values(database.canonicalItems).map(canonical=>({canonical,title:searchKey(canonical.title),records:canonical.providerItemIds.map(id=>records.get(id)).filter(Boolean)})),database);
     const accounts=new Map();for(const value of records.values())if(value.record.profileId&&!accounts.has(value.record.profileId))accounts.set(value.record.profileId,accountLabel(value.record,database));
     const accountOptions=[...accounts].map(([value,label])=>({value,label})).sort((a,b)=>compareTitles(a.label,b.label));
     const seriesOptions=distinct([...records.values()].flatMap(value=>value.series)).sort(compareTitles);
@@ -106,7 +107,7 @@ export function libraryBrowseResults(projection,{query='',filters={},sort='title
   matches.sort((a,b)=>a.rank-b.rank||compareBrowseRows(a,b,sort));
   const entries=paginateRecords?matches.flatMap(row=>row.qualifying.map(value=>({...row,qualifying:[value]}))):matches;
   size=paginationState(entries.length,page,size).size;
-  const anchored=anchor?entries.findIndex(row=>row.canonical.id===anchor||row.qualifying.some(value=>value.record.recordRef===anchor)):-1;
+  const anchored=anchor?entries.findIndex(row=>row.canonical.id===anchor||row.canonicalIds?.includes(anchor)||row.qualifying.some(value=>value.record.recordRef===anchor)):-1;
   if(anchored>=0)page=Math.floor(anchored/size);
   const state=paginationState(entries.length,page,size);page=state.page;
   return {matches,rows:entries.slice(page*size,(page+1)*size),total:entries.length,catalogTotal:matches.length,page,pages:state.pages};

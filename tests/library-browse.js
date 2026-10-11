@@ -1,3 +1,7 @@
+import {acquisitionHistory,createAcquisitionHistory} from '../src/ui/library-acquisitions.js';
+import {createLibraryResultSummary} from '../src/ui/library-result.js';
+import {normalizeProviderItem,createEmptyDatabase,rebuildCanonicalItems} from '../src/lib/models.js';
+import {matchItems} from '../src/lib/matcher.js';
 import assert from 'node:assert/strict';
 import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
 import {validateUiPreferences,browseView,rememberBrowseView,mergeUiPreferences} from '../src/lib/ui-preferences.js';
@@ -76,4 +80,80 @@ libraryBrowseTests.push(['Shared Library and Contents state migrates old views o
  const db=database(Array.from({length:70},(_,n)=>record(String(n),'Book '+n)));const other=record('other','Book 55',{}, {profileId:'family'});db.providerItems.other=other;db.canonicalItems['55'].providerItemIds.push('other');const project=createLibraryBrowseProjection()(db);
  const result=libraryBrowseResults(project,{anchor:'55',recordFilter:r=>Number(r.id)>=40||r.id==='other'});assert.equal(result.page,0);assert(result.rows.some(r=>r.canonical.id==='55'&&r.qualifying.length===2));
  assert.equal(libraryBrowseResults(project,{anchor:'missing',page:99}).page,1);assert.equal(libraryBrowseResults(project,{filters:{account:'family'},anchor:'55'}).rows[0].qualifying[0].record.id,'other');
+}]);
+
+
+const purchase=(id,volume,order,bundle,date,extra={})=>record(id,'The Autumnlands Vol. '+volume,
+  {purchaseId:order,sourceBundle:bundle,entitlement:'direct-download'},
+  {provider:'humble',acquiredAt:date,...extra});
+libraryBrowseTests.push(
+ ['Autumnlands purchases consolidate as two display rows with two independent histories and unchanged data/matches',()=>{
+   const records=[1,2].flatMap(volume=>[
+     purchase('old-'+volume,volume,'old-order',"Humble Comics Bundle: Image Comics 30th Anniversary: The '10s",'2022-12-25'),
+     purchase('new-'+volume,volume,'new-order',"Humble Comic Bundle: Image Comics in the '10s",'2025-12-17')]);
+   const items=records.map(value=>normalizeProviderItem({...value,profileId:undefined}));
+   const db={...createEmptyDatabase(),providerItems:Object.fromEntries(items.map(item=>[item.id,item]))};db.canonicalItems=rebuildCanonicalItems(db.providerItems);
+   assert.equal(Object.keys(db.canonicalItems).length,4,'Canonical identity requires stronger evidence and remains untouched');
+   const before=JSON.stringify(db),offers=[1,2].map(n=>({title:'AUTUMNLANDS, VOL. '+n+' TP (Digital)',mediaType:'book'})),matches=JSON.stringify(matchItems(db.providerItems,offers,db));
+   const result=libraryBrowseResults(createLibraryBrowseProjection()(db));assert.equal(result.total,2);
+   for(const row of result.rows){assert.equal(row.records.length,2);const h=acquisitionHistory(row.records.map(v=>v.record),db);assert.equal(h.label,'Owned twice');assert.equal(h.purchases,2);assert.equal(resultProviderSummary(row.records),'Humble Bundle');assert.deepEqual(h.entries.map(e=>e.dates[0].slice(0,10)),['2022-12-25','2025-12-17']);assert(h.entries.every(e=>e.bundles.length===1));}
+   assert.equal(JSON.stringify(db),before);assert.equal(JSON.stringify(matchItems(db.providerItems,offers,db)),matches);
+ }],
+ ['Cross-provider exact identity consolidates without conflating access or inventing a second transaction',()=>{
+   const db=database([purchase('purchase',1,'one','Bundle','2025-01-01'),record('kindle','AUTUMNLANDS, VOL. 1',{}, {provider:'kindle',ownership:'borrowed',profileId:'family'})]);
+   const row=libraryBrowseResults(createLibraryBrowseProjection()(db)).rows[0];assert.equal(row.records.length,2);
+   const h=acquisitionHistory(row.records.map(v=>v.record),db);assert.equal(h.purchases,1);assert.equal(h.ownedPurchases,1);assert.equal(h.entries.length,2);assert(h.entries.some(e=>e.access.includes('Borrowed')));
+   assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(db),{filters:{provider:'kindle',account:'family',ownership:'borrowed'}}).total,1);
+   const fan=record('fan','AUTUMNLANDS, VOL. 1',{purchaseOrigins:[{occurrenceRef:'b'.repeat(64),orderRef:'a'.repeat(64),bundleId:'fan-bundle',bundleTitle:'Fan bundle',purchasedAt:'2026-01-01'}]},{provider:'fanatical'});
+   const both=database([db.providerItems.purchase,fan]),bothRow=libraryBrowseResults(createLibraryBrowseProjection()(both)).rows[0];
+   assert.equal(bothRow.records.length,2);assert.equal(acquisitionHistory(bothRow.records.map(v=>v.record),both).label,'Owned twice');
+ }],
+ ['Repeated Humble native/companion observations of one order count once, with separate account scope retained',()=>{
+   const records=[purchase('native',1,'same','Bundle','2025-01-01'),purchase('synced',1,'same','Bundle','2025-01-01')],db=database(records);
+   let h=acquisitionHistory(records,db);assert.equal(h.entries.length,1);assert.equal(h.purchases,1);assert.equal(h.ownedPurchases,1);assert.equal(h.entries[0].records.length,2);
+   const another={...records[1],id:'family',profileId:'family'};h=acquisitionHistory([...records,another],db);assert.equal(h.purchases,2);
+ }],
+ ['Fanatical native and synchronized aggregate occurrences do not double count purchases',()=>{
+   const origin=(ref,basis)=>({occurrenceRef:ref.repeat(64),orderRef:'a'.repeat(64),bundleId:'bundle',bundleTitle:'Fan bundle',purchasedAt:'2025-01-01',...(basis?{basis:'order-bundle-count'}:{})});
+   const native=record('native','Example', {purchaseOrigins:[origin('b'),origin('c')]},{provider:'fanatical'}),sync=record('sync','Example',{purchaseOrigins:[origin('d',true),origin('e',true)]},{provider:'fanatical'}),db=database([native,sync]);
+   const h=acquisitionHistory([native,sync,native],db);assert.equal(h.entries.length,1);assert.equal(h.purchases,2);assert.equal(h.label,'Owned twice');
+ }],
+ ['Different editions, units, runs, creators, identifiers and Possible subtitles never consolidate',()=>{
+   for(const [title,metadata]of [['The Autumnlands Vol. 2',{}],['The Autumnlands Vol. 1: A Different Story',{}],['The Autumnlands Vol. 1',{edition:'Second'}],['The Autumnlands Vol. 1',{run:'2020'}],['The Autumnlands Vol. 1',{authors:['Other Writer']}],['The Autumnlands Vol. 1',{isbn:'9780140328721'}]]){
+     const db=database([record('first','The Autumnlands Vol. 1',{edition:'First',run:'1995',authors:['Writer'],isbn:'9780306406157'}),record('other',title,metadata)]);
+     assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(db)).total,2,title+JSON.stringify(metadata));
+   }
+ }],
+ ['Explicit separations and ambiguous missing-metadata bridges remain separate display entries',()=>{
+   const db=database([record('a','Same Work',{isbn:'9780306406157'}),record('b','Same Work'),record('c','Same Work',{isbn:'9780140328721'})]);assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(db)).total,3);
+   const split=database([record('a','Same Work'),record('b','Same Work')]);split.manualMatchDecisions={different:{decision:'same-work',itemIds:['a','b']}};assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(split)).total,2);
+   delete split.manualMatchDecisions;split.editionSeparations={one:{itemId:'a',otherItemIds:['b']}};assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(split)).total,2);
+ }],
+ ['Earlier missing records remain history, deduplicate observations and cannot add current owned copies',()=>{
+   const current=purchase('current',1,'new','New bundle','2025-12-17'),db=database([current]);
+   db.providerHistory={older:{item:purchase('old',1,'old','Old bundle','2022-12-25')},observation:{item:{...current,observedAt:'2025-12-18'}},otherVolume:{item:purchase('other',2,'other','Other bundle','2020-01-01')}};
+   const before=JSON.stringify(db),row=libraryBrowseResults(createLibraryBrowseProjection()(db)).rows[0],h=acquisitionHistory([...row.records.map(v=>v.record),...row.historyRecords],db);
+   assert.equal(row.records.length,1);assert.equal(row.historyRecords.length,2);assert.equal(h.purchases,2);assert.equal(h.ownedPurchases,1);assert.equal(h.label,'2 recorded purchases');assert.equal(JSON.stringify(db),before);
+ }],
+ ['Single purchases stay simple and ownership overrides cannot manufacture acquisitions',()=>{
+   const item=purchase('one',1,'order','Bundle',null),db=database([item]),h=acquisitionHistory([item],db);assert.equal(h.label,'');assert.equal(h.purchases,1);assert.deepEqual(h.entries[0].dates,[]);
+   db.ownershipPolicy={allOwned:true,providers:{}};const unknown={...item,ownership:'unknown'};assert.equal(acquisitionHistory([unknown],db).ownedPurchases,0);
+ }],
+ ['Consolidated filters, pagination and all original canonical anchors retain every current record',()=>{
+   const records=[purchase('a',1,'a','Bundle A','2022-01-01'),purchase('b',1,'b','Bundle B','2025-01-01',{profileId:'family'})],db=database(records),projection=createLibraryBrowseProjection()(db);
+   assert.equal(libraryBrowseResults(projection,{anchor:'b'}).rows[0].records.length,2);
+   const filtered=libraryBrowseResults(projection,{filters:{account:'family'}});assert.equal(filtered.total,1);assert.equal(filtered.rows[0].qualifying.length,1);
+   assert.equal(libraryBrowseResults(projection,{paginateRecords:true}).total,2);
+ }]
+);
+
+libraryBrowseTests.push(['Purchase history is collapsed and lazy, safely shows original bundles/accounts/dates and labels unavailable totals',()=>{
+ class Element{constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.open=false;this.value='';}set textContent(v){this.value=v;}get textContent(){return this.value+this.children.map(c=>c.textContent).join(' ');}append(...values){this.children.push(...values);}addEventListener(name,listener){this.listeners[name]=listener;}}
+ const old=globalThis.document;try{globalThis.document={createElement:tag=>new Element(tag)};
+   const records=[purchase('a',1,'a','Bundle A <img src=x>','2022-12-25'),purchase('b',1,'b','Bundle B','2025-12-17')],db=database(records),row=libraryBrowseResults(createLibraryBrowseProjection()(db)).rows[0];
+   const summary=createLibraryResultSummary(row,db);assert.match(summary.textContent,/Owned twice/);
+   const history=summary.children.find(child=>child.className==='library-purchase-history');assert.equal(history.open,false);assert.equal(history.children.length,1);assert(!history.textContent.includes('Bundle A'));
+   history.open=true;history.listeners.toggle();assert.match(history.textContent,/Bundle A <img src=x>/);assert.match(history.textContent,/Humble Bundle/);assert.match(history.textContent,/Personal/);assert.match(history.textContent,/2022/);assert.match(history.textContent,/Total bundle price: not recorded/);assert(!history.textContent.includes('$25'));
+   history.listeners.toggle();assert.equal(history.children.length,2,'Expanding repeatedly does not duplicate history');
+ }finally{if(old===undefined)delete globalThis.document;else globalThis.document=old;}
 }]);

@@ -211,3 +211,8 @@ button.danger { background:var(--gh-danger-fill); }
 /* Neutral controls need their paired foreground in both palettes. */
 :is(.library-filters button,.review-actions .different,.review-actions .undo,.open-library-results .open-library-apply,.library-active-filters button) { color:var(--gh-text); }
 :is(.library-filters button,.review-actions .different,.review-actions .undo,.open-library-results .open-library-apply,.library-active-filters button):hover:not(:disabled) { background:var(--gh-surface-hover); color:var(--gh-text); }
+
+.library-acquisition-count { color:var(--gh-text-muted); font-weight:normal; }
+.library-purchase-history { margin-top:8px; }
+.library-purchase-history li { margin:10px 0; overflow-wrap:anywhere; }
+.library-purchase-history p { margin:4px 0; }
