@@ -321,7 +321,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full)});
   }
   async function restoreDatabase(database){
-    const restored=validateDatabase(database);for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all');
+    const restored=validateDatabase(database);for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',{galacticPurchaseSync:{}});
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
     const database=await getDatabase();
@@ -368,7 +368,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return database;
   }
 
-  async function persistDatabase(database,invalidate=null,extra={}) {
+  async function persistDatabase(database,invalidate=null,extra={},beforeSave=null) {
     for(const [provider,state]of Object.entries(database.providers)){
       const profile=database.providerProfiles[state.activeProfileId];if(profile){profile.state={...state};delete profile.state.activeProfileId;}
     }
@@ -379,7 +379,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(invalidate==='all'||invalidate==='humble')updates[FEED_UPLOAD_KEY]={};
     if(invalidate==='all')updates[NOTIFICATIONS]={enabled:false,lastNotifiedDay:''};
     if(invalidate==='all'){const stored=await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null});if(stored[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY])updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=null;}
-    await timedAsync('storage_write',()=>storageArea.set(updates));
+    if(beforeSave)await beforeSave();await timedAsync('storage_write',()=>storageArea.set(updates));
     return validated;
   }
 
@@ -394,7 +394,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database);
   }
 
-  async function importPurchaseSnapshot(data,target){const scans=(await storageArea.get({[SCANS]:{}}))[SCANS];if(scans[data.provider])throw Error('Wait for the provider scan to finish before importing saved purchases.');const database=await getDatabase(),stats=await applyPurchaseSnapshot(database,data,target);if(stats.added||stats.updated||target?.newLabel)await persistDatabase(database);return stats;}
+  async function importPurchaseSnapshot(data,target){const scans=(await storageArea.get({[SCANS]:{}}))[SCANS];if(scans[data.provider])throw Error('Wait for the provider scan to finish before importing saved purchases.');const database=await getDatabase();const guard=()=>GalacticPurchaseSync.assertCommit(storageArea,data.provider,target,target?.accountRef);await guard();const stats=await applyPurchaseSnapshot(database,data,target);if(stats.added||stats.updated||target?.newLabel)await persistDatabase(database,null,{},guard);return stats;}
 
   function historicalRecords(database,profileId){
     const groups=new Map();for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId){const list=groups.get(h.item.id)??[];list.push(h.item);groups.set(h.item.id,list);}
@@ -551,7 +551,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function clearDatabase() {
-    await storageArea.remove([DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
+    await storageArea.remove(['galacticPurchaseSync',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {

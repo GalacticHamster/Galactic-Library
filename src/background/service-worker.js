@@ -1,3 +1,4 @@
+import {purchaseAccounts} from './purchase-handoff.js';
 import {createPurchaseHandoff} from './purchase-handoff.js';
 import {allowedCompanionOperation} from '../lib/companion-identities.js';
 import {createAppearanceService} from './appearance.js';
@@ -22,14 +23,14 @@ import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnost
 import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
 
-let workerLifecycle;
+let workerLifecycle,purchaseSync;
 const queryDiagnostics=createQueryDiagnostics({onActivity:(stage,details)=>workerLifecycle?.observe(details.operation??stage)});
 
 const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
-  if(keys.includes('galacticLibraryDatabase'))storageWriter.invalidateQuerySnapshot(undefined,'private-observer');
+  if(keys.includes('galacticLibraryDatabase')){storageWriter.invalidateQuerySnapshot(undefined,'private-observer');observePurchaseSync().catch(()=>{});}
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
@@ -40,7 +41,17 @@ const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension
 const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
 const appearanceService=createAppearanceService(privateArea,storageWriter,chrome.runtime,storageReady);
 globalThis.GalacticHamsterTheme.register(appearanceService,chrome.runtime);
-createPurchaseHandoff({runtime:chrome.runtime,area:privateArea,writer:storageWriter}).register();
+const purchaseHandoff=createPurchaseHandoff({runtime:chrome.runtime,area:privateArea,writer:storageWriter});purchaseHandoff.register();
+purchaseSync=chrome.alarms?GalacticPurchaseSync.createCoordinator({runtime:chrome.runtime,area:privateArea,alarms:chrome.alarms,service:purchaseHandoff,role:'gl',catalog:async provider=>(await purchaseAccounts(await storageWriter.getQueryDatabase(),provider)).map(a=>({...a,stableId:a.accountRef})),busy:async provider=>Boolean((await privateArea.get({galacticLibraryProviderScans:{}})).galacticLibraryProviderScans[provider]),onActive:async()=>{purchaseSyncActive=true;await observePurchaseSync(undefined,true);}}):null;
+purchaseSync?.register();
+let purchaseSignatures={},purchaseSyncActive=false;
+async function observePurchaseSync(database,initialize=false){
+ if(!purchaseSync||!purchaseSyncActive)return;const db=database??await storageWriter.getQueryDatabase();
+ for(const provider of ['humble','fanatical']){
+  const signature=GalacticPurchaseSync.stable(GalacticPurchaseSync.meaningful({profiles:Object.values(db.providerProfiles).filter(p=>p.provider===provider).map(p=>({profileId:p.profileId,keySpace:p.keySpace})),items:Object.values(db.providerItems).filter(i=>i.provider===provider)}));
+  const previous=purchaseSignatures[provider];purchaseSignatures[provider]=signature;if(!initialize&&previous!==undefined&&signature!==previous)await purchaseSync.mark(provider);
+ }
+}
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
@@ -77,7 +88,7 @@ chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
   if(area==='local')for(const key of Object.keys(changes).slice(0,16))queryDiagnostics.event('storage_change',{key:diagnosticStorageKey(key),source:'observer'});
   if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();
-  if(area==='local'&&changes.galacticLibraryDatabase)storageWriter.invalidateQuerySnapshot(changes.galacticLibraryDatabase.newValue);
+  if(area==='local'&&changes.galacticLibraryDatabase){storageWriter.invalidateQuerySnapshot(changes.galacticLibraryDatabase.newValue);observePurchaseSync(changes.galacticLibraryDatabase.newValue).catch(()=>{});}
   if(area==='local'&&changes.galacticLibraryReminderNotifications&&changes.galacticLibraryReminderNotifications.oldValue?.enabled!==changes.galacticLibraryReminderNotifications.newValue?.enabled)reconcileReminders();
 });
 chrome.runtime.onStartup?.addListener(()=>reconcileReminders());

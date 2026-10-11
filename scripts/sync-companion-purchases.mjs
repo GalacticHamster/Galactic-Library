@@ -6,7 +6,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const check=process.argv.includes('--check');
 const hb=resolve(process.argv.find(arg=>arg.startsWith('--hb='))?.slice(5)??resolve(root,'../HB'));
 const fan=resolve(process.argv.find(arg=>arg.startsWith('--fan='))?.slice(6)??resolve(root,'../Fanatical'));
-for(const name of ['purchase-snapshot.js','purchase-transfer.js','purchase-adapters.js','purchase-handoff-ui.js']){
+for(const name of ['purchase-snapshot.js','purchase-transfer.js','purchase-adapters.js','purchase-handoff-ui.js','purchase-sync.js','purchase-sync-ui.js']){
   const source=await readFile(resolve(root,'shared',name));
   for(const target of [resolve(hb,name),resolve(fan,'src',name)]){
     if(check){if(!source.equals(await readFile(target)))throw Error('Theme mirror differs: '+target);}

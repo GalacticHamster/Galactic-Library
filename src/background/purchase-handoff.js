@@ -1,5 +1,6 @@
 import '../../shared/purchase-snapshot.js';
 import '../../shared/purchase-transfer.js';
+import '../../shared/purchase-sync.js';
 import '../../shared/purchase-adapters.js';
 import {builtinCompanions,resolvePurchasePeer} from '../lib/companion-identities.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
@@ -37,7 +38,7 @@ export async function applyPurchaseSnapshot(database,raw,target){const data=S.va
  const fallback=new Map();for(const item of oldRecords){const key=JSON.stringify([item.metadata.purchaseId,item.mediaType,item.title.normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase()]);const rows=fallback.get(key)??[];rows.push(item);fallback.set(key,rows);}
  for(const row of data.records){if(!['book','audiobook','game','software'].includes(row.mediaType)){stats.skipped++;continue;}let native=row.providerItemId;
  if(!native){const candidates=fallback.get(JSON.stringify([row.metadata.purchaseId,row.mediaType,row.title.normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase()]))??[];if(candidates.length!==1){stats.skipped++;continue;}native=candidates[0].providerItemId;}
- const id=providerItemKey(provider,native,profile.keySpace),previous=database.providerItems[id];if(previous&&previous.mediaType!==row.mediaType){stats.skipped++;continue;}
+ const id=providerItemKey(provider,native,profile.keySpace),previous=database.providerItems[id];if(previous&&(previous.mediaType!==row.mediaType||target?.autoSync&&previous.metadata.purchaseId&&row.metadata.purchaseId&&previous.metadata.purchaseId!==row.metadata.purchaseId)){stats.skipped++;continue;}
  const metadata=S.richer(previous?.metadata??{},row.metadata);delete metadata.platforms;for(const field of ['editionId','seriesId','runId'])delete metadata[field];
  if(Array.isArray(metadata.isbn)){metadata.isbns=metadata.isbn;metadata.isbn=metadata.isbn[0]??'';}metadata.source=PROVIDER_SOURCES[provider];
  if(provider==='fanatical'){

@@ -146,5 +146,7 @@
   "shared/purchase-transfer.js",
   "shared/purchase-adapters.js",
   "shared/purchase-handoff-ui.js",
-  "src/background/purchase-handoff.js"
+  "src/background/purchase-handoff.js",
+  "shared/purchase-sync.js",
+  "shared/purchase-sync-ui.js"
 ]
