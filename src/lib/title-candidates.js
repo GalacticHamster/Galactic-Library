@@ -27,7 +27,7 @@ function relationTitleParts(value, kind) {
     title = qualifier[1].trim(); stripEdition();
   }
   const subtitle = /^(.*?)\s*:\s+(.+)$/u.exec(title);
-  return { primary: normalizeTitle(subtitle?.[1]?.trim() || title), subtitle: Boolean(subtitle),
+  return { primary: kind === 'book' ? presentationTitle(subtitle?.[1]?.trim() || title, kind) : normalizeTitle(subtitle?.[1]?.trim() || title), subtitle: Boolean(subtitle),
     qualifier: Boolean(qualifier), hasEdition, hasVersion: false };
 }
 
