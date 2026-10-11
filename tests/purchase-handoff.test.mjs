@@ -8,7 +8,7 @@ const row=(n=0,provider='fanatical')=>({providerItemId:provider==='fanatical'?'p
 const snapshot=(records=[row()],provider='fanatical')=>S.validate({protocolVersion:1,provider,snapshotId:'snapshot-control',accountRef:'source-profile',accountLabel:'Personal',capturedAt:'2026-10-09T12:00:00Z',scope:'historical',completeness:'partial',limitations:[],records});
 function bus(data=snapshot()){
  const services={},areas={},commits=[],states={};for(const role of ['gl','hb','fan']){areas[role]={get:async defaults=>structuredClone({...defaults,...states[role]}),set:async values=>{states[role]={...states[role],...structuredClone(values)};}};const runtime={id:role,getURL:()=>role+'://own/',onMessage:{addListener(){}},onMessageExternal:{addListener(){}},openOptionsPage:async()=>{},sendMessage:async(id,message)=>{if(typeof id!=='string')return {};if(!services[id])throw Error('Missing peer');try{return {ok:true,protocolVersion:1,...await services[id].external(message,{id:role})};}catch(error){return {ok:false,protocolVersion:1,error:error.message};}}};
- services[role]=T.createService({runtime,area:areas[role],authorize:async(id,provider)=>provider===data.provider&&(role==='gl'?id===(provider==='humble'?'hb':'fan'):id==='gl'),peer:async()=>role==='gl'?(data.provider==='humble'?'hb':'fan'):'gl',accounts:async()=>[{accountRef:'source-profile',label:'Personal',count:data.records.length}],snapshot:async()=>structuredClone(data),commit:async(value,target)=>{commits.push({role,value,target});return {added:value.records.length,updated:0,unchanged:0,skipped:0};}});}
+ services[role]=T.createService({runtime,area:areas[role],authorize:async(id,provider)=>provider===data.provider&&(role==='gl'?id===(provider==='humble'?'hb':'fan'):id==='gl'),peer:async()=>role==='gl'?(data.provider==='humble'?'hb':'fan'):'gl',accounts:async()=>[{accountRef:'source-profile',label:'Personal',count:data.records.length}],snapshot:async()=>structuredClone(data),preview:async value=>({readOnly:true,added:value.records.length,updated:0}),commit:async(value,target)=>{commits.push({role,value,target});return {added:value.records.length,updated:0,unchanged:0,skipped:0};}});}
  return {services,states,commits};}
 for(const provider of ['humble','fanatical'])for(const destination of ['gl',provider==='humble'?'hb':'fan'])test(provider+' transfer into '+destination+' validates before one local commit',async()=>{const b=bus(snapshot([row(1,provider)],provider)),result=await b.services[destination].local({action:'import',provider,accountRef:'source-profile',target:{accountRef:'destination'},confirmed:true});assert.equal(result.received,1);assert.equal(b.commits.length,1);assert.equal(b.commits[0].role,destination);});
 test('Capabilities/version/provider/sender boundaries cannot import externally',async()=>{const b=bus();for(const message of [{type:'GH_PURCHASE_BEGIN',protocolVersion:2,provider:'fanatical'},{type:'GH_PURCHASE_BEGIN',protocolVersion:1,provider:'humble'},{type:'GH_PURCHASE_IMPORT',protocolVersion:1,provider:'fanatical'}])await assert.rejects(b.services.gl.external(message,{id:'fan'}));await assert.rejects(b.services.gl.external({type:'GH_PURCHASE_BEGIN',protocolVersion:1,provider:'fanatical'},{id:'unrelated'}));assert.equal(b.commits.length,0);});
@@ -119,4 +119,31 @@ test('GL destination stamp survives native storage property reordering but rejec
  const d=createEmptyDatabase(),p=newProviderProfile('fanatical','Personal');d.providerProfiles[p.profileId]=p;const target=(await purchaseAccounts(d,'fanatical'))[0];const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).reverse().map(([key,value])=>[key,reorder(value)])):value;
  d.providerProfiles[p.profileId]=reorder(p);assert.notEqual(JSON.stringify(d.providerProfiles[p.profileId]),JSON.stringify(p));assert.equal((await applyPurchaseSnapshot(d,snapshot(),target)).added,1);
  const next=(await purchaseAccounts(d,'fanatical'))[0];d.providerProfiles[p.profileId].nickname='Changed';await assert.rejects(applyPurchaseSnapshot(d,snapshot(),next),/Destination account changed/);
+});
+
+
+test('guided source fingerprints ignore capture time but reject changed source purchases before commit/offer',async()=>{
+ const data=snapshot(),b=bus(data),request={provider:'fanatical',accountRef:'source-profile',target:{accountRef:'source-profile'}};
+ const first=await b.services.gl.local({...request,action:'preview',direction:'import'});assert.match(first.preview.sourceStamp,/^[a-f0-9]{64}$/);assert.equal(b.commits.length,0);
+ data.snapshotId='next-capture';data.capturedAt='2026-10-11T12:00:00Z';const next=await b.services.gl.local({...request,action:'preview',direction:'import'});assert.equal(next.preview.sourceStamp,first.preview.sourceStamp);
+ data.records[0].title='Changed saved purchase';await assert.rejects(b.services.gl.local({...request,action:'import',confirmed:true,sourceStamp:first.preview.sourceStamp}),/source purchases changed/);assert.equal(b.commits.length,0);
+ await assert.rejects(b.services.fan.local({...request,action:'send',confirmed:true,sourceStamp:first.preview.sourceStamp}),/source purchases changed/);assert.equal(b.states.gl,undefined);
+});
+
+test('GL review account stamp detects edits even when profile and counts stay unchanged',async()=>{
+ const d=createEmptyDatabase();await applyPurchaseSnapshot(d,snapshot(),{newLabel:'Personal',expectedActiveId:null});const target=(await purchaseAccounts(d,'fanatical'))[0],profileBefore=JSON.stringify(d.providerProfiles);
+ Object.values(d.providerItems)[0].metadata.publisher='New local detail';assert.equal(JSON.stringify(d.providerProfiles),profileBefore);const before=JSON.stringify(d);
+ await assert.rejects(applyPurchaseSnapshot(d,snapshot(),target),/Destination account changed/);assert.equal(JSON.stringify(d),before);assert.notEqual((await purchaseAccounts(d,'fanatical'))[0].stamp,target.stamp);
+});
+
+test('GL account stamp survives native storage dictionary ordering changes',async()=>{
+ const d=createEmptyDatabase();await applyPurchaseSnapshot(d,snapshot([row(1),row(2)]),{newLabel:'Personal',expectedActiveId:null});const before=(await purchaseAccounts(d,'fanatical'))[0];d.providerItems=Object.fromEntries(Object.entries(d.providerItems).reverse());assert.equal((await purchaseAccounts(d,'fanatical'))[0].stamp,before.stamp);
+});
+
+test('a reviewed offer cannot import after its source account changes even though its prepared grant is intact',async()=>{
+ const b=bus(),external=b.services.fan.external;let stamp='before';b.services.fan.external=async(...args)=>{const result=await external(...args);if(args[0].type==='GH_PURCHASE_ACCOUNTS')result.accounts[0].stamp=stamp;return result;};
+ const request={provider:'fanatical',accountRef:'source-profile',target:{accountRef:'source-profile'}};
+ const review=(await b.services.gl.local({...request,action:'preview',direction:'import'})).preview;
+ await b.services.fan.local({...request,action:'send',confirmed:true});const offer=b.states.gl.galacticPurchaseOffer;stamp='after';
+ await assert.rejects(b.services.gl.local({...request,action:'import',confirmed:true,sourceStamp:review.sourceStamp,sourceAccountStamp:review.sourceAccountStamp,useOffer:true,offerToken:offer.manifest.token}),/source account changed/);assert.equal(b.commits.length,0);
 });
