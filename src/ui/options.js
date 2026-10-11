@@ -83,6 +83,7 @@ const seriesFilter=document.querySelector('#series-filter');
 const informationFilter=document.querySelector('#information-filter');
 const librarySort=document.querySelector('#library-sort');
 const mediaTypeFilter = document.querySelector('#media-type-filter');
+const acquisitionsFilter = document.querySelector('#acquisitions-filter');
 const ownershipFilter = document.querySelector('#ownership-filter');
 const dlcFilter = document.querySelector('#dlc-filter');
 const genreFilter = document.querySelector('#genre-filter');
@@ -184,7 +185,7 @@ let unlinkedPage=0;
 let coverageDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
-const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, dlc: dlcFilter, account:accountFilter, reading:readingFilter, series:seriesFilter, information:informationFilter };
+const viewControls = { provider: providerFilter, mediaType: mediaTypeFilter, genre: genreFilter, ownership: ownershipFilter, acquisitions:acquisitionsFilter, dlc: dlcFilter, account:accountFilter, reading:readingFilter, series:seriesFilter, information:informationFilter };
 const workspace = createWorkspaceNavigation({
   readView: current => current==='contents'?contentsWorkspace.readView():({ search: search.value, ...Object.fromEntries(Object.entries(viewControls).map(([key, field]) => [key, field.value || "all"])), sort:librarySort.value, page: libraryPage,anchor:lastBrowseResult?.rows.some(row=>row.records.some(value=>value.record.recordRef===selectedBrowseRef))?selectedBrowseRef:lastBrowseResult?.rows[0]?.canonical.id??'' }),
   applyView: (view,current) => {if(current==='contents'){if(contentsWorkspace.selected)contentsWorkspace.close();contentsWorkspace.applyView(view);return;} search.value = view.search; libraryPage = view.page; browseAnchor=view.anchor??'';librarySort.value=view.sort??'title-asc'; for (const [key, field] of Object.entries(viewControls)) { field.value = view[key]??'all'; if (!field.value) { field.dataset.pendingValue = view[key]; field.value = "all"; } } },
@@ -365,7 +366,7 @@ function populateBrowseFilters(browse){
 function renderActiveFilters(filters){
   const root=document.querySelector('#library-active-filters');root.replaceChildren();
   if(search.value.trim())root.append(actionButton('Search: '+search.value.trim()+' - clear',()=>{search.value='';viewChanged();}));
-  const labels={provider:'Provider',mediaType:'Media',account:'Account',genre:'Genre',ownership:'Access',reading:'Reading',series:'Series',information:'Information',dlc:'DLC'};
+  const labels={provider:'Provider',mediaType:'Media',account:'Account',genre:'Genre',ownership:'Access',acquisitions:'Ownership',reading:'Reading',series:'Series',information:'Information',dlc:'DLC'};
   for(const [key,value]of Object.entries(filters))if(value!=='all'){const field=viewControls[key];root.append(actionButton(labels[key]+': '+field.selectedOptions[0]?.textContent+' - clear',()=>{field.value='all';viewChanged();}));}
   root.hidden=!root.children.length;
 }
@@ -775,8 +776,9 @@ function render(timing = null) {
   const linkedAddOnIds=browse.linkedAddOnIds;
   const query = search.value.trim().toLocaleLowerCase();
   const filters = selectedFilters();
-  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage,size:workspace.pageSize,anchor:browseAnchor});
+  const result=libraryBrowseResults(browse,{query,filters,sort:librarySort.value,workspace:workspace.workspace,page:libraryPage,size:workspace.pageSize,anchor:browseAnchor,countAcquisitions:true});
   browseAnchor='';lastBrowseResult=result;libraryPage=result.page;
+  acquisitionsFilter.querySelector('[value="multiple"]').textContent=`Owned multiple times (${result.multipleOwnedCount})`;
   const canonical=result.matches.map(row=>row.canonical);
   renderActiveFilters(filters);
   document.querySelector('#library-no-results').hidden=canonical.length>0||!Object.keys(database.providerItems).length;
@@ -785,7 +787,7 @@ function render(timing = null) {
   const labels={game:'game',software:'software item',audiobook:'audiobook',book:'book',movie:'movie',tv:'TV title'};
   const counts=[...types].map(([type,count])=>count+' '+(labels[type]??type)+(count===1?'':'s'));
   const canShowAddOns=(filters.mediaType==='all'||filters.mediaType==='game')&&filters.dlc!=='without';
-  const orphanValues=(workspace.workspace==='library'&&canShowAddOns?browse.addOns:[]).filter(value=>!linkedAddOnIds.has(value.record.id)&&recordQualifies(value,filters,database)&&recordSearchRank(value,searchKey(query))!==null).sort((a,b)=>compareTitles(a.record.title,b.record.title));
+  const orphanValues=(workspace.workspace==='library'&&canShowAddOns&&filters.acquisitions!=='multiple'?browse.addOns:[]).filter(value=>!linkedAddOnIds.has(value.record.id)&&recordQualifies(value,filters,database)&&recordSearchRank(value,searchKey(query))!==null).sort((a,b)=>compareTitles(a.record.title,b.record.title));
   const visibleAddOnCount=canShowAddOns?new Set([...result.matches.flatMap(row=>row.addons),...orphanValues].map(value=>value.record.id)).size:0;
   const summaryText=result.total+' catalog '+(result.total===1?'item':'items')+(filtersAreActive(filters,query)?' matching search / filters':'')+'. '+counts.join(' / ')+(visibleRecords.length?' \u00b7 '+visibleRecords.length+' matching account records':'')+(visibleAddOnCount?' \u00b7 '+visibleAddOnCount+' DLC add-ons':'');
   if(summary.textContent!==summaryText)summary.textContent=summaryText;

@@ -1,4 +1,4 @@
-import {consolidateLibraryRows} from './library-acquisitions.js';
+import {consolidateLibraryRows,acquisitionHistory} from './library-acquisitions.js';
 import {identityEvidence} from '../lib/identity.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {libraryBroadGenreValues} from '../lib/genre-hints.js';
@@ -93,8 +93,8 @@ export function compareBrowseRows(a,b,sort='title-asc'){
   return title();
 }
 
-export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50,anchor='',recordFilter=()=>true,paginateRecords=false}={}){
-  const key=searchKey(query),matches=[];
+export function libraryBrowseResults(projection,{query='',filters={},sort='title-asc',workspace='library',page=0,size=50,anchor='',recordFilter=()=>true,paginateRecords=false,countAcquisitions=false}={}){
+  const key=searchKey(query),matches=[];let multipleOwnedCount=0;
   for(const row of projection.rows){
     if(workspace==='books'&&!['book','audiobook'].includes(row.canonical.mediaType))continue;
     if(filters.mediaType&&filters.mediaType!=='all'&&row.canonical.mediaType!==filters.mediaType)continue;
@@ -102,7 +102,15 @@ export function libraryBrowseResults(projection,{query='',filters={},sort='title
     const addons=qualifying.flatMap(value=>projection.addOnsByParent.get(value.record.id)??[]).filter(value=>recordQualifies(value,{provider:filters.provider,account:filters.account,ownership:filters.ownership},projection.database));
     if(filters.dlc&&filters.dlc!=='all'&&(row.canonical.mediaType!=='game'||(filters.dlc==='with')!==Boolean(addons.length)))continue;
     const ranks=[...qualifying.map(value=>recordSearchRank(value,key,row.title)),...addons.map(value=>recordSearchRank(value,key))].filter(rank=>rank!==null);
-    if(ranks.length)matches.push({...row,qualifying,addons,rank:Math.min(...ranks)});
+    if(!ranks.length)continue;
+    if(countAcquisitions||filters.acquisitions==='multiple'){
+      // Single observations cannot represent multiple purchases unless they retain multiple origins.
+      const possible=row.records.length+(row.historyRecords?.length??0)>1||row.records.some(value=>value.record.metadata?.purchaseOrigins?.length>1);
+      const multiple=possible&&acquisitionHistory([...row.records.map(value=>value.record),...(row.historyRecords??[])],projection.database).ownedPurchases>=2;
+      if(multiple)multipleOwnedCount++;
+      if(filters.acquisitions==='multiple'&&!multiple)continue;
+    }
+    matches.push({...row,qualifying,addons,rank:Math.min(...ranks)});
   }
   matches.sort((a,b)=>a.rank-b.rank||compareBrowseRows(a,b,sort));
   const entries=paginateRecords?matches.flatMap(row=>row.qualifying.map(value=>({...row,qualifying:[value]}))):matches;
@@ -110,5 +118,5 @@ export function libraryBrowseResults(projection,{query='',filters={},sort='title
   const anchored=anchor?entries.findIndex(row=>row.canonical.id===anchor||row.canonicalIds?.includes(anchor)||row.qualifying.some(value=>value.record.recordRef===anchor)):-1;
   if(anchored>=0)page=Math.floor(anchored/size);
   const state=paginationState(entries.length,page,size);page=state.page;
-  return {matches,rows:entries.slice(page*size,(page+1)*size),total:entries.length,catalogTotal:matches.length,page,pages:state.pages};
+  return {matches,rows:entries.slice(page*size,(page+1)*size),total:entries.length,multipleOwnedCount,catalogTotal:matches.length,page,pages:state.pages};
 }

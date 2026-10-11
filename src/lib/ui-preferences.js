@@ -9,10 +9,10 @@ export function workspaceTarget(value) {
   const name=String(value??'').replace(/^#/u,'').split('?')[0].replace(/-workspace$/u,'');
   return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
 }
-export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', sort:'title-asc', page: 0 });
+export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', acquisitions:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
 export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
-export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,browse:emptyBrowseView(),library:{information:'all',dlc:'all'},contents:{status:'all'},books:emptyLibraryView()});
+export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
 function validateView(view,defaults){
   if(!view||typeof view!=='object'||Array.isArray(view)||Object.keys(view).some(key=>!Object.hasOwn(defaults,key)))throw Error('Invalid library filters.');
   const output={...defaults,...view};
@@ -20,7 +20,7 @@ function validateView(view,defaults){
     if(key==='page'){if(!Number.isSafeInteger(value)||value<0||value>1000000)throw Error('Invalid library page.');}
     else if(typeof value!=='string'||value.length>(['search','series'].includes(key)?500:200))throw Error('Invalid library filter.');
   }
-  const enums={mediaType:['all','game','software','book','audiobook','movie','tv'],ownership:['all','owned','claimed','unknown','rental','borrowed','subscription'],dlc:['all','with','without'],reading:['all','not-saved','unread','reading','completed'],information:['all','missing','review'],sort:['title-asc','title-desc','added','updated','creator','series'],status:['all','review','failure','reviewed','identified','partial','uncertain','missing','unattempted','failed']};
+  const enums={acquisitions:['all','multiple'],mediaType:['all','game','software','book','audiobook','movie','tv'],ownership:['all','owned','claimed','unknown','rental','borrowed','subscription'],dlc:['all','with','without'],reading:['all','not-saved','unread','reading','completed'],information:['all','missing','review'],sort:['title-asc','title-desc','added','updated','creator','series'],status:['all','review','failure','reviewed','identified','partial','uncertain','missing','unattempted','failed']};
   for(const [key,choices]of Object.entries(enums))if(key in output&&!choices.includes(output[key]))throw Error('Unknown library filter.');
   return output;
 }
@@ -33,7 +33,7 @@ export function validateUiPreferences(value){
   // Migrate old Library fields once. Shared state is authoritative thereafter.
   const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();
   output.browse=validateView(value.browse??Object.fromEntries(SHARED_BROWSE_FIELDS.filter(key=>key!=='anchor').map(key=>[key,legacy[key]])),emptyBrowseView());
-  output.library={information:legacy.information,dlc:legacy.dlc};
+  output.library={information:legacy.information,dlc:legacy.dlc,acquisitions:legacy.acquisitions};
   if(value.contents)output.contents=validateView(value.contents,output.contents);
   if(value.books)output.books=validateView(value.books,output.books);
   return output;

@@ -72,7 +72,7 @@ libraryBrowseTests.push(
 
 libraryBrowseTests.push(['Shared Library and Contents state migrates old views once and keeps specialized filters separate',()=>{
  const prefs=validateUiPreferences({library:{search:'Batman',provider:'kindle',sort:'added',page:1,information:'missing'},books:{search:'Other'}});
- assert.equal(prefs.browse.search,'Batman');assert.deepEqual(prefs.library,{information:'missing',dlc:'all'});
+ assert.equal(prefs.browse.search,'Batman');assert.deepEqual(prefs.library,{information:'missing',dlc:'all',acquisitions:'all'});
  rememberBrowseView(prefs,'contents',{...browseView(prefs,'contents'),search:'Detective',status:'partial',anchor:'same-record'});
  assert.equal(browseView(prefs,'library').search,'Detective');assert.equal(browseView(prefs,'library').information,'missing');assert.equal(prefs.contents.status,'partial');assert.equal(prefs.books.search,'Other');
  const saved=mergeUiPreferences(prefs,{browse:{sort:'series'}});assert.equal(saved.browse.anchor,'same-record');assert.equal(saved.browse.search,'Detective');assert(!('search' in saved.library));
@@ -106,7 +106,7 @@ libraryBrowseTests.push(
    assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(db),{filters:{provider:'kindle',account:'family',ownership:'borrowed'}}).total,1);
    const fan=record('fan','AUTUMNLANDS, VOL. 1',{purchaseOrigins:[{occurrenceRef:'b'.repeat(64),orderRef:'a'.repeat(64),bundleId:'fan-bundle',bundleTitle:'Fan bundle',purchasedAt:'2026-01-01'}]},{provider:'fanatical'});
    const both=database([db.providerItems.purchase,fan]),bothRow=libraryBrowseResults(createLibraryBrowseProjection()(both)).rows[0];
-   assert.equal(bothRow.records.length,2);assert.equal(acquisitionHistory(bothRow.records.map(v=>v.record),both).label,'Owned twice');
+   assert.equal(bothRow.records.length,2);assert.equal(acquisitionHistory(bothRow.records.map(v=>v.record),both).label,'Owned twice');assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(both),{filters:{acquisitions:'multiple',provider:'fanatical'}}).total,1);
  }],
  ['Repeated Humble native/companion observations of one order count once, with separate account scope retained',()=>{
    const records=[purchase('native',1,'same','Bundle','2025-01-01'),purchase('synced',1,'same','Bundle','2025-01-01')],db=database(records);
@@ -157,3 +157,35 @@ libraryBrowseTests.push(['Purchase history is collapsed and lazy, safely shows o
    history.listeners.toggle();assert.equal(history.children.length,2,'Expanding repeatedly does not duplicate history');
  }finally{if(old===undefined)delete globalThis.document;else globalThis.document=old;}
 }]);
+
+
+libraryBrowseTests.push(
+ ['Owned multiple times filters distinct Autumnlands purchases, not observations, editions or uncertain access',()=>{
+   const records=[1,2].flatMap(n=>[purchase('old-'+n,n,'old','Old bundle','2022-12-25'),purchase('new-'+n,n,'new','New bundle','2025-12-17')]);
+   records.push(purchase('single',3,'one','One bundle','2025-01-01'),purchase('repeat-a',4,'repeat','Repeated bundle','2025-01-01'),purchase('repeat-b',4,'repeat','Repeated bundle','2025-01-01'),purchase('five',5,'five','Bundle','2025-01-01'),purchase('six',6,'six','Bundle','2025-01-01'));
+   records.push({...purchase('first',7,'first','Bundle','2025-01-01'),metadata:{purchaseId:'first',edition:'First'}},{...purchase('second',7,'second','Bundle','2025-01-01'),metadata:{purchaseId:'second',edition:'Second'}});
+   records.push(purchase('unknown-a',8,'ua','Bundle','2025-01-01',{ownership:'unknown'}),purchase('unknown-b',8,'ub','Bundle','2025-01-01',{ownership:'unknown'}));
+   const db=database(records);db.ownershipPolicy={allOwned:true,providers:{}};const before=JSON.stringify(db),projection=createLibraryBrowseProjection()(db);
+   const all=libraryBrowseResults(projection,{countAcquisitions:true}),filtered=libraryBrowseResults(projection,{filters:{acquisitions:'multiple'},countAcquisitions:true});
+   assert.equal(all.total,9);assert.equal(all.multipleOwnedCount,2);assert.deepEqual(filtered.rows.map(row=>row.canonical.title),['The Autumnlands Vol. 1','The Autumnlands Vol. 2']);assert.equal(filtered.multipleOwnedCount,2);
+   assert.equal(JSON.stringify(db),before);
+ }],
+ ['Multiple ownership composes with search, media, provider, account and access without recounting filtered copies',()=>{
+   const records=[1,2].flatMap(n=>[purchase('old-'+n,n,'old','Old bundle','2022-12-25'),purchase('new-'+n,n,'new','New bundle','2025-12-17',{profileId:'family'})]);
+   const projection=createLibraryBrowseProjection()(database(records)),filters={acquisitions:'multiple',provider:'humble',account:'family',ownership:'owned',mediaType:'book'};
+   const result=libraryBrowseResults(projection,{query:'Autumnlands Vol 2',filters,countAcquisitions:true});assert.equal(result.total,1);assert.equal(result.multipleOwnedCount,1);assert.equal(result.rows[0].qualifying.length,1);assert.equal(result.rows[0].records.length,2);
+   assert.equal(libraryBrowseResults(projection,{filters:{...filters,provider:'kobo'},countAcquisitions:true}).multipleOwnedCount,0);assert.equal(libraryBrowseResults(projection,{filters:{...filters,mediaType:'game'}}).total,0);
+   const unfiltered=libraryBrowseResults(projection,{query:'Autumnlands Vol 2',filters:{provider:'humble'},countAcquisitions:true});assert.equal(unfiltered.multipleOwnedCount,1);
+ }],
+ ['Multiple ownership keeps sorting/pagination and uses Fanatical occurrence deduplication including single aggregated records',()=>{
+   const records=Array.from({length:21},(_,i)=>i+1).flatMap(n=>[purchase('a-'+n,n,'a','A','2022-01-01'),purchase('b-'+n,n,'b','B','2025-01-01')]);
+   const projection=createLibraryBrowseProjection()(database(records)),result=libraryBrowseResults(projection,{filters:{acquisitions:'multiple'},sort:'title-desc',size:20,page:1});assert.equal(result.total,21);assert.equal(result.multipleOwnedCount,21);assert.equal(result.rows.length,1);assert.equal(result.rows[0].canonical.title,'The Autumnlands Vol. 1');
+   const origin=ref=>({occurrenceRef:ref.repeat(64),orderRef:'a'.repeat(64),bundleId:'bundle',bundleTitle:'Fan bundle'}),single=record('single','Single Fan',{purchaseOrigins:[origin('b')]},{provider:'fanatical'}),repeat={...single,id:'repeat',recordRef:'repeat'},multiple=record('multiple','Multiple Fan',{purchaseOrigins:[origin('b'),origin('c')]},{provider:'fanatical'});
+   const fan=libraryBrowseResults(createLibraryBrowseProjection()(database([single,repeat,multiple])),{filters:{acquisitions:'multiple'}});assert.equal(fan.total,1);assert.equal(fan.rows[0].canonical.title,'Multiple Fan');
+ }],
+ ['Multiple ownership preferences default to All, round-trip privately, reject unsupported values and stay local to Library',()=>{
+   assert.equal(validateUiPreferences({library:{}}).library.acquisitions,'all');
+   const prefs=mergeUiPreferences(validateUiPreferences({}),{library:{acquisitions:'multiple'}});assert.equal(browseView(prefs,'library').acquisitions,'multiple');assert(!('acquisitions' in browseView(prefs,'contents')));
+   assert.equal(validateUiPreferences(JSON.parse(JSON.stringify(prefs))).library.acquisitions,'multiple');assert.throws(()=>validateUiPreferences({library:{acquisitions:'all-observations'}}));rememberBrowseView(prefs,'library',{acquisitions:'all'});assert.equal(prefs.library.acquisitions,'all');
+ }]
+);
