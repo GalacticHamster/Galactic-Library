@@ -1,4 +1,4 @@
-import {identityConflicts,sameEditionEvidence} from '../lib/identity.js';
+import {identityConflicts,sameEditionEvidence,identityEvidence,identityKey} from '../lib/identity.js';
 import {editionBarriers,pairKey} from '../lib/relationships.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {providerLabel,accountLabel,accessLabel,formatDate} from './formatters.js';
@@ -39,6 +39,38 @@ export function consolidateLibraryRows(rows,database){
 }
 
 const unique=values=>[...new Set(values.filter(Boolean))];
+// Immutable saved provenance only; access/expiry are reevaluated separately below.
+const claimProjections=new WeakMap();
+const scopeOf=record=>JSON.stringify([record.provider,record.profileId??'']);
+const humbleOrder=record=>scopeOf(record)+':order:'+record.metadata.purchaseId;
+const bundleName=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+function repeatedClaimProjection(database){
+  if(claimProjections.has(database))return claimProjections.get(database);
+  const orders=new Map(),projection=new Map(),buckets=new Map();
+  for(const record of [...Object.values(database.providerItems??{}),...Object.values(database.providerHistory??{}).map(value=>value.item).filter(Boolean)]){
+    if(record.provider!=='humble'||!record.profileId||!record.metadata?.purchaseId)continue;
+    const key=humbleOrder(record),order=orders.get(key)??{key,scope:scopeOf(record),names:new Set(),dates:new Set(),products:new Set(),safe:true};
+    order.names.add(bundleName(record.metadata.sourceBundle));
+    const date=Date.parse(record.acquiredAt);if(Number.isFinite(date))order.dates.add(date);
+    const prefix=record.metadata.purchaseId+':product:',native=record.providerItemId?.startsWith(prefix)?record.providerItemId.slice(prefix.length):'';
+    // A repeated paid order is still a purchase. Only explicit native free-product claims qualify.
+    if(!native||!/(?:_|-)free$/iu.test(native)||record.metadata.entitlement!=='direct-download')order.safe=false;
+    const identity=identityEvidence(record),details=['authors','isbn','asin','edition','run','unit','unitType','language','series'].map(field=>Array.isArray(identity[field])?identity[field].map(identityKey).sort():identityKey(identity[field]));
+    order.products.add(JSON.stringify([native,record.mediaType,globalThis.LibraryMatchingPolicy.presentationTitle(record.title,record.mediaType),details]));orders.set(key,order);
+  }
+  for(const order of orders.values()){
+    if(!order.safe||order.names.size!==1||!/(?:^| )free(?: |$)/u.test(order.names.values().next().value)||order.dates.size!==1||order.products.size<2)continue;
+    order.date=[...order.dates][0];const fingerprint=JSON.stringify([order.scope,[...order.names][0],[...order.products].sort()]),bucket=buckets.get(fingerprint)??[];bucket.push(order);buckets.set(fingerprint,bucket);
+  }
+  const window=30*24*60*60*1000;
+  for(const bucket of buckets.values()){
+    bucket.sort((a,b)=>a.date-b.date||a.key.localeCompare(b.key));let component=[];
+    const flush=()=>{if(component.length>1&&component.at(-1).date-component[0].date<=window){const key='claims:'+component[0].key;for(const order of component)projection.set(order.key,key);}component=[];};
+    for(const order of bucket){if(component.length&&order.date-component.at(-1).date>window)flush();component.push(order);}flush();
+  }
+  claimProjections.set(database,projection);return projection;
+}
+
 export function acquisitionHistory(records,database){
   const entries=new Map(),fanGroups=new Map();
   const add=(key,record,source={})=>{
@@ -50,7 +82,7 @@ export function acquisitionHistory(records,database){
   for(const record of records){
     const scope=JSON.stringify([record.provider,record.profileId??'']),metadata=record.metadata??{};
     if(record.provider==='humble'&&metadata.purchaseId){
-      add(scope+':order:'+metadata.purchaseId,record,{bundle:metadata.sourceBundle,date:record.acquiredAt,confirmed:true});continue;
+      const entry=add(humbleOrder(record),record,{bundle:metadata.sourceBundle,date:record.acquiredAt,confirmed:true});entry.purchaseRef=metadata.purchaseId;continue;
     }
     if(record.provider==='fanatical'&&metadata.purchaseOrigins?.length){
       const perRecord=new Map();
@@ -58,7 +90,7 @@ export function acquisitionHistory(records,database){
         const key=scope+':order:'+JSON.stringify([origin.orderRef,origin.bundleId]),group=fanGroups.get(key)??{native:new Set(),maximum:0};
         if(!origin.basis)group.native.add(origin.occurrenceRef);
         perRecord.set(key,(perRecord.get(key)??0)+1);fanGroups.set(key,group);
-        add(key,record,{bundle:origin.bundleTitle,date:origin.purchasedAt,confirmed:true});
+        const entry=add(key,record,{bundle:origin.bundleTitle,date:origin.purchasedAt,confirmed:true});entry.purchaseRef=origin.orderRef;
       }
       for(const [key,count]of perRecord)fanGroups.get(key).maximum=Math.max(fanGroups.get(key).maximum,count);
       continue;
@@ -67,31 +99,57 @@ export function acquisitionHistory(records,database){
     add(scope+':record:'+(record.providerItemId||record.recordRef),record,{bundle:metadata.sourceBundle||metadata.bundleTitle,date:record.acquiredAt});
   }
   for(const [key,group]of fanGroups)entries.get(key).quantity=Math.max(group.native.size,group.maximum);
-  const history=[...entries.values()].sort((a,b)=>(a.dates[0]??'9999').localeCompare(b.dates[0]??'9999')||a.key.localeCompare(b.key));
-  let purchases=0,ownedPurchases=0;
-  for(const entry of history){entry.accounts=unique(entry.records.map(record=>accountLabel(record,database)));
-    entry.access=unique(entry.records.map(record=>record.historical?'Earlier record; not in the latest complete scan (previously '+accessLabel(record.ownership)+')':accessLabel(effectiveOwnershipRecord(record,database,Date.now(),{ignoreOverride:true}).ownership)));
-    if(entry.confirmedPurchase){purchases+=entry.quantity;if(entry.records.some(record=>!record.historical&&['owned','claimed'].includes(effectiveOwnershipRecord(record,database,Date.now(),{ignoreOverride:true}).ownership)))ownedPurchases+=entry.quantity;}
+  const claims=repeatedClaimProjection(database),groups=new Map();
+  for(const entry of entries.values()){
+    const key=claims.get(entry.key)??entry.key,group=groups.get(key)??{...entry,key,records:[],bundles:[],titles:[],dates:[],transactions:[]};
+    group.transactions.push(entry);group.records=unique([...group.records,...entry.records]);
+    for(const field of ['bundles','titles','dates'])group[field]=unique([...group[field],...entry[field]]);
+    groups.set(key,group);
   }
-  const label=ownedPurchases>1?(ownedPurchases===2?'Owned twice':`Owned ${ownedPurchases} times`):purchases>1?`${purchases} recorded purchases`:history.length>1?'Multiple library records':'';
-  return {entries:history,purchases,ownedPurchases,label};
+  const history=[...groups.values()].sort((a,b)=>(a.dates[0]??'9999').localeCompare(b.dates[0]??'9999')||a.key.localeCompare(b.key));
+  let purchases=0,ownedPurchases=0;
+  const now=Date.now(),owned=record=>!record.historical&&['owned','claimed'].includes(effectiveOwnershipRecord(record,database,now,{ignoreOverride:true}).ownership);
+  for(const entry of history){entry.claims=entry.transactions.length;entry.accounts=unique(entry.records.map(record=>accountLabel(record,database)));
+    entry.access=unique(entry.records.map(record=>record.historical?'Earlier record; not in the latest complete scan (previously '+accessLabel(record.ownership)+')':accessLabel(effectiveOwnershipRecord(record,database,now,{ignoreOverride:true}).ownership)));
+    if(entry.confirmedPurchase){purchases++;if(entry.records.some(owned))ownedPurchases++;}
+  }
+  // Unlinked catalogs/Steam activation can establish access to one copy, never an extra purchase.
+  const ownedGroups=Math.max(ownedPurchases,records.some(record=>!record.historical&&['owned','claimed'].includes(effectiveOwnershipRecord(record,database,now).ownership))?1:0);
+  const repeated=history.filter(entry=>entry.claims>1),claimCount=repeated.reduce((sum,entry)=>sum+entry.claims,0);
+  const label=ownedPurchases>1?(ownedPurchases===2?'Owned twice':`Owned ${ownedPurchases} times`):repeated.length?`${claimCount} claims in ${repeated.length} acquisition group${repeated.length===1?'':'s'}`:purchases>1?`${purchases} recorded acquisition groups`:history.length>1?'Multiple library records':'';
+  return {entries:history,purchases,ownedPurchases,ownedGroups,label};
 }
 
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-export function createAcquisitionHistory(history){
-  const details=text('details','');details.className='library-purchase-history';
-  details.append(text('summary','Purchase and access history'));
-  // Details are created only when expanded, so the normal card stays small.
+function datesLabel(dates,{month=false}={}){
+  const sorted=unique(dates).sort((a,b)=>Date.parse(a)-Date.parse(b));if(!sorted.length)return 'Not recorded';
+  const first=sorted[0],last=sorted.at(-1),date=value=>/^\d{4}-\d{2}-\d{2}$/u.test(value)?new Date(value+'T12:00:00'):new Date(value);
+  if(month&&date(first).getFullYear()===date(last).getFullYear()&&date(first).getMonth()===date(last).getMonth())return date(first).toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  return first===last?formatDate(first,{time:false}):formatDate(first,{time:false})+' to '+formatDate(last,{time:false});
+}
+function transactionItem(entry,database){
+  const item=text('li','');item.append(text('strong',providerLabel(entry.provider)+' \u2014 '+(entry.bundles[0]||entry.titles[0])));
+  item.append(text('p',unique(entry.records.map(record=>accountLabel(record,database))).join('; ')));
+  item.append(text('p',(entry.confirmedPurchase?'Purchase date: ':'Acquisition date: ')+(entry.dates.length?entry.dates.map(date=>formatDate(date)).join('; '):'Not recorded')));
+  if(entry.purchaseRef)item.append(text('p','Transaction reference: '+entry.purchaseRef));
+  item.append(text('p','Source item references: '+unique(entry.records.map(record=>record.providerItemId||record.recordRef)).join('; ')));
+  if(entry.dates.length)item.append(text('small','Saved dates: '+entry.dates.join('; ')));
+  if(entry.quantity>1)item.append(text('p',entry.quantity+' copies recorded in this order'));
+  return item;
+}
+export function createAcquisitionHistory(history,database={}){
+  const details=text('details','');details.className='library-purchase-history';details.append(text('summary','Purchase and access history'));
   let built=false;details.addEventListener('toggle',()=>{if(!details.open||built)return;built=true;const list=text('ul','');
     for(const entry of history.entries){const item=text('li','');
-      item.append(text('strong',providerLabel(entry.provider)+' — '+(entry.bundles.join('; ')||entry.titles.join('; '))));
+      item.append(text('strong',providerLabel(entry.provider)+' \u2014 '+(entry.bundles[0]||entry.titles[0])+(entry.claims>1?` \u2014 ${entry.claims} claims (${datesLabel(entry.dates,{month:true})})`:'')));
       item.append(text('p',entry.accounts.join('; ')));
-      item.append(text('p',(entry.confirmedPurchase?'Purchase date: ':'Acquisition date: ')+(entry.dates.length?entry.dates.map(date=>formatDate(date,{time:false})).join('; '):'Not recorded')));
-      item.append(text('p',entry.access.join('; ')+(entry.quantity>1?` · ${entry.quantity} copies in this order`:'')));
-      if(entry.bundles.length)item.append(text('small','Total bundle price: not recorded'));
+      if(entry.claims===1)item.append(text('p',(entry.confirmedPurchase?'Purchase date: ':'Acquisition date: ')+datesLabel(entry.dates)));
+      item.append(text('p',entry.access.join('; ')));
       if(!entry.confirmedPurchase)item.append(text('small','Purchase details are not recorded; this is a saved library record.'));
+      if(entry.confirmedPurchase){const originals=text('details','');originals.className='acquisition-transactions';originals.append(text('summary',entry.claims>1?'Original transactions ('+entry.claims+')':'Original transaction'));let loaded=false;
+        originals.addEventListener('toggle',()=>{if(!originals.open||loaded)return;loaded=true;const transactions=text('ul','');for(const transaction of entry.transactions)transactions.append(transactionItem(transaction,database));originals.append(transactions);});item.append(originals);
+      }
       list.append(item);
-    }
-    details.append(list);
+    }details.append(list);
   });return details;
 }

@@ -27,6 +27,6 @@ export function createLibraryResultSummary(row,database,{series:visitSeries,filt
   if(exceptions.length)root.append(Object.assign(text('p',exceptions.slice(0,3).join('; ')+(exceptions.length>3?` +${exceptions.length-3} access exceptions in Details`:'')),{className:'library-result-access'}));
   if(information==='missing')root.append(Object.assign(text('p','Book information is missing a creator or edition identifier. See Details.'),{className:'library-result-scope'}));
   if(information==='review')root.append(Object.assign(text('p','Saved suggestions or contents await review. See Details.'),{className:'library-result-scope'}));
-  if(history.entries.length)root.append(createAcquisitionHistory(history));
+  if(history.entries.length)root.append(createAcquisitionHistory(history,database));
   return root;
 }
