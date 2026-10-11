@@ -1,3 +1,4 @@
+import {validateDisplayTitlePreferences} from './display-title.js';
 import {migrateProviderProfiles,validateProviderProfiles,profileRef,profileItemKey} from './provider-profiles.js';
 import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } from './constants.js';
 import { normalizeGameTitle } from './normalization.js';
@@ -138,8 +139,15 @@ export function* canonicalItemsSteps(providerItems, manualMatchDecisions = {}, p
   }
   const usedIds = new Set();
   const previousByRecord = new Map();
+  const titlePreferences = new Map();
   for (const entry of Object.values(previousCanonicalItems ?? {})) {
     yield;
+    if(entry?.displayTitlePreferences!==undefined){
+      const memberRefs=new Set((Array.isArray(entry.providerItemIds)?entry.providerItemIds:[]).map(id=>providerItems[id]?.recordRef));
+      for(const [ref,choice] of Object.entries(validateDisplayTitlePreferences(entry.displayTitlePreferences))){
+        if(memberRefs.has(ref))titlePreferences.set(ref,choice);
+      }
+    }
     if (/^edition:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(entry?.id??'') && Array.isArray(entry.providerItemIds) && entry.providerItemIds.length<=500000) for (const itemId of entry.providerItemIds) if(typeof itemId==='string'&&providerItems[itemId]) previousByRecord.set(itemId, entry);
   }
   const result=[];
@@ -153,6 +161,7 @@ export function* canonicalItemsSteps(providerItems, manualMatchDecisions = {}, p
     // Never overwrite that group when input/provider order changes.
     if(usedIds.has(id))id=ordered.map(item=>`edition:${item.recordRef}`).find(candidate=>!usedIds.has(candidate))??`edition:${crypto.randomUUID()}`;
     usedIds.add(id);
+    const displayTitlePreferences=Object.fromEntries(ordered.filter(item=>titlePreferences.has(item.recordRef)).map(item=>[item.recordRef,titlePreferences.get(item.recordRef)]));
     result.push([id, {
       id,
       mediaType: ordered[0].mediaType,
@@ -161,6 +170,7 @@ export function* canonicalItemsSteps(providerItems, manualMatchDecisions = {}, p
       baseTitle: ordered[0].baseTitle,
       edition: ordered[0].edition,
       providerItemIds: ordered.map((item) => item.id),
+      ...(Object.keys(displayTitlePreferences).length?{displayTitlePreferences}:{}),
       providerCount: ordered.length
     }]);
   }

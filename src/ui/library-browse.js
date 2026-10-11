@@ -1,3 +1,4 @@
+import {preferredDisplayTitle} from '../lib/display-title.js';
 import {consolidateLibraryRows,acquisitionHistory} from './library-acquisitions.js';
 import {identityEvidence} from '../lib/identity.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
@@ -42,7 +43,10 @@ export function createLibraryBrowseProjection(){
     for(const value of addOns){const record=value.record,parent=native.get([record.provider,record.profileId??'',record.metadata?.parentProviderItemId].join('\0'));
       if(parent?.record.mediaType!=='game')continue;const list=addOnsByParent.get(parent.record.id)??[];list.push(value);addOnsByParent.set(parent.record.id,list);linkedAddOnIds.add(record.id);
     }
-    const rows=consolidateLibraryRows(Object.values(database.canonicalItems).map(canonical=>({canonical,title:searchKey(canonical.title),records:canonical.providerItemIds.map(id=>records.get(id)).filter(Boolean)})),database);
+    const rows=consolidateLibraryRows(Object.values(database.canonicalItems).map(canonical=>({canonical,title:searchKey(canonical.title),records:canonical.providerItemIds.map(id=>records.get(id)).filter(Boolean)})),database).map(row=>{
+      const title=preferredDisplayTitle(row.canonicalIds.map(id=>database.canonicalItems[id]));
+      return title?{...row,title:searchKey(title),canonical:{...row.canonical,title}}:row;
+    });
     const accounts=new Map();for(const value of records.values())if(value.record.profileId&&!accounts.has(value.record.profileId))accounts.set(value.record.profileId,accountLabel(value.record,database));
     const accountOptions=[...accounts].map(([value,label])=>({value,label})).sort((a,b)=>compareTitles(a.label,b.label));
     const seriesOptions=distinct([...records.values()].flatMap(value=>value.series)).sort(compareTitles);

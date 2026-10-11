@@ -47,6 +47,10 @@ Expand **Advanced**, then **Matching, editions and source evidence** to review t
 | Separate this record into its own edition | Applies an explicit edition barrier; undo restores the prior grouping. |
 | Alternate titles and aliases | Adds record-scoped Possible evidence, not confirmed ownership. |
 
+To compare records, type a title, provider or edition into the search picker and choose one of up to 20 results. The current record and its confirmed Same Edition group are excluded. Same Work relates different editions without establishing identical products; Same Edition confirms the same specific product, subject to existing conflict checks.
+
+When confirming Same Edition, choose which source title the library should display. You can change it later with **Preferred library display title ? Save display title** in this section. Imports and synchronization preserve your choice; backups include it. All original source titles and purchase histories remain intact. If groups with previously chosen titles are combined, the most recently saved choice supplies the display title; separating records retains each choice with its source record.
+
 Canonical identity decisions are not ownership confirmations. Contents source history and independent claims remain available through the exact record in Contents. Existing game contents tools remain under Advanced because the current Contents workspace lists books.
 
 ## Existing capabilities and routes

@@ -24,7 +24,7 @@ export const {
   saveGoogleBooksEnrichmentJob, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob,
   acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
   getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
-  saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment,
+  saveManualMatchDecision, savePreferredDisplayTitle, removeManualMatchDecision, saveOpenLibraryEnrichment,
   saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
   applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
   separateEdition, undoEditionSeparation, saveTitleAliases,

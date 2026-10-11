@@ -689,7 +689,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return normalised;
   }
 
-  async function saveManualMatchDecision(candidate, decision) {
+  async function saveManualMatchDecision(candidate, decision, preferredTitle=null) {
     if (!candidate || !Array.isArray(candidate.itemIds) || candidate.itemIds.length !== 2 || !['same', 'same-work', 'same-edition', 'different'].includes(decision)) {
       throw new Error('Invalid duplicate-review decision.');
     }
@@ -697,10 +697,28 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const itemIds = [...candidate.itemIds].sort();
     if (!itemIds.every((id) => database.providerItems[id])) throw new Error('One of the reviewed library items no longer exists.');
     if(itemIds[0]===itemIds[1]||database.providerItems[itemIds[0]].mediaType!==database.providerItems[itemIds[1]].mediaType)throw new Error('Review two different records of the same media type.');
+    if(decision==='same-edition'&&Object.values(database.canonicalItems).some(group=>itemIds.every(id=>group.providerItemIds.includes(id))))throw Error('These records already belong to the same edition. Change its preferred title instead.');
     if(decision==='same-edition'&&identityConflicts(...itemIds.map(id=>database.providerItems[id])).length)throw new Error('These records have conflicting edition evidence. Use Same work instead.');
     database.manualMatchDecisions[itemIds.join('\u0000')] = { decision, itemIds, updatedAt: new Date().toISOString() };
     database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
     if(decision==='same-edition'&&!Object.values(database.canonicalItems).some(group=>itemIds.every(id=>group.providerItemIds.includes(id))))throw new Error('An indirect identity conflict or Different works decision prevents this edition merge. Review those relationships first.');
+    if(decision==='same-edition'&&preferredTitle){
+      const group=Object.values(database.canonicalItems).find(group=>itemIds.every(id=>group.providerItemIds.includes(id)));
+      applyPreferredTitle(database,group,preferredTitle);
+    }
+    return persistDatabase(database);
+  }
+
+  function applyPreferredTitle(database,group,choice){
+    const record=group?.providerItemIds.map(id=>database.providerItems[id]).find(record=>record?.recordRef===choice?.recordRef);
+    if(!record||typeof choice.title!=='string'||record.title!==choice.title)throw Error('This source title changed or no longer belongs to this edition. Reload and choose again.');
+    const last=Object.values(group.displayTitlePreferences??{}).reduce((latest,value)=>Math.max(latest,Date.parse(value.updatedAt)||0),0);
+    group.displayTitlePreferences={...(group.displayTitlePreferences??{}),[record.recordRef]:{title:record.title,updatedAt:new Date(Math.max(Date.now(),last+1)).toISOString()}};
+  }
+
+  async function savePreferredDisplayTitle(canonicalId,choice){
+    const database=await getDatabase();
+    applyPreferredTitle(database,database.canonicalItems[canonicalId],choice);
     return persistDatabase(database);
   }
 
@@ -1243,7 +1261,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     getGoogleBooksApiKey, saveGoogleBooksApiKey, getGoogleBooksEnrichmentJob,
     saveGoogleBooksEnrichmentJob:async value=>{const job=await getGoogleBooksEnrichmentJob();if(job?.runId&&job.leaseUntil>Date.now())throw new Error('Use the active enrichment checkpoint to update progress.');return saveGoogleBooksEnrichmentJob(value);}, clearGoogleBooksEnrichmentJob, startGoogleBooksEnrichmentJob, acquireEnrichmentRun, commitEnrichmentBatch, finishEnrichmentRun,
     getAllowedExternalClientIds, saveAllowedExternalClientIds, addAllowedExternalClientId,
-    saveManualMatchDecision, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
+    saveManualMatchDecision, savePreferredDisplayTitle, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
     saveContentReview, removeContentReview,

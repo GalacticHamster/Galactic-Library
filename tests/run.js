@@ -1,3 +1,4 @@
+import {manualReconciliationTests} from './manual-reconciliation.js';
 import {purchaseRepairTests} from './purchase-repair.js';
 import {purchaseReconciliationTests} from './purchase-reconciliation.js';
 import {purchasePresentationTests} from './purchase-presentation.js';
@@ -98,6 +99,7 @@ const { fanaticalMediaType, fanaticalItemsFromProjection } = globalThis.Galactic
 const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = globalThis.GalacticHumble;
 
 const tests = [
+  ...manualReconciliationTests,
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,...purchaseRepairTests,...purchaseReconciliationTests,...purchasePresentationTests,

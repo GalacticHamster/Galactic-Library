@@ -149,5 +149,7 @@
   "src/background/purchase-handoff.js",
   "shared/purchase-sync.js",
   "shared/purchase-sync-ui.js",
-  "src/ui/library-acquisitions.js"
+  "src/ui/library-acquisitions.js",
+  "src/lib/display-title.js",
+  "src/ui/relationship-picker.js"
 ]

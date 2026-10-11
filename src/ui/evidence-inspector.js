@@ -1,3 +1,5 @@
+import {createRelationshipPicker} from './relationship-picker.js';
+import {preferredDisplayTitle} from '../lib/display-title.js';
 import {performAction} from './operation-feedback.js';
 import {labeledControl,presentAction} from './form-presentation.js';
 import { compact, identityConflicts, identityEvidence, names, validIsbn } from '../lib/identity.js';
@@ -108,27 +110,56 @@ export function createEvidenceInspector(canonical, records, database, actions) {
     }
     const status=element('p','');status.setAttribute('role','status');
     const comparison=element('div','');comparison.className='relationship-review';
-    comparison.append(element('p','Review two provider records. Same work keeps editions separate; Same edition requires compatible identity evidence. Different works also blocks indirect grouping.'));
+    comparison.append(element('p','Same Work: Different editions or versions of the same underlying work. Does not establish identical products. Same work keeps editions separate and can show a Possible match.'));
+    comparison.append(element('p','Same Edition: Two records represent the same specific edition/product, even if their source titles differ. Consolidates their display and acquisition history; it does not add purchase evidence. Known edition conflicts still prevent this choice.'));
+    comparison.append(element('p','Different works keeps the records separate and blocks indirect grouping. Original titles and purchases are preserved for every choice.'));
     const left=element('select','');left.setAttribute('aria-label','First relationship record');
-    const right=element('select','');right.setAttribute('aria-label','Compare with library record');
-    for(const record of records){const option=element('option',`${record.title} — ${accountLabel(record,database)}`);option.value=record.id;left.append(option);}
-    const empty=element('option','Choose a record to compare');empty.value='';right.append(empty);
-    const choices=Object.values(database.providerItems).filter(record=>record.mediaType===canonical.mediaType).sort((a,b)=>a.title.localeCompare(b.title));
-    for(const record of choices){const option=element('option',`${record.title} — ${accountLabel(record,database)}`);option.value=record.id;right.append(option);}
+    for(const record of records){const option=element('option',`${record.title} \u2014 ${accountLabel(record,database)}`);option.value=record.id;left.append(option);}
     const conflicts=element('p','');conflicts.className='identity-conflicts';
+    const preferred=element('select','');preferred.setAttribute('aria-label','Preferred title for Same Edition');
+    const groupRecords=id=>Object.values(database.canonicalItems).find(group=>group.providerItemIds.includes(id))?.providerItemIds??[id];
+    let titleChoices=[];
     const compare=()=>{
-      const a=database.providerItems[left.value];const b=database.providerItems[right.value];
+      const a=database.providerItems[left.value];const b=database.providerItems[picker.select.value];
+      const ids=[...new Set([...groupRecords(left.value),...(b?groupRecords(b.id):[])])];
+      titleChoices=ids.map(id=>database.providerItems[id]).filter(Boolean);
+      preferred.replaceChildren(...titleChoices.map(record=>{const option=element('option',`${record.title} \u2014 ${accountLabel(record,database)}`);option.value=record.recordRef;return option;}));
+      const savedTitle=preferredDisplayTitle(Object.values(database.canonicalItems).filter(group=>group.providerItemIds.some(id=>ids.includes(id))));
+      const savedChoice=titleChoices.find(record=>record.title===savedTitle);
+      if(savedChoice)preferred.value=savedChoice.recordRef;
+      preferred.disabled=!b;
       if(!a||!b){conflicts.textContent='Choose a record to inspect identity conflicts.';return;}
       const differences=identityConflicts(a,b);
       conflicts.textContent=differences.length?`Known differences: ${differences.join(', ')}. These prevent a same-edition merge.`:'No known conflicting fields. Missing evidence still needs human review.';
     };
-    left.addEventListener('change',compare);right.addEventListener('change',compare);comparison.append(labeledControl('This account copy',left),labeledControl('Compare with',right),conflicts);compare();
+    const picker=createRelationshipPicker(database,()=>left.value,compare);
+    left.addEventListener('change',picker.update);
+    comparison.append(labeledControl('This account copy',left),picker.root,conflicts,labeledControl('Display title if confirmed as Same Edition',preferred));picker.update();
+    comparison.append(element('p','Choose the title to show in the library. Both original source titles remain available below, and you can change this choice later.'));
     for(const value of ['same-work','same-edition','different']){
       const button=element('button',decisionLabel(value));button.type='button';button.addEventListener('click',async()=>{
+        const right=picker.select;
         if(!right.value||left.value===right.value){status.textContent='Choose two different records.';return;}
-        try{const itemIds=[left.value,right.value].sort();await performAction({status,name:'Saving title relationship...',task:()=>actions.save({id:itemIds.join('\u0000'),itemIds},value)});actions.refresh();}
-        catch(error){status.textContent=`Could not save relationship: ${error.message}`;}
+        try{
+          const itemIds=[left.value,right.value].sort(),record=titleChoices.find(record=>record.recordRef===preferred.value);
+          const choice=value==='same-edition'&&record?{recordRef:record.recordRef,title:record.title}:null;
+          await performAction({status,name:'Saving title relationship...',task:()=>actions.save({id:itemIds.join('\u0000'),itemIds},value,choice)});actions.refresh();
+        }catch(error){status.textContent=`Could not save relationship: ${error.message}`;}
       });comparison.append(button);
+    }
+    if(actions.preferredTitle){
+      const editor=element('div',''),titles=element('select','');titles.setAttribute('aria-label','Preferred library display title');
+      for(const record of records){const option=element('option',`${record.title} \u2014 ${accountLabel(record,database)}`);option.value=record.recordRef;titles.append(option);}
+      const groups=(canonical.sourceCanonicalIds??[canonical.id]).map(id=>database.canonicalItems[id]).filter(Boolean);
+      const current=preferredDisplayTitle(groups)??canonical.title;
+      titles.value=records.find(record=>record.title===current)?.recordRef??records[0].recordRef;
+      editor.append(element('p',`Library display title: ${current}. Your choice survives imports and sync; original source titles stay unchanged.`),labeledControl('Preferred library display title',titles));
+      const save=element('button','Save display title');save.type='button';save.addEventListener('click',async()=>{
+        try{
+          const record=records.find(record=>record.recordRef===titles.value),group=groups.find(group=>group.providerItemIds.includes(record?.id));
+          await performAction({status,name:'Saving display title...',task:()=>actions.preferredTitle(group?.id,{recordRef:record?.recordRef,title:record?.title})});actions.refresh();
+        }catch(error){status.textContent=`Could not save display title: ${error.message}`;}
+      });editor.append(save);comparison.prepend(editor);
     }
     root.append(comparison,status,technical);
   });

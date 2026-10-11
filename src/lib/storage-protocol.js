@@ -47,6 +47,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveAllowedExternalClientIds',
   'addAllowedExternalClientId',
   'saveManualMatchDecision',
+  'savePreferredDisplayTitle',
   'removeManualMatchDecision',
   'separateEdition',
   'undoEditionSeparation',

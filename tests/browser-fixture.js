@@ -105,13 +105,14 @@ try{
   checks.push('evidence inspector exposes dates, identities and unknown account scope safely');
   assert(inspector.textContent.includes('Reseller purchase evidenceconfirmed')&&inspector.textContent.includes('Destination activationnot-applicable'),'Direct purchase evidence missing.');
   checks.push('reseller purchase evidence is displayed separately from destination activation');
-  inspector.querySelector('[aria-label="Compare with library record"]').value='humble:c';
+  const pickComparison=async(root,id)=>{const db=await writer.getDatabase(),input=root.querySelector('[aria-label="Search comparison records"]');input.value=db.providerItems[id].title;input.dispatchEvent(new Event('input'));const select=root.querySelector('[aria-label="Compare with library record"]');select.value=id;select.dispatchEvent(new Event('change'));};
+  await pickComparison(inspector,'humble:c');
   inspector.querySelector('[aria-label="Compare with library record"]').dispatchEvent(new Event('change'));
   assert(inspector.querySelector('.identity-conflicts').textContent.includes('edition'),'Edition conflict not shown.');
   button(inspector,'Same edition').click();
   await wait(()=>inspector.textContent.includes('conflicting edition evidence'),'Conflicting edition review should fail.');
   checks.push('Same edition rejects known edition conflicts with a visible reason');
-  inspector.querySelector('[aria-label="Compare with library record"]').value='humble:d';
+  await pickComparison(inspector,'humble:d');
   button(inspector,'Same work').click();
   await wait(()=>card('Collection A').querySelector('.evidence-inspector')!==inspector,'Same work did not refresh.');
   let database=await writer.getDatabase();
@@ -122,7 +123,7 @@ try{
   assert(Object.keys((await writer.getDatabase()).manualMatchDecisions).length===0,'Undo did not persist.');
   checks.push('Same work yields Possible and relationship undo persists');
   inspector=await open(card('Collection A').querySelector('.evidence-inspector'));
-  inspector.querySelector('[aria-label="Compare with library record"]').value='humble:d';button(inspector,'Same edition').click();
+  await pickComparison(inspector,'humble:d');button(inspector,'Same edition').click();
   await wait(()=>document.querySelectorAll('#library-items > li').length===5,'Reviewed edition did not group aliases.');
   database=await writer.getDatabase();result=matchItems(database.providerItems,[{title:'Unconfirmed alias',mediaType:'book'}],database)[0];assert(result.owned,'Reviewed edition should resolve ownership.');
   inspector=await open(card('Collection A').querySelector('.evidence-inspector'));button(inspector,'Undo relationship').click();
