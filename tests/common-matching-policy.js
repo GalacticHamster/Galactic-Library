@@ -38,3 +38,33 @@ commonMatchingPolicyTests.push(['HB, FAN and GL ship identical shared identity r
     assert.equal(readFileSync(new URL(data,import.meta.url),'utf8').trim(),fixture);
   }
 }]);
+
+function checkFormatPresentation(policy) {
+  const p = (title, kind = 'book') => policy.presentationTitle(title, kind);
+  assert.equal(p('FREE AGENTS TP VOL 01 (Digital)'), p('FREE AGENTS, VOL. 1'));
+  assert.equal(p('FREE AGENTS TPB VOLUME 001 (Digital)'), p('FREE AGENTS, VOL. 1'));
+  for (const [left,right,kind] of [
+    ['Project 01','Project 1','book'], ['Series #01','Series #1','book'],
+    ['Series Book 01','Series Book 1','book'], ['Series Vol. 01.5','Series Vol. 1.5','book'],
+    ['Series Vol. 01/2','Series Vol. 1/2','book'], ['Digital Agents','Agents','book'],
+    ['Agents Digital','Agents','book'], ['Agents TP Stories Vol. 1','Agents Stories Vol. 1','book'],
+    ['Agents TP VOL 01 (Digital)','Agents Vol. 1','game'],
+    ['Agents Vol. 01','Agents Vol. 1','software'],
+    ['Agents Vol. 1: Revised Edition','Agents Vol. 1','book'],
+    ['Agents Vol. 1: Another Story','Agents Vol. 1','book']
+  ]) assert.notEqual(p(left,kind),p(right,kind),left+' must keep meaningful information');
+}
+
+commonMatchingPolicyTests.push(['format presentation normalizes only delivery labels and labeled whole volumes', () => {
+  checkFormatPresentation(globalThis.LibraryMatchingPolicy);
+}]);
+commonMatchingPolicyTests.push(['format identity cannot invent permanent ownership', () => {
+  for (const ownership of ['unknown','borrowed','subscription']) {
+    const item = normalizeProviderItem({provider:'kindle',providerItemId:'format-access',
+      title:'FREE AGENTS, VOL. 1',mediaType:'book',ownership});
+    const result = matchItems({[item.id]:item},[{title:'FREE AGENTS TP VOL 01 (Digital)',mediaType:'book'}])[0];
+    assert.equal(result.owned,false,ownership);
+    assert.equal(result.matches[0].relationship,'same-edition');
+    assert.equal(item.ownership,ownership);
+  }
+}]);
