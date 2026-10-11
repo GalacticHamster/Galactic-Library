@@ -61,6 +61,8 @@ function closeTitleSpelling(left, right) {
 export function possibleTitleRelation(left, right, kind = 'book') {
   const a = normalizeTitle(left); const b = normalizeTitle(right);
   if (!a || !b) return '';
+  const numbered = globalThis.LibraryMatchingPolicy.numberedCollectionRelation(left, right, kind);
+  if (numbered !== null) return numbered;
   const presentation = globalThis.LibraryMatchingPolicy.relatedPresentationReason(left, right, kind);
   if (presentation) return presentation;
   if (a === b || presentationTitle(left, kind) === presentationTitle(right, kind)) return 'Related title presentation; identity needs review.';
