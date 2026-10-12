@@ -1,0 +1,1784 @@
+{
+  "note": "Minimal public source spans for the 35 audited wrapper/attribution cases and four inspected adjacent controls. No purchase IDs, account data or workbook row identifiers.",
+  "cases": [
+    {
+      "title": "Dark Nights: Metal: Dark Knights Rising (Dark Nights: Metal (2017-2018))",
+      "statement": "Collects the seven Dark Nights: Batman tie-in one-shots and Dark Knights Rising: The Wild Hunt #1.",
+      "parserInput": "Collects the seven Dark Nights: Batman tie-in one-shots and Dark Knights Rising: The Wild Hunt #1",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Dark Knights Rising: The Wild Hunt",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the seven Dark Nights: Batman tie-in one-shots"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Animal Man (1988-1995) Vol. 2: Origin of the Species",
+      "statement": "reprints issues #10-17, plus the 19-page story from SECRET ORIGINS #39, this volume shows Animal Man moving more and more deeply into the cause of animal rights.",
+      "parserInput": "Collects Animal Man (1988-1995) issues #10-17, plus the 19-page story from SECRET ORIGINS #39, this volume shows Animal Man moving more and more deeply into the cause of animal rights",
+      "binding": "explicit-product-series-volume-title",
+      "expected": [
+        {
+          "series": "Animal Man",
+          "run": "1988-1995",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17"
+          ]
+        },
+        {
+          "series": "SECRET ORIGINS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "39"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the 19-page story from",
+        "this volume shows Animal Man moving more and more deeply into the cause of animal rights"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman: The Golden Age Vol. 1 (Detective Comics (1937-2011))",
+      "statement": "collects all of the Dark Knight Detective's first-ever adventures from DETECTIVE COMICS #27-45, BATMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #2.",
+      "parserInput": "collects all of the Dark Knight Detective's first-ever adventures from DETECTIVE COMICS #27-45, BATMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #2",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "DETECTIVE COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41",
+            "42",
+            "43",
+            "44",
+            "45"
+          ]
+        },
+        {
+          "series": "BATMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "series": "NEW YORK WORLD'S FAIR COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "2"
+          ]
+        }
+      ],
+      "unresolved": [
+        "all of the Dark Knight Detective's first-ever adventures from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman: The Golden Age Vol. 2 (Detective Comics (1937-2011))",
+      "statement": "collects the Dark Knight Detective’s early adventures from BATMAN #4-7, DETECTIVE COMICS #46-56, WORLD’S BEST COMICS #1 and WORLD’S FINEST COMICS #2-3.",
+      "parserInput": "collects the Dark Knight Detective’s early adventures from BATMAN #4-7, DETECTIVE COMICS #46-56, WORLD’S BEST COMICS #1 and WORLD’S FINEST COMICS #2-3",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "BATMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "4",
+            "5",
+            "6",
+            "7"
+          ]
+        },
+        {
+          "series": "DETECTIVE COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "46",
+            "47",
+            "48",
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54",
+            "55",
+            "56"
+          ]
+        },
+        {
+          "series": "WORLD’S BEST COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "WORLD’S FINEST COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "2",
+            "3"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the Dark Knight Detective’s early adventures from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman: The Golden Age Vol. 4 (Detective Comics (1937-2011))",
+      "statement": "collects the Dark Knight Detective’s adventures from BATMAN #12-15, DETECTIVE COMICS #66-74 and WORLD’S FINEST COMICS #7-9.",
+      "parserInput": "collects the Dark Knight Detective’s adventures from BATMAN #12-15, DETECTIVE COMICS #66-74 and WORLD’S FINEST COMICS #7-9",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "BATMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "12",
+            "13",
+            "14",
+            "15"
+          ]
+        },
+        {
+          "series": "DETECTIVE COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "66",
+            "67",
+            "68",
+            "69",
+            "70",
+            "71",
+            "72",
+            "73",
+            "74"
+          ]
+        },
+        {
+          "series": "WORLD’S FINEST COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "7",
+            "8",
+            "9"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the Dark Knight Detective’s adventures from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman: The Golden Age Vol. 5 (Detective Comics (1937-2011))",
+      "statement": "collects the early adventures of Batman, Robin and Alfred from Batman #16-20, Detective Comics #75-81 and World’s Finest Comics #10-11.",
+      "parserInput": "collects the early adventures of Batman, Robin and Alfred from Batman #16-20, Detective Comics #75-81 and World’s Finest Comics #10-11",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Batman",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "16",
+            "17",
+            "18",
+            "19",
+            "20"
+          ]
+        },
+        {
+          "series": "Detective Comics",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "75",
+            "76",
+            "77",
+            "78",
+            "79",
+            "80",
+            "81"
+          ]
+        },
+        {
+          "series": "World’s Finest Comics",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "10",
+            "11"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the early adventures of Batman, Robin and Alfred from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman: The Complete Hush (Batman (1940-2011))",
+      "statement": "collects BATMAN #609-619 as well as the 6-page segment from WIZARD #0 and a 2-page origin story.",
+      "parserInput": "collects BATMAN #609-619 as well as the 6-page segment from WIZARD #0 and a 2-page origin story",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "BATMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "609",
+            "610",
+            "611",
+            "612",
+            "613",
+            "614",
+            "615",
+            "616",
+            "617",
+            "618",
+            "619"
+          ]
+        },
+        {
+          "series": "WIZARD",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "0"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the 6-page segment from",
+        "a 2-page origin story"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman (2016-) Vol. 5: The Rules of Engagement",
+      "statement": "Collects Batman #33-37 and the critically acclaimed tale from Batman Annual #2.",
+      "parserInput": "Collects Batman #33-37 and the critically acclaimed tale from Batman Annual #2",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Batman",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "33",
+            "34",
+            "35",
+            "36",
+            "37"
+          ]
+        },
+        {
+          "series": "Batman",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "2"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the critically acclaimed tale from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman (2016-): The Rebirth Deluxe Edition - Book 3",
+      "statement": "collects the Bat and the Cat's road to the altar in issues #33-44 and Annual #2 of the ongoing hit series by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson).",
+      "parserInput": "collects the Bat and the Cat's road to the altar in issues #33-44 and Annual #2 of the ongoing hit series by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson)",
+      "binding": "explicit-clause",
+      "expected": [],
+      "unresolved": [
+        "the Bat and the Cat's road to the altar in issues #33-44",
+        "Annual #2 of the ongoing hit series by Tom King (Grayson",
+        "The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson)"
+      ],
+      "outcome": "failed"
+    },
+    {
+      "title": "Batman The Long Halloween Deluxe Edition The Sequel: Dark Victory (Batman: Dark Victory)",
+      "statement": "Collects the entire series Batman: Dark Victory #1-13 and Batman: Dark Victory (New Edition).",
+      "parserInput": "Collects the entire series Batman: Dark Victory #1-13 and Batman: Dark Victory (New Edition)",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Batman: Dark Victory",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the entire series",
+        "Batman: Dark Victory (New Edition)"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman/Catwoman (2020-)",
+      "statement": "Collects the entire series, Batman/Catwoman #1-12, plus the Batman/Catwoman Special, along with Batman Annual #2, Catwoman 80th Anniversary 100-Page Super Spectacular #1, and Detective Comics #1027.",
+      "parserInput": "Collects the entire series, Batman/Catwoman #1-12, plus the Batman/Catwoman Special, along with Batman Annual #2, Catwoman 80th Anniversary 100-Page Super Spectacular #1, and Detective Comics #1027",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Batman/Catwoman",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        {
+          "series": "Batman",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "2"
+          ]
+        },
+        {
+          "series": "Catwoman 80th Anniversary 100-Page Super Spectacular",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Detective Comics",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1027"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the entire series,",
+        "plus the Batman/Catwoman Special"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman and the Outsiders (1983-1987) Vol. 3",
+      "statement": "Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83.",
+      "parserInput": "Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "BATMAN AND THE OUTSIDERS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32"
+          ]
+        },
+        {
+          "series": "BATMAN AND THE OUTSIDERS",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "2"
+          ]
+        },
+        {
+          "series": "DC COMICS PRESENTS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "83"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Find out in these tales from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman in The Brave & the Bold: The Bronze Age Vol. 1 (The Brave and the Bold (1955-1983))",
+      "statement": "collects the first stories of Batman's epic run on the series—THE BRAVE AND THE BOLD #74-91—and",
+      "parserInput": "collects the first stories of Batman's epic run on the series—THE BRAVE AND THE BOLD #74-91—and",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "THE BRAVE AND THE BOLD",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "74",
+            "75",
+            "76",
+            "77",
+            "78",
+            "79",
+            "80",
+            "81",
+            "82",
+            "83",
+            "84",
+            "85",
+            "86",
+            "87",
+            "88",
+            "89",
+            "90",
+            "91"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the first stories of Batman's epic run on the series—",
+        "—and"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "The Demon: Hell's Hitman (The Demon (1993-1995))",
+      "statement": "Collects THE DEMON #40 and #42-49 together with THE DEMON ANNUAL #2.",
+      "parserInput": "Collects THE DEMON #40 and #42-49 together with THE DEMON ANNUAL #2",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "THE DEMON",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "40",
+            "42",
+            "43",
+            "44",
+            "45",
+            "46",
+            "47",
+            "48",
+            "49"
+          ]
+        },
+        {
+          "series": "THE DEMON",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "2"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "outcome": "full"
+    },
+    {
+      "title": "The Flash: The Silver Age Vol. 3 (The Flash (1959-1985))",
+      "statement": "collects the era-defining adventures of the Scarlet Speedster from The Flash #133-147.",
+      "parserInput": "collects the era-defining adventures of the Scarlet Speedster from The Flash #133-147",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "The Flash",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "133",
+            "134",
+            "135",
+            "136",
+            "137",
+            "138",
+            "139",
+            "140",
+            "141",
+            "142",
+            "143",
+            "144",
+            "145",
+            "146",
+            "147"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the era-defining adventures of the Scarlet Speedster from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Green Lantern: The Silver Age Vol. 1 (Green Lantern (1960-1986))",
+      "statement": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern for the first time in SHOWCASE #22-24 and GREEN LANTERN #1-9.",
+      "parserInput": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern for the first time in SHOWCASE #22-24 and GREEN LANTERN #1-9",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "SHOWCASE",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "22",
+            "23",
+            "24"
+          ]
+        },
+        {
+          "series": "GREEN LANTERN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern for the first time in"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Green Lantern: The Silver Age Vol. 2 (Green Lantern (1960-1986))",
+      "statement": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in GREEN LANTERN #10-22.",
+      "parserInput": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in GREEN LANTERN #10-22",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "GREEN LANTERN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20",
+            "21",
+            "22"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Green Lantern: The Silver Age Vol. 3 (Green Lantern (1960-1986))",
+      "statement": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in Green Lantern #23-35.",
+      "parserInput": "collects the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in Green Lantern #23-35",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Green Lantern",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the adventures of Hal Jordan as he takes on the responsibility of the ring and the lantern in"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "John Constantine, Hellblazer Vol. 13: Haunted",
+      "statement": "Collects #134-145 of the signature Vertigo series together with the controversial \"Shoot\" one-shot from VERTIGO RESURRECTED and three never-before-reprinted seasonal tales from VERTIGO: WINTER'S EDGE.",
+      "parserInput": "Collects #134-145 of the signature Vertigo series together with the controversial \"Shoot\" one-shot from VERTIGO RESURRECTED and three never-before-reprinted seasonal tales from VERTIGO: WINTER'S EDGE",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "John Constantine, Hellblazer",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "134",
+            "135",
+            "136",
+            "137",
+            "138",
+            "139",
+            "140",
+            "141",
+            "142",
+            "143",
+            "144",
+            "145"
+          ]
+        }
+      ],
+      "unresolved": [
+        "of the signature Vertigo series",
+        "the controversial \"Shoot\" one-shot from VERTIGO RESURRECTED and three never-before-reprinted seasonal tales from VERTIGO: WINTER'S EDGE"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "John Constantine, Hellblazer Vol. 19: Red Right Hand",
+      "statement": "collecting Mina’s complete run on the series from issues #216-228 as well as the never-before-reprinted story “With a Little Help from My Friends” from issue #229 by Hellblazer emeritus author Mike Carey and guest artist John Paul Leon.",
+      "parserInput": "collecting Mina’s complete run on the series from issues #216-228 as well as the never-before-reprinted story “With a Little Help from My Friends” from issue #229 by Hellblazer emeritus author Mike Carey and guest artist John Paul Leon",
+      "binding": "explicit-clause",
+      "expected": [],
+      "unresolved": [
+        "Mina’s complete run on the series from issues #216-228",
+        "the never-before-reprinted story “With a Little Help from",
+        "the never-before-reprinted story “With a Little Help from My Friends” from issue #229 by Hellblazer emeritus author Mike Carey",
+        "guest artist John Paul Leon"
+      ],
+      "outcome": "failed"
+    },
+    {
+      "title": "Justice League of America: The Silver Age Vol. 2 (Justice League of America (1960-1987))",
+      "statement": "collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19",
+      "parserInput": "collects the fame super-team's exploits from JUSTICE LEAGUE OF AMERICA #9-19",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "JUSTICE LEAGUE OF AMERICA",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the fame super-team's exploits from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Justice League of America: The Silver Age Vol. 3 (Justice League of America (1960-1987))",
+      "statement": "collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30",
+      "parserInput": "collects the famed super-team’s exploits from JUSTICE LEAGUE OF AMERICA #20-30",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "JUSTICE LEAGUE OF AMERICA",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the famed super-team’s exploits from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Justice League of America: The Silver Age Vol. 4 (Justice League of America (1960-1987))",
+      "statement": "collects the famed super-team’s exploits from Justice League Of America #31-41",
+      "parserInput": "collects the famed super-team’s exploits from Justice League Of America #31-41",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Justice League Of America",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the famed super-team’s exploits from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "JSA (1999-2006): by Geoff Johns Book Three",
+      "statement": "Collects JSA: All Stars #1-8, JSA Annual #1, JSA Secret Files and Origins #2 and JSA #26-31, plus a never-before-collected story from JSA SECRET FILES #1 and a treasure trove of bonus material.",
+      "parserInput": "Collects JSA: All Stars #1-8, JSA Annual #1, JSA Secret Files and Origins #2 and JSA #26-31, plus a never-before-collected story from JSA SECRET FILES #1 and a treasure trove of bonus material",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "JSA: All Stars",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
+          ]
+        },
+        {
+          "series": "JSA",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "JSA Secret Files and Origins",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "2"
+          ]
+        },
+        {
+          "series": "JSA",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31"
+          ]
+        },
+        {
+          "series": "JSA SECRET FILES",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "a never-before-collected story from",
+        "a treasure trove of bonus material"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Nightwing (2016-): Fear State",
+      "statement": "collects Nightwing #84-86, Nightwing 2021 Annual #1, and the Nightwing/Batgirls feature story from Batman: Urban Legends #10.",
+      "parserInput": "collects Nightwing #84-86, Nightwing 2021 Annual #1, and the Nightwing/Batgirls feature story from Batman: Urban Legends #10",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Nightwing",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "84",
+            "85",
+            "86"
+          ]
+        },
+        {
+          "series": "Nightwing 2021",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Batman: Urban Legends",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "10"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the Nightwing/Batgirls feature story from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Dead Boy Detectives by Toby Litt & Mark Buckingham (The Dead Boy Detectives (2013-2014))",
+      "statement": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1.",
+      "parserInput": "collects Toby Litt and Mark Buckingham's Dead Boy Detectives #1-12, as well as well as the short stories “Run Ragged” from Witching Hour #1, Ghosts #1 and Time Warp #1",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Dead Boy Detectives",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        {
+          "series": "Witching Hour",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Ghosts",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Time Warp",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "Toby Litt and Mark Buckingham's",
+        "well as the short stories “Run Ragged” from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Superman: The Golden Age Vol. 1 (Action Comics (1938-2011))",
+      "statement": "Collecting all of the Metropolis Wonder's first-ever adventures from ACTION COMICS #1-19, selections from SUPERMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #1!",
+      "parserInput": "Collecting all of the Metropolis Wonder's first-ever adventures from ACTION COMICS #1-19, selections from SUPERMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #1",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "ACTION COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19"
+          ]
+        },
+        {
+          "series": "SUPERMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "series": "NEW YORK WORLD'S FAIR COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "all of the Metropolis Wonder's first-ever adventures from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Superman: Whatever Happened to the Man of Tomorrow?",
+      "statement": "collects the two-part \"Whatever Happened to the Man of Tomorrow?\" from SUPERMAN #423 and ACTION COMICS #583, as well as \"The Jungle Line\" from DC COMICS PRESENTS #85 and \"For the Man Who Has Everything...\" from SUPERMAN ANNUAL #11.",
+      "parserInput": "collects the two-part \"Whatever Happened to the Man of Tomorrow?\" from SUPERMAN #423 and ACTION COMICS #583, as well as \"The Jungle Line\" from DC COMICS PRESENTS #85 and \"For the Man Who Has Everything...\" from SUPERMAN ANNUAL #11",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "SUPERMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "423"
+          ]
+        },
+        {
+          "series": "ACTION COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "583"
+          ]
+        },
+        {
+          "series": "DC COMICS PRESENTS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "85"
+          ]
+        },
+        {
+          "series": "SUPERMAN",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "11"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the two-part \"Whatever Happened to the Man of Tomorrow?\" from",
+        "\"The Jungle Line\" from",
+        "\"For the Man Who Has Everything...\" from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Swamp Thing: The Bronze Age Vol. 1 (Swamp Thing (1972-1976))",
+      "statement": "collects the original short story “Swamp Thing” from The House of Secrets #92 and Swamp Thing #1-13, featuring all of Wein and Wrightson’s original run on the series and",
+      "parserInput": "collects the original short story “Swamp Thing” from The House of Secrets #92 and Swamp Thing #1-13, featuring all of Wein and Wrightson’s original run on the series and",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "The House of Secrets",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "92"
+          ]
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the original short story “Swamp Thing” from",
+        "featuring all of Wein and Wrightson’s original run on the series and"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Wonder Woman: The Golden Age Vol. 1 (Sensation Comics (1942-1952))",
+      "statement": "The very first stories of the Amazon Warrior are collected here in WONDER WOMAN: THE GOLDEN AGE VOLUME 1, featuring the adventures of Wonder Woman as she tackles corruption, oppression and cruelty in ALL STAR COMICS #8, COMIC CAVALCADE #1, SENSATION COMICS #1-14 and WONDER WOMAN #1-3.",
+      "parserInput": "The very first stories of the Amazon Warrior are collected here in WONDER WOMAN: THE GOLDEN AGE VOLUME 1, featuring the adventures of Wonder Woman as she tackles corruption, oppression and cruelty in ALL STAR COMICS #8, COMIC CAVALCADE #1, SENSATION COMICS #1-14 and WONDER WOMAN #1-3",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "ALL STAR COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "8"
+          ]
+        },
+        {
+          "series": "COMIC CAVALCADE",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "SENSATION COMICS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14"
+          ]
+        },
+        {
+          "series": "WONDER WOMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3"
+          ]
+        }
+      ],
+      "unresolved": [
+        "The very first stories of the Amazon Warrior are collected here in WONDER WOMAN: THE GOLDEN AGE VOLUME 1",
+        "featuring the adventures of Wonder Woman as she tackles corruption, oppression and cruelty in"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Wonder Woman by George Perez Vol. 4 (Wonder Woman (1987-2006))",
+      "statement": "George Pérez’s storied run on Wonder Woman continues in these tales from Wonder Woman #36-45 and Wonder Woman Annual #2!",
+      "parserInput": "George Pérez’s storied run on Wonder Woman continues in these tales from Wonder Woman #36-45 and Wonder Woman Annual #2",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Wonder Woman",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41",
+            "42",
+            "43",
+            "44",
+            "45"
+          ]
+        },
+        {
+          "series": "Wonder Woman",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "2"
+          ]
+        }
+      ],
+      "unresolved": [
+        "George Pérez’s storied run on Wonder Woman continues in these tales from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Wonder Woman: The Rebirth Deluxe Edition - Book 3 (Wonder Woman (2016-))",
+      "statement": "Collects WONDER WOMAN #26-30, Wonder Woman: Steve Trevor #1, Annual #1 and the Wonder Woman 75th Anniversary SPECIAL #1.",
+      "parserInput": "Collects WONDER WOMAN #26-30, Wonder Woman: Steve Trevor #1, Annual #1 and the Wonder Woman 75th Anniversary SPECIAL #1",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "WONDER WOMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "26",
+            "27",
+            "28",
+            "29",
+            "30"
+          ]
+        },
+        {
+          "series": "Wonder Woman: Steve Trevor",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Wonder Woman: Steve Trevor",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Wonder Woman 75th Anniversary",
+          "run": "",
+          "unitType": "special",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman & Superman in World's Finest: The Silver Age Vol. 1 (World's Finest (1941-1986))",
+      "statement": "collects the classic story of the two heroes first meeting from SUPERMAN #76 and their super team-ups from WORLD'S FINEST #71-94.",
+      "parserInput": "collects the classic story of the two heroes first meeting from SUPERMAN #76 and their super team-ups from WORLD'S FINEST #71-94",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "SUPERMAN",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "76"
+          ]
+        },
+        {
+          "series": "WORLD'S FINEST",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "71",
+            "72",
+            "73",
+            "74",
+            "75",
+            "76",
+            "77",
+            "78",
+            "79",
+            "80",
+            "81",
+            "82",
+            "83",
+            "84",
+            "85",
+            "86",
+            "87",
+            "88",
+            "89",
+            "90",
+            "91",
+            "92",
+            "93",
+            "94"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the classic story of the two heroes first meeting from",
+        "their super team-ups from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Batman & Superman in World's Finest: The Silver Age Vol. 2 (World's Finest (1941-1986))",
+      "statement": "collects their super-team-ups from World’s Finest Comics #95-116.",
+      "parserInput": "collects their super-team-ups from World’s Finest Comics #95-116",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "World’s Finest Comics",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "95",
+            "96",
+            "97",
+            "98",
+            "99",
+            "100",
+            "101",
+            "102",
+            "103",
+            "104",
+            "105",
+            "106",
+            "107",
+            "108",
+            "109",
+            "110",
+            "111",
+            "112",
+            "113",
+            "114",
+            "115",
+            "116"
+          ]
+        }
+      ],
+      "unresolved": [
+        "their super-team-ups from"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "G.I. Joe: Classics Vol. 2",
+      "statement": "collects classic Marvel Comics G.I. Joe #11 to 20.",
+      "parserInput": "collects classic Marvel Comics G.I. Joe #11 to 20",
+      "binding": "explicit-clause",
+      "expected": [],
+      "unresolved": [
+        "classic Marvel Comics G.I. Joe #11 to 20"
+      ],
+      "outcome": "failed"
+    }
+  ],
+  "controls": [
+    {
+      "title": "Before Watchmen: Ozymandias/Crimson Corsair",
+      "statement": "Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\"\nRead more",
+      "parserInput": "Collects BEFORE WATCHMEN: OZYMANDIAS #1-6, \"Curse of the Crimson Corsair.\" Read more",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "BEFORE WATCHMEN: OZYMANDIAS",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "series": "Before Watchmen: Ozymandias/Crimson Corsair",
+          "run": "",
+          "unitType": "component",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "Curse of the Crimson Corsair."
+          ]
+        }
+      ],
+      "unresolved": [],
+      "outcome": "full"
+    },
+    {
+      "title": "iZombie Vol. 2: uVampire",
+      "statement": "Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2\nRead more",
+      "parserInput": "Collects iZombie issues #6-12; plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more",
+      "binding": "explicit-product-series-volume-title",
+      "expected": [
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        {
+          "series": "HOUSE OF MYSTERY",
+          "run": "",
+          "unitType": "annual",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "2"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "John Constantine, Hellblazer Vol. 8: Rake at the Gates of Hell (Hellblazer (Graphic Novels))",
+      "statement": "collecting issues #72-83 as well as the special one-shot HEARTLAND.",
+      "parserInput": "Collects John Constantine, Hellblazer issues #72-83 as well as the special one-shot HEARTLAND",
+      "binding": "explicit-description-title-anchor",
+      "expected": [
+        {
+          "series": "John Constantine, Hellblazer",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "72",
+            "73",
+            "74",
+            "75",
+            "76",
+            "77",
+            "78",
+            "79",
+            "80",
+            "81",
+            "82",
+            "83"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the special one-shot HEARTLAND"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 13",
+      "statement": "Collects Teenage Mutant Ninja Turtles #90–100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series.",
+      "parserInput": "Collects Teenage Mutant Ninja Turtles #90-100 as well as the 2019 Free Comic Book Day issue, Macro-Series: Raphael, and the Shredder In Hell mini-series",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Teenage Mutant Ninja Turtles",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "90",
+            "91",
+            "92",
+            "93",
+            "94",
+            "95",
+            "96",
+            "97",
+            "98",
+            "99",
+            "100"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the 2019 Free Comic Book Day issue, Macro-Series: Raphael",
+        "the Shredder In Hell mini-series"
+      ],
+      "outcome": "partial"
+    },
+    {
+      "title": "Tales from the Dark Multiverse II (2019-) (Tales from the Dark Multiverse (2019-) Book 2)",
+      "statement": "Collects Tales from the Dark Multiverse: Batman: Hush #1; Tales from the Dark Multiverse: Flashpoint #1; Tales from the Dark Multiverse: Wonder Woman: War of the Gods #1; Tales from the Dark Multiverse: Crisis on Infinite Earths #1; and Tales from the Dark Multiverse: Dark Nights Metal #1, plus the stories that inspired these tales from Batman #619, Flashpoint #1, Wonder Woman: War of the Gods #4, Crisis on Infinite Earths #12, and Dark Nights: Metal #6.",
+      "parserInput": "Collects Tales from the Dark Multiverse: Batman: Hush #1; Tales from the Dark Multiverse: Flashpoint #1; Tales from the Dark Multiverse: Wonder Woman: War of the Gods #1; Tales from the Dark Multiverse: Crisis on Infinite Earths #1; and Tales from the Dark Multiverse: Dark Nights Metal #1, plus the stories that inspired these tales from Batman #619, Flashpoint #1, Wonder Woman: War of the Gods #4, Crisis on Infinite Earths #12, and Dark Nights: Metal #6",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Tales from the Dark Multiverse: Batman: Hush",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Tales from the Dark Multiverse: Flashpoint",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Tales from the Dark Multiverse: Wonder Woman: War of the Gods",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Tales from the Dark Multiverse: Crisis on Infinite Earths",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Tales from the Dark Multiverse: Dark Nights Metal",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "full",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Batman",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "619"
+          ]
+        },
+        {
+          "series": "Flashpoint",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "1"
+          ]
+        },
+        {
+          "series": "Wonder Woman: War of the Gods",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "4"
+          ]
+        },
+        {
+          "series": "Crisis on Infinite Earths",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "12"
+          ]
+        },
+        {
+          "series": "Dark Nights: Metal",
+          "run": "",
+          "unitType": "issue",
+          "language": "",
+          "completeness": "excerpt",
+          "numbers": [
+            "6"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the stories that inspired these tales from"
+      ],
+      "outcome": "partial"
+    }
+  ]
+}

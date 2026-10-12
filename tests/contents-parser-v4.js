@@ -11,10 +11,15 @@ const parse=id=>{const f=byId(id);return proposeContentsForReview(f.statement,f.
 const range=(p,series,type='issue')=>p.entries.filter(e=>e.series===series&&e.unitType===type).map(e=>e.number);
 const numbers=(start,end)=>Array.from({length:end-start+1},(_,n)=>String(n+start));
 export const contentsParserV4Tests=[
- ...fixtures.filter(f=>![32,1437].includes(f.auditId)).map(f=>[`parser 4 saved-corpus regression ${f.auditId}: ${f.title}`,()=>{
+ ...fixtures.filter(f=>![32,284,442,1437].includes(f.auditId)).map(f=>[`parser 4 saved-corpus regression ${f.auditId}: ${f.title}`,()=>{
    const p=proposeContentsForReview(f.statement,f.title,f.context);
    assert.equal(p.outcome,f.outcome);assert.deepEqual(p.entries,f.entries);assert.deepEqual(p.unparsed,f.unparsed);
  }]),
+ ['bounded wrapper recovery preserves historical source and unnumbered siblings',()=>{
+   const bat=parse(284);assert.deepEqual(range(bat,'Batman/Catwoman'),numbers(1,12));assert.equal(bat.entries.length,15);assert.ok(bat.unparsed.some(t=>t.includes('Batman/Catwoman Special')));
+   const dead=parse(442);assert.deepEqual(range(dead,'Dead Boy Detectives'),numbers(1,12));assert.equal(dead.entries.length,15);
+   assert.ok(dead.entries.filter(e=>['Witching Hour','Ghosts','Time Warp'].includes(e.series)).every(e=>e.completeness==='excerpt'));
+ }],
  ['parser 5 recovers bounded dash clause and lexical Book labels in prior regressions',()=>{
    const aliens=parse(32);assert.deepEqual(range(aliens,'Aliens, Space Marines'),numbers(1,12));
    assert.deepEqual(aliens.entries.filter(e=>e.series!=='Aliens, Space Marines'),byId(32).entries);
@@ -85,7 +90,7 @@ export const contentsParserV4Tests=[
    assert.notEqual(prior.selected,current.selected,'parser change demonstrably changes winner');
    const restored=validateManifest(prior);assert.equal(restored.candidates[restored.selected].raw,prior.candidates[prior.selected].raw);assert.deepEqual(restored.blocks,prior.blocks);
    const forged=structuredClone(prior);forged.candidates[forged.selected].raw='Collects Fake #1-99';forged.candidates[0].parserInput='Collects Fake #1-99';assert.deepEqual(validateManifest(forged),current);
-   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,5);
+   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,6);
  }],
  ['ordinary proposal semantics remain independent of discovery grammar',async()=>{
    const old=await oldParser();for(const f of fixtures)assert.deepEqual(proposeContents(f.statement),old.module.proposeContents(f.statement));

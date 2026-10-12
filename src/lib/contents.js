@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 5;
+export const CONTENTS_PARSER_VERSION = 6;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -84,7 +84,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   if(anchor && /^(?:issues?\s*#?\s*|#\s*)\d/iu.test(body) && !/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(body)){
     input=anchor.series+' '+body;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
-  const proposal=discoveryNumberedContents(input,collectionTitle);
+  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput));
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return finish(proposal.entries,proposal.unparsed);
   // This fallback is discovery/editor-only; ordinary matching still uses
   // proposeContents above. Unsupported numeric syntax never becomes a name.
@@ -112,21 +112,21 @@ function reviewRangeEnd(first,last) {
 }
 
 /** Bounded discovery grammar. Arbitrary prose must not become a series label. */
-function discoveryNumberedContents(body,collectionTitle) {
+function discoveryNumberedContents(body,collectionTitle,collectionClaim=false) {
   const entries=[],unparsed=[],chunks=[];
   // Parallel digital numbering is not a print-issue conversion. Retain a
   // finite, explicitly labelled aside separately so the print clause survives.
   body=body.replace(/\(\s*digital\s+(?:chapters?\s*)?#?\s*\d+(?:\s*[-–—]\s*#?\d+)?(?:\s*,\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*\s*\)/giu,raw=>{unparsed.push(raw);return '';});
   for(const part of body.split(/\s*;\s*/u)){
     let start=0;
-    for(const separator of part.matchAll(/\s*,\s*(?:and\s+)?(?=[\p{L}\d#])|\s+(?:and|plus|&)\s+(?=[\p{L}\d#])/giu)){
+    for(const separator of part.matchAll(/\s*,\s*(?:and\s+)?(?=["“\p{L}\d#])|\s+(?:and|plus|&|as well as|together with|along with)\s+(?=["“\p{L}\d#])/giu)){
       const prefix=part.slice(start,separator.index),next=part.slice(separator.index+separator[0].length);
       const prefixStem=/^\s*([\p{L}\d-]+)/u.exec(prefix)?.[1],nextStem=/^([\p{L}\d-]+)/u.exec(next)?.[1];
       const repeatedTitle=prefix.includes(':') && prefixStem && prefixStem.toLowerCase()===nextStem?.toLowerCase()
         || separator[0].includes(',') && prefixStem && prefixStem.toLowerCase()===nextStem?.toLowerCase();
       // Commas/conjunctions before a numeric anchor belong to the title. A
       // new extent qualifier must still start its own clause after named prose.
-      const typedWork=/\b(?:one-shot|specials?|annuals?)\s*$/iu.test(prefix);
+      const typedWork=/\b(?:one-shots?|specials?|annuals?)\s*$/iu.test(prefix);
       const postposed=/^\s*issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+(.+)/iu.exec(prefix);
       const postTail=/^(?:part of\b|the (?:new |classic |acclaimed )?(?:ongoing )?series\b|features?\b|featuring\b|includes?\b|including\b|(?:written|drawn|illustrated) by\b)/iu.test(next);
       // Numbering before "of" is not a completed title. Keep title-internal
@@ -146,10 +146,12 @@ function discoveryNumberedContents(body,collectionTitle) {
     if(!raw)continue;
     if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
     if(/^collects?\s+/iu.test(raw))clauseExtent='full';
-    let chunk=raw.replace(/^(?:and|plus|as well as|along with|collects?|collecting)\s+/iu,'');
+    let chunk=raw.replace(/^(?:and|plus|as well as|together with|along with|collects?|collecting)\s+/iu,'');
     // Chapters have no supported unit type. Never let their numbers establish
     // issue entries or supply a series/type to a following bare continuation.
     if(/\bchapters?\s*#?\s*\d/iu.test(chunk)){unparsed.push(raw);previous=null;continue;}
+    if(/\b(?:recommendations? for|reviews? of|description of|synopsis of|plot summary|scripts? from)\b/iu.test(chunk)){unparsed.push(raw);previous=null;continue;}
+    if(/^(?:a|an|the)\s+(?:hero|character|villain)\s+(?:travels?|escapes?|fights?|meets?|is|will)\b/iu.test(chunk)||/^(?:[\p{Lu}][\p{L}'’\-]+\s+){1,4}(?:writes|draws|illustrates)\s+/u.test(chunk)){unparsed.push(raw);previous=null;continue;}
     // Sentence punctuation can terminate a range; an abbreviation at the end
     // of a postposed title remains part of its literal label.
     if(!/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(chunk))chunk=chunk.replace(/[.!]+$/u,'');
@@ -163,6 +165,11 @@ function discoveryNumberedContents(body,collectionTitle) {
     // A demonstrated collection wrapper, not a general prose-prefix stripper.
     chunk=chunk.replace(/^adventures from\s+/iu,'');
     chunk=chunk.replace(/^in single magazine form as\s+/iu,'');
+    // Interpret only bounded collection/attribution grammar, not arbitrary
+    // words preceding '#'. Keep the literal wrappers as unresolved evidence.
+    const wrapped=numberedCollectionPayload(chunk,collectionTitle,collectionClaim||/\bare collected here in\b/iu.test(body));
+    if(wrapped){chunk=wrapped.payload;unparsed.push(wrapped.prefix);if(wrapped.excerpt)clauseExtent='excerpt';}
+    if(/\bare collected here in\b/iu.test(chunk)){unparsed.push(raw);previous=null;continue;}
     if(qualified)clauseExtent='excerpt';
     // A semicolon after partial material may continue that heading or start
     // a new full list. Without an explicit qualifier, do not choose for users.
@@ -200,7 +207,8 @@ function discoveryNumberedContents(body,collectionTitle) {
     const ambiguousConjunction=!label.includes(':') && /['’]s\b/iu.test(label)&&/\band\b/iu.test(label);
     // A marker/qualifier inside a label exposes greedy last-marker parsing.
     const creditTail=/^from\s+(?!(?:pages?|material|excerpts?|selections?|stories?|issues?|chapters?)\b)[^#;]{1,250}\b(?:creators?|writers?|artists?)\b/iu.test(after+following.slice(raw.length));
-    const boundedTail=/^\s*(?:[,;]|\.(?=\s+|["“])|[—–](?!\s*#?\d)|and\b|plus\b|(?:written|drawn|illustrated|pencilled|penciled|art) by\b|with (?:bonus|additional|supplemental|extra) (?:material|content)\b|of\s+[^#;]{1,180}\brun\b)/iu.test(after)||creditTail;
+    const seriesTail=/^of (?:the|a) [^#;]{0,100}\bseries\b/iu.test(after);
+    const boundedTail=/^\s*(?:[,;]|\.(?=\s+|["“])|[—–](?!\s*#?\d)|and\b|plus\b|(?:written|drawn|illustrated|pencilled|penciled|art) by\b|with (?:bonus|additional|supplemental|extra) (?:material|content)\b|of\s+[^#;]{1,180}\brun\b)/iu.test(after)||creditTail||seriesTail;
     const attachedTail=after&&/^\p{L}/u.test(after)&&/\d$/u.test(chunk.slice(0,chunk.length-after.length));
     if(ambiguousComma || ambiguousConjunction || attachedTail || (label.match(/,/gu)?.length??0)>1 || /["“”]|\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || /^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /^(?:all|the|this|these|his|her|their)$/iu.test(label) || /#|\b(?:issues?|volumes?|vols?|chapters?|scripts?|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|stories from|recommendations? for|run on|reprinting|storyline|description|characters|meet|more than|and more|present|was|were|published|you)\b|(?<![\p{L}\d-])(?:he|she|they)(?![\p{L}\d-])|\bbooks?\s*#?\d/iu.test(label)
       || type==='annual' && /^\d{4}$/u.test(numbers) && !/#/u.test(chunk)
@@ -218,6 +226,38 @@ function discoveryNumberedContents(body,collectionTitle) {
     if(entries.length>2000)return {entries:[],unparsed:[body]};
   }
   return {entries:entries.length?validateContents(entries):[],unparsed};
+}
+
+function numberedCollectionPayload(chunk,title,collectionClaim){
+  const numbered=/^[\p{Lu}][^#;]{0,180}#\s*\d/u;
+  const result=(hit,excerpt=false)=>hit&&numbered.test(hit[2])?{prefix:hit[1].trim(),payload:hit[2],excerpt}:null;
+  if(collectionClaim){
+    if(/\b(?:recommendations?|reviews?|synopsis|plot summary|descriptions? of|scripts? from|reading guide)\b/iu.test(chunk))return null;
+    const entire=/^(the (?:entire|complete) series\s*,?\s+)(.+)$/iu.exec(chunk);
+    if(entire)return result(entire);
+    // Grammatical adventures/exploits wrappers identify the listed series.
+    // The prefix stays unresolved; ordinary plot 'from/in' is not supported.
+    const adventures=/^((?:(?:all of )?the|their|featuring the)\s+[^#;]{0,240}\b(?:adventures|exploits|super[ -]?team-ups)\b[^#;]{0,240}\s+(?:from|in)\s+)(.+)$/iu.exec(chunk);
+    if(adventures)return result(adventures);
+    const seriesRun=/^(the\s+[^#;]{1,150}\brun on the series\s*[—–]\s*)(.+)$/iu.exec(chunk);
+    if(seriesRun)return result(seriesRun,true);
+    const story=/^((?:(?:the|a|an)\s+)?(?:[^#;]{0,100}\b(?:story|stories|tale|tales|segment)\b[^#;]{0,160}?\s+|(?:the two-part\s+)?["“][^"”]{1,140}["”]\s*)from\s+)(.+)$/iu.exec(chunk);
+    const storyProse=story?.[1].replace(/["“][^"”]*["”]/gu,'');
+    if(story&&!/\b(?:says?|escapes?|fights?|travels?|meets?|was|were|is|are|will|would|can|could)\b/iu.test(storyProse))return result(story,true);
+    // A lowercase grammatical article before a numbered annual/special is
+    // different from stripping articles from arbitrary series titles.
+    const typed=/^(the\s+)([\p{Lu}][^#;]{1,150}\b(?:annual|special)\s*#\s*\d.*)$/iu.exec(chunk);
+    if(typed&&typed[1].startsWith('the '))return result(typed);
+    // A possessive creator credit can be removed only when the product title
+    // independently states exactly that series and those creators using 'by'.
+    const credit=/^(.{1,120}['’]s\s+)([^#;]{1,150}#\s*\d.*)$/u.exec(chunk),by=/^(.{1,150}?)\s+by\s+(.+?)(?:\s+\(|$)/iu.exec(title);
+    const literal=s=>s.replace(/\s+(?:and|&)\s+/giu,' and ').trim().toLowerCase();
+    if(credit&&by&&literal(credit[1].replace(/['’]s\s+$/u,''))===literal(by[2])&&literal(credit[2].split('#')[0])===literal(by[1]))return result(credit);
+  }
+  // Explicit 'these tales' framing survives a narrative lead; it never turns
+  // arbitrary plot summaries into numbered products or confirms full issues.
+  const tales=/^((?:Find out|[^#;]{0,160}\brun\b[^#;]{0,80}\bcontinues)\s+in these tales from\s+)(.+)$/iu.exec(chunk);
+  return result(tales,true);
 }
 
 function reviewSeriesDescriptor(label,run='') {

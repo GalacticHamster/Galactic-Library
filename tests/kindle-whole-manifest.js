@@ -13,6 +13,10 @@ export const kindleWholeManifestTests=[
   for(const r of controls){const a=old.selectManifest(r.blocks,r.title),b=selectManifest(r.blocks,r.title),p=old.manifestReviewProposal(a,r.title),q=manifestReviewProposal(b,r.title);
    assert.deepEqual(b.manifest.blocks,a.manifest.blocks);
    if(r.title===fixture.title){assert.equal(q.entries.length,52);assert.equal(q.outcome,'partial');}
+   else if(r.title==='iZombie Vol. 2: uVampire'){
+     assert.equal(q.entries.length,8);assert.deepEqual(q.entries.at(-1),{series:'HOUSE OF MYSTERY',run:'',unitType:'annual',number:'2',language:'',completeness:'excerpt'});
+     assert.deepEqual(q.entries.slice(0,7).map(e=>[e.series,e.number,e.completeness]),Array.from({length:7},(_,n)=>['iZombie',String(n+6),'full']));assert.equal(b.statement,a.statement,r.title);assert.equal(q.outcome,'partial');
+   }
    else if(!p.entries.length&&/^collecting\s+issues?\b/iu.test(a.statement)){
      // The bounded prefix correction also benefits this existing control.
      // Compare with the prior interpreter on a literal prefix-only copy.

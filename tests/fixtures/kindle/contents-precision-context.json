@@ -338,6 +338,14 @@
           "number": "12",
           "language": "",
           "completeness": "full"
+        },
+        {
+          "series": "HOUSE OF MYSTERY",
+          "run": "",
+          "unitType": "annual",
+          "number": "2",
+          "language": "",
+          "completeness": "excerpt"
         }
       ]
     },

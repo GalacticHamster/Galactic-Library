@@ -7,7 +7,7 @@ const parse=s=>proposeContentsForReview(s,'Collection');
 const equal=(a,b,message)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(message+': '+JSON.stringify(a));};
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const nums=(a,b)=>Array.from({length:b-a+1},(_,n)=>String(a+n));
-add('parser 5 means bounded numbered precision',()=>equal(CONTENTS_PARSER_VERSION,5,'Parser version'));
+add('parser 6 retains bounded numbered precision with wrapper attribution',()=>equal(CONTENTS_PARSER_VERSION,6,'Parser version'));
 for(const title of ['Batman and Robin','Sword and Sorcery','Cloak and Dagger']){
  add('conjunction stays inside numbered title: '+title,()=>{
   for(const label of [title,title.toLowerCase()])for(const s of [`Collects ${label} #1-3`,`Collects issues #1-3 of ${label}, part of the event`]){
@@ -57,7 +57,10 @@ add('annual special volume and excerpt controls retain typed scope',()=>{
 add('excerpt conjunction and credit tail never establish full-unit scope',()=>{
  const p=parse('Collects stories from Sword and Sorcery #1-2 written by Jane Doe');assert(p.entries.length===2&&p.entries.every(e=>e.completeness==='excerpt'),'Lost excerpt');equal(p.outcome,'partial','Credits unresolved');
 });
-for(const source of ['Collects the early adventures of heroes from Explorer #1-3','Collects scripts from Explorer #1-3','Includes recommendations for Explorer #1-3','Collects Explorer #1-3 from pages 4-5','Collects Explorer #1-3 from pages selected by the creators','Collects Explorer #1-3 of an unknown book','Collects Explorer #1-3 There are two sides to every story','Collects Explorer #1-3abc','Collects Explorer #1Written by Jane Doe','Collects Explorer #1-3.5','Collects Explorer #1-3–5','Collects more than Explorer #1-3']){
+add('explicit adventures wrapper now recovers units while retaining its source prose',()=>{
+ const p=parse('Collects the early adventures of heroes from Explorer #1-3');equal(p.entries.map(e=>e.number),nums(1,3),'Bounded wrapper');equal(p.unparsed,['the early adventures of heroes from'],'Wrapper evidence');equal(p.outcome,'partial','Source prose retained');
+});
+for(const source of ['Collects scripts from Explorer #1-3','Includes recommendations for Explorer #1-3','Collects Explorer #1-3 from pages 4-5','Collects Explorer #1-3 from pages selected by the creators','Collects Explorer #1-3 of an unknown book','Collects Explorer #1-3 There are two sides to every story','Collects Explorer #1-3abc','Collects Explorer #1Written by Jane Doe','Collects Explorer #1-3.5','Collects Explorer #1-3–5','Collects more than Explorer #1-3']){
  add('unsafe prose or number attachment remains unresolved: '+source,()=>equal(parse(source).entries,[],'Unsafe numbered clause'));
 }
 add('bare numbering never finds a unit substring inside a title',()=>equal(parse('Collects Explorerbook 1').entries.map(e=>[e.series,e.unitType,e.number]),[['Explorerbook','issue','1']],'Bare unit boundary'));

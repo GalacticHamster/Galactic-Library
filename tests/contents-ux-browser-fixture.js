@@ -5,6 +5,7 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {createContentsWorkspace} from '../src/ui/contents-workspace.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
 import {precisionRecord,verifySourcePaths} from './contents-precision-context-fixture.js';
+import {verifyNumberedWrapper,verifyIndependentWrappers} from './numbered-wrappers-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -29,6 +30,19 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ const wrappers=await (await fetch('/tests/fixtures/kindle/numbered-wrappers.json')).json();
+ for(const c of [...wrappers.cases,...wrappers.controls]){
+   const {record,proposal}=verifyNumberedWrapper(c,assert),before=JSON.stringify(record);
+   const editor=createContentsEditor(record,null,{save:()=>{throw Error('No save');},refresh:()=>{}},{expanded:true});
+   document.body.append(editor);button(editor,'Parse statement for review').click();
+   const entries=[...editor.querySelectorAll('tbody tr')].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
+   const keys=values=>values.map(e=>JSON.stringify([e.series,e.run,e.unitType,e.number,e.language,e.completeness])).sort();
+   assert(JSON.stringify(keys(entries))===JSON.stringify(keys(proposal.entries)),'Actual editor changed numbered wrapper entries: '+c.title);
+   for(const fragment of c.unresolved)assert(editor.textContent.includes(fragment),'Actual editor hid unresolved wrapper/named evidence');
+   assert(JSON.stringify(record)===before,'Editor changed source');editor.remove();
+ }
+ verifyIndependentWrappers(assert);
+ checks.push('All 35 numbered-wrapper cases and four adjacent controls retain exact proposals and unresolved evidence in the actual editor');
  const precision=await (await fetch('/tests/fixtures/kindle/contents-precision-context.json')).json();
  for(const c of precision.sourceContext){
    const {record,proposal}=verifySourcePaths(c,assert),before=JSON.stringify(record);

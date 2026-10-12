@@ -14,7 +14,7 @@ Three completeness questions are distinct:
 
 **Full is local parse completeness, not universal book completeness or ownership.** A literal same-clause parent can represent structural children, preserving unresolved material and diagnostic windows. Independent semantic claims stay separate; neither adjacent location nor higher proposal count authorizes aggregation or automatic promotion. Loading one independent claim changes editor text/rows only; saving replaces the parent's single saved review.
 
-Source generation 5 preserves captured DOM lines; parser 5/filter 1 interpret saved text independently. A parser reparse does not refresh source. Exact source-backed historical selections must survive validation even when a new parser changes ranking. Read more may signal premature/incomplete hydration or extraction; it is not universally disposable garbage. No local reparse can recover source that was never captured.
+Source generation 5 preserves captured DOM lines; parser 6/filter 1 interpret saved text independently. A parser reparse does not refresh source. Exact source-backed historical selections must survive validation even when a new parser changes ranking. Read more may signal premature/incomplete hydration or extraction; it is not universally disposable garbage. No local reparse can recover source that was never captured.
 
 **Refresh all eligible books** acquires new source for every supported Kindle book, including previous successes. A pinned earlier source and bounded latest failed attempt remain separate from current evidence; verified reviews and ownership are unchanged. See [refresh retention and checkpoint contracts](kindle-refresh.md).
 
@@ -36,6 +36,18 @@ Explicit digital chapters cannot supply a series/type to bare numeric continuati
 Captured-source handoff compares whitespace-only presentation copies with the saved selection (or its proven whole-manifest parent). UI summaries retain source characters, including Unicode ellipses; parser normalization happens afterward. This lets scan/status, workbench and editor reuse the same captured context. Substantive edits, punctuation changes and independent claims cannot borrow the untouched selection's contextual input. Reading/parsing does not alter captured evidence, histories or confirmed reviews.
 
 Permanent synthetic controls live in `tests/contents-numbered-precision-fixture.js`, shared by unit and packaged UI checks. Frozen parser-4 snapshots remain historical controls. Offline replay tooling accepts a separately supplied source-only ledger; reference answers never become parser input. Detailed population/reference comparisons belong in ignored audit artifacts, not runtime or committed fixtures.
+
+## Parser 6: bounded numbered wrappers and attribution
+
+The review/discovery parser recognizes `as well as`, `together with` and `along with` as list separators after a grounded numeric clause. Quoted siblings and plural one-shots can form a new clause; named supplements never acquire guessed issue numbers. Independent collection claims remain separate source selections.
+
+Within an explicit collection claim, bounded adventures/exploits/team-up headings, `the entire series`, quoted story attribution and series/run attribution can expose an explicitly named numbered payload. Wrapper text stays unresolved. Story/segment/tale attribution supplies excerpt proposals, not ownership of full issues. Numbered annuals/specials retain their types; bare annuals reuse only the existing prior-series context. A possessive creator credit is removed only when the product title independently provides the same literal series and creators in a `by` credit. Publisher prefixes and series aliases are not guessed.
+
+Source prose stating that stories `are collected here in` the subject volume cannot turn that volume into a contained product. Recommendations, scripts, obvious plot subjects and creator predicates remain unresolved. Existing chapter, numeric-range, run, language and named-component safeguards still apply. Ordinary product matching and reviewed coverage are unchanged.
+
+Parser generation 6 makes the existing local reparse planner recognize older derived results even when their outcome remains Partial and their input text is unchanged. This is not a new source capture: extractor 5, manifest interpretation 2, filter 1 and storage formats remain unchanged. Local interpretation retains original captured text, acquisition history and confirmed reviews.
+
+Public source-span regressions for all 35 audited cases and four adjacent controls live in `tests/fixtures/kindle/numbered-wrappers.json`; private corpus comparisons remain under ignored audit artifacts.
 
 ## Named components: parent-local identity
 
