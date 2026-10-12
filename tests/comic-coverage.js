@@ -5,7 +5,24 @@ import {coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage
 import {validateUiPreferences,mergeUiPreferences,defaultUiPreferences} from '../src/lib/ui-preferences.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {comicSeriesLabel,coverageSegments,comicGridPage} from '../src/ui/comic-coverage-presentation.js';
 export const comicCoverageTests=[
+ ['coverage presentation keeps ranges, duplicates, special numbers and disambiguating labels',()=>{
+   const group={series:'52',run:'',unitType:'issue',language:'en',issues:[{number:'0',copies:1},{number:'1/2',copies:1},{number:'3',copies:1},{number:'5',copies:2}]};
+   assert.equal(comicSeriesLabel(group),'52');assert.equal(comicSeriesLabel({...group,series:'Amazing Spider-Man',run:'1963'}),'Amazing Spider-Man (1963)');
+   assert.equal(comicSeriesLabel(group,[group,{...group,language:'fr'}]),'52 · en');
+   assert.equal(comicSeriesLabel(group,[group,{...group,unitType:'annual'}]),'52 · issues');
+   assert.deepEqual(coverageSegments(group).segments,[{first:1,last:2,status:'missing'},{first:3,last:3,status:'owned'},{first:4,last:4,status:'missing'},{first:5,last:5,status:'duplicate'}]);
+   const grid=comicGridPage(group);assert.deepEqual(grid.rows.map(row=>row.number),['1','2','3','4','5']);assert.deepEqual(grid.extras.map(row=>row.number),['0','1/2']);assert.equal(grid.rows[4].copies,2);
+   assert.deepEqual(comicGridPage(group,{start:3}).rows.map(row=>row.number),['3','4','5']);
+ }],
+ ['long coverage grids remain bounded and preserve exact range positions',()=>{
+   const group={issues:[{number:'1',copies:1},{number:'169',copies:2},{number:'999999',copies:1}]};
+   const grid=comicGridPage(group,{page:1});assert.equal(grid.rows.length,100);assert.equal(grid.first,101);assert.equal(grid.last,200);assert.equal(grid.rows[68].copies,2);
+   assert.equal(coverageSegments(group).segments.reduce((sum,segment)=>sum+segment.last-segment.first+1,0),999999);
+   assert.equal(comicGridPage(group,{page:999999}).rows.at(-1).number,'999999');
+   assert.equal(validateUiPreferences({workspace:'overlap'}).workspace,'comic-coverage');
+ }],
  ['Comic Coverage assumes #1 through highest covered integer and retains #0 and fractions',()=>{
    const db=coverageDatabase(coverageBook('one','Collects Alpha (2001) #0, 1/2, 3, 5'));
    const result=comicCoverageForLibrary(db),group=result.groups[0],range=comicRange(group);

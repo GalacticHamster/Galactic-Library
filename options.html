@@ -12,14 +12,13 @@
     </nav>
     <nav id="library-navigation" class="workspace-navigation secondary-navigation" aria-label="Library views">
       <button type="button" data-workspace="library">All items</button>
-      <button type="button" data-workspace="overlap" aria-controls="overlap-workspace">Collection Overlap</button>
       <button type="button" data-workspace="comic-coverage" aria-controls="comic-coverage-workspace">Comic Coverage</button>
       <button type="button" data-workspace="books">Book information</button>
       <button type="button" data-workspace="reading">Reading</button>
       <button type="button" data-workspace="ownership">Ownership and access</button>
     </nav>
-<section id="overlap-workspace" data-workspace-panel="overlap" hidden><h2>Collection Overlap</h2><div id="collection-overlap-view"></div><p><a href="#contents" data-go-workspace="contents">Inspect contents or compare a target series range</a></p></section>
-<section id="comic-coverage-workspace" data-workspace-panel="comic-coverage" hidden><h2>Comic Coverage</h2><div id="comic-coverage-view"></div></section>
+
+<section id="comic-coverage-workspace" data-workspace-panel="comic-coverage" hidden><h2>Comic Coverage</h2><nav id="comic-coverage-navigation" aria-label="Comic Coverage views" class="actions"><button type="button" data-coverage-view="series" aria-pressed="true">Series Coverage</button><button type="button" data-coverage-view="overlap" aria-pressed="false">Collection Overlap</button></nav><div id="comic-coverage-view"></div><section id="overlap-workspace" hidden><div id="collection-overlap-view"></div></section></section>
 <p id="workspace-status" class="muted" role="status"></p><div id="library-load-status" class="compact-notice"><span class="operation-status" role="status" aria-live="polite" aria-atomic="true" aria-busy="true">Loading your library…</span><button id="retry-library-load" type="button" hidden>Try loading again</button></div>
     <div id="active-book-job" class="compact-notice" hidden><span id="active-book-job-status" role="status"></span><button id="open-active-book-job" type="button">View book lookup</button><button id="pause-active-book-job" type="button" hidden>Pause</button></div>
     <div id="library-alerts" class="compact-notice" aria-label="Library review alerts" hidden></div>

@@ -53,6 +53,6 @@ export const collectionOverlapTests=[
  ['on-demand cooperative overlap projection matches synchronous results',async()=>{
    const db=coverageDatabase(coverageBook('a'),coverageBook('b'));let yields=0;
    const asyncResult=await collectionOverlapAsync(db,{yieldWork:async()=>{yields++;}});assert.deepEqual(asyncResult,collectionOverlap(db));assert(yields>0);
-   assert.equal(workspaceTarget('#overlap'),'overlap');assert(LIBRARY_WORKSPACES.includes('overlap'));assert.equal(validateUiPreferences({workspace:'overlap'}).workspace,'overlap');
+   assert.equal(workspaceTarget('#overlap'),'comic-coverage');assert(LIBRARY_WORKSPACES.includes('overlap'));assert.equal(validateUiPreferences({workspace:'overlap'}).workspace,'comic-coverage');
  }]
 ];

@@ -232,3 +232,26 @@ button.danger { background:var(--gh-danger-fill); }
 .comic-series-detail input[type=number] { width:7rem; margin:0 8px; }
 .comic-series-detail li,.comic-series-list h3 { overflow-wrap:anywhere; }
 .comic-series-detail summary { cursor:pointer; }
+.comic-series-detail { margin-top:12px; border-top:0; padding-top:0; }
+.comic-series-list { grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); }
+.coverage-view-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:16px 0; }
+.coverage-view-controls [aria-pressed=true],#comic-coverage-navigation [aria-pressed=true] { outline:2px solid var(--gh-link); outline-offset:2px; }
+.comic-coverage-bar { display:flex; height:18px; overflow:hidden; border-radius:6px; margin:12px 0; background:var(--gh-surface-raised); }
+.coverage-owned { background:#146c50; color:#fff; }
+.coverage-duplicate { background:#6048a2; color:#fff; }
+.coverage-missing { background:var(--gh-surface-raised); color:var(--gh-text); }
+.comic-coverage-bar .coverage-missing { background:repeating-linear-gradient(135deg,var(--gh-surface-raised),var(--gh-surface-raised) 4px,var(--gh-border) 4px,var(--gh-border) 6px); }
+.coverage-legend { display:flex; flex-wrap:wrap; gap:8px; font-size:.85rem; }
+.coverage-legend span { padding:3px 8px; border-radius:4px; border:1px solid var(--gh-border); }
+.comic-issue-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:6px; margin:16px 0; }
+.comic-issue-grid > p { grid-column:1 / -1; }
+.comic-issue-cell { min-height:42px; padding:6px; border:1px solid var(--gh-border); border-radius:5px; font-variant-numeric:tabular-nums; }
+.comic-issue-cell.coverage-duplicate { border:3px double #c9b8fa; }
+.comic-issue-cell.coverage-missing { border-style:dashed; }
+.comic-issue-cell:hover { filter:brightness(1.15); }
+.comic-issue-cell.coverage-owned:hover { background:#146c50; }
+.comic-issue-cell.coverage-duplicate:hover { background:#6048a2; }
+.comic-issue-cell.coverage-missing:hover { background:var(--gh-surface-raised); }
+.comic-issue-cell[aria-pressed=true] { outline:3px solid var(--gh-link); outline-offset:2px; }
+.comic-issue-cell:focus-visible { outline:3px solid var(--gh-link); outline-offset:2px; }
+.comic-issue-sources { border:1px solid var(--gh-border); border-radius:6px; padding:12px; margin:12px 0; }

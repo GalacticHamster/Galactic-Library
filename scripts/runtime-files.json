@@ -141,6 +141,7 @@
   "src/ui/collection-overlap-projection.js",
   "src/ui/collection-overlap-worker.js",
   "src/ui/comic-coverage.js",
+  "src/ui/comic-coverage-presentation.js",
   "src/ui/comic-coverage-projection.js",
   "src/ui/sync-health.js",
   "src/ui/title-aliases.js",

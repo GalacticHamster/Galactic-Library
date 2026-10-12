@@ -999,16 +999,21 @@ clearFilters.addEventListener('click', () => {
 document.querySelector('#unlinked-previous').addEventListener('click',()=>{unlinkedPage--;render();});
 document.querySelector('#unlinked-next').addEventListener('click',()=>{unlinkedPage++;render();});
 document.querySelector('#clear-empty-library-filters').addEventListener('click',()=>clearFilters.click());
+let coverageView=location.hash.startsWith('#overlap')?'overlap':'series';
 function renderCollectionCoverage(){
-  if(database&&workspace.workspace==='comic-coverage'&&comicCoverageDatabase!==database){
+  document.querySelector('#comic-coverage-view').hidden=coverageView!=='series';
+  document.querySelector('#overlap-workspace').hidden=coverageView!=='overlap';
+  for(const button of document.querySelectorAll('[data-coverage-view]'))button.setAttribute('aria-pressed',String(button.dataset.coverageView===coverageView));
+  if(database&&workspace.workspace==='comic-coverage'&&coverageView==='series'&&comicCoverageDatabase!==database){
     document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{starts:comicCoverageStarts,openRecord:ref=>openLibraryRecord(ref),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
   }
-  if(database&&workspace.workspace==='overlap'&&overlapDatabase!==database){
+  if(database&&workspace.workspace==='comic-coverage'&&coverageView==='overlap'&&overlapDatabase!==database){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;
   }
   if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
 }
+document.querySelector('#comic-coverage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-coverage-view]');if(button){coverageView=button.dataset.coverageView;renderCollectionCoverage();}});
 document.querySelector('#series-coverage-panel').addEventListener('toggle',renderCollectionCoverage);
 const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('#contents-progress-slot'),reconcile:()=>refresh(recentContentsDiagnosticId())});
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;

@@ -7,7 +7,7 @@ export const LIBRARY_WORKSPACES = ['library', 'overlap', 'comic-coverage', 'book
 export const WORKSPACES = [...PRIMARY_WORKSPACES, 'overlap', 'comic-coverage', 'books', 'reading', 'ownership'];
 export function workspaceTarget(value) {
   const name=String(value??'').replace(/^#/u,'').split('?')[0].replace(/-workspace$/u,'');
-  return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
+  return name==='overlap'?'comic-coverage':WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;
 }
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', acquisitions:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
@@ -39,7 +39,7 @@ export function validateUiPreferences(value){
   const output=defaultUiPreferences();
   if(value.appearance!==undefined){if(!['dark','light','system'].includes(value.appearance))throw Error('Invalid appearance preference.');output.appearance=value.appearance;}
   if(value.pageSize!==undefined){if(!validPageSize(value.pageSize))throw Error('Invalid items per page.');output.pageSize=value.pageSize;}
-  if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=value.workspace;}
+  if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=workspaceTarget(value.workspace);}
   if(value.comicCoverageStarts!==undefined)output.comicCoverageStarts=validateComicCoverageStarts(value.comicCoverageStarts);
   // Migrate old Library fields once. Shared state is authoritative thereafter.
   const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();
