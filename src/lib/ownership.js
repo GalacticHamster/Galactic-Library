@@ -36,7 +36,14 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
   const review=database.ownershipReviews?.[item.recordRef];
   const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
   const expiredKey=key&&item.metadata?.expiresAt&&Date.parse(item.metadata.expiresAt)<=now;
-  if(!review)return expiredKey?{...item,ownership:'unknown'}:item;
+  if(!review){
+    const profile=database.providerProfiles?.[item.profileId];
+    if(!ignoreOverride&&item.provider==='kobo'&&profile?.provider==='kobo'&&profile.assumeUnconfirmedOwned===true&&item.ownership==='unknown'
+      &&[undefined,'','library-presence-only','kobo-plus-availability'].includes(item.metadata?.ownershipBasis)){
+      return {...item,ownership:'owned',ownershipOverride:{observedOwnership:item.ownership,scope:'profile-unconfirmed'}};
+    }
+    return expiredKey?{...item,ownership:'unknown'}:item;
+  }
   const expired=review.expiresAt&&Date.parse(review.expiresAt)<=now;
   const negativeKey=expiredKey||item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
   const ownership=expired||negativeKey&&['owned','claimed'].includes(review.ownership)?'unknown':review.ownership;

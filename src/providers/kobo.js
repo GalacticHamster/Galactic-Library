@@ -59,6 +59,8 @@
         ...(global.GalacticProviderMetadata?.extract(card) ?? {}),
         source: 'kobo-my-books-library',
         ownershipBasis:evidence.ownershipBasis,
+        ...(card?.titleEvidence ? {titleEvidence:card.titleEvidence} : {}),
+        ...(stringValues(card?.genres).length ? {genres:stringValues(card.genres)} : {}),
         detailUrl,
         imageUrl: absoluteUrl(card?.imageUrl),
         authors: stringValues(card?.authors),
@@ -68,44 +70,66 @@
     };
   }
 
-  function firstText(elements) {
-    for (const element of elements) {
-      const text = compactText(element?.textContent ?? element?.getAttribute?.('content') ?? element?.getAttribute?.('aria-label'));
-      if (text) return text;
-    }
-    return '';
-  }
-
   function namedTexts(container, selectors) {
     return [...container.querySelectorAll(selectors)]
+      .filter(element => !element.querySelector(selectors))
       .map((element) => compactText(element.textContent ?? element.getAttribute('aria-label')))
       .filter((value, index, values) => value && values.indexOf(value) === index);
   }
 
   function cardDataFromLink(link) {
     let container = link.parentElement?.closest('article, li, [data-book-title], [data-testid*="book" i], [data-testid*="item" i], [class*="book" i], [class*="tile" i], [class*="item" i]') ?? link;
+    // A Read Now button can sit inside a book-actions wrapper, with the
+    // authors/genre in a sibling. Walk only within a single-book scope.
+    for(let node=link.parentElement,depth=0;node&&depth<8;node=node.parentElement,depth++){
+      const readLinks=node.querySelectorAll('a[data-book-title][href]');
+      const bookLinks=readLinks.length?[...readLinks]:[...node.querySelectorAll('a[href*="/ebook/" i], a[href*="/audiobook/" i], a[href*="/ReadNow/" i]')];
+      if(new Set(bookLinks.map(book=>koboItemIdFromValue(book.getAttribute('href')))).size>1)break;
+      if(node.matches('article, li, [data-product-id], [data-content-id], [data-contributors], [data-author], [data-genre], .book-card, .book-item, .library-item')
+        ||node.querySelector('[class*="author" i], [class*="contributor" i], [class*="genre" i], [data-testid*="author" i], [data-testid*="genre" i]')){
+        container=node;break;
+      }
+    }
     // Never borrow ownership labels from a wrapper containing several books.
-    if(container.querySelectorAll('a[data-book-title][href]').length>1)container=link;
+    if(new Set([...container.querySelectorAll('a[data-book-title][href]')].map(book=>koboItemIdFromValue(book.getAttribute('href')))).size>1)container=link;
     const image = container.querySelector('img');
-    const title = firstText([
-      container.querySelector('[data-testid*="title" i], [class*="title" i], h1, h2, h3, h4'),
-      { textContent: container.getAttribute('data-book-title') },
-      { textContent: container.getAttribute('data-title') },
-      { textContent: image?.getAttribute('alt') },
-      { textContent: link.getAttribute('aria-label') }
-    ]);
+    const attribute = (name) => compactText(link.getAttribute(name)) || compactText(container.getAttribute(name));
+    // Read Now's accessible action label is not the bibliographic title.
+    // Prefer Kobo's dedicated title attribute, retaining its literal value.
+    const candidates = [
+      {text:attribute('data-book-title') || attribute('data-title'), evidence:'title-attribute'},
+      ...[...container.querySelectorAll('[data-testid*="title" i], [class*="title" i], h1, h2, h3, h4')]
+        .filter(element => !element.closest('button') && !/^read\s+now\s*:/iu.test(compactText(element.textContent)))
+        .map(element => ({text:compactText(element.textContent), evidence:'title-element'})),
+      {text:compactText(image?.getAttribute('alt')), evidence:'cover-alt'},
+      {text:compactText(link.getAttribute('aria-label')).replace(/^read\s+now\s*:\s*/iu,''), evidence:'action-label'}
+    ];
+    const selected = candidates.find(candidate => candidate.text && !/^read\s+now$/iu.test(candidate.text));
+    const title = selected?.text ?? '';
+    const values = (names, selectors) => {
+      for (const name of names) {
+        const value = attribute(name);
+        if (!value) continue;
+        if (value.startsWith('[')) {try {const parsed=JSON.parse(value);if(Array.isArray(parsed))return stringValues(parsed);} catch {}}
+        // A singular name can contain commas; only Kobo's plural contributor
+        // list uses comma separation. Genre labels are retained verbatim.
+        return name==='data-contributors' ? value.split(/\s*,\s*/u) : [value];
+      }
+      return namedTexts(container,selectors);
+    };
     return {
-      ownershipType:container.getAttribute('data-ownership-type')??container.getAttribute('data-entitlement-type')??link.getAttribute('data-ownership-type'),
-      isPurchased:container.getAttribute('data-is-purchased')==='true'?true:container.getAttribute('data-is-purchased')==='false'?false:undefined,
-      isKoboPlus:container.getAttribute('data-is-kobo-plus')==='true',
+      ownershipType:attribute('data-ownership-type') || attribute('data-entitlement-type'),
+      isPurchased:attribute('data-is-purchased')==='true'?true:attribute('data-is-purchased')==='false'?false:undefined,
+      isKoboPlus:attribute('data-is-kobo-plus')==='true',
       ownershipLabels:namedTexts(container,'[data-testid*="ownership" i], [class*="ownership" i], [data-testid*="kobo-plus" i], [class*="kobo-plus" i], [data-testid*="subscription" i], [class*="subscription" i], [class*="purchased" i], [class*="badge" i]'),
-      providerItemId: container.getAttribute('data-product-id') ?? container.getAttribute('data-content-id') ?? container.getAttribute('data-id') ?? link.getAttribute('data-product-id') ?? link.getAttribute('href'),
-      title,
+      providerItemId: /readnow\.kobo\.com\b|\/readnow\//iu.test(link.getAttribute('href')??'') ? link.getAttribute('href') : container.getAttribute('data-product-id') ?? container.getAttribute('data-content-id') ?? container.getAttribute('data-id') ?? link.getAttribute('data-product-id') ?? link.getAttribute('href'),
+      title,titleEvidence:selected?.evidence,
       detailUrl: link.getAttribute('href'),
       imageUrl: image?.currentSrc ?? image?.getAttribute('src'),
-      typeText: `${container.getAttribute('data-format') ?? ''} ${container.getAttribute('data-type') ?? ''} ${container.textContent ?? ''}`,
-      authors: stringValues(container.getAttribute('data-contributors')).length ? compactText(container.getAttribute('data-contributors')).split(/\s*,\s*/u) : namedTexts(container, '[data-testid*="author" i], [class*="author" i]'),
-      series: stringValues(container.getAttribute('data-series-name')).length ? [compactText(container.getAttribute('data-series-name'))] : namedTexts(container, '[data-testid*="series" i], [class*="series" i]')
+      typeText: [attribute('data-format'),attribute('data-type'),...namedTexts(container,'[data-testid*="format" i], [class*="format" i]')].join(' '),
+      authors: values(['data-authors','data-author','data-contributors'], '[data-testid*="author" i], [class*="author" i], [class*="contributor" i]'),
+      genres: values(['data-genres','data-genre'], '[data-testid*="genre" i], [class*="genre" i]'),
+      series: values(['data-series-name','data-series'], '[data-testid*="series" i], [class*="series" i]')
     };
   }
 

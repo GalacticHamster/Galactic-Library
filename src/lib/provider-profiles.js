@@ -19,9 +19,10 @@ export function validateProviderProfiles(value={}){
     if(!keySpace){if(legacy.has(p.provider))throw Error('Duplicate legacy profile namespace.');legacy.add(p.provider);}
     const name=`${p.provider}:${nickname}`;if(nickname&&names.has(name))throw Error('Duplicate provider profile nickname.');if(nickname)names.add(name);
     if(!['declared','unassigned'].includes(p.provenance))throw Error('Invalid profile provenance.');
+    if(p.assumeUnconfirmedOwned!==undefined&&(p.provider!=='kobo'||typeof p.assumeUnconfirmedOwned!=='boolean'))throw Error('Invalid Kobo account ownership preference.');
     const state=validateProviderStates({[p.provider]:p.state??{}})[p.provider];delete state.activeProfileId;state.profileLabel=nickname;
     const legacyArchive={};object(p.legacyArchive??{},'Legacy archive dates');if(Object.keys(p.legacyArchive??{}).length>500000)throw Error('Too many legacy archive dates.');for(const [ref,at]of Object.entries(p.legacyArchive??{}))legacyArchive[profileRef(ref)]=date(at);
-    return [id,{...(Object.keys(legacyArchive).length?{legacyArchive}:{}),profileId:id,provider:p.provider,nickname,keySpace,state,lastSelectedAt:date(p.lastSelectedAt),provenance:p.provenance}];
+    return [id,{...(Object.keys(legacyArchive).length?{legacyArchive}:{}),...(p.assumeUnconfirmedOwned===true?{assumeUnconfirmedOwned:true}:{}),profileId:id,provider:p.provider,nickname,keySpace,state,lastSelectedAt:date(p.lastSelectedAt),provenance:p.provenance}];
   }));
 }
 // Migration/unscoped legacy bootstrap reserves one legacy namespace; its IDs remain stable;

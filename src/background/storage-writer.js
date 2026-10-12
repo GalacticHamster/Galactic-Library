@@ -4,6 +4,7 @@ import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/compa
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
+import {preserveKoboObservation,koboObservationChanged} from '../lib/kobo-observations.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
 import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
@@ -183,16 +184,18 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
-  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null) {
+  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
-    const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
+    const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await getDatabase(),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
     if(requestedProfileId&&existing?.profileId!==requestedProfileId)throw Error('Scan profile changed. Start a fresh confirmed scan.');
+    if(rememberedProfile===true&&(Object.values(database.providerProfiles).filter(p=>p.provider===provider).length!==1
+      ||!requestedProfileId||existing?.profileId!==active||existing?.state.connected!==true||!existing?.state.lastSync))throw Error('Saved accounts changed. Select and confirm the signed-in account before scanning.');
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     if(changing&&!existing&&mode!=='full')throw Error('A different account without a baseline requires a complete full scan.');
-    const profile=importProfile(database,provider,profileLabel),forceFull=!profile.state.fullSyncAt;
+    const profile=importProfile(database,provider,profileLabel,requestedProfileId),forceFull=!profile.state.fullSyncAt;
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -247,6 +250,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId)h.profileLabel=nickname;
     if(database.providers[profile.provider]?.activeProfileId===profileId)profileState(database,profile,profile.state);
     return persistDatabase(database,null,extra);
+  }
+  async function saveKoboOwnershipAssumption(profileId,enabled){
+    const database=await getDatabase(),profile=database.providerProfiles[profileId];
+    if(!profile||profile.provider!=='kobo'||typeof enabled!=='boolean')throw Error('Choose a saved Kobo account and a valid ownership preference.');
+    if(enabled)profile.assumeUnconfirmedOwned=true;else delete profile.assumeUnconfirmedOwned;
+    return persistDatabase(database);
   }
   async function getProviderProfiles(provider=null){return enumerateProviderProfiles(await getDatabase(),provider);}
   async function invalidateProfileScan(database,profileId){
@@ -318,7 +327,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function successfulSyncHealth(database,provider,records,full,details){
     const diagnostics=details.scanDiagnostics??{};const profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&(p.profileId===details.profileId||p.nickname===(details.profileLabel??database.providers[provider]?.profileLabel??'')));const prior=profile?.state.syncHealth;
     const failedRequestCount=diagnostics.failedRequestCount??0;
-    return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full)});
+    return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database){
     const restored=validateDatabase(database);for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',{galacticPurchaseSync:{}});
@@ -407,6 +416,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   function preserveEnrichment(incoming, previous) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
+    incoming=preserveKoboObservation(incoming,previous);
+    if(incoming.provider==='kobo'&&previous&&!koboObservationChanged(previous,incoming))incoming.updatedAt=previous.updatedAt;
     if(incoming.provider==='fanatical'){
       const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>({...entry,observedAt:incoming.observedAt}));
       if(origins.length||previous?.metadata.purchaseOrigins?.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(previous?.metadata.purchaseOrigins??[],origins);
@@ -1254,6 +1265,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const operations = {
     saveOwnershipPolicy,
+    saveKoboOwnershipAssumption,
     beginCompanionFeed,appendCompanionFeed,commitCompanionFeed,removeCompanionFeed,
     saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
     saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,reserveReminderNotification,releaseReminderNotification,

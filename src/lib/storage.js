@@ -17,6 +17,7 @@ export function createStorageClient(sendMessage) {
 const client = createStorageClient((message) => chrome.runtime.sendMessage(message));
 export const {
   getDatabase, getCommittedLibraryView, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, saveOwnershipPolicy,
+  saveKoboOwnershipAssumption,
   saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
   removeCompanionFeed,
   getProviderProfiles,previewProviderProfileRemoval,removeProviderProfile,resetProviderProfileBaseline,selectProviderProfile,renameProviderProfile,cancelProviderScan,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,

@@ -7,10 +7,11 @@
     const session=sessions.get(provider);
     if(request.type==='GET_PROVIDER_SYNC_STATE'){
       if(!session)throw new Error('Reload this page to start a profile scan.');
+      await session.ready;
       const context=session.resume??session.read();session.resume=null;
-      if(!context.confirmed||!context.profileLabel)throw new Error('Enter a profile label and confirm the signed-in account.');
+      if(!context.rememberedProfile&&(!context.confirmed||!context.profileLabel))throw new Error('Enter a profile label and confirm the signed-in account.');
       const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true});
-      if(result.ok)session.context={...context,scanToken:result.scanToken,profileId:result.profileId};
+      if(result.ok)session.context={...context,confirmed:true,scanToken:result.scanToken,profileId:result.profileId};
       return result;
     }
     if(request.type==='IMPORT_PROVIDER_ITEMS'){
@@ -45,15 +46,30 @@
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal"></label><p>A name you choose for the account signed in on this site. GL does not sign you in or verify your login. Name an existing unnamed import in Providers to keep its saved update history.</p><label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
+      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>A name you choose for the account signed in on this site. GL does not sign you in or verify your login. If you sign in to another store account, choose a different nickname and confirm switching before updating.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';
       const input=controls.querySelector('[data-profile-label]');
-      const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode})};
+      let remembered=null,edited=false;
+      const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
+        ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:true}:{})})};
+      input.addEventListener('input',()=>{edited=true;remembered=null;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
       sessions.set(provider,session);
       shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&!button.dataset.galacticFloatingPanelControl){mode=button.dataset.mode??'full';session.context=null;session.resume=null;}},true);
-      chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider}).then(result=>{if(result.ok&&!input.value)input.value=result.profileLabel??'';}).catch(()=>{});
+      session.ready=chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider}).then(result=>{
+        if(!result.ok)throw Error(result.error??'Could not read saved accounts.');
+        if(!edited&&!input.value)input.value=result.profileLabel??'';
+        for(const profile of result.profiles??[]){if(!profile.nickname)continue;const option=document.createElement('option');option.value=profile.nickname;controls.querySelector('datalist').append(option);}
+        if(!edited&&result.reuseAllowed&&result.profileId){
+          remembered={profileId:result.profileId,profileLabel:result.profileLabel??''};
+          controls.querySelector('[data-profile-confirm-label]').hidden=true;
+          controls.querySelector('[data-profile-status]').textContent=`Using saved account: ${result.profileLabel||'Default account'}.`;
+        }else controls.querySelector('[data-profile-status]').textContent='Select and confirm the signed-in account.';
+      }).catch(error=>{controls.querySelector('[data-profile-status]').textContent='Could not load saved accounts. Reload this page before updating.';throw error;});
+      // A click during hydration waits for the same account result. Failure
+      // keeps scans blocked; never infer consent from an unresolved lookup.
+      session.ready.catch(()=>{});
     }
     const style = document.createElement('style');
     style.textContent = ':host { color-scheme:var(--gh-color-scheme); } .panel { position:relative; } button:hover:not(:disabled) { background:var(--gh-accent-hover); } button:active:not(:disabled) { background:var(--gh-accent-pressed); } button:disabled { background:var(--gh-disabled); color:var(--gh-disabled-text); cursor:default; } input,select,textarea { background:var(--gh-input); color:var(--gh-text); border:1px solid var(--gh-input-border); accent-color:var(--gh-accent); font:inherit; max-width:100%; } button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--gh-focus); outline-offset:3px; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid var(--gh-border); border-radius:7px; background:var(--gh-accent); box-shadow:var(--gh-shadow); color:var(--gh-on-accent); cursor:pointer; font:14px/1.4 var(--gh-font); padding:7px 10px; }';

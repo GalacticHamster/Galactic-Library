@@ -148,6 +148,7 @@ export function libraryCategoryEvidence(record) {
   const manual=enrichment.localMetadata?.approved?enrichment.localMetadata.categories:[];
   add('approved-local-metadata',1,'user-reviewed',manual);
   add('provider-format',2,'provider-explicit',[metadata.format,metadata.contentType]);
+  if(record.provider==='kobo')add('kobo-library-genre',2,'provider-category',metadata.genres);
   if(record.provider==='kindle')for(const path of enrichment.kindleProductComicContents?.categoryPaths??[]){
     const broad=kindleBroadCategory(path);
     entries.push({source:'amazon-kindle-breadcrumb',authority:2,confidence:broad?'provider-category':'incomplete-path',evidence:path.nodes.map(node=>node.label+(node.nodeId?' ['+node.nodeId+']':'')).join(' → '),classificationLabel:broad,categories:broad?normalizedLibraryCategories(broad):[],nodes:path.nodes,sourceUrl:enrichment.kindleProductComicContents.sourceUrl,checkedAt:enrichment.kindleProductComicContents.categoriesCheckedAt});

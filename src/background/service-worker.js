@@ -407,14 +407,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return undefined;
     }
     const read = request.beginScan===true
-      ? (request.confirmed===true && Number.isInteger(sender.tab?.id)
-        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId)
+      ? ((request.confirmed===true || request.rememberedProfile===true) && Number.isInteger(sender.tab?.id)
+        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
       : getDatabase().then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
         const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
         const state = database.providerProfiles?.[activeId]?.state ?? {};
-        if(request.type==='GET_PROVIDER_PROFILE'){sendResponse({ok:true,profileLabel:database.providerProfiles?.[activeId]?.nickname??'',profileId:activeId});return;}
+        if(request.type==='GET_PROVIDER_PROFILE'){
+          const profile=database.providerProfiles?.[activeId],profiles=Object.values(database.providerProfiles??{}).filter(p=>p.provider===request.provider);
+          sendResponse({ok:true,profileLabel:profile?.nickname??'',profileId:activeId,
+            reuseAllowed:profiles.length===1&&profile?.state.connected===true&&Boolean(profile.state.lastSync),
+            profiles:profiles.map(p=>({profileId:p.profileId,nickname:p.nickname}))});return;
+        }
         const knownProviderItemIds = Object.values(database.providerItems)
           .filter((item) => item.provider === request.provider&&item.profileId===activeId)
           .map((item) => item.providerItemId)
@@ -512,6 +517,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       movieCount: database.providers[request.provider].movieCount ?? 0,
       tvCount: database.providers[request.provider].tvCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
+      ...(request.provider==='kobo'?{changes:database.providers.kobo.syncHealth?.differences}:{}),
       syncedAt: database.providers[request.provider].lastSync
     }))
     .catch((error) => sendResponse({ ok: false, error: error.message }));

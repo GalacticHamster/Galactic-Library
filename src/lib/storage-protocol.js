@@ -6,6 +6,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'getDatabase',
   'getCommittedLibraryView',
   'saveOwnershipPolicy',
+  'saveKoboOwnershipAssumption',
   'beginCompanionFeed',
   'appendCompanionFeed',
   'commitCompanionFeed',

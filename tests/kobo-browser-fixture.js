@@ -1,0 +1,73 @@
+import '../src/providers/metadata.js';
+import '../src/providers/kobo.js';
+import '../src/providers/floating-panel.js';
+import {createStorageWriter} from '../src/background/storage-writer.js';
+import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {createProvidersView} from '../src/ui/providers-view.js';
+import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
+const checks=[],stored={},writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async changes=>Object.assign(stored,structuredClone(changes))});
+const assert=(value,message)=>{if(!value)throw Error(message);};
+const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
+const wait=async predicate=>{for(let n=0;n<300;n++){if(predicate())return;await pause();}throw Error('Kobo fixture did not complete.');};
+const uuid=n=>'11111111-1111-4111-8111-'+String(n).padStart(12,'0');
+const originalFetch=globalThis.fetch;
+const shadows=[],attach=Element.prototype.attachShadow;
+Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
+try{
+  const html='<div class="filter-btn">All Items (137)</div><ul>'+Array.from({length:24},(_,n)=>`<li class="book-card"><div class="book-info"><h3 class="book-title">Example Book ${n}</h3><span class="book-author">Writer ${n}</span><span class="book-genre">Comics &amp; Graphic Novels</span></div><div class="book-actions"><span class="action-title">Read Now: Example Book ${n}</span><a data-book-title="Example Book ${n}" aria-label="Read Now: Example Book ${n}" href="https://readnow.kobo.com/${uuid(n)}">Read Now</a></div></li>`).join('')+'</ul>';
+  const doc=new DOMParser().parseFromString(html,'text/html'),cards=globalThis.GalacticKobo.koboItemsFromDocument(doc);
+  assert(cards.length===24&&cards.every((r,n)=>r.title==='Example Book '+n&&r.metadata.authors[0]==='Writer '+n&&r.metadata.genres[0]==='Comics & Graphic Novels'&&r.providerItemId===uuid(n)),'Read Now wrapper polluted title or lost adjacent metadata.');
+  checks.push('Actual Kobo DOM parser reads clean dedicated titles, adjacent authors/genres and stable UUIDs from 24 action wrappers');
+  const tricky=new DOMParser().parseFromString('<ul><li class="book-card"><a data-book-title="Read Now: A Novel" href="https://www.kobo.com/ebook/novel">Read Now</a></li><li class="book-card"><h3>Unlabeled</h3><span class="ownership-label">Kobo Plus</span><a data-book-title="Unlabeled" href="https://www.kobo.com/ebook/unlabeled">Read Now</a></li><li class="book-card"><span class="ownership-label">Purchased</span><a data-book-title="Proof" data-author="Writer, Jr." data-genre="History" href="https://www.kobo.com/ebook/proof">Read Now</a></li></ul>','text/html');
+  const parsed=globalThis.GalacticKobo.koboItemsFromDocument(tricky);assert(parsed[0].title==='Read Now: A Novel'&&parsed[1].ownership==='unknown'&&parsed[2].ownership==='owned'&&parsed[2].metadata.authors[0]==='Writer, Jr.','Speculative title stripping, comma splitting or purchase leakage.');
+  checks.push('Literal book-title attributes are preserved and availability badges never imply purchase or leak between cards');
+  const stableDoc=new DOMParser().parseFromString(`<article data-product-id="${uuid(555)}"><h3>Audiobook Adventures</h3><a data-book-title="Audiobook Adventures" href="https://readnow.kobo.com/${uuid(777)}">Read Now</a><a data-book-title="Audiobook Adventures" href="https://readnow.kobo.com/${uuid(777)}">Read Now</a><span class="book-author">Writer</span></article>`,'text/html');
+  const stable=globalThis.GalacticKobo.koboItemsFromDocument(stableDoc);assert(stable.length===1&&stable[0].providerItemId===uuid(777)&&stable[0].mediaType==='book'&&stable[0].metadata.authors[0]==='Writer','Card expansion changed the reader UUID, format or deduplicated metadata.');
+  checks.push('Stable reader UUID survives conflicting wrapper IDs and duplicate action links; title words never change book format');
+  const items=[...cards.map(r=>({...r,metadata:{...r.metadata,librarySection:'my-books'}})),...Array.from({length:113},(_,n)=>({providerItemId:uuid(n+24),title:'Saved Book '+n,mediaType:'book',ownership:'unknown',metadata:{authors:['Saved Writer'],ownershipBasis:'library-presence-only'}}))];
+  let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Sean',fullSyncAt:'2026-10-01'},completeProviderSnapshot('kobo',items,[completedScope('library',137,137,'reported-count')]));
+  const profileId=db.providers.kobo.activeProfileId,refs=Object.values(db.providerItems).map(r=>r.recordRef).sort().join();
+  let releaseProfile,profilePending=true,started=0,completed=0;
+  const profileGate=new Promise(resolve=>{releaseProfile=resolve;});
+  globalThis.fetch=async()=>({ok:true,text:async()=>html});
+  globalThis.chrome={runtime:{sendMessage:async request=>{
+    if(request.type==='GET_PROVIDER_PROFILE'){
+      if(profilePending)await profileGate;
+      const current=await writer.getDatabase(),profile=current.providerProfiles[current.providers.kobo.activeProfileId],profiles=Object.values(current.providerProfiles).filter(p=>p.provider==='kobo');
+      return {ok:true,profileId:profile.profileId,profileLabel:profile.nickname,reuseAllowed:profiles.length===1&&profile.state.connected,profiles};
+    }
+    if(request.type==='GET_PROVIDER_SYNC_STATE'){
+      started++;
+      try{const scan=await writer.beginProviderScan('kobo',request.profileLabel,request.mode,request.switchProfile,1,request.profileId,!request.confirmed&&request.rememberedProfile);
+        return {ok:true,profileId:scan.profileId,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:Object.values(scan.database.providerItems).filter(r=>r.profileId===scan.profileId).map(r=>r.providerItemId)}};
+      }catch(error){return {ok:false,error:error.message};}
+    }
+    if(request.type==='COMMIT_PROVIDER_SCAN'){
+      try{db=await writer.commitProviderScan('kobo',request.items,{syncMode:request.mode},request.snapshot,request.scanToken,1);completed++;return {ok:true,bookCount:db.providers.kobo.bookCount,audiobookCount:db.providers.kobo.audiobookCount,changes:db.providers.kobo.syncHealth.differences};}
+      catch(error){return {ok:false,error:error.message};}
+    }
+    if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true};
+    return {ok:false,error:'Unexpected request'};
+  }}};
+  history.replaceState(null,'','/library');await import('../src/providers/kobo-content.js');let shadow=shadows.at(-1),button=shadow.querySelector('[data-mode="incremental"]');
+  button.click();await pause();assert(started===0,'Scan began before persisted profile selection resolved.');profilePending=false;releaseProfile();await wait(()=>completed===1);
+  assert(shadow.querySelector('[data-profile-label]').value==='Sean'&&!shadow.querySelector('[data-profile-confirm]').checked,'Remembered account required a repeated checkbox confirmation.');
+  assert(shadow.querySelector('.status').textContent.includes('0 new, 0 updated. Checked 24'),'Observed cards were reported as changed books.');
+  checks.push('A click during delayed account loading waits, then reuses the single saved profile without nickname entry or repeat confirmation');
+  button.click();await wait(()=>completed===2);assert(db.providers.kobo.syncHealth.differences.updated===0&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
+  assert(JSON.stringify(parseBackup(createBackup(db)))===JSON.stringify(db),'Author/genre backup roundtrip changed metadata.');
+  checks.push('Two actual unchanged quick scans report zero new/updated, retain all 137 UUIDs and preserve metadata through backup restore');
+  db=await writer.mergeProviderItems('kobo',[{providerItemId:uuid(999),title:'Other Account Book',mediaType:'book'}],{profileLabel:'Other'});
+  const before=JSON.stringify(db.providerItems);button.click();await wait(()=>!shadow.querySelector('.status').dataset.busy);assert(shadow.querySelector('.status').textContent.includes('Saved accounts changed')&&JSON.stringify((await writer.getDatabase()).providerItems)===before,'Stale remembered single-profile permission crossed accounts.');
+  document.querySelector('#galactic-library-kobo-importer').remove();await import('../src/providers/kobo-content.js?multiple');shadow=shadows.at(-1);await wait(()=>shadow.querySelector('[data-profile-label]').value==='Other');
+  assert(!shadow.querySelector('[data-profile-confirm-label]').hidden,'Multi-account ambiguity auto-confirmed.');const input=shadow.querySelector('[data-profile-label]');input.value='Sean';input.dispatchEvent(new Event('input'));shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>!shadow.querySelector('.status').dataset.busy);assert(shadow.querySelector('.status').textContent.includes('confirm'),'Unconfirmed multi-account scan succeeded.');
+  shadow.querySelector('[data-profile-confirm]').checked=true;shadow.querySelector('[data-profile-switch]').checked=true;shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>completed===3);assert(db.providers.kobo.activeProfileId===profileId&&Object.keys(db.providerItems).length===138,'Confirmed profile switch lost account isolation.');
+  checks.push('Stale automatic profile reuse is rejected; multiple saved accounts require explicit selection, confirmation and switch');
+  const view=createProvidersView({saveKoboOwnershipAssumption:(...args)=>writer.saveKoboOwnershipAssumption(...args),onDatabase:next=>{db=next;view.update(next);}});document.body.append(view.element);view.update(db);
+  const account=view.element.querySelector('[data-account="'+profileId+'"]');account.closest('details').open=true;account.querySelector('details').open=true;
+  [...account.querySelectorAll('button')].find(b=>b.textContent==='Ownership preference').click();const dialog=view.element.querySelector('dialog'),checkbox=dialog.querySelector('[data-kobo-assume-owned]');assert(!checkbox.checked,'Ownership assumption defaulted to true.');checkbox.checked=true;[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Save preference').click();await wait(()=>db.providerProfiles[profileId].assumeUnconfirmedOwned);
+  const record=Object.values(db.providerItems).find(r=>r.profileId===profileId);assert(record.ownership==='unknown'&&effectiveOwnershipRecord(record,db).ownership==='owned','Preference overwrote source evidence or failed to affect display.');
+  checks.push('Kobo account ownership preference is explicitly opt-in and changes effective access without rewriting source evidence');
+}catch(error){checks.push('FAILED: '+error.message);await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});throw error;}
+await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

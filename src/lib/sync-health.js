@@ -9,7 +9,7 @@ export function validateSyncHealth(value){
   const failedPages=value.failedPages??[];if(!Array.isArray(failedPages)||failedPages.length>100||failedPages.some(page=>!Number.isSafeInteger(page)||page<1||page>100000))throw new Error('Invalid failed page numbers.');
   const attemptRef=text(value.attemptRef??'',36,'Sync attempt reference');if(attemptRef&&!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(attemptRef))throw new Error('Invalid sync attempt reference.');
   const result={attemptRef,status:value.status,mode:value.mode,attemptedProfileLabel:text(value.attemptedProfileLabel??'',100,'Attempted profile'),startedAt:date(value.startedAt),finishedAt:date(value.finishedAt),failureCode,retryable:value.retryable,failedRequestCount:count(value.failedRequestCount??0),failedPages:[...new Set(failedPages)],retries:value.retries===undefined||value.retries===null?null:count(value.retries),coverageLimit:text(value.coverageLimit??'',100,'Coverage limitation')};
-  if(value.differences!==undefined){object(value.differences,'Snapshot differences');result.differences=Object.fromEntries(['added','missing','ownershipChanged','observed'].map(key=>[key,count(value.differences[key]??0)]));}
+  if(value.differences!==undefined){object(value.differences,'Snapshot differences');result.differences=Object.fromEntries(['added','missing','ownershipChanged','observed'].map(key=>[key,count(value.differences[key]??0)]));if(value.differences.updated!==undefined)result.differences.updated=count(value.differences.updated);}
   return result;
 }
 export function syncFailure(error){

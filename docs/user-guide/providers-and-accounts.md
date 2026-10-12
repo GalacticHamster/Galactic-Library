@@ -25,6 +25,13 @@ coverage and recent update health. **Select for updates** restores that account'
 saved import history offline, after confirmation. It does not start a scan or
 require a full rescan merely because another account was selected.
 
+On returning to a provider website, the importer remembers a single connected
+saved account. Ordinary updates do not require reentering its nickname or
+reconfirming the same account. GL does not verify the website login: if you sign
+in to another store account, choose a different nickname and confirm switching.
+Multiple saved accounts still require explicit selection and confirmation. An
+update clicked while saved accounts are loading waits for that lookup.
+
 **Name this account** names a migrated unnamed import without importing it again.
 **Rename account** changes the display nickname while keeping the account's
 identity, records, contents and reviews.
@@ -52,6 +59,28 @@ about coverage and any additional restrictions.
 Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
+
+## Kobo metadata and ownership
+
+Kobo quick updates check the newest-first pages up to the first known page. The
+summary distinguishes books **checked** from **new** or **updated** books; a
+24-card page is not evidence of 24 changed books. Sparse observations retain
+saved authors, series, genre labels and explicit access evidence. Dedicated
+book-title attributes take priority over Read Now action labels.
+
+My Books presence and a bare Kobo Plus availability badge do not prove purchase.
+Explicit purchase, subscription, borrowing, rental and free-claim evidence is
+kept separately. A claimed free book is not labeled as a paid purchase. When the
+page provides no acquisition evidence, access remains unconfirmed.
+
+If you know your unconfirmed books were purchased, open **Providers → Kobo →
+your saved account → Advanced account recovery and removal → Ownership
+preference**. Enable **Treat unconfirmed books in this Kobo account as
+purchased** and save. This opt-in preference affects display and matching for
+that account only; it does not rewrite source ownership or invent a receipt.
+Explicit subscription, loan, rental, free, not-purchased, conflicting and
+individually reviewed records are excluded. Turn it off to restore the original
+access display. The preference survives imports, renaming and backup/restore.
 
 ## Recovery and removal
 

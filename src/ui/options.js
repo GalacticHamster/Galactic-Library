@@ -16,7 +16,7 @@ import {createContentsBookDetails,createContentsHistory,createCollectionComparis
 import {combinedProviderStates} from '../lib/profile-management.js';
 import {createProvidersView} from './providers-view.js';
 import {renderOnboarding} from './onboarding.js';
-import {selectProviderProfile,renameProviderProfile,previewProviderProfileRemoval,removeProviderProfile,resetProviderProfileBaseline} from '../lib/storage.js';
+import {selectProviderProfile,renameProviderProfile,previewProviderProfileRemoval,removeProviderProfile,resetProviderProfileBaseline,saveKoboOwnershipAssumption} from '../lib/storage.js';
 import {createContentsWorkspace} from './contents-workspace.js';
 import {createContentsScanProgress} from './contents-scan-progress.js';
 import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
@@ -150,7 +150,7 @@ const contentsWorkspace=createContentsWorkspace({projection:browseProjection,can
   return root;
 }});
 document.querySelector('#contents-collections-slot').append(contentsWorkspace.element);
-const providerAccountsView=createProvidersView({select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
+const providerAccountsView=createProvidersView({saveKoboOwnershipAssumption,select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
 document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
 let ownershipPolicySaving=false;
 async function changeOwnershipPolicy(patch) {

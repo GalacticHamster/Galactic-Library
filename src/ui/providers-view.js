@@ -7,7 +7,7 @@ const date=value=>value?formatDate(value):'Not yet';
 const nickname=p=>p.nickname||(['humble','fanatical'].includes(p.provider)?'Default account':'Unnamed account');
 const health=p=>({running:'Update in progress',succeeded:'Last update completed',failed:'Last update failed',partial:'Last update incomplete',cancelled:'Update cancelled'})[p.syncHealth?.status]??'No recent update details';
 
-export function createProvidersView({select,rename,preview,remove,reset,openProvider,onDatabase}){
+export function createProvidersView({select,rename,preview,remove,reset,saveKoboOwnershipAssumption,openProvider,onDatabase}){
  let database=null,busy=false;
  const element=node('div');element.id='provider-accounts';
  const status=node('p');status.setAttribute('role','status');
@@ -54,15 +54,24 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
    if(!allowed){status.textContent=mode==='quick'?permission.quickReason:permission.fullReason;return;}
    const label=mode==='quick'?'Quick Update':'Full Rescan',d=dialog(label+' · '+site.name);p={...p,nickname:current.nickname};
    d.root.insertBefore(node('p',mode==='quick'?'Check for new items using this account’s saved import history.':'Check the complete inventory for this account. Missing items may move to earlier imports; acquired contents, reviews and other saved accounts are retained.'),d.feedback);
-   d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}, check the account nickname on the Galactic Library panel and confirm the signed-in account. Then choose ${site.provider==='epic'?'Sync library':mode==='quick'?'Quick update':'Full rescan'}. Opening the site does not start an import.`),d.feedback);
+   const unambiguous=site.accounts.length===1&&current.state.connected&&current.state.lastSync;
+   d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}. ${unambiguous?'The panel remembers this saved account; choose another nickname before updating a different store account.':'Check the account nickname on the Galactic Library panel and confirm the signed-in account.'} Then choose ${site.provider==='epic'?'Sync library':mode==='quick'?'Quick update':'Full rescan'}. Opening the site does not start an import.`),d.feedback);
    if(site.provider==='fandango-at-home'&&mode==='quick')d.root.insertBefore(node('p','Fandango Quick Update runs from its Recently Purchased View All grids. Full Rescan checks the complete My Library grids.'),d.feedback);
-   const open=button('Open '+site.name+' for '+label,async()=>{try{await openProvider(site.url);d.feedback.textContent='Provider page opened. Confirm the signed-in account and start the update there.';}catch(error){d.feedback.textContent=error.message;}});d.controls.append(open);d.root.showModal();
+   const open=button('Open '+site.name+' for '+label,async()=>{try{await openProvider(site.url);d.feedback.textContent='Provider page opened. Check the selected account and start the update there.';}catch(error){d.feedback.textContent=error.message;}});d.controls.append(open);d.root.showModal();
  }
  function resetAccount(site,p){
    const d=dialog('Reset import history · '+nickname(p));
    d.root.insertBefore(node('p',`Recovery only: forget the saved update position and coverage for this ${site.name} account. Imported items, acquired contents, source history and your reviews stay saved. The next import must be a Full Rescan. No scan starts now.`),d.feedback);
    const label=node('label');label.className='ownership-choice';const confirm=node('input');confirm.type='checkbox';label.append(confirm,document.createTextNode('I understand the next import requires a complete scan.'));d.root.insertBefore(label,d.feedback);
    d.controls.append(button('Reset import history',()=>{if(!confirm.checked){d.feedback.textContent='Confirm the reset before continuing.';return;}commit(d,()=>management.reset(p.profileId,true),'Import history reset. Existing records and acquired evidence are retained; the next import requires a Full Rescan.');}));d.root.showModal();
+ }
+ function koboOwnership(p){
+   const d=dialog('Ownership preference · '+nickname(p));
+   const label=node('label');label.className='ownership-choice';const input=node('input');input.type='checkbox';input.dataset.koboAssumeOwned='';input.checked=database.providerProfiles[p.profileId]?.assumeUnconfirmedOwned===true;
+   label.append(input,document.createTextNode('Treat unconfirmed books in this Kobo account as purchased.'));
+   d.root.insertBefore(label,d.feedback);
+   d.root.insertBefore(node('p','Your choice affects display and ownership checks. Kobo has not confirmed these purchases; original source evidence stays saved. Subscription, borrowed, rented, free, explicitly not purchased, conflicting, and individually reviewed items stay unchanged. This applies only to this saved account.'),d.feedback);
+   d.controls.append(button('Save preference',()=>commit(d,()=>saveKoboOwnershipAssumption(p.profileId,input.checked),'Kobo ownership preference saved. Original access evidence is unchanged.')));d.root.showModal();
  }
  async function removeAccount(site,p){
    const d=dialog('Remove saved account · '+nickname(p));d.root.insertBefore(node('p','Loading the current removal preview…'),d.feedback);d.root.showModal();
@@ -108,6 +117,7 @@ export function createProvidersView({select,rename,preview,remove,reset,openProv
        quick.disabled=!eligibility.quick;full.disabled=!eligibility.full;updates.append(quick,full);account.append(updates);
        if(eligibility.quickReason)account.append(node('p',eligibility.quickReason));
        const advanced=node('details');advanced.append(node('summary','Advanced account recovery and removal'),node('p','Reset import history keeps saved evidence. Remove account deletes its records and related evidence. Neither starts an import.'));
+       if(site.provider==='kobo'&&saveKoboOwnershipAssumption)advanced.append(button('Ownership preference',()=>koboOwnership(p)));
        const managementButtons=node('p');managementButtons.className='actions';managementButtons.append(button('Reset import history',()=>resetAccount(site,p)),button('Remove saved account',()=>removeAccount(site,p)));advanced.append(managementButtons);account.append(advanced);
      }
      return card;

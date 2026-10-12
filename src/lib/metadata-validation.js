@@ -9,11 +9,11 @@ const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com']
 const FIELDS = {
   steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery'],
   audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory'],
-  'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis'],
+  'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
   fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt']
 };
 const COMMON = ['source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
-const LISTS = new Set(['authors','series','narrators','collections','drm','formats']);
+const LISTS = new Set(['authors','series','narrators','collections','drm','formats','genres']);
 const LIMITS = {language:80,run:100,seriesYear:100,volume:80,issue:80,unitType:20,asin:32,source:100,collects:10000,contentsStatement:10000,steamAppId:16,purchaseId:256,bundleId:256,parentProviderItemId:500};
 
 export function validateEnrichment(kind, value) {
@@ -85,7 +85,8 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
   }
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
   if(result.keyStatus&&!['unknown','unrevealed','revealed','expired','unavailable'].includes(result.keyStatus))throw new Error('Invalid key status.');
-  if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');
+  if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental','free-claim','free-availability','not-purchased'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');
+  if(provider==='kobo'&&result.titleEvidence&&!['title-attribute','title-element','cover-alt','action-label'].includes(result.titleEvidence))throw new Error('Invalid Kobo title evidence.');
   if (allowEnrichment && value.enrichment !== undefined && value.enrichment !== null) {
     object(value.enrichment,'Enrichment metadata'); const entries={};
     for (const kind of ['openLibrary','googleBooks','googleBooksGenreHint','kindleProductComicContents','localMetadata']) {

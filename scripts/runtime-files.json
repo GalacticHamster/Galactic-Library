@@ -14,6 +14,7 @@
   "src/lib/companion-identities.js",
   "src/lib/companion-response.js",
   "src/lib/constants.js",
+  "src/lib/kobo-observations.js",
   "src/lib/contents-performance.js",
   "src/lib/contents-quality.js",
   "src/lib/contents.js",

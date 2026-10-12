@@ -31,7 +31,9 @@
       if (!response?.ok) throw new Error(response?.error ?? 'Kobo import did not complete.');
       const ownershipNote=` ${items.filter(item=>item.ownership==='subscription').length} observed subscription item(s); ${items.filter(item=>item.ownership==='unknown').length} need ownership review. My Books presence alone does not confirm a purchase.`;
       if (!fullRescan) {
-        status.textContent = `Quick update refreshed ${items.length} observed Kobo item${items.length === 1 ? '' : 's'}. ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally. Use Full rescan to check Archive and Audiobooks.${ownershipNote}`;
+        const changes=response.changes;
+        const summary=changes?`${changes.added} new, ${changes.updated} updated. Checked ${items.length} Kobo item${items.length === 1 ? '' : 's'}.`:`Checked ${items.length} Kobo item${items.length === 1 ? '' : 's'}.`;
+        status.textContent = `${summary} ${response.bookCount} Kobo book${response.bookCount === 1 ? '' : 's'} and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally. Use Full rescan to check Archive and Audiobooks.${ownershipNote}`;
         return;
       }
       const archiveText = archiveAvailable ? ` Included ${archivePagesRead} Archive page${archivePagesRead === 1 ? '' : 's'}.` : ' Kobo did not expose an Archive link in this view.';

@@ -17,6 +17,7 @@ const narrow=process.argv.includes('--narrow');
 const medium=process.argv.includes('--medium'),tiny=process.argv.includes('--tiny'),width=tiny?420:narrow?560:medium?820:1200;
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const importerMode=process.argv.includes('--importers');
+const koboMode=process.argv.includes('--kobo');
 const uxMode=process.argv.includes('--ux');
 const polishMode=process.argv.includes('--polish');
 const contentsUxMode=process.argv.includes('--contents-ux');
@@ -49,7 +50,7 @@ const server=createServer(async(request,response)=>{
     }
     const target=resolve(root,`.${decodeURIComponent(pathname)}`);
     if(!target.startsWith(root+sep)){response.writeHead(403);response.end();return;}
-    let body=pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
+    let body=pathname==='/tests/kobo.html'?'<html><body><script type="module" src="/tests/kobo-browser-fixture.js"></script></body></html>':pathname==='/tests/importers.html'?'<html><body><script type="module" src="/tests/importers-fixture.js"></script></body></html>':packaged&&!pathname.startsWith('/tests/')?packaged.files.get(decodeURIComponent(pathname).slice(1)):await readFile(target);
     if(!body)throw new Error('File is absent from the validated runtime package.');
     if(operationMode&&process.argv.includes('--eager-ui-control')){
       if(pathname==='/src/ui/options.js')body=body.toString().replace("if(workspace.workspace==='providers')providerAccountsView.update(database);",'providerAccountsView.update(database);').replace("if(workspace.workspace==='ownership')renderDuplicateReview();",'renderDuplicateReview();');
@@ -67,7 +68,7 @@ try{
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
   const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):'';
-  const url=`http://127.0.0.1:${server.address().port}/${importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
+  const url=`http://127.0.0.1:${server.address().port}/${koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};

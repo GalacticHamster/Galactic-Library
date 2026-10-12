@@ -26,6 +26,7 @@ import {navigationUxTests} from './navigation-ux.js';
 import {providersUxTests} from './providers-ux.js';
 import {onboardingUxTests} from './onboarding-ux.js';
 import {providerProfileTests} from './provider-profiles.js';
+import {koboWorkflowTests} from './kobo-workflow.js';
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {refreshWritePacingTests} from './refresh-write-pacing.js';
 import {companionQueryConcurrencyTests} from './companion-query-concurrency.js';
@@ -107,6 +108,7 @@ const tests = [
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,
+  ...koboWorkflowTests,
   ...operationFeedbackTests,
   ...libraryLoadingTests,
   ...backupExportTests,
