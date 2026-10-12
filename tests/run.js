@@ -42,6 +42,7 @@ import {kindleManifestTests} from './kindle-manifest.js';
 import {boundedManifestTests} from './manifest-bounded-regressions.js';
 import {contentsPrecisionContextTests} from './contents-precision-context.js';
 import {numberedWrapperTests} from './numbered-wrappers.js';
+import {inferredCoverageTests} from './inferred-coverage.js';
 import {contentsParserV4Tests} from './contents-parser-v4.js';
 import {numberedPrecisionCases} from './contents-numbered-precision-fixture.js';
 import {kindleRefreshCases} from './kindle-refresh-fixture.js';
@@ -104,6 +105,7 @@ const { redactRedemptionValues, humbleItemsFromOrder, purchaseIdsForSync } = glo
 const tests = [
   ...contentsPrecisionContextTests,
   ...numberedWrapperTests,
+  ...inferredCoverageTests,
   ...manualReconciliationTests,
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,

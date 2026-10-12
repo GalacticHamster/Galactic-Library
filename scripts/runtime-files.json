@@ -18,6 +18,7 @@
   "src/lib/contents-performance.js",
   "src/lib/contents-quality.js",
   "src/lib/contents.js",
+  "src/lib/inferred-coverage.js",
   "src/lib/cooperative-work.js",
   "src/lib/data-equality.js",
   "src/lib/duplicate-review.js",

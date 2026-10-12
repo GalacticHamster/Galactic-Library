@@ -2,7 +2,17 @@
 
 Identity confidence and ownership/access confidence are separate. Provider presence is not proof of a purchase. An ownership override changes effective access classification while retaining observed provenance; it does not identify an edition or contained work.
 
-Contents discovery produces **unverified proposals**, not owned standalone titles. Only an explicitly saved contents review can supply contents coverage, and only full entries from effectively owned/claimed parents qualify. Excerpts never establish full-unit coverage. Ordinary title matching does not index proposed or verified component names as standalone library items.
+Contents discovery produces **unverified proposals**, not owned standalone titles. Local series coverage and collection comparisons use automatically inferred full issue/annual/special entries from effectively owned/claimed parents by default. Manually confirmed contents take precedence. Excerpts never establish full-unit coverage. Ordinary title matching does not index proposed or verified component names as standalone library items; the companion API retains its reviewed-only contents behavior.
+
+## Inferred local coverage
+
+`inferred-coverage.js` supplies an evidence index to the existing `contentCoverage` and `seriesCoverage` evaluators; it does not store a second library or change ownership. `collectionContents` reinterprets the current selected source with parser 6 and the existing manifest/source-context handoff. It never unions independent claims or reads historical attempts as current contents. Library/Contents previews use that same interpretation lazily.
+
+Confidence and identity scope are independent: evidence is `verified` (human review), `inferred` (automatic proposal), or `direct` (an effectively owned, explicitly numbered standalone issue). Unsupported/named material, excerpts and unparsed fragments remain unresolved for comic issue coverage. Full issue keys retain literal series, run, type, normalized number and language. Missing run or language creates useful source-local provisional coverage, not definite cross-parent overlap or missing-issue suppression. Explicit conflicting runs/languages never become Possible through these tools. No run, language, alias or chapter-to-issue conversion is invented.
+
+Fully scoped keys deduplicate across supporting parents; verified evidence wins over inferred evidence for the displayed confidence while both parent references remain. Provisional totals are source-local candidates, not distinct global issues. Their numerical holes are possible gaps only. Effective ownership, expiry and preferences are evaluated on each use; raw access provenance is retained. Read-only coverage creates neither provider observations nor separate acquisitions.
+
+The existing `contentReviews` map also accepts an explicit `status: 'rejected'` review with an empty entry list. Ordinary accepted/corrected reviews still require valid nonempty entries. A rejection blocks all automatic suggestions for that provider record until explicit undo or a corrected review; it survives imports, local reparsing, backup and restore. No storage-schema migration is needed. A rejection does not alter captured evidence or another account's review. Older extension versions that require nonempty reviews cannot consume this new review form.
 
 Three completeness questions are distinct:
 

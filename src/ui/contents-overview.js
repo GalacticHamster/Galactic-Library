@@ -1,7 +1,7 @@
 import {contentsStatement} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
-  reviewed:'Contents reviewed', identified:'Contents found · Not reviewed',
+  rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Contents found · Not reviewed',
   partial:'Some contents found · Not reviewed', uncertain:'Contents need review',
   missing:'No contents statement found', unattempted:'Not checked yet',
   failed:"Couldn't retrieve description"
@@ -18,10 +18,10 @@ export function contentsSummary(record, database) {
   const changed=Boolean(review && statement && statement!==review.statement && parent?.raw!==review.statement);
   const incomplete=Boolean(saved?.descriptionMayBeIncomplete || saved?.manifest?.descriptionMayBeIncomplete || candidate?.truncated);
   const outcome=saved?.parseOutcome;
-  const status=review?'reviewed':statement
+  const status=review?review.status==='rejected'?'rejected':'reviewed':statement
     ? incomplete||outcome==='partial'?'partial':outcome==='full'?'identified':'uncertain'
     :failed(attempt?.availability)?'failed':saved?'missing':'unattempted';
-  const needsReview=changed || !review&&Boolean(statement);
+  const needsReview=review?.status==='rejected'?false:changed || !review&&Boolean(statement);
   const updatedAt=[attempt?.checkedAt,review?.verifiedAt,saved?.checkedAt,local?.appliedAt||local?.retrievedAt]
     .filter(value=>Number.isFinite(Date.parse(value))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??'';
   // A saved candidate's count may describe a child span, not the review input.

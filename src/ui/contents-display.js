@@ -1,9 +1,10 @@
-import {proposeContentsForReview,contentsStatement} from '../lib/contents.js';
+import {contentsStatement} from '../lib/contents.js';
+import {collectionContents} from '../lib/inferred-coverage.js';
 import {accountLabel} from './item-presentation.js';
 
-// Presentation only: use committed reviews or the saved bounded parser input.
-// Never select candidates, read source blocks, or feed this projection to matching.
-export function createContentsDisplay({limit=200,interpret=proposeContentsForReview}={}){
+// Lazy presentation of the same current selected-source interpretation used by
+// local coverage. This never changes selected source or companion matching.
+export function createContentsDisplay({limit=200,interpret=null}={}){
   let current;const cache=new Map();
   return (record,database)=>{
     if(current!==database){current=database;cache.clear();}
@@ -11,14 +12,15 @@ export function createContentsDisplay({limit=200,interpret=proposeContentsForRev
     const review=database.contentReviews?.[record.id],saved=record.metadata?.enrichment?.kindleProductComicContents;
     let entries=review?.entries??[],unresolved=[],fallback='',incomplete=Boolean(saved?.descriptionMayBeIncomplete);
     if(!review){
-      if(saved?.parseInput&&['full','partial'].includes(saved.parseOutcome)){
-        const proposal=interpret(saved.parseInput,record.title);
+      if(!interpret||saved?.parseInput&&['full','partial'].includes(saved.parseOutcome)){
+        const proposal=interpret?interpret(saved.parseInput,record.title):collectionContents(record,database);
         entries=proposal.entries;unresolved=proposal.unparsed;if(!entries.length)fallback=contentsStatement(record);
+        incomplete ||= Boolean(proposal.descriptionMayBeIncomplete);
       }else fallback=contentsStatement(record);
       incomplete ||= saved?.parseOutcome==='partial'||Boolean(unresolved.length);
     }
     const result={entries,groups:groupContents(entries),reviewed:Boolean(review),incomplete,unresolved,fallback,
-      source:accountLabel(record,database),basis:review?'Human reviewed':saved?'From book description':'From saved metadata'};
+      source:accountLabel(record,database),basis:review?.status==='rejected'?'Rejected':review?'Human reviewed':entries.length?'Inferred contents':saved?'From book description':'From saved metadata'};
     cache.set(record.recordRef,result);while(cache.size>limit)cache.delete(cache.keys().next().value);
     return result;
   };
@@ -53,7 +55,8 @@ export function contentsPreview(value){
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 export function createContentsReadOnly(record,database,{compact=false,showSource=true,showCaption=true,needsReview=false}={}){
   const value=contentsDisplay(record,database),preview=contentsPreview(value),root=text('div','');root.className='contents-read-only';
-  if(preview.text)root.append(text('p','Collects: '+preview.text+(preview.remaining?' \u00b7 '+preview.remaining+' more entries':'')));
+  if(database.contentReviews?.[record.id]?.status==='rejected')root.append(text('p','Contents suggestions rejected · Excluded from coverage'));
+  else if(preview.text)root.append(text('p','Collects: '+preview.text+(preview.remaining?' \u00b7 '+preview.remaining+' more entries':'')));
   else if(value.fallback)root.append(text('p','Description: '+value.fallback.slice(0,220)+(value.fallback.length>220?'\u2026':'')));
   else return null;
   if(showCaption)root.append(text('small',(showSource?value.source+' \u00b7 ':'')+value.basis+(value.reviewed?'':' \u00b7 Not reviewed')+(value.incomplete||needsReview?' \u00b7 Some description details need review':'')));

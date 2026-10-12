@@ -13,6 +13,7 @@ Choose **Inspect contents** to review the exact account record. **Back to Librar
 | Status | Meaning |
 | --- | --- |
 | Contents reviewed | Human-reviewed entries are saved for this record. This does not assert that every part of the book has been enumerated. |
+| Contents rejected | You excluded this record's suggestions from coverage. Undo the review to use inferred contents again, or save corrected entries. |
 | Contents found · Not reviewed | The saved interpretation accounted for the selected source text. Entries remain suggestions; a parsed description does not prove complete book contents. |
 | Some contents found · Not reviewed | Saved interpretation left unresolved text, or the captured description may be incomplete. |
 | Contents need review | A statement exists but its interpretation is uncertain, unsuccessful, filtered, or not recorded. |
@@ -22,18 +23,20 @@ Choose **Inspect contents** to review the exact account record. **Back to Librar
 
 The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Needs contents review** finds unconfirmed statements and statements that differ from the saved review. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
 
-List counts refer to saved human-reviewed entries, not a guessed total number of issues in the book. Statuses use stored interpretation fields. Visible previews reuse human entries or derive suggestions from the saved bounded parser input in a 200-record snapshot cache. They do not read full source blocks, reinterpret every record or refresh a provider. Where that input is unavailable, saved description text is shown without claiming a structured result.
+List counts refer to saved human-reviewed entries, not a guessed total number of issues in the book. Statuses use stored interpretation fields. Visible previews reuse human entries or interpret the selected captured statement and its proven parent manifest in a 200-record snapshot cache. This uses the same source context as coverage and inspection, without refreshing a provider or reparsing the entire library on list navigation. Where interpretation is unavailable, saved description text remains visible.
 
 ## Inspect and correct contents
 
 Contents is the authoritative book contents editor; Library cards and Details provide read-only included works and an exact-account editing link. Suggestions appear as editable rows; they are not automatically confirmed. Check series/collection, series version or year, unit type, number or name, language, and full versus excerpt extent. Unresolved source material stays visible.
 
 - Correct a row or remove a wrong suggestion before **Save reviewed contents**.
+- **Accept all suggestions** verifies the original proposed list in one action. It does not include unsaved row edits; use Save for corrections.
+- **Reject suggested contents** excludes this record's suggestions, including after new parsing or source updates. The source is retained.
 - Use **Add contents entry** for material you checked yourself.
 - Under **Where this information came from**, inspect/edit the statement and source URL. **Parse statement for review** replaces draft rows with suggestions from that input.
 - **Undo contents review** removes the human review while preserving captured source evidence.
 
-These are the existing authoritative review operations. There is one saved contents review per provider record. No persistent rejection of an acquired statement exists: leaving it unconfirmed is not confirmed coverage. Saving requires at least one valid entry; undo is the supported way to remove confirmation.
+There is one saved contents review per provider record. Leaving suggestions unverified keeps inferred coverage without any action. A reviewed list overrides automatic proposals; a rejection blocks them until you undo it or save a corrected list. Saving corrections requires at least one valid entry. Reviews and rejections survive backup/restore; drafts do not.
 
 If saved source evidence or a review changes during editing, your draft is retained and Save/Undo are disabled. **Reload saved contents** deliberately replaces that draft with the latest saved state. This is a reconciliation safeguard, not a new database conflict-resolution protocol. Navigation asks before discarding a dirty editor. If the record disappears, its open draft remains readable for reference and Save/Undo are blocked. Drafts are not backed up; closing/reloading uses the browser's unsaved-changes prompt.
 
@@ -50,9 +53,9 @@ Book lookup metadata, contents suggestions, human corrections and ownership/acce
 
 ## Collection overlap and gaps
 
-**Overlap with other reviewed collections** compares this record's saved full entries with other qualifying owned records through the existing contents coverage evaluator. It excludes this record so a collection does not report overlap with itself. Missing series version/language, excerpts, and named-component identity limitations remain visible; uncertain overlap is not promoted to confirmed ownership.
+**Overlap with other owned collections** compares this record's extracted or reviewed full entries with qualifying owned records. It excludes this record so a collection does not report overlap with itself. It shows inferred versus verified evidence and supporting book/account names. Missing series version/language remains possible overlap; it cannot hide an issue lacking a sufficiently identified match. Excerpts and digital chapters never count as complete print issues.
 
-**Collection overlap and series gaps** retains the existing reviewed-series dashboard and target-range comparison. Gaps are within an observed or explicitly requested span, not a complete-series bibliography. Coverage through a collection does not create independent digital entitlements to its included issues. Unconfirmed absence is not proof that an issue is missing from every account.
+**Collection overlap and series gaps** uses inferred contents by default, alongside reviewed contents and explicitly owned numbered standalone issues. Search the series, expand a group to see each issue's evidence and supporting books, or compare an explicit target range. Identified keys deduplicate across collections; provisional groups stay separate by source. Unknown run/language shows possible numerical holes rather than definite gaps. Gaps are within an observed or requested span, not a complete-series bibliography. Coverage does not create independent purchases or entitlements. Unconfirmed absence is not proof that an issue is missing from every account.
 
 ## Acquisition and navigation
 

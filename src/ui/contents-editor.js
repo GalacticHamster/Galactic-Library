@@ -17,7 +17,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   const populate=()=>{
   const help=element('details','');help.className='book-tool-help';help.append(element('summary','How contents review works'));
   const steps=element('ol','');for(const instruction of ['GL suggests included works from a book’s description.','Check names, numbers, series version, language and whether each entry is a full work or an excerpt. Correct anything wrong or missing.','Save the entries you reviewed. A reviewed list is not necessarily everything in the book.'])steps.append(element('li',instruction));
-  help.append(steps,element('p','Reviewing contents does not change ownership or add separate purchases of the included works. Comparisons use qualifying owned copies, including your existing ownership preferences.'));root.append(element('p','Check the suggested included works before saving.'),help);
+  help.append(steps,element('p','Reviewing contents does not change ownership or add separate purchases of the included works. Comparisons use qualifying owned copies, including your existing ownership preferences.'));root.append(element('p','Unreviewed full issues already contribute inferred coverage when this book is effectively owned. Review is optional. Missing series version or language remains provisional; excerpts and digital chapters do not count as complete issues.'),help);
   const evidence=record.metadata?.enrichment?.kindleProductComicContents;
   const interpretedEvidence=evidence?.manifest?manifestReviewProposal(evidence,record.title):null;
   const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
@@ -51,7 +51,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   };
   const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
-  if(review)status.textContent=`${review.entries.length} reviewed entries saved. Edit to correct them, or undo the review.`;
+  if(review)status.textContent=review.status==='rejected'?'Suggestions rejected: excluded from coverage until you save corrected entries or undo the rejection.':`${review.entries.length} reviewed entries saved. Edit to correct them, or undo the review.`;
   else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not reviewed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
   if(initialProposal)showInterpretation(initialProposal,discovered);
@@ -113,8 +113,10 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
       const entries=[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
       await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});
   })));
+  if(!review&&initialProposal?.entries.length)root.append(button('Accept all suggestions',()=>persist(()=>actions.save(record.id,{entries:validateContents(initialProposal.entries),statement:initialProposal.manifestEvidence||discovered,sourceUrl:source.value,source:'manual-review'}))));
+  root.append(button('Reject suggested contents',()=>persist(()=>actions.save(record.id,{status:'rejected',entries:[],statement:discovered,sourceUrl:source.value,source:'manual-review'}))));
   if(review)root.append(button('Undo contents review',()=>persist(()=>actions.remove(record.id))));
-  root.append(element('p','Correct an entry directly or remove a wrong suggestion before saving. Undo removes human confirmation, not captured evidence. Leaving a suggestion unreviewed does not confirm that it is included.'),status);
+  root.append(element('p','Accept all verifies the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave unverified to keep inferred coverage without saving.'),status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
   if(expanded){root.open=true;populated=true;populate();}

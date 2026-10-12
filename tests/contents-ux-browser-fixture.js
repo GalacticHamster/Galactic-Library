@@ -6,6 +6,11 @@ import {createContentsWorkspace} from '../src/ui/contents-workspace.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
 import {precisionRecord,verifySourcePaths} from './contents-precision-context-fixture.js';
 import {verifyNumberedWrapper,verifyIndependentWrappers} from './numbered-wrappers-fixture.js';
+import {inferredCoverageCases,coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage-fixture.js';
+import {createSeriesCoverageView} from '../src/ui/series-coverage.js';
+import {createCollectionComparison} from '../src/ui/contents-book-details.js';
+import {validateContentReview} from '../src/lib/contents.js';
+import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -30,6 +35,28 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ {
+ for(const [,run]of inferredCoverageCases)await run();
+ checks.push('Inferred coverage safeguards, manual overrides, rejection backup, provisional identities and unchanged companion API');
+ const coverageParent=coverageBook('ui'),otherParent=coverageBook('other'),coverageDb=coverageDatabase(coverageParent,otherParent);
+ const coverageView=createSeriesCoverageView(coverageDb);document.body.append(coverageView);
+ assert(coverageView.textContent.includes('inferred')&&coverageView.textContent.includes('3 identified covered works'),'Series UI requires verification or double counts');
+ const group=coverageView.querySelector('.series-groups details');group.open=true;group.dispatchEvent(new Event('toggle'));
+ assert(group.textContent.includes('Collection ui')&&group.textContent.includes('Collection other'),'Supporting books hidden');
+ const comparisonView=createCollectionComparison(coverageParent,coverageDb);document.body.append(comparisonView);comparisonView.open=true;comparisonView.dispatchEvent(new Event('toggle'));
+ assert(comparisonView.textContent.includes('3 of 3')&&comparisonView.textContent.includes('inferred'),'Unreviewed collection overlap absent');coverageView.remove();comparisonView.remove();
+ checks.push('Series and collection comparison UI use inferred coverage by default and show parent provenance');
+ const coverageActions={save:async(id,value)=>{coverageDb.contentReviews[id]=validateContentReview({...value,verifiedAt:'2026-10-12T12:00:00Z'});},remove:async id=>{delete coverageDb.contentReviews[id];},refresh:()=>{}};
+ const acceptEditor=createContentsEditor(coverageParent,null,coverageActions,{expanded:true});document.body.append(acceptEditor);
+ button(acceptEditor,'Accept all suggestions').click();await wait(()=>coverageDb.contentReviews[coverageParent.id]?.entries.length===3,'Accept all did not save a verified list');
+ assert(libraryContentCoverage(coverageDb,[issue()]).verified===1,'Accept all remained inferred');await delay();acceptEditor.remove();
+ const rejectEditor=createContentsEditor(coverageParent,coverageDb.contentReviews[coverageParent.id],coverageActions,{expanded:true});document.body.append(rejectEditor);
+ button(rejectEditor,'Reject suggested contents').click();await wait(()=>coverageDb.contentReviews[coverageParent.id]?.status==='rejected','Reject did not persist');
+ assert(coverageDb.contentReviews[coverageParent.id].entries.length===0,'Reject retained coverage');await delay();rejectEditor.remove();
+ const undoEditor=createContentsEditor(coverageParent,coverageDb.contentReviews[coverageParent.id],coverageActions,{expanded:true});document.body.append(undoEditor);
+ assert(undoEditor.textContent.includes('Suggestions rejected'),'Rejection missing from editor');button(undoEditor,'Undo contents review').click();await wait(()=>!coverageDb.contentReviews[coverageParent.id],'Undo did not restore suggestions');await delay();undoEditor.remove();
+ checks.push('Actual contents editor accepts all, rejects and restores inferred contents without acquisition');
+ }
  const wrappers=await (await fetch('/tests/fixtures/kindle/numbered-wrappers.json')).json();
  for(const c of [...wrappers.cases,...wrappers.controls]){
    const {record,proposal}=verifyNumberedWrapper(c,assert),before=JSON.stringify(record);

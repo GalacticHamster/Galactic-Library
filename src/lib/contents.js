@@ -315,7 +315,10 @@ export function validateContentReview(value) {
   object(value,'Contents review');
   const sourceUrl=url(value.sourceUrl);
   if(value.sourceUrl && !sourceUrl)throw new Error('Contents source must be an HTTP(S) page without credentials.');
-  return {entries:validateContents(value.entries),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date')};
+  const rejected=value.status==='rejected';
+  if(value.status!==undefined&&!rejected)throw Error('Invalid contents review status.');
+  if(rejected&&(!Array.isArray(value.entries)||value.entries.length))throw Error('Rejected contents must have an empty entry list.');
+  return {entries:rejected?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date')};
 }
 
 export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {
@@ -346,7 +349,7 @@ export function parentContentCoverage(database,parentItemId,requested,options = 
 
 function evaluateContentCoverage(database, requested, options, parentScope) {
   const entries=validateContents(requested).filter((entry)=>entry.completeness==='full');
-  const index=ownedContentIndex(database, options);
+  const index=options.contentIndex??ownedContentIndex(database, options);
   const byUnit=new Map(),byComponent=new Map(),needsComponents=entries.some(entry=>entry.unitType==='component');
   const add=(map,key,evidence)=>{const matches=map.get(key)??[];matches.push(...evidence);map.set(key,matches);};
   for(const evidence of index.values()){
@@ -366,7 +369,7 @@ function evaluateContentCoverage(database, requested, options, parentScope) {
     const component=entry.unitType==='component';
     const scoped=component&&parentScope?.valid&&parentScope.mediaType===options.mediaType;
     const key=component?(scoped?componentContentKey(entry,parentScope.parentItemId,parentScope.mediaType):null):contentKey(entry);
-    const evidence=key?index.get(key)??[]:[];
+    const evidence=key&&(!options.requireIdentityScope||entry.run&&entry.language)?index.get(key)??[]:[];
     (evidence.length?covered:missing).push({...entry, ...(evidence.length?{evidence}: {})});
     if (!evidence.length) {
       const [series,run,type,number,language]=JSON.parse(contentKey(entry));
@@ -382,13 +385,15 @@ function evaluateContentCoverage(database, requested, options, parentScope) {
   return {total:entries.length,owned:covered.length,complete:entries.length>0&&!missing.length&&!scopeUncertain,scopeUncertain:scopeUncertain||possibleCovered.length>0,covered,possibleCovered,missing};
 }
 
-export function seriesCoverage(database) {
-  const index=ownedContentIndex(database);const groups=new Map();
+export function seriesCoverage(database,options={}) {
+  const index=options.contentIndex??ownedContentIndex(database);const groups=new Map();
   for (const evidence of index.values()) {
     const entry=evidence[0].entry,parent=evidence[0].item,component=entry.unitType==='component',parentItemId=evidence[0].parentItemId;
-    const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language),...(component?[parentItemId,parent.mediaType]:[])]);
+    const provisional=Boolean(options.requireIdentityScope&&(!entry.run||!entry.language));
+    const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language),...(component?[parentItemId,parent.mediaType]:provisional?[parent.id]:[])]);
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
-    group.entries.push({number:entry.number,sources:evidence.map(({item})=>({id:item.id,title:item.title,provider:item.provider}))});groups.set(key,group);
+    const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;
+    group.entries.push({number:entry.number,confidence:supporting.some(value=>value.review)?'verified':supporting.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,sources:supporting.map(({item,confidence})=>({id:item.id,title:item.title,provider:item.provider,confidence}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
     const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);

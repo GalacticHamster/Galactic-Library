@@ -2,25 +2,28 @@ import {presentAction} from './form-presentation.js';
 import {accessLabel,formatDate} from './formatters.js';
 import {accountLabel} from './item-presentation.js';
 import {createEnrichmentEvidence} from './enrichment-evidence.js';
-import {contentCoverage} from '../lib/contents.js';
+import {collectionContents,libraryContentCoverage} from '../lib/inferred-coverage.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return presentAction(node);};
 export function collectionComparison(record,database) {
-  const review=database.contentReviews?.[record.id];if(!review)return null;
-  return contentCoverage(database,review.entries,{excludeItemIds:[record.id],mediaType:record.mediaType});
+  const contents=collectionContents(record,database);if(!contents.entries.length)return null;
+  const requested=contents.entries.map(entry=>({...entry,language:entry.language||record.metadata?.language||''}));
+  return libraryContentCoverage(database,requested,{excludeItemIds:[record.id],mediaType:record.mediaType});
 }
 export function createCollectionComparison(record,database) {
-  const root=text('details','');root.className='contents-collection-comparison';root.append(text('summary','Overlap with other reviewed collections'));
+  const root=text('details','');root.className='contents-collection-comparison';root.append(text('summary','Overlap with other owned collections'));
   let built=false;root.addEventListener('toggle',()=>{if(!root.open||built)return;built=true;
-    root.append(text('p','Compare the entries you reviewed with checked contents in other collections you own. Included material is not a separate purchase of each work.'));
+    root.append(text('p','Compare extracted or reviewed contents with other effectively owned collections. Inferred coverage is unverified; incomplete issue identities are only possible overlap. Included material is not a separate purchase.'));
     const result=collectionComparison(record,database);
-    if(!result){root.append(text('p','Review and save this collection’s contents first. Unverified suggestions are not used as confirmed coverage.'));return;}
-    root.append(text('p',`${result.owned} of ${result.total} checked entries also appear in other collections you own. ${result.missing.length} have no confirmed match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
+    if(!result){root.append(text('p','No usable contents are available for this collection. A saved rejection excludes its suggestions until you undo it.'));return;}
+    root.append(text('p',`${result.owned} of ${result.total} entries also appear in other owned collections (${result.verified} verified, ${result.inferred} inferred, ${result.direct} standalone). ${result.missing.length} have no sufficiently identified match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
     if(result.scopeUncertain)root.append(text('p','Series version, language or a related match needs checking before a complete comparison can be made.'));
     const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(sources.length)root.append(text('p','Covered through: '+sources.join('; ')));
-    if(result.missing.length)root.append(text('p','No confirmed match in other collections: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
-    root.append(text('p','No confirmed match does not prove the material is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
+    const possibleSources=[...new Set(result.possibleCovered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
+    if(possibleSources.length)root.append(text('p','Possible overlap through (identity needs more detail): '+possibleSources.join('; ')));
+    if(result.missing.length)root.append(text('p','No sufficiently identified match in other collections: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
+    root.append(text('p','No sufficiently identified match does not prove the material is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
   });return root;
 }
 export function createContentsBookDetails(record,database,actions) {
