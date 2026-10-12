@@ -57,6 +57,17 @@ chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, 
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
 const companionTimings=contentsPerformance.collector();
+const providerTimings=contentsPerformance.collector();
+let providerDiagnosticSequence=100;
+function providerTiming(request){
+  if(request.provider!=='kobo')return null;
+  const timing=contentsPerformance.trace(contentsPerformance.validId(request.diagnosticLookupId)?request.diagnosticLookupId:`lookup-${companionDiagnosticPrefix}-${providerDiagnosticSequence++}`,'provider');
+  timing.providerPhase=request.type==='GET_PROVIDER_PROFILE'?'profile':request.beginScan?'start':'finish';return timing;
+}
+function providerResponse(timing,sendResponse,value){
+  if(timing){providerTimings.add(timing.finish(value.ok?'prepared':'failed'));value={...value,performance:contentsPerformance.clean(timing)};}
+  sendResponse(value);
+}
 const companionCallbacks=new Map();
 let contentsDiagnosticUntil=0,companionDiagnosticSequence=0;
 const companionDiagnosticPrefix=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
@@ -247,7 +258,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if(request?.type==='GET_KINDLE_CONTENTS_UI_TIMINGS'){
     if(!isProviderImportPage('kindle',sender.url)&&!isOwnExtensionPage(sender.url)){sendResponse({ok:false});return undefined;}
     workerLifecycle.observe('diagnostics_export');
-    workerLifecycle.report().then(lifecycle=>sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean),activity:queryDiagnostics.report(),lifecycle}));return true;
+    workerLifecycle.report().then(lifecycle=>sendResponse({ok:true,records:contentsUiTimings.report().records.map(contentsPerformance.clean),companions:companionTimings.report().records.map(contentsPerformance.clean),providers:providerTimings.report().records.map(contentsPerformance.clean),activity:queryDiagnostics.report(),lifecycle}));return true;
   }
   if (request?.type === 'SEARCH_GOOGLE_BOOKS') {
     if (!isOwnExtensionPage(sender.url)) {
@@ -401,22 +412,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if(request?.type==='GL_PROVIDER_UI_TIMING'){
+    if(request.provider==='kobo'&&isProviderImportPage('kobo',sender.url)&&contentsPerformance.clean(request.timing)?.kind==='provider')providerTimings.add(request.timing);
+    sendResponse({ok:true});return undefined;
+  }
+  if(request?.type==='GET_PROVIDER_PROFILE_HINT'){
+    if(request.provider!=='kobo'||!isProviderImportPage('kobo',sender.url)){sendResponse({ok:false});return undefined;}
+    storageWriter.getProviderProfileHint('kobo').then(hint=>sendResponse({ok:true,hint})).catch(()=>sendResponse({ok:false}));return true;
+  }
   if (['GET_PROVIDER_SYNC_STATE','GET_PROVIDER_PROFILE'].includes(request?.type)) {
     if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
       sendResponse({ ok: false, error: 'Sync state is available only from the matching signed-in provider site.' });
       return undefined;
     }
+    const timing=providerTiming(request),end=timing?.begin(request.type==='GET_PROVIDER_PROFILE'?'provider_profile':'provider_start');
+    const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};
     const read = request.beginScan===true
       ? ((request.confirmed===true || request.rememberedProfile===true) && Number.isInteger(sender.tab?.id)
-        ? storageWriter.beginProviderScan(request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true)
+        ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true],timing)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
-      : getDatabase().then(database=>({database}));
+      : (request.provider==='kobo'?storageWriter.getQueryDatabase({beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
         const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
         const state = database.providerProfiles?.[activeId]?.state ?? {};
         if(request.type==='GET_PROVIDER_PROFILE'){
           const profile=database.providerProfiles?.[activeId],profiles=Object.values(database.providerProfiles??{}).filter(p=>p.provider===request.provider);
-          sendResponse({ok:true,profileLabel:profile?.nickname??'',profileId:activeId,
+          if(request.provider==='kobo')storageWriter.rememberProviderProfileHints(database).catch(()=>{});
+          reply({ok:true,profileLabel:profile?.nickname??'',profileId:activeId,
             reuseAllowed:profiles.length===1&&profile?.state.connected===true&&Boolean(profile.state.lastSync),
             profiles:profiles.map(p=>({profileId:p.profileId,nickname:p.nickname}))});return;
         }
@@ -425,7 +447,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           .map((item) => item.providerItemId)
           .filter(Boolean)
           .slice(0, 50000);
-        sendResponse({
+        reply({
           ok: true,
           scanToken,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
@@ -440,7 +462,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             : { knownProviderItemIds }
         });
       })
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+      .catch((error) => reply({ ok: false, error: error.message }));
     return true;
   }
 
@@ -504,10 +526,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if(!raw||typeof raw!=='object'||Array.isArray(raw)||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}
     syncDetails.scanDiagnostics={failedRequestCount:raw.failedRequestCount??0,...(raw.retries!==undefined?{retries:raw.retries}:{}),coverageLimit:raw.arrayOnly===true?'array-only-index-without-total':''};
   }
+  const timing=providerTiming(request),end=timing?.begin('provider_finish');
+  const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};
   (request.type==='COMMIT_PROVIDER_SCAN'
-    ? storageWriter.commitProviderScan(request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id)
+    ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,request.provider==='kobo'],timing)
     : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))
-    .then((database) => sendResponse({
+    .then((result) => {const database=result.database??result;reply({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
@@ -517,10 +541,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       movieCount: database.providers[request.provider].movieCount ?? 0,
       tvCount: database.providers[request.provider].tvCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
-      ...(request.provider==='kobo'?{changes:database.providers.kobo.syncHealth?.differences}:{}),
+      ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
       syncedAt: database.providers[request.provider].lastSync
-    }))
-    .catch((error) => sendResponse({ ok: false, error: error.message }));
+    });})
+    .catch((error) => reply({ ok: false, error: error.message }));
   return true;
 });
 

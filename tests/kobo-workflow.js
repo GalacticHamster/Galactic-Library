@@ -12,6 +12,53 @@ import {matchItems} from '../src/lib/matcher.js';
 import {recoverKoboActionTitles} from '../scripts/recover-kobo-action-titles.mjs';
 const item=(n,metadata={})=>({providerItemId:String(n),title:'Example Book '+n,mediaType:'book',ownership:'unknown',metadata:{authors:['Writer'],genres:['Comics & Graphic Novels'],ownershipBasis:'library-presence-only',titleEvidence:'title-attribute',...metadata}});
 export const koboWorkflowTests=[
+ ['Kobo unchanged leased checks do not write the database, rebuild identities or notify purchase synchronization',async()=>{
+   const {writer,stored,writes}=memory({cacheQuerySnapshots:true}),items=Array.from({length:137},(_,n)=>item(n));
+   let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshotFixture('kobo',items));
+   const original=structuredClone(db),snapshot=await writer.getQueryDatabase(),id=db.providers.kobo.activeProfileId;
+   for(let pass=0;pass<2;pass++){
+     writes.length=0;
+     const scan=await writer.beginProviderScan('kobo','Personal','incremental',false,1,id,true);
+     const result=await writer.commitProviderScan('kobo',items.slice(0,24),{syncMode:'incremental'},null,scan.scanToken,1,true);
+     assert.deepEqual(result.database,original);assert.equal(result.scanResult.changes.updated,0);assert.equal(result.scanResult.changes.added,0);assert.equal(result.scanResult.ownership.review,24);
+     assert(writes.every(write=>!('galacticLibraryDatabase' in write)));assert.equal(await writer.getQueryDatabase(),snapshot);
+     await assert.rejects(writer.commitProviderScan('kobo',items.slice(0,24),{syncMode:'incremental'},null,scan.scanToken,1),/superseded/);
+   }
+   assert.deepEqual(stored.galacticLibraryDatabase,original);assert.deepEqual(parseBackup(createBackup(original)),original);
+ }],
+ ['Kobo fast checks commit substantive title, author, genre and access changes through validated normal saves',async()=>{
+   for(const change of [{title:'Changed Title'}, {metadata:{authors:['New Writer']}},{metadata:{genres:['History']}},{ownership:'subscription',metadata:{ownershipBasis:'kobo-plus-subscription'}}]){
+     const {writer,writes}=memory({cacheQuerySnapshots:true}),items=[item(1),item(2)];
+     let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshotFixture('kobo',items));
+     const untouched=Object.values(db.providerItems).find(r=>r.providerItemId==='2');await writer.getQueryDatabase();writes.length=0;
+     const scan=await writer.beginProviderScan('kobo','Personal','incremental',false,1,db.providers.kobo.activeProfileId,true);
+     const changed={...items[0],...change,metadata:{...items[0].metadata,...change.metadata}};
+     const result=await writer.commitProviderScan('kobo',[changed],{syncMode:'incremental'},null,scan.scanToken,1,true);
+     assert.equal(result.scanResult.changes.updated,1);assert(writes.some(write=>'galacticLibraryDatabase' in write));
+     assert.deepEqual(result.database.providerItems[untouched.id],untouched);assert.deepEqual(parseBackup(createBackup(result.database)),result.database);
+   }
+ }],
+ ['Kobo result separates raw uncertainty, preference-covered books and explicit conflicts without altering evidence',async()=>{
+   const {writer}=memory({cacheQuerySnapshots:true}),items=[item(1),item(2,{ownershipBasis:'conflicting-evidence'}),{...item(3,{ownershipBasis:'kobo-plus-subscription'}),ownership:'subscription'}];
+   let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshotFixture('kobo',items));const id=db.providers.kobo.activeProfileId;
+   for(const enabled of [false,true]){
+     db=await writer.saveKoboOwnershipAssumption(id,enabled);const before=structuredClone(db.providerItems);
+     const scan=await writer.beginProviderScan('kobo','Personal','incremental',false,1,id,true);
+     const result=await writer.commitProviderScan('kobo',items,{syncMode:'incremental'},null,scan.scanToken,1,true);
+     assert.deepEqual(result.scanResult.ownership,{unconfirmed:2,covered:Number(enabled),review:enabled?1:2,subscriptions:1});assert.deepEqual(result.database.providerItems,before);
+   }
+ }],
+ ['Kobo display hints survive a worker restart but never authorize stale, switched, restored or ambiguous accounts',async()=>{
+   const {writer,stored}=memory({cacheQuerySnapshots:true}),items=[item(1)];let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshotFixture('kobo',items));const id=db.providers.kobo.activeProfileId;
+   assert.equal((await writer.getProviderProfileHint('kobo')).nickname,'Personal');assert.equal(await writer.getProviderProfileHint('humble'),null);
+   const restarted=memory();Object.assign(restarted.stored,structuredClone(stored));assert.equal((await restarted.writer.getProviderProfileHint('kobo')).nickname,'Personal');
+   const scan=await writer.beginProviderScan('kobo','Personal','incremental',false,1,id,true);
+   await writer.restoreDatabase(parseBackup(createBackup(db)));await assert.rejects(writer.commitProviderScan('kobo',items,{syncMode:'incremental'},null,scan.scanToken,1),/superseded/);
+   await writer.mergeProviderItems('kobo',[item(2)],{profileLabel:'Other'});assert.equal(await writer.getProviderProfileHint('kobo'),null);
+   await assert.rejects(writer.beginProviderScan('kobo','Personal','incremental',false,1,id,true),/Saved accounts changed/);
+   await writer.clearDatabase();assert.equal(await writer.getProviderProfileHint('kobo'),null);
+   assert(!stored.galacticLibraryProviderProfileHints);
+ }],
  ['Kobo offline recovery requires matching stable account/record IDs and a corroborated original title',async()=>{
    const {writer}=memory();let current=await writer.mergeProviderItems('kobo',[item(1),item(2)]),reference=structuredClone(current);
    const records=Object.values(current.providerItems);records[0].title='Read Now: '+records[0].title;records[0].metadata.authors=[];records[1].title='Read Now: Uncorroborated';

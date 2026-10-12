@@ -215,15 +215,22 @@
     reportProgress({ ...progress, books, audiobooks });
   }
 
-  async function fetchLibraryDocument(url) {
-    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  async function fetchLibraryDocument(url,timing) {
+    let end=timing?.begin('fetch_headers'),response;
+    try{response=await fetch(url, { credentials: 'include', cache: 'no-store' });}finally{end?.();}
     if (!response.ok) throw new Error(`Kobo returned ${response.status} while loading your Archive.`);
-    const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+    end=timing?.begin('response_body');let body;
+    try{body=await response.text();}finally{end?.();}
+    end=timing?.begin('dom_parse');let document;
+    try{document=new DOMParser().parseFromString(body,'text/html');}finally{end?.();}
+    end=timing?.begin('page_checks');
+    try{
     if (!document.querySelector('.filter-btn, [data-kobo-sort], a[data-book-title]') && !/\b(?:no books|no audiobooks|archive is empty|no items)\b/iu.test(document.body?.textContent ?? '')) throw new Error('Kobo returned a page without readable library structure. No library changes were saved.');
     for (const link of document.querySelectorAll('a[data-book-title][href]')) {
       if (!koboItemFromCardData(cardDataFromLink(link))) throw new Error('Kobo returned an unreadable library card. No library changes were saved.');
     }
     return document;
+    }finally{end?.();}
   }
 
   function expectedCountFromDocument(document) {
@@ -234,7 +241,7 @@
     return /\b(?:no books|no audiobooks|archive is empty|no items)\b/iu.test(document.body?.textContent ?? '') ? 0 : null;
   }
 
-  async function fetchKoboLinkedSection(itemsById, reportProgress, rootDocument, linkLabel, librarySection) {
+  async function fetchKoboLinkedSection(itemsById, reportProgress, rootDocument, linkLabel, librarySection,timing) {
     const sectionLink = librarySectionLinkFromDocument(rootDocument, linkLabel);
     if (!sectionLink) return { pagesRead: 0, available: false, document: null };
     let url = absoluteUrl(sectionLink.getAttribute('href'));
@@ -248,7 +255,7 @@
       if (seenUrls.has(url)) throw new Error(`Kobo repeated a ${linkLabel} page before reaching its end.`);
       if (pagesRead >= MAX_PAGES) throw new Error(`Kobo reached the ${MAX_PAGES}-page limit in ${linkLabel}.`);
       seenUrls.add(url);
-      const document = await fetchLibraryDocument(url);
+      const document = await fetchLibraryDocument(url,timing);
       if (!firstDocument) firstDocument = document;
       const count = expectedCountFromDocument(document);
       if (pagesRead > 0 && count !== expectedCount) throw new Error(`Kobo changed the ${linkLabel} total during the scan.`);
@@ -269,13 +276,13 @@
     return { pagesRead, available: true, document: firstDocument, scope: global.GalacticProviderSnapshot.completedScope(librarySection, sectionIds.size, expectedCount, 'pagination-end', pagesRead) };
   }
 
-  async function fetchKoboLibrary(reportProgress = () => {}, knownItemIds = null) {
+  async function fetchKoboLibrary(reportProgress = () => {}, knownItemIds = null,timing) {
     const itemsById = new Map();
     const incremental = Array.isArray(knownItemIds);
     const initialUrl = new URL(global.location.href);
     initialUrl.searchParams.set('pageNumber', '1');
     initialUrl.searchParams.set('sort', 'DateAddedDesc');
-    const firstDocument = await fetchLibraryDocument(initialUrl.toString());
+    const firstDocument = await fetchLibraryDocument(initialUrl.toString(),timing);
     const totalPages = pageCountFromDocument(firstDocument);
     if (totalPages > MAX_PAGES) throw new Error(`Kobo reported ${totalPages} pages, exceeding the ${MAX_PAGES}-page scan limit.`);
     const expectedCount = expectedCountFromDocument(firstDocument);
@@ -283,8 +290,9 @@
     for (let page = 1; page <= totalPages; page += 1) {
       const pageUrl = new URL(initialUrl);
       pageUrl.searchParams.set('pageNumber', String(page));
-      const document = page === 1 ? firstDocument : await fetchLibraryDocument(pageUrl.toString());
-      const pageItems = koboItemsFromDocument(document);
+      const document = page === 1 ? firstDocument : await fetchLibraryDocument(pageUrl.toString(),timing);
+      const extractionEnd=timing?.begin('extraction');let pageItems;
+      try{pageItems=koboItemsFromDocument(document);}finally{extractionEnd?.();}
       if (expectedCountFromDocument(document) !== expectedCount || pageCountFromDocument(document) > totalPages) throw new Error('Kobo changed its library totals during the scan. Please retry.');
       if (!pageItems.length && (page < totalPages || expectedCount !== 0)) throw new Error('Kobo returned an empty or unreadable library page before completing the scan.');
       const signature = pageItems.map((item) => item.providerItemId).sort().join('|');
@@ -305,10 +313,10 @@
     }
     if (incremental) return { items: [...itemsById.values()], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
     const scopes = [global.GalacticProviderSnapshot.completedScope('my-books', itemsById.size, expectedCount, 'pagination-end', totalPages)];
-    const myBooksArchive = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Archive', 'archive');
-    const audiobooks = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Audiobooks', 'audiobooks');
+    const myBooksArchive = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Archive', 'archive',timing);
+    const audiobooks = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Audiobooks', 'audiobooks',timing);
     const audiobookArchive = audiobooks.document
-      ? await fetchKoboLinkedSection(itemsById, reportProgress, audiobooks.document, 'Archive', 'audiobooks-archive')
+      ? await fetchKoboLinkedSection(itemsById, reportProgress, audiobooks.document, 'Archive', 'audiobooks-archive',timing)
       : { pagesRead: 0, available: false };
     return {
       items: [...itemsById.values()],

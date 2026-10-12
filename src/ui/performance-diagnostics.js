@@ -16,7 +16,7 @@ export function bindPerformanceDiagnostics({button,status,worker,runtime,downloa
     try{
       const response=await runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'});
       if(!response?.ok)throw Error('Could not read worker diagnostics.');
-      const summary={...globalThis.GalacticContentsPerformance.collector().report(response.records??[],response.companions??[]),activity:response.activity,lifecycle:response.lifecycle};
+      const summary={...globalThis.GalacticContentsPerformance.collector().report(response.records??[],response.companions??[]),providers:response.providers??[],activity:response.activity,lifecycle:response.lifecycle};
       const activity=response.activity;
       worker.textContent=activity?.worker&&Number.isFinite(activity.startedEpochMs)
         ?`Worker at last export: ${activity.worker}; started ${new Date(activity.startedEpochMs).toLocaleString()}.`

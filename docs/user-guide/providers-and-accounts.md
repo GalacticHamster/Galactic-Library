@@ -101,6 +101,27 @@ account before updating.
 
 ## Other sections
 
+### Kobo quick checks
+
+Kobo shows a remembered single-account nickname promptly while checking the
+saved account in the background. This display hint does not authorize an import;
+updates wait for verification. Multiple accounts and changed selections still
+require explicit confirmation.
+
+An unchanged Quick update checks the observed cards and completes its scan
+without rewriting the library or changing its last saved-import timestamp.
+New or changed evidence follows the normal validated save path. The result
+shows checked, new and updated counts. **Ownership preference applied** means
+the preference covers raw unconfirmed Kobo evidence; explicit conflicts still
+show an ownership-review warning. Source ownership is preserved.
+
+Settings → Performance diagnostics → **Export timing summary** includes the
+last 50 Kobo diagnostic records under `providers`, independently of Kindle
+tracing. Records identify profile lookup, scan startup, fetching, comparison
+and finishing. Worker records and page totals share correlation IDs; nested
+stage durations must not be added twice. They are bounded in-memory diagnostics
+and disappear when the worker restarts.
+
 Library retains All items, Book information, Reading, and Ownership and access
 as secondary views. Existing filters, item details, enrichment and reviews
 remain available there.

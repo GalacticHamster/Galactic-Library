@@ -32,6 +32,8 @@ try{
   const profileGate=new Promise(resolve=>{releaseProfile=resolve;});
   globalThis.fetch=async()=>({ok:true,text:async()=>html});
   globalThis.chrome={runtime:{sendMessage:async request=>{
+    if(request.type==='GET_PROVIDER_PROFILE_HINT')return {ok:true,hint:await writer.getProviderProfileHint('kobo')};
+    if(request.type==='GL_PROVIDER_UI_TIMING')return {ok:true};
     if(request.type==='GET_PROVIDER_PROFILE'){
       if(profilePending)await profileGate;
       const current=await writer.getDatabase(),profile=current.providerProfiles[current.providers.kobo.activeProfileId],profiles=Object.values(current.providerProfiles).filter(p=>p.provider==='kobo');
@@ -44,18 +46,18 @@ try{
       }catch(error){return {ok:false,error:error.message};}
     }
     if(request.type==='COMMIT_PROVIDER_SCAN'){
-      try{db=await writer.commitProviderScan('kobo',request.items,{syncMode:request.mode},request.snapshot,request.scanToken,1);completed++;return {ok:true,bookCount:db.providers.kobo.bookCount,audiobookCount:db.providers.kobo.audiobookCount,changes:db.providers.kobo.syncHealth.differences};}
+      try{const result=await writer.commitProviderScan('kobo',request.items,{syncMode:request.mode},request.snapshot,request.scanToken,1,true);db=result.database;completed++;return {ok:true,bookCount:db.providers.kobo.bookCount,audiobookCount:db.providers.kobo.audiobookCount,...result.scanResult};}
       catch(error){return {ok:false,error:error.message};}
     }
     if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true};
     return {ok:false,error:'Unexpected request'};
   }}};
   history.replaceState(null,'','/library');await import('../src/providers/kobo-content.js');let shadow=shadows.at(-1),button=shadow.querySelector('[data-mode="incremental"]');
-  button.click();await pause();assert(started===0,'Scan began before persisted profile selection resolved.');profilePending=false;releaseProfile();await wait(()=>completed===1);
+  button.click();await pause();assert(started===0,'Scan began before persisted profile selection resolved.');assert(shadow.querySelector('[data-profile-label]').value==='Sean','Display-only remembered nickname waited for full validation.');profilePending=false;releaseProfile();await wait(()=>completed===1);
   assert(shadow.querySelector('[data-profile-label]').value==='Sean'&&!shadow.querySelector('[data-profile-confirm]').checked,'Remembered account required a repeated checkbox confirmation.');
-  assert(shadow.querySelector('.status').textContent.includes('0 new, 0 updated. Checked 24'),'Observed cards were reported as changed books.');
+  assert(shadow.querySelector('.status').textContent.includes('24 checked · 0 new · 0 updated'),'Observed cards were reported as changed books.');
   checks.push('A click during delayed account loading waits, then reuses the single saved profile without nickname entry or repeat confirmation');
-  button.click();await wait(()=>completed===2);assert(db.providers.kobo.syncHealth.differences.updated===0&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
+  button.click();await wait(()=>completed===2);assert(shadow.querySelector('.status').textContent.includes('0 updated')&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
   assert(JSON.stringify(parseBackup(createBackup(db)))===JSON.stringify(db),'Author/genre backup roundtrip changed metadata.');
   checks.push('Two actual unchanged quick scans report zero new/updated, retain all 137 UUIDs and preserve metadata through backup restore');
   db=await writer.mergeProviderItems('kobo',[{providerItemId:uuid(999),title:'Other Account Book',mediaType:'book'}],{profileLabel:'Other'});
@@ -68,6 +70,8 @@ try{
   const account=view.element.querySelector('[data-account="'+profileId+'"]');account.closest('details').open=true;account.querySelector('details').open=true;
   [...account.querySelectorAll('button')].find(b=>b.textContent==='Ownership preference').click();const dialog=view.element.querySelector('dialog'),checkbox=dialog.querySelector('[data-kobo-assume-owned]');assert(!checkbox.checked,'Ownership assumption defaulted to true.');checkbox.checked=true;[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Save preference').click();await wait(()=>db.providerProfiles[profileId].assumeUnconfirmedOwned);
   const record=Object.values(db.providerItems).find(r=>r.profileId===profileId);assert(record.ownership==='unknown'&&effectiveOwnershipRecord(record,db).ownership==='owned','Preference overwrote source evidence or failed to affect display.');
+  shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>completed===4);
+  assert(shadow.querySelector('.status').textContent.includes('Ownership preference applied')&&!shadow.querySelector('.status').textContent.includes('need ownership review'),'Covered items were incorrectly reported as needing review.');
   checks.push('Kobo account ownership preference is explicitly opt-in and changes effective access without rewriting source evidence');
 }catch(error){checks.push('FAILED: '+error.message);await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});throw error;}
 await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

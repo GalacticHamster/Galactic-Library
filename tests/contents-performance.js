@@ -14,6 +14,19 @@ const prepare=async writer=>{
 const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}for(const observation of Object.values(copy.kindleContentsObservations??{}))delete observation.undoRef;copy.enrichmentHistory={};copy.providers={};return copy;};
 
 export const contentsPerformanceTests=[
+ ['Kobo diagnostics retain only bounded numeric stages, survive export and enforce provider-page access',async()=>withWorker(async({dispatch,pageA})=>{
+   await pageA.mergeProviderItems('kobo',[{providerItemId:'a',title:'PRIVATE KOBO TITLE',mediaType:'book',ownership:'unknown'}],{profileLabel:'Private nickname'});
+   const sender={id:globalThis.chrome.runtime.id,url:'https://www.kobo.com/us/en/library',tab:{id:42}};
+   const profile=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'kobo'},sender);assert(profile.ok);assert.equal(profile.performance.kind,'provider');assert.equal(profile.performance.providerPhase,'profile');
+   const hint=await dispatch({type:'GET_PROVIDER_PROFILE_HINT',provider:'kobo'},sender);assert(hint.ok);
+   const denied=await dispatch({type:'GET_PROVIDER_PROFILE_HINT',provider:'kobo'},{...sender,url:'https://example.com'});assert.equal(denied.ok,false);
+   const row=perf.trace(id(8),'provider');row.providerPhase='scan';const end=row.begin('provider_fetch');end();row.privateTitle='PRIVATE';
+   await dispatch({type:'GL_PROVIDER_UI_TIMING',provider:'kobo',timing:row.finish('prepared')},sender);
+   await dispatch({type:'GL_PROVIDER_UI_TIMING',provider:'kobo',timing:{...row,id:id(9)}},{...sender,url:'https://example.com'});
+   const exported=await dispatch({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'},{id:sender.id,url:globalThis.chrome.runtime.getURL('src/ui/options.html')});
+   assert(exported.ok);assert(exported.providers.some(r=>r.id===id(8)&&r.providerPhase==='scan'));assert(!exported.providers.some(r=>r.id===id(9)));
+   assert(!JSON.stringify(exported.providers).includes('PRIVATE'));assert(!JSON.stringify(exported.providers).includes('nickname'));
+ },{concurrentQueries:true})],
  ['refresh timing joins preflight and save without double counting history, checkpoint or worker costs',()=>{
   let clock=1000;const page=perf.trace(id(1),'network',()=>clock),worker=perf.trace(id(1),'network',()=>clock);
   const event=(trace,stage,amount)=>{const end=trace.begin(stage);clock+=amount;end();};

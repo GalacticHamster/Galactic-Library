@@ -11,6 +11,7 @@
   stages.add('validation_yield_wait');
   for(const stage of ['options_contents','options_feedback_paint','options_projection','options_filter_controls'])stages.add(stage);
   for(const stage of ['snapshot_certificate','certificate_read','certificate_serialize','certificate_hash','certificate_hit','certificate_miss','certificate_issue','matching_canonical_reuse'])stages.add(stage);
+  for(const stage of ['provider_profile','provider_start','provider_fetch','provider_compare','provider_finish','provider_total','provider_profile_wait'])stages.add(stage);
   const cleanClient=value=>({...Object.fromEntries(['beforeSendMs','localStorageMs','preparationMs','previousFlightMs','postResponseMs','pageToRenderedMs'].filter(key=>Number.isFinite(value?.[key])&&value[key]>=0&&value[key]<=300000).map(key=>[key,value[key]])),...(['rendered','superseded','incomplete'].includes(value?.renderOutcome)?{renderOutcome:value.renderOutcome}:{})});
   const cleanWork=value=>Object.fromEntries(['snapshot','index','execution'].filter(key=>value?.[key]).map(key=>[key,Object.fromEntries(['cpuMs','waitMs','maxWaitMs','yields'].filter(field=>Number.isFinite(value[key][field])&&value[key][field]>=0).map(field=>[field,value[key][field]]))]));
   const now = () => performance.timeOrigin + performance.now();
@@ -30,7 +31,7 @@
   }
   function clean(value) {
     if (!validId(value?.id)) return null;
-    return {id:value.id,kind:['network','reparse','prepare','options','checkpoint','companion'].includes(value.kind)?value.kind:'network',startEpochMs:Number.isFinite(value.startEpochMs??value.start)?value.startEpochMs??value.start:0,totalMs:Math.max(0,Number(value.totalMs)||0),result:categories.has(value.result)?value.result:'failed',attempts:Math.min(3,Math.max(0,Number(value.attempts)||0)),batchSize:Math.min(100,Math.max(0,Number(value.batchSize)||0)),visibilityStart:['visible','hidden'].includes(value.visibilityStart)?value.visibilityStart:'unknown',visibilityEnd:['visible','hidden'].includes(value.visibilityEnd)?value.visibilityEnd:'unknown',focusStart:value.focusStart===true,focusEnd:value.focusEnd===true,
+    return {id:value.id,kind:['network','reparse','prepare','options','checkpoint','companion','provider'].includes(value.kind)?value.kind:'network',startEpochMs:Number.isFinite(value.startEpochMs??value.start)?value.startEpochMs??value.start:0,totalMs:Math.max(0,Number(value.totalMs)||0),result:categories.has(value.result)?value.result:'failed',attempts:Math.min(3,Math.max(0,Number(value.attempts)||0)),batchSize:Math.min(100,Math.max(0,Number(value.batchSize)||0)),visibilityStart:['visible','hidden'].includes(value.visibilityStart)?value.visibilityStart:'unknown',visibilityEnd:['visible','hidden'].includes(value.visibilityEnd)?value.visibilityEnd:'unknown',focusStart:value.focusStart===true,focusEnd:value.focusEnd===true,
       ...(value.scheduling&&Number.isSafeInteger(value.scheduling.yields)&&value.scheduling.yields>=0&&Number.isFinite(value.scheduling.maxSliceMs)&&value.scheduling.maxSliceMs>=0&&Number.isFinite(value.scheduling.cpuMs)&&value.scheduling.cpuMs>=0?{scheduling:{yields:value.scheduling.yields,maxSliceMs:value.scheduling.maxSliceMs,cpuMs:value.scheduling.cpuMs,...(Number.isFinite(value.scheduling.waitMs)&&value.scheduling.waitMs>=0&&Number.isFinite(value.scheduling.maxWaitMs)&&value.scheduling.maxWaitMs>=0?{waitMs:value.scheduling.waitMs,maxWaitMs:value.scheduling.maxWaitMs}:{})}}:{}),
       ...(Number.isSafeInteger(value.snapshotSequence)&&value.snapshotSequence>=0?{snapshotSequence:value.snapshotSequence}:{}),
       ...(Number.isSafeInteger(value.requestItemCount)&&value.requestItemCount>=0&&value.requestItemCount<=500?{requestItemCount:value.requestItemCount}:{}),
@@ -38,6 +39,7 @@
       ...(/^[a-f0-9]{12}$/u.test(value.worker??'')?{worker:value.worker}:{}),
       ...(Number.isFinite(value.workerStartedEpochMs)?{workerStartedEpochMs:value.workerStartedEpochMs}:{}),
       ...(value.work?{work:cleanWork(value.work)}:{}),
+      ...(['profile','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
       ...(value.client?{client:cleanClient(value.client)}:{}),
       events:(Array.isArray(value.events)?value.events:[]).filter(event=>stages.has(event?.stage)&&Number.isFinite(event.startMs)&&Number.isFinite(event.durationMs)&&event.startMs>=0&&event.durationMs>=0).slice(0,512).map(event=>({stage:event.stage,attempt:Number.isInteger(event.attempt)&&event.attempt>=0&&event.attempt<=3?event.attempt:0,startMs:event.startMs,durationMs:event.durationMs}))};
   }

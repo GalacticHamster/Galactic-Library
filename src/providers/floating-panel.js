@@ -7,11 +7,15 @@
     const session=sessions.get(provider);
     if(request.type==='GET_PROVIDER_SYNC_STATE'){
       if(!session)throw new Error('Reload this page to start a profile scan.');
+      const timing=provider==='kobo'?global.GalacticContentsPerformance?.trace(request.diagnosticLookupId,'provider'):null;
+      const waitEnd=timing?.begin('provider_profile_wait');
       await session.ready;
+      waitEnd?.();
       const context=session.resume??session.read();session.resume=null;
       if(!context.rememberedProfile&&(!context.confirmed||!context.profileLabel))throw new Error('Enter a profile label and confirm the signed-in account.');
       const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true});
       if(result.ok)session.context={...context,confirmed:true,scanToken:result.scanToken,profileId:result.profileId};
+      if(timing){global.GalacticContentsPerformance.merge(timing,result.performance);result.performance=global.GalacticContentsPerformance.clean(timing.finish(result.ok?'prepared':'failed'));}
       return result;
     }
     if(request.type==='IMPORT_PROVIDER_ITEMS'){
@@ -51,15 +55,22 @@
       panel.querySelector('button').before(controls);
       let mode='full';
       const input=controls.querySelector('[data-profile-label]');
-      let remembered=null,edited=false;
+      let remembered=null,edited=false,hintValue='',resolved=false;
       const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
         ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:true}:{})})};
       input.addEventListener('input',()=>{edited=true;remembered=null;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
       sessions.set(provider,session);
       shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&!button.dataset.galacticFloatingPanelControl){mode=button.dataset.mode??'full';session.context=null;session.resume=null;}},true);
+      if(provider==='kobo')chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE_HINT',provider}).then(result=>{
+        if(!resolved&&!edited&&!input.value&&result?.hint){
+          hintValue=result.hint.nickname;input.value=hintValue;
+          controls.querySelector('[data-profile-status]').textContent='Remembered account shown; verifying saved account before updating...';
+        }
+      }).catch(()=>{});
       session.ready=chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider}).then(result=>{
+        resolved=true;
         if(!result.ok)throw Error(result.error??'Could not read saved accounts.');
-        if(!edited&&!input.value)input.value=result.profileLabel??'';
+        if(!edited&&(!input.value||input.value===hintValue))input.value=result.profileLabel??'';
         for(const profile of result.profiles??[]){if(!profile.nickname)continue;const option=document.createElement('option');option.value=profile.nickname;controls.querySelector('datalist').append(option);}
         if(!edited&&result.reuseAllowed&&result.profileId){
           remembered={profileId:result.profileId,profileLabel:result.profileLabel??''};

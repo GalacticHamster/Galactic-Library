@@ -11,7 +11,7 @@ import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/commit
 import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences, mergeUiPreferences } from '../lib/ui-preferences.js';
-import {validateOwnershipPolicy} from '../lib/ownership.js';
+import {validateOwnershipPolicy,effectiveOwnershipRecord} from '../lib/ownership.js';
 import { DATABASE_SCHEMA_VERSION, DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, PROVIDERS } from '../lib/constants.js';
 import { isExtensionId, normaliseExternalClientIds } from '../lib/external-api.js';
 import {supportedKindleContentsBook, contentsParseState, kindleContentsPlan, KINDLE_CONTENTS_EXTRACTOR_VERSION} from '../lib/kindle-contents.js';
@@ -42,10 +42,31 @@ import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES} from '../lib/
 /**
  * Instantiate once in the service worker. Mutations and ordinary storage
  * operations share one queue. Integration queries use detached committed read
- * snapshots. Refresh can reuse their validation only after a fresh, exact
+ * snapshots. Refresh and Kobo checks can reuse their validation only after a fresh, exact
  * whole-value storage comparison, and receives a detached mutable copy.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null} = {}) {
+  const PROFILE_HINTS='galacticLibraryProviderProfileHints';
+  const profileHints=database=>Object.fromEntries(['kobo'].map(provider=>{
+    const profiles=Object.values(database.providerProfiles).filter(p=>p.provider===provider),profile=database.providerProfiles[database.providers[provider]?.activeProfileId];
+    return [provider,profile?{profileId:profile.profileId,nickname:profile.nickname,count:profiles.length}:null];
+  }));
+  async function getProviderProfileHint(provider){
+    await ready;
+    const hints=(await committedArea.get({[PROFILE_HINTS]:{}}))[PROFILE_HINTS],hint=hints?.[provider];
+    if(provider!=='kobo'||!hint||typeof hint.profileId!=='string'||hint.profileId.length>100||typeof hint.nickname!=='string'||hint.nickname.length>100||hint.count!==1)return null;
+    return hint; // Display only. Never a source of account/write authorization.
+  }
+  function rememberProviderProfileHints(database){
+    // Advisory metadata writes still share the single mutation queue.
+    const result=tail.then(async()=>{
+      await ready;
+      const hints=profileHints(database),previous=(await committedArea.get({[PROFILE_HINTS]:{}}))[PROFILE_HINTS];
+      if(equalDatabaseData(hints,previous)||cacheQuerySnapshots&&querySnapshot!==database)return;
+      await storageArea.set({[PROFILE_HINTS]:hints});
+    });
+    tail=result.catch(()=>{});return result;
+  }
   const certificates=createValidationCertificates(certificateArea);
   let activeTiming = null;
   let activeOperation=null;
@@ -92,6 +113,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   storageArea={
     async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
     async set(updates){
+      if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))updates={...updates,[PROFILE_HINTS]:profileHints(updates[DATABASE_STORAGE_KEY])};
       const endActivity=activity('storage_set',{key:storageKey(updates),operation:activeOperation});
       try{
       let pending;
@@ -103,6 +125,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       }finally{endActivity();}
     },
     async remove(keys){
+      if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))keys=[...(Array.isArray(keys)?keys:[keys]),PROFILE_HINTS];
       const end=activity('storage_remove',{key:storageKey(typeof keys==='string'?[keys]:keys),operation:activeOperation});try{
       await committedArea.remove(keys);
       if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY)){publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
@@ -187,7 +210,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
     const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
-    const database=await getDatabase(),active=database.providers[provider]?.activeProfileId;
+    const database=await readDatabase(provider==='kobo'),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
     if(requestedProfileId&&existing?.profileId!==requestedProfileId)throw Error('Scan profile changed. Start a fresh confirmed scan.');
     if(rememberedProfile===true&&(Object.values(database.providerProfiles).filter(p=>p.provider===provider).length!==1
@@ -200,17 +223,49 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
+    // An existing-account quick check needs a tab-bound lease, not a rewrite of
+    // every saved book merely to announce that scanning has started.
+    if(provider==='kobo'&&mode==='incremental'&&!forceFull&&active===profile.profileId){
+      scans[provider].readOnlyStart=true;
+      await storageArea.set({[SCANS]:scans});
+      return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
+    }
     profile.state.syncHealth=validateSyncHealth({attemptRef:scans[provider].attemptRef,status:'running',mode:scans[provider].mode,attemptedProfileLabel:profileLabel,startedAt:scans[provider].startedAt,finishedAt:null,retryable:false});
     if(activeAtStartId===profile.profileId)profileState(database,profile,profile.state);
     await storageArea.set({[SCANS]:scans,[DATABASE_STORAGE_KEY]:validateDatabase(database)});
     return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
   }
-  async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null) {
-    const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await getDatabase();
+  async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false) {
+    const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(provider==='kobo');
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId||!scan.profileId||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||!database.providerProfiles[scan.profileId])throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname};
-    return syncDetails.syncMode==='full'?replaceProviderItems(provider,values,details,snapshot):mergeProviderItems(provider,values,details);
+    let result,changes;
+    if(provider==='kobo'&&scan.readOnlyStart&&details.syncMode==='incremental'&&!details.scanDiagnostics?.failedRequestCount
+      &&profile.state.syncHealth?.status==='succeeded'){
+      const incoming=timed('entry_validation',()=>[...new Map(normalizedIncoming(database,provider,profile,values).map(item=>[item.id,item])).values()]);
+      changes=timed('provider_compare',()=>successfulSyncHealth(database,provider,incoming,false,details).differences);
+      if(changes.added===0&&changes.updated===0){
+        // No database mutation means no canonical rebuild, database set or sync
+        // notification. Completing the lease still rejects a repeated commit.
+        const scans={...stored[SCANS]};delete scans[provider];await storageArea.set({[SCANS]:scans});
+        result=database;
+      }
+    }
+    result??=await (details.syncMode==='full'?replaceProviderItems(provider,values,details,snapshot):mergeIntoDatabase(provider,values,details,provider==='kobo'?database:null));
+    if(!includeResult)return result;
+    const observedIds=new Set(values.map(value=>value.providerItemId));
+    const observed=provider==='kobo'?Object.values(result.providerItems).filter(item=>item.provider===provider&&item.profileId===profile.profileId&&observedIds.has(item.providerItemId)):[];
+    const ownership={unconfirmed:0,covered:0,review:0,subscriptions:0};
+    for(const item of observed){
+      if(item.ownership==='subscription')ownership.subscriptions++;
+      if(item.ownership!=='unknown')continue;
+      ownership.unconfirmed++;
+      const effective=effectiveOwnershipRecord(item,result);
+      if(effective.ownership==='owned'&&effective.ownershipOverride)ownership.covered++;
+      else if(effective.ownership==='unknown')ownership.review++;
+    }
+    return {database:result,scanResult:{changes:changes??result.providers[provider].syncHealth?.differences,ownership,checkedAt:new Date().toISOString()}};
   }
   async function kindleProfileTransition(database,oldId,newId){
     if(oldId===newId)return {};
@@ -346,7 +401,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(reuseCommittedValidation&&cacheQuerySnapshots)querySnapshotsUsed=true;
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
-    // Refresh-only proof: the freshly read authoritative value is exactly the
+    // Mutation proof: the freshly read authoritative value is exactly the
     // already validated immutable committed revision. Never use the eligibility
     // projection, an uncommitted working copy, or epoch identity alone as proof.
     const committed=querySnapshot;
@@ -513,19 +568,26 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   // Incremental syncs must never make an entitlement disappear merely because
   // the provider returned only its recent additions. Full syncs use the
   // replacement function above; quick syncs add or refresh records here.
-  async function mergeProviderItems(provider, values, syncDetails = {}) {
+  function normalizedIncoming(database,provider,profile,values){
+    if(!Array.isArray(values)||values.length>50000)throw Error('Import needs a bounded item list.');
+    const historicalById=historicalRecords(database,profile.profileId),now=new Date().toISOString();
+    return values.map(value=>{
+      const item=normalizeProviderItem({...value,provider,profileId:profile.profileId,recordRef:undefined,observedAt:now},now,{allowEnrichment:false,profileKeySpace:profile.keySpace});
+      item.metadata.source=PROVIDER_SOURCES[provider];
+      return preserveEnrichment(item,database.providerItems[item.id]??historicalById.get(item.id));
+    });
+  }
+  async function mergeProviderItems(provider,values,syncDetails={}){
+    return mergeIntoDatabase(provider,values,syncDetails);
+  }
+  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
-    const database = await getDatabase();
+    const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    const historicalById=historicalRecords(database,profile.profileId);
     const now = new Date().toISOString();
-    const incoming = values.map((value) => {
-      const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
-      item.metadata.source = PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
-    });
+    const incoming = timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     reconcileMediaChanges(database,incoming);
@@ -544,7 +606,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const parentId = String(item.metadata?.parentProviderItemId ?? '').trim();
       return item.mediaType === 'game-addon' && parentId && providerRecords.has(providerItemKey(provider, parentId,profile.keySpace));
     }).length;
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
+    database.canonicalItems = timed('canonical_rebuild',()=>rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations));
     database.providers[provider] = {
       ...profile.state,
       connected: true,
@@ -1319,7 +1381,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   return Object.freeze({
     execute,
     invalidateRefreshPreflight,
-    getQueryDatabase,getQueryAllowedExternalClientIds,invalidateQuerySnapshot,
+    getQueryDatabase,getQueryAllowedExternalClientIds,invalidateQuerySnapshot,getProviderProfileHint,rememberProviderProfileHints,
     ...Object.fromEntries(STORAGE_OPERATIONS.map((name) => [name, (...args) => execute(name, args)]))
   });
 }
