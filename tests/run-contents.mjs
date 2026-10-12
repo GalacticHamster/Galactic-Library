@@ -1,6 +1,7 @@
 // Offline unit selection: contents/parser/manifest and their persistence controls.
 // No packaging, browser, companion, live acquisition or unrelated provider suites.
 import {boundedManifestTests} from './manifest-bounded-regressions.js';
+import {contentsPrecisionContextTests} from './contents-precision-context.js';
 import {kindleManifestTests} from './kindle-manifest.js';
 import {kindleWholeManifestTests} from './kindle-whole-manifest.js';
 import {kindleContentsTests} from './kindle-contents.js';
@@ -11,7 +12,7 @@ import {independentEvidenceTests} from './kindle-independent-evidence.js';
 import {kindleSourceCaptureTests} from './kindle-source-capture.js';
 import {parentScopedComponentCases} from './parent-scoped-components-fixture.js';
 globalThis.fetch=()=>{throw Error('Live requests are forbidden in the offline contents unit suite.');};
-const tests=process.argv.includes('--focused')?boundedManifestTests:[...boundedManifestTests,...kindleManifestTests,...kindleWholeManifestTests,...kindleContentsTests,...kindleContentsQualityTests,...contentsParserV4Tests,...numberedPrecisionCases,...independentEvidenceTests,...kindleSourceCaptureTests,...parentScopedComponentCases];
+const tests=process.argv.includes('--focused')?[...contentsPrecisionContextTests,...boundedManifestTests]:[...contentsPrecisionContextTests,...boundedManifestTests,...kindleManifestTests,...kindleWholeManifestTests,...kindleContentsTests,...kindleContentsQualityTests,...contentsParserV4Tests,...numberedPrecisionCases,...independentEvidenceTests,...kindleSourceCaptureTests,...parentScopedComponentCases];
 let failed=0;
 for(const [name,run]of tests){try{await run();console.log('PASS '+name);}catch(error){failed++;console.error('FAIL '+name+'\n'+error.stack);}}
 console.log(`${tests.length-failed}/${tests.length} contents tests passed.`);

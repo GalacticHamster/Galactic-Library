@@ -9,6 +9,9 @@ export const MANIFEST_INTERPRETATION_VERSION=2;
 const trigger=/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?|comprising|reprints?|reprinting)\b/giu;
 const semanticClaim=new RegExp(trigger.source,'iu');
 const clean=value=>String(value??'').replace(/\s+/gu,' ').trim();
+// UI textareas/list summaries compact whitespace. That changes presentation,
+// not captured-source identity; substantive edits still need independent parsing.
+const sameSourceText=(a,b)=>typeof a==='string'&&typeof b==='string'&&Boolean(clean(a))&&clean(a)===clean(b);
 
 export function validateDescriptionBlocks(value) {
   if(!Array.isArray(value)||value.length>MANIFEST_LIMITS.blocks)throw Error('Invalid description blocks.');
@@ -214,12 +217,12 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
   // Old selections remain source history. Reinterpret only a proven parent of
   // that exact saved child, never a better-ranked unrelated secondary claim.
   const manifest=saved?.manifest?.interpretationVersion===MANIFEST_INTERPRETATION_VERSION?saved.manifest:saved?.manifest?validateManifest(saved.manifest):null;
-  let reviewContext={...context,allowTitleBinding:statement===saved?.statement};
+  let reviewContext={...context,allowTitleBinding:sameSourceText(statement,saved?.statement)};
   if(manifest){
     const candidate=manifest.candidates[manifest.selected];
-    if(candidate&&candidate.raw===saved.statement){
+    if(candidate&&sameSourceText(candidate.raw,saved.statement)){
       const parent=candidate.manifestRange&&!candidate.whole?manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange.start===candidate.manifestRange.start&&c.manifestRange.end===candidate.manifestRange.end):null;
-      if(statement!==saved.statement&&statement!==parent?.raw)return proposeContentsForReview(statement,title,reviewContext);
+      if(!sameSourceText(statement,saved.statement)&&!sameSourceText(statement,parent?.raw))return proposeContentsForReview(statement,title,reviewContext);
       reviewContext={...context,allowTitleBinding:true};
       const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,reviewContext);
       const incomplete=interpreted.truncated||candidate.manifestRange&&!candidate.whole&&!parent;

@@ -1,0 +1,689 @@
+{
+  "note": "Minimal public description spans from the October 11 frozen audit. No purchase/account identifiers or workbook data.",
+  "chapters": [
+    {
+      "title": "DCeased: Hope At World's End (2020)",
+      "statement": "collects DCeased: Hope at World’s End Digital Chapters 1-15.",
+      "parserInput": "collects DCeased: Hope at World’s End Digital Chapters 1-15",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Injustice: Gods Among Us: Year Zero: The Complete Collection (Injustice: Year Zero (2020-))",
+      "statement": "Collects Injustice: Year Zero chapters 1-14.",
+      "parserInput": "Collects Injustice: Year Zero chapters 1-14",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Injustice: Gods Among Us: Year One - The Complete Collection (Injustice: Gods Among Us (2013-2016))",
+      "statement": "collects INJUSTICE: GODS AMONG US digital chapters 1-36 and in single magazine form as INJUSTICE: GODS AMONG US 1-12 and INJUSTICE: GODS AMONG US ANNUAL 1.",
+      "parserInput": "collects INJUSTICE: GODS AMONG US digital chapters 1-36 and in single magazine form as INJUSTICE: GODS AMONG US 1-12 and INJUSTICE: GODS AMONG US ANNUAL 1",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Batman: White Knight Presents: Harley Quinn (2020-) (Batman: White Knight (2017-))",
+      "statement": "includes Batman: White Knight Presents Harley Quinn #1-6 and a story from Harley Quinn Black + White + Red Digital Chapter 6.",
+      "parserInput": "includes Batman: White Knight Presents Harley Quinn #1-6 and a story from Harley Quinn Black + White + Red Digital Chapter 6",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Injustice: Ground Zero Vol. 1 (Injustice: Ground Zero (2016-))",
+      "statement": "Collects INJUSTICE: GROUND ZERO #1-6 (digital #1-12).",
+      "parserInput": "Collects INJUSTICE: GROUND ZERO #1-6 (digital #1-12)",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Injustice: Ground Zero Vol. 2 (Injustice: Ground Zero (2016-))",
+      "statement": "Collects #7-12 (digital #13-24)!",
+      "parserInput": "Collects #7-12 (digital #13-24)",
+      "binding": "explicit-clause"
+    },
+    {
+      "title": "Injustice 2 (2017-2018) Vol. 1",
+      "statement": "collects INJUSTICE 2 #1-6 (digital #1-12).",
+      "parserInput": "collects INJUSTICE 2 #1-6 (digital #1-12)",
+      "binding": "explicit-clause"
+    }
+  ],
+  "sourceContext": [
+    {
+      "title": "Animal Man (2011-2014) Vol. 2: Animal vs. Man",
+      "statement": "Collects issues #0, 7-11, Animal Man Annual #1\nRead more",
+      "parserInput": "Collects Animal Man (2011-2014) issues #0, 7-11, Animal Man Annual #1 Read more",
+      "binding": "explicit-product-series-volume-title",
+      "expected": [
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "0",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "7",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "10",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "2011-2014",
+          "unitType": "issue",
+          "number": "11",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Animal Man",
+          "run": "",
+          "unitType": "annual",
+          "number": "1",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "Catwoman (2011-2016) Vol. 2: Dollhouse (Catwoman Vol. IV)",
+      "statement": "Collects issues #7-12\nRead more",
+      "parserInput": "Collects Catwoman (2011-2016) issues #7-12 Read more",
+      "binding": "explicit-product-series-volume-title",
+      "expected": [
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "7",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "10",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "11",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Catwoman",
+          "run": "2011-2016",
+          "unitType": "issue",
+          "number": "12",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "Earth 2 (2012-2015) Vol. 1: The Gathering (Earth 2 Series)",
+      "statement": "Collects #1-6\nRead more",
+      "parserInput": "Collects #1-6 Read more",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "1",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "2",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "3",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "4",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "5",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Earth 2",
+          "run": "2012-2015",
+          "unitType": "issue",
+          "number": "6",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "Swamp Thing (2011-2015) Vol. 2: Family Tree (Swamp Thing Volume (The New 52))",
+      "statement": "Collects #0, 8-11, Swamp Thing Annual #1\nRead more",
+      "parserInput": "Collects #0, 8-11, Swamp Thing Annual #1 Read more",
+      "binding": "explicit-clause",
+      "expected": [
+        {
+          "series": "Swamp Thing",
+          "run": "2011-2015",
+          "unitType": "issue",
+          "number": "0",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "2011-2015",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "2011-2015",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "2011-2015",
+          "unitType": "issue",
+          "number": "10",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "2011-2015",
+          "unitType": "issue",
+          "number": "11",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Swamp Thing",
+          "run": "",
+          "unitType": "annual",
+          "number": "1",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "iZombie Vol. 2: uVampire",
+      "statement": "Collecting issues #6-12 of the Eisner Award-nominated series, plus a story from the HOUSE OF MYSTERY ANNUAL #2\nRead more",
+      "parserInput": "Collects iZombie issues #6-12; plus a story from the HOUSE OF MYSTERY ANNUAL #2 Read more",
+      "binding": "explicit-product-series-volume-title",
+      "expected": [
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "6",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "7",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "10",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "11",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "iZombie",
+          "run": "",
+          "unitType": "issue",
+          "number": "12",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "Ex Machina: Book Two",
+      "statement": "Collects issues #12-20\nRead more",
+      "parserInput": "Collects Ex Machina issues #12-20 Read more",
+      "binding": "explicit-description-title-anchor",
+      "expected": [
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "12",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "13",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "14",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "15",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "16",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "17",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "18",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "19",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "20",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "Ex Machina: Book Three",
+      "statement": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more",
+      "parserInput": "Collects Ex Machina issues #21-29, Ex Machina: Inside the Machine; Ex Machina Special #3 Read more",
+      "binding": "explicit-description-title-anchor",
+      "expected": [
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "21",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "22",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "23",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "24",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "25",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "26",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "27",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "28",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "issue",
+          "number": "29",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "Ex Machina",
+          "run": "",
+          "unitType": "special",
+          "number": "3",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "New Teen Titans (1980-1988) Vol. 9",
+      "statement": "collects issues #1-9 of the second series of The New Teen Titans and features the shattering story arc “The Terror of Trigon!” as well as the never-before-reprinted tales “The Origin of Lilith,” “There Might Be…Giants” and more!",
+      "parserInput": "Collects New Teen Titans issues #1-9",
+      "binding": "explicit-description-title-anchor",
+      "expected": [
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "1",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "2",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "3",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "4",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "5",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "6",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "7",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Teen Titans",
+          "run": "",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    },
+    {
+      "title": "New Gods by Jack Kirby (New Gods (1984))",
+      "statement": "collecting issues #1-11 of the legendary series together with the King’s two concluding tales, “Even Gods Must Die!” and “The Hunger Dogs!”\nRead more",
+      "parserInput": "Collects New Gods by Jack Kirby issues #1-11; together with the King’s two concluding tales, “Even Gods Must Die!” and “The Hunger Dogs!” Read more",
+      "binding": "explicit-description-title-anchor",
+      "expected": [
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "1",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "2",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "3",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "4",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "5",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "6",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "7",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "8",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "9",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "10",
+          "language": "",
+          "completeness": "full"
+        },
+        {
+          "series": "New Gods by Jack Kirby",
+          "run": "",
+          "unitType": "issue",
+          "number": "11",
+          "language": "",
+          "completeness": "full"
+        }
+      ]
+    }
+  ]
+}

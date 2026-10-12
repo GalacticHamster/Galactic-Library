@@ -3,6 +3,8 @@ import {createStorageWriter} from '../src/background/storage-writer.js';
 import {DATABASE_STORAGE_KEY} from '../src/lib/constants.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
 import {createContentsWorkspace} from '../src/ui/contents-workspace.js';
+import {createContentsEditor} from '../src/ui/contents-editor.js';
+import {precisionRecord,verifySourcePaths} from './contents-precision-context-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -27,6 +29,22 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ const precision=await (await fetch('/tests/fixtures/kindle/contents-precision-context.json')).json();
+ for(const c of precision.sourceContext){
+   const {record,proposal}=verifySourcePaths(c,assert),before=JSON.stringify(record);
+   const editor=createContentsEditor(record,null,{save:()=>{throw Error('Read-only fixture must not save');},refresh:()=>{}},{expanded:true});
+   document.body.append(editor);button(editor,'Parse statement for review').click();
+   assert(editor.querySelectorAll('tbody tr').length===proposal.entries.length,'Actual editor lost source context: '+c.title);
+   assert(JSON.stringify(record)===before,'Editor mutated captured evidence');editor.remove();
+ }
+ checks.push('All nine source fixtures agree across scan/status, workbench and actual editor parsing');
+ for(const [index,c] of precision.chapters.entries()){
+   const record=precisionRecord(c),editor=createContentsEditor(record,null,{save:()=>{throw Error('No save');},refresh:()=>{}},{expanded:true});
+   document.body.append(editor);button(editor,'Parse statement for review').click();
+   assert(editor.querySelectorAll('tbody tr').length===[0,0,13,6,6,6,6][index],'Editor coerced chapters or lost print clauses');
+   assert(editor.textContent.includes('unresolved'),'Digital evidence was hidden');editor.remove();
+ }
+ checks.push('Four chapter failures and three mixed print/digital controls retain unresolved digital evidence');
  await import('../src/ui/options.js');await wait(()=>!document.querySelector('#empty-library').hidden,'Initial Options load missing');navigate('contents');
  assert(list().textContent===''&&document.querySelector('#contents-collections').textContent.includes('No imported books yet'),'First-run contents confused with a failed scan');checks.push('Contents empty state distinguishes no imported books without acquisition');
  const books=Array.from({length:65},(_,i)=>item(i+1));let db=await writer.replaceProviderItems('kindle',books,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshot(books));

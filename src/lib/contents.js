@@ -114,6 +114,9 @@ function reviewRangeEnd(first,last) {
 /** Bounded discovery grammar. Arbitrary prose must not become a series label. */
 function discoveryNumberedContents(body,collectionTitle) {
   const entries=[],unparsed=[],chunks=[];
+  // Parallel digital numbering is not a print-issue conversion. Retain a
+  // finite, explicitly labelled aside separately so the print clause survives.
+  body=body.replace(/\(\s*digital\s+(?:chapters?\s*)?#?\s*\d+(?:\s*[-–—]\s*#?\d+)?(?:\s*,\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*\s*\)/giu,raw=>{unparsed.push(raw);return '';});
   for(const part of body.split(/\s*;\s*/u)){
     let start=0;
     for(const separator of part.matchAll(/\s*,\s*(?:and\s+)?(?=[\p{L}\d#])|\s+(?:and|plus|&)\s+(?=[\p{L}\d#])/giu)){
@@ -144,6 +147,9 @@ function discoveryNumberedContents(body,collectionTitle) {
     if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
     if(/^collects?\s+/iu.test(raw))clauseExtent='full';
     let chunk=raw.replace(/^(?:and|plus|as well as|along with|collects?|collecting)\s+/iu,'');
+    // Chapters have no supported unit type. Never let their numbers establish
+    // issue entries or supply a series/type to a following bare continuation.
+    if(/\bchapters?\s*#?\s*\d/iu.test(chunk)){unparsed.push(raw);previous=null;continue;}
     // Sentence punctuation can terminate a range; an abbreviation at the end
     // of a postposed title remains part of its literal label.
     if(!/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(chunk))chunk=chunk.replace(/[.!]+$/u,'');
@@ -156,6 +162,7 @@ function discoveryNumberedContents(body,collectionTitle) {
     const qualified=extentPrefix.test(chunk);chunk=chunk.replace(extentPrefix,'').replace(/^the (?:entire|complete) miniseries\s+/iu,'');
     // A demonstrated collection wrapper, not a general prose-prefix stripper.
     chunk=chunk.replace(/^adventures from\s+/iu,'');
+    chunk=chunk.replace(/^in single magazine form as\s+/iu,'');
     if(qualified)clauseExtent='excerpt';
     // A semicolon after partial material may continue that heading or start
     // a new full list. Without an explicit qualifier, do not choose for users.
@@ -168,7 +175,7 @@ function discoveryNumberedContents(body,collectionTitle) {
     let label='',numbers='',type='issue',after='';
     const post=/^issues?\s*#?\s*(\d+(?:\s*[-–—]\s*\d+)?)\s+of\s+(.+)$/iu.exec(chunk);
     const runIssue=/^(.+?)\s+\(?vol(?:ume)?\.?\s*(\d+)\)?\s+(?:issues?\s*)?#\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
-    const numbered=/^(.*?)\s*(#|\bissues?\b\s*#?|\bvol(?:ume)?s?\b\.?\s*#?|\bbooks?\b\s*#?|\bchapters?\b\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
+    const numbered=/^(.*?)\s*(#|\bissues?\b\s*#?|\bvol(?:ume)?s?\b\.?\s*#?|\bbooks?\b\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
     const bare=/^(.*?)\s+(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*\d+)?)$/u.exec(chunk);
     const continuation=/^#?\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)(\s*[.;—–]\s*.+)?$/u.exec(chunk);
     if(runIssue){label=runIssue[1];numbers=runIssue[3];after=runIssue[4];}
@@ -257,7 +264,11 @@ function containedNames(body) {
 }
 
 export function contentsStatement(item) {
-  return compact(item?.metadata?.enrichment?.kindleProductComicContents?.statement || item?.metadata?.contentsStatement || item?.metadata?.collects || item?.metadata?.enrichment?.localMetadata?.statement, 10000);
+  const captured=item?.metadata?.enrichment?.kindleProductComicContents?.statement;
+  // Keep source characters intact during UI handoff (e.g. an ellipsis must
+  // not become three periods). Parsing applies its own normalization later.
+  if(captured)return String(captured).replace(/\s+/gu,' ').trim().slice(0,10000);
+  return compact(item?.metadata?.contentsStatement || item?.metadata?.collects || item?.metadata?.enrichment?.localMetadata?.statement, 10000);
 }
 
 export function validateContentReview(value) {
