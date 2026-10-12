@@ -2,9 +2,9 @@ export const UI_PREFERENCES_KEY = 'galacticLibraryUiPreferences';
 export const PAGE_SIZES = Object.freeze([20,50,100,200]);
 export const validPageSize = value => PAGE_SIZES.includes(value);
 export const PRIMARY_WORKSPACES = ['library', 'providers', 'contents', 'settings'];
-export const LIBRARY_WORKSPACES = ['library', 'books', 'reading', 'ownership'];
+export const LIBRARY_WORKSPACES = ['library', 'overlap', 'books', 'reading', 'ownership'];
 // Old saved views remain valid secondary Library destinations.
-export const WORKSPACES = [...PRIMARY_WORKSPACES, 'books', 'reading', 'ownership'];
+export const WORKSPACES = [...PRIMARY_WORKSPACES, 'overlap', 'books', 'reading', 'ownership'];
 export function workspaceTarget(value) {
   const name=String(value??'').replace(/^#/u,'').split('?')[0].replace(/-workspace$/u,'');
   return WORKSPACES.includes(name)?name:({libraries:'providers',kindle:'contents','library-section':'library'})[name]??null;

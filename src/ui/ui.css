@@ -216,3 +216,10 @@ button.danger { background:var(--gh-danger-fill); }
 .library-purchase-history { margin-top:8px; }
 .library-purchase-history li { margin:10px 0; overflow-wrap:anywhere; }
 .library-purchase-history p { margin:4px 0; }
+.overlap-pairs { display:grid; gap:12px; }
+.collection-overlap .library-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.collection-overlap input[type=search] { flex:1 1 240px; }
+.overlap-pairs h3,.overlap-pair-details h3 { overflow-wrap:anywhere; }
+.overlap-pair-details { margin-top:20px; border-top:1px solid var(--gh-divider); padding-top:16px; }
+.overlap-pair-details li { margin:8px 0; overflow-wrap:anywhere; }
+.overlap-pair-details summary { cursor:pointer; }

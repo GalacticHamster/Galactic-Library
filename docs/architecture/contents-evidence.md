@@ -18,6 +18,12 @@ Resolved keys, including supported run-unspecified keys, deduplicate across supp
 
 The existing `contentReviews` map also accepts an explicit `status: 'rejected'` review with an empty entry list. Ordinary accepted/corrected reviews still require valid nonempty entries. A rejection blocks all automatic suggestions for that provider record until explicit undo or a corrected review; it survives imports, local reparsing, backup and restore. No storage-schema migration is needed. A rejection does not alter captured evidence or another account's review. Older extension versions that require nonempty reviews cannot consume this new review form.
 
+### Collection-pair browsing
+
+Library's **Collection Overlap** workspace uses `collection-overlap.js` to invert the existing resolved comic coverage keys into collection pairs. It compares only parents sharing a key, never every possible pair of books. Existing canonical IDs group observations of the same product and prevent self-pairs; contents never create product identities. Standalone issues do not create collection pairs. Each pair retains all eligible supporting records, deduplicates shared keys and marks an issue verified only if both sides have verified evidence. Provisional keys cannot create pairs. A missing-run versus known-run relation is excluded from definite unique lists, including relevant provisional evidence on the other side.
+
+The UI builds this projection lazily in `collection-overlap-worker.js` from current books, canonical labels/membership, content reviews and ownership context. It sends no history, queue or synchronization maps. The worker uses the existing coverage resolver and has no storage or network API. The bounded list and detail presentation reuse the existing pagination and record-link/navigation helpers. Returning to an unchanged Options database view reuses the built pair list; reconciliation with a new database view builds a fresh projection only when this workspace is active. This display does not change companion matching or verified ownership coverage.
+
 Three completeness questions are distinct:
 
 | Layer | Question |

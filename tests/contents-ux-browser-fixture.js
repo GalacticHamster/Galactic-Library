@@ -11,6 +11,7 @@ import {createSeriesCoverageView} from '../src/ui/series-coverage.js';
 import {createCollectionComparison} from '../src/ui/contents-book-details.js';
 import {validateContentReview} from '../src/lib/contents.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
+import {createCollectionOverlapView} from '../src/ui/collection-overlap.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -55,6 +56,11 @@ try{
  assert(contextView.textContent.includes('3 of 3'),'Collection comparison lost parent run context');contextView.remove();
  checks.push('Blank/English language defaults and exact parent run context work in target and collection comparisons without rewriting metadata');
  checks.push('Series and collection comparison UI use inferred coverage by default and show parent provenance');
+ const pairsView=createCollectionOverlapView(coverageDb);document.body.append(pairsView);await pairsView.ready;
+ assert(pairsView.querySelectorAll('[data-overlap-pair]').length===1,'Collection pair missing');button(pairsView,'Inspect overlap').click();
+ assert(pairsView.querySelector('.overlap-pair-details').textContent.includes('3 shared issues')&&pairsView.querySelector('.overlap-pair-details a').href.includes('#library?record='),'Shared units or record links missing');
+ change(pairsView.querySelector('[aria-label="Search overlapping collections"]'),'no such title','input');assert(pairsView.textContent.includes('No overlapping collections match'),'Overlap search not applied');pairsView.remove();
+ checks.push('Collection-level overlap shows inferred issues, source links and empty search results');
  const coverageActions={save:async(id,value)=>{coverageDb.contentReviews[id]=validateContentReview({...value,verifiedAt:'2026-10-12T12:00:00Z'});},remove:async id=>{delete coverageDb.contentReviews[id];},refresh:()=>{}};
  const acceptEditor=createContentsEditor(coverageParent,null,coverageActions,{expanded:true});document.body.append(acceptEditor);
  button(acceptEditor,'Accept all suggestions').click();await wait(()=>coverageDb.contentReviews[coverageParent.id]?.entries.length===3,'Accept all did not save a verified list');
@@ -96,6 +102,9 @@ try{
  }
  checks.push('Four chapter failures and three mixed print/digital controls retain unresolved digital evidence');
  await import('../src/ui/options.js');await wait(()=>!document.querySelector('#empty-library').hidden,'Initial Options load missing');navigate('contents');
+ navigate('library');const overlapNav=document.querySelector('#library-navigation [data-workspace="overlap"]');assert(overlapNav&&overlapNav.getBoundingClientRect().height>0&&overlapNav.textContent==='Collection Overlap','Overlap is not visible in Library navigation');overlapNav.click();
+ await wait(()=>document.querySelector('#collection-overlap-view').textContent.includes('No comparable issue overlaps found'),'Overlap empty workspace missing');assert(!document.querySelector('#overlap-workspace').hidden&&document.querySelector('#workspace-navigation [data-workspace="library"]').getAttribute('aria-current')==='page','Overlap left Library navigation');navigate('contents');
+ checks.push('Library exposes Collection Overlap directly and opens an honest empty state');
  assert(list().textContent===''&&document.querySelector('#contents-collections').textContent.includes('No imported books yet'),'First-run contents confused with a failed scan');checks.push('Contents empty state distinguishes no imported books without acquisition');
  const books=Array.from({length:65},(_,i)=>item(i+1));let db=await writer.replaceProviderItems('kindle',books,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshot(books));
  const a=db.providers.kindle.activeProfileId,record=n=>Object.values(db.providerItems).find(r=>r.profileId===a&&r.providerItemId===item(n).providerItemId);

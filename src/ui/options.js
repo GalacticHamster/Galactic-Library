@@ -55,6 +55,7 @@ import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
+import {createCollectionOverlapView} from './collection-overlap.js';
 import { identityEvidence } from '../lib/identity.js';
 import {PRIVATE_STORAGE_CHANGED,isFirefoxRuntime} from '../background/private-storage.js';
 
@@ -183,6 +184,7 @@ let libraryPage = 0;
 let browseAnchor='',lastBrowseResult,selectedBrowseRef;
 let unlinkedPage=0;
 let coverageDatabase;
+let overlapDatabase;
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
 const filterDefault=()=> 'all';
@@ -995,6 +997,9 @@ document.querySelector('#unlinked-previous').addEventListener('click',()=>{unlin
 document.querySelector('#unlinked-next').addEventListener('click',()=>{unlinkedPage++;render();});
 document.querySelector('#clear-empty-library-filters').addEventListener('click',()=>clearFilters.click());
 function renderCollectionCoverage(){
+  if(database&&workspace.workspace==='overlap'&&overlapDatabase!==database){
+    document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;
+  }
   if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
 }
