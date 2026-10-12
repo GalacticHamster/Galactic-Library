@@ -10,6 +10,35 @@ const record=(id,title,metadata={},extra={})=>({id,recordRef:id,provider:'kobo',
 const database=records=>({providerItems:Object.fromEntries(records.map(record=>[record.id,record])),canonicalItems:Object.fromEntries(records.map(record=>[record.id,{id:record.id,title:record.title,mediaType:record.mediaType,providerItemIds:[record.id]}])),providerProfiles:{personal:{nickname:'Personal'}},titleAliases:{},readingStates:{},contentReviews:{},enrichmentReviews:{}});
 const results=(db,query,options={})=>libraryBrowseResults(createLibraryBrowseProjection()(db),{query,...options}).matches.map(row=>row.canonical.id);
 export const libraryBrowseTests=[
+ ['All saved items is the default and includes every access state without changing ownership',()=>{
+   const records=['owned','claimed','unknown','borrowed','subscription','rental'].map(ownership=>record(ownership,'Access example '+ownership,{}, {ownership}));
+   const db=database(records),before=JSON.stringify(db),projection=createLibraryBrowseProjection()(db);
+   const preferences=validateUiPreferences({});
+   assert.equal(preferences.library.acquisitions,'all');assert.equal(preferences.books.acquisitions,'all');
+   assert.equal(libraryBrowseResults(projection,{filters:browseView(preferences,'library')}).total,6);
+   assert.equal(libraryBrowseResults(projection,{filters:{acquisitions:'1'}}).total,2);
+   for(let n=2;n<=5;n++)assert.equal(libraryBrowseResults(projection,{filters:{acquisitions:String(n)}}).total,0);
+   assert.equal(JSON.stringify(db),before);
+ }],
+ ['Every ownership option composes with source-provider search, sorting and pagination without losing records',()=>{
+   const records=Array.from({length:45},(_,n)=>Array.from({length:n%5+1},(_,copy)=>record(`owned-${n}-${copy}`,`Visibility Volume ${String(n).padStart(2,'0')}`,{purchaseId:`order-${n}-${copy}`,sourceBundle:`Bundle ${copy}`},{provider:'humble'}))).flat();
+   records.push(record('cross-kobo','Visibility Volume 04',{}, {ownership:'unknown'}),record('unknown-only','Visibility Unknown',{}, {ownership:'unknown'}),record('subscription-only','Visibility Subscription',{}, {provider:'kindle',ownership:'subscription'}),record('borrowed-only','Visibility Loan',{}, {provider:'audible',ownership:'borrowed'}));
+   const db=database(records),before=JSON.stringify(db),projection=createLibraryBrowseProjection()(db);
+   for(const option of ['all','1','2','3','4','5']){
+     const n=Number(option)||0,filters={acquisitions:option},expected=n?45/5*(6-n):48;
+     const first=libraryBrowseResults(projection,{query:'Visibility',filters,sort:'title-desc',size:20});
+     assert.equal(first.total,expected,option);
+     const pages=Array.from({length:first.pages},(_,page)=>libraryBrowseResults(projection,{query:'Visibility',filters,sort:'title-desc',size:20,page}).rows).flat();
+     assert.equal(pages.length,expected);assert.equal(new Set(pages.map(row=>row.canonical.id)).size,expected);
+     const ascending=libraryBrowseResults(projection,{query:'Visibility',filters,sort:'title-asc'}).matches;
+     assert.deepEqual(pages.map(row=>row.canonical.id),ascending.map(row=>row.canonical.id).reverse());
+     assert.equal(libraryBrowseResults(projection,{query:'Visibility Volume 04',filters:{...filters,provider:'kobo'}}).total,1);
+     assert.equal(libraryBrowseResults(projection,{query:'Visibility Unknown',filters:{...filters,provider:'kobo'}}).total,n?0:1);
+     assert.equal(libraryBrowseResults(projection,{filters:{...filters,provider:'audible'}}).total,n?0:1);
+     assert.equal(libraryBrowseResults(projection,{filters:{...filters,provider:'kindle'}}).total,n?0:1);
+   }
+   assert.equal(JSON.stringify(db),before);
+ }],
  ['Library retrieval searches titles, aliases, creators, series, units and identifiers without changing identity',()=>{
    const db=database([record('one','A Hidden Book',{authors:['Jane Writer'],series:['Night Stories'],volume:'10',isbn:'9780306406157'})]);db.titleAliases.one={titles:['Secret translation']};const before=JSON.stringify(db);
    for(const query of ['hidden','secret translation','Jane Writer','Night Stories','volume 10','978-0-306-40615-7','Kobo Personal'])assert.deepEqual(results(db,query),['one'],query);
@@ -72,7 +101,7 @@ libraryBrowseTests.push(
 
 libraryBrowseTests.push(['Shared Library and Contents state migrates old views once and keeps specialized filters separate',()=>{
  const prefs=validateUiPreferences({library:{search:'Batman',provider:'kindle',sort:'added',page:1,information:'missing'},books:{search:'Other'}});
- assert.equal(prefs.browse.search,'Batman');assert.deepEqual(prefs.library,{information:'missing',dlc:'all',acquisitions:'1'});
+ assert.equal(prefs.browse.search,'Batman');assert.deepEqual(prefs.library,{information:'missing',dlc:'all',acquisitions:'all'});
  rememberBrowseView(prefs,'contents',{...browseView(prefs,'contents'),search:'Detective',status:'partial',anchor:'same-record'});
  assert.equal(browseView(prefs,'library').search,'Detective');assert.equal(browseView(prefs,'library').information,'missing');assert.equal(prefs.contents.status,'partial');assert.equal(prefs.books.search,'Other');
  const saved=mergeUiPreferences(prefs,{browse:{sort:'series'}});assert.equal(saved.browse.anchor,'same-record');assert.equal(saved.browse.search,'Detective');assert(!('search' in saved.library));
@@ -184,7 +213,7 @@ libraryBrowseTests.push(
    const fan=libraryBrowseResults(createLibraryBrowseProjection()(database([single,repeat,multiple])),{filters:{acquisitions:'2'}});assert.equal(fan.total,0,'Two copies in one order still form one acquisition group');
  }],
  ['Multiple ownership preferences default to All, round-trip privately, reject unsupported values and stay local to Library',()=>{
-   assert.equal(validateUiPreferences({library:{}}).library.acquisitions,'1');
+   assert.equal(validateUiPreferences({library:{}}).library.acquisitions,'all');
    const prefs=mergeUiPreferences(validateUiPreferences({}),{library:{acquisitions:'2'}});assert.equal(browseView(prefs,'library').acquisitions,'2');assert(!('acquisitions' in browseView(prefs,'contents')));
    assert.equal(validateUiPreferences(JSON.parse(JSON.stringify(prefs))).library.acquisitions,'2');assert.throws(()=>validateUiPreferences({library:{acquisitions:'all-observations'}}));rememberBrowseView(prefs,'library',{acquisitions:'1'});assert.equal(prefs.library.acquisitions,'1');
  }]
@@ -221,7 +250,7 @@ libraryBrowseTests.push(
    const distinct=database([record('issue','Archer & Armstrong #0'),record('volume','Archer & Armstrong Vol. 1',{collects:'Archer & Armstrong #0-4'})]);assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(distinct),{filters:{acquisitions:'2'}}).total,0);assert.equal(libraryBrowseResults(createLibraryBrowseProjection()(distinct),{filters:{acquisitions:'1'}}).total,2);
  }],
  ['Old binary preferences map to thresholds and supported thresholds remain Library-only',()=>{
-   assert.equal(validateUiPreferences({library:{acquisitions:'all'}}).library.acquisitions,'1');assert.equal(validateUiPreferences({library:{acquisitions:'multiple'}}).library.acquisitions,'2');for(let n=1;n<=5;n++)assert.equal(validateUiPreferences({library:{acquisitions:String(n)}}).library.acquisitions,String(n));assert.throws(()=>validateUiPreferences({library:{acquisitions:'6'}}));
+   assert.equal(validateUiPreferences({library:{acquisitions:'all'}}).library.acquisitions,'all');assert.equal(validateUiPreferences({library:{acquisitions:'multiple'}}).library.acquisitions,'2');for(let n=1;n<=5;n++)assert.equal(validateUiPreferences({library:{acquisitions:String(n)}}).library.acquisitions,String(n));assert.throws(()=>validateUiPreferences({library:{acquisitions:'6'}}));
  }],
  ['Compact claim history expands all original references/dates lazily and omits unknown prices',()=>{
    class Element{constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.open=false;this.value='';}set textContent(v){this.value=v;}get textContent(){return this.value+this.children.map(c=>c.textContent).join(' ');}append(...values){this.children.push(...values);}addEventListener(name,listener){this.listeners[name]=listener;}}
