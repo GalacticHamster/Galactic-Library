@@ -122,6 +122,11 @@ and finishing. Worker records and page totals share correlation IDs; nested
 stage durations must not be added twice. They are bounded in-memory diagnostics
 and disappear when the worker restarts.
 
+For an intermittent nickname delay, account diagnostics also record the
+remembered-hint lookup, message round trips, and when the nickname becomes
+visible versus verified. Export immediately after reproducing the delay or
+completing a Quick update, before the worker idles and loses its timing buffers.
+
 Library retains All items, Book information, Reading, and Ownership and access
 as secondary views. Existing filters, item details, enrichment and reviews
 remain available there.

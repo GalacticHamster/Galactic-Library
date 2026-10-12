@@ -11,7 +11,7 @@
   stages.add('validation_yield_wait');
   for(const stage of ['options_contents','options_feedback_paint','options_projection','options_filter_controls'])stages.add(stage);
   for(const stage of ['snapshot_certificate','certificate_read','certificate_serialize','certificate_hash','certificate_hit','certificate_miss','certificate_issue','matching_canonical_reuse'])stages.add(stage);
-  for(const stage of ['provider_profile','provider_start','provider_fetch','provider_compare','provider_finish','provider_total','provider_profile_wait'])stages.add(stage);
+  for(const stage of ['provider_profile','provider_start','provider_fetch','provider_compare','provider_finish','provider_total','provider_profile_wait','provider_hint_ready','provider_hint_read','provider_hint_message','provider_profile_message','provider_hint_display','provider_verified_display'])stages.add(stage);
   const cleanClient=value=>({...Object.fromEntries(['beforeSendMs','localStorageMs','preparationMs','previousFlightMs','postResponseMs','pageToRenderedMs'].filter(key=>Number.isFinite(value?.[key])&&value[key]>=0&&value[key]<=300000).map(key=>[key,value[key]])),...(['rendered','superseded','incomplete'].includes(value?.renderOutcome)?{renderOutcome:value.renderOutcome}:{})});
   const cleanWork=value=>Object.fromEntries(['snapshot','index','execution'].filter(key=>value?.[key]).map(key=>[key,Object.fromEntries(['cpuMs','waitMs','maxWaitMs','yields'].filter(field=>Number.isFinite(value[key][field])&&value[key][field]>=0).map(field=>[field,value[key][field]]))]));
   const now = () => performance.timeOrigin + performance.now();
@@ -39,7 +39,8 @@
       ...(/^[a-f0-9]{12}$/u.test(value.worker??'')?{worker:value.worker}:{}),
       ...(Number.isFinite(value.workerStartedEpochMs)?{workerStartedEpochMs:value.workerStartedEpochMs}:{}),
       ...(value.work?{work:cleanWork(value.work)}:{}),
-      ...(['profile','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
+      ...(['profile','hint','account','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
+      ...(['found','missing','ambiguous','invalid'].includes(value.profileHintStatus)?{profileHintStatus:value.profileHintStatus}:{}),
       ...(value.client?{client:cleanClient(value.client)}:{}),
       events:(Array.isArray(value.events)?value.events:[]).filter(event=>stages.has(event?.stage)&&Number.isFinite(event.startMs)&&Number.isFinite(event.durationMs)&&event.startMs>=0&&event.durationMs>=0).slice(0,512).map(event=>({stage:event.stage,attempt:Number.isInteger(event.attempt)&&event.attempt>=0&&event.attempt<=3?event.attempt:0,startMs:event.startMs,durationMs:event.durationMs}))};
   }

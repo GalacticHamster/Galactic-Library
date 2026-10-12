@@ -61,8 +61,11 @@ const providerTimings=contentsPerformance.collector();
 let providerDiagnosticSequence=100;
 function providerTiming(request){
   if(request.provider!=='kobo')return null;
-  const timing=contentsPerformance.trace(contentsPerformance.validId(request.diagnosticLookupId)?request.diagnosticLookupId:`lookup-${companionDiagnosticPrefix}-${providerDiagnosticSequence++}`,'provider');
-  timing.providerPhase=request.type==='GET_PROVIDER_PROFILE'?'profile':request.beginScan?'start':'finish';return timing;
+  const sent=request.diagnosticSentEpochMs,entered=contentsPerformance.now(),hasSenderTime=Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000;
+  const timing=contentsPerformance.trace(contentsPerformance.validId(request.diagnosticLookupId)?request.diagnosticLookupId:`lookup-${companionDiagnosticPrefix}-${providerDiagnosticSequence++}`,'provider',undefined,hasSenderTime?sent:null);
+  timing.providerPhase=request.type==='GET_PROVIDER_PROFILE_HINT'?'hint':request.type==='GET_PROVIDER_PROFILE'?'profile':request.beginScan?'start':'finish';
+  if(hasSenderTime)timing.events.push({stage:'handler_delay',attempt:0,startMs:0,durationMs:entered-sent});
+  return timing;
 }
 function providerResponse(timing,sendResponse,value){
   if(timing){providerTimings.add(timing.finish(value.ok?'prepared':'failed'));value={...value,performance:contentsPerformance.clean(timing)};}
@@ -418,7 +421,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if(request?.type==='GET_PROVIDER_PROFILE_HINT'){
     if(request.provider!=='kobo'||!isProviderImportPage('kobo',sender.url)){sendResponse({ok:false});return undefined;}
-    storageWriter.getProviderProfileHint('kobo').then(hint=>sendResponse({ok:true,hint})).catch(()=>sendResponse({ok:false}));return true;
+    const timing=providerTiming(request);
+    storageWriter.getProviderProfileHint('kobo',timing).then(hint=>providerResponse(timing,sendResponse,{ok:true,hint})).catch(()=>providerResponse(timing,sendResponse,{ok:false}));return true;
   }
   if (['GET_PROVIDER_SYNC_STATE','GET_PROVIDER_PROFILE'].includes(request?.type)) {
     if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {

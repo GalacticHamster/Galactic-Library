@@ -28,12 +28,12 @@ try{
   const items=[...cards.map(r=>({...r,metadata:{...r.metadata,librarySection:'my-books'}})),...Array.from({length:113},(_,n)=>({providerItemId:uuid(n+24),title:'Saved Book '+n,mediaType:'book',ownership:'unknown',metadata:{authors:['Saved Writer'],ownershipBasis:'library-presence-only'}}))];
   let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Sean',fullSyncAt:'2026-10-01'},completeProviderSnapshot('kobo',items,[completedScope('library',137,137,'reported-count')]));
   const profileId=db.providers.kobo.activeProfileId,refs=Object.values(db.providerItems).map(r=>r.recordRef).sort().join();
-  let releaseProfile,profilePending=true,started=0,completed=0;
+  let releaseProfile,profilePending=true,started=0,completed=0;const uiTimings=[];
   const profileGate=new Promise(resolve=>{releaseProfile=resolve;});
   globalThis.fetch=async()=>({ok:true,text:async()=>html});
   globalThis.chrome={runtime:{sendMessage:async request=>{
     if(request.type==='GET_PROVIDER_PROFILE_HINT')return {ok:true,hint:await writer.getProviderProfileHint('kobo')};
-    if(request.type==='GL_PROVIDER_UI_TIMING')return {ok:true};
+    if(request.type==='GL_PROVIDER_UI_TIMING'){uiTimings.push(request.timing);return {ok:true};}
     if(request.type==='GET_PROVIDER_PROFILE'){
       if(profilePending)await profileGate;
       const current=await writer.getDatabase(),profile=current.providerProfiles[current.providers.kobo.activeProfileId],profiles=Object.values(current.providerProfiles).filter(p=>p.provider==='kobo');
@@ -55,6 +55,7 @@ try{
   history.replaceState(null,'','/library');await import('../src/providers/kobo-content.js');let shadow=shadows.at(-1),button=shadow.querySelector('[data-mode="incremental"]');
   button.click();await pause();assert(started===0,'Scan began before persisted profile selection resolved.');assert(shadow.querySelector('[data-profile-label]').value==='Sean','Display-only remembered nickname waited for full validation.');profilePending=false;releaseProfile();await wait(()=>completed===1);
   assert(shadow.querySelector('[data-profile-label]').value==='Sean'&&!shadow.querySelector('[data-profile-confirm]').checked,'Remembered account required a repeated checkbox confirmation.');
+  const accountTiming=uiTimings.find(r=>r.providerPhase==='account');assert(accountTiming&&['provider_hint_message','provider_hint_display','provider_profile_message','provider_verified_display'].every(stage=>accountTiming.events.some(e=>e.stage===stage)),'Account hint, callback and display diagnostics are missing.');
   assert(shadow.querySelector('.status').textContent.includes('24 checked · 0 new · 0 updated'),'Observed cards were reported as changed books.');
   checks.push('A click during delayed account loading waits, then reuses the single saved profile without nickname entry or repeat confirmation');
   button.click();await wait(()=>completed===2);assert(shadow.querySelector('.status').textContent.includes('0 updated')&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');

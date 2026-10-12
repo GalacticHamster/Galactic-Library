@@ -51,10 +51,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const profiles=Object.values(database.providerProfiles).filter(p=>p.provider===provider),profile=database.providerProfiles[database.providers[provider]?.activeProfileId];
     return [provider,profile?{profileId:profile.profileId,nickname:profile.nickname,count:profiles.length}:null];
   }));
-  async function getProviderProfileHint(provider){
-    await ready;
-    const hints=(await committedArea.get({[PROFILE_HINTS]:{}}))[PROFILE_HINTS],hint=hints?.[provider];
-    if(provider!=='kobo'||!hint||typeof hint.profileId!=='string'||hint.profileId.length>100||typeof hint.nickname!=='string'||hint.nickname.length>100||hint.count!==1)return null;
+  async function getProviderProfileHint(provider,timing=null){
+    let end=timing?.begin('provider_hint_ready');
+    try{await ready;}finally{end?.();}
+    end=timing?.begin('provider_hint_read');let hints;
+    try{hints=(await committedArea.get({[PROFILE_HINTS]:{}}))[PROFILE_HINTS];}finally{end?.();}
+    const hint=hints?.[provider];
+    const status=!hint?'missing':hint.count>1?'ambiguous':provider!=='kobo'||typeof hint.profileId!=='string'||hint.profileId.length>100||typeof hint.nickname!=='string'||hint.nickname.length>100||hint.count!==1?'invalid':'found';
+    if(timing)timing.profileHintStatus=status;
+    if(status!=='found')return null;
     return hint; // Display only. Never a source of account/write authorization.
   }
   function rememberProviderProfileHints(database){

@@ -18,7 +18,10 @@ export const contentsPerformanceTests=[
    await pageA.mergeProviderItems('kobo',[{providerItemId:'a',title:'PRIVATE KOBO TITLE',mediaType:'book',ownership:'unknown'}],{profileLabel:'Private nickname'});
    const sender={id:globalThis.chrome.runtime.id,url:'https://www.kobo.com/us/en/library',tab:{id:42}};
    const profile=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'kobo'},sender);assert(profile.ok);assert.equal(profile.performance.kind,'provider');assert.equal(profile.performance.providerPhase,'profile');
-   const hint=await dispatch({type:'GET_PROVIDER_PROFILE_HINT',provider:'kobo'},sender);assert(hint.ok);
+   const hint=await dispatch({type:'GET_PROVIDER_PROFILE_HINT',provider:'kobo',diagnosticSentEpochMs:perf.now()-25},sender);assert(hint.ok);
+   assert.equal(hint.performance.providerPhase,'hint');assert.equal(hint.performance.profileHintStatus,'found');
+   for(const stage of ['handler_delay','provider_hint_ready','provider_hint_read'])assert(hint.performance.events.some(e=>e.stage===stage));
+   const account=perf.clean({...hint.performance,providerPhase:'account',profileHintStatus:'missing',privateNickname:'PRIVATE'});assert.equal(account.providerPhase,'account');assert.equal(account.profileHintStatus,'missing');assert(!JSON.stringify(account).includes('PRIVATE'));
    const denied=await dispatch({type:'GET_PROVIDER_PROFILE_HINT',provider:'kobo'},{...sender,url:'https://example.com'});assert.equal(denied.ok,false);
    const row=perf.trace(id(8),'provider');row.providerPhase='scan';const end=row.begin('provider_fetch');end();row.privateTitle='PRIVATE';
    await dispatch({type:'GL_PROVIDER_UI_TIMING',provider:'kobo',timing:row.finish('prepared')},sender);

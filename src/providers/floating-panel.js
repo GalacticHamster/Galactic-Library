@@ -61,13 +61,28 @@
       input.addEventListener('input',()=>{edited=true;remembered=null;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
       sessions.set(provider,session);
       shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&!button.dataset.galacticFloatingPanelControl){mode=button.dataset.mode??'full';session.context=null;session.resume=null;}},true);
-      if(provider==='kobo')chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE_HINT',provider}).then(result=>{
+      const performanceApi=provider==='kobo'?global.GalacticContentsPerformance:null;
+      const accountTiming=performanceApi?.trace(`lookup-${crypto.randomUUID().replace(/-/gu,'').slice(0,12)}-100`,'provider');
+      if(accountTiming)accountTiming.providerPhase='account';
+      let hintFinished=provider!=='kobo',profileFinished=false,profileFailed=false;
+      const reportAccountTiming=()=>{
+        if(!accountTiming||!hintFinished||!profileFinished)return;
+        chrome.runtime.sendMessage({type:'GL_PROVIDER_UI_TIMING',provider,timing:performanceApi.clean(accountTiming.finish(profileFailed?'failed':'prepared'))}).catch(()=>{});
+      };
+      const diagnostic=()=>accountTiming?{diagnosticLookupId:accountTiming.id,diagnosticSentEpochMs:performanceApi.now()}:{};
+      const hintEnd=accountTiming?.begin('provider_hint_message');
+      if(provider==='kobo')chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE_HINT',provider,...diagnostic()}).then(result=>{
+        hintEnd?.();performanceApi?.merge(accountTiming,result.performance);
+        if(accountTiming&&result.performance?.profileHintStatus)accountTiming.profileHintStatus=result.performance.profileHintStatus;
         if(!resolved&&!edited&&!input.value&&result?.hint){
           hintValue=result.hint.nickname;input.value=hintValue;
           controls.querySelector('[data-profile-status]').textContent='Remembered account shown; verifying saved account before updating...';
+          accountTiming?.begin('provider_hint_display')();
         }
-      }).catch(()=>{});
-      session.ready=chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider}).then(result=>{
+      }).catch(()=>{hintEnd?.();}).finally(()=>{hintFinished=true;reportAccountTiming();});
+      const profileEnd=accountTiming?.begin('provider_profile_message');
+      session.ready=chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider,...diagnostic()}).then(result=>{
+        profileEnd?.();performanceApi?.merge(accountTiming,result.performance);
         resolved=true;
         if(!result.ok)throw Error(result.error??'Could not read saved accounts.');
         if(!edited&&(!input.value||input.value===hintValue))input.value=result.profileLabel??'';
@@ -77,7 +92,9 @@
           controls.querySelector('[data-profile-confirm-label]').hidden=true;
           controls.querySelector('[data-profile-status]').textContent=`Using saved account: ${result.profileLabel||'Default account'}.`;
         }else controls.querySelector('[data-profile-status]').textContent='Select and confirm the signed-in account.';
-      }).catch(error=>{controls.querySelector('[data-profile-status]').textContent='Could not load saved accounts. Reload this page before updating.';throw error;});
+        accountTiming?.begin('provider_verified_display')();
+      }).catch(error=>{profileFailed=true;profileEnd?.();controls.querySelector('[data-profile-status]').textContent='Could not load saved accounts. Reload this page before updating.';throw error;})
+        .finally(()=>{profileFinished=true;reportAccountTiming();});
       // A click during hydration waits for the same account result. Failure
       // keeps scans blocked; never infer consent from an unresolved lookup.
       session.ready.catch(()=>{});
