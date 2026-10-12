@@ -12,6 +12,7 @@ import {createCollectionComparison} from '../src/ui/contents-book-details.js';
 import {validateContentReview} from '../src/lib/contents.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 import {createCollectionOverlapView} from '../src/ui/collection-overlap.js';
+import {createComicCoverageView} from '../src/ui/comic-coverage.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -61,6 +62,12 @@ try{
  assert(pairsView.querySelector('.overlap-pair-details').textContent.includes('3 shared issues')&&pairsView.querySelector('.overlap-pair-details a').href.includes('#library?record='),'Shared units or record links missing');
  change(pairsView.querySelector('[aria-label="Search overlapping collections"]'),'no such title','input');assert(pairsView.textContent.includes('No overlapping collections match'),'Overlap search not applied');pairsView.remove();
  checks.push('Collection-level overlap shows inferred issues, source links and empty search results');
+ const comicDb=coverageDatabase(coverageBook('comic-one','Collects Alpha (2001) #3, 5'),coverageBook('comic-two','Collects Alpha (2001) #5'));
+ let savedStarts={};const comicView=createComicCoverageView(comicDb,{saveStart:async(key,value)=>{savedStarts={...savedStarts,[key]:value??1};return savedStarts;}});document.body.append(comicView);await comicView.ready;
+ button(comicView,'Inspect issues').click();const comicDetail=comicView.querySelector('.comic-series-detail');assert(comicDetail.textContent.includes('2 covered · 1 owned multiple times · 3 missing'),'Comic summary wrong');
+ change(comicDetail.querySelector('[aria-label="Comic issue filter"]'),'missing');assert([...comicDetail.querySelectorAll('[data-comic-issue]')].map(row=>row.dataset.comicIssue).join()==='1,2,4','Comic range did not begin at #1');
+ comicDetail.querySelector('[aria-label="Series starting number"]').value='3';button(comicDetail,'Save starting number').click();await wait(()=>comicDetail.textContent.includes('Starting number saved'),'Comic start did not save');assert(comicDetail.querySelectorAll('[data-comic-issue]').length===1&&comicDetail.querySelector('[data-comic-issue]').dataset.comicIssue==='4','Start override did not update gaps');
+ change(comicDetail.querySelector('[aria-label="Comic issue filter"]'),'duplicates');const duplicate=comicDetail.querySelector('details');duplicate.open=true;duplicate.dispatchEvent(new Event('toggle'));assert(comicDetail.querySelectorAll('a[data-comic-record]').length===2,'Comic duplicate source links missing');comicView.remove();checks.push('Comic Coverage supports assumed gaps, start override and duplicate source links without verification');
  const coverageActions={save:async(id,value)=>{coverageDb.contentReviews[id]=validateContentReview({...value,verifiedAt:'2026-10-12T12:00:00Z'});},remove:async id=>{delete coverageDb.contentReviews[id];},refresh:()=>{}};
  const acceptEditor=createContentsEditor(coverageParent,null,coverageActions,{expanded:true});document.body.append(acceptEditor);
  button(acceptEditor,'Accept all suggestions').click();await wait(()=>coverageDb.contentReviews[coverageParent.id]?.entries.length===3,'Accept all did not save a verified list');
@@ -105,6 +112,7 @@ try{
  navigate('library');const overlapNav=document.querySelector('#library-navigation [data-workspace="overlap"]');assert(overlapNav&&overlapNav.getBoundingClientRect().height>0&&overlapNav.textContent==='Collection Overlap','Overlap is not visible in Library navigation');overlapNav.click();
  await wait(()=>document.querySelector('#collection-overlap-view').textContent.includes('No comparable issue overlaps found'),'Overlap empty workspace missing');assert(!document.querySelector('#overlap-workspace').hidden&&document.querySelector('#workspace-navigation [data-workspace="library"]').getAttribute('aria-current')==='page','Overlap left Library navigation');navigate('contents');
  checks.push('Library exposes Collection Overlap directly and opens an honest empty state');
+ navigate('library');const comicNav=document.querySelector('#library-navigation [data-workspace="comic-coverage"]');assert(comicNav?.getBoundingClientRect().height>0&&comicNav.textContent==='Comic Coverage','Comic Coverage not visible in Library');comicNav.click();await wait(()=>document.querySelector('#comic-coverage-view').textContent.includes('No comparable comic coverage found'),'Comic empty state missing');navigate('contents');checks.push('Library exposes Comic Coverage directly with an honest empty state');
  assert(list().textContent===''&&document.querySelector('#contents-collections').textContent.includes('No imported books yet'),'First-run contents confused with a failed scan');checks.push('Contents empty state distinguishes no imported books without acquisition');
  const books=Array.from({length:65},(_,i)=>item(i+1));let db=await writer.replaceProviderItems('kindle',books,{profileLabel:'Personal',fullSyncAt:'2026-10-01'},snapshot(books));
  const a=db.providers.kindle.activeProfileId,record=n=>Object.values(db.providerItems).find(r=>r.profileId===a&&r.providerItemId===item(n).providerItemId);

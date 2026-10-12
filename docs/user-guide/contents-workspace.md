@@ -53,6 +53,16 @@ Book lookup metadata, contents suggestions, human corrections and ownership/acce
 
 ## Collection overlap and gaps
 
+### Comic Coverage
+
+Choose **Library → Comic Coverage** to browse comic series across your owned library. Search a series name, sort by covered/duplicate/missing counts, and choose **Inspect issues**. **Show** switches between **Owned issues**, **Owned multiple times**, and **Missing issues**; both the series list and issue list have pagination. Expand **Supporting books** for links to the exact Library records, including standalone issues and collected editions. Inferred coverage works without manual review; reviewed entries take precedence. Explicit series runs, languages, annuals and specials stay separate.
+
+V1 assumes regular whole-number issues begin at **#1** and continue through the highest covered issue number. Uncovered whole numbers within that span are missing in this assumed range. Use **Starting number → Save starting number** for exceptions such as #169, or **Reset to #1**. Covered #0, fractional/decimal issues and covered numbers below an override remain visible; GL does not invent missing fractional numbers. Renumbering, anniversary numbers and publication breaks can still create apparent gaps. The view is not a complete publication bibliography, and unknown/provisional contents cannot establish ownership or absence.
+
+Duplicate counts reuse Library product consolidation and acquisition groups. Repeated imports, sync observations and grouped repeated claims are not extra copies. Different supporting products can each cover the same issue; multiple purchases of one product count when acquisition evidence establishes them. A catalog observation alone does not establish an additional purchase.
+
+Starting-number overrides are scoped to the series/run/type/language and saved as browser display preferences. They survive navigation and reloads, do not change contents or ownership, and are not included in library backups. The view calculates on demand in the existing read-only UI worker, with bounded lists and lazy source links.
+
 From **Library**, choose **Collection Overlap** in the Library navigation. It lists pairs of owned collections with comparable shared comic issues, including inferred contents by default. Search either collection's source or display title, sort by shared issue count or title, and choose **Inspect overlap** to see shared issues and entries listed only in each collection. Expand an issue to see its supporting source books; the links open those exact Library records. Shared issues are verified only when both collections have reviewed evidence for them.
 
 The pair list is paginated, and issue lists show 50 entries at a time with **Show more issues**. Its read-only calculation runs on demand in a separate UI worker; ordinary Library browsing does not calculate collection pairs. Unknown/provisional identities do not become definite overlap or unique-issue claims. “Listed only” compares saved contents, not guaranteed absence from an incomplete description. The existing series-gap and target-range tools remain in Contents below.

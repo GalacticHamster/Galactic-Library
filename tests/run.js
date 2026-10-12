@@ -44,6 +44,7 @@ import {contentsPrecisionContextTests} from './contents-precision-context.js';
 import {numberedWrapperTests} from './numbered-wrappers.js';
 import {inferredCoverageTests} from './inferred-coverage.js';
 import {collectionOverlapTests} from './collection-overlap.js';
+import {comicCoverageTests} from './comic-coverage.js';
 import {contentsParserV4Tests} from './contents-parser-v4.js';
 import {numberedPrecisionCases} from './contents-numbered-precision-fixture.js';
 import {kindleRefreshCases} from './kindle-refresh-fixture.js';
@@ -108,6 +109,7 @@ const tests = [
   ...numberedWrapperTests,
   ...inferredCoverageTests,
   ...collectionOverlapTests,
+  ...comicCoverageTests,
   ...manualReconciliationTests,
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,

@@ -12,13 +12,16 @@ import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,projectRoot} from '../scripts/release.mjs';
 import {coverageBook,coverageDatabase} from './inferred-coverage-fixture.js';
 import {collectionOverlap,overlapIssueLabel} from '../src/lib/collection-overlap.js';
+import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
+import {comicCoverageSummary,comicIssuePage,comicRange} from '../src/lib/comic-coverage.js';
 import {outputPath} from '../scripts/audit-artifacts.mjs';
 const firefox=process.argv.includes('--firefox'),kind=firefox?'firefox':'chrome';
+const comicMode=process.argv.includes('--comic-coverage'),destination=comicMode?'comic-coverage':'overlap',viewSelector=comicMode?'#comic-coverage-view':'#collection-overlap-view';
 const backupPath=process.argv.find(arg=>arg.startsWith('--backup='))?.slice(9);
 const original=backupPath?await readFile(backupPath):null;
 const database=original?JSON.parse(original).database:coverageDatabase(coverageBook('left','Collects Alpha (2001) #1-3'),coverageBook('right','Collects Alpha (2001) #3-5'));
-const expected=collectionOverlap(database),bytes=Buffer.from(JSON.stringify(database));
-assert(expected.pairs.length>0,'Test input must contain overlapping collections');
+const expected=comicMode?comicCoverageForLibrary(database):collectionOverlap(database),bytes=Buffer.from(JSON.stringify(database));
+assert(comicMode?expected.groups.length>0:expected.pairs.length>0,'Test input must contain comparable comics');
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const server=createServer((req,res)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Content-Type','application/json');if(req.url==='/backup'){res.end(bytes);}else{res.writeHead(404);res.end();}});
 await new Promise(done=>server.listen(0,'127.0.0.1',done));
@@ -47,16 +50,46 @@ try{
     if(firefox){const response=await driver.send('WebDriver:ExecuteAsyncScript',{script:'(async()=>{'+script+'})().then(arguments[arguments.length-1],error=>arguments[arguments.length-1]({error:error.message+"\\n"+error.stack}));',args:[],newSandbox:false});const result=response.value??response;assert.equal(result?.error,undefined,result?.error);return result;}
     const response=await driver.send('Runtime.evaluate',{expression:'(async()=>{'+script+'})()',awaitPromise:true,returnByValue:true},session);assert.equal(response.exceptionDetails,undefined,JSON.stringify(response.exceptionDetails));return response.result.value;
   }
-  async function wait(expression){for(let n=0;n<450;n++){const result=await evaluate('return '+expression+';');if(result)return;await pause(100);}throw Error('UI timed out: '+expression);}
+  async function wait(expression){let lastError;for(let n=0;n<450;n++){try{const result=await evaluate('return '+expression+';');if(result)return;}catch(error){lastError=error;}await pause(100);}throw Error('UI timed out: '+expression+(lastError?'\n'+lastError.message:''));}
   await wait('document.querySelector("#empty-library")&&!document.querySelector("#empty-library").hidden');
-  assert(await evaluate('const b=document.querySelector("#library-navigation [data-workspace=overlap]");return b.textContent==="Collection Overlap"&&b.getBoundingClientRect().height>0;'));
-  await evaluate('document.querySelector("#library-navigation [data-workspace=overlap]").click();return true;');
-  await wait('document.querySelector("#collection-overlap-view").textContent.includes("No comparable issue overlaps found")');
+  assert(await evaluate(`const b=document.querySelector('#library-navigation [data-workspace="${destination}"]');return b.textContent===${JSON.stringify(comicMode?'Comic Coverage':'Collection Overlap')}&&b.getBoundingClientRect().height>0;`));
+  await evaluate(`document.querySelector('#library-navigation [data-workspace="${destination}"]').click();return true;`);
+  await wait(`document.querySelector('${viewSelector}').textContent.includes(${JSON.stringify(comicMode?'No comparable comic coverage found':'No comparable issue overlaps found')})`);
   await evaluate('document.querySelector("#workspace-navigation [data-workspace=library]").click();return true;');
   await evaluate(`window.testRestore={done:false};(async()=>{const S=await import('./src/lib/storage.js');const db=await(await fetch('http://127.0.0.1:${server.address().port}/backup')).json();await S.restoreDatabase(db);window.testRestore.done=true;})().catch(error=>{window.testRestore.error=error.message;});return true;`);
   await wait('window.testRestore?.done||window.testRestore?.error');assert.equal(await evaluate("return window.testRestore.error||'';"),'');
   await wait('document.querySelector("#library-items").children.length>0');
-  const coldTimings=await evaluate(`const start=performance.now();let last=start,maxGap=0,ticks=0;const timer=setInterval(()=>{const now=performance.now();maxGap=Math.max(maxGap,now-last);last=now;ticks++;},10);document.querySelector('#library-navigation [data-workspace=overlap]').click();const admissionMs=performance.now()-start;await document.querySelector('#collection-overlap-view > div').ready;clearInterval(timer);return {coldMs:performance.now()-start,admissionMs,maxHeartbeatGapMs:maxGap,heartbeatTicks:ticks};`);
+  const coldTimings=await evaluate(`const start=performance.now();let last=start,maxGap=0,ticks=0;const timer=setInterval(()=>{const now=performance.now();maxGap=Math.max(maxGap,now-last);last=now;ticks++;},10);document.querySelector('#library-navigation [data-workspace="${destination}"]').click();const admissionMs=performance.now()-start;await document.querySelector('${viewSelector} > div').ready;clearInterval(timer);return {coldMs:performance.now()-start,admissionMs,maxHeartbeatGapMs:maxGap,heartbeatTicks:ticks};`);
+  if(comicMode){
+    const summary=comicCoverageSummary(expected.groups),chosen=expected.groups.find(group=>group.duplicates&&comicRange(group).missing)||expected.groups[0];
+    const result=await evaluate(`
+      const view=document.querySelector('#comic-coverage-view'),assert=(ok,text)=>{if(!ok)throw Error(text);},change=(node,value,type)=>{node.value=value;node.dispatchEvent(new Event(type,{bubbles:true}));};
+      assert(view.querySelectorAll('[data-comic-series]').length<=50,'Series list is unbounded');assert(view.textContent.includes(${JSON.stringify(summary.seriesGroups+' series/run/type groups · '+summary.covered+' covered issues · '+summary.duplicates+' owned multiple times · '+summary.missing+' missing')}),'Frozen totals differ');
+      change(view.querySelector('[aria-label="Sort comic coverage"]'),'covered','change');const coveredCounts=[...view.querySelectorAll('[data-comic-series] p')].map(node=>Number(/^(\\d+) covered/.exec(node.textContent)[1]));assert(coveredCounts.every((number,i)=>!i||coveredCounts[i-1]>=number),'Coverage sort failed');
+      if(${summary.seriesGroups}>50){[...view.querySelectorAll('.pagination button')].find(button=>button.textContent==='Next page').click();assert(view.querySelector('.pagination-info').textContent.includes('Page 2'),'Series pagination failed');}
+      change(view.querySelector('[aria-label="Search comic coverage"]'),'zzzz-no-series','input');assert(view.textContent.includes('No comic series match'),'Empty search failed');
+      change(view.querySelector('[aria-label="Search comic coverage"]'),${JSON.stringify(chosen.series)},'input');const row=[...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===${JSON.stringify(chosen.id)});assert(row,'Series search lost exact run');row.querySelector('button').click();
+      const detail=view.querySelector('.comic-series-detail'),filter=detail.querySelector('[aria-label="Comic issue filter"]');change(filter,'duplicates','change');
+      const duplicates=[...detail.querySelectorAll('[data-comic-issue]')].map(row=>row.dataset.comicIssue);const disclosure=detail.querySelector('details');if(disclosure){disclosure.open=true;disclosure.dispatchEvent(new Event('toggle'));assert(detail.querySelector('a[data-comic-record]'),'Supporting book link missing');}
+      change(filter,'missing','change');const missing=[...detail.querySelectorAll('[data-comic-issue]')].map(row=>row.dataset.comicIssue);
+      if(${comicRange(chosen).missing}>50){[...detail.querySelectorAll('.pagination button')].find(button=>button.textContent==='Next page').click();assert(detail.querySelector('.pagination-info').textContent.includes('Page 2'),'Issue pagination failed');assert(detail.querySelectorAll('[data-comic-issue]').length<=50,'Issue list is unbounded');}
+      const start=detail.querySelector('[aria-label="Series starting number"]');start.value='169';[...detail.querySelectorAll('button')].find(button=>button.textContent==='Save starting number').click();
+      return {duplicates,missing,visibleSeries:view.querySelectorAll('[data-comic-series]').length,visibleIssues:detail.querySelectorAll('[data-comic-issue]').length};
+    `);
+    assert.deepEqual(result.duplicates,comicIssuePage(chosen,{filter:'duplicates'}).rows.map(row=>row.number));assert.deepEqual(result.missing,comicIssuePage(chosen,{filter:'missing'}).rows.map(row=>row.number));
+    await wait(`document.querySelector('#comic-coverage-view .comic-series-detail').textContent.includes('Starting number saved')`);
+    await evaluate(`document.querySelector('#workspace-navigation [data-workspace=library]').click();return true;`);await pause(400);
+    assert.equal(await evaluate(`const S=await import('./src/lib/storage.js');return (await S.getUiPreferences()).comicCoverageStarts[${JSON.stringify(chosen.id)}];`),169);
+    const reloadUrl=await evaluate(`window.__comicReloadMarker=true;const target=new URL(location.href);target.searchParams.set('comic-test-reload',String(Date.now()));target.hash='comic-coverage';return target.href;`);
+    if(firefox)await driver.send('WebDriver:Navigate',{url:reloadUrl});else await driver.send('Page.navigate',{url:reloadUrl},session);
+    await wait(`!window.__comicReloadMarker&&Boolean(document.querySelector('#comic-coverage-workspace')&&!document.querySelector('#comic-coverage-workspace').hidden&&document.querySelector('#comic-coverage-view [data-comic-series]'))`);
+    const persistence=await evaluate(`const view=document.querySelector('#comic-coverage-view'),search=view.querySelector('[aria-label="Search comic coverage"]');search.value=${JSON.stringify(chosen.series)};search.dispatchEvent(new Event('input',{bubbles:true}));const row=[...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===${JSON.stringify(chosen.id)});if(!row)throw Error('Reloaded series not found: '+view.textContent.slice(0,1500));row.querySelector('button').click();const detail=view.querySelector('.comic-series-detail'),value=detail.querySelector('[aria-label="Series starting number"]').value;[...detail.querySelectorAll('button')].find(button=>button.textContent==='Reset to #1').click();return value;`);
+    assert.equal(persistence,'169');await wait(`document.querySelector('#comic-coverage-view .comic-series-detail [aria-label="Series starting number"]').value==='1'`);
+    const navigation=await evaluate(`const detail=document.querySelector('#comic-coverage-view .comic-series-detail'),filter=detail.querySelector('[aria-label="Comic issue filter"]');filter.value='owned';filter.dispatchEvent(new Event('change',{bubbles:true}));const source=detail.querySelector('details');source.open=true;source.dispatchEvent(new Event('toggle'));detail.querySelector('a[data-comic-record]').click();return !document.querySelector('#library-section').hidden&&Boolean(document.querySelector('#library-items .item-details[open]'));`);assert(navigation,'Comic source navigation failed');
+    if(original)assert.equal(hash(await readFile(backupPath)),hash(original),'Frozen backup changed');
+    const report={browser:kind,providerRecords:Object.keys(database.providerItems).length,summary,provisional:expected.provisional,unresolved:expected.unresolved,chosen:{series:chosen.series,run:chosen.run,type:chosen.unitType,covered:chosen.issues.length,duplicates:chosen.duplicates,defaultRange:comicRange(chosen),override169:comicRange(chosen,169)},...coldTimings,backupUntouched:Boolean(original)};
+    await writeFile(await outputPath('audit-artifacts/comic-coverage/'+kind+'-native.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({browser:kind,summary,...coldTimings}));console.log('PASS installed '+kind+': visible Comic Coverage, frozen totals, duplicates and source links, missing range, search, saved start/reload/reset and Library record navigation');
+  }else{
   await wait(`document.querySelector('#collection-overlap-view [role=status]')?.textContent===${JSON.stringify(expected.pairs.length+' overlapping collection pairs.')}`);
   const result=await evaluate(`
     const view=document.querySelector('#collection-overlap-view'),status=view.querySelector('[role=status]');
@@ -91,6 +124,7 @@ try{
   const report={browser:kind,providerRecords:Object.keys(database.providerItems).length,distinctSharedIssues:new Set(expected.pairs.flatMap(pair=>pair.shared)).size,...result,...coldTimings,...timings,backupUntouched:Boolean(original)};
   await writeFile(await outputPath('audit-artifacts/collection-overlap/'+kind+'-native.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
   console.log('PASS installed '+kind+': visible Library entry, empty state, frozen/synthetic pairs, shared issues and source links, search, sorting, record navigation, bounded rendering and warm navigation');
+  }
 }finally{
   if(firefox)try{await driver?.send('WebDriver:DeleteSession');}catch{}
   child?.kill();if(exited)await exited;await new Promise(done=>server.close(done));

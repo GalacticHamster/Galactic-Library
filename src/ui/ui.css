@@ -223,3 +223,12 @@ button.danger { background:var(--gh-danger-fill); }
 .overlap-pair-details { margin-top:20px; border-top:1px solid var(--gh-divider); padding-top:16px; }
 .overlap-pair-details li { margin:8px 0; overflow-wrap:anywhere; }
 .overlap-pair-details summary { cursor:pointer; }
+.comic-series-list { display:grid; gap:12px; }
+.comic-coverage .library-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.comic-coverage input[type=search] { flex:1 1 240px; }
+.comic-series-detail { margin-top:20px; border-top:1px solid var(--gh-divider); padding-top:16px; overflow:auto; }
+.comic-series-detail table { width:100%; border-collapse:collapse; }
+.comic-series-detail th,.comic-series-detail td { text-align:left; padding:8px; border-bottom:1px solid var(--gh-divider); }
+.comic-series-detail input[type=number] { width:7rem; margin:0 8px; }
+.comic-series-detail li,.comic-series-list h3 { overflow-wrap:anywhere; }
+.comic-series-detail summary { cursor:pointer; }

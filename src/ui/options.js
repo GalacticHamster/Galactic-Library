@@ -56,6 +56,7 @@ import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
 import { createSeriesCoverageView } from './series-coverage.js';
 import {createCollectionOverlapView} from './collection-overlap.js';
+import {createComicCoverageView} from './comic-coverage.js';
 import { identityEvidence } from '../lib/identity.js';
 import {PRIVATE_STORAGE_CHANGED,isFirefoxRuntime} from '../background/private-storage.js';
 
@@ -185,6 +186,7 @@ let browseAnchor='',lastBrowseResult,selectedBrowseRef;
 let unlinkedPage=0;
 let coverageDatabase;
 let overlapDatabase;
+let comicCoverageDatabase,comicCoverageStarts={};
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
 const filterDefault=()=> 'all';
@@ -877,6 +879,7 @@ async function refreshView(context,diagnosticLookupId = null) {
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
+  comicCoverageStarts=preferences.comicCoverageStarts??{};
   if(!navigationHydrated&&globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
   navigationHydrated=true;
   endStage?.();endStage=timing?.begin('options_render');
@@ -997,6 +1000,9 @@ document.querySelector('#unlinked-previous').addEventListener('click',()=>{unlin
 document.querySelector('#unlinked-next').addEventListener('click',()=>{unlinkedPage++;render();});
 document.querySelector('#clear-empty-library-filters').addEventListener('click',()=>clearFilters.click());
 function renderCollectionCoverage(){
+  if(database&&workspace.workspace==='comic-coverage'&&comicCoverageDatabase!==database){
+    document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{starts:comicCoverageStarts,openRecord:ref=>openLibraryRecord(ref),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
+  }
   if(database&&workspace.workspace==='overlap'&&overlapDatabase!==database){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;
   }
