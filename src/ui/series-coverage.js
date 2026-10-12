@@ -6,18 +6,18 @@ import {libraryContentCoverage,librarySeriesCoverage} from '../lib/inferred-cove
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 export function createSeriesCoverageView(database) {
   const root=element('div','');root.className='series-coverage';
-  root.append(bookToolHelp({heading:'How collection comparisons work',purpose:'Compare collections and find missing issues or volumes within a known span.',input:'Automatically extracted and reviewed full contents from effectively owned books. Unknown series versions stay separate by source.',saves:'This view and its target comparison do not save ownership or book details.',review:'Gaps cover the known span only; there is no automatic complete-series bibliography or chronological reading order.',example:'Owning issues 1, 2 and 4 shows a gap at 3, but does not tell you whether the series ends at 4.'}));
-  root.append(element('p','Inferred means extracted from a description; verified means you reviewed the contents. Neither adds a separate purchase. Unknown series versions or languages show provisional coverage, not definite overlap or missing issues. Excerpts and temporary access are excluded unless an ownership preference applies. Gaps cover only the known range.'));
+  root.append(bookToolHelp({heading:'How collection comparisons work',purpose:'Compare collections and find missing issues or volumes within a known span.',input:'Automatically extracted and reviewed full contents from effectively owned books. Missing language defaults to English; explicit languages and conflicting series runs stay separate.',saves:'This view and its target comparison do not save ownership or book details.',review:'Gaps cover the known span only; there is no automatic complete-series bibliography or chronological reading order.',example:'Owning issues 1, 2 and 4 shows a gap at 3, but does not tell you whether the series ends at 4.'}));
+  root.append(element('p','Inferred means extracted from a description; verified means you reviewed the contents. Neither adds a separate purchase. Missing comic language is treated as English for comparisons; saved source metadata stays unchanged. A matching parent series can supply run context. Explicitly named series can also share coverage with a run left unspecified. Explicitly conflicting runs or unclear series context stay separate. Excerpts and temporary access are excluded unless an ownership preference applies. Gaps cover only the known range.'));
   const {groups,unresolved}=librarySeriesCoverage(database);
   root.append(element('p',`${groups.reduce((n,g)=>n+(!g.provisional?g.entries.length:0),0)} identified covered works; ${groups.reduce((n,g)=>n+(g.provisional?g.entries.length:0),0)} provisional source-local candidates; ${unresolved.length} unresolved fragments or unsupported entries. Provisional candidates may describe the same issue and are not added to the identified total.`));
   const search=element('input','');search.type='search';search.placeholder='Filter covered series';search.setAttribute('aria-label','Filter covered series');root.append(search);
   const list=element('div','');list.className='series-groups';
   for(const group of groups){
     const details=element('details','');details.dataset.series=group.series.toLocaleLowerCase();
-    details.append(element('summary',`${group.series} · ${group.run||'run unknown'} · ${group.language||'language unknown'} · ${group.unitType} · ${group.entries.length} covered (${group.verified} verified, ${group.inferred} inferred, ${group.direct} standalone)${group.provisional?' · provisional identity':''} · ${group.overlap.length} overlapping`));
+    details.append(element('summary',`${group.series} · ${group.run||'run not specified'} · ${group.language||'language unknown'} · ${group.unitType} · ${group.entries.length} covered (${group.verified} verified, ${group.inferred} inferred, ${group.direct} standalone)${group.provisional?' · provisional identity':''} · ${group.overlap.length} overlapping`));
     let populated=false;
     details.addEventListener('toggle',()=>{if(!details.open||populated)return;populated=true;
-      if(group.provisional)details.append(element('p','Series version or language is unknown. These candidates belong to this source only; matching numbers in another collection do not confirm overlap. Possible numerical holes: '+(group.possibleGaps.join(', ')||'none')+'.'));
+      if(group.provisional)details.append(element('p','Series context is unclear or known publication runs conflict. These candidates belong to this source only; matching numbers in another collection do not confirm overlap. Possible numerical holes: '+(group.possibleGaps.join(', ')||'none')+'.'));
       if(!group.provisional)details.append(element('p',`Missing numbers within the checked range: ${group.gaps.join(', ')||'none'}. This does not tell us where the series ends or add separate purchases of its issues.`));
       const table=element('table','');const head=element('tr','');for(const label of ['Unit','Evidence','Covered through','Overlap'])head.append(element('th',label));const thead=element('thead','');thead.append(head);table.append(thead);
       const body=element('tbody','');
@@ -31,10 +31,10 @@ export function createSeriesCoverageView(database) {
   search.addEventListener('input',()=>{for(const node of list.querySelectorAll('[data-series]'))node.hidden=!node.dataset.series.includes(search.value.trim().toLocaleLowerCase());});
   root.append(list);
   const comparison=element('details','');comparison.append(element('summary','Compare a target series range or proposed collection'));
-  comparison.append(element('p','Enter explicit contents, for example “Batman (2011) #1-12; Batman Annual #1” or “Naruto Vols. 1-9”. Supply run and language to resolve missing scope. This comparison does not save ownership or contents.'));
+  comparison.append(element('p','Enter explicit contents, for example “Batman (2011) #1-12; Batman Annual #1” or “Naruto Vols. 1-9”. Supply a run to distinguish series versions. Comic language defaults to English if blank; explicit languages remain separate. This comparison does not save ownership or contents.'));
   const statement=element('textarea','');statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Target contents statement');
   const run=element('input','');run.placeholder='Run / year when missing from statement';run.setAttribute('aria-label','Target series run');
-  const language=element('input','');language.placeholder='Language code, for example en or ja';language.setAttribute('aria-label','Target language');
+  const language=element('input','');language.placeholder='Language code (English if blank), for example en or ja';language.setAttribute('aria-label','Target language');
   const result=element('div','');result.setAttribute('role','status');
   const compare=element('button','Compare coverage');compare.type='button';
   compare.addEventListener('click',()=>{
@@ -45,7 +45,7 @@ export function createSeriesCoverageView(database) {
       const requested=proposal.entries.map(entry=>({...entry,run:entry.run||run.value.trim(),language:language.value.trim().toLowerCase()}));
       const coverage=libraryContentCoverage(database,requested);
       result.append(element('p',`${coverage.owned} of ${coverage.total} requested entries are covered (${coverage.verified} verified, ${coverage.inferred} inferred, ${coverage.direct} standalone). ${coverage.missing.length} have no sufficiently identified match.${coverage.possibleCovered.length?` ${coverage.possibleCovered.length} of these may overlap but need more detail.`:''}${coverage.complete?' All requested full entries are covered.':''}`));
-      if(coverage.scopeUncertain)result.append(element('p','Series version, language or a related match needs checking before the comparison can be complete.'));
+      if(coverage.scopeUncertain)result.append(element('p','Series context or a related match needs checking before the comparison can be complete.'));
       if(proposal.unparsed.length)result.append(element('p',`Text not included in the comparison: ${proposal.unparsed.join('; ')}. The comparison does not cover this text.`));
       if(proposal.entries.some(entry=>entry.completeness==='excerpt'))result.append(element('p','Excerpt entries are excluded from full-unit ownership comparisons.'));
       if(coverage.missing.length)result.append(element('p',`No sufficiently identified match: ${coverage.missing.map(entry=>`${entry.series} (${entry.run||'run unknown'}) ${entry.unitType} ${entry.number}`).join('; ')}`));

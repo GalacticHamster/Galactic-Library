@@ -365,11 +365,12 @@ function evaluateContentCoverage(database, requested, options, parentScope) {
     }
   }
   const covered=[]; const missing=[]; const possibleCovered=[];
+  const unspecifiedRunAllowed=entry=>options.allowUnspecifiedRun&&['issue','annual','special'].includes(entry.unitType);
   for (const entry of entries) {
     const component=entry.unitType==='component';
     const scoped=component&&parentScope?.valid&&parentScope.mediaType===options.mediaType;
     const key=component?(scoped?componentContentKey(entry,parentScope.parentItemId,parentScope.mediaType):null):contentKey(entry);
-    const evidence=key&&(!options.requireIdentityScope||entry.run&&entry.language)?index.get(key)??[]:[];
+    const evidence=key&&(!options.requireIdentityScope||entry.language&&(entry.run||unspecifiedRunAllowed(entry)))?index.get(key)??[]:[];
     (evidence.length?covered:missing).push({...entry, ...(evidence.length?{evidence}: {})});
     if (!evidence.length) {
       const [series,run,type,number,language]=JSON.parse(contentKey(entry));
@@ -381,7 +382,8 @@ function evaluateContentCoverage(database, requested, options, parentScope) {
       if(possible.length)possibleCovered.push({...entry,evidence:possible});
     }
   }
-  const scopeUncertain=entries.some((entry)=>!entry.run || !entry.language || entry.unitType==='component'&&(!parentScope?.valid||parentScope.mediaType!==options.mediaType));
+  const coveredKeys=new Set(covered.map(contentKey));
+  const scopeUncertain=entries.some((entry)=>(!entry.run&&!(unspecifiedRunAllowed(entry)&&coveredKeys.has(contentKey(entry)))) || !entry.language || entry.unitType==='component'&&(!parentScope?.valid||parentScope.mediaType!==options.mediaType));
   return {total:entries.length,owned:covered.length,complete:entries.length>0&&!missing.length&&!scopeUncertain,scopeUncertain:scopeUncertain||possibleCovered.length>0,covered,possibleCovered,missing};
 }
 
@@ -389,7 +391,7 @@ export function seriesCoverage(database,options={}) {
   const index=options.contentIndex??ownedContentIndex(database);const groups=new Map();
   for (const evidence of index.values()) {
     const entry=evidence[0].entry,parent=evidence[0].item,component=entry.unitType==='component',parentItemId=evidence[0].parentItemId;
-    const provisional=Boolean(options.requireIdentityScope&&(!entry.run||!entry.language));
+    const provisional=options.resolvedScope&&Object.hasOwn(evidence[0],'provisional')?Boolean(evidence[0].provisional):Boolean(options.requireIdentityScope&&(!entry.run||!entry.language));
     const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language),...(component?[parentItemId,parent.mediaType]:provisional?[parent.id]:[])]);
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;

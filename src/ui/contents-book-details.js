@@ -8,7 +8,7 @@ const button=(label,run)=>{const node=text('button',label);node.type='button';no
 export function collectionComparison(record,database) {
   const contents=collectionContents(record,database);if(!contents.entries.length)return null;
   const requested=contents.entries.map(entry=>({...entry,language:entry.language||record.metadata?.language||''}));
-  return libraryContentCoverage(database,requested,{excludeItemIds:[record.id],mediaType:record.mediaType});
+  return libraryContentCoverage(database,requested,{excludeItemIds:[record.id],mediaType:record.mediaType,parent:record});
 }
 export function createCollectionComparison(record,database) {
   const root=text('details','');root.className='contents-collection-comparison';root.append(text('summary','Overlap with other owned collections'));
@@ -17,7 +17,7 @@ export function createCollectionComparison(record,database) {
     const result=collectionComparison(record,database);
     if(!result){root.append(text('p','No usable contents are available for this collection. A saved rejection excludes its suggestions until you undo it.'));return;}
     root.append(text('p',`${result.owned} of ${result.total} entries also appear in other owned collections (${result.verified} verified, ${result.inferred} inferred, ${result.direct} standalone). ${result.missing.length} have no sufficiently identified match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
-    if(result.scopeUncertain)root.append(text('p','Series version, language or a related match needs checking before a complete comparison can be made.'));
+    if(result.scopeUncertain)root.append(text('p','Series context or a related match needs checking before a complete comparison can be made.'));
     const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(sources.length)root.append(text('p','Covered through: '+sources.join('; ')));
     const possibleSources=[...new Set(result.possibleCovered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];

@@ -1,6 +1,7 @@
 import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCoverage,proposeContentsForReview,CONTENTS_PARSER_VERSION} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
 import {effectiveOwnershipRecord} from './ownership.js';
+import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
 
 // Local collection tools only. Companion matching retains its reviewed-only
 // index. Proposals are derived from current selected source, never history or
@@ -23,28 +24,81 @@ function standaloneContents(record) {
   return proposeContentsForReview('Collects '+record.title).entries.map(entry=>({...entry,language:record.metadata?.language||entry.language}));
 }
 
+const comicUnit=entry=>['issue','annual','special'].includes(entry.unitType);
+// Coverage defaults are projections, never source metadata or parser repairs.
+export const coverageLanguage=value=>{
+  const language=compact(value,80).toLowerCase();
+  return !language||language==='english'?'en':language;
+};
+function descriptor(value){
+  const text=compact(value),match=/\s*\((\d{4}(?:[-–—]\d{0,4})?)\)\s*$/u.exec(text);
+  return {series:match?text.slice(0,match.index).trim():text,run:match?match[1].replace(/[–—]/gu,'-'):''};
+}
+const meaningfulSeries=series=>series&&!/^(?:comics?|issues?|books?|volumes?|collections?|stories|collected works|anthology)$/u.test(series);
+function parentSeriesContext(entry,parent){
+  if(!parent)return {strong:false,run:''};
+  const identity=identityEvidence(parent),series=identityKey(entry.series);
+  if(!meaningfulSeries(series))return {strong:false,run:''};
+  const parentDescriptor=value=>{
+    const part=descriptor(value);
+    // The parser already distinguishes typed annuals/specials from issues.
+    // Their explicit type word is presentation, not a different series alias.
+    if(['annual','special'].includes(entry.unitType))part.series=part.series.replace(new RegExp('\\s+'+entry.unitType+'s?$','iu'),'');
+    return part;
+  };
+  const descriptors=identity.series.map(parentDescriptor);
+  const title=parentDescriptor(titleIdentity(parent.title,parent.mediaType).series);
+  if(title.series&&descriptors.length===1&&identityKey(descriptors[0].series)!==identityKey(title.series))return {strong:false,run:'',conflict:true};
+  const matching=descriptors.filter(value=>identityKey(value.series)===series);
+  if(identityKey(title.series)===series)matching.push(title);
+  const runs=new Set(matching.map(value=>value.run).filter(Boolean));
+  // A parent-level run belongs only to its unambiguous literal series, not
+  // every constituent series in an anthology or mixed-series collection.
+  if(descriptors.length===1&&identityKey(descriptors[0].series)===series&&identity.run)runs.add(identity.run);
+  return {strong:matching.length>0&&runs.size<=1,run:runs.size===1?[...runs][0]:'',conflict:runs.size>1};
+}
+export function resolveCoverageEntry(entry,parent){
+  if(!comicUnit(entry))return {...entry};
+  const context=parentSeriesContext(entry,parent);
+  return {...entry,run:entry.run||context.run,
+    language:coverageLanguage(entry.language||identityEvidence(parent).language)};
+}
+
 export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[]}={}) {
   const index=new Map(),unresolved=[];
-  const add=(item,entry,confidence,review)=>{
+  const rows=[],knownRuns=new Map();
+  const scopeKey=entry=>JSON.stringify([identityKey(entry.series),identityKey(entry.language)]);
+  // Contradictions remain visible when the caller excludes a provider/parent.
+  // Access gates participation, not the identity evidence available locally.
+  for(const original of Object.values(database.providerItems??{})){
+    if(original.mediaType!=='book')continue;
+    const contents=collectionContents(original,database),entries=contents.entries.map(entry=>resolveCoverageEntry(entry,original));
+    const standalone=contents.confidence==='rejected'?[]:standaloneContents(original).map(entry=>resolveCoverageEntry(entry,original));
+    rows.push({original,contents,entries,standalone});
+    for(const entry of [...entries,...standalone]){
+      if(!comicUnit(entry)||entry.completeness!=='full'||!entry.run)continue;
+      const key=scopeKey(entry),runs=knownRuns.get(key)??new Set();runs.add(identityKey(entry.run));knownRuns.set(key,runs);
+    }
+  }
+  const add=(item,entry,confidence,review,explicitSeries=false)=>{
     if(entry.completeness!=='full')return;
     if(!['issue','annual','special'].includes(entry.unitType))return;
-    const provisional=!entry.run||!entry.language;
+    const context=parentSeriesContext(entry,item);
+    const named=explicitSeries&&meaningfulSeries(identityKey(entry.series));
+    const provisional=!entry.run&&(context.conflict||!context.strong&&!named||(knownRuns.get(scopeKey(entry))?.size??0)>1);
     const key=contentKey(entry)+(provisional?':parent:'+item.id:'');
     const evidence=index.get(key)??[];
     evidence.push({item,entry,confidence,provisional,...(review?{review}:{})});index.set(key,evidence);
   };
-  for(const original of Object.values(database.providerItems??{})){
+  for(const {original,contents,entries,standalone} of rows){
     const item=effectiveOwnershipRecord(original,database);
     if(item.mediaType!=='book'||!['owned','claimed'].includes(item.ownership)||excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id))continue;
-    const contents=collectionContents(original,database);
-    for(const entry of contents.entries){
-      // Language belongs to the source parent, never invented defaults.
-      const scoped={...entry,language:entry.language||original.metadata?.language||''};
-      add(item,scoped,contents.confidence,contents.review);
-      if(scoped.completeness!=='full'||!['issue','annual','special'].includes(scoped.unitType))unresolved.push({item,entry:scoped,reason:scoped.completeness==='excerpt'?'excerpt':'unsupported or named material'});
+    for(const entry of entries){
+      add(item,entry,contents.confidence,contents.review,Boolean(contents.review)||contents.parseBinding==='explicit-statement');
+      if(entry.completeness!=='full'||!comicUnit(entry))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
     }
     for(const fragment of contents.unparsed??[])unresolved.push({item,fragment,reason:'unparsed source'});
-    if(contents.confidence!=='rejected')for(const entry of standaloneContents(original))add(item,entry,'direct');
+    for(const entry of standalone)add(item,entry,'direct',undefined,true);
   }
   // Preserve the existing verified volume and parent-local component tools.
   for(const [key,evidence]of ownedContentIndex(database,{excludeProviders,excludeItemIds})){
@@ -56,7 +110,8 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
 
 export function libraryContentCoverage(database,requested,options={}) {
   const {index,unresolved}=libraryCoverageIndex(database,options);
-  const result=contentCoverage(database,requested,{...options,contentIndex:index,requireIdentityScope:true});
+  const entries=requested.map(entry=>resolveCoverageEntry(entry,options.parent));
+  const result=contentCoverage(database,entries,{...options,contentIndex:index,requireIdentityScope:true,allowUnspecifiedRun:true});
   return {...result,verified:result.covered.filter(value=>value.evidence.some(e=>e.confidence==='verified')).length,
     direct:result.covered.filter(value=>value.evidence.some(e=>e.confidence==='direct')&&!value.evidence.some(e=>e.confidence==='verified')).length,
     inferred:result.covered.filter(value=>value.evidence.every(e=>e.confidence==='inferred')).length,unresolved};
@@ -64,14 +119,14 @@ export function libraryContentCoverage(database,requested,options={}) {
 
 export function librarySeriesCoverage(database,options={}) {
   const {index,unresolved}=libraryCoverageIndex(database,options);
-  const groups=seriesCoverage(database,{contentIndex:index,requireIdentityScope:true});
+  const groups=seriesCoverage(database,{contentIndex:index,requireIdentityScope:true,resolvedScope:true});
   for(const group of groups){
     group.provisional=group.entries.some(entry=>entry.provisional);
     group.verified=group.entries.filter(entry=>entry.confidence==='verified').length;
     group.direct=group.entries.filter(entry=>entry.confidence==='direct').length;
     group.inferred=group.entries.length-group.verified-group.direct;
-    // Unknown runs/languages cannot establish cross-parent overlap or definite
-    // missing issues. Keep the source-local numerical holes explicitly possible.
+    // Insufficient/conflicting series context remains source-local. Supported
+    // run-unspecified groups have useful overlap/gaps without inventing a run.
     if(group.provisional){group.possibleGaps=group.gaps;group.gaps=[];group.overlap=[];}
   }
   return {groups,unresolved};
