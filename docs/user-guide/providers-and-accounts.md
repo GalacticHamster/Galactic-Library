@@ -116,8 +116,10 @@ the preference covers raw unconfirmed Kobo evidence; explicit conflicts still
 show an ownership-review warning. Source ownership is preserved.
 
 Settings → Performance diagnostics → **Export timing summary** includes the
-last 50 Kobo diagnostic records under `providers`, independently of Kindle
-tracing. Records identify profile lookup, scan startup, fetching, comparison
+last 50 provider diagnostic records under `providers`, independently of Kindle
+tracing. Account verification reuses validated committed library data for every
+provider; scan authorization still checks current account state. Records identify
+each provider's profile lookup and Kobo scan startup, fetching, comparison
 and finishing. Worker records and page totals share correlation IDs; nested
 stage durations must not be added twice. They are bounded in-memory diagnostics
 and disappear when the worker restarts.

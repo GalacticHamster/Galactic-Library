@@ -14,6 +14,17 @@ const prepare=async writer=>{
 const comparable=db=>{const copy=structuredClone(db);for(const item of Object.values(copy.providerItems)){delete item.recordRef;delete item.updatedAt;const saved=item.metadata.enrichment?.kindleProductComicContents;if(saved){delete saved.checkedAt;delete saved.retrievedAt;delete saved.selectionRef;}}for(const observation of Object.values(copy.kindleContentsObservations??{}))delete observation.undoRef;copy.enrichmentHistory={};copy.providers={};return copy;};
 
 export const contentsPerformanceTests=[
+ ['All provider profile lookups reuse committed read state; Fandango scan authorization still rejects stale accounts',async()=>withWorker(async({dispatch,pageA,memory})=>{
+   await pageA.mergeProviderItems('fandango-at-home',[{providerItemId:'film',title:'Synthetic Film',mediaType:'movie',ownership:'owned'}],{profileLabel:'Personal',fullSyncAt:'2026-10-01'});
+   const sender={id:chrome.runtime.id,url:'https://athome.fandango.com/content/mymovies',tab:{id:42}};
+   const first=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'fandango-at-home'},sender);assert(first.ok);assert.equal(first.performance.provider,'fandango-at-home');
+   const readCount=memory.getCount;
+   const second=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'fandango-at-home'},sender);assert(second.ok);assert.equal(second.profileId,first.profileId);assert.equal(second.profileLabel,'Personal');assert(second.performance.events.some(e=>e.stage==='snapshot_hit'));
+   assert.equal(memory.getCount,readCount);
+   await pageA.mergeProviderItems('fandango-at-home',[{providerItemId:'another',title:'Another Film',mediaType:'movie',ownership:'owned'}],{profileLabel:'Other'});
+   const denied=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'fandango-at-home',beginScan:true,mode:'incremental',profileLabel:'Personal',profileId:first.profileId,rememberedProfile:true},sender);
+   assert.equal(denied.ok,false);assert.match(denied.error,/Saved accounts changed/);
+ },{storageEvents:true,concurrentQueries:true})],
  ['Kobo diagnostics retain only bounded numeric stages, survive export and enforce provider-page access',async()=>withWorker(async({dispatch,pageA})=>{
    await pageA.mergeProviderItems('kobo',[{providerItemId:'a',title:'PRIVATE KOBO TITLE',mediaType:'book',ownership:'unknown'}],{profileLabel:'Private nickname'});
    const sender={id:globalThis.chrome.runtime.id,url:'https://www.kobo.com/us/en/library',tab:{id:42}};

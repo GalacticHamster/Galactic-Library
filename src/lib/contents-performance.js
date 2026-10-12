@@ -41,6 +41,7 @@
       ...(value.work?{work:cleanWork(value.work)}:{}),
       ...(['profile','hint','account','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
       ...(['found','missing','ambiguous','invalid'].includes(value.profileHintStatus)?{profileHintStatus:value.profileHintStatus}:{}),
+      ...(['steam','gog','epic','humble','fanatical','kindle','kobo','audible','amazon-games','amazon-video','fandango-at-home'].includes(value.provider)?{provider:value.provider}:{}),
       ...(value.client?{client:cleanClient(value.client)}:{}),
       events:(Array.isArray(value.events)?value.events:[]).filter(event=>stages.has(event?.stage)&&Number.isFinite(event.startMs)&&Number.isFinite(event.durationMs)&&event.startMs>=0&&event.durationMs>=0).slice(0,512).map(event=>({stage:event.stage,attempt:Number.isInteger(event.attempt)&&event.attempt>=0&&event.attempt<=3?event.attempt:0,startMs:event.startMs,durationMs:event.durationMs}))};
   }

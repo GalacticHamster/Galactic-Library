@@ -60,10 +60,11 @@ const companionTimings=contentsPerformance.collector();
 const providerTimings=contentsPerformance.collector();
 let providerDiagnosticSequence=100;
 function providerTiming(request){
-  if(request.provider!=='kobo')return null;
+  if(request.provider!=='kobo'&&request.type!=='GET_PROVIDER_PROFILE')return null;
   const sent=request.diagnosticSentEpochMs,entered=contentsPerformance.now(),hasSenderTime=Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000;
   const timing=contentsPerformance.trace(contentsPerformance.validId(request.diagnosticLookupId)?request.diagnosticLookupId:`lookup-${companionDiagnosticPrefix}-${providerDiagnosticSequence++}`,'provider',undefined,hasSenderTime?sent:null);
   timing.providerPhase=request.type==='GET_PROVIDER_PROFILE_HINT'?'hint':request.type==='GET_PROVIDER_PROFILE'?'profile':request.beginScan?'start':'finish';
+  timing.provider=request.provider;
   if(hasSenderTime)timing.events.push({stage:'handler_delay',attempt:0,startMs:0,durationMs:entered-sent});
   return timing;
 }
@@ -435,7 +436,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? ((request.confirmed===true || request.rememberedProfile===true) && Number.isInteger(sender.tab?.id)
         ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true],timing)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
-      : (request.provider==='kobo'?storageWriter.getQueryDatabase({beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
+      : (request.type==='GET_PROVIDER_PROFILE'||request.provider==='kobo'?storageWriter.getQueryDatabase({beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
         const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
         const state = database.providerProfiles?.[activeId]?.state ?? {};
