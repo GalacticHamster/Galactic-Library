@@ -15,7 +15,9 @@ import {equivalentRunMergeTests} from './equivalent-run-merges.js';
 import {annualCoverageTests} from './annual-coverage.js';
 import {quickContentsTests} from './quick-contents.js';
 import {contentsSourceBaselineTests} from './contents-source-baseline.js';
+import {mergeDialogTests} from './merge-dialog.js';
 export const comicCoverageTests=[
+ ...mergeDialogTests,
  ...contentsSourceBaselineTests,
  ...quickContentsTests,
  ...annualCoverageTests,
@@ -158,9 +160,9 @@ export const comicCoverageTests=[
  }],
  ['coverage presentation keeps ranges, duplicates, special numbers and disambiguating labels',()=>{
    const group={series:'52',run:'',unitType:'issue',language:'en',issues:[{number:'0',copies:1},{number:'1/2',copies:1},{number:'3',copies:1},{number:'5',copies:2}]};
-   assert.equal(comicSeriesLabel(group),'52');assert.equal(comicSeriesLabel({...group,series:'Amazing Spider-Man',run:'1963'}),'Amazing Spider-Man (1963)');
-   assert.equal(comicSeriesLabel(group,[group,{...group,language:'fr'}]),'52 · en');
-   assert.equal(comicSeriesLabel(group,[group,{...group,unitType:'annual'}]),'52 · issues');
+   assert.equal(comicSeriesLabel(group),'52 — issues');assert.equal(comicSeriesLabel({...group,series:'Amazing Spider-Man',run:'1963'}),'Amazing Spider-Man (1963) — issues');
+   assert.equal(comicSeriesLabel(group,[group,{...group,language:'fr'}]),'52 — issues · en');
+   assert.equal(comicSeriesLabel(group,[group,{...group,unitType:'annual'}]),'52 — issues');
    assert.deepEqual(coverageSegments(group).segments,[{first:1,last:2,status:'missing'},{first:3,last:3,status:'owned'},{first:4,last:4,status:'missing'},{first:5,last:5,status:'duplicate'}]);
    const grid=comicGridPage(group);assert.deepEqual(grid.rows.map(row=>row.number),['1','2','3','4','5']);assert.deepEqual(grid.extras.map(row=>row.number),['0','1/2']);assert.equal(grid.rows[4].copies,2);
    assert.deepEqual(comicGridPage(group,{start:3}).rows.map(row=>row.number),['3','4','5']);

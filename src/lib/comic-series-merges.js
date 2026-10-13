@@ -28,7 +28,7 @@ export function continuityAssessment(left,right){
     // Preserve the context of an existing user-confirmed group: a start-only
     // member can use its same-name, same-start bounded member's run extent.
     // Different starting years cannot lend one another an extent this way.
-    const memberEnds=new Set((group.originalScopes??[]).filter(member=>identityKey(member.series)===identityKey(scope.series)).map(member=>calendarRun(member.run)).filter(run=>run?.start===calendar?.start&&run.end).map(run=>run.end));
+    const memberEnds=new Set((group.originalScopes??[]).filter(member=>identityKey(member.series)===identityKey(scope.series)).map(member=>calendarRun(member.run)).filter(run=>run&&calendar&&run.start===calendar.start&&run.end).map(run=>run.end));
     const issues=group.issues.filter(issue=>!group.originalScopes||(issue.sources??[]).some(source=>source.seriesScope?.run===scope.run&&source.seriesScope?.series===scope.series));
     const numbers=issues.map(issue=>/^\d+\/\d+$/u.test(issue.number)?Number(issue.number.split('/')[0])/Number(issue.number.split('/')[1]):Number(issue.number)).filter(Number.isFinite);
     const records=[...new Map(issues.flatMap(issue=>issue.sources??[]).filter(source=>!group.originalScopes||source.seriesScope?.run===scope.run&&source.seriesScope?.series===scope.series).map(source=>[source.record?.id,source.record])).values()].filter(record=>record?.title);

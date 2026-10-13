@@ -12,9 +12,8 @@ export function comicSeriesLabel(group, groups = [group]) {
   const base = item => item.series + (item.run ? ` (${item.run})` : '');
   const peers = groups.filter(item => base(item).toLocaleLowerCase() === base(group).toLocaleLowerCase());
   const qualifiers = [];
-  if(new Set(peers.map(item=>item.unitType)).size>1) qualifiers.push(group.unitType==='issue'?'issues':group.unitType+'s');
   if(new Set(peers.filter(item=>item.unitType===group.unitType).map(item=>item.language)).size>1) qualifiers.push(group.language);
-  return base(group)+(qualifiers.length?' · '+qualifiers.join(' · '):'');
+  return base(group)+' — '+(group.unitType==='issue'?'issues':group.unitType+'s')+(qualifiers.length?' · '+qualifiers.join(' · '):'');
 }
 // Presentation only: keep the engine's range assumptions and special numbering.
 // Segments are compact intervals; never allocate one entry per missing number.

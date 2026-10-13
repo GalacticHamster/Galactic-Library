@@ -212,36 +212,45 @@ export function createComicCoverageView(database,{starts={},transitions={},saveT
     const continuityLabel=el('label','Confirm these eras kept the same continuing issue numbering '),continuity=el('input');continuity.type='checkbox';continuity.setAttribute('aria-label','Same continuing numbering across publication eras');continuityLabel.prepend(continuity);continuityLabel.hidden=true;
     const search=el('input');search.type='search';search.placeholder='Search series';search.setAttribute('aria-label','Search merge target');
     const results=el('div'),titleLabel=el('label','Display series name '),title=el('input');title.maxLength=300;title.setAttribute('aria-label','Merged series name');titleLabel.append(title);
-    const notice=el('p');notice.setAttribute('role','status');let target;
+    const selection=el('p');selection.className='comic-merge-selection';selection.setAttribute('aria-live','polite');
+    const notice=el('p');notice.setAttribute('role','status');let target,saving=false;
     const cancel=button('Cancel',()=>{dialog.close();dialog.remove();}),confirm=button('Combine series',async()=>{
-      if(!target||!title.value.trim()||!compatibleSeries(group.id,target.id,continuity.checked)||continuityProblem(group,target))return;
-      confirm.disabled=cancel.disabled=search.disabled=title.disabled=continuity.disabled=true;notice.textContent='Saving series merge...';
-      try{merges=await saveMerge(group.id,target.id,title.value.trim(),continuity.checked);}
-      catch(error){notice.textContent='Could not combine series: '+error.message;confirm.disabled=cancel.disabled=search.disabled=title.disabled=continuity.disabled=false;}
-      if(!confirm.disabled)return;
-      try{await reload(target.id);dialog.close();dialog.remove();}
+      if(saving)return;updateCompatibility();if(confirm.disabled)return;
+      const destination=target.id;saving=true;
+      for(const control of dialog.querySelectorAll('button,input'))control.disabled=true;notice.textContent='Saving series merge...';
+      try{merges=await saveMerge(group.id,destination,title.value.trim(),continuity.checked);}
+      catch(error){saving=false;for(const control of dialog.querySelectorAll('button,input'))control.disabled=false;updateCompatibility();notice.textContent='Could not combine series: '+error.message;return;}
+      try{await reload(destination);dialog.close();dialog.remove();}
       catch(error){notice.textContent='Series merge saved, but coverage could not reload: '+error.message+'. Close this dialog and reopen Options to load the saved merge.';cancel.disabled=false;cancel.textContent='Close';}
-    });confirm.disabled=true;dialog.append(search,results,titleLabel,continuityLabel,el('p','The combined view recalculates issue coverage and copies using the supporting purchases. The target series keeps its starting number and numbering transitions. This does not confirm new ownership.'),notice,cancel,confirm);
+    });confirm.disabled=true;dialog.append(el('p','Current group: '+label(group)),search,results,selection,titleLabel,continuityLabel,el('p','The combined view recalculates issue coverage and copies using the supporting purchases. The target series keeps its starting number and numbering transitions. This does not confirm new ownership.'),notice,cancel,confirm);
     function updateCompatibility(){
-      continuityLabel.hidden=true;confirm.disabled=true;
-      if(!target)return;
-      if(!compatibleSeries(group.id,target.id,true)){notice.textContent='Issue type and language must match. Choose a compatible series; annuals, regular issues and different languages stay separate.';return;}
-      const assessment=continuityAssessment(group,target);if(assessment.problem){notice.textContent=assessment.problem;return;}
-      if(!compatibleSeries(group.id,target.id)){
-        continuityLabel.hidden=false;notice.textContent=assessment.equivalent?'Saved collection information connects both labels to the same publication run. Shared issues are allowed; multiple copies still require separate purchases. Confirm that these labels use the same continuing numbering. Original runs remain in supporting-book details.':'These have different publication-era labels. Confirm continuing numbering only if the series did not restart at #1. Original runs remain in supporting-book details.';
-      }else notice.textContent='These use the same run, issue type and language. Combine them only if the names refer to the same series.';
-      confirm.disabled=!title.value.trim()||!compatibleSeries(group.id,target.id,continuity.checked);
+      continuityLabel.hidden=true;confirm.disabled=true;notice.textContent='';
+      selection.textContent=target?'Selected target: '+label(target)+' · '+target.language:'No target selected.';
+      if(saving){notice.textContent='Saving series merge...';return;}
+      if(!target){notice.textContent='Select a series to combine.';return;}
+      try{
+        if(!compatibleSeries(group.id,target.id,true)){continuity.checked=false;notice.textContent='Issue type and language must match. Choose a compatible series; annuals, regular issues and different languages stay separate.';return;}
+        const assessment=continuityAssessment(group,target);if(assessment.problem){continuity.checked=false;notice.textContent=assessment.problem;return;}
+        if(!compatibleSeries(group.id,target.id)){
+          const unknownRun=[group,target].some(value=>value.originalScopes?value.originalScopes.some(scope=>!scope.run):!value.run);
+          continuityLabel.hidden=false;notice.textContent=assessment.equivalent?'Saved collection information connects both labels to the same publication run. Shared issues are allowed; multiple copies still require separate purchases. Confirm that these labels use the same continuing numbering. Original runs remain in supporting-book details.':unknownRun?'One or more original series labels have no publication run. Confirm that these are the same series with continuing numbering; do not combine runs that restarted at #1. Original labels remain in supporting-book details.':'These have different publication-era labels. Confirm continuing numbering only if the series did not restart at #1. Original runs remain in supporting-book details.';
+        }else{continuity.checked=false;notice.textContent='These use the same run, issue type and language. Combine them only if the names refer to the same series.';}
+        if(!title.value.trim()){notice.textContent+=' Enter a display series name before combining.';return;}
+        confirm.disabled=!compatibleSeries(group.id,target.id,continuity.checked);
+      }catch(error){continuity.checked=false;notice.textContent='Could not check this target: '+error.message+'. Choose another series or reopen Comic Coverage.';}
     }
     function renderTargets(){
       results.replaceChildren();const query=search.value.trim().toLocaleLowerCase();
       const matches=seriesMergeTargets(group,groups,query);
-      for(const candidate of matches.slice(0,10)){
-        const choice=button(label(candidate)+' — '+candidate.unitType+'s · '+candidate.language,()=>{target=candidate;continuity.checked=false;title.value=candidate.series;updateCompatibility();renderTargets();});choice.setAttribute('aria-pressed',String(candidate===target));choice.dataset.mergeTarget=candidate.id;results.append(choice);
+      if(target&&!matches.includes(target)){target=undefined;title.value='';continuity.checked=false;updateCompatibility();}
+      const visible=matches.slice(0,10);if(target&&matches.includes(target)&&!visible.includes(target))visible[visible.length-1]=target;
+      for(const candidate of visible){
+        const choice=button(label(candidate)+' · '+candidate.language,()=>{if(saving)return;target=candidate;continuity.checked=false;title.value=candidate.series;updateCompatibility();renderTargets();[...results.querySelectorAll('[data-merge-target]')].find(node=>node.dataset.mergeTarget===candidate.id)?.focus({preventScroll:true});});choice.className='comic-merge-target';choice.setAttribute('aria-pressed',String(candidate===target));if(candidate===target){const mark=el('span',' ✓');mark.setAttribute('aria-hidden','true');choice.append(mark);}choice.dataset.mergeTarget=candidate.id;choice.disabled=saving;results.append(choice);
       }
       if(!matches.length)results.append(el('p','No other series match your search.'));
       else if(matches.length>10)results.append(el('p','Showing 10 matches. Type more to narrow the list.'));
     }
-    continuity.addEventListener('change',updateCompatibility);title.addEventListener('input',updateCompatibility);search.addEventListener('input',renderTargets);dialog.addEventListener('cancel',event=>{if(cancel.disabled)event.preventDefault();else dialog.remove();});renderTargets();document.body.append(dialog);dialog.showModal();search.focus();
+    continuity.addEventListener('change',updateCompatibility);title.addEventListener('input',updateCompatibility);search.addEventListener('input',renderTargets);dialog.addEventListener('cancel',event=>{if(cancel.disabled)event.preventDefault();else dialog.remove();});updateCompatibility();renderTargets();document.body.append(dialog);dialog.showModal();search.focus();
   }
   root.ready=loadCoverageProjection(database,'comic-coverage',merges).then(result=>{groups=result.groups;unassigned=result.unassigned??[];for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();if(result.provisional||result.unresolved){const excluded=el('details');excluded.append(el('summary','Unresolved contents'),el('p',`${result.provisional} provisional entries and ${result.unresolved} unresolved fragments or unsupported entries are excluded from covered-issue and missing-range totals.`));unassignedList=el('div');excluded.append(unassignedList);excluded.addEventListener('toggle',renderUnassigned);overview.append(excluded);}return {...result,summary:totals()};}).catch(error=>{status.textContent='Could not calculate comic coverage: '+error.message;status.setAttribute('aria-busy','false');root.append(button('Try again',()=>root.replaceWith(createComicCoverageView(database,{starts,transitions,saveTransitions,merges,saveMerge,undoMerge,saveStart,openRecord}))));});
   return root;
