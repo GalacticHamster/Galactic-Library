@@ -1,5 +1,12 @@
 import {comicRange} from '../lib/comic-coverage.js';
+import {identityKey} from '../lib/identity.js';
 const numeric = value => /^\d+\/\d+$/u.test(value) ? Number(value.split('/')[0])/Number(value.split('/')[1]) : Number(value);
+export function seriesMergeTargets(source,groups,query=''){
+  const text=identityKey(query),key=identityKey(source.series),words=new Set(key.split(' '));
+  const names=group=>[group.series,...(group.originalTitles??[])];
+  const score=group=>Math.max(...names(group).map(title=>{const value=identityKey(title);return value===key?1000:value.includes(key)||key.includes(value)?500:value.split(' ').filter(word=>words.has(word)).length;}));
+  return groups.filter(group=>group.id!==source.id&&names(group).some(name=>identityKey(name).includes(text))).sort((a,b)=>score(b)-score(a)||comicSeriesLabel(a).localeCompare(comicSeriesLabel(b),undefined,{numeric:true}));
+}
 export function comicSeriesLabel(group, groups = [group]) {
   const base = item => item.series + (item.run ? ` (${item.run})` : '');
   const peers = groups.filter(item => base(item).toLocaleLowerCase() === base(group).toLocaleLowerCase());

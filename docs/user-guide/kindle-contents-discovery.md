@@ -37,7 +37,7 @@ The operation can take hours. No refresh is started by installing/reloading or c
 
 To investigate scan speed, enable **Record local timing** before starting and export after pausing. The report separates Amazon requests, one-second pacing, retries, extraction/parsing, storage, source-history work, queue checks and UI work. Refresh includes the current-record check before each fetch. Final checkpoint work is recorded separately and must be included when calculating average time per book. The report contains no book or account details; reloading clears it.
 
-Progress reports checked/total, statements found, no contents statement found, failures/retryable, remaining pages, unavailable pages and local reparses. **No contents statement found** describes that lookup, not a permanent assertion that a book contains no works.
+Progress reports checked/total, statements found, contents not extracted, failures/retryable, remaining pages, unavailable pages and local reparses. **Contents not extracted** describes that lookup, not a permanent assertion that a book contains no works.
 
 ## Storage and compatibility
 

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {dcContentsRecoveryCases,checkDcFixture} from './dc-contents-recovery-fixture.js';
 import {comicRange,comicIssuePage,comicCoverageSummary,comicSeriesKey,comicSequenceOffset,validateNumberingTransitions} from '../src/lib/comic-coverage.js';
 import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
 import {coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage-fixture.js';
@@ -10,6 +12,17 @@ import {proposeContents,proposeContentsForReview} from '../src/lib/contents.js';
 import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '../src/lib/comic-series-merges.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 export const comicCoverageTests=[
+ ...dcContentsRecoveryCases,
+ ['six frozen natural descriptions and Detective era fixtures recover without changing original evidence',async()=>{
+   checkDcFixture(JSON.parse(await readFile(new URL('./fixtures/kindle/dc-contents-recovery.json',import.meta.url),'utf8')));
+ }],
+ ['authoritative merge save rejects publication numbering resets and permits legacy continuation',async()=>{
+   const db=coverageDatabase(coverageBook('original','Collects Detective Comics (1937) #27-45'),coverageBook('new52','Collects Detective Comics (2011) #1-29'),coverageBook('legacy','Collects Detective Comics (2016) #934-940')),data={},writer=createStorageWriter({get:async defaults=>({...defaults,...data}),set:async values=>Object.assign(data,structuredClone(values))});await writer.restoreDatabase(db);
+   const groups=comicCoverageForLibrary(db).groups,original=groups.find(g=>g.run==='1937'),reset=groups.find(g=>g.run==='2011'),legacy=groups.find(g=>g.run==='2016'),before=JSON.stringify(await writer.getDatabase());
+   await assert.rejects(()=>writer.saveComicCoverageMerge(original.id,reset.id,'Detective Comics',true),/restarted numbering/);assert.deepEqual((await writer.getUiPreferences()).comicCoverageMerges,{});
+   const prefs=await writer.saveComicCoverageMerge(original.id,legacy.id,'Detective Comics',true);assert(prefs.comicCoverageMerges[legacy.id].continuity);assert.equal(JSON.stringify(await writer.getDatabase()),before);
+   await writer.removeComicCoverageMerge(legacy.id);assert.equal(comicCoverageForLibrary(await writer.getDatabase()).groups.length,3);
+ }],
  ['Golden Age explicit contained series qualifiers resolve all five Detective ranges without borrowing the parent identity',()=>{
    const statements=["collects all of the Dark Knight Detective's first-ever adventures from DETECTIVE COMICS #27-45, BATMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #2.","collects the Dark Knight Detective’s early adventures from BATMAN #4-7, DETECTIVE COMICS #46-56, WORLD’S BEST COMICS #1 and WORLD’S FINEST COMICS #2-3.",'Collects BATMAN #8-11, DETECTIVE COMICS #57-65 and WORLD’S FINEST COMICS #4-6.','collects the Dark Knight Detective’s adventures from BATMAN #12-15, DETECTIVE COMICS #66-74 and WORLD’S FINEST COMICS #7-9.','collects the early adventures of Batman, Robin and Alfred from Batman #16-20, Detective Comics #75-81 and World’s Finest Comics #10-11.'];
    const books=statements.map((statement,i)=>coverageBook('golden-'+i,statement,{title:'Batman: The Golden Age Vol. '+(i+1)+' (Detective Comics (1937-2011))'}));

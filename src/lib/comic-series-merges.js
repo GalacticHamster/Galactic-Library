@@ -8,6 +8,19 @@ export function compatibleSeries(a,b,continuity=false){
   const left=seriesScope(a),right=seriesScope(b);
   return left[2]===right[2]&&left[3]===right[3]&&(continuity||left[1]===right[1]);
 }
+export function continuityProblem(left,right){
+  const scopes=group=>(group.originalScopes??[{series:group.series,run:group.run}]).map(scope=>{
+    const year=/^(\d{4})(?:$|[-–—])/u.exec(scope.run??'');
+    const issues=group.issues.filter(issue=>!group.originalScopes||issue.sources.some(source=>source.seriesScope?.run===scope.run&&source.seriesScope?.series===scope.series));
+    const numbers=issues.map(issue=>/^\d+\/\d+$/u.test(issue.number)?Number(issue.number.split('/')[0])/Number(issue.number.split('/')[1]):Number(issue.number)).filter(Number.isFinite);
+    return {year:year?Number(year[1]):null,min:Math.min(...numbers),max:Math.max(...numbers)};
+  });
+  for(const a of scopes(left))for(const b of scopes(right)){
+    if(a.year===null||b.year===null||a.year===b.year)continue;
+    const [early,late]=a.year<b.year?[a,b]:[b,a];
+    if(early.max>=late.min)return 'These publication eras have overlapping or restarted numbering. Keep them separate so different issues with the same number do not become duplicates.';
+  }return '';
+}
 export function validateComicCoverageMerges(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>1000)throw Error('Invalid comic series merges.');
   const output={},seen=new Set();

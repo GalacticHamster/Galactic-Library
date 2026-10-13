@@ -1,4 +1,5 @@
-import {addSeriesMerge} from '../lib/comic-series-merges.js';
+import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
+import {comicCoverage} from '../lib/comic-coverage.js';
 import {applyPurchaseSnapshot} from './purchase-handoff.js';
 import {mergeProductDetailsEvidence} from '../lib/kindle-product-details.js';
 import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/companion-identities.js';
@@ -1232,6 +1233,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   async function saveComicCoverageMerge(source,target,title,continuity=false){
     const current=await getUiPreferences();
+    if(continuity||current.comicCoverageMerges[source]?.continuity||current.comicCoverageMerges[target]?.continuity){
+      const groups=mergeCoverageGroups(comicCoverage(await getDatabase()).groups,current.comicCoverageMerges,()=>1),left=groups.find(g=>g.id===source),right=groups.find(g=>g.id===target);
+      if(left&&right){const problem=continuityProblem(left,right);if(problem)throw Error(problem);}
+    }
     const next=validateUiPreferences({...current,comicCoverageMerges:addSeriesMerge(current.comicCoverageMerges,source,target,title,continuity)});
     await storageArea.set({[UI_PREFERENCES_KEY]:next});return next;
   }

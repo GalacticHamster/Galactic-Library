@@ -20,7 +20,8 @@ export function comicCoverage(database,{copiesForSources=()=>1}={}){
     }).sort((a,b)=>(numberValue(a.number)-numberValue(b.number))||a.number.localeCompare(b.number,undefined,{numeric:true}));
     return {id:comicSeriesKey(group),series:group.series,run:group.run,unitType:group.unitType,language:group.language,issues,...comicGroupCounts({issues})};
   });
-  return {groups:recognized,provisional:groups.filter(group=>group.provisional).reduce((sum,group)=>sum+group.entries.length,0),unresolved:unresolved.length};
+  const unassigned=groups.filter(group=>group.provisional).map(group=>({series:group.series,run:group.run,unitType:group.unitType,numbers:group.entries.map(entry=>entry.number),sources:[...new Map(group.entries.flatMap(entry=>entry.sources).map(source=>[source.id,{id:source.id,title:source.title,recordRef:database.providerItems[source.id]?.recordRef}])).values()]}));
+  return {groups:recognized,unassigned,provisional:groups.filter(group=>group.provisional).reduce((sum,group)=>sum+group.entries.length,0),unresolved:unresolved.length};
 }
 export function validateNumberingTransitions(value){
   if(!Array.isArray(value)||value.length>100)throw Error('Use at most 100 numbering transitions.');

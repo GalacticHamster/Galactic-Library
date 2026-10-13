@@ -4,9 +4,41 @@ const introduction = /^(?:collects?|collecting|contains?|containing|includes?|in
 const units = /#\s*-?\d|\b(?:issues?|volumes?|vols?\.?|books?|chapters?|parts?)\s*#?\d|\b\d+\s*[-–—]\s*\d+\s+of\b/iu;
 const works = /\b(?:novels?|stories|story|tales?|antholog(?:y|ies)|omnibus|trilog(?:y|ies)|miniseries|maxiseries|serial|poems?|manifesto|autobiograph\w*|primers?|excerpts?|ending|eulogy|chapters?|one.shots?|issues?|adventures?|appearances?|debuts?|battles|work|republished)\b/iu;
 
+// Positive reprint grammar followed by a finite, explicitly named issue list.
+// A bare "from the pages of" or "originally published in" is not a claim.
+export function naturalContentsClaims(text){
+  text=String(text??'').slice(0,12000);const claims=[];
+  const cue=/\b(?:in these (?:\d{4}s\s+)?(?:stories|tales|adventures) from (?:the pages of\s+)?|these (?:stories|tales|issues) (?:were )?originally published in\s+|(?:this|the) (?:volume|collection) (?:reprints|collects|presents) (?:the )?(?:stories|issues) originally published in\s+|(?:is|are) (?:now )?collected in (?:a single|this|one|a) (?:volume|collection) from the pages of\s+)/giu;
+  const number='\\d+(?:/\\d+|\\.\\d+)?(?:\\s*[-–—]\\s*#?\\d+)?';
+  const named=new RegExp('^([\\p{L}][^#;,!?\\n]{0,160}?)\\s*#\\s*'+number,'u'),bare=new RegExp('^#\\s*'+number,'u');
+  for(const match of text.matchAll(cue)){
+    const prefix=text.slice(Math.max(0,match.index-300),match.index).split(/[.!?]\s+/u).at(-1);
+    if(/\b(?:not included|not reprinted|does not|also available|first appear\w*|historical references?|recommend\w*|promot\w*)\b/iu.test(prefix))continue;
+    let end=match.index+match[0].length,count=0;
+    while(end<text.length&&end-match.index<2000){
+      const tail=text.slice(end),token=named.exec(tail)??(count?bare.exec(tail):null);if(!token)break;
+      if(token[1]&&/\b(?:chapter|first appear\w*|references?|mentions?|was|were|fights?|recalls?|inspired|debuts?|bestsell\w*)\b/iu.test(token[1]))break;
+      end+=token[0].length;count++;
+      const separator=/^(?:,\s*(?:and\s+)?|;\s*(?:and\s+)?|\s+and\s+)/iu.exec(text.slice(end));
+      if(!separator)break;
+      const next=text.slice(end+separator[0].length);if(!named.test(next)&&!bare.test(next))break;
+      end+=separator[0].length;
+    }
+    if(count){const raw=text.slice(match.index,end),payload=raw.slice(match[0].length);claims.push({raw,input:'Collects '+payload,start:match.index,end});}
+  }return claims;
+}
+export function recoveredNaturalContents(saved){
+  if(saved?.statement||!Array.isArray(saved?.manifest?.blocks)||saved.manifest.blocks.length>8)return null;
+  const claims=[...new Map(saved.manifest.blocks.flatMap(block=>naturalContentsClaims(block.text)).map(claim=>[claim.raw,claim])).values()];
+  // Independent descriptions are never blindly combined or silently selected.
+  return claims.length===1?claims[0]:null;
+}
+
 export function normalizeContentsInput(statement) {
   // Never replace the saved evidence with this parsing-only copy.
   let input=String(statement ?? '').replace(/\s+/gu,' ').trim();
+  const natural=naturalContentsClaims(input).find(claim=>claim.start===0);
+  if(natural)input=natural.input;
   // Only locally parse an already-captured numbered claim. The marker may
   // indicate an unhydrated description; removing it never establishes source
   // completeness and cannot recover omitted later candidate sentences.

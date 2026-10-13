@@ -1,10 +1,10 @@
 import { compact, identityKey } from './identity.js';
 import { object, text, date, url } from './validation.js';
 import {effectiveOwnershipRecord} from './ownership.js';
-import {assessContentsQuality} from './contents-quality.js';
+import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 8;
+export const CONTENTS_PARSER_VERSION = 9;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -84,7 +84,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   if(anchor && /^(?:issues?\s*#?\s*|#\s*)\d/iu.test(body) && !/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(body)){
     input=anchor.series+' '+body;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
-  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),context);
+  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),{...context,naturalCollection:naturalContentsClaims(statement).some(claim=>claim.start===0)});
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return {...finish(proposal.entries,proposal.unparsed),...(proposal.annualRunHints?.length?{annualRunHints:proposal.annualRunHints}:{})};
   // This fallback is discovery/editor-only; ordinary matching still uses
   // proposeContents above. Unsupported numeric syntax never becomes a name.
@@ -201,7 +201,13 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     // Literal source series metadata or the exact subject title can establish
     // that a suffix belongs to the name. Super Special is a compound title,
     // not a generic Special qualifier. Keep ordinary typed annuals/specials.
-    const literalName=[collectionTitle,...(Array.isArray(context.series)?context.series:context.series?[context.series]:[])].some(value=>identityKey(reviewSeriesDescriptor(compact(value)).series)===identityKey(label));
+    const literalName=[collectionTitle,reviewSeriesAnchor(collectionTitle,context)?.series,...(Array.isArray(context.series)?context.series:context.series?[context.series]:[])].some(value=>identityKey(reviewSeriesDescriptor(compact(value)).series)===identityKey(label));
+    // Newly recovered natural prose must not turn a separately named Special
+    // into a generic special of an unrelated series. Preserve that literal
+    // clause unless subject metadata or a preceding parent supplies context.
+    if(context.naturalCollection&&/\bspecials?$/iu.test(label)&&!literalName&&!/\bsuper\s+special$/iu.test(label)&&identityKey(label.replace(/\s*specials?$/iu,''))!==identityKey(previous?.series)){
+      unparsed.push(raw);previous=null;continue;
+    }
     if(/\bannuals?$/iu.test(label)&&!literalName){
       type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';
       // A bare Annual (year) is contextual. Its date is the annual's
@@ -221,7 +227,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     const seriesTail=/^of (?:the|a) [^#;]{0,100}\bseries\b/iu.test(after);
     const boundedTail=/^\s*(?:[,;]|\.(?=\s+|["“])|[—–](?!\s*#?\d)|and\b|plus\b|(?:written|drawn|illustrated|pencilled|penciled|art) by\b|with (?:bonus|additional|supplemental|extra) (?:material|content)\b|of\s+[^#;]{1,180}\brun\b)/iu.test(after)||creditTail||seriesTail;
     const attachedTail=after&&/^\p{L}/u.test(after)&&/\d$/u.test(chunk.slice(0,chunk.length-after.length));
-    if(ambiguousComma || ambiguousConjunction || attachedTail || (label.match(/,/gu)?.length??0)>1 || /["“”]|\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || /^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /^(?:all|the|this|these|his|her|their)$/iu.test(label) || /#|\b(?:issues?|volumes?|vols?|chapters?|scripts?|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|stories from|recommendations? for|run on|reprinting|storyline|description|characters|meet|more than|and more|present|was|were|published|you)\b|(?<![\p{L}\d-])(?:he|she|they)(?![\p{L}\d-])|\bbooks?\s*#?\d/iu.test(label)
+    if(ambiguousComma || ambiguousConjunction || attachedTail || (label.match(/,/gu)?.length??0)>1 || /["“”]|\(\d{4}\)/u.test(label) || /\d#/u.test(chunk) || !literalName&&/^(?:all|the|a|an|this|these|his|her|their)\s/u.test(label) || /^(?:all|the|this|these|his|her|their)$/iu.test(label) || /#|\b(?:issues?|volumes?|vols?|chapters?|scripts?|bonus|extras?|complete script|written|artistry|creators?|featuring|starring|plus|material|excerpts?|selections?|stories from|recommendations? for|run on|reprinting|storyline|description|characters|meet|more than|and more|present|was|were|published|you)\b|(?<![\p{L}\d-])(?:he|she|they)(?![\p{L}\d-])|\bbooks?\s*#?\d/iu.test(label)
       || type==='annual' && /^\d{4}$/u.test(numbers) && !/#/u.test(chunk)
       || (!label && !previous) || (after && !boundedTail)){unparsed.push(raw);previous=null;continue;}
     if(after){unparsed.push(after.trim());}
@@ -329,11 +335,17 @@ function containedNames(body) {
   return names;
 }
 
-export function contentsStatement(item) {
-  const captured=item?.metadata?.enrichment?.kindleProductComicContents?.statement;
+export function contentsStatement(item,{recoverNatural=false}={}) {
+  const saved=item?.metadata?.enrichment?.kindleProductComicContents,captured=saved?.statement;
   // Keep source characters intact during UI handoff (e.g. an ellipsis must
   // not become three periods). Parsing applies its own normalization later.
   if(captured)return String(captured).replace(/\s+/gu,' ').trim().slice(0,10000);
+  // Ordinary browsing consumes the small, validated interpretation cache;
+  // only contents tools inspect raw blocks to recover an older empty result.
+  const manifest=saved?.manifest,candidate=manifest?.candidates?.[manifest.selected];
+  if(candidate?.binding==='natural-reprint'&&candidate.quality==='containment'&&candidate.entries>0&&manifest.candidates.filter(c=>c.binding==='natural-reprint').length===1)return candidate.raw;
+  const recovered=recoverNatural?recoveredNaturalContents(saved):null;
+  if(recovered)return recovered.raw;
   return compact(item?.metadata?.contentsStatement || item?.metadata?.collects || item?.metadata?.enrichment?.localMetadata?.statement, 10000);
 }
 

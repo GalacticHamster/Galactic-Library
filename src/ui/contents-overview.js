@@ -3,7 +3,7 @@ import {contentsStatement} from '../lib/contents.js';
 export const CONTENTS_STATUSES = {
   rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Contents found · Not reviewed',
   partial:'Some contents found · Not reviewed', uncertain:'Contents need review',
-  missing:'No contents statement found', unattempted:'Not checked yet',
+  missing:'Contents not extracted', unattempted:'Not checked yet',
   failed:"Couldn't retrieve description"
 };
 const failed = value => ['unavailable','temporary-failure'].includes(value);
@@ -17,7 +17,7 @@ export function contentsSummary(record, database) {
   const parent=candidate?.manifestRange&&!candidate.whole?saved.manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange?.start===candidate.manifestRange.start&&c.manifestRange?.end===candidate.manifestRange.end):null;
   const changed=Boolean(review && statement && statement!==review.statement && parent?.raw!==review.statement);
   const incomplete=Boolean(saved?.descriptionMayBeIncomplete || saved?.manifest?.descriptionMayBeIncomplete || candidate?.truncated);
-  const outcome=saved?.parseOutcome;
+  const outcome=statement&&!saved?.statement&&candidate?.binding==='natural-reprint'?candidate.outcome:saved?.parseOutcome;
   const status=review?review.status==='rejected'?'rejected':'reviewed':statement
     ? incomplete||outcome==='partial'?'partial':outcome==='full'?'identified':'uncertain'
     :failed(attempt?.availability)?'failed':saved?'missing':'unattempted';

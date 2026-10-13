@@ -1,11 +1,11 @@
 import {proposeContentsForReview,contentKey} from './contents.js';
-import {assessContentsQuality} from './contents-quality.js';
+import {assessContentsQuality,naturalContentsClaims,recoveredNaturalContents} from './contents-quality.js';
 
 // Source acquisition stays in the classic adapter. Assessment stays beside the
 // existing review parser in the worker; no page-side module/permission changes.
 export const MANIFEST_LIMITS=Object.freeze({blocks:8,total:24000,block:12000,candidates:32,window:2000,evidence:16000});
 // Interpretation of existing source, independent of capture/parser generations.
-export const MANIFEST_INTERPRETATION_VERSION=2;
+export const MANIFEST_INTERPRETATION_VERSION=3;
 const trigger=/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?|comprising|reprints?|reprinting)\b/giu;
 const semanticClaim=new RegExp(trigger.source,'iu');
 const clean=value=>String(value??'').replace(/\s+/gu,' ').trim();
@@ -145,6 +145,10 @@ export function discoverManifestCandidates(blocks,title='') {
   blocks=validateDescriptionBlocks(blocks);const windows=[],candidates=[],seen=new Set();let evidenceSize=0;
   for(let block=0;block<blocks.length;block++){
     const text=blocks[block].text;
+    for(const claim of naturalContentsClaims(text)){
+      if(seen.has(claim.raw))continue;seen.add(claim.raw);
+      windows.push({block,start:claim.start,end:claim.end,raw:claim.raw,structural:false,natural:true,syntax:3,contextStart:Math.max(0,claim.start-600),contextEnd:claim.end});
+    }
     for(const sentence of sentences(text)){
       const body=text.slice(sentence.start,sentence.end);
       const verbs=[...body.matchAll(trigger)];
@@ -192,7 +196,7 @@ export function discoverManifestCandidates(blocks,title='') {
         const quality=proposal.quality==='containment'?2:proposal.quality==='uncertain'?1:0;
         const numeric=proposal.entries.filter(e=>e.unitType!=='component').length;
         const rank=[quality,numeric?2:proposal.entries.length?1:0,Math.min(proposal.entries.length,500),proposal.outcome==='full'?1:0,-proposal.unparsed.length];
-        candidates.push({block,start,end,contextStart,contextEnd,raw,parserInput:normalized.input,binding:normalized.binding,structural,position:start/Math.max(1,text.length),rank,quality:proposal.quality,outcome:proposal.outcome,entries:proposal.entries.length,unresolved:proposal.unparsed.length,proposal,...(manifestRange?{manifestRange,...(whole?{whole:true,truncated}: {})}: {})});
+        candidates.push({block,start,end,contextStart,contextEnd,raw,parserInput:normalized.input,binding:window.natural?'natural-reprint':normalized.binding,structural,position:start/Math.max(1,text.length),rank,quality:proposal.quality,outcome:proposal.outcome,entries:proposal.entries.length,unresolved:proposal.unparsed.length,proposal,...(manifestRange?{manifestRange,...(whole?{whole:true,truncated}: {})}: {})});
   }
   return candidates.sort((a,b)=>a.block-b.block||a.start-b.start||a.end-b.end);
 }
@@ -214,6 +218,11 @@ export function selectManifest(blocks,title='') {
 }
 
 export function manifestReviewProposal(saved,title,statement=saved?.statement??'',context={}) {
+  const recovered=recoveredNaturalContents(saved);
+  if(recovered&&(!statement||sameSourceText(statement,recovered.raw))){
+    const proposal=proposeContentsForReview(recovered.raw,title,{...context,allowTitleBinding:true});
+    return {...proposal,manifestEvidence:recovered.raw,recoveredFromDescription:true,descriptionMayBeIncomplete:Boolean(saved.manifest?.descriptionMayBeIncomplete)};
+  }
   // Old selections remain source history. Reinterpret only a proven parent of
   // that exact saved child, never a better-ranked unrelated secondary claim.
   const manifest=saved?.manifest?.interpretationVersion===MANIFEST_INTERPRETATION_VERSION?saved.manifest:saved?.manifest?validateManifest(saved.manifest):null;

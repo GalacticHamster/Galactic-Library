@@ -9,7 +9,7 @@ export const supportedKindleContentsBook = item => item?.provider === 'kindle' &
   && /^https:\/\/www\.amazon\.com\/dp\/[A-Z0-9]+$/u.test(item.metadata?.detailUrl ?? '');
 
 export function contentsParseState(item) {
-  const statement = item.metadata?.enrichment?.kindleProductComicContents?.statement?.trim() ?? '';
+  const statement = contentsStatement(item,{recoverNatural:true});
   if (!statement) return {parseStatus:'not-attempted',parseOutcome:'not-attempted',parserVersion:CONTENTS_PARSER_VERSION,filterVersion:CONTENTS_FILTER_VERSION};
   const proposal = manifestReviewProposal(item.metadata.enrichment.kindleProductComicContents, item.title,statement,{series:item.metadata?.series});
   const parseOutcome = proposal.outcome;
