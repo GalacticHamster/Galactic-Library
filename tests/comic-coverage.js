@@ -14,7 +14,9 @@ import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 import {equivalentRunMergeTests} from './equivalent-run-merges.js';
 import {annualCoverageTests} from './annual-coverage.js';
 import {quickContentsTests} from './quick-contents.js';
+import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 export const comicCoverageTests=[
+ ...contentsSourceBaselineTests,
  ...quickContentsTests,
  ...annualCoverageTests,
  ...equivalentRunMergeTests,

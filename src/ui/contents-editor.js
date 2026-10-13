@@ -2,7 +2,7 @@ import {labeledControl,presentAction} from './form-presentation.js';
 import {performAction} from './operation-feedback.js';
 import {createContentsInterpretation} from './contents-interpretation.js';
 import {formatDate} from './formatters.js';
-import { contentsStatement, validateContents } from '../lib/contents.js';
+import { contentsStatement, validateContents,contentsReviewChanged } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
 import {independentContentsClaims} from '../lib/kindle-evidence-review.js';
 import {previewQuickContents,quickContentsToAppend,quickContentsNumbers} from '../lib/quick-contents.js';
@@ -129,8 +129,8 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     }
     advanced.append(details);
   }
-  if (review && discovered && discovered !== review.statement) {
-    sourceDetails.append(element('p','New discovery differs from your reviewed statement. Your reviewed entries remain unchanged.'),element('blockquote',discovered),
+  if (review && discovered && contentsReviewChanged(record,review)) {
+    sourceDetails.append(element('p','Captured description changed since this review. Your reviewed entries remain unchanged.'),element('blockquote',discovered),
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; your saved review has not changed.';}));
   }
   const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);

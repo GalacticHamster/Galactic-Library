@@ -350,6 +350,24 @@ export function contentsStatement(item,{recoverNatural=false}={}) {
   return compact(item?.metadata?.contentsStatement || item?.metadata?.collects || item?.metadata?.enrichment?.localMetadata?.statement, 10000);
 }
 
+// Source comparison is independent of human text, entries and parser selection.
+// Retain a bounded exact snapshot only for reviewed records, not every book.
+export function contentsSourceBaseline(item){
+  const blocks=item?.metadata?.enrichment?.kindleProductComicContents?.manifest?.blocks;
+  const descriptions=Array.isArray(blocks)?[...new Set(blocks.map(block=>String(block.text??'').replace(/\s+/gu,' ').trim()).filter(Boolean))].sort():[];
+  return {version:1,kind:descriptions.length?'description':'statement',text:descriptions.length?JSON.stringify(descriptions):contentsStatement(item)};
+}
+export function contentsReviewChanged(item,review){
+  if(!review)return false;
+  if(review.sourceBaseline){const current=contentsSourceBaseline(item);return current.kind!==review.sourceBaseline.kind||current.text!==review.sourceBaseline.text;}
+  // Older reviews have no separate baseline. Quick Add appended a labelled
+  // manual section; compare its original prefix, never the authored additions.
+  const previous=String(review.statement??'').split(/(?:^|\s+)Manually entered contents:\s*/u)[0].replace(/\s+/gu,' ').trim();
+  const statement=contentsStatement(item);if(!statement)return false;
+  const saved=item.metadata?.enrichment?.kindleProductComicContents,candidate=saved?.manifest?.candidates?.[saved.manifest.selected];
+  const parent=candidate?.manifestRange&&!candidate.whole?saved.manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange?.start===candidate.manifestRange.start&&c.manifestRange?.end===candidate.manifestRange.end):null;
+  return statement!==previous&&(!parent||String(parent.raw??'').replace(/\s+/gu,' ').trim()!==previous);
+}
 export function validateContentReview(value) {
   object(value,'Contents review');
   const sourceUrl=url(value.sourceUrl);
@@ -357,7 +375,13 @@ export function validateContentReview(value) {
   const rejected=value.status==='rejected';
   if(value.status!==undefined&&!rejected)throw Error('Invalid contents review status.');
   if(rejected&&(!Array.isArray(value.entries)||value.entries.length))throw Error('Rejected contents must have an empty entry list.');
-  return {entries:rejected?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date')};
+  let sourceBaseline;
+  if(value.sourceBaseline!==undefined){
+    const baseline=object(value.sourceBaseline,'Contents source baseline');
+    if(baseline.version!==1||!['statement','description'].includes(baseline.kind))throw Error('Invalid contents source baseline.');
+    sourceBaseline={version:1,kind:baseline.kind,text:text(baseline.text,50000,'Contents source baseline text')};
+  }
+  return {entries:rejected?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date'),...(sourceBaseline?{sourceBaseline}:{})};
 }
 
 export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {

@@ -1,5 +1,11 @@
 # Contents evidence and identity boundaries
 
+## Review source baselines
+
+Saving a contents review captures a separate, bounded `sourceBaseline` from the current record in the serialized storage writer. It snapshots normalized captured description blocks when available, otherwise the captured/local contents statement, including an empty-source baseline. Authored review text, Quick Add notes and entries do not establish that baseline. Parser selection, outcomes, versions, acquisition timestamps and block ordering do not change it; substantively changed captured text does. This is an exact text snapshot, not a product identity or ownership fingerprint.
+
+The optional field is validated and retained by ordinary backups/restores without a schema migration. Existing reviews are not rewritten. Without a baseline, comparison retains the previous statement/whole-manifest compatibility and recognizes the original source prefix before Quick Add's labelled manual additions. A genuinely different prefix still warns. Arbitrary legacy edited reviews cannot reconstruct a lost source baseline; saving the review again establishes one. Library/Contents warnings, the editor, workbench and Kindle status share the same comparison. A source change never replaces reviewed entries.
+
 ## Annual coverage context
 
 Parser 10 retains the publication date of a contextual `Annual (year)` independently of the preceding regular-series run. Date hints bind to their corresponding proposal entries, including repeated annual numbers from different cycles; unresolved dates cannot inherit a contradictory parent run through an undated fallback. Parser inputs, captured text and confirmed reviews are not rewritten.

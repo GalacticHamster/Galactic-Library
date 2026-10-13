@@ -1,5 +1,5 @@
 import '../providers/kindle.js';
-import {contentsStatement, proposeContentsForReview, CONTENTS_PARSER_VERSION} from './contents.js';
+import {contentsStatement, contentsReviewChanged,proposeContentsForReview, CONTENTS_PARSER_VERSION} from './contents.js';
 import {isConfirmedComicManga} from './genre-hints.js';
 import {CONTENTS_FILTER_VERSION} from './contents-quality.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
@@ -28,7 +28,7 @@ export function kindleContentsState(item, database = {}) {
   const parse = contentsParseState(item);
   const review = database.contentReviews?.[item.id];
   return {fetchOutcome,...parse,reviewStatus:review ? review.status==='rejected'?'rejected':'verified' : statement ? 'unverified' : 'none',
-    reviewChanged:Boolean(review && statement && statement !== review.statement),
+    reviewChanged:contentsReviewChanged(item,review),
     needsReparse:Boolean(statement && (saved.parserVersion !== CONTENTS_PARSER_VERSION || saved.filterVersion !== CONTENTS_FILTER_VERSION || saved.parseOutcome !== parse.parseOutcome || saved.manifest && saved.parseInput !== parse.parseInput)),
     extractorOutdated:Boolean(saved?.extractorVersion && saved.extractorVersion < KINDLE_CONTENTS_EXTRACTOR_VERSION)};
 }

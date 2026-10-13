@@ -1,4 +1,4 @@
-import {contentsStatement} from '../lib/contents.js';
+import {contentsStatement,contentsReviewChanged} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
   rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Contents found · Not reviewed',
@@ -14,8 +14,7 @@ export function contentsSummary(record, database) {
   const review=database.contentReviews?.[record.id];
   const attempt=database.kindleContentsObservations?.[record.recordRef]?.latestAttempt ?? saved;
   const candidate=saved?.manifest?.candidates?.[saved.manifest.selected];
-  const parent=candidate?.manifestRange&&!candidate.whole?saved.manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange?.start===candidate.manifestRange.start&&c.manifestRange?.end===candidate.manifestRange.end):null;
-  const changed=Boolean(review && statement && statement!==review.statement && parent?.raw!==review.statement);
+  const changed=contentsReviewChanged(record,review);
   const incomplete=Boolean(saved?.descriptionMayBeIncomplete || saved?.manifest?.descriptionMayBeIncomplete || candidate?.truncated);
   const outcome=statement&&!saved?.statement&&candidate?.binding==='natural-reprint'?candidate.outcome:saved?.parseOutcome;
   const status=review?review.status==='rejected'?'rejected':'reviewed':statement

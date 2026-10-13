@@ -20,6 +20,7 @@ import {supportedKindleContentsBook, contentsParseState, kindleContentsPlan, KIN
 import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh,KINDLE_REFRESH_VERSION,validateKindleRefresh,kindleRefreshSummary} from '../lib/kindle-contents-refresh.js';
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
+import {contentsSourceBaseline} from '../lib/contents.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase,validateDatabaseAsync } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
@@ -1214,7 +1215,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function saveContentReview(itemId, value) {
     const database=await getDatabase();
     if (!database.providerItems[itemId] || !['book','game'].includes(database.providerItems[itemId].mediaType)) throw new Error('Contents can be reviewed only for a current book or game record.');
-    database.contentReviews[itemId]=validateContentReview({...value,verifiedAt:new Date().toISOString()});
+    database.contentReviews[itemId]=validateContentReview({...value,sourceBaseline:contentsSourceBaseline(database.providerItems[itemId]),verifiedAt:new Date().toISOString()});
     return persistDatabase(database);
   }
 

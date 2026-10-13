@@ -17,6 +17,7 @@ import {dcContentsRecoveryCases,checkDcFixture,recoveryBook} from './dc-contents
 import {checkEquivalentRunFixture} from './equivalent-run-fixture.js';
 import {checkAnnualCoverageFixture} from './annual-coverage-fixture.js';
 import {checkQuickContentsExamples,quickContentsExamples} from './quick-contents-fixture.js';
+import {contentsSummary} from '../src/ui/contents-overview.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -41,6 +42,18 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ {
+ const baselineBefore=await writer.getDatabase();
+ for(const [i,sourceText]of ['',"including a look at John Constantine's rough and tumble childhood and the beginnings of his unique skills.",'Collects Hellblazer #1-2; bonus essays'].entries()){
+   const baselineBook=coverageBook('source-baseline-'+i,sourceText,{title:'Hellblazer Collection '+i});await writer.restoreDatabase(coverageDatabase(baselineBook));let baselineSaved=false;
+   const baselineEditor=createContentsEditor(baselineBook,null,{save:async(id,review)=>{await writer.saveContentReview(id,review);baselineSaved=true;},refresh(){}},{expanded:true});document.body.append(baselineEditor);
+   const baselineQuick=baselineEditor.querySelector('.contents-quick-add');change(baselineQuick.querySelector('textarea'),'Hellblazer #1-8','input');button(baselineQuick,'Preview').click();button(baselineQuick,'Add entries').click();button(baselineEditor,'Save reviewed contents').click();await wait(()=>baselineSaved,'Baseline review not saved');baselineEditor.remove();
+   const baselineDb=await writer.getDatabase(),baselineReview=baselineDb.contentReviews[baselineBook.id];assert(baselineReview.entries.length===8&&!contentsSummary(baselineDb.providerItems[baselineBook.id],baselineDb).changed,'Manual contents immediately marked stale');
+   const baselineView=createContentsWorkspace({review:(record,db)=>createContentsEditor(record,db.contentReviews[record.id],{save:async()=>{},refresh(){}},{expanded:true})});document.body.append(baselineView.element);baselineView.update(baselineDb,true);assert(!baselineView.element.textContent.includes('Description changed since your review'),'Unchanged source warned in contents list');baselineView.open(baselineBook.recordRef);assert(!baselineView.element.textContent.includes('Captured description changed since this review')&&baselineView.element.querySelectorAll('tbody tr').length===8,'Reopening lost entries or marked source stale');baselineView.close();
+   const baselineChanged=structuredClone(baselineDb);baselineChanged.providerItems[baselineBook.id].metadata.enrichment.kindleProductComicContents.statement='Collects Hellblazer #1-9';baselineView.update(baselineChanged,true);assert(baselineView.element.textContent.includes('Description changed since your review. Your review is retained.'),'Genuine source change suppressed');baselineView.open(baselineBook.recordRef);assert(baselineView.element.textContent.includes('Captured description changed since this review')&&baselineView.element.querySelectorAll('tbody tr').length===8,'Genuine change overwrote manual review');baselineView.element.remove();
+ }
+ await writer.restoreDatabase(baselineBefore);checks.push('Quick Add review baselines prevent immediate stale warnings for empty/failed/partial sources and preserve eight reviewed entries through reopening and genuine source changes');
+ }
  {
  checkQuickContentsExamples();
  const bulkBefore=await writer.getDatabase(),bulkBook=coverageBook('bulk-sandman','',{title:'The Sandman Vol. 1'}),bulkDb=coverageDatabase(bulkBook);await writer.restoreDatabase(bulkDb);

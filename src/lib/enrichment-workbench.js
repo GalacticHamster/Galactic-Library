@@ -1,6 +1,6 @@
 import {enrichmentStages} from './enrichment.js';
 import {editionEnrichmentConflicts} from './identity.js';
-import {contentsStatement,proposeContentsForReview} from './contents.js';
+import {contentsStatement,contentsReviewChanged,proposeContentsForReview} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
 
 export function candidateConflicts(records,source,candidate){
@@ -27,7 +27,7 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
   for(const record of records.values()){
     const statement=contentsStatement(record);
     const review = database.contentReviews[record.id];
-    if (includeContents && statement && (!review || statement !== review.statement)) {
+    if (includeContents && statement && (!review || contentsReviewChanged(record,review))) {
       const saved=record.metadata.enrichment?.kindleProductComicContents;
       const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);
       const status = proposal.outcome==='filtered' ? 'Filtered non-containment; original evidence retained' : proposal.outcome==='uncertain' ? 'Uncertain candidate; context needs review' : !proposal.entries.length ? 'Unresolved containment statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
