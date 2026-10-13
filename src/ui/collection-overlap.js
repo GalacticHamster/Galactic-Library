@@ -1,3 +1,4 @@
+import {compareTitles} from '../lib/title-sort.js';
 import {overlapPairDetails,overlapIssueLabel,sortOverlapUnits} from '../lib/collection-overlap.js';
 import {loadOverlapProjection} from './collection-overlap-projection.js';
 import {accountLabel} from './item-presentation.js';
@@ -59,7 +60,7 @@ export function createCollectionOverlapView(database,{openRecord}={}){
     const query=search.value.trim().toLocaleLowerCase();
     const matches=pairs.filter(pair=>[pair.left,pair.right].some(c=>[c.title,...[...c.records.values()].map(r=>r.title)].some(title=>title.toLocaleLowerCase().includes(query))));
     const titleKey=pair=>[pair.left.title,pair.right.title].sort().join(' ');
-    matches.sort((a,b)=>(sort.value==='shared'?b.shared.length-a.shared.length:0)||titleKey(a).localeCompare(titleKey(b),undefined,{numeric:true}));
+    matches.sort((a,b)=>(sort.value==='shared'?b.shared.length-a.shared.length:0)||compareTitles(titleKey(a),titleKey(b)));
     const state=pager.update({total:matches.length,page,size});page=state.page;list.replaceChildren();
     status.textContent=`${matches.length} overlapping collection pairs${query?' matching your search':''}.`;status.setAttribute('aria-busy','false');
     for(const pair of matches.slice(page*size,(page+1)*size)){

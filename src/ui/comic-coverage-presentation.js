@@ -1,3 +1,4 @@
+import {compareTitles} from '../lib/title-sort.js';
 import {comicRange} from '../lib/comic-coverage.js';
 import {identityKey} from '../lib/identity.js';
 import {comicSeriesDisplayName} from '../lib/comic-series-names.js';
@@ -7,7 +8,7 @@ export function seriesMergeTargets(source,groups,query='',displayNames={}){
   const names=group=>[comicSeriesDisplayName(group,displayNames),group.series,...(group.originalTitles??[])];
   const matches=group=>names(group).some(name=>{const runs=[group.run,...(group.originalScopes??[]).map(scope=>scope.run)].join(' '),value=identityKey(name+' '+runs+' '+group.unitType+'s '+group.language);return text.split(' ').every(word=>value.includes(word));});
   const score=group=>Math.max(...names(group).map(title=>{const value=identityKey(title);return value===key?1000:value.includes(key)||key.includes(value)?500:value.split(' ').filter(word=>words.has(word)).length;}));
-  return groups.filter(group=>group.id!==source.id&&matches(group)).sort((a,b)=>Number(b.unitType===source.unitType)-Number(a.unitType===source.unitType)||score(b)-score(a)||comicSeriesLabel(a).localeCompare(comicSeriesLabel(b),undefined,{numeric:true}));
+  return groups.filter(group=>group.id!==source.id&&matches(group)).sort((a,b)=>Number(b.unitType===source.unitType)-Number(a.unitType===source.unitType)||score(b)-score(a)||compareTitles(comicSeriesLabel(a),comicSeriesLabel(b)));
 }
 export function comicSeriesLabel(group, groups = [group]) {
   const base = item => item.series + (item.run ? ` (${item.run})` : '');

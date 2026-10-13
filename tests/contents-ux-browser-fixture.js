@@ -21,6 +21,8 @@ import {contentsSummary} from '../src/ui/contents-overview.js';
 import {checkMergeDialogFixture} from './merge-dialog-fixture.js';
 import {selectManifest} from '../src/lib/kindle-manifest.js';
 import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
+import {checkTitleSorting} from './natural-title-sort-fixture.mjs';
+import {compareTitles} from '../src/lib/title-sort.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -45,6 +47,7 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  checkTitleSorting({...globalThis.LibraryTitleSort,compare:compareTitles},assert);checks.push('packaged title sorting uses written and numeric book, volume and part order');
   {
     const title='Saga of the Swamp Thing: Book Three',source=selectManifest([{selector:'description',text:'Continuing the run on THE SAGA OF THE SWAMP THING. Collecting issues #35-42.'}],title),book=coverageBook('contextual-three',source.statement,{title});
     book.metadata.enrichment.kindleProductComicContents={...source,productDetailsEvidence:{observations:[{field:'series',status:'observed',value:'Part of: Swamp Thing (1982-1996)'}]}};

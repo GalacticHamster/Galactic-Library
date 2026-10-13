@@ -57,7 +57,7 @@ const server=createServer(async(request,response)=>{
       if(pathname==='/src/ui/contents-workspace.js')body=body.toString().replace('if(!active&&!selected)return;','');
     }
     if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${reconciliationMode?'manual-reconciliation-browser-fixture':paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
-    response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
+    response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}
 });

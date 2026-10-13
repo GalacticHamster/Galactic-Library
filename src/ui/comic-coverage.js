@@ -1,3 +1,4 @@
+import {compareTitles} from '../lib/title-sort.js';
 import {compatibleSeries,continuityProblem,continuityAssessment} from '../lib/comic-series-merges.js';
 import {comicCoverageNameKey,comicSeriesDisplayName,defaultComicSeriesName} from '../lib/comic-series-names.js';
 import {createConfirmation} from './confirmation.js';
@@ -179,7 +180,7 @@ export function createComicCoverageView(database,{starts={},transitions={},names
   }
   function render(){
     const query=search.value.trim().toLocaleLowerCase(),matches=groups.filter(group=>[label(group),group.series,...(group.originalTitles??[])].some(title=>title.toLocaleLowerCase().includes(query)));
-    matches.sort((a,b)=>(sort.value==='covered'?comicGroupCounts(b).covered-comicGroupCounts(a).covered:sort.value==='duplicates'?b.duplicates-a.duplicates:sort.value==='missing'?comicRange(b,starts[b.id]??1,transitions[b.id]).missing-comicRange(a,starts[a.id]??1,transitions[a.id]).missing:0)||label(a).localeCompare(label(b),undefined,{numeric:true}));
+    matches.sort((a,b)=>(sort.value==='covered'?comicGroupCounts(b).covered-comicGroupCounts(a).covered:sort.value==='duplicates'?b.duplicates-a.duplicates:sort.value==='missing'?comicRange(b,starts[b.id]??1,transitions[b.id]).missing-comicRange(a,starts[a.id]??1,transitions[a.id]).missing:0)||compareTitles(label(a),label(b)));
     const state=pager.update({total:matches.length,page,size});page=state.page;list.replaceChildren();const counts=totals();
     status.textContent=`${counts.seriesGroups} series · ${counts.covered} covered issues${counts.partial?' · '+counts.partial+' partial':''} · ${counts.duplicates} owned multiple times · ${counts.missing} missing in assumed ranges${query?' · '+matches.length+' matching groups':''}.`;status.setAttribute('aria-busy','false');
     for(const group of matches.slice(page*size,(page+1)*size)){

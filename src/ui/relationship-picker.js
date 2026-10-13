@@ -1,3 +1,4 @@
+import {compareTitles} from '../lib/title-sort.js';
 import {identityEvidence} from '../lib/identity.js';
 import {providerLabel,accountLabel} from './item-presentation.js';
 
@@ -11,7 +12,7 @@ export function relationshipSearchIndex(database){
     const identity=identityEvidence(record);
     const label=[record.title,providerLabel(record.provider),accountLabel(record,database),identity.unit?`${identity.unitType} ${identity.unit}`:'',identity.edition].filter(Boolean).join(' \u2014 ');
     return {record,label,search:key(label)};
-  }).sort((a,b)=>a.record.title.localeCompare(b.record.title));
+  }).sort((a,b)=>compareTitles(a.record.title,b.record.title));
   const index={groups,entries};indexes.set(database,index);return index;
 }
 export function searchRelationshipRecords(index,currentId,query,limit=20){

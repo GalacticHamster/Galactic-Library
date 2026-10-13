@@ -1,4 +1,5 @@
 import {manualReconciliationTests} from './manual-reconciliation.js';
+import {naturalTitleSortTests} from './natural-title-sort.js';
 import {purchaseRepairTests} from './purchase-repair.js';
 import {purchaseReconciliationTests} from './purchase-reconciliation.js';
 import {purchasePresentationTests} from './purchase-presentation.js';
@@ -111,6 +112,7 @@ const tests = [
   ...collectionOverlapTests,
   ...comicCoverageTests,
   ...manualReconciliationTests,
+  ...naturalTitleSortTests,
   ...enrichmentIntegrityTests, ...genreRecoveryTests, ...kindleProductDetailsTests, ...kindleCategoryTests, ...genreClassificationTests,
   ...crossProviderCollectionTests,
   ...companionIdentityTests,...purchaseRepairTests,...purchaseReconciliationTests,...purchasePresentationTests,

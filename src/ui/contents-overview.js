@@ -1,3 +1,4 @@
+import {compareTitles} from '../lib/title-sort.js';
 import {contentsStatement,contentsReviewChanged} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
@@ -39,7 +40,7 @@ export function createContentsProjection() {
     if(database===current)return rows;
     current=database;
     rows=Object.values(database.providerItems??{}).filter(record=>record.mediaType==='book')
-      .map(record=>contentsSummary(record,database)).sort((a,b)=>a.title.localeCompare(b.title,undefined,{numeric:true})||a.id.localeCompare(b.id));
+      .map(record=>contentsSummary(record,database)).sort((a,b)=>compareTitles(a.title,b.title)||a.id.localeCompare(b.id));
     return rows;
   };
 }

@@ -166,5 +166,6 @@
   "shared/purchase-sync-ui.js",
   "src/ui/library-acquisitions.js",
   "src/lib/display-title.js",
-  "src/ui/relationship-picker.js"
+  "src/ui/relationship-picker.js",
+  "shared/natural-title-sort.js"
 ]
