@@ -16,7 +16,9 @@ import {annualCoverageTests} from './annual-coverage.js';
 import {quickContentsTests} from './quick-contents.js';
 import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 import {mergeDialogTests} from './merge-dialog.js';
+import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
+ ...comicSeriesNameTests,
  ...mergeDialogTests,
  ...contentsSourceBaselineTests,
  ...quickContentsTests,

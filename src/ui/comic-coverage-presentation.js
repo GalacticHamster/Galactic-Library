@@ -1,9 +1,10 @@
 import {comicRange} from '../lib/comic-coverage.js';
 import {identityKey} from '../lib/identity.js';
+import {comicSeriesDisplayName} from '../lib/comic-series-names.js';
 const numeric = value => /^\d+\/\d+$/u.test(value) ? Number(value.split('/')[0])/Number(value.split('/')[1]) : Number(value);
-export function seriesMergeTargets(source,groups,query=''){
+export function seriesMergeTargets(source,groups,query='',displayNames={}){
   const text=identityKey(query),key=identityKey(source.series),words=new Set(key.split(' '));
-  const names=group=>[group.series,...(group.originalTitles??[])];
+  const names=group=>[comicSeriesDisplayName(group,displayNames),group.series,...(group.originalTitles??[])];
   const matches=group=>names(group).some(name=>{const runs=[group.run,...(group.originalScopes??[]).map(scope=>scope.run)].join(' '),value=identityKey(name+' '+runs+' '+group.unitType+'s '+group.language);return text.split(' ').every(word=>value.includes(word));});
   const score=group=>Math.max(...names(group).map(title=>{const value=identityKey(title);return value===key?1000:value.includes(key)||key.includes(value)?500:value.split(' ').filter(word=>words.has(word)).length;}));
   return groups.filter(group=>group.id!==source.id&&matches(group)).sort((a,b)=>Number(b.unitType===source.unitType)-Number(a.unitType===source.unitType)||score(b)-score(a)||comicSeriesLabel(a).localeCompare(comicSeriesLabel(b),undefined,{numeric:true}));

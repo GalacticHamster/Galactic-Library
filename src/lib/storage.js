@@ -1,4 +1,5 @@
 import {validateComicCoverageMerges} from './comic-series-merges.js';
+import {validateComicCoverageNames} from './comic-series-names.js';
 import { BACKUP_FORMAT, BACKUP_VERSION } from './constants.js';
 import { validateDatabase } from './models.js';
 import { STORAGE_MESSAGE_TYPE, STORAGE_OPERATIONS } from './storage-protocol.js';
@@ -44,7 +45,7 @@ export function createBackup(database, preferences) {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     database: validated,
-    ...(preferences ? {comicCoverageStarts:validateComicCoverageStarts(preferences.comicCoverageStarts??{}),comicCoverageTransitions:validateComicCoverageTransitions(preferences.comicCoverageTransitions??{}),comicCoverageMerges:validateComicCoverageMerges(preferences.comicCoverageMerges??{})} : {})
+    ...(preferences ? {comicCoverageStarts:validateComicCoverageStarts(preferences.comicCoverageStarts??{}),comicCoverageTransitions:validateComicCoverageTransitions(preferences.comicCoverageTransitions??{}),comicCoverageMerges:validateComicCoverageMerges(preferences.comicCoverageMerges??{}),comicCoverageNames:validateComicCoverageNames(preferences.comicCoverageNames??{})} : {})
   };
 }
 
@@ -63,5 +64,6 @@ export function parseBackupPreferences(value) {
   if(Object.hasOwn(value,'comicCoverageStarts'))preferences.comicCoverageStarts=validateComicCoverageStarts(value.comicCoverageStarts);
   if(Object.hasOwn(value,'comicCoverageTransitions'))preferences.comicCoverageTransitions=validateComicCoverageTransitions(value.comicCoverageTransitions);
   if(Object.hasOwn(value,'comicCoverageMerges'))preferences.comicCoverageMerges=validateComicCoverageMerges(value.comicCoverageMerges);
+  if(Object.hasOwn(value,'comicCoverageNames'))preferences.comicCoverageNames=validateComicCoverageNames(value.comicCoverageNames);
   return Object.keys(preferences).length?preferences:undefined;
 }

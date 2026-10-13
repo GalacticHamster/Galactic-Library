@@ -1,4 +1,5 @@
 import {validateComicCoverageMerges} from './comic-series-merges.js';
+import {validateComicCoverageNames} from './comic-series-names.js';
 import {validateNumberingTransitions} from './comic-coverage.js';
 export const UI_PREFERENCES_KEY = 'galacticLibraryUiPreferences';
 export const PAGE_SIZES = Object.freeze([20,50,100,200]);
@@ -14,7 +15,7 @@ export function workspaceTarget(value) {
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', acquisitions:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
 export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
-export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,comicCoverageStarts:{},comicCoverageTransitions:{},comicCoverageMerges:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
+export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,comicCoverageStarts:{},comicCoverageTransitions:{},comicCoverageMerges:{},comicCoverageNames:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
 export function validateComicCoverageTransitions(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>10000)throw Error('Invalid numbering transitions.');
   const output={};for(const [key,list]of Object.entries(value)){
@@ -44,7 +45,7 @@ function validateView(view,defaults){
   return output;
 }
 export function validateUiPreferences(value){
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
   const output=defaultUiPreferences();
   if(value.appearance!==undefined){if(!['dark','light','system'].includes(value.appearance))throw Error('Invalid appearance preference.');output.appearance=value.appearance;}
   if(value.pageSize!==undefined){if(!validPageSize(value.pageSize))throw Error('Invalid items per page.');output.pageSize=value.pageSize;}
@@ -52,6 +53,7 @@ export function validateUiPreferences(value){
   if(value.comicCoverageStarts!==undefined)output.comicCoverageStarts=validateComicCoverageStarts(value.comicCoverageStarts);
   if(value.comicCoverageTransitions!==undefined)output.comicCoverageTransitions=validateComicCoverageTransitions(value.comicCoverageTransitions);
   if(value.comicCoverageMerges!==undefined)output.comicCoverageMerges=validateComicCoverageMerges(value.comicCoverageMerges);
+  if(value.comicCoverageNames!==undefined)output.comicCoverageNames=validateComicCoverageNames(value.comicCoverageNames);
   // Migrate old Library fields once. Shared state is authoritative thereafter.
   const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();
   output.browse=validateView(value.browse??Object.fromEntries(SHARED_BROWSE_FIELDS.filter(key=>key!=='anchor').map(key=>[key,legacy[key]])),emptyBrowseView());
@@ -63,7 +65,7 @@ export function validateUiPreferences(value){
 export function mergeUiPreferences(current,patch){
   validateUiPreferences(patch);
   const sharedPatch={...Object.fromEntries(Object.entries(patch.library??{}).filter(([key])=>SHARED_BROWSE_FIELDS.includes(key))),...patch.browse};
-  return validateUiPreferences({...current,...patch,comicCoverageStarts:validateComicCoverageStarts({...current.comicCoverageStarts,...patch.comicCoverageStarts}),comicCoverageTransitions:validateComicCoverageTransitions({...current.comicCoverageTransitions,...patch.comicCoverageTransitions}),browse:{...current.browse,...sharedPatch},library:{...current.library,...patch.library},contents:{...current.contents,...patch.contents},books:{...current.books,...patch.books}});
+  return validateUiPreferences({...current,...patch,comicCoverageNames:validateComicCoverageNames({...current.comicCoverageNames,...patch.comicCoverageNames}),comicCoverageStarts:validateComicCoverageStarts({...current.comicCoverageStarts,...patch.comicCoverageStarts}),comicCoverageTransitions:validateComicCoverageTransitions({...current.comicCoverageTransitions,...patch.comicCoverageTransitions}),browse:{...current.browse,...sharedPatch},library:{...current.library,...patch.library},contents:{...current.contents,...patch.contents},books:{...current.books,...patch.books}});
 }
 export function browseView(preferences,workspace){
   return workspace==='books'?preferences.books:{...preferences.browse,...preferences[workspace==='contents'?'contents':'library']};

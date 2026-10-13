@@ -1,4 +1,5 @@
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
+import {comicCoverageNameKey} from '../lib/comic-series-names.js';
 import {comicCoverage} from '../lib/comic-coverage.js';
 import {applyPurchaseSnapshot} from './purchase-handoff.js';
 import {mergeProductDetailsEvidence} from '../lib/kindle-product-details.js';
@@ -395,7 +396,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function restoreDatabase(database,preferences){
     const restored=validateDatabase(database),extra={galacticPurchaseSync:{}};
     if(preferences!==undefined){
-      if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
+      if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
       extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),...preferences});
     }
     for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
@@ -1239,6 +1240,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(left&&right){const problem=continuityProblem(left,right);if(problem)throw Error(problem);}
     }
     const next=validateUiPreferences({...current,comicCoverageMerges:addSeriesMerge(current.comicCoverageMerges,source,target,title,continuity)});
+    // The explicit name chosen in the merge dialog wins for this new group.
+    // Original-member and earlier-group rename preferences remain untouched.
+    const combined=Object.entries(next.comicCoverageMerges).find(([,merge])=>merge.members.includes(source)&&merge.members.includes(target));
+    if(combined)delete next.comicCoverageNames[comicCoverageNameKey({id:combined[0],members:combined[1].members})];
     await storageArea.set({[UI_PREFERENCES_KEY]:next});return next;
   }
   async function removeComicCoverageMerge(id){
