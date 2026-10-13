@@ -19,6 +19,8 @@ import {checkAnnualCoverageFixture} from './annual-coverage-fixture.js';
 import {checkQuickContentsExamples,quickContentsExamples} from './quick-contents-fixture.js';
 import {contentsSummary} from '../src/ui/contents-overview.js';
 import {checkMergeDialogFixture} from './merge-dialog-fixture.js';
+import {selectManifest} from '../src/lib/kindle-manifest.js';
+import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -43,6 +45,14 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const title='Saga of the Swamp Thing: Book Three',source=selectManifest([{selector:'description',text:'Continuing the run on THE SAGA OF THE SWAMP THING. Collecting issues #35-42.'}],title),book=coverageBook('contextual-three',source.statement,{title});
+    book.metadata.enrichment.kindleProductComicContents={...source,productDetailsEvidence:{observations:[{field:'series',status:'observed',value:'Part of: Swamp Thing (1982-1996)'}]}};
+    const data=coverageDatabase(book),groups=comicCoverageForLibrary(data).groups;assert(groups.length===1&&groups[0].issues.length===8,'Written book label lost saved run context');
+    const view=createComicCoverageView(data);document.body.append(view);await view.ready;button(view,'Inspect issues').click();
+    assert(view.textContent.includes('35')&&view.textContent.includes('42'),'Recovered Swamp Thing issues missing from packaged view');view.remove();
+    checks.push('written-title contextual contents reach the packaged Comic Coverage grid');
+  }
  {
  const renameBefore=await writer.getDatabase(),renamePrefsBefore=await writer.getUiPreferences(),renameFixture=checkMergeDialogFixture(),renamePartial=coverageBook('rename-partial','Collects material from SAGA OF THE SWAMP THING #35');renameFixture.database.providerItems[renamePartial.id]=renamePartial;await writer.restoreDatabase(renameFixture.database,{comicCoverageMerges:{},comicCoverageNames:{}});const renameData=await writer.getDatabase(),renameDataBefore=JSON.stringify(renameData);
  const renameOptions={saveName:async(key,value)=>(await writer.saveUiPreferences({comicCoverageNames:{[key]:value}})).comicCoverageNames,saveMerge:async(...args)=>(await writer.saveComicCoverageMerge(...args)).comicCoverageMerges,undoMerge:async key=>(await writer.removeComicCoverageMerge(key)).comicCoverageMerges};

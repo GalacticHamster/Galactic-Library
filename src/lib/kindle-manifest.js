@@ -63,6 +63,10 @@ function parserInput(raw,context,title) {
   const hit=[...input.matchAll(trigger)][0];
   if(hit)input=input.slice(hit.index);
   input=input.replace(/^(?:reprints?|reprinting|comprising)\b/iu,'Collects').replace(/^Contents\s*:\s*/iu,'Includes ');
+  if(/\bof this (?:seminal |classic |original |comic(?: book)? )?series\b|\bthrough\s+\d|\bthe first\s+(?:\w+|\d+)\s+issues of (?:this|the) series\b/iu.test(input)){
+    const contextual=proposeContentsForReview(input,title,{allowTitleBinding:true});
+    if(contextual.parseBinding==='explicit-product-series-volume-title')return {input:contextual.parseInput,binding:contextual.parseBinding};
+  }
   const collecting=/^collecting\b/iu.test(input);
   const start=input.replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*/iu,'');
   const elliptical=/^(?:the\s+)?(?:final\s+\d+\s+)?issues?\s*,?\s*(#?\d+(?:\s*[-–—]\s*#?\d+)?(?:\s*(?:,|and)\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*)/iu.exec(start);

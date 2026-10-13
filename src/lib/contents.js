@@ -80,9 +80,11 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   const finish=(entries,unparsed)=>({...quality,parseBinding,parseInput,entries,unparsed,outcome:quality.quality==='filtered'?'filtered':quality.quality==='uncertain'?'uncertain':!entries.length?'failed':unparsed.length?'partial':'full'});
   if(quality.quality!=='containment')return finish([],body?[body]:[]);
   const anchor=reviewSeriesAnchor(collectionTitle,context);
+  if(!anchor&&/^issues?\s*#?\s*\d[^;]*\bof (?:this|the) (?:(?:seminal|classic|original|comic(?: book)?) )?series\b|^the first \w+ issues of (?:this|the) series\b/iu.test(body))return finish([],[body]);
   let input=body;
-  if(anchor && /^(?:issues?\s*#?\s*|#\s*)\d/iu.test(body) && !/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(body)){
-    input=anchor.series+' '+body;parseBinding=anchor.basis;parseInput='Collects '+input;
+  const contextual=anchor&&contextualIssueInput(body,anchor.series);
+  if(contextual){
+    input=contextual;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
   const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),{...context,naturalCollection:naturalContentsClaims(statement).some(claim=>claim.start===0)});
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return {...finish(proposal.entries,proposal.unparsed),...(proposal.annualRunHints?.length?{annualRunHints:proposal.annualRunHints}:{})};
@@ -299,7 +301,7 @@ function reviewSeriesDescriptor(label,run='') {
 }
 
 /** Only explicit product-series context can supply an otherwise missing label. */
-function reviewSeriesAnchor(title,context) {
+export function reviewSeriesAnchor(title,context={}) {
   const metadata=Array.isArray(context.series)?[...new Set(context.series.map(s=>compact(s,500)).filter(Boolean))]:[];
   const hit=context.allowTitleBinding && /^(.{2,200}?)\s*[:,-]?\s+\b(?:vol(?:ume)?\.?|book)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/iu.exec(compact(title));
   const titleSeries=hit?.[1]?.replace(/[:,-]+$/u,'').trim();
@@ -309,9 +311,31 @@ function reviewSeriesAnchor(title,context) {
     if(a&&b&&a!==b)return null;
   }
   const series=metadata[0]||titleSeries;
-  if(!series || /^(?:a|an|the)\s+(?:collection|omnibus|anthology)|\b(?:box set|complete collection|epic collection|deluxe|edition|anniversary|ultimate collection|by)\b/iu.test(series))return null;
+  if(!series || /^(?:a|an|the)\s+(?:collection|omnibus|anthology)|\b(?:omnibus|anthology|box set|complete collection|epic collection|deluxe|edition|anniversary|ultimate collection|by)\b/iu.test(series))return null;
   if(/^(?:(?:a|an|the)\s+)?(?:collection|omnibus|anthology|collected (?:works|stories|novels|essays))$/iu.test(series))return null;
   return {series,basis:metadata.length?'explicit-product-series-metadata':'explicit-product-series-volume-title'};
+}
+
+// A bounded elliptical claim, not arbitrary prose or an explicit other series.
+// Keep any following supplement for the ordinary parser/unresolved evidence.
+function contextualIssueInput(body,series){
+  let text=body;
+  const first=/^the first (one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,3}) issues of (?:this|the) series\b/iu.exec(text);
+  if(first){
+    const words=['one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
+    const count=Number(first[1])||words.indexOf(first[1].toLowerCase())+1;
+    if(count<1||count>499)return null;
+    text='issues #1-'+count+text.slice(first[0].length);
+  }
+  const numbers=/^(?:issues?\s*#?\s*|#\s*)\d+(?:\s*(?:[-–—]|through)\s*#?\d+)?(?:\s*(?:,|and)\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*/iu.exec(text);
+  if(!numbers)return null;
+  let tail=text.slice(numbers[0].length);
+  if(/^issues?/iu.test(text)&&/^\s+of\s+/iu.test(tail)){
+    const reference=/^\s+of (?:this|the) (?:(?:seminal|classic|original|comic(?: book)?) )?series\b/iu.exec(tail);
+    if(!reference)return null;
+    tail=tail.slice(reference[0].length);
+  }
+  return series+' '+numbers[0].replace(/\s+through\s+/giu,'-')+tail;
 }
 
 function containedNames(body) {

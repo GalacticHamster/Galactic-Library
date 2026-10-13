@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {contextualCollectionCoverageTests} from './contextual-collection-coverage.js';
 import {readFile} from 'node:fs/promises';
 import {dcContentsRecoveryCases,checkDcFixture} from './dc-contents-recovery-fixture.js';
 import {comicRange,comicIssuePage,comicCoverageSummary,comicSeriesKey,comicSequenceOffset,validateNumberingTransitions} from '../src/lib/comic-coverage.js';
@@ -18,6 +19,7 @@ import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 import {mergeDialogTests} from './merge-dialog.js';
 import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
+ ...contextualCollectionCoverageTests,
  ...comicSeriesNameTests,
  ...mergeDialogTests,
  ...contentsSourceBaselineTests,

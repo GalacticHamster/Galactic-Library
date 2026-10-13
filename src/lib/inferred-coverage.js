@@ -1,4 +1,4 @@
-import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCoverage,proposeContentsForReview,CONTENTS_PARSER_VERSION} from './contents.js';
+import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCoverage,proposeContentsForReview,reviewSeriesAnchor,CONTENTS_PARSER_VERSION} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
@@ -55,7 +55,10 @@ function parentSeriesContext(entry,parent,allowSubjectAlias=true){
     return part;
   };
   const descriptors=identity.series.map(parentDescriptor);
-  const title=parentDescriptor(titleIdentity(parent.title,parent.mediaType).series);
+  // Fill only the written-volume gap in the identity parser. Do not reinterpret
+  // otherwise unsupported numeric/anthology titles as subject-series aliases.
+  const writtenVolume=/\b(?:vol(?:ume)?\.?|book)\s+(?:one|two|three|four|five|six|seven|eight|nine|ten)\b/iu.test(parent.title);
+  const title=parentDescriptor(titleIdentity(parent.title,parent.mediaType).series||(writtenVolume?reviewSeriesAnchor(parent.title,{allowTitleBinding:true})?.series:''));
   // Amazon's captured product-series label is evidence for this product only.
   // It can resolve a literal contained series or the subject's own title-based
   // series variant, never assign its run to unrelated anthology constituents.
