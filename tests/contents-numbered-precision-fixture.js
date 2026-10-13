@@ -7,7 +7,7 @@ const parse=s=>proposeContentsForReview(s,'Collection');
 const equal=(a,b,message)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(message+': '+JSON.stringify(a));};
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const nums=(a,b)=>Array.from({length:b-a+1},(_,n)=>String(a+n));
-add('parser 6 retains bounded numbered precision with wrapper attribution',()=>equal(CONTENTS_PARSER_VERSION,7,'Parser version'));
+add('parser 6 retains bounded numbered precision with wrapper attribution',()=>equal(CONTENTS_PARSER_VERSION,8,'Parser version'));
 for(const title of ['Batman and Robin','Sword and Sorcery','Cloak and Dagger']){
  add('conjunction stays inside numbered title: '+title,()=>{
   for(const label of [title,title.toLowerCase()])for(const s of [`Collects ${label} #1-3`,`Collects issues #1-3 of ${label}, part of the event`]){

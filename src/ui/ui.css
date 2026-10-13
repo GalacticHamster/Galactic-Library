@@ -238,9 +238,10 @@ button.danger { background:var(--gh-danger-fill); }
 .coverage-view-controls [aria-pressed=true],#comic-coverage-navigation [aria-pressed=true] { outline:2px solid var(--gh-link); outline-offset:2px; }
 .comic-coverage-bar { display:flex; height:18px; overflow:hidden; border-radius:6px; margin:12px 0; background:var(--gh-surface-raised); }
 .coverage-owned { background:#146c50; color:#fff; }
-.coverage-duplicate { background:#6048a2; color:#fff; }
+.coverage-duplicate { background:#7c3aed; color:#fff; }
+.coverage-partial { background:#d97706; color:#111827; }
 .coverage-missing { background:#6b7280; color:#fff; }
-.comic-coverage-bar .coverage-missing { background:repeating-linear-gradient(135deg,var(--gh-surface-raised),var(--gh-surface-raised) 4px,var(--gh-border) 4px,var(--gh-border) 6px); }
+.comic-coverage-bar .coverage-missing { background:repeating-linear-gradient(135deg,#6b7280,#6b7280 4px,#4b5563 4px,#4b5563 6px); }
 .coverage-legend { display:flex; flex-wrap:wrap; gap:8px; font-size:.85rem; }
 .coverage-legend > span { display:inline-flex; align-items:center; gap:6px; }
 .coverage-legend i { display:inline-block; width:12px; height:12px; border:1px solid var(--gh-border); }
@@ -255,7 +256,8 @@ button.danger { background:var(--gh-danger-fill); }
 .comic-issue-cell.coverage-missing { border-style:dashed; }
 .comic-issue-cell:hover { filter:brightness(1.15); }
 .comic-issue-cell.coverage-owned:hover { background:#146c50; }
-.comic-issue-cell.coverage-duplicate:hover { background:#6048a2; }
+.comic-issue-cell.coverage-duplicate:hover { background:#6d28d9; filter:none; }
+.comic-issue-cell.coverage-partial:hover { background:#d97706; color:#111827; filter:none; }
 .comic-issue-cell.coverage-missing:hover { background:#6b7280; }
 .comic-issue-cell[aria-pressed=true] { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-cell:focus-visible { outline:3px solid var(--gh-link); outline-offset:2px; }

@@ -1,3 +1,4 @@
+import {comicIssueEvidence,comicGroupCounts} from './comic-coverage.js';
 export function seriesScope(id){
   let scope;try{scope=JSON.parse(id);}catch{throw Error('Invalid comic series.');}
   if(typeof id!=='string'||id.length>800||!Array.isArray(scope)||scope.length!==4||scope.some(part=>typeof part!=='string')||!scope[0]||!['issue','annual','special'].includes(scope[2])||!scope[3])throw Error('Invalid comic series.');
@@ -46,15 +47,15 @@ export function mergeCoverageGroups(groups,aliases,copiesForSources){
       if(!prior){combined.units.set(key,{...issue,sources:[...issue.sources]});continue;}
       const sources=new Map();
       const rank=confidence=>confidence==='verified'?3:confidence==='direct'?2:1;
-      for(const source of [...prior.sources,...issue.sources])if(!sources.has(source.id)||rank(source.confidence)>rank(sources.get(source.id).confidence))sources.set(source.id,source);
+      for(const source of [...prior.sources,...issue.sources]){const key=source.id+':'+(source.completeness??'full');if(!sources.has(key)||rank(source.confidence)>rank(sources.get(key).confidence))sources.set(key,source);}
       prior.sources=[...sources.values()];
       if(issue.confidence==='verified'||prior.confidence!=='verified'&&issue.confidence==='direct')prior.confidence=issue.confidence;
     }
   }
   for(const group of output.values())if(group.units){
-    group.issues=[...group.units.values()].map(issue=>({...issue,copies:Math.max(1,copiesForSources(issue.sources.map(source=>source.record)))})).sort((a,b)=>{
+    group.issues=[...group.units.values()].map(issue=>comicIssueEvidence(issue,copiesForSources)).sort((a,b)=>{
       const n=value=>value.includes('/')?Number(value.split('/')[0])/Number(value.split('/')[1]):Number(value);
       return n(a.number)-n(b.number)||a.number.localeCompare(b.number,undefined,{numeric:true});
-    });group.duplicates=group.issues.filter(issue=>issue.copies>1).length;delete group.units;
+    });Object.assign(group,comicGroupCounts(group));delete group.units;
   }return [...output.values()];
 }

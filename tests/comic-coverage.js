@@ -8,7 +8,40 @@ import {createBackup,parseBackup,parseBackupPreferences} from '../src/lib/storag
 import {comicSeriesLabel,coverageSegments,comicGridPage} from '../src/ui/comic-coverage-presentation.js';
 import {proposeContents,proposeContentsForReview} from '../src/lib/contents.js';
 import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '../src/lib/comic-series-merges.js';
+import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 export const comicCoverageTests=[
+ ['named and contextual annual publication dates resolve only supported parent runs',()=>{
+   const first='Collects Spectacular Spider-Man (1976) #32-42, Annual (1979) #1; Amazing Spider-Man Annual (1964) #13; Fantastic Four (1961) #218';
+   const second='Collects Amazing Spider-Man (1963) #381-393, Amazing Spider-Man Annual (1964) #28, Spider-Man (1990) #45, Spectacular Spider-Man (1976) #211, Web of Spider-Man (1985) #112, Amazing Spider-Man Ashcan Edition (1994) #1';
+   const db=coverageDatabase(coverageBook('masterworks',first),coverageBook('lifetheft',second)),before=JSON.stringify(db),result=comicCoverageForLibrary(db);
+   const asm=result.groups.find(group=>group.series==='Amazing Spider-Man'&&group.unitType==='annual'),spectacular=result.groups.find(group=>group.series==='Spectacular Spider-Man'&&group.unitType==='annual');
+   assert.equal(asm.run,'1963');assert.deepEqual(asm.issues.map(issue=>issue.number),['13','28']);assert.equal(spectacular.run,'1976');assert.equal(spectacular.issues[0].number,'1');assert(!result.groups.some(group=>group.series==='Amazing Spider-Man'&&group.run==='1964'));assert.equal(JSON.stringify(db),before);
+   const solo=coverageDatabase(coverageBook('unresolved','Collects Amazing Spider-Man Annual (1964) #13'));assert.equal(comicCoverageForLibrary(solo).groups.length,0);assert.equal(comicCoverageForLibrary(solo).provisional,1);
+   const context={annualParentRuns:[{series:'Alpha',run:'1963'},{series:'Alpha',run:'1999'},{series:'Other',run:'1962'}]};
+   assert.equal(proposeContentsForReview('Collects Alpha Annual (1964) #1','',context).entries[0].run,'1963');
+   context.annualParentRuns.push({series:'Alpha',run:'1960'});assert.equal(proposeContentsForReview('Collects Alpha Annual (1964) #1','',context).entries[0].run,'');
+   assert.equal(proposeContentsForReview('Collects Alpha (1963-1963) #1, Alpha Annual (1964) #1').entries.at(-1).run,'');
+   assert.deepEqual(proposeContentsForReview('Collects Alpha (1963) #1; Alpha (1999) #1; Alpha Annual (1964) #1, Alpha Annual (2000) #1').entries.filter(entry=>entry.unitType==='annual').map(entry=>entry.run),['1963','']);
+   assert.deepEqual(proposeContentsForReview('Collects Alpha (1963) #1, Alpha Annual (1964) #13, 14').entries.filter(entry=>entry.unitType==='annual').map(entry=>[entry.number,entry.run]),[['13','1963'],['14','1963']]);
+   db.contentReviews[db.providerItems[Object.keys(db.providerItems)[0]].id]=confirmed([issue('13',{series:'Amazing Spider-Man',run:'1964',unitType:'annual'})]);assert(comicCoverageForLibrary(db).groups.some(group=>group.run==='1964'&&group.unitType==='annual'),'Reviewed run must remain authoritative');
+ }],
+ ['partial evidence is visible, source-backed and never full ownership or extra copies',()=>{
+   const partial=coverageBook('partial','Collects Alpha (2001) #1 and selected material from Amazing Fantasy (1962) #15'),db=coverageDatabase(partial),before=JSON.stringify(db);
+   let group=comicCoverageForLibrary(db).groups.find(group=>group.series==='Amazing Fantasy'),summary=comicCoverageSummary([group]),entry=group.issues[0];
+   assert(entry.partial&&entry.copies===0&&group.duplicates===0);assert.equal(group.covered,0);assert.equal(group.partial,1);assert(entry.sources[0].statement.includes('selected material from'));assert.equal(comicRange(group).missing,15);assert.equal(comicRange(group).uncovered,14);assert.equal(summary.covered,0);assert.equal(summary.partial,1);assert.equal(summary.missing,14);assert.equal(summary.needsComplete,15);
+   assert.equal(coverageSegments(group).segments.at(-1).status,'partial');assert(comicGridPage(group).rows.at(-1).partial);assert(comicIssuePage(group,{filter:'missing'}).rows.at(-1).partial);assert.equal(comicIssuePage(group,{filter:'duplicates'}).total,0);
+   assert.equal(libraryContentCoverage(db,[issue('15',{series:'Amazing Fantasy',run:'1962'})],{includeExcerpts:true}).owned,0);assert.equal(JSON.stringify(db),before);
+   const full=coverageBook('full','Collects Amazing Fantasy (1962) #15');db.providerItems[full.id]=full;group=comicCoverageForLibrary(db).groups.find(group=>group.series==='Amazing Fantasy');entry=group.issues[0];assert(!entry.partial);assert.equal(entry.copies,1);assert.equal(entry.sources.length,2);assert.equal(group.partial,0);assert.equal(group.duplicates,0);assert.equal(comicRange(group).missing,14);
+   const full2=coverageBook('full2','Collects Amazing Fantasy (1962) #15');db.providerItems[full2.id]=full2;assert.equal(comicCoverageForLibrary(db).groups.find(group=>group.series==='Amazing Fantasy').issues[0].copies,2);
+   partial.ownership='subscription';delete db.providerItems[full.id];delete db.providerItems[full2.id];assert(!comicCoverageForLibrary(db).groups.some(group=>group.series==='Amazing Fantasy'));
+   assert.equal(proposeContentsForReview('Plot summary: A hero mentions Amazing Fantasy (1962) #15.').entries.length,0);
+   assert(!proposeContentsForReview('A hero mentions Amazing Fantasy (1962) #15.').entries.some(entry=>entry.completeness==='excerpt'));
+ }],
+ ['series merges retain partial support and count only complete acquisitions',()=>{
+   const a=coverageBook('a','Collects Alpha (2001) #1-2 and material from Alpha (2001) #3'),b=coverageBook('b','Collects Beta (2001) #3 and material from Beta (2001) #4'),db=coverageDatabase(a,b),original=comicCoverageForLibrary(db).groups;
+   const merged=comicCoverageForLibrary(db,addSeriesMerge({},original[0].id,original[1].id,'Combined')).groups[0];
+   assert.equal(merged.covered,3);assert.equal(merged.partial,1);assert.equal(merged.duplicates,0);assert.equal(merged.issues[2].copies,1);assert.equal(merged.issues[2].sources.length,2);assert.equal(merged.issues[3].copies,0);assert.equal(comicRange(merged).missing,1);
+ }],
  ['Super Special titles keep their distinct parent names, runs and regular issue type',()=>{
    const titles=['Amazing Spider-Man','Spider-Man','Venom','Spectacular Spider-Man','Web of Spider-Man'].map(parent=>parent+' Super Special');
    const statement='Collects '+titles.map(title=>title+' (1995) #1').join(', ')+'.';

@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 7;
+export const CONTENTS_PARSER_VERSION = 8;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -85,7 +85,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
     input=anchor.series+' '+body;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
   const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),context);
-  if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return finish(proposal.entries,proposal.unparsed);
+  if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return {...finish(proposal.entries,proposal.unparsed),...(proposal.annualRunHints?.length?{annualRunHints:proposal.annualRunHints}:{})};
   // This fallback is discovery/editor-only; ordinary matching still uses
   // proposeContents above. Unsupported numeric syntax never becomes a name.
   const names=containedNames(body);
@@ -113,7 +113,7 @@ function reviewRangeEnd(first,last) {
 
 /** Bounded discovery grammar. Arbitrary prose must not become a series label. */
 function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,context={}) {
-  const entries=[],unparsed=[],chunks=[];
+  const entries=[],unparsed=[],chunks=[],annualRunHints=[],annualBindings=[];
   // Parallel digital numbering is not a print-issue conversion. Retain a
   // finite, explicitly labelled aside separately so the print clause survives.
   body=body.replace(/\(\s*digital\s+(?:chapters?\s*)?#?\s*\d+(?:\s*[-–—]\s*#?\d+)?(?:\s*,\s*#?\d+(?:\s*[-–—]\s*#?\d+)?)*\s*\)/giu,raw=>{unparsed.push(raw);return '';});
@@ -179,7 +179,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     const novel=/^(?:an?\s+)?excerpts? from [^#;,]{1,100}\bnovel,\s*([^#;,]{1,80})$/iu.exec(raw.replace(/[.!]+$/u,''));
     const named=novel?.[1] ?? (/^["“]([^"”]{1,80})["”]$/u.exec(chunk)?.[1]);
     if(named && collectionTitle){entries.push(...validateContents([{series:collectionTitle,unitType:'component',number:named,run:'',language:'',completeness:novel?'excerpt':clauseExtent}]));previous=null;continue;}
-    let label='',numbers='',type='issue',after='';
+    let label='',numbers='',type='issue',after='',annualYear='';
     const post=/^issues?\s*#?\s*(\d+(?:\s*[-–—]\s*\d+)?)\s+of\s+(.+)$/iu.exec(chunk);
     const runIssue=/^(.+?)\s+\(?vol(?:ume)?\.?\s*(\d+)\)?\s+(?:issues?\s*)?#\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
     const numbered=/^(.*?)\s*(#|\bissues?\b\s*#?|\bvol(?:ume)?s?\b\.?\s*#?|\bbooks?\b\s*#?)\s*(\d+(?:\/\d+|\.\d+)?(?:\s*[-–—]\s*#?\d+)?)\s*(.*)$/iu.exec(chunk);
@@ -192,7 +192,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       if(boundary){after=label.slice(boundary.index);label=label.slice(0,boundary.index);}
     }
     else if(numbered){label=numbered[1].replace(/^issues?\s+/iu,'');numbers=numbered[3];after=numbered[4];type=/^(?:vol|book)/iu.test(numbered[2])?'volume':'issue';}
-    else if(continuation && previous){numbers=continuation[1];type=previous.unitType;after=continuation[2]??'';}
+    else if(continuation && previous){numbers=continuation[1];type=previous.unitType;after=continuation[2]??'';annualYear=previous.annualYear??'';}
     else if(bare && !/\b(?:first|all|five|six|years?|chapter|parts?|script|story|stories|novels?|books?)\b/iu.test(bare[1]) && !/^(?:19|20)\d{2}$/u.test(bare[2])){label=bare[1];numbers=bare[2];}
     else {unparsed.push(raw);previous=null;continue;}
     label=label.replace(/,\s*$/u,'');
@@ -206,7 +206,9 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';
       // A bare Annual (year) is contextual. Its date is the annual's
       // publication year, not a replacement for the preceding series run.
-      if(!label&&previous&&['issue','annual'].includes(previous.unitType))explicitRun=previous.run;
+      if(!label&&previous&&['issue','annual'].includes(previous.unitType)){explicitRun=previous.run;annualYear=previous.annualYear??'';}
+      else if(label&&/^\d{4}$/u.test(explicitRun)){annualYear=explicitRun;explicitRun='';}
+      else if(!explicitRun&&previous&&identityKey(label)===identityKey(previous.series))explicitRun=previous.run;
     }
     if(/\bspecials?$/iu.test(label)&&!literalName&&!/\bsuper\s+special$/iu.test(label)){type='special';label=label.replace(/\s*specials?$/iu,'').trim();}
     const commaParts=label.split(/,\s*/u);
@@ -225,16 +227,31 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     if(after){unparsed.push(after.trim());}
     const descriptor=label?reviewSeriesDescriptor(label,explicitRun):{...previous,run:explicitRun||previous.run};
     const completeness=clauseExtent;
-    const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness};
+    const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness,...(annualYear?{annualYear}:{})};
     const match=/^(\d+(?:\/\d+|\.\d+)?)(?:\s*[-–—]\s*#?(\d+))?$/u.exec(numbers);
     const end=match?reviewRangeEnd(match[1],match[2]):NaN;
     if(!match || Number.isNaN(end)) {unparsed.push(raw);previous=null;continue;}
     const values=end!==null?Array.from({length:end-Number(match[1])+1},(_,n)=>String(Number(match[1])+n)):[match[1]];
-    try{const validated=validateContents(values.map(number=>({...base,number})));entries.push(...validated);previous=base;}
+    try{const validated=validateContents(values.map(number=>({...base,number})));entries.push(...validated);if(annualYear){annualRunHints.push({series:base.series,year:annualYear,numbers:values});annualBindings.push(validated);}previous=base;}
     catch{unparsed.push(raw);previous=null;}
     if(entries.length>2000)return {entries:[],unparsed:[body]};
   }
-  return {entries:entries.length?validateContents(entries):[],unparsed};
+  // A named annual's year dates that annual, not its parent run. Resolve only
+  // from one compatible explicit regular-series run. Never subtract a year
+  // or choose the nearest of competing runs. Hints remain transient evidence.
+  const regular=[...entries.filter(entry=>entry.unitType==='issue'),...(context.annualParentRuns??[])];
+  for(const [index,hint]of annualRunHints.entries()){
+    const candidates=new Set(regular.filter(entry=>identityKey(entry.series)===identityKey(hint.series)&&annualParentRunEligible(entry.run,hint.year)).map(entry=>entry.run));
+    if(candidates.size!==1)continue;
+    const run=[...candidates][0];hint.resolvedRun=run;
+    for(const entry of annualBindings[index])entry.run=run;
+  }
+  return {entries:entries.length?validateContents(entries):[],unparsed,annualRunHints};
+}
+
+export function annualParentRunEligible(run,year){
+  const match=/^(\d{4})(?:-(\d{4})?)?$/u.exec(run??'');
+  return Boolean(match&&Number(match[1])<=Number(year)&&(!match[2]||Number(match[2])>=Number(year)));
 }
 
 function numberedCollectionPayload(chunk,title,collectionClaim){
@@ -404,7 +421,8 @@ export function seriesCoverage(database,options={}) {
     const key=JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language),...(component?[parentItemId,parent.mediaType]:provisional?[parent.id]:[])]);
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;
-    group.entries.push({number:entry.number,confidence:supporting.some(value=>value.review)?'verified':supporting.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,sources:supporting.map(({item,confidence})=>({id:item.id,title:item.title,provider:item.provider,confidence}))});groups.set(key,group);
+    const complete=supporting.filter(value=>value.entry.completeness==='full'),primary=complete.length?complete:supporting;
+    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
     const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);

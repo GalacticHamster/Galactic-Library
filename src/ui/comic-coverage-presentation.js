@@ -16,7 +16,7 @@ export function coverageSegments(group,start=1) {
   for(const issue of group.issues){const n=numeric(issue.number);if(Number.isSafeInteger(n)&&n>=start&&n<=range.end)owned.set(n,issue);}
   const append=(first,last,status)=>{if(last<first)return;const previous=segments.at(-1);if(previous?.status===status&&previous.last+1===first)previous.last=last;else segments.push({first,last,status});};
   let cursor=start;
-  for(const [number,issue]of [...owned].sort((a,b)=>a[0]-b[0])){append(cursor,number-1,'missing');append(number,number,issue.copies>1?'duplicate':'owned');cursor=number+1;}
+  for(const [number,issue]of [...owned].sort((a,b)=>a[0]-b[0])){append(cursor,number-1,'missing');append(number,number,issue.partial?'partial':issue.copies>1?'duplicate':'owned');cursor=number+1;}
   append(cursor,range.end,'missing');return {range,segments};
 }
 export function comicGridPage(group,{start=1,page=0,size=100}={}) {
