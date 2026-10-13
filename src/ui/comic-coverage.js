@@ -1,4 +1,4 @@
-import {compatibleSeries,continuityProblem} from '../lib/comic-series-merges.js';
+import {compatibleSeries,continuityProblem,continuityAssessment} from '../lib/comic-series-merges.js';
 import {createConfirmation} from './confirmation.js';
 import {loadCoverageProjection} from './collection-overlap-projection.js';
 import {comicRange,comicIssuePage,comicCoverageSummary,comicGroupCounts,comicSequenceOffset,validateNumberingTransitions} from '../lib/comic-coverage.js';
@@ -226,9 +226,9 @@ export function createComicCoverageView(database,{starts={},transitions={},saveT
       continuityLabel.hidden=true;confirm.disabled=true;
       if(!target)return;
       if(!compatibleSeries(group.id,target.id,true)){notice.textContent='Issue type and language must match. Choose a compatible series; annuals, regular issues and different languages stay separate.';return;}
-      const problem=continuityProblem(group,target);if(problem){notice.textContent=problem;return;}
+      const assessment=continuityAssessment(group,target);if(assessment.problem){notice.textContent=assessment.problem;return;}
       if(!compatibleSeries(group.id,target.id)){
-        continuityLabel.hidden=false;notice.textContent='These have different publication-era labels. Confirm continuing numbering only if the series did not restart at #1. Original runs remain in supporting-book details.';
+        continuityLabel.hidden=false;notice.textContent=assessment.equivalent?'Saved collection information connects both labels to the same publication run. Shared issues are allowed; multiple copies still require separate purchases. Confirm that these labels use the same continuing numbering. Original runs remain in supporting-book details.':'These have different publication-era labels. Confirm continuing numbering only if the series did not restart at #1. Original runs remain in supporting-book details.';
       }else notice.textContent='These use the same run, issue type and language. Combine them only if the names refer to the same series.';
       confirm.disabled=!title.value.trim()||!compatibleSeries(group.id,target.id,continuity.checked);
     }

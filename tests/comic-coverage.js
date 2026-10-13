@@ -11,7 +11,9 @@ import {comicSeriesLabel,coverageSegments,comicGridPage} from '../src/ui/comic-c
 import {proposeContents,proposeContentsForReview} from '../src/lib/contents.js';
 import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '../src/lib/comic-series-merges.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
+import {equivalentRunMergeTests} from './equivalent-run-merges.js';
 export const comicCoverageTests=[
+ ...equivalentRunMergeTests,
  ...dcContentsRecoveryCases,
  ['six frozen natural descriptions and Detective era fixtures recover without changing original evidence',async()=>{
    checkDcFixture(JSON.parse(await readFile(new URL('./fixtures/kindle/dc-contents-recovery.json',import.meta.url),'utf8')));
