@@ -1,7 +1,7 @@
 import {compatibleSeries} from '../lib/comic-series-merges.js';
 import {createConfirmation} from './confirmation.js';
 import {loadCoverageProjection} from './collection-overlap-projection.js';
-import {comicRange,comicIssuePage,comicCoverageSummary,comicGroupCounts} from '../lib/comic-coverage.js';
+import {comicRange,comicIssuePage,comicCoverageSummary,comicGroupCounts,comicSequenceOffset,validateNumberingTransitions} from '../lib/comic-coverage.js';
 import {createPagination} from './pagination.js';
 import {accountLabel} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
@@ -9,8 +9,8 @@ import {comicSeriesLabel,coverageSegments,comicGridPage} from './comic-coverage-
 export {comicSeriesLabel} from './comic-coverage-presentation.js';
 const el=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const button=(label,run)=>{const node=el('button',label);node.type='button';node.addEventListener('click',run);return node;};
-export function createComicCoverageView(database,{starts={},merges={},saveMerge=async()=>{throw Error('Series merges cannot be saved here.');},undoMerge=async()=>{throw Error('Series merges cannot be saved here.');},saveStart=async()=>{throw Error('Starting numbers cannot be saved here.');},openRecord}={}){
-  starts={...starts};const root=el('div');root.className='comic-coverage';
+export function createComicCoverageView(database,{starts={},transitions={},saveTransitions=async()=>{throw Error("Numbering transitions cannot be saved here.");},merges={},saveMerge=async()=>{throw Error('Series merges cannot be saved here.');},undoMerge=async()=>{throw Error('Series merges cannot be saved here.');},saveStart=async()=>{throw Error('Starting numbers cannot be saved here.');},openRecord}={}){
+  starts={...starts};transitions={...transitions};const root=el('div');root.className='comic-coverage';
   const intro=el('p','See comic issues covered by your owned books and standalone purchases. Partial coverage means some material from an issue; it still needs complete coverage. Inferred contents are included automatically; verified contents were reviewed. Missing ranges run from the starting number through your highest represented issue, not the end of the published series.');
   const controls=el('div');controls.className='library-controls';
   const search=el('input');search.type='search';search.placeholder='Search comic series';search.setAttribute('aria-label','Search comic coverage');
@@ -24,13 +24,14 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
   overview.append(status,pager.sizeContainer,pager.top,list,pager.bottom);root.append(detail);
   let returnScroll=0,returnFocus;
   const label=group=>labels.get(group.id)??comicSeriesLabel(group,groups);
-  const totals=()=>comicCoverageSummary(groups,starts);
+  const totals=()=>comicCoverageSummary(groups,starts,transitions);
   const issueLabel=issue=>issue.missing?'Missing':issue.partial?'Partial coverage':issue.copies>1?'Owned '+issue.copies+' times':'Owned';
   const countLabel=group=>{const counts=comicGroupCounts(group);return counts.covered+' covered'+(counts.partial?' · '+counts.partial+' partial':'')+' · '+counts.duplicates+' owned multiple times';};
   function appendSource(list,source){
     const record=source.record,link=el('a',record.title+' — '+accountLabel(record,database));link.href=bookHref('library',record.recordRef);link.dataset.comicRecord=record.recordRef;
     if(openRecord)link.addEventListener('click',event=>{if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();openRecord(record.recordRef);});
     const li=el('li');li.append(link,el('span',source.completeness==='excerpt'?' — Partial coverage':' — Complete issue'));
+    if(source.seriesScope)li.append(el('span',' — '+source.seriesScope.series+(source.seriesScope.run?' ('+source.seriesScope.run+')':'')));
     if(source.statement){const evidence=el('details');evidence.append(el('summary','Source evidence'),el('blockquote',source.statement));li.append(evidence);}list.append(li);
   }
   function select(group){
@@ -38,7 +39,7 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
     detail.append(button('Back to series',()=>{selected=null;detail.hidden=true;overview.hidden=false;returnFocus?.focus({preventScroll:true});globalThis.scrollTo?.(0,returnScroll);}));
     const heading=el('h3',label(group));heading.tabIndex=-1;detail.append(heading);
     detail.append(button('Merge with another series',()=>mergePicker(group)));
-    if(group.members){detail.append(el('p','Combined series: '+group.originalTitles.join(' / ')),button('Undo series merge',async()=>{
+    if(group.members){detail.append(el('p','Combined series: '+(group.originalScopes??group.originalTitles.map(series=>({series}))).map(scope=>scope.series+(scope.run?' ('+scope.run+')':'')).join(' / ')),button('Undo series merge',async()=>{
       const confirmation=createConfirmation({title:'Undo series merge?',message:'Separate all original series in this group. Collection records and contents will stay unchanged.',confirmLabel:'Separate series'});
       if(!await confirmation.result)return;
       try{merges=await undoMerge(group.id);}catch(error){detail.append(el('p','Could not undo merge: '+error.message));return;}
@@ -48,6 +49,34 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
     const startLabel=el('label','Starting number '),start=el('input');start.type='number';start.min='0';start.max='999999';start.step='1';start.value=String(starts[group.id]??1);start.setAttribute('aria-label','Series starting number');startLabel.append(start);
     const settings=el('div');settings.className='actions';
     const save=button('Save starting number',()=>persist(Number(start.value))),reset=button('Reset to #1',()=>persist(null));settings.append(startLabel,save,reset);detail.append(rangeInfo);const startSettings=el('details');startSettings.append(el('summary','Starting issue number'),el('p','Missing issues are counted from this number to your highest covered issue.'),settings,notice);detail.append(startSettings);
+    const numbering=el('details'),transitionList=el('div'),transitionNotice=el('p'),from=el('input'),to=el('input');
+    transitionNotice.setAttribute('role','status');
+    for(const [input,name]of [[from,'Last issue before transition'],[to,'Next published issue']]){input.type='number';input.min='0';input.max='999999';input.step='1';input.setAttribute('aria-label',name);}
+    const fromLabel=el('label','From # '),toLabel=el('label','Next # ');fromLabel.append(from);toLabel.append(to);
+    const addTransition=button('Add transition',()=>{
+      if(!from.value.trim()||!to.value.trim()){transitionNotice.textContent='Enter both issue numbers.';return;}
+      persistTransitions([...(transitions[group.id]??[]),[Number(from.value),Number(to.value)]]);
+    });
+    numbering.append(el('summary','Numbering transitions'),el('p','For continuing numbering, #58 → #500 means #500 follows #58. The skipped numbers are excluded from gaps, the grid and the bar. This does not change your books or their issue numbers.'),transitionList,fromLabel,toLabel,addTransition,transitionNotice);detail.append(numbering);
+    function renderTransitions(){
+      transitionList.replaceChildren();
+      for(const pair of transitions[group.id]??[]){const row=el('div');row.className='actions';
+        row.append(el('span','#'+pair[0]+' → #'+pair[1]),button('Edit transition',()=>{from.value=String(pair[0]);to.value=String(pair[1]);editing=pair;addTransition.textContent='Save transition';from.focus();}),button('Remove transition',()=>persistTransitions((transitions[group.id]??[]).filter(value=>value!==pair))));transitionList.append(row);
+      }
+      const conflicts=comicRange(group,starts[group.id]??1,transitions[group.id]).conflicts;
+      if(conflicts.length)transitionList.append(el('p','A saved transition contains covered issues in its skipped range. It is inactive so those issues remain visible. Edit or remove it.'));
+    }
+    let editing;
+    async function persistTransitions(value){
+      try{
+        if(editing&&value.length>(transitions[group.id]??[]).length)value=value.filter(pair=>pair!==editing);
+        const checked=validateNumberingTransitions(value);
+        if(comicRange(group,starts[group.id]??1,checked).conflicts.length)throw Error('The skipped range contains covered issues. Choose a transition that preserves them.');
+        for(const control of numbering.querySelectorAll('button,input'))control.disabled=true;transitionNotice.textContent='Saving numbering transitions…';
+        transitions=await saveTransitions(group.id,checked);editing=undefined;from.value=to.value='';addTransition.textContent='Add transition';
+        issuePage=gridPage=0;renderTransitions();renderIssues();renderGrid();render();transitionNotice.textContent='Numbering transitions saved. Contents and ownership are unchanged.';
+      }catch(error){transitionNotice.textContent='Could not save transition: '+error.message;}finally{for(const control of numbering.querySelectorAll('button,input'))control.disabled=false;}
+    }
     const filterLabel=el('label','Show '),filter=el('select');filter.setAttribute('aria-label','Comic issue filter');
     for(const [value,label]of [['owned','Complete or partial coverage'],['duplicates','Multiple complete copies'],['partial','Partial coverage'],['missing','Needs complete coverage']])filter.append(Object.assign(el('option',label),{value}));filterLabel.append(filter);
     let mode='grid',gridPage=0;const display=el('div');display.className='coverage-view-controls';const gridButton=button('Grid',()=>switchMode('grid')),listButton=button('List',()=>switchMode('list'));display.append(gridButton,listButton,filterLabel);detail.append(display);
@@ -74,9 +103,11 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
       sourcePanel.append(sources);
     }
     function renderGrid(){
-      const result=comicGridPage(group,{start:starts[group.id]??1,page:gridPage});
+      const result=comicGridPage(group,{start:starts[group.id]??1,transitions:transitions[group.id],page:gridPage});
       gridPage=result.page;previous.disabled=gridPage===0;next.disabled=gridPage+1>=result.pages;
-      rangeLabel.textContent=result.rows.length?'#'+result.first+'\u2013'+result.last:'No whole-number range';
+      const visibleRanges=[];
+      for(const issue of result.rows){const n=Number(issue.number),prior=visibleRanges.at(-1);if(prior&&prior[1]+1===n)prior[1]=n;else visibleRanges.push([n,n]);}
+      rangeLabel.textContent=result.rows.length?visibleRanges.map(([a,b])=>'#'+a+(a===b?'':'\u2013'+b)).join(', '):'No whole-number range';
       grid.replaceChildren();extraGrid.replaceChildren();sourcePanel.hidden=true;
       function cells(rows,target){
         for(const issue of rows){
@@ -101,11 +132,11 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
         appendExtras();
       }
       bar.replaceChildren();
-      const projection=coverageSegments(group,starts[group.id]??1),extent=projection.range.end-projection.range.start+1;
+      const projection=coverageSegments(group,starts[group.id]??1,transitions[group.id]),extent=projection.range.extent;
       for(const segment of projection.segments){
         const description=group.series+' #'+segment.first+(segment.last===segment.first?'':'\u2013'+segment.last)+' — '+(segment.status==='duplicate'?'Multiple copies':segment.status==='owned'?'Owned':segment.status==='partial'?'Partial coverage':'Missing');
         const item=button('',()=>{
-          gridPage=Math.floor((segment.first-(starts[group.id]??1))/100);renderGrid();switchMode('grid');
+          gridPage=Math.floor(comicSequenceOffset(projection.range,segment.first)/100);renderGrid();switchMode('grid');
           for(const cell of grid.querySelectorAll('[data-comic-grid-issue]')){
             const number=Number(cell.dataset.comicGridIssue);if(number>=segment.first&&number<=segment.last)cell.classList.add('coverage-highlight');
           }
@@ -120,7 +151,7 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
       bar.setAttribute('aria-label','Coverage from #'+projection.range.start+' to #'+projection.range.end+': '+(extent-projection.range.missing)+' covered, '+projection.range.partial+' partial, '+projection.range.uncovered+' missing. Partial issues still need complete coverage. See numbered issue cells for supporting books.');
     }
     function renderIssues(){
-      const result=comicIssuePage(group,{start:starts[group.id]??1,filter:filter.value,page:issuePage,size:issueSize});issuePage=result.page;
+      const result=comicIssuePage(group,{start:starts[group.id]??1,transitions:transitions[group.id],filter:filter.value,page:issuePage,size:issueSize});issuePage=result.page;
       const range=result.range;rangeInfo.textContent=`${countLabel(group)} · ${range.uncovered} missing${range.end>=range.start?' within #'+range.start+'–'+range.end:'; no whole-number range at this start'}.${range.partial?' '+range.missing+' issues still need complete coverage, including partial issues.':''}${range.belowStart?' Covered issues below the starting number are still listed.':''}`;
       issuesPager.update({total:result.total,page:issuePage,size:issueSize});body.replaceChildren();
       for(const issue of result.rows){
@@ -139,16 +170,16 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
       catch(error){notice.textContent='Could not save starting number: '+error.message;}
       finally{save.disabled=reset.disabled=start.disabled=false;}
     }
-    filter.addEventListener('change',()=>{issuePage=0;renderIssues();});renderIssues();renderGrid();switchMode('grid');heading.focus({preventScroll:true});root.scrollIntoView?.({block:'start'});
+    filter.addEventListener('change',()=>{issuePage=0;renderIssues();});renderTransitions();renderIssues();renderGrid();switchMode('grid');heading.focus({preventScroll:true});root.scrollIntoView?.({block:'start'});
   }
   function render(){
     const query=search.value.trim().toLocaleLowerCase(),matches=groups.filter(group=>[label(group),...(group.originalTitles??[])].some(title=>title.toLocaleLowerCase().includes(query)));
-    matches.sort((a,b)=>(sort.value==='covered'?comicGroupCounts(b).covered-comicGroupCounts(a).covered:sort.value==='duplicates'?b.duplicates-a.duplicates:sort.value==='missing'?comicRange(b,starts[b.id]??1).missing-comicRange(a,starts[a.id]??1).missing:0)||label(a).localeCompare(label(b),undefined,{numeric:true}));
+    matches.sort((a,b)=>(sort.value==='covered'?comicGroupCounts(b).covered-comicGroupCounts(a).covered:sort.value==='duplicates'?b.duplicates-a.duplicates:sort.value==='missing'?comicRange(b,starts[b.id]??1,transitions[b.id]).missing-comicRange(a,starts[a.id]??1,transitions[a.id]).missing:0)||label(a).localeCompare(label(b),undefined,{numeric:true}));
     const state=pager.update({total:matches.length,page,size});page=state.page;list.replaceChildren();const counts=totals();
     status.textContent=`${counts.seriesGroups} series · ${counts.covered} covered issues${counts.partial?' · '+counts.partial+' partial':''} · ${counts.duplicates} owned multiple times · ${counts.missing} missing in assumed ranges${query?' · '+matches.length+' matching groups':''}.`;status.setAttribute('aria-busy','false');
     for(const group of matches.slice(page*size,(page+1)*size)){
       const row=el('article');row.className='tool-card';row.dataset.comicSeries=group.id;
-      row.append(el('h3',label(group)),el('p',`${countLabel(group)} · ${comicRange(group,starts[group.id]??1).uncovered} missing`),button('Inspect issues',()=>select(group)));list.append(row);
+      row.append(el('h3',label(group)),el('p',`${countLabel(group)} · ${comicRange(group,starts[group.id]??1,transitions[group.id]).uncovered} missing`),button('Inspect issues',()=>select(group)));list.append(row);
     }
     if(!matches.length)list.append(el('p',query?'No comic series match your search.':'No comparable comic coverage found. Owned books with explicit full contents or numbered standalone issues contribute automatically; manual review is optional.'));
     if(selected&&!matches.includes(selected)){selected=null;detail.hidden=true;overview.hidden=false;detail.replaceChildren();}
@@ -164,29 +195,30 @@ export function createComicCoverageView(database,{starts={},merges={},saveMerge=
   function mergePicker(group){
     const dialog=el('dialog');dialog.className='account-dialog';dialog.setAttribute('aria-label','Merge comic series');
     dialog.append(el('h3','Merge with another series'),el('p','Combine equivalent names for this run. Issue type and language must match. Original records stay unchanged; you can undo this merge.'));
+    const continuityLabel=el('label','Same continuing numbering across publication eras '),continuity=el('input');continuity.type='checkbox';continuity.setAttribute('aria-label','Same continuing numbering across publication eras');continuityLabel.prepend(continuity);dialog.append(continuityLabel,el('p','Select this only when the series kept its issue numbers across these eras. Matching numbers will share coverage; original publication identities stay with their supporting books. Do not use it for a series that restarted at #1.'));
     const search=el('input');search.type='search';search.placeholder='Search series';search.setAttribute('aria-label','Search merge target');
-    const results=el('div'),titleLabel=el('label','Display series name (run is kept) '),title=el('input');title.maxLength=300;title.setAttribute('aria-label','Merged series name');titleLabel.append(title);
+    const results=el('div'),titleLabel=el('label','Display series name '),title=el('input');title.maxLength=300;title.setAttribute('aria-label','Merged series name');titleLabel.append(title);
     const notice=el('p');notice.setAttribute('role','status');let target;
     const cancel=button('Cancel',()=>{dialog.close();dialog.remove();}),confirm=button('Combine series',async()=>{
       if(!target||!title.value.trim())return;
-      confirm.disabled=cancel.disabled=search.disabled=title.disabled=true;notice.textContent='Saving series merge...';
-      try{merges=await saveMerge(group.id,target.id,title.value.trim());}
-      catch(error){notice.textContent='Could not combine series: '+error.message;confirm.disabled=cancel.disabled=search.disabled=title.disabled=false;}
+      confirm.disabled=cancel.disabled=search.disabled=title.disabled=continuity.disabled=true;notice.textContent='Saving series merge...';
+      try{merges=await saveMerge(group.id,target.id,title.value.trim(),continuity.checked);}
+      catch(error){notice.textContent='Could not combine series: '+error.message;confirm.disabled=cancel.disabled=search.disabled=title.disabled=continuity.disabled=false;}
       if(!confirm.disabled)return;
       try{await reload(target.id);dialog.close();dialog.remove();}
       catch(error){notice.textContent='Series merge saved, but coverage could not reload: '+error.message+'. Close this dialog and reopen Options to load the saved merge.';cancel.disabled=false;cancel.textContent='Close';}
-    });confirm.disabled=true;dialog.append(search,results,titleLabel,el('p','The combined view recalculates issue coverage and copies using the supporting purchases. The target series keeps its starting number. This does not confirm new ownership.'),notice,cancel,confirm);
+    });confirm.disabled=true;dialog.append(search,results,titleLabel,el('p','The combined view recalculates issue coverage and copies using the supporting purchases. The target series keeps its starting number and numbering transitions. This does not confirm new ownership.'),notice,cancel,confirm);
     function renderTargets(){
       results.replaceChildren();const query=search.value.trim().toLocaleLowerCase();
-      const matches=groups.filter(candidate=>candidate.id!==group.id&&compatibleSeries(group.id,candidate.id)&&[label(candidate),...(candidate.originalTitles??[])].some(name=>name.toLocaleLowerCase().includes(query)));
+      const matches=groups.filter(candidate=>candidate.id!==group.id&&compatibleSeries(group.id,candidate.id,continuity.checked)&&[label(candidate),...(candidate.originalTitles??[])].some(name=>name.toLocaleLowerCase().includes(query)));
       for(const candidate of matches.slice(0,10)){
         const choice=button(label(candidate)+' — '+candidate.unitType+'s · '+candidate.language,()=>{target=candidate;title.value=candidate.series;confirm.disabled=false;renderTargets();});choice.setAttribute('aria-pressed',String(candidate===target));choice.dataset.mergeTarget=candidate.id;results.append(choice);
       }
-      if(!matches.length)results.append(el('p','No other series with the same run, issue type and language match.'));
+      if(!matches.length)results.append(el('p',continuity.checked?'No other series with the same issue type and language match.':'No other series with the same run, issue type and language match.'));
       else if(matches.length>10)results.append(el('p','Showing 10 matches. Type more to narrow the list.'));
     }
-    search.addEventListener('input',renderTargets);dialog.addEventListener('cancel',event=>{if(cancel.disabled)event.preventDefault();else dialog.remove();});renderTargets();document.body.append(dialog);dialog.showModal();search.focus();
+    continuity.addEventListener('change',()=>{target=undefined;confirm.disabled=true;title.value='';renderTargets();});search.addEventListener('input',renderTargets);dialog.addEventListener('cancel',event=>{if(cancel.disabled)event.preventDefault();else dialog.remove();});renderTargets();document.body.append(dialog);dialog.showModal();search.focus();
   }
-  root.ready=loadCoverageProjection(database,'comic-coverage',merges).then(result=>{groups=result.groups;for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();if(result.provisional||result.unresolved){const excluded=el('details');excluded.append(el('summary','Unresolved contents'),el('p',`${result.provisional} provisional entries and ${result.unresolved} unresolved fragments or unsupported entries are excluded from covered-issue and missing-range totals.`));overview.append(excluded);}return {...result,summary:totals()};}).catch(error=>{status.textContent='Could not calculate comic coverage: '+error.message;status.setAttribute('aria-busy','false');root.append(button('Try again',()=>root.replaceWith(createComicCoverageView(database,{starts,merges,saveMerge,undoMerge,saveStart,openRecord}))));});
+  root.ready=loadCoverageProjection(database,'comic-coverage',merges).then(result=>{groups=result.groups;for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();if(result.provisional||result.unresolved){const excluded=el('details');excluded.append(el('summary','Unresolved contents'),el('p',`${result.provisional} provisional entries and ${result.unresolved} unresolved fragments or unsupported entries are excluded from covered-issue and missing-range totals.`));overview.append(excluded);}return {...result,summary:totals()};}).catch(error=>{status.textContent='Could not calculate comic coverage: '+error.message;status.setAttribute('aria-busy','false');root.append(button('Try again',()=>root.replaceWith(createComicCoverageView(database,{starts,transitions,saveTransitions,merges,saveMerge,undoMerge,saveStart,openRecord}))));});
   return root;
 }

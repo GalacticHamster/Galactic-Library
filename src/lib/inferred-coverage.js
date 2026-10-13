@@ -48,7 +48,19 @@ function parentSeriesContext(entry,parent){
   };
   const descriptors=identity.series.map(parentDescriptor);
   const title=parentDescriptor(titleIdentity(parent.title,parent.mediaType).series);
-  if(title.series&&descriptors.length===1&&identityKey(descriptors[0].series)!==identityKey(title.series))return {strong:false,run:'',conflict:true};
+  // A nested, explicitly named source-title qualifier can describe a contained
+  // series rather than the collected book's main title. Match the literal name;
+  // never distribute its run to other series in a mixed collection.
+  const qualified=[];
+  for(const match of parent.title.matchAll(/\(([^()]+?)\s*\((\d{4}(?:[-–—]\d{0,4})?)\)\)/gu)){
+    if(identityKey(match[1])===series)qualified.push(match[2].replace(/[–—]/gu,'-'));
+  }
+  if(qualified.length){
+    const matching=descriptors.filter(value=>identityKey(value.series)===series),runs=new Set([...qualified,...matching.map(value=>value.run).filter(Boolean)]);
+    if(descriptors.length===1&&matching.length&&identity.run)runs.add(identity.run);
+    return {strong:runs.size===1,run:runs.size===1?[...runs][0]:'',conflict:runs.size>1};
+  }
+  if(title.series&&descriptors.length===1&&identityKey(descriptors[0].series)!==identityKey(title.series))return {strong:false,run:'',conflict:[identityKey(descriptors[0].series),identityKey(title.series)].includes(series)};
   const matching=descriptors.filter(value=>identityKey(value.series)===series);
   if(identityKey(title.series)===series)matching.push(title);
   const runs=new Set(matching.map(value=>value.run).filter(Boolean));
@@ -99,7 +111,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     if(item.mediaType!=='book'||!['owned','claimed'].includes(item.ownership)||excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id))continue;
     for(const entry of entries){
       const unresolvedAnnual=entry.unitType==='annual'&&!entry.run&&contents.annualRunHints?.some(hint=>!hint.resolvedRun&&identityKey(hint.series)===identityKey(entry.series)&&hint.numbers.includes(entry.number));
-      add(item,entry,contents.confidence,contents.review,Boolean(contents.review)||contents.parseBinding==='explicit-statement',contents.review?.statement||contents.manifestEvidence||contentsStatement(original),unresolvedAnnual);
+      add(item,entry,contents.confidence,contents.review,Boolean(contents.review)||['explicit-statement','explicit-clause'].includes(contents.parseBinding),contents.review?.statement||contents.manifestEvidence||contentsStatement(original),unresolvedAnnual);
       if((entry.completeness!=='full'&&!includeExcerpts)||!comicUnit(entry))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
     }
     for(const fragment of contents.unparsed??[])unresolved.push({item,fragment,reason:'unparsed source'});

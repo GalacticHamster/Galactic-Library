@@ -13,7 +13,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
     clearTimeout(saveTimer);
     // View navigation must not overwrite a newer page-size choice from another
     // page. Only the explicit selector saves the shared pageSize field.
-    const {pageSize,appearance,comicCoverageStarts,comicCoverageMerges,...snapshot} = structuredClone(preferences);
+    const {pageSize,appearance,comicCoverageStarts,comicCoverageTransitions,comicCoverageMerges,...snapshot} = structuredClone(preferences);
     saveTimer = setTimeout(() => save(snapshot).catch(() => { status.textContent = 'Could not remember this view. Your library is unchanged.'; }), 180);
   };
   function show() {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {comicRange,comicIssuePage,comicCoverageSummary,comicSeriesKey} from '../src/lib/comic-coverage.js';
+import {comicRange,comicIssuePage,comicCoverageSummary,comicSeriesKey,comicSequenceOffset,validateNumberingTransitions} from '../src/lib/comic-coverage.js';
 import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
 import {coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage-fixture.js';
 import {validateUiPreferences,mergeUiPreferences,defaultUiPreferences} from '../src/lib/ui-preferences.js';
@@ -10,6 +10,49 @@ import {proposeContents,proposeContentsForReview} from '../src/lib/contents.js';
 import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '../src/lib/comic-series-merges.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 export const comicCoverageTests=[
+ ['Golden Age explicit contained series qualifiers resolve all five Detective ranges without borrowing the parent identity',()=>{
+   const statements=["collects all of the Dark Knight Detective's first-ever adventures from DETECTIVE COMICS #27-45, BATMAN #1-3 and NEW YORK WORLD'S FAIR COMICS #2.","collects the Dark Knight Detective’s early adventures from BATMAN #4-7, DETECTIVE COMICS #46-56, WORLD’S BEST COMICS #1 and WORLD’S FINEST COMICS #2-3.",'Collects BATMAN #8-11, DETECTIVE COMICS #57-65 and WORLD’S FINEST COMICS #4-6.','collects the Dark Knight Detective’s adventures from BATMAN #12-15, DETECTIVE COMICS #66-74 and WORLD’S FINEST COMICS #7-9.','collects the early adventures of Batman, Robin and Alfred from Batman #16-20, Detective Comics #75-81 and World’s Finest Comics #10-11.'];
+   const books=statements.map((statement,i)=>coverageBook('golden-'+i,statement,{title:'Batman: The Golden Age Vol. '+(i+1)+' (Detective Comics (1937-2011))'}));
+   const db=coverageDatabase(...books,coverageBook('other-run','Collects Detective Comics (2011) #1')),before=JSON.stringify(db),groups=comicCoverageForLibrary(db).groups;
+   const detective=groups.find(g=>g.series.toLowerCase()==='detective comics'&&g.run==='1937-2011');
+   assert.equal(detective.covered,55);assert.deepEqual(detective.issues.map(i=>Number(i.number)),Array.from({length:55},(_,i)=>i+27));
+   assert(!groups.some(g=>g.run==='1937-2011'&&g.series.toLowerCase()!=='detective comics'));assert.equal(JSON.stringify(db),before);
+   const anthology=coverageBook('anthology','Collects Beta #0-2; Gamma (2010) #3',{title:'Alpha Collection Vol. 1 (Beta (2001))'}),result=comicCoverageForLibrary(coverageDatabase(anthology)).groups;
+   assert.equal(result.find(g=>g.series==='Beta').run,'2001');assert.equal(result.find(g=>g.series==='Gamma').run,'2010');
+   const ambiguous=coverageBook('ambiguous','Collects Beta #1',{title:'Alpha Collection (Beta (2001)) (Beta (2010))'});assert.equal(comicCoverageForLibrary(coverageDatabase(ambiguous)).groups.length,0);
+   const conflicting=coverageBook('conflicting','Collects Beta #1',{title:'Alpha Collection (Beta (2001))'});conflicting.metadata.series=['Beta (2010)'];assert.equal(comicCoverageForLibrary(coverageDatabase(conflicting)).groups.length,0,'Conflicting metadata must not be overridden by a title qualifier');
+   const named=coverageBook('named','Collects Beta #1-3; Gamma #0',{title:'Alpha Collection Vol. 1',metadata:{series:['Wrong Parent'],enrichment:{kindleProductComicContents:{statement:'Collects Beta #1-3; Gamma #0',parseInput:'Collects Beta #1-3; Gamma #0',parserVersion:8}}}});
+   assert.deepEqual(comicCoverageForLibrary(coverageDatabase(named)).groups.map(g=>[g.series,g.run,g.covered]),[['Beta','',3],['Gamma','',1]]);
+   const unrelatedRuns=coverageDatabase(named,coverageBook('beta-2001','Collects Beta (2001) #1'),coverageBook('beta-2010','Collects Beta (2010) #1'));
+   assert(!comicCoverageForLibrary(unrelatedRuns).groups.some(g=>g.series==='Beta'&&!g.run),'Multiple known runs must keep unspecified evidence provisional');
+ }],
+ ['numbering transitions skip unpublished gaps without altering issues, partials, duplicate counts or sources',()=>{
+   const db=coverageDatabase(coverageBook('asm','Collects Amazing Spider-Man (1999) #46-58, #500-502')),group=comicCoverageForLibrary(db).groups[0],before=JSON.stringify(db),transitions=[[58,500]];
+   assert.equal(comicRange(group).missing,486);const range=comicRange(group,1,transitions);assert.equal(range.missing,45);assert.equal(range.extent,61);assert.deepEqual(range.sequence,[[1,58],[500,502]]);
+   const grid=comicGridPage(group,{transitions});assert.equal(grid.rows.length,61);assert.deepEqual(grid.rows.slice(-3).map(i=>i.number),['500','501','502']);assert.equal(comicSequenceOffset(range,500),58);assert.equal(comicSequenceOffset(range,100),-1);
+   const bar=coverageSegments(group,1,transitions);assert.equal(bar.segments.reduce((n,s)=>n+s.last-s.first+1,0),61);assert(!bar.segments.some(s=>s.first>58&&s.first<500));assert.equal(comicIssuePage(group,{transitions,filter:'missing'}).total,45);assert.equal(comicCoverageSummary([group],{}, {[group.id]:transitions}).missing,45);assert.equal(JSON.stringify(db),before);
+   const changed={...group,issues:[...group.issues,{number:'100',partial:true,copies:0,sources:[]}]};assert.equal(comicRange(changed,1,transitions).conflicts.length,1);assert(comicGridPage(changed,{transitions}).pages>1);assert.equal(comicRange(changed,1,transitions).partial,1);
+   assert.equal(comicRange(group,46,transitions).missing,0);assert.equal(comicRange(group,100,transitions).missing,0);
+   assert.deepEqual(validateNumberingTransitions([[58,500],[545,698]]),[[58,500],[545,698]]);for(const value of [[[500,58]],[[58,59]],[[58,500],[400,600]],[[1.5,4]]])assert.throws(()=>validateNumberingTransitions(value));
+ }],
+ ['continuing numbering across eras requires explicit consent and retains source publication scopes',()=>{
+   const db=coverageDatabase(coverageBook('early','Collects Detective Comics (1937) #27-29'),coverageBook('late','Collects Detective Comics (2016) #29-31')),before=JSON.stringify(db),groups=comicCoverageForLibrary(db).groups,[a,b]=groups;
+   assert.throws(()=>addSeriesMerge({},a.id,b.id,'Detective Comics'));
+   const prefs=addSeriesMerge({},a.id,b.id,'Detective Comics',true),group=comicCoverageForLibrary(db,prefs).groups[0];assert.equal(group.covered,5);assert.equal(group.duplicates,1);assert.equal(group.run,'');assert(group.continuity);assert.deepEqual(group.originalScopes.map(s=>s.run),['1937','2016']);assert.deepEqual(group.issues.find(i=>i.number==='29').sources.map(s=>s.seriesScope.run),['1937','2016']);assert.equal(comicRange(group,27).missing,0);assert.equal(JSON.stringify(db),before);
+   assert.equal(comicCoverageForLibrary(db,{}).groups.length,2);assert.throws(()=>addSeriesMerge({},a.id,JSON.stringify(['detective comics','2016','annual','en']),'Detective',true));assert.throws(()=>addSeriesMerge({},a.id,JSON.stringify(['detective comics','2016','issue','fr']),'Detective',true));
+   const single=coverageDatabase(coverageBook('same-book','Collects Detective Comics (1937) #29; Detective Comics (2016) #29')),singleGroups=comicCoverageForLibrary(single).groups,singleMerge=addSeriesMerge({},singleGroups[0].id,singleGroups[1].id,'Detective Comics',true),singleResult=comicCoverageForLibrary(single,singleMerge).groups[0];assert.equal(singleResult.duplicates,0);assert.equal(singleResult.issues[0].copies,1);assert.deepEqual(singleResult.issues[0].sources.map(s=>s.seriesScope.run),['1937','2016']);
+ }],
+ ['numbering preferences survive independent saves and atomic backup round trips',async()=>{
+   const db=coverageDatabase(coverageBook('a')),data={},area={get:async defaults=>({...defaults,...data}),set:async patch=>Object.assign(data,structuredClone(patch))},writer=createStorageWriter(area);await writer.restoreDatabase(db);
+   const key=comicSeriesKey({series:'Alpha',run:'2001',unitType:'issue',language:'en'}),other=comicSeriesKey({series:'Alpha',run:'2010',unitType:'issue',language:'en'});
+   await writer.saveUiPreferences({comicCoverageTransitions:{[key]:[[58,500]]}});await writer.saveUiPreferences({comicCoverageTransitions:{[other]:[[3,100]]}});await writer.saveUiPreferences({workspace:'library'});
+   const merge=await writer.saveComicCoverageMerge(key,other,'Alpha',true),backup=createBackup(await writer.getDatabase(),merge),before=JSON.stringify(backup.database);
+   await writer.saveUiPreferences({comicCoverageTransitions:{[key]:[]}});await writer.removeComicCoverageMerge(other);await writer.restoreDatabase(parseBackup(backup),parseBackupPreferences(backup));
+   const restored=await writer.getUiPreferences();assert.deepEqual(restored.comicCoverageTransitions[key],[[58,500]]);assert.deepEqual(restored.comicCoverageTransitions[other],[[3,100]]);assert(restored.comicCoverageMerges[other].continuity);assert.equal(JSON.stringify(await writer.getDatabase()),before);
+   await writer.restoreDatabase(parseBackup(createBackup(db)));assert.deepEqual((await writer.getUiPreferences()).comicCoverageTransitions[key],[[58,500]]);
+   assert.throws(()=>parseBackup({...backup,comicCoverageTransitions:{[key]:[[500,58]]}}));await assert.rejects(()=>writer.saveUiPreferences({comicCoverageTransitions:{bad:[[58,500]]}}));
+   await writer.restoreDatabase(parseBackup({...backup,comicCoverageTransitions:{}}),parseBackupPreferences({...backup,comicCoverageTransitions:{}}));assert.deepEqual((await writer.getUiPreferences()).comicCoverageTransitions,{});
+ }],
  ['named and contextual annual publication dates resolve only supported parent runs',()=>{
    const first='Collects Spectacular Spider-Man (1976) #32-42, Annual (1979) #1; Amazing Spider-Man Annual (1964) #13; Fantastic Four (1961) #218';
    const second='Collects Amazing Spider-Man (1963) #381-393, Amazing Spider-Man Annual (1964) #28, Spider-Man (1990) #45, Spectacular Spider-Man (1976) #211, Web of Spider-Man (1985) #112, Amazing Spider-Man Ashcan Edition (1994) #1';

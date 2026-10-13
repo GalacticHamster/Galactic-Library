@@ -10,20 +10,23 @@ export function comicSeriesLabel(group, groups = [group]) {
 }
 // Presentation only: keep the engine's range assumptions and special numbering.
 // Segments are compact intervals; never allocate one entry per missing number.
-export function coverageSegments(group,start=1) {
-  const range=comicRange(group,start),segments=[];
+export function coverageSegments(group,start=1,transitions=[]) {
+  const range=comicRange(group,start,transitions),segments=[];
   const owned=new Map();
   for(const issue of group.issues){const n=numeric(issue.number);if(Number.isSafeInteger(n)&&n>=start&&n<=range.end)owned.set(n,issue);}
   const append=(first,last,status)=>{if(last<first)return;const previous=segments.at(-1);if(previous?.status===status&&previous.last+1===first)previous.last=last;else segments.push({first,last,status});};
-  let cursor=start;
-  for(const [number,issue]of [...owned].sort((a,b)=>a[0]-b[0])){append(cursor,number-1,'missing');append(number,number,issue.partial?'partial':issue.copies>1?'duplicate':'owned');cursor=number+1;}
-  append(cursor,range.end,'missing');return {range,segments};
+  for(const [first,last]of range.sequence){let cursor=first;
+    for(const [number,issue]of [...owned].sort((a,b)=>a[0]-b[0])){if(number<first||number>last)continue;append(cursor,number-1,'missing');append(number,number,issue.partial?'partial':issue.copies>1?'duplicate':'owned');cursor=number+1;}
+    append(cursor,last,'missing');
+  }return {range,segments};
 }
-export function comicGridPage(group,{start=1,page=0,size=100}={}) {
-  const range=comicRange(group,start),total=Math.max(0,range.end-start+1),pages=Math.ceil(total/size);
+export function comicGridPage(group,{start=1,transitions=[],page=0,size=100}={}) {
+  const range=comicRange(group,start,transitions),total=range.extent,pages=Math.ceil(total/size);
   page=Math.max(0,Math.min(page,Math.max(0,pages-1)));
-  const first=start+page*size,last=Math.min(range.end,first+size-1),owned=new Map(group.issues.map(issue=>[numeric(issue.number),issue])),rows=[];
-  for(let n=first;n<=last;n++)rows.push(owned.get(n)??{number:String(n),missing:true});
+  const owned=new Map(group.issues.map(issue=>[numeric(issue.number),issue])),rows=[];
+  let skip=page*size;
+  for(const [a,b]of range.sequence){const length=b-a+1;if(skip>=length){skip-=length;continue;}for(let n=a+skip;n<=b&&rows.length<size;n++)rows.push(owned.get(n)??{number:String(n),missing:true});skip=0;if(rows.length===size)break;}
+  const first=Number(rows[0]?.number??start),last=Number(rows.at(-1)?.number??(start-1));
   const extras=group.issues.filter(issue=>{const n=numeric(issue.number);return !Number.isSafeInteger(n)||n<start;});
   return {rows,extras,page,pages,first,last,range};
 }

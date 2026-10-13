@@ -393,7 +393,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function restoreDatabase(database,preferences){
     const restored=validateDatabase(database),extra={galacticPurchaseSync:{}};
     if(preferences!==undefined){
-      if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageMerges'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
+      if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
       extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),...preferences});
     }
     for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
@@ -1230,9 +1230,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const stored = await storageArea.get({ [UI_PREFERENCES_KEY]: defaultUiPreferences() });
     try { return validateUiPreferences(stored[UI_PREFERENCES_KEY]); } catch { return defaultUiPreferences(); }
   }
-  async function saveComicCoverageMerge(source,target,title){
+  async function saveComicCoverageMerge(source,target,title,continuity=false){
     const current=await getUiPreferences();
-    const next=validateUiPreferences({...current,comicCoverageMerges:addSeriesMerge(current.comicCoverageMerges,source,target,title)});
+    const next=validateUiPreferences({...current,comicCoverageMerges:addSeriesMerge(current.comicCoverageMerges,source,target,title,continuity)});
     await storageArea.set({[UI_PREFERENCES_KEY]:next});return next;
   }
   async function removeComicCoverageMerge(id){

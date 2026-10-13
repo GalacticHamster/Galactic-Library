@@ -22,23 +22,39 @@ export function comicCoverage(database,{copiesForSources=()=>1}={}){
   });
   return {groups:recognized,provisional:groups.filter(group=>group.provisional).reduce((sum,group)=>sum+group.entries.length,0),unresolved:unresolved.length};
 }
-export function comicRange(group,start=1){
+export function validateNumberingTransitions(value){
+  if(!Array.isArray(value)||value.length>100)throw Error('Use at most 100 numbering transitions.');
+  const output=value.map(pair=>{
+    if(!Array.isArray(pair)||pair.length!==2||pair.some(n=>!Number.isSafeInteger(n)||n<0||n>999999)||pair[1]<=pair[0]+1)throw Error('A transition must skip forward between whole issue numbers from 0 to 999999.');
+    return [...pair];
+  }).sort((a,b)=>a[0]-b[0]);
+  for(let i=1;i<output.length;i++)if(output[i][0]<output[i-1][1])throw Error('Numbering transitions cannot overlap.');
+  return output;
+}
+export function comicRange(group,start=1,transitions=[]){
   if(!Number.isSafeInteger(start)||start<0||start>999999)throw Error('Starting number must be a whole number from 0 to 999999.');
   const integers=group.issues.filter(issue=>!issue.partial).map(issue=>numberValue(issue.number)).filter(number=>Number.isSafeInteger(number)&&number>=0).sort((a,b)=>a-b);
   // Only whole numbers inside the requested range can be missing. Retain
   // fractional/decimal issues, without inventing absent fractional numbers.
   const end=Math.floor(group.issues.reduce((max,issue)=>Number.isFinite(numberValue(issue.number))?Math.max(max,numberValue(issue.number)):max,0)),covered=integers.filter(number=>number>=start&&number<=end),missingRanges=[];
-  let cursor=start;
-  for(const number of covered){if(number>cursor)missingRanges.push([cursor,number-1]);cursor=number+1;}
-  if(cursor<=end)missingRanges.push([cursor,end]);
+  // A stale transition must never hide newly acquired issues. Keep that entire
+  // transition inactive if any represented number lies in its skipped gap.
+  const defined=validateNumberingTransitions(transitions),conflicts=defined.filter(([from,to])=>group.issues.some(issue=>numberValue(issue.number)>from&&numberValue(issue.number)<to)),active=defined.filter(pair=>!conflicts.includes(pair));
+  const sequence=[];let cursor=start;
+  for(const [from,to]of active){if(from>=end||to<=start)continue;if(cursor<=from)sequence.push([cursor,Math.min(from,end)]);cursor=Math.max(cursor,to);}
+  if(cursor<=end)sequence.push([cursor,end]);
+  for(const [first,last]of sequence){cursor=first;for(const number of covered){if(number<first||number>last)continue;if(number>cursor)missingRanges.push([cursor,number-1]);cursor=number+1;}if(cursor<=last)missingRanges.push([cursor,last]);}
   const missing=missingRanges.reduce((sum,[a,b])=>sum+b-a+1,0),partial=group.issues.filter(issue=>issue.partial&&Number.isSafeInteger(numberValue(issue.number))&&numberValue(issue.number)>=start&&numberValue(issue.number)<=end).length;
-  return {start,end,missingRanges,missing,partial,uncovered:missing-partial,belowStart:integers.filter(number=>number<start).length};
+  return {start,end,sequence,extent:sequence.reduce((sum,[a,b])=>sum+b-a+1,0),conflicts,missingRanges,missing,partial,uncovered:missing-partial,belowStart:integers.filter(number=>number<start).length};
 }
-export function comicCoverageSummary(groups,starts={}){
-  return {seriesNames:new Set(groups.map(group=>identityKey(group.series))).size,seriesGroups:groups.length,covered:groups.reduce((sum,group)=>sum+comicGroupCounts(group).covered,0),partial:groups.reduce((sum,group)=>sum+comicGroupCounts(group).partial,0),duplicates:groups.reduce((sum,group)=>sum+group.duplicates,0),missing:groups.reduce((sum,group)=>sum+comicRange(group,starts[group.id]??1).uncovered,0),needsComplete:groups.reduce((sum,group)=>sum+comicRange(group,starts[group.id]??1).missing,0)};
+export function comicSequenceOffset(range,number){
+  let offset=0;for(const [a,b]of range.sequence){if(number>=a&&number<=b)return offset+number-a;offset+=b-a+1;}return -1;
 }
-export function comicIssuePage(group,{start=1,filter='owned',page=0,size=50}={}){
-  const range=comicRange(group,start);
+export function comicCoverageSummary(groups,starts={},transitions={}){
+  return {seriesNames:new Set(groups.map(group=>identityKey(group.series))).size,seriesGroups:groups.length,covered:groups.reduce((sum,group)=>sum+comicGroupCounts(group).covered,0),partial:groups.reduce((sum,group)=>sum+comicGroupCounts(group).partial,0),duplicates:groups.reduce((sum,group)=>sum+group.duplicates,0),missing:groups.reduce((sum,group)=>sum+comicRange(group,starts[group.id]??1,transitions[group.id]).uncovered,0),needsComplete:groups.reduce((sum,group)=>sum+comicRange(group,starts[group.id]??1,transitions[group.id]).missing,0)};
+}
+export function comicIssuePage(group,{start=1,transitions=[],filter='owned',page=0,size=50}={}){
+  const range=comicRange(group,start,transitions);
   const available=filter==='duplicates'?group.issues.filter(issue=>!issue.partial&&issue.copies>1):filter==='partial'?group.issues.filter(issue=>issue.partial):group.issues;
   const total=filter==='missing'?range.missing:available.length;
   page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(total/size)-1)));
