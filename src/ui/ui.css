@@ -239,10 +239,15 @@ button.danger { background:var(--gh-danger-fill); }
 .comic-coverage-bar { display:flex; height:18px; overflow:hidden; border-radius:6px; margin:12px 0; background:var(--gh-surface-raised); }
 .coverage-owned { background:#146c50; color:#fff; }
 .coverage-duplicate { background:#6048a2; color:#fff; }
-.coverage-missing { background:var(--gh-surface-raised); color:var(--gh-text); }
+.coverage-missing { background:#6b7280; color:#fff; }
 .comic-coverage-bar .coverage-missing { background:repeating-linear-gradient(135deg,var(--gh-surface-raised),var(--gh-surface-raised) 4px,var(--gh-border) 4px,var(--gh-border) 6px); }
 .coverage-legend { display:flex; flex-wrap:wrap; gap:8px; font-size:.85rem; }
-.coverage-legend span { padding:3px 8px; border-radius:4px; border:1px solid var(--gh-border); }
+.coverage-legend > span { display:inline-flex; align-items:center; gap:6px; }
+.coverage-legend i { display:inline-block; width:12px; height:12px; border:1px solid var(--gh-border); }
+.coverage-legend i.coverage-missing { background:#6b7280; }
+.comic-coverage-bar button { min-width:0; padding:0; border:0; border-radius:0; }
+.comic-coverage-bar button:hover { filter:brightness(1.2); }
+.comic-issue-cell.coverage-highlight { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:6px; margin:16px 0; }
 .comic-issue-grid > p { grid-column:1 / -1; }
 .comic-issue-cell { min-height:42px; padding:6px; border:1px solid var(--gh-border); border-radius:5px; font-variant-numeric:tabular-nums; }
@@ -251,7 +256,7 @@ button.danger { background:var(--gh-danger-fill); }
 .comic-issue-cell:hover { filter:brightness(1.15); }
 .comic-issue-cell.coverage-owned:hover { background:#146c50; }
 .comic-issue-cell.coverage-duplicate:hover { background:#6048a2; }
-.comic-issue-cell.coverage-missing:hover { background:var(--gh-surface-raised); }
+.comic-issue-cell.coverage-missing:hover { background:#6b7280; }
 .comic-issue-cell[aria-pressed=true] { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-cell:focus-visible { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-sources { border:1px solid var(--gh-border); border-radius:6px; padding:12px; margin:12px 0; }

@@ -23,7 +23,7 @@ import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
 import {bookToolHelp} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
-import { getCommittedLibraryView, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
+import { getCommittedLibraryView, getUiPreferences, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -42,7 +42,7 @@ import {cancelProviderScan} from '../lib/storage.js';
 import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
-import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision,savePreferredDisplayTitle, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
+import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, parseBackupPreferences, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision,savePreferredDisplayTitle, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
@@ -897,7 +897,7 @@ async function refreshView(context,diagnosticLookupId = null) {
 const libraryLoader=createLibraryLoader({panel:document.querySelector('#library-load-status'),message:document.querySelector('#library-load-status span'),retry:document.querySelector('#retry-library-load'),content:document.querySelector('#library-section'),load:refreshView});
 const refresh=(...args)=>libraryLoader.refresh(...args);
 
-const backupExporter=createBackupExporter({button:document.querySelector('#export'),status:backupStatus,read:getDatabase,canStart:()=>!backupRestore.saving&&!clearOperation.busy});
+const backupExporter=createBackupExporter({button:document.querySelector('#export'),status:backupStatus,read:async()=>({database:await getDatabase(),preferences:await getUiPreferences()}),prepare:value=>createBackup(value.database,value.preferences),canStart:()=>!backupRestore.saving&&!clearOperation.busy});
 const exportCurrentBackup=()=>backupExporter.run();
 document.querySelector('#export').addEventListener('click',()=>exportCurrentBackup().catch(()=>{}));
 
@@ -905,7 +905,7 @@ bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summar
 
 document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();if(!document.querySelector('#import').disabled)document.querySelector('#import').click();}});
 
-const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:parseBackup,read:getDatabase,restore:restoreDatabase,refresh:()=>libraryLoader.reload(),exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
+const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:value=>({database:parseBackup(value),preferences:parseBackupPreferences(value)}),read:getDatabase,restore:value=>restoreDatabase(value.database,value.preferences),refresh:()=>libraryLoader.reload(),exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
 
 const clearOperation=createOperation({id:'library-clear',name:'Clearing local library...',status:backupStatus,controls:[document.querySelector('#clear'),document.querySelector('#import'),document.querySelector('#export')]});
 document.querySelector('#clear').addEventListener('click', async () => {

@@ -25,7 +25,7 @@ export function bindBackupRestore({input,status,parse,read,restore,refresh,expor
         const before=JSON.stringify(await read());if(!current())return {cancelled:true};
         if(!canLeave())return {cancelled:true,message:'Restoration cancelled. Your library was not changed.'};
         context.update('Backup checked. Confirm whether to replace your current library.');
-        const decision=prompt({title:'Replace library from backup?',message:'Restoration replaces the library saved in this browser, including its saved accounts and reviews. It does not merge libraries. Changes made after this backup may be lost. Keep this page open until restoration finishes.',confirmLabel:'Replace library',extraLabel:'Export current backup',extraAction:exportCurrent});pending=decision;
+        const decision=prompt({title:'Replace library from backup?',message:'Restoration replaces the library saved in this browser, including its saved accounts, reviews and comic starting-number overrides when present in the backup. It does not merge libraries. Changes made after this backup may be lost. Keep this page open until restoration finishes.',confirmLabel:'Replace library',extraLabel:'Export current backup',extraAction:exportCurrent});pending=decision;
         const accepted=await decision.result;if(pending===decision)pending=null;
         if(!current())return {cancelled:true};
         if(!accepted)return {cancelled:true,message:'Restoration cancelled. Your library was not changed.'};

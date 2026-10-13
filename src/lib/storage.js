@@ -1,6 +1,7 @@
 import { BACKUP_FORMAT, BACKUP_VERSION } from './constants.js';
 import { validateDatabase } from './models.js';
 import { STORAGE_MESSAGE_TYPE, STORAGE_OPERATIONS } from './storage-protocol.js';
+import {validateComicCoverageStarts} from './ui-preferences.js';
 
 /** Each extension page sends operations to the one service-worker writer. */
 export function createStorageClient(sendMessage) {
@@ -35,13 +36,14 @@ export const {
   getUiPreferences, saveUiPreferences, getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;
 
-export function createBackup(database) {
+export function createBackup(database, preferences) {
   const validated = validateDatabase(database);
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    database: validated
+    database: validated,
+    ...(preferences ? {comicCoverageStarts:validateComicCoverageStarts(preferences.comicCoverageStarts??{})} : {})
   };
 }
 
@@ -49,5 +51,12 @@ export function parseBackup(value) {
   if (!value || typeof value !== 'object' || value.format !== BACKUP_FORMAT || value.version !== BACKUP_VERSION) {
     throw new Error('This is not a Galactic Library backup version 1.');
   }
+  parseBackupPreferences(value);
   return validateDatabase(value.database);
+}
+
+// Optional display preferences live outside the library schema. Older backups
+// omit this field and leave the browser's current starting numbers untouched.
+export function parseBackupPreferences(value) {
+  return Object.hasOwn(value,'comicCoverageStarts') ? {comicCoverageStarts:validateComicCoverageStarts(value.comicCoverageStarts)} : undefined;
 }

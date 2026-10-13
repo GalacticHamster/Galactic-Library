@@ -17,7 +17,7 @@ export function createCollectionOverlapView(database,{openRecord}={}){
   const list=el('div'),detail=el('section');list.className='overlap-pairs';detail.className='overlap-pair-details';detail.hidden=true;
   let pairs=[],page=0,size=50,selected=null;
   const pager=createPagination({name:'Collection overlap',onPage:value=>{page=value;render();},onSize:value=>{size=value;page=0;render();}});
-  root.append(status,pager.sizeContainer,pager.top,list,pager.bottom,detail);
+  root.append(status,pager.sizeContainer,pager.top,list,pager.bottom);
   const linkRecord=record=>{
     const link=el('a',record.title+' — '+accountLabel(record,database));link.href=bookHref('library',record.recordRef);link.dataset.overlapRecord=record.recordRef;
     if(openRecord)link.addEventListener('click',event=>{if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();openRecord(record.recordRef);});
@@ -36,7 +36,11 @@ export function createCollectionOverlapView(database,{openRecord}={}){
     }shown+=50;more.hidden=shown>=units.length;}
     if(!units.length)section.append(el('p','None in the comparable saved contents.'));section.append(more);show();return section;
   }
-  function select(pair){
+  function select(pair,row,toggle){
+    const scroll=globalThis.scrollY;
+    if(selected===pair&&!detail.hidden){selected=null;detail.hidden=true;toggle.textContent="Inspect overlap";toggle.setAttribute("aria-expanded","false");globalThis.scrollTo?.(0,scroll);return;}
+    for(const other of list.querySelectorAll("button[aria-expanded]")){other.textContent="Inspect overlap";other.setAttribute("aria-expanded","false");}
+    row.append(detail);toggle.textContent="Collapse overlap";toggle.setAttribute("aria-expanded","true");
     selected=pair;detail.hidden=false;detail.replaceChildren();
     const heading=el('h3',pair.left.title+' ↔ '+pair.right.title);heading.tabIndex=-1;
     detail.append(heading,el('p',pair.shared.length+' shared issues · '+(pair.verified===pair.shared.length?'Verified':pair.verified?'Mixed inferred and verified':'Inferred')));
@@ -49,7 +53,7 @@ export function createCollectionOverlapView(database,{openRecord}={}){
     detail.append(issueList('Listed only in '+pair.left.title,result.left.unique),issueList('Listed only in '+pair.right.title,result.right.unique));
     const uncertain=result.left.uncertain.length+result.right.uncertain.length+pair.left.provisional.size+pair.right.provisional.size;
     if(uncertain)detail.append(el('p',`${uncertain} entries have insufficient identity context for a shared-or-unique conclusion.`));
-    heading.focus();detail.scrollIntoView?.({block:'start'});
+    globalThis.scrollTo?.(0,scroll);
   }
   function render(){
     const query=search.value.trim().toLocaleLowerCase();
@@ -59,8 +63,8 @@ export function createCollectionOverlapView(database,{openRecord}={}){
     const state=pager.update({total:matches.length,page,size});page=state.page;list.replaceChildren();
     status.textContent=`${matches.length} overlapping collection pairs${query?' matching your search':''}.`;status.setAttribute('aria-busy','false');
     for(const pair of matches.slice(page*size,(page+1)*size)){
-      const row=el('article');row.className='tool-card';row.dataset.overlapPair=pair.id;
-      row.append(el('h3',pair.left.title+' ↔ '+pair.right.title),el('p',`${pair.shared.length} shared issues · ${pair.verified===pair.shared.length?'Verified':pair.verified?'Mixed inferred and verified':'Inferred'}`),button('Inspect overlap',()=>select(pair)));list.append(row);
+      const row=el('article'),toggle=button('Inspect overlap',()=>select(pair,row,toggle));toggle.setAttribute('aria-expanded',String(selected===pair&&!detail.hidden));if(selected===pair&&!detail.hidden)toggle.textContent='Collapse overlap';row.className='tool-card';row.dataset.overlapPair=pair.id;
+      row.append(el('h3',pair.left.title+' ↔ '+pair.right.title),el('p',`${pair.shared.length} shared issues · ${pair.verified===pair.shared.length?'Verified':pair.verified?'Mixed inferred and verified':'Inferred'}`),toggle);if(selected===pair&&!detail.hidden)row.append(detail);list.append(row);
     }
     if(!matches.length)list.append(el('p',query?'No overlapping collections match these titles.':'No comparable issue overlaps found. Owned collections with full, sufficiently identified contents contribute automatically; manual review is optional.'));
     if(selected&&!matches.includes(selected)){selected=null;detail.hidden=true;detail.replaceChildren();}

@@ -389,8 +389,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const failedRequestCount=diagnostics.failedRequestCount??0;
     return validateSyncHealth({attemptRef:prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
-  async function restoreDatabase(database){
-    const restored=validateDatabase(database);for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',{galacticPurchaseSync:{}});
+  async function restoreDatabase(database,preferences){
+    const restored=validateDatabase(database),extra={galacticPurchaseSync:{}};
+    if(preferences!==undefined){
+      if(!preferences||Object.keys(preferences).some(key=>key!=='comicCoverageStarts')||!Object.hasOwn(preferences,'comicCoverageStarts'))throw Error('Invalid backup display preferences.');
+      extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),comicCoverageStarts:preferences.comicCoverageStarts});
+    }
+    for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
     const database=await getDatabase();

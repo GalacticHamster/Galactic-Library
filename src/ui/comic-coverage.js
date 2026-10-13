@@ -35,7 +35,11 @@ export function createComicCoverageView(database,{starts={},saveStart=async()=>{
     for(const [value,label]of [['owned','Owned issues'],['duplicates','Owned multiple times'],['missing','Missing issues']])filter.append(Object.assign(el('option',label),{value}));filterLabel.append(filter);
     let mode='grid',gridPage=0;const display=el('div');display.className='coverage-view-controls';const gridButton=button('Grid',()=>switchMode('grid')),listButton=button('List',()=>switchMode('list'));display.append(gridButton,listButton,filterLabel);detail.append(display);
     const bar=el('div');bar.className='comic-coverage-bar';bar.setAttribute('aria-label','Issue coverage ranges');
-    const legend=el('p');legend.className='coverage-legend';for(const [state,text]of [['owned','Owned'],['duplicate','Owned multiple times'],['missing','Missing']]){const item=el('span',text);item.className='coverage-'+state;legend.append(item);}detail.insertBefore(bar,display);detail.insertBefore(legend,display);
+    const legend=el('p');legend.className='coverage-legend';legend.setAttribute('aria-label','Issue color legend');
+    for(const [state,text]of [['owned','Owned'],['duplicate','Multiple copies'],['missing','Missing']]){
+      const item=el('span'),square=el('i');square.className='coverage-'+state;square.setAttribute('aria-hidden','true');item.append(square,document.createTextNode(text));legend.append(item);
+    }
+    detail.insertBefore(bar,display);detail.insertBefore(legend,display);
     const gridView=el('section'),rangeNav=el('div'),grid=el('div'),extraGrid=el('div'),sourcePanel=el('section');grid.className=extraGrid.className='comic-issue-grid';rangeNav.className='actions';sourcePanel.className='comic-issue-sources';sourcePanel.hidden=true;sourcePanel.setAttribute('aria-live','polite');
     const previous=button('Previous range',()=>{gridPage--;renderGrid();}),next=button('Next range',()=>{gridPage++;renderGrid();}),rangeLabel=el('span');rangeNav.append(previous,rangeLabel,next);gridView.append(rangeNav,grid,extraGrid);detail.append(gridView,sourcePanel);
     const table=el('table'),thead=el('thead'),head=el('tr');for(const title of ['Issue','Coverage','Supporting books'])head.append(el('th',title));thead.append(head);const body=el('tbody');table.append(thead,body);let issuePage=0,issueSize=50;
@@ -89,13 +93,20 @@ export function createComicCoverageView(database,{starts={},saveStart=async()=>{
       bar.replaceChildren();
       const projection=coverageSegments(group,starts[group.id]??1),extent=projection.range.end-projection.range.start+1;
       for(const segment of projection.segments){
-        const item=el('span');item.className='coverage-'+segment.status;
+        const description=group.series+' #'+segment.first+(segment.last===segment.first?'':'\u2013'+segment.last)+' — '+(segment.status==='duplicate'?'Multiple copies':segment.status==='owned'?'Owned':'Missing');
+        const item=button('',()=>{
+          gridPage=Math.floor((segment.first-(starts[group.id]??1))/100);renderGrid();switchMode('grid');
+          for(const cell of grid.querySelectorAll('[data-comic-grid-issue]')){
+            const number=Number(cell.dataset.comicGridIssue);if(number>=segment.first&&number<=segment.last)cell.classList.add('coverage-highlight');
+          }
+          grid.querySelector('.coverage-highlight')?.focus({preventScroll:true});grid.scrollIntoView?.({block:'nearest'});
+        });item.className='coverage-'+segment.status;
         item.style.flexGrow=String(segment.last-segment.first+1);item.style.flexBasis='0';
         item.dataset.first=segment.first;item.dataset.last=segment.last;item.dataset.coverage=segment.status;
-        item.title='#'+segment.first+(segment.last===segment.first?'':'\u2013'+segment.last)+' \u00b7 '+(segment.status==='duplicate'?'Owned multiple times':segment.status==='owned'?'Owned':'Missing');
+        item.title=description;item.setAttribute('aria-label',description);
         bar.append(item);
       }
-      bar.hidden=extent<=0;bar.setAttribute('role','img');
+      bar.hidden=extent<=0;bar.setAttribute('role','group');
       bar.setAttribute('aria-label','Coverage from #'+projection.range.start+' to #'+projection.range.end+': '+(extent-projection.range.missing)+' covered, '+projection.range.missing+' missing. See numbered issue cells for supporting books.');
     }
     function renderIssues(){

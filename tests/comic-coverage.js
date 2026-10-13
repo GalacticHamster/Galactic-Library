@@ -4,7 +4,7 @@ import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
 import {coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage-fixture.js';
 import {validateUiPreferences,mergeUiPreferences,defaultUiPreferences} from '../src/lib/ui-preferences.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
-import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {createBackup,parseBackup,parseBackupPreferences} from '../src/lib/storage.js';
 import {comicSeriesLabel,coverageSegments,comicGridPage} from '../src/ui/comic-coverage-presentation.js';
 export const comicCoverageTests=[
  ['coverage presentation keeps ranges, duplicates, special numbers and disambiguating labels',()=>{
@@ -78,10 +78,18 @@ export const comicCoverageTests=[
    assert.equal(two.comicCoverageStarts[key],169);assert.equal(mergeUiPreferences(two,{comicCoverageStarts:{[key]:null}}).comicCoverageStarts[key],undefined);
    assert.throws(()=>validateUiPreferences({comicCoverageStarts:{[key]:1.5}}));assert.throws(()=>validateUiPreferences({comicCoverageStarts:{bad:169}}));
  }],
- ['starting-number preferences persist separately from database and backups',async()=>{
+ ['starting-number preferences round-trip atomically in backups without changing library records',async()=>{
    const memory={},writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...memory}),set:async updates=>Object.assign(memory,structuredClone(updates))});
    const key=JSON.stringify(['alpha','2001','issue','en']),db=coverageDatabase(coverageBook('a'));await writer.restoreDatabase(db);const before=JSON.stringify(await writer.getDatabase());
    await writer.saveUiPreferences({comicCoverageStarts:{[key]:169}});await writer.saveUiPreferences({workspace:'library'});assert.equal((await writer.getUiPreferences()).comicCoverageStarts[key],169);assert.equal(JSON.stringify(await writer.getDatabase()),before);
-   const backup=createBackup(await writer.getDatabase());assert(!JSON.stringify(backup).includes('comicCoverageStarts'));assert.deepEqual(parseBackup(JSON.parse(JSON.stringify(backup))).providerItems,(await writer.getDatabase()).providerItems);
+   const old=createBackup(await writer.getDatabase());assert(!JSON.stringify(old).includes('comicCoverageStarts'));
+   const backup=JSON.parse(JSON.stringify(createBackup(await writer.getDatabase(),await writer.getUiPreferences())));
+   await writer.saveUiPreferences({comicCoverageStarts:{[key]:null},appearance:'light'});
+   await writer.restoreDatabase(parseBackup(backup),parseBackupPreferences(backup));
+   assert.equal((await writer.getUiPreferences()).comicCoverageStarts[key],169);assert.equal((await writer.getUiPreferences()).appearance,'light');
+   assert.equal(JSON.stringify(await writer.getDatabase()),before);
+   await writer.restoreDatabase(parseBackup(old),parseBackupPreferences(old));assert.equal((await writer.getUiPreferences()).comicCoverageStarts[key],169);
+   const bad={...backup,comicCoverageStarts:{bad:169}};assert.throws(()=>parseBackup(bad));await assert.rejects(()=>writer.restoreDatabase(db,{comicCoverageStarts:bad.comicCoverageStarts}));assert.equal(JSON.stringify(await writer.getDatabase()),before);
+   const empty=createBackup(db,{comicCoverageStarts:{}});await writer.restoreDatabase(parseBackup(empty),parseBackupPreferences(empty));assert.deepEqual((await writer.getUiPreferences()).comicCoverageStarts,{});
  }]
 ];
