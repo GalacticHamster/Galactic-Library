@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import {validateContents} from '../src/lib/contents.js';
 import {contentsSummary,contentsPage} from '../src/ui/contents-overview.js';
 import {validateUiPreferences} from '../src/lib/ui-preferences.js';
-export const inferredCoverageTests=[...inferredCoverageCases,
+import {coverageRunContextTests} from './coverage-run-context.js';
+export const inferredCoverageTests=[...inferredCoverageCases,...coverageRunContextTests,
  ['rejection is explicit, searchable and persists as a contents filter without accepting invalid empty reviews',()=>{
    const a=coverageBook('status'),db=coverageDatabase(a);db.contentReviews[a.id]=confirmed([],'rejected');
    const row=contentsSummary(a,db);assert.equal(row.status,'rejected');assert.equal(row.needsReview,false);

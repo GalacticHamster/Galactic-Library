@@ -2,6 +2,7 @@ import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCov
 import {manifestReviewProposal} from './kindle-manifest.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
+import {inferCoverageRuns} from './coverage-run-context.js';
 
 // Local collection tools only. Companion matching retains its reviewed-only
 // index. Proposals are derived from current selected source, never history or
@@ -89,7 +90,7 @@ export function resolveCoverageEntry(entry,parent,allowSubjectAlias=true){
     language:coverageLanguage(entry.language||identityEvidence(parent).language)};
 }
 
-export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[],includeExcerpts=false}={}) {
+export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[],includeExcerpts=false,runInferenceExclusions=[]}={}) {
   const index=new Map(),unresolved=[];
   const rows=[],knownRuns=new Map();
   const scopeKey=entry=>JSON.stringify([identityKey(entry.series),identityKey(entry.language)]);
@@ -109,6 +110,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   for(const row of rows)if(row.contents.annualRunHints?.some(hint=>!hint.resolvedRun)){
     row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=row.contents.entries.map(entry=>resolveCoverageEntry(entry,row.original));
   }
+  inferCoverageRuns(rows,{resolveEntry:resolveCoverageEntry,hasConflict:(entry,parent)=>Boolean(parentSeriesContext(entry,parent).conflict),excludedScopes:runInferenceExclusions});
   const add=(item,entry,confidence,review,explicitSeries=false,statement='',unresolvedAnnual=false)=>{
     if(entry.completeness!=='full'&&!(includeExcerpts&&entry.completeness==='excerpt'))return;
     if(!['issue','annual','special'].includes(entry.unitType))return;

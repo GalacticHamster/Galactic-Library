@@ -434,7 +434,7 @@ export function seriesCoverage(database,options={}) {
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;
     const complete=supporting.filter(value=>value.entry.completeness==='full'),primary=complete.length?complete:supporting;
-    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
+    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(entry.runInference?{runInference:entry.runInference}:{}),...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
     const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);

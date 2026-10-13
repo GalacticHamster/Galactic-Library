@@ -11,8 +11,8 @@ export function comicIssueEvidence(issue,copiesForSources){
 export function comicGroupCounts(group){
   return {covered:group.issues.filter(issue=>!issue.partial).length,partial:group.issues.filter(issue=>issue.partial).length,duplicates:group.issues.filter(issue=>!issue.partial&&issue.copies>1).length};
 }
-export function comicCoverage(database,{copiesForSources=()=>1}={}){
-  const {groups,unresolved}=librarySeriesCoverage(database,{includeExcerpts:true});
+export function comicCoverage(database,{copiesForSources=()=>1,runInferenceExclusions=[]}={}){
+  const {groups,unresolved}=librarySeriesCoverage(database,{includeExcerpts:true,runInferenceExclusions});
   const recognized=groups.filter(group=>!group.provisional&&['issue','annual','special'].includes(group.unitType)).map(group=>{
     const issues=group.entries.map(entry=>{
       const sources=entry.sources.map(source=>({...source,record:database.providerItems[source.id]})).filter(source=>source.record);

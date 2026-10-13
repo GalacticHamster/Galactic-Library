@@ -1234,7 +1234,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function saveComicCoverageMerge(source,target,title,continuity=false){
     const current=await getUiPreferences();
     if(continuity||current.comicCoverageMerges[source]?.continuity||current.comicCoverageMerges[target]?.continuity){
-      const groups=mergeCoverageGroups(comicCoverage(await getDatabase()).groups,current.comicCoverageMerges,()=>1),left=groups.find(g=>g.id===source),right=groups.find(g=>g.id===target);
+      const groups=mergeCoverageGroups(comicCoverage(await getDatabase(),{runInferenceExclusions:Object.values(current.comicCoverageMerges).flatMap(merge=>merge.members)}).groups,current.comicCoverageMerges,()=>1),left=groups.find(g=>g.id===source),right=groups.find(g=>g.id===target);
       if(left&&right){const problem=continuityProblem(left,right);if(problem)throw Error(problem);}
     }
     const next=validateUiPreferences({...current,comicCoverageMerges:addSeriesMerge(current.comicCoverageMerges,source,target,title,continuity)});

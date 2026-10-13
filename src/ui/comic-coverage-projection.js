@@ -13,6 +13,8 @@ export function comicCoverageForLibrary(database,merges={}){
     const products=new Map();for(const record of records){const id=owners.get(record.id)??record.id,rows=products.get(id)??[];rows.push(record);products.set(id,rows);}
     const count=[...products.values()].reduce((sum,rows)=>sum+Math.max(1,acquisitionHistory(rows,database).ownedGroups),0);counts.set(key,count);return count;
   };
-  const result=comicCoverage(database,{copiesForSources});
+  // An existing user merge owns its member scopes. Do not silently move a
+  // previously runless member out of that relationship through new inference.
+  const result=comicCoverage(database,{copiesForSources,runInferenceExclusions:Object.values(merges).flatMap(merge=>merge.members??[])});
   return {...result,groups:mergeCoverageGroups(result.groups,merges,copiesForSources)};
 }

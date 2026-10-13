@@ -19,6 +19,7 @@
   "src/lib/contents-quality.js",
   "src/lib/contents.js",
   "src/lib/inferred-coverage.js",
+  "src/lib/coverage-run-context.js",
   "src/lib/collection-overlap.js",
   "src/lib/comic-coverage.js",
   "src/lib/comic-series-merges.js",

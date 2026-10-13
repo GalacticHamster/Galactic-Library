@@ -32,6 +32,7 @@ export function createComicCoverageView(database,{starts={},transitions={},saveT
     if(openRecord)link.addEventListener('click',event=>{if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();openRecord(record.recordRef);});
     const li=el('li');li.append(link,el('span',source.completeness==='excerpt'?' — Partial coverage':' — Complete issue'));
     if(source.seriesScope)li.append(el('span',' — '+source.seriesScope.series+(source.seriesScope.run?' ('+source.seriesScope.run+')':'')));
+    if(source.runInference){const note=el('span',' (Run inferred: '+source.runInference.run+'. '+source.runInference.reason+'. '),review=el('a','Review contents');review.href=bookHref('contents',record.recordRef);note.append(review,')');li.append(note);}
     if(source.statement){const evidence=el('details');evidence.append(el('summary','Source evidence'),el('blockquote',source.statement));li.append(evidence);}list.append(li);
   }
   function select(group){

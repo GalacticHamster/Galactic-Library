@@ -47,7 +47,7 @@ export const collectionOverlapTests=[
    const {pairs}=collectionOverlap(coverageDatabase(coverageBook('a',text),coverageBook('b',text)));assert.equal(pairs[0].shared.length,2);
  }],
  ['run-unspecified versus known-run evidence is not presented as definitely unique in pair details',()=>{
-   const a=coverageBook('a','Collects Alpha (2001) #1; Beta #2'),b=coverageBook('b','Collects Alpha (2001) #1; Beta (2000) #2');
+   const a=coverageBook('a','Collects Alpha (2001) #1; Beta #2',{title:'Collection (2015)'}),b=coverageBook('b','Collects Alpha (2001) #1; Beta (2000) #2');
    const detail=overlapPairDetails(collectionOverlap(coverageDatabase(a,b)).pairs[0]);assert.equal(detail.left.unique.length+detail.right.unique.length,0);assert.equal(detail.left.uncertain.length+detail.right.uncertain.length,2);
  }],
  ['on-demand cooperative overlap projection matches synchronous results',async()=>{

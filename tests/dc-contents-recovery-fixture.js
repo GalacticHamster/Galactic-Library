@@ -36,7 +36,7 @@ export function checkDcFixture(fixtures){
  const reviewed=coverageDatabase(books[2]);reviewed.contentReviews[books[2].id]=confirmed([issue('969',{series:'Batman - Detective Comics',run:'2016-'})]);assert(comicCoverageForLibrary(reviewed).groups[0].series==='Batman - Detective Comics','Captured metadata replaced a verified series name');
  const fifties=recoveryBook(fixtures.fifties,'fifties');db.providerItems[fifties.id]=fifties;
  const parsed=collectionContents(fifties,db).entries.filter(e=>/detective comics/iu.test(e.series));assert(JSON.stringify(parsed.map(e=>e.number))===JSON.stringify(fixtures.fifties.numbers),'Fifties extraction lost issues');
- const next=comicCoverageForLibrary(db);assert(next.unassigned.some(g=>g.series==='Detective Comics'&&g.numbers.length===14),'Unassigned Fifties evidence hidden');assert(!next.groups.some(g=>g.issues.some(i=>i.sources.some(source=>source.id===fifties.id))&&g.series==='Detective Comics'),'Batman run leaked to Detective');
+ const next=comicCoverageForLibrary(db);assert(next.unassigned.some(g=>g.series==='Detective Comics'&&g.numbers.length===14),'Unassigned Fifties evidence hidden');assert(!next.groups.some(g=>g.issues.some(i=>i.sources.some(source=>source.id===fifties.id))&&g.series==='Detective Comics'),'No original run evidence exists in this small fixture: Batman era must not invent one or select New 52');
  delete db.providerItems[fifties.id];assert(JSON.stringify(db)===before,'Projection changed source data');
 }
 export const dcContentsRecoveryCases=[
