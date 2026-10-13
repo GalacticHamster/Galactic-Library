@@ -159,6 +159,9 @@ summary { cursor:pointer; }
 .contents-editor { overflow:visible; }
 .contents-editor > button { max-width:100%; white-space:normal; }
 .contents-table-scroll { max-width:100%; overflow-x:auto; margin:8px 0; border:1px solid var(--gh-border); border-radius:4px; }
+.contents-quick-add { margin:12px 0; padding:12px; border:1px solid var(--gh-border); border-radius:6px; background:var(--gh-surface); }
+.contents-quick-add h3 { margin-top:0; }
+.contents-quick-preview { overflow-wrap:anywhere; }
 .contents-editor table { width:100%; min-width:920px; table-layout:fixed; margin:0; }
 .contents-editor th:nth-child(1) { width:24%; }
 .contents-editor th:nth-child(2) { width:15%; }

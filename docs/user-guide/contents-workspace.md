@@ -8,6 +8,12 @@ Results use the same rounded card treatment as Library. Each card shows its titl
 
 Choose **Inspect contents** to review the exact account record. **Back to Library results** or **Back to Contents results** returns to the actual origin with filters, sort, item/page and scroll. **Contents collection list** opens that list explicitly. Common preferences and contents status survive Options reloads; the current tab's browser history also retains a review's return context. Copied direct links default to Contents results when no origin exists.
 
+## Quickly enter contents
+
+Open **Inspect contents → Review included works → Quick add contents**. Enter a list such as `The Sandman #1-8`, choose **Preview**, then **Add entries**. Commas continue a series; semicolons or separate lines can introduce another series. Years, annuals, specials and `material from` are supported. The preview shows issue ranges, types and anything it could not interpret. Missing years are not guessed; correct the series version/year in the rows where needed.
+
+Adding appends editable rows without replacing existing corrections or duplicating identical entries. Full and partial entries remain distinct. Nothing changes coverage until **Save reviewed contents**. The entered text is retained with the human review; captured provider descriptions remain unchanged. The detailed **Add contents entry** control remains available for exceptions.
+
 ## What the statuses mean
 
 | Status | Meaning |

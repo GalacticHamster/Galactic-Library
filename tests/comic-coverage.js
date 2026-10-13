@@ -13,7 +13,9 @@ import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '..
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 import {equivalentRunMergeTests} from './equivalent-run-merges.js';
 import {annualCoverageTests} from './annual-coverage.js';
+import {quickContentsTests} from './quick-contents.js';
 export const comicCoverageTests=[
+ ...quickContentsTests,
  ...annualCoverageTests,
  ...equivalentRunMergeTests,
  ...dcContentsRecoveryCases,

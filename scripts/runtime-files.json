@@ -18,6 +18,7 @@
   "src/lib/contents-performance.js",
   "src/lib/contents-quality.js",
   "src/lib/contents.js",
+  "src/lib/quick-contents.js",
   "src/lib/inferred-coverage.js",
   "src/lib/coverage-run-context.js",
   "src/lib/coverage-annual-context.js",

@@ -5,6 +5,7 @@ import {formatDate} from './formatters.js';
 import { contentsStatement, validateContents } from '../lib/contents.js';
 import {manifestReviewProposal} from '../lib/kindle-manifest.js';
 import {independentContentsClaims} from '../lib/kindle-evidence-review.js';
+import {previewQuickContents,quickContentsToAppend,quickContentsNumbers} from '../lib/quick-contents.js';
 
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
 function sourcePage(value) {
@@ -58,6 +59,35 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
   if(review&&initialProposal?.descriptionMayBeIncomplete)root.append(element('p','The captured description may be incomplete. Your human review is retained; it is not proof that the description lists everything in the book.'));
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return presentAction(node);};
+  const draftEntries=()=>[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
+  let quickProposal=null;const quickStatements=[];
+  const quick=element('section','');quick.className='contents-quick-add';quick.setAttribute('aria-label','Quick add contents');
+  const quickInput=document.createElement('textarea');quickInput.rows=3;quickInput.maxLength=10000;quickInput.placeholder='The Sandman #1-8';quickInput.setAttribute('aria-label','Quick add contents');
+  const quickPreview=element('div','');quickPreview.className='contents-quick-preview';quickPreview.setAttribute('role','status');
+  const append=button('Add entries',()=>{
+    if(!quickProposal||quickProposal.text!==quickInput.value.trim())return;
+    try{
+      const entries=quickContentsToAppend(draftEntries(),quickProposal.entries);
+      entries.forEach(addRow);if(entries.length)quickStatements.push(quickProposal.text);
+      quickPreview.append(element('p',entries.length?`${entries.length} entries added to the draft. Existing rows are unchanged. Save reviewed contents to apply them.`:'All these entries are already in the draft. No rows added.'));
+      append.disabled=true;
+    }catch(error){quickPreview.append(element('p',error.message));}
+  });append.disabled=true;
+  quickInput.addEventListener('input',()=>{quickProposal=null;append.disabled=true;quickPreview.replaceChildren(element('p','Input changed. Preview again before adding entries.'));});
+  quick.append(element('h3','Quick add contents'),element('p','Enter series and issue ranges, then preview and add them to the draft. Nothing is saved until you choose Save reviewed contents.'),labeledControl('Contents to add',quickInput),button('Preview',()=>{
+    append.disabled=true;quickProposal=null;quickPreview.replaceChildren();
+    try{
+      const proposed=previewQuickContents(quickInput.value);quickProposal=proposed;
+      quickPreview.append(element('p',proposed.entries.length?`${proposed.entries.length} entries ready to add.`:'No entries recognized. Use a series name and issue numbers, for example The Sandman #1-8.'));
+      const list=element('ul','');
+      for(const group of proposed.groups)list.append(element('li',`${group.series}${group.run?' ('+group.run+')':''} — ${({issue:'Issues',annual:'Annuals',special:'Specials',volume:'Volumes',component:'Named works'})[group.unitType]} ${quickContentsNumbers(group.numbers)} · ${group.numbers.length} entries · ${group.completeness==='excerpt'?'Partial material':'Full coverage'}`));
+      quickPreview.append(list);
+      if(proposed.groups.some(group=>!group.run))quickPreview.append(element('p','Some series years are not specified. Set the correct series version/year in the rows if needed; GL has not chosen a publication run.'));
+      for(const hint of proposed.annualRunHints)if(!hint.resolvedRun)quickPreview.append(element('p',`${hint.series} Annual (${hint.year}): the annual year does not establish the parent series run. Check the series version/year after adding.`));
+      if(proposed.unparsed.length){quickPreview.append(element('p','Not added automatically — correct this text and preview again, or add it with the detailed row editor:'));const unresolved=element('ul','');for(const fragment of proposed.unparsed)unresolved.append(element('li',fragment));quickPreview.append(unresolved);}
+      append.disabled=!proposed.entries.length;
+    }catch(error){quickPreview.append(element('p',error.message));}
+  }),append,quickPreview);
   let saving=false;
   const persist=async operation=>{
     if(saving)return;saving=true;
@@ -78,7 +108,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
       if(claim.qualifiers.length)section.append(element('p',`Source qualifiers: ${claim.qualifiers.join('; ')}. Check the material and extent; these are not normal full-work ownership claims.`));
 
       section.append(button('Replace draft with this statement',()=>{
-        loadedClaim=claim;statement.value=claim.raw;source.value=sourcePage(evidence?.sourceUrl||record.metadata?.detailUrl);body.replaceChildren();
+        loadedClaim=claim;statement.value=claim.raw;source.value=sourcePage(evidence?.sourceUrl||record.metadata?.detailUrl);body.replaceChildren();quickStatements.length=0;
         status.textContent='Draft replaced with this separate statement and entry rows cleared. Parse and check it before saving. Your saved reviewed contents remain unchanged. Other statements have not been combined.';
       }));claims.append(section);
     }
@@ -104,14 +134,15 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; your saved review has not changed.';}));
   }
   const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);
-  root.append(button('Parse statement for review',()=>{
-    const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();proposed.entries.forEach(addRow);
+  root.append(quick,button('Parse statement for review',()=>{
+    const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();quickStatements.length=0;proposed.entries.forEach(addRow);
     status.textContent=`${proposed.entries.length} suggested entries · Not reviewed. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
     showInterpretation(proposed);
   }),button('Add contents entry',()=>addRow()),element('p','Scroll the entry table to see every field. Series version/year and language help distinguish editions.'),tableScroll);
   root.append(button('Save reviewed contents',()=>persist(async()=>{
-      const entries=[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
-      await actions.save(record.id,{entries:validateContents(entries),statement:statement.value,sourceUrl:source.value,source:'manual-review'});
+      const entries=draftEntries(),reviewStatement=[statement.value,...quickStatements.map(text=>'Manually entered contents:\n'+text)].filter(Boolean).join('\n\n');
+      if(reviewStatement.length>10000)throw Error('The review text is too long. Shorten the original statement or add fewer sections before saving.');
+      await actions.save(record.id,{entries:validateContents(entries),statement:reviewStatement,sourceUrl:source.value,source:'manual-review'});
   })));
   if(!review&&initialProposal?.entries.length)root.append(button('Accept all suggestions',()=>persist(()=>actions.save(record.id,{entries:validateContents(initialProposal.entries),statement:initialProposal.manifestEvidence||discovered,sourceUrl:source.value,source:'manual-review'}))));
   root.append(button('Reject suggested contents',()=>persist(()=>actions.save(record.id,{status:'rejected',entries:[],statement:discovered,sourceUrl:source.value,source:'manual-review'}))));

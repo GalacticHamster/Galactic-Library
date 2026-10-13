@@ -16,6 +16,7 @@ import {createComicCoverageView} from '../src/ui/comic-coverage.js';
 import {dcContentsRecoveryCases,checkDcFixture,recoveryBook} from './dc-contents-recovery-fixture.js';
 import {checkEquivalentRunFixture} from './equivalent-run-fixture.js';
 import {checkAnnualCoverageFixture} from './annual-coverage-fixture.js';
+import {checkQuickContentsExamples,quickContentsExamples} from './quick-contents-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -40,6 +41,25 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ {
+ checkQuickContentsExamples();
+ const bulkBefore=await writer.getDatabase(),bulkBook=coverageBook('bulk-sandman','',{title:'The Sandman Vol. 1'}),bulkDb=coverageDatabase(bulkBook);await writer.restoreDatabase(bulkDb);
+ const bulkOriginal=await writer.getDatabase(),bulkSources=JSON.stringify(bulkOriginal.providerItems);let bulkSaves=0;
+ const bulkEditor=createContentsEditor(bulkBook,null,{save:async(id,review)=>{bulkSaves++;await writer.saveContentReview(id,review);},refresh(){}},{expanded:true});document.body.append(bulkEditor);
+ const bulkQuick=bulkEditor.querySelector('.contents-quick-add'),bulkInput=bulkQuick.querySelector('textarea'),bulkRows=()=>bulkEditor.querySelectorAll('tbody tr');
+ assert(bulkQuick.getBoundingClientRect().height>0&&button(bulkQuick,'Add entries').disabled,'Quick add hidden or enabled without preview');
+ for(const [text,count]of quickContentsExamples){change(bulkInput,text,'input');button(bulkQuick,'Preview').click();assert(bulkQuick.textContent.includes(count+' entries ready to add.')&&bulkRows().length===0,'Preview altered draft or miscounted '+text);}
+ change(bulkInput,'Alpha #1-3; Digital Chapters 1-15; Beta #8-2','input');button(bulkQuick,'Preview').click();assert(bulkQuick.textContent.includes('Not added automatically')&&bulkQuick.textContent.includes('Chapters')&&bulkQuick.textContent.includes('8-2'),'Unsupported input silently discarded');
+ change(bulkInput,'#1-8','input');button(bulkQuick,'Preview').click();assert(button(bulkQuick,'Add entries').disabled&&bulkQuick.textContent.includes('Use a series name'),'Ambiguous input guessed an identity');
+ change(bulkInput,'material from Alpha #1-3','input');button(bulkQuick,'Preview').click();assert(bulkQuick.textContent.includes('Partial material'),'Partial preview claims full coverage');
+ change(bulkInput,'The Sandman #1-8','input');assert(button(bulkQuick,'Add entries').disabled,'Stale preview remained actionable');button(bulkQuick,'Preview').click();button(bulkQuick,'Add entries').click();assert(bulkRows().length===8&&bulkSaves===0,'Quick add saved early or wrong count');assert(JSON.stringify(await writer.getDatabase())===JSON.stringify(bulkOriginal),'Draft changed database');
+ button(bulkQuick,'Preview').click();button(bulkQuick,'Add entries').click();assert(bulkRows().length===8&&bulkQuick.textContent.includes('already in the draft'),'Duplicate quick add duplicated rows');
+ change(bulkInput,'The Sandman #5-10','input');button(bulkQuick,'Preview').click();button(bulkQuick,'Add entries').click();assert(bulkRows().length===10,'Overlapping range appended incorrect rows');button(bulkRows()[9],'Remove').click();button(bulkRows()[8],'Remove').click();assert(bulkRows().length===8,'Bulk rows cannot be removed');
+ button(bulkEditor,'Save reviewed contents').click();await wait(()=>bulkSaves===1&&button(bulkEditor,'Save reviewed contents').disabled===false,'Bulk review save did not complete');const bulkSaved=await writer.getDatabase();assert(bulkSaved.contentReviews[bulkBook.id].entries.length===8&&bulkSaved.contentReviews[bulkBook.id].statement.includes('Manually entered contents: The Sandman #1-8'),'Bulk entries or manual evidence not saved');assert(JSON.stringify(bulkSaved.providerItems)===bulkSources,'Captured evidence changed');
+ const bulkCoverage=createComicCoverageView(bulkSaved);document.body.append(bulkCoverage);await bulkCoverage.ready;button(bulkCoverage,'Inspect issues').click();assert(bulkCoverage.querySelectorAll('[data-comic-grid-issue][data-coverage=owned]').length===8,'Saved Sandman coverage does not contain eight full issues');bulkCoverage.remove();bulkEditor.remove();
+ const bulkReviewEditor=createContentsEditor(bulkBook,bulkSaved.contentReviews[bulkBook.id],{save:async()=>{throw Error('Draft correction saved without consent');},refresh(){}},{expanded:true});document.body.append(bulkReviewEditor);const bulkCorrected=bulkReviewEditor.querySelector('[data-contents-field=number]');bulkCorrected.value='11';const bulkOther=bulkReviewEditor.querySelector('.contents-quick-add');change(bulkOther.querySelector('textarea'),'Uncanny X-Men #210-219; X-Men Annual #10','input');button(bulkOther,'Preview').click();button(bulkOther,'Add entries').click();assert(bulkReviewEditor.querySelectorAll('tbody tr').length===19&&bulkCorrected.value==='11','Append replaced existing corrections');assert((await writer.getDatabase()).contentReviews[bulkBook.id].entries[0].number==='1','Unsaved corrections persisted');bulkReviewEditor.remove();await writer.restoreDatabase(bulkBefore);
+ checks.push('Quick contents previews all examples, exposes ambiguous/partial/unsupported input, appends without duplicates or replacing edits, and saves eight Sandman issues only on explicit review save');
+ }
  {
  for(const [,run]of inferredCoverageCases)await run();
  for(const [,run]of dcContentsRecoveryCases)await run();
