@@ -3,6 +3,7 @@ import {manifestReviewProposal} from './kindle-manifest.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
 import {inferCoverageRuns} from './coverage-run-context.js';
+import {resolveAnnualCoverage,annualHintForEntry} from './coverage-annual-context.js';
 
 // Local collection tools only. Companion matching retains its reviewed-only
 // index. Proposals are derived from current selected source, never history or
@@ -36,6 +37,12 @@ function descriptor(value){
   return {series:match?text.slice(0,match.index).trim():text,run:match?match[1].replace(/[–—]/gu,'-'):''};
 }
 const meaningfulSeries=series=>series&&!/^(?:comics?|issues?|books?|volumes?|collections?|stories|collected works|anthology)$/u.test(series);
+export function capturedCoverageSeries(parent){
+  const observed=parent.metadata?.enrichment?.kindleProductComicContents?.productDetailsEvidence?.observations??[];
+  const values=observed.filter(value=>value.field==='series'&&value.status==='observed'&&/^Part of:\s*/iu.test(value.value??value.raw??'')).map(value=>descriptor((value.value??value.raw).replace(/^Part of:\s*/iu,'')));
+  for(const match of parent.title.matchAll(/\(([^()]+?)\s*\((\d{4}(?:[-–—]\d{0,4})?)\)\)/gu))values.push({series:match[1],run:match[2].replace(/[–—]/gu,'-')});
+  return [...new Map(values.map(value=>[JSON.stringify([identityKey(value.series),value.run]),value])).values()];
+}
 function parentSeriesContext(entry,parent,allowSubjectAlias=true){
   if(!parent)return {strong:false,run:''};
   const identity=identityEvidence(parent),series=identityKey(entry.series);
@@ -89,6 +96,18 @@ export function resolveCoverageEntry(entry,parent,allowSubjectAlias=true){
   return {...entry,series:context.series||entry.series,run:entry.run||context.run,
     language:coverageLanguage(entry.language||identityEvidence(parent).language)};
 }
+function resolvedContentsEntries(contents,parent){
+  return contents.entries.map(entry=>{
+    const result=resolveCoverageEntry(entry,parent,!contents.review);
+    // An unresolved annual publication date must not acquire a conflicting
+    // parent run through the ordinary undated-series fallback.
+    if(entry.unitType==='annual'){
+      const hint=annualHintForEntry(contents,entry);
+      if(hint){result.annualHint=hint;if(!hint.resolvedRun)result.run=entry.run;}
+    }
+    return result;
+  });
+}
 
 export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[],includeExcerpts=false,runInferenceExclusions=[]}={}) {
   const index=new Map(),unresolved=[];
@@ -98,7 +117,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   // Access gates participation, not the identity evidence available locally.
   for(const original of Object.values(database.providerItems??{})){
     if(original.mediaType!=='book')continue;
-    const contents=collectionContents(original,database),entries=contents.entries.map(entry=>resolveCoverageEntry(entry,original,!contents.review));
+    const contents=collectionContents(original,database),entries=resolvedContentsEntries(contents,original);
     const standalone=contents.confidence==='rejected'?[]:standaloneContents(original).map(entry=>resolveCoverageEntry(entry,original));
     rows.push({original,contents,entries,standalone});
     for(const entry of [...entries,...standalone]){
@@ -108,8 +127,9 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   }
   const regularRuns=[...new Map(rows.flatMap(row=>[...row.entries,...row.standalone]).filter(entry=>entry.unitType==='issue'&&entry.run).map(entry=>[JSON.stringify([identityKey(entry.series),entry.run]),{series:entry.series,run:entry.run}])).values()];
   for(const row of rows)if(row.contents.annualRunHints?.some(hint=>!hint.resolvedRun)){
-    row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=row.contents.entries.map(entry=>resolveCoverageEntry(entry,row.original));
+    row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=resolvedContentsEntries(row.contents,row.original);
   }
+  resolveAnnualCoverage(rows,{parentSeries:capturedCoverageSeries});
   inferCoverageRuns(rows,{resolveEntry:resolveCoverageEntry,hasConflict:(entry,parent)=>Boolean(parentSeriesContext(entry,parent).conflict),excludedScopes:runInferenceExclusions});
   const add=(item,entry,confidence,review,explicitSeries=false,statement='',unresolvedAnnual=false)=>{
     if(entry.completeness!=='full'&&!(includeExcerpts&&entry.completeness==='excerpt'))return;
@@ -125,7 +145,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     const item=effectiveOwnershipRecord(original,database);
     if(item.mediaType!=='book'||!['owned','claimed'].includes(item.ownership)||excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id))continue;
     for(const entry of entries){
-      const unresolvedAnnual=entry.unitType==='annual'&&!entry.run&&contents.annualRunHints?.some(hint=>!hint.resolvedRun&&identityKey(hint.series)===identityKey(entry.series)&&hint.numbers.includes(entry.number));
+      const unresolvedAnnual=Boolean(entry.unitType==='annual'&&!entry.run&&(entry.annualHint||contents.annualRunHints?.some(hint=>!hint.resolvedRun&&identityKey(hint.series)===identityKey(entry.series)&&hint.numbers.includes(entry.number))));
       add(item,entry,contents.confidence,contents.review,Boolean(contents.review)||['explicit-statement','explicit-clause','natural-reprint'].includes(contents.parseBinding),contents.review?.statement||contents.manifestEvidence||contentsStatement(original),unresolvedAnnual);
       if((entry.completeness!=='full'&&!includeExcerpts)||!comicUnit(entry))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
     }

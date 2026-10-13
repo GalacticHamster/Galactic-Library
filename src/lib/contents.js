@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 9;
+export const CONTENTS_PARSER_VERSION = 10;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -212,7 +212,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';
       // A bare Annual (year) is contextual. Its date is the annual's
       // publication year, not a replacement for the preceding series run.
-      if(!label&&previous&&['issue','annual'].includes(previous.unitType)){explicitRun=previous.run;annualYear=previous.annualYear??'';}
+      if(!label&&previous&&['issue','annual'].includes(previous.unitType)){annualYear=/^\d{4}$/u.test(explicitRun)?explicitRun:previous.annualYear??'';explicitRun=annualYear?'':previous.run;}
       else if(label&&/^\d{4}$/u.test(explicitRun)){annualYear=explicitRun;explicitRun='';}
       else if(!explicitRun&&previous&&identityKey(label)===identityKey(previous.series))explicitRun=previous.run;
     }
@@ -247,6 +247,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
   // or choose the nearest of competing runs. Hints remain transient evidence.
   const regular=[...entries.filter(entry=>entry.unitType==='issue'),...(context.annualParentRuns??[])];
   for(const [index,hint]of annualRunHints.entries()){
+    for(const entry of annualBindings[index])entry.run='';
     const candidates=new Set(regular.filter(entry=>identityKey(entry.series)===identityKey(hint.series)&&annualParentRunEligible(entry.run,hint.year)).map(entry=>entry.run));
     if(candidates.size!==1)continue;
     const run=[...candidates][0];hint.resolvedRun=run;
@@ -434,7 +435,7 @@ export function seriesCoverage(database,options={}) {
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;
     const complete=supporting.filter(value=>value.entry.completeness==='full'),primary=complete.length?complete:supporting;
-    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(entry.runInference?{runInference:entry.runInference}:{}),...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
+    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(entry.runInference?{runInference:entry.runInference}:{}),...(entry.annualInference?{annualInference:entry.annualInference}:{}),...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
     const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);

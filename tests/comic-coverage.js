@@ -12,7 +12,9 @@ import {proposeContents,proposeContentsForReview} from '../src/lib/contents.js';
 import {addSeriesMerge,validateComicCoverageMerges,mergeCoverageGroups} from '../src/lib/comic-series-merges.js';
 import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 import {equivalentRunMergeTests} from './equivalent-run-merges.js';
+import {annualCoverageTests} from './annual-coverage.js';
 export const comicCoverageTests=[
+ ...annualCoverageTests,
  ...equivalentRunMergeTests,
  ...dcContentsRecoveryCases,
  ['six frozen natural descriptions and Detective era fixtures recover without changing original evidence',async()=>{

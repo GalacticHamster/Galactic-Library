@@ -1,5 +1,13 @@
 # Contents evidence and identity boundaries
 
+## Annual coverage context
+
+Parser 10 retains the publication date of a contextual `Annual (year)` independently of the preceding regular-series run. Date hints bind to their corresponding proposal entries, including repeated annual numbers from different cycles; unresolved dates cannot inherit a contradictory parent run through an undated fallback. Parser inputs, captured text and confirmed reviews are not rewritten.
+
+`coverage-annual-context.js` supplies a transient, Library-only projection. Same-name/calendar-start labels share a candidate scope; existing annual run formatting is retained when unambiguous. A later start-only label can join an earlier bounded run only when dated source contexts agree and no regular #0/#1 indicates a reset. A shorter distinctive annual title can connect to a bounded collection parent only with supporting same-row regular contents and an eligible annual date. The alias is run/language-specific, not a global series-name substitution. Undated renamed annuals require that source-supported relationship plus their own collection context. Literal dated regular constituents take precedence in mixed annual collections. Matching dated annual anchors can resolve otherwise competing regular-run labels, but contradictory anchors remain unresolved.
+
+Coverage retains the original annual name/run/date in `annualInference` and links to the original statement and contents editor. Reviews bypass this projection; regular issue identities, acquisition counts, external matching and storage/export schemas are unchanged. Partial annual evidence stays excerpt-only. Existing manual merges, starts and transitions remain view preferences and survive backup/restore.
+
 Identity confidence and ownership/access confidence are separate. Provider presence is not proof of a purchase. An ownership override changes effective access classification while retaining observed provenance; it does not identify an edition or contained work.
 
 Contents discovery produces **unverified proposals**, not owned standalone titles. Local series coverage and collection comparisons use automatically inferred full issue/annual/special entries from effectively owned/claimed parents by default. Manually confirmed contents take precedence. Excerpts never establish full-unit coverage. Ordinary title matching does not index proposed or verified component names as standalone library items; the companion API retains its reviewed-only contents behavior.
