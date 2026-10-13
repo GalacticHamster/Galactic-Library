@@ -80,6 +80,8 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'removeContentReview',
   'getUiPreferences',
   'saveUiPreferences',
+  'saveComicCoverageMerge',
+  'removeComicCoverageMerge',
   'getShowEnrichmentActions',
   'saveShowEnrichmentActions',
 ]);

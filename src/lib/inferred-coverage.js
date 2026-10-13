@@ -43,7 +43,7 @@ function parentSeriesContext(entry,parent){
     const part=descriptor(value);
     // The parser already distinguishes typed annuals/specials from issues.
     // Their explicit type word is presentation, not a different series alias.
-    if(['annual','special'].includes(entry.unitType))part.series=part.series.replace(new RegExp('\\s+'+entry.unitType+'s?$','iu'),'');
+    if(['annual','special'].includes(entry.unitType)&&identityKey(part.series)!==series)part.series=part.series.replace(new RegExp('\\s+'+entry.unitType+'s?$','iu'),'');
     return part;
   };
   const descriptors=identity.series.map(parentDescriptor);

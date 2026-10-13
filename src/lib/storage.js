@@ -1,3 +1,4 @@
+import {validateComicCoverageMerges} from './comic-series-merges.js';
 import { BACKUP_FORMAT, BACKUP_VERSION } from './constants.js';
 import { validateDatabase } from './models.js';
 import { STORAGE_MESSAGE_TYPE, STORAGE_OPERATIONS } from './storage-protocol.js';
@@ -33,7 +34,7 @@ export const {
   saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
   saveContentReview, removeContentReview,
-  getUiPreferences, saveUiPreferences, getShowEnrichmentActions, saveShowEnrichmentActions
+  getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge, getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;
 
 export function createBackup(database, preferences) {
@@ -43,7 +44,7 @@ export function createBackup(database, preferences) {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     database: validated,
-    ...(preferences ? {comicCoverageStarts:validateComicCoverageStarts(preferences.comicCoverageStarts??{})} : {})
+    ...(preferences ? {comicCoverageStarts:validateComicCoverageStarts(preferences.comicCoverageStarts??{}),comicCoverageMerges:validateComicCoverageMerges(preferences.comicCoverageMerges??{})} : {})
   };
 }
 
@@ -56,7 +57,10 @@ export function parseBackup(value) {
 }
 
 // Optional display preferences live outside the library schema. Older backups
-// omit this field and leave the browser's current starting numbers untouched.
+// omit these fields and leave the browser's current coverage preferences untouched.
 export function parseBackupPreferences(value) {
-  return Object.hasOwn(value,'comicCoverageStarts') ? {comicCoverageStarts:validateComicCoverageStarts(value.comicCoverageStarts)} : undefined;
+  const preferences={};
+  if(Object.hasOwn(value,'comicCoverageStarts'))preferences.comicCoverageStarts=validateComicCoverageStarts(value.comicCoverageStarts);
+  if(Object.hasOwn(value,'comicCoverageMerges'))preferences.comicCoverageMerges=validateComicCoverageMerges(value.comicCoverageMerges);
+  return Object.keys(preferences).length?preferences:undefined;
 }

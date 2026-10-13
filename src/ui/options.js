@@ -23,7 +23,7 @@ import {bindPerformanceDiagnostics} from './performance-diagnostics.js';
 import '../lib/contents-performance.js';
 import {bookToolHelp} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
-import { getCommittedLibraryView, getUiPreferences, saveUiPreferences, saveOwnershipPolicy } from '../lib/storage.js';
+import { getCommittedLibraryView, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge, saveOwnershipPolicy } from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -186,7 +186,7 @@ let browseAnchor='',lastBrowseResult,selectedBrowseRef;
 let unlinkedPage=0;
 let coverageDatabase;
 let overlapDatabase;
-let comicCoverageDatabase,comicCoverageStarts={};
+let comicCoverageDatabase,comicCoverageStarts={},comicCoverageMerges={};
 let duplicateReviewDatabase,duplicateReviewCandidates;
 const itemDetailContexts=new Map();
 const filterDefault=()=> 'all';
@@ -879,7 +879,7 @@ async function refreshView(context,diagnosticLookupId = null) {
   database = loadedDatabase;
   downloadComixologyListButton.disabled = false;
   workspace.hydrate(preferences);
-  comicCoverageStarts=preferences.comicCoverageStarts??{};
+  comicCoverageStarts=preferences.comicCoverageStarts??{};comicCoverageMerges=preferences.comicCoverageMerges??{};
   if(!navigationHydrated&&globalThis.history?.state?.gl){restoringRoute=true;const saved=globalThis.history.state.gl;reviewOrigin=saved.origin??null;workspace.select(saved.workspace,{view:saved.view,history:false});restoringRoute=false;}
   navigationHydrated=true;
   endStage?.();endStage=timing?.begin('options_render');
@@ -1005,7 +1005,7 @@ function renderCollectionCoverage(){
   document.querySelector('#overlap-workspace').hidden=coverageView!=='overlap';
   for(const button of document.querySelectorAll('[data-coverage-view]'))button.setAttribute('aria-pressed',String(button.dataset.coverageView===coverageView));
   if(database&&workspace.workspace==='comic-coverage'&&coverageView==='series'&&comicCoverageDatabase!==database){
-    document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{starts:comicCoverageStarts,openRecord:ref=>openLibraryRecord(ref),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
+    document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{starts:comicCoverageStarts,merges:comicCoverageMerges,saveMerge:async(source,target,title)=>{const prefs=await saveComicCoverageMerge(source,target,title);comicCoverageMerges=prefs.comicCoverageMerges;return comicCoverageMerges;},undoMerge:async id=>{const prefs=await removeComicCoverageMerge(id);comicCoverageMerges=prefs.comicCoverageMerges;return comicCoverageMerges;},openRecord:ref=>openLibraryRecord(ref),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
   }
   if(database&&workspace.workspace==='comic-coverage'&&coverageView==='overlap'&&overlapDatabase!==database){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;

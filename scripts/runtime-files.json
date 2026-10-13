@@ -21,6 +21,7 @@
   "src/lib/inferred-coverage.js",
   "src/lib/collection-overlap.js",
   "src/lib/comic-coverage.js",
+  "src/lib/comic-series-merges.js",
   "src/lib/cooperative-work.js",
   "src/lib/data-equality.js",
   "src/lib/duplicate-review.js",

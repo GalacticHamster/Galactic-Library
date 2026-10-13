@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 6;
+export const CONTENTS_PARSER_VERSION = 7;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -60,7 +60,7 @@ export function proposeContents(statement) {
     let label=match[1].replace(/^(?:and|,)\s*/iu,'').trim();
     let unitType=match[3]?'issue':'volume';
     if (/\bannuals?$/iu.test(label)) {unitType='annual';label=label.replace(/\s*annuals?$/iu,'').trim();}
-    if (/\bspecials?$/iu.test(label)) {unitType='special';label=label.replace(/\s*specials?$/iu,'').trim();}
+    if (/\bspecials?$/iu.test(label)&&!/\bsuper\s+special$/iu.test(label)) {unitType='special';label=label.replace(/\s*specials?$/iu,'').trim();}
     if (/^(?:issues?|volumes?|vols?\.?|books?)$/iu.test(label)) {unparsed.push(chunk);continue;}
     const descriptor=seriesDescriptor(label||lastSeries,label? '':lastRun);
     if (!descriptor.series) {unparsed.push(chunk);continue;}
@@ -84,7 +84,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   if(anchor && /^(?:issues?\s*#?\s*|#\s*)\d/iu.test(body) && !/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(body)){
     input=anchor.series+' '+body;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
-  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput));
+  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),context);
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return finish(proposal.entries,proposal.unparsed);
   // This fallback is discovery/editor-only; ordinary matching still uses
   // proposeContents above. Unsupported numeric syntax never becomes a name.
@@ -112,7 +112,7 @@ function reviewRangeEnd(first,last) {
 }
 
 /** Bounded discovery grammar. Arbitrary prose must not become a series label. */
-function discoveryNumberedContents(body,collectionTitle,collectionClaim=false) {
+function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,context={}) {
   const entries=[],unparsed=[],chunks=[];
   // Parallel digital numbering is not a print-issue conversion. Retain a
   // finite, explicitly labelled aside separately so the print clause survives.
@@ -198,8 +198,17 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false) {
     label=label.replace(/,\s*$/u,'');
     const labelDescriptor=reviewSeriesDescriptor(label);let explicitRun=runIssue?'volume '+runIssue[2]:labelDescriptor.run;label=labelDescriptor.series;
     label=label.replace(/\.["”]$/u,'');
-    if(/\bannuals?$/iu.test(label)){type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';}
-    if(/\bspecials?$/iu.test(label)){type='special';label=label.replace(/\s*specials?$/iu,'').trim();}
+    // Literal source series metadata or the exact subject title can establish
+    // that a suffix belongs to the name. Super Special is a compound title,
+    // not a generic Special qualifier. Keep ordinary typed annuals/specials.
+    const literalName=[collectionTitle,...(Array.isArray(context.series)?context.series:context.series?[context.series]:[])].some(value=>identityKey(reviewSeriesDescriptor(compact(value)).series)===identityKey(label));
+    if(/\bannuals?$/iu.test(label)&&!literalName){
+      type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';
+      // A bare Annual (year) is contextual. Its date is the annual's
+      // publication year, not a replacement for the preceding series run.
+      if(!label&&previous&&['issue','annual'].includes(previous.unitType))explicitRun=previous.run;
+    }
+    if(/\bspecials?$/iu.test(label)&&!literalName&&!/\bsuper\s+special$/iu.test(label)){type='special';label=label.replace(/\s*specials?$/iu,'').trim();}
     const commaParts=label.split(/,\s*/u);
     const ambiguousComma=commaParts.length===2 && commaParts[0].split(/\s+/u).length>1
       && !/^(?:the|a|an)\b|&/iu.test(commaParts[1]) && !/['’]s\b/u.test(commaParts[0])

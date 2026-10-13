@@ -1,3 +1,4 @@
+import {validateComicCoverageMerges} from './comic-series-merges.js';
 export const UI_PREFERENCES_KEY = 'galacticLibraryUiPreferences';
 export const PAGE_SIZES = Object.freeze([20,50,100,200]);
 export const validPageSize = value => PAGE_SIZES.includes(value);
@@ -12,7 +13,7 @@ export function workspaceTarget(value) {
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', acquisitions:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
 export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
-export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,comicCoverageStarts:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
+export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,comicCoverageStarts:{},comicCoverageMerges:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
 export function validateComicCoverageStarts(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>10000)throw Error('Invalid comic coverage starting numbers.');
   const output={};for(const [key,start]of Object.entries(value)){
@@ -35,12 +36,13 @@ function validateView(view,defaults){
   return output;
 }
 export function validateUiPreferences(value){
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','comicCoverageStarts','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','comicCoverageStarts','comicCoverageMerges','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
   const output=defaultUiPreferences();
   if(value.appearance!==undefined){if(!['dark','light','system'].includes(value.appearance))throw Error('Invalid appearance preference.');output.appearance=value.appearance;}
   if(value.pageSize!==undefined){if(!validPageSize(value.pageSize))throw Error('Invalid items per page.');output.pageSize=value.pageSize;}
   if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=workspaceTarget(value.workspace);}
   if(value.comicCoverageStarts!==undefined)output.comicCoverageStarts=validateComicCoverageStarts(value.comicCoverageStarts);
+  if(value.comicCoverageMerges!==undefined)output.comicCoverageMerges=validateComicCoverageMerges(value.comicCoverageMerges);
   // Migrate old Library fields once. Shared state is authoritative thereafter.
   const legacy=value.library?validateView(value.library,emptyLibraryView()):emptyLibraryView();
   output.browse=validateView(value.browse??Object.fromEntries(SHARED_BROWSE_FIELDS.filter(key=>key!=='anchor').map(key=>[key,legacy[key]])),emptyBrowseView());

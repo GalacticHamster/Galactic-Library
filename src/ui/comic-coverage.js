@@ -1,3 +1,5 @@
+import {compatibleSeries} from '../lib/comic-series-merges.js';
+import {createConfirmation} from './confirmation.js';
 import {loadCoverageProjection} from './collection-overlap-projection.js';
 import {comicRange,comicIssuePage,comicCoverageSummary} from '../lib/comic-coverage.js';
 import {createPagination} from './pagination.js';
@@ -7,7 +9,7 @@ import {comicSeriesLabel,coverageSegments,comicGridPage} from './comic-coverage-
 export {comicSeriesLabel} from './comic-coverage-presentation.js';
 const el=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const button=(label,run)=>{const node=el('button',label);node.type='button';node.addEventListener('click',run);return node;};
-export function createComicCoverageView(database,{starts={},saveStart=async()=>{throw Error('Starting numbers cannot be saved here.');},openRecord}={}){
+export function createComicCoverageView(database,{starts={},merges={},saveMerge=async()=>{throw Error('Series merges cannot be saved here.');},undoMerge=async()=>{throw Error('Series merges cannot be saved here.');},saveStart=async()=>{throw Error('Starting numbers cannot be saved here.');},openRecord}={}){
   starts={...starts};const root=el('div');root.className='comic-coverage';
   const intro=el('p','See comic issues covered by your owned books and standalone purchases. Inferred contents are included automatically; verified contents were reviewed. Missing means not covered from the starting number through your highest covered issue number, not the end of the published series.');
   const controls=el('div');controls.className='library-controls';
@@ -27,6 +29,13 @@ export function createComicCoverageView(database,{starts={},saveStart=async()=>{
     returnScroll=globalThis.scrollY??0;returnFocus=document.activeElement;selected=group;overview.hidden=true;detail.hidden=false;detail.replaceChildren();
     detail.append(button('Back to series',()=>{selected=null;detail.hidden=true;overview.hidden=false;returnFocus?.focus({preventScroll:true});globalThis.scrollTo?.(0,returnScroll);}));
     const heading=el('h3',label(group));heading.tabIndex=-1;detail.append(heading);
+    detail.append(button('Merge with another series',()=>mergePicker(group)));
+    if(group.members){detail.append(el('p','Combined series: '+group.originalTitles.join(' / ')),button('Undo series merge',async()=>{
+      const confirmation=createConfirmation({title:'Undo series merge?',message:'Separate all original series in this group. Collection records and contents will stay unchanged.',confirmLabel:'Separate series'});
+      if(!await confirmation.result)return;
+      try{merges=await undoMerge(group.id);}catch(error){detail.append(el('p','Could not undo merge: '+error.message));return;}
+      try{await reload(group.id);}catch(error){detail.append(el('p','Series separated, but coverage could not reload: '+error.message+'. Reopen Options to load the saved change.'));}
+    }));}
     const rangeInfo=el('p'),notice=el('p');notice.setAttribute('role','status');
     const startLabel=el('label','Starting number '),start=el('input');start.type='number';start.min='0';start.max='999999';start.step='1';start.value=String(starts[group.id]??1);start.setAttribute('aria-label','Series starting number');startLabel.append(start);
     const settings=el('div');settings.className='actions';
@@ -133,7 +142,7 @@ export function createComicCoverageView(database,{starts={},saveStart=async()=>{
     filter.addEventListener('change',()=>{issuePage=0;renderIssues();});renderIssues();renderGrid();switchMode('grid');heading.focus({preventScroll:true});root.scrollIntoView?.({block:'start'});
   }
   function render(){
-    const query=search.value.trim().toLocaleLowerCase(),matches=groups.filter(group=>label(group).toLocaleLowerCase().includes(query));
+    const query=search.value.trim().toLocaleLowerCase(),matches=groups.filter(group=>[label(group),...(group.originalTitles??[])].some(title=>title.toLocaleLowerCase().includes(query)));
     matches.sort((a,b)=>(sort.value==='covered'?b.issues.length-a.issues.length:sort.value==='duplicates'?b.duplicates-a.duplicates:sort.value==='missing'?comicRange(b,starts[b.id]??1).missing-comicRange(a,starts[a.id]??1).missing:0)||label(a).localeCompare(label(b),undefined,{numeric:true}));
     const state=pager.update({total:matches.length,page,size});page=state.page;list.replaceChildren();const counts=totals();
     status.textContent=`${counts.seriesGroups} series · ${counts.covered} covered issues · ${counts.duplicates} owned multiple times · ${counts.missing} missing in assumed ranges${query?' · '+matches.length+' matching groups':''}.`;status.setAttribute('aria-busy','false');
@@ -145,6 +154,39 @@ export function createComicCoverageView(database,{starts={},saveStart=async()=>{
     if(selected&&!matches.includes(selected)){selected=null;detail.hidden=true;overview.hidden=false;detail.replaceChildren();}
   }
   search.addEventListener('input',()=>{page=0;render();});sort.addEventListener('change',()=>{page=0;render();});
-  root.ready=loadCoverageProjection(database,'comic-coverage').then(result=>{groups=result.groups;for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();if(result.provisional||result.unresolved){const excluded=el('details');excluded.append(el('summary','Unresolved contents'),el('p',`${result.provisional} provisional entries and ${result.unresolved} unresolved fragments or unsupported entries are excluded from covered-issue and missing-range totals.`));overview.append(excluded);}return {...result,summary:totals()};}).catch(error=>{status.textContent='Could not calculate comic coverage: '+error.message;status.setAttribute('aria-busy','false');root.append(button('Try again',()=>root.replaceWith(createComicCoverageView(database,{starts,saveStart,openRecord}))));});
+  async function reload(id){
+    status.textContent='Updating series coverage...';status.setAttribute('aria-busy','true');
+    let result;try{result=await loadCoverageProjection(database,'comic-coverage',merges);}finally{status.setAttribute('aria-busy','false');}
+    groups=result.groups;labels.clear();
+    for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();
+    const next=groups.find(group=>group.id===id);if(next)select(next);
+  }
+  function mergePicker(group){
+    const dialog=el('dialog');dialog.className='account-dialog';dialog.setAttribute('aria-label','Merge comic series');
+    dialog.append(el('h3','Merge with another series'),el('p','Combine equivalent names for this run. Issue type and language must match. Original records stay unchanged; you can undo this merge.'));
+    const search=el('input');search.type='search';search.placeholder='Search series';search.setAttribute('aria-label','Search merge target');
+    const results=el('div'),titleLabel=el('label','Display series name (run is kept) '),title=el('input');title.maxLength=300;title.setAttribute('aria-label','Merged series name');titleLabel.append(title);
+    const notice=el('p');notice.setAttribute('role','status');let target;
+    const cancel=button('Cancel',()=>{dialog.close();dialog.remove();}),confirm=button('Combine series',async()=>{
+      if(!target||!title.value.trim())return;
+      confirm.disabled=cancel.disabled=search.disabled=title.disabled=true;notice.textContent='Saving series merge...';
+      try{merges=await saveMerge(group.id,target.id,title.value.trim());}
+      catch(error){notice.textContent='Could not combine series: '+error.message;confirm.disabled=cancel.disabled=search.disabled=title.disabled=false;}
+      if(!confirm.disabled)return;
+      try{await reload(target.id);dialog.close();dialog.remove();}
+      catch(error){notice.textContent='Series merge saved, but coverage could not reload: '+error.message+'. Close this dialog and reopen Options to load the saved merge.';cancel.disabled=false;cancel.textContent='Close';}
+    });confirm.disabled=true;dialog.append(search,results,titleLabel,el('p','The combined view recalculates issue coverage and copies using the supporting purchases. The target series keeps its starting number. This does not confirm new ownership.'),notice,cancel,confirm);
+    function renderTargets(){
+      results.replaceChildren();const query=search.value.trim().toLocaleLowerCase();
+      const matches=groups.filter(candidate=>candidate.id!==group.id&&compatibleSeries(group.id,candidate.id)&&[label(candidate),...(candidate.originalTitles??[])].some(name=>name.toLocaleLowerCase().includes(query)));
+      for(const candidate of matches.slice(0,10)){
+        const choice=button(label(candidate)+' — '+candidate.unitType+'s · '+candidate.language,()=>{target=candidate;title.value=candidate.series;confirm.disabled=false;renderTargets();});choice.setAttribute('aria-pressed',String(candidate===target));choice.dataset.mergeTarget=candidate.id;results.append(choice);
+      }
+      if(!matches.length)results.append(el('p','No other series with the same run, issue type and language match.'));
+      else if(matches.length>10)results.append(el('p','Showing 10 matches. Type more to narrow the list.'));
+    }
+    search.addEventListener('input',renderTargets);dialog.addEventListener('cancel',event=>{if(cancel.disabled)event.preventDefault();else dialog.remove();});renderTargets();document.body.append(dialog);dialog.showModal();search.focus();
+  }
+  root.ready=loadCoverageProjection(database,'comic-coverage',merges).then(result=>{groups=result.groups;for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups));render();if(result.provisional||result.unresolved){const excluded=el('details');excluded.append(el('summary','Unresolved contents'),el('p',`${result.provisional} provisional entries and ${result.unresolved} unresolved fragments or unsupported entries are excluded from covered-issue and missing-range totals.`));overview.append(excluded);}return {...result,summary:totals()};}).catch(error=>{status.textContent='Could not calculate comic coverage: '+error.message;status.setAttribute('aria-busy','false');root.append(button('Try again',()=>root.replaceWith(createComicCoverageView(database,{starts,merges,saveMerge,undoMerge,saveStart,openRecord}))));});
   return root;
 }

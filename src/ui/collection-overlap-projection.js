@@ -10,7 +10,7 @@ export function overlapProjectionInput(database){
 export async function loadOverlapProjection(database){
   return loadCoverageProjection(database);
 }
-export async function loadCoverageProjection(database,mode='overlap'){
+export async function loadCoverageProjection(database,mode='overlap',merges={}){
   // Paint the existing loading state before preparing the read-only input.
   await new Promise(resolve=>setTimeout(resolve,0));
   const input=overlapProjectionInput(database);
@@ -19,13 +19,13 @@ export async function loadCoverageProjection(database,mode='overlap'){
     input.manualMatchDecisions=database.manualMatchDecisions;
     input.editionSeparations=database.editionSeparations;
   }
-  if(typeof Worker==='undefined')return mode==='comic-coverage'?(await import('./comic-coverage-projection.js')).comicCoverageForLibrary(input):collectionOverlapAsync(input);
+  if(typeof Worker==='undefined')return mode==='comic-coverage'?(await import('./comic-coverage-projection.js')).comicCoverageForLibrary(input,merges):collectionOverlapAsync(input);
   return new Promise((resolve,reject)=>{
     const worker=new Worker(new URL('./collection-overlap-worker.js',import.meta.url),{type:'module'});
     const timeout=setTimeout(()=>finish(new Error('The overlap calculation did not finish. Try again.')),60000);
     const finish=(error,result)=>{clearTimeout(timeout);worker.terminate();error?reject(error):resolve(result);};
     worker.onmessage=event=>finish(event.data.error?new Error(event.data.error):null,event.data.result);
     worker.onerror=event=>finish(new Error(event.message||'The overlap calculation could not start.'));
-    try{worker.postMessage(mode==='comic-coverage'?{mode,database:input}:input);}catch(error){finish(error);}
+    try{worker.postMessage(mode==='comic-coverage'?{mode,database:input,merges}:input);}catch(error){finish(error);}
   });
 }
