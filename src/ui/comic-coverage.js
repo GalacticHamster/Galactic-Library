@@ -1,14 +1,14 @@
 import {compareTitles} from '../lib/title-sort.js';
 import {createCoverageExclusions} from './coverage-exclusions.js';
 import {compatibleSeries,continuityProblem,continuityAssessment} from '../lib/comic-series-merges.js';
-import {comicCoverageNameKey,comicSeriesDisplayName,defaultComicSeriesName} from '../lib/comic-series-names.js';
+import {comicCoverageNameKey,comicSeriesDisplayName} from '../lib/comic-series-names.js';
 import {createConfirmation} from './confirmation.js';
 import {loadCoverageProjection} from './collection-overlap-projection.js';
 import {comicRange,comicIssuePage,comicCoverageSummary,comicGroupCounts,comicSequenceOffset,validateNumberingTransitions} from '../lib/comic-coverage.js';
 import {createPagination} from './pagination.js';
 import {accountLabel} from './item-presentation.js';
 import {bookHref} from './contents-navigation.js';
-import {comicSeriesLabel,coverageSegments,comicGridPage,seriesMergeTargets} from './comic-coverage-presentation.js';
+import {comicSeriesTitle,comicSeriesLabel,coverageSegments,comicGridPage,seriesMergeTargets} from './comic-coverage-presentation.js';
 export {comicSeriesLabel} from './comic-coverage-presentation.js';
 const el=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const button=(label,run)=>{const node=el('button',label);node.type='button';node.addEventListener('click',run);return node;};
@@ -32,8 +32,8 @@ export function createComicCoverageView(database,{starts={},transitions={},names
   overview.append(status,pager.sizeContainer,pager.top,list,pager.bottom);root.append(detail);
   let returnScroll=0,returnFocus;
   const displayName=group=>comicSeriesDisplayName(group,names);
-  const label=group=>labels.get(group.id)??comicSeriesLabel({...group,series:displayName(group)});
-  function rebuildLabels(){labels.clear();const shown=groups.map(group=>({...group,series:displayName(group)}));for(const group of shown)labels.set(group.id,comicSeriesLabel(group,shown));}
+  const label=group=>labels.get(group.id)??comicSeriesLabel(group,groups,names);
+  function rebuildLabels(){labels.clear();for(const group of groups)labels.set(group.id,comicSeriesLabel(group,groups,names));}
   const totals=()=>comicCoverageSummary(groups,starts,transitions);
   const issueLabel=issue=>issue.missing?'Missing':issue.partial?'Partial coverage':issue.copies>1?'Owned '+issue.copies+' times':'Owned';
   const countLabel=group=>{const counts=comicGroupCounts(group);return counts.covered+' covered'+(counts.partial?' · '+counts.partial+' partial':'')+' · '+counts.duplicates+' owned multiple times';};
@@ -178,7 +178,7 @@ export function createComicCoverageView(database,{starts={},transitions={},names
     async function persist(value){
       if(value!==null&&(!start.value.trim()||!Number.isSafeInteger(value)||value<0||value>999999)){notice.textContent='Enter a whole starting number from 0 to 999999.';return;}
       save.disabled=reset.disabled=start.disabled=true;notice.textContent='Saving starting number…';
-      try{const updated=await saveStart(group.id,value);starts=updated??{...starts,[group.id]:value??1};if(value===null||value===1)delete starts[group.id];start.value=String(starts[group.id]??1);issuePage=gridPage=0;renderIssues();renderGrid();render();returnFocus=[...list.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===group.id)?.querySelector('button');notice.textContent='Starting number saved. Contents and ownership are unchanged.';}
+      try{const updated=await saveStart(group.id,value);starts=updated??{...starts,[group.id]:value??1};if(value===null||value===1)delete starts[group.id];start.value=String(starts[group.id]??1);issuePage=gridPage=0;renderIssues();renderGrid();render();returnFocus=[...list.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===group.id)?.querySelector(':scope > button');notice.textContent='Starting number saved. Contents and ownership are unchanged.';}
       catch(error){notice.textContent='Could not save starting number: '+error.message;}
       finally{save.disabled=reset.disabled=start.disabled=false;}
     }
@@ -191,7 +191,12 @@ export function createComicCoverageView(database,{starts={},transitions={},names
     status.textContent=`${counts.seriesGroups} series · ${counts.covered} covered issues${counts.partial?' · '+counts.partial+' partial':''} · ${counts.duplicates} owned multiple times · ${counts.missing} missing in assumed ranges${query?' · '+matches.length+' matching groups':''}.`;status.setAttribute('aria-busy','false');
     for(const group of matches.slice(page*size,(page+1)*size)){
       const row=el('article');row.className='tool-card';row.dataset.comicSeries=group.id;
-      row.append(el('h3',label(group)),el('p',`${countLabel(group)} · ${comicRange(group,starts[group.id]??1,transitions[group.id]).uncovered} missing`),button('Inspect issues',()=>select(group)));list.append(row);
+      const title=el('div');title.className='comic-series-card-title';
+      const rename=button('\u270e',()=>renameSeries(group,()=>{render();[...list.querySelectorAll('[data-comic-series]')].find(card=>card.dataset.comicSeries===group.id)?.querySelector('.comic-series-rename')?.focus({preventScroll:true});}));
+      rename.className='comic-series-rename';rename.title='Rename series';rename.setAttribute('aria-label','Rename series');
+      title.append(el('h3',label(group)),rename);
+      row.append(title,el('p',`${countLabel(group)} · ${comicRange(group,starts[group.id]??1,transitions[group.id]).uncovered} missing`),button('Inspect issues',()=>select(group)));list.append(row);
+      if(selected?.id===group.id)returnFocus=row.querySelector(':scope > button');
     }
     if(!matches.length)list.append(el('p',query?'No comic series match your search.':'No comparable comic coverage found. Owned books with explicit full contents or numbered standalone issues contribute automatically; manual review is optional.'));
     if(selected&&!groups.includes(selected)){selected=null;detail.hidden=true;overview.hidden=false;detail.replaceChildren();}
@@ -218,19 +223,22 @@ export function createComicCoverageView(database,{starts={},transitions={},names
   }
   function renameSeries(group,updated){
     const dialog=el('dialog');dialog.className='account-dialog';dialog.setAttribute('aria-label','Rename comic series');
-    const name=el('input');name.maxLength=300;name.value=displayName(group);name.setAttribute('aria-label','Series display name');
+    const name=el('input');name.maxLength=300;name.value=comicSeriesTitle(group,names);name.setAttribute('aria-label','Series display name');
     const field=el('label','Display series name ');field.append(name);
     const notice=el('p');notice.setAttribute('role','status');let saving=false;
     const cancel=button('Cancel',()=>{dialog.close();dialog.remove();}),save=button('Save name',()=>persistName(name.value.trim())),reset=button('Reset to default',()=>persistName(null));
-    dialog.append(el('h3','Rename series'),el('p','Change only this group’s display name. Issues, copies, source records and merge relationships stay unchanged.'),el('p','Issue type: '+group.unitType+'s'),field,el('p','Default name: '+defaultComicSeriesName(group)),notice,cancel,reset,save);
+    dialog.append(el('h3','Rename series'),el('p','Choose the complete display name, including any years or volume labels you want. The issue type is shown separately. Issues, copies, source records and merge relationships stay unchanged.'),el('p','Issue type: '+group.unitType+'s'),field,el('p','Default name: '+comicSeriesTitle(group,{[comicCoverageNameKey(group)]:null})),notice,cancel,reset,save);
     function validateName(){save.disabled=!name.value.trim();notice.textContent=save.disabled?'Enter a display name, or choose Reset to default.':'';}
     async function persistName(value){
       if(saving)return;if(value!==null&&!value){validateName();return;}saving=true;
       for(const control of dialog.querySelectorAll('button,input'))control.disabled=true;notice.textContent='Saving series name...';
-      try{names=await saveName(comicCoverageNameKey(group),value);rebuildLabels();updated();dialog.close();dialog.remove();}
+      try{names=await saveName(comicCoverageNameKey(group),value);rebuildLabels();dialog.close();dialog.remove();updated();}
       catch(error){saving=false;for(const control of dialog.querySelectorAll('button,input'))control.disabled=false;validateName();notice.textContent='Could not save series name: '+error.message;}
     }
-    name.addEventListener('input',validateName);dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();else dialog.remove();});validateName();document.body.append(dialog);dialog.showModal();name.focus();name.select();
+    name.addEventListener('input',validateName);
+    name.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.isComposing){event.preventDefault();persistName(name.value.trim());}});
+    dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();if(!saving){dialog.close();dialog.remove();}}});
+    dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();else dialog.remove();});validateName();document.body.append(dialog);dialog.showModal();name.focus();name.select();
   }
   function mergePicker(group){
     const dialog=el('dialog');dialog.className='account-dialog';dialog.setAttribute('aria-label','Merge comic series');

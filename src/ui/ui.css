@@ -229,6 +229,10 @@ button.danger { background:var(--gh-danger-fill); }
 .overlap-pair-details li { margin:8px 0; overflow-wrap:anywhere; }
 .overlap-pair-details summary { cursor:pointer; }
 .comic-series-list { display:grid; gap:12px; }
+.comic-series-card-title { display:flex; align-items:baseline; gap:6px; }
+.comic-series-card-title h3 { flex:1; margin-block:1em; min-width:0; }
+.comic-series-card-title .comic-series-rename { flex:none; padding:3px 6px; background:transparent; color:var(--gh-link); }
+.comic-series-rename:hover { background:var(--gh-surface-raised); }
 .comic-coverage .library-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
 .comic-coverage input[type=search] { flex:1 1 240px; }
 .comic-series-detail { margin-top:20px; border-top:1px solid var(--gh-divider); padding-top:16px; overflow:auto; }

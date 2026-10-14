@@ -1,7 +1,7 @@
 import {compareTitles} from '../lib/title-sort.js';
 import {comicRange} from '../lib/comic-coverage.js';
 import {identityKey} from '../lib/identity.js';
-import {comicSeriesDisplayName} from '../lib/comic-series-names.js';
+import {comicSeriesDisplayName,comicCoverageNameKey} from '../lib/comic-series-names.js';
 const numeric = value => /^\d+\/\d+$/u.test(value) ? Number(value.split('/')[0])/Number(value.split('/')[1]) : Number(value);
 export function seriesMergeTargets(source,groups,query='',displayNames={}){
   const text=identityKey(query),key=identityKey(source.series),words=new Set(key.split(' '));
@@ -10,11 +10,19 @@ export function seriesMergeTargets(source,groups,query='',displayNames={}){
   const score=group=>Math.max(...names(group).map(title=>{const value=identityKey(title);return value===key?1000:value.includes(key)||key.includes(value)?500:value.split(' ').filter(word=>words.has(word)).length;}));
   return groups.filter(group=>group.id!==source.id&&matches(group)).sort((a,b)=>Number(b.unitType===source.unitType)-Number(a.unitType===source.unitType)||score(b)-score(a)||compareTitles(comicSeriesLabel(a),comicSeriesLabel(b)));
 }
-export function comicSeriesLabel(group, groups = [group]) {
-  const base = item => item.series + (item.run ? ` (${item.run})` : '');
+export function comicSeriesTitle(group,names={}) {
+  const key=comicCoverageNameKey(group);
+  // Merge titles predate separate rename preferences and are also user names.
+  const custom=Object.hasOwn(names,key)?names[key]!==null:group.members?.length>1;
+  const title=comicSeriesDisplayName(group,names);
+  return title+(!custom&&group.run&&!title.endsWith(` (${group.run})`)?` (${group.run})`:'');
+}
+export function comicSeriesLabel(group, groups = [group],names={}) {
+  const base = item => comicSeriesTitle(item,names);
   const peers = groups.filter(item => base(item).toLocaleLowerCase() === base(group).toLocaleLowerCase());
   const qualifiers = [];
-  if(new Set(peers.filter(item=>item.unitType===group.unitType).map(item=>item.language)).size>1) qualifiers.push(group.language);
+  const key=comicCoverageNameKey(group),custom=Object.hasOwn(names,key)?names[key]!==null:group.members?.length>1;
+  if(!custom&&new Set(peers.filter(item=>item.unitType===group.unitType).map(item=>item.language)).size>1) qualifiers.push(group.language);
   return base(group)+' — '+(group.unitType==='issue'?'issues':group.unitType+'s')+(qualifiers.length?' · '+qualifiers.join(' · '):'');
 }
 // Presentation only: keep the engine's range assumptions and special numbering.

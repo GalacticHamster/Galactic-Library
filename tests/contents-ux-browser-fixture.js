@@ -68,6 +68,30 @@ try{
     const card=[...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===regular.id);button(card,'Inspect issues').click();assert(view.textContent.includes('36')&&view.textContent.includes('45'),'Recovered full issues missing from packaged view');view.remove();
     checks.push('Wonder Woman full run, separate annuals and publication-volume duplicates reach the packaged coverage view');
   }
+  {
+    const data=coverageDatabase(coverageBook('card-names','Collects Wonder Woman (1987-2006) #1-7; Wonder Woman Annual (1964) #2'),coverageBook('card-vol3','Collects Wonder Woman (2006-2011) #1-3'));
+    let names={},saves=0;
+    const options={saveName:async(key,value)=>{saves++;names={...names,[key]:value};return names;}};
+    let view=createComicCoverageView(data,options);document.body.append(view);const result=await view.ready,before=JSON.stringify(result.groups);
+    const card=id=>[...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===id);
+    const open=id=>{const row=card(id),icon=row.querySelector('[aria-label="Rename series"]');assert(icon.title==='Rename series'&&getComputedStyle(row.querySelector('.comic-series-card-title')).display==='flex','Card rename is inaccessible or not beside title');icon.click();assert(view.querySelector('.comic-series-detail').hidden,'Card rename opened inspector');return document.querySelector('dialog[aria-label="Rename comic series"]');};
+    for(const group of result.groups){
+      const title=group.run.includes('2006')?'Wonder Woman Vol 3 (2006–2011)':'Wonder Woman Vol 2 (1987–2006)',suffix=' — '+group.unitType+'s';
+      let dialog=open(group.id),input=dialog.querySelector('input');assert(input.value+suffix===card(group.id).querySelector('h3').textContent,'Editor omits part of displayed name');change(input,title,'input');input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await wait(()=>!dialog.isConnected,'Enter did not save');assert(card(group.id).querySelector('h3').textContent===title+suffix,'Custom card name gained a qualifier');
+      assert(document.activeElement===card(group.id).querySelector('[aria-label="Rename series"]'),'Save lost card keyboard focus');
+      dialog=open(group.id);assert(dialog.querySelector('input').value===title,'Card editor does not match custom name');change(dialog.querySelector('input'),'Discard me','input');dialog.querySelector('input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert(!dialog.isConnected&&card(group.id).querySelector('h3').textContent===title+suffix,'Escape saved draft or failed to close');
+      button(card(group.id),'Inspect issues').click();button(view,'Rename series').click();dialog=document.querySelector('dialog[aria-label="Rename comic series"]');assert(dialog.querySelector('input').value===title,'Detail editor differs from card');button(dialog,'Cancel').click();button(view,'Back to series').click();
+    }
+    assert(saves===result.groups.length&&JSON.stringify(result.groups)===before,'Rename changed coverage or cancel wrote preferences');view.remove();
+    view=createComicCoverageView(data,{...options,names});document.body.append(view);await view.ready;
+    for(const group of result.groups){const dialog=open(group.id);assert(dialog.querySelector('input').value===names[group.id],'Reload lost custom title');button(dialog,'Reset to default').click();await wait(()=>!dialog.isConnected,'Card reset failed');assert(card(group.id).querySelector('h3').textContent.includes('('+group.run+')'),'Reset lost automatic run metadata');}
+    view.remove();
+    const merged=checkMergeDialogFixture();view=createComicCoverageView(merged.database,{...options,merges:merged.merges});document.body.append(view);await view.ready;
+    let dialog=open(merged.merged.id);change(dialog.querySelector('input'),'My combined series (1982–1996)','input');button(dialog,'Save name').click();await wait(()=>!dialog.isConnected,'Merged card rename failed');
+    assert(card(merged.merged.id).querySelector('h3').textContent==='My combined series (1982–1996) — issues','Merged card gained a qualifier or lost issue type');
+    dialog=open(merged.merged.id);assert(dialog.querySelector('input').value==='My combined series (1982–1996)','Merged card editor differs from title');button(dialog,'Cancel').click();view.remove();
+    checks.push('Card pencil and detail share complete custom names: merged/regular/annual/year/volume labels, Enter save, Escape/Cancel, immediate focused card update, reload and reset preserve coverage');
+  }
   checkTitleSorting({...globalThis.LibraryTitleSort,compare:compareTitles},assert);checks.push('packaged title sorting uses written and numeric book, volume and part order');
   {
     const title='Saga of the Swamp Thing: Book Three',source=selectManifest([{selector:'description',text:'Continuing the run on THE SAGA OF THE SWAMP THING. Collecting issues #35-42.'}],title),book=coverageBook('contextual-three',source.statement,{title});
@@ -202,7 +226,7 @@ try{
  const mergeView=createComicCoverageView(mergeDb,mergeOptions);document.body.append(mergeView);await mergeView.ready;
  const sourceCard=[...mergeView.querySelectorAll('[data-comic-series]')].find(row=>row.textContent.includes('Peter Parker'));button(sourceCard,'Inspect issues').click();button(mergeView,'Merge with another series').click();
  const picker=document.querySelector('dialog[aria-label="Merge comic series"]');change(picker.querySelector('[aria-label="Search merge target"]'),'Spectacular','input');assert(picker.querySelectorAll('[data-merge-target]').length===1,'Target picker failed scope/self exclusion');picker.querySelector('[data-merge-target]').click();picker.querySelector('[aria-label="Merged series name"]').value='Spectacular Spider-Man';button(picker,'Combine series').click();
- await wait(()=>mergeView.querySelectorAll('[data-comic-grid-issue]').length===5,'Merged coverage not rendered');assert(mergeView.querySelector('.comic-series-detail h3').textContent==='Spectacular Spider-Man (1976) — issues','Preferred series name or issue type missing');mergeView.querySelector('[data-comic-grid-issue="3"]').click();assert(mergeView.querySelectorAll('.comic-issue-sources a').length===2,'Merged duplicate links missing');
+ await wait(()=>mergeView.querySelectorAll('[data-comic-grid-issue]').length===5,'Merged coverage not rendered');assert(mergeView.querySelector('.comic-series-detail h3').textContent==='Spectacular Spider-Man — issues','Preferred series name or issue type missing');mergeView.querySelector('[data-comic-grid-issue="3"]').click();assert(mergeView.querySelectorAll('.comic-issue-sources a').length===2,'Merged duplicate links missing');
  button(mergeView,'Back to series').click();assert(mergeView.querySelectorAll('[data-comic-series]').length===1,'Original series still duplicated');mergeView.remove();
  const reloadedMergeView=createComicCoverageView(mergeDb,{...mergeOptions,merges:(await writer.getUiPreferences()).comicCoverageMerges});document.body.append(reloadedMergeView);await reloadedMergeView.ready;assert(reloadedMergeView.querySelectorAll('[data-comic-series]').length===1,'Reload lost merge');button(reloadedMergeView,'Inspect issues').click();button(reloadedMergeView,'Undo series merge').click();button(document.querySelector('.confirmation-dialog'),'Separate series').click();
  await wait(()=>reloadedMergeView.querySelectorAll('[data-comic-series]').length===2,'Undo did not recover original series');reloadedMergeView.remove();checks.push('Searchable series merge preserves supporting books, chosen name, reload and undo');

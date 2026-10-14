@@ -5,9 +5,24 @@ import {mergeUiPreferences,defaultUiPreferences} from '../src/lib/ui-preferences
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createBackup,parseBackup,parseBackupPreferences} from '../src/lib/storage.js';
 import {checkMergeDialogFixture} from './merge-dialog-fixture.js';
-import {comicSeriesLabel,seriesMergeTargets} from '../src/ui/comic-coverage-presentation.js';
+import {comicSeriesTitle,comicSeriesLabel,seriesMergeTargets} from '../src/ui/comic-coverage-presentation.js';
 import {coverageBook,coverageDatabase} from './inferred-coverage-fixture.js';
 export const comicSeriesNameTests=[
+ ['custom coverage names own every qualifier except issue type, including annuals and legacy merged names',()=>{
+   for(const unitType of ['issue','annual'])for(const merged of [false,true]){
+     const group={id:JSON.stringify(['wonder woman','volume 2',unitType,'en']),series:'Wonder Woman',run:'volume 2',unitType,language:'en'};
+     if(merged){group.members=[group.id,JSON.stringify(['wonder woman','1987-2006',unitType,'en'])];group.originalScopes=[{series:'Wonder Woman',run:'volume 2'}];}
+     const title='Wonder Woman Vol 2 (1987–2006)',names={[comicCoverageNameKey(group)]:title},before=JSON.stringify(group);
+     assert.equal(comicSeriesTitle(group,names),title);
+     assert.equal(comicSeriesLabel(group,[group,{...group,language:'fr'}],names),title+' — '+unitType+'s');
+     assert.equal(comicSeriesTitle(group,{[comicCoverageNameKey(group)]:null}),'Wonder Woman (volume 2)');
+     assert.equal(JSON.stringify(group),before);
+     if(merged)assert.equal(comicSeriesLabel({...group,series:title}),title+' — '+unitType+'s');
+   }
+   const group={id:'v3',series:'Wonder Woman',run:'volume 3',unitType:'issue'};
+   assert.equal(comicSeriesLabel(group,[group],{v3:'Wonder Woman Vol 3 (2006–2011)'}),'Wonder Woman Vol 3 (2006–2011) — issues');
+   assert.equal(comicSeriesTitle({...group,series:'Wonder Woman (volume 3)'}),'Wonder Woman (volume 3)');
+ }],
  ['renaming preserves complete copies, duplicates, partial coverage and supporting identities',async()=>{
    const database=coverageDatabase(coverageBook('full','Collects Alpha (2001) #1 and material from Alpha (2001) #2'),coverageBook('other-full','Collects Alpha (2001) #1')),data={},writer=createStorageWriter({get:async defaults=>({...defaults,...data}),set:async values=>Object.assign(data,structuredClone(values))});await writer.restoreDatabase(database);
    const before=await writer.getDatabase(),groups=comicCoverageForLibrary(before).groups,group=groups[0];assert.equal(group.covered,1);assert.equal(group.duplicates,1);assert.equal(group.partial,1);
