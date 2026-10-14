@@ -133,6 +133,7 @@
   "src/ui/operation-feedback.js",
   "src/ui/options.js",
   "src/ui/ownership-review.js",
+  "src/ui/quick-access.js",
   "src/ui/pagination.js",
   "src/ui/performance-diagnostics.js",
   "src/ui/popup.js",

@@ -39,6 +39,7 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
     item={...original,ownership:ownershipInference.observedOwnership};
   }
   const review=database.ownershipReviews?.[item.recordRef];
+  if(review?.source==='user-correction')return reviewedOwnershipRecord(item,review,now);
   // Explicit loss of access is not uncertainty to assume away. Keep the raw
   // observation intact; a saved user return also survives subsequent imports.
   const terminal=state=>['returned','revoked','expired'].includes(state);
@@ -63,8 +64,13 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
     const inferred=globalThis.GalacticKindleOwnership.infer(item);
     return inferred?{...item,ownership:inferred.ownership,ownershipInference:{observedOwnership:item.ownership,basis:inferred.basis}}:item;
   }
+  return reviewedOwnershipRecord(item,review,now);
+}
+
+function reviewedOwnershipRecord(item,review,now){
   const expired=review.expiresAt&&Date.parse(review.expiresAt)<=now;
-  const negativeKey=expiredKey||item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
+  const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
+  const negativeKey=key&&item.metadata?.expiresAt&&Date.parse(item.metadata.expiresAt)<=now||item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
   const ownership=expired||negativeKey&&['owned','claimed'].includes(review.ownership)?'unknown':review.ownership;
   return {...item,ownership,manualOwnershipEvidence:{source:review.source,confirmedAt:review.confirmedAt,evidenceDate:review.evidenceDate,expiresAt:review.expiresAt}};
 }

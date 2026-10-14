@@ -55,6 +55,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'saveTitleAliases',
   'saveOwnershipReview',
   'removeOwnershipReview',
+  'saveOwnershipCorrections',
   'importPurchaseEvidence',
   'refreshPurchaseEvidence',
   'applyPurchaseEvidence',

@@ -8,6 +8,7 @@ import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} f
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
+import {createAccessCardControls,openQuickAccessEditor} from './quick-access.js';
 import {createPagination} from './pagination.js';
 import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
 import {createItemDetailsBody} from './item-details.js';
@@ -39,7 +40,7 @@ import {createRemindersView,requestReminderPermissions} from './reminders.js';
 import {removeCompanionFeed,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings} from '../lib/storage.js';
 import {createSyncHealthView} from './sync-health.js';
 import {cancelProviderScan} from '../lib/storage.js';
-import {saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
+import {saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, parseBackupPreferences, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision,savePreferredDisplayTitle, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
@@ -92,6 +93,20 @@ const genreFilter = document.querySelector('#genre-filter');
 const clearFilters = document.querySelector('#clear-filters');
 const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
+const selectedAccessRecords=new Map(),accessSelection=document.createElement('div'),accessResult=document.createElement('p');
+accessSelection.className='actions';accessSelection.setAttribute('aria-label','Selected access changes');accessSelection.hidden=true;accessResult.setAttribute('role','status');
+items.before(accessSelection,accessResult);
+function updateAccessSelection(){
+  const current=new Map(Object.values(database?.providerItems??{}).map(record=>[record.recordRef,record]));for(const [ref,scope]of selectedAccessRecords){const record=current.get(ref);if(!record||record.provider!==scope.provider||record.profileId!==scope.profileId)selectedAccessRecords.delete(ref);}
+  accessSelection.hidden=!selectedAccessRecords.size;accessSelection.replaceChildren();if(!selectedAccessRecords.size)return;
+  const count=document.createElement('span');count.textContent=selectedAccessRecords.size+' selected copies';
+  const edit=document.createElement('button');edit.type='button';edit.textContent='Change access for selected';edit.addEventListener('click',()=>editAccess(Object.values(database.providerItems).filter(record=>selectedAccessRecords.has(record.recordRef)),true));
+  const clear=document.createElement('button');clear.type='button';clear.textContent='Clear selection';clear.addEventListener('click',()=>{selectedAccessRecords.clear();render();});accessSelection.append(count,edit,clear);
+}
+function editAccess(records,bulk=false){
+  if(!drafts.allowNavigation())return;
+  openQuickAccessEditor(records,database,{selectedRefs:bulk?records.map(r=>r.recordRef):undefined,save:(targets,value)=>saveOwnershipCorrections(targets,value),saved:(updated,count,cleared)=>{database=updated;selectedAccessRecords.clear();accessResult.textContent=count+' '+(count===1?'copy':'copies')+(cleared?' restored to provider-derived access.':' updated.');render();}});
+}
 const unlinkedAddOnsSection = document.querySelector('#unlinked-add-ons-section');
 const unlinkedAddOnsSummary = document.querySelector('#unlinked-add-ons-summary');
 const unlinkedAddOns = document.querySelector('#unlinked-add-ons');
@@ -798,6 +813,7 @@ function render(timing = null) {
   if(summary.textContent!==summaryText)summary.textContent=summaryText;
 
   endSegment?.();endSegment=timing?.begin('options_cards');
+  updateAccessSelection();
   libraryPaging.update({total:result.total,page:libraryPage,size:workspace.pageSize});
   items.replaceChildren(...result.rows.map((row) => {
     const canonicalItem=row.canonical;
@@ -807,6 +823,7 @@ function render(timing = null) {
     const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
     node.className = 'library-item';
     node.append(createLibraryResultSummary(row,database,{filtered:Object.entries(filters).some(([key,value])=>key!=='mediaType'&&value!==filterDefault(key)),information:filters.information,series:value=>{seriesFilter.value=value;search.value='';librarySort.value='series';viewChanged();}}));
+    node.append(createAccessCardControls(row.qualifying.map(value=>value.record),database,{selected:selectedAccessRecords,onSelect:(record,checked)=>{if(checked&&selectedAccessRecords.size>=500){accessResult.textContent='Change up to 500 account copies at once.';return;}checked?selectedAccessRecords.set(record.recordRef,{provider:record.provider,profileId:record.profileId}):selectedAccessRecords.delete(record.recordRef);updateAccessSelection();},change:editAccess}));
     const details=document.createElement("details");details.className="item-details";details.dataset.canonicalId=canonicalItem.id;
     details.append(textElement("summary","Details"));
     const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;

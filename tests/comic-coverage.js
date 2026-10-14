@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {ownershipCoverageTests} from './ownership-coverage.js';
 import {kindleReturnTests} from './kindle-returns.js';
+import {quickOwnershipTests} from './quick-ownership.js';
 import {wonderWomanCoverageTests} from './wonder-woman-coverage.js';
 import {contextualCollectionCoverageTests} from './contextual-collection-coverage.js';
 import {readFile} from 'node:fs/promises';
@@ -24,6 +25,7 @@ import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
  ...ownershipCoverageTests,
  ...kindleReturnTests,
+ ...quickOwnershipTests,
  ...wonderWomanCoverageTests,
  ...contextualCollectionCoverageTests,
  ...comicSeriesNameTests,

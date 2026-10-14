@@ -1,5 +1,30 @@
 # Treat library items as owned
 
+Use **Change access** on a Library card for ordinary corrections. Choose the
+status, optionally add a note, and Save. No explanation, receipt, evidence date
+or confirmation checkbox is required. GL records when you made the correction;
+it does not infer when you purchased, returned or lost access to the book.
+Cancel keeps the previous status.
+
+For several books, use the **Select** checkbox on each card, then **Change access
+for selected**. Cards containing several account copies offer **Select account
+copies** so you can choose exactly which provider/accounts to change. The editor
+previews every chosen copy and its current status before Save. Changes apply
+atomically to up to 500 selected account copies; an outdated selection must be
+reloaded rather than partially applied. Selection can span pages and filters.
+
+Choose **Use provider status (clear correction)** in the same editor to remove
+your correction. Quick corrections use the existing ownership-review storage,
+survive imports and backup/restore, and update coverage and duplicate counts.
+They take precedence over provider inference and assume-owned preferences.
+Reseller purchase confirmations still do not establish destination activation.
+Original provider observations, titles, contents and purchase information stay
+unchanged. Other owned copies of an issue continue contributing to coverage.
+
+The existing **Details → Your library → Confirm ownership with dated evidence**
+form remains available for detailed documentation. It retains its evidence/date
+requirements; ordinary changes do not require opening it.
+
 Kindle purchases migrated from Comixology are recognized from the saved Kindle
 library context. This is separate from the optional override below: it does not
 include Comics Unlimited, Kindle Unlimited, loans, rentals, samples or conflicting
@@ -14,7 +39,7 @@ ownership. Each entry shows its status, exclusion reason and issue ranges.
 Saving a correction updates coverage without rescanning the provider or editing
 the book's contents. The section stays collapsed during ordinary browsing.
 
-For a refunded book, open its **Details → Your library → Confirm ownership with
+For detailed refund documentation, open **Details → Your library → Confirm ownership with
 dated evidence**, choose **Returned / Refunded**, record the checked evidence
 and date, then confirm and save. Check the exact product/ASIN and account, not
 just a similar title. **Access revoked** and **Access expired** are also available.
@@ -28,7 +53,9 @@ assume-owned settings below. A saved return correction survives provider updates
 and backup/restore. If the book is later purchased again, review the current
 account/product evidence and update or undo the correction. A provider-reported
 completed return cannot be overridden by purchase inference or an old purchase
-confirmation. Absence from a scan never establishes a return.
+confirmation. A new quick correction is your explicit choice about current
+access. Clearing it restores provider-derived status. Absence from a scan never
+establishes a return.
 
 The Kindle scanner reads Amazon's Content & Devices library response, not order
 history. It recognizes completed return/refund, revoked and expired status when

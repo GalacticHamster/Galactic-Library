@@ -835,6 +835,21 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function removeOwnershipReview(ref,expected){
     const database=await getDatabase();currentOwnershipRecord(database,ref,expected);delete database.ownershipReviews[ref];return persistDatabase(database);
   }
+  async function saveOwnershipCorrections(targets,value){
+    if(!Array.isArray(targets)||!targets.length||targets.length>500||new Set(targets.map(t=>t?.recordRef)).size!==targets.length)throw Error('Choose 1–500 distinct account records.');
+    if(!value||!Object.hasOwn(value,'ownership'))throw Error('Choose an access status.');
+    const confirmedAt=new Date().toISOString();
+    const review=value.ownership===null?null:validateOwnershipReview({ownership:value.ownership,note:value.note??'',source:'user-correction',evidenceDate:null,sourceUrl:'',expiresAt:null,confirmedAt,reviewRef:crypto.randomUUID()});
+    const database=await getDatabase();
+    // Validate the entire selection before editing or persisting any record.
+    for(const target of targets){
+      if(!target||!Object.hasOwn(target,'expectedReviewRef'))throw Error('Reload the selected records before changing access.');
+      const item=currentOwnershipRecord(database,target.recordRef,target.expectedReviewRef);
+      if(item.provider!==target.provider||item.profileId!==target.profileId)throw Error('A selected account changed. Reload before changing access.');
+    }
+    for(const target of targets){if(review)database.ownershipReviews[target.recordRef]={...review,reviewRef:crypto.randomUUID()};else delete database.ownershipReviews[target.recordRef];}
+    return persistDatabase(database);
+  }
   async function importPurchaseEvidence(entries){
     if(!Array.isArray(entries)||!entries.length||entries.length>1000)throw new Error('Import 1–1,000 purchase evidence entries.');
     const evidence=entries.map(purchaseEvidence),database=await getDatabase(),now=new Date().toISOString();
@@ -1371,7 +1386,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
     saveContentReview, removeContentReview,
-    separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
+    separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
   };
   let tail = Promise.resolve();

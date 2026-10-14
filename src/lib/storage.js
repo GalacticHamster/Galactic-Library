@@ -32,7 +32,7 @@ export const {
   saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection,
   applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
   separateEdition, undoEditionSeparation, saveTitleAliases,
-  saveOwnershipReview,removeOwnershipReview,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
+  saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
   saveContentReview, removeContentReview,
   getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge, getShowEnrichmentActions, saveShowEnrichmentActions

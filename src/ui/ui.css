@@ -229,6 +229,14 @@ button.danger { background:var(--gh-danger-fill); }
 .overlap-pair-details li { margin:8px 0; overflow-wrap:anywhere; }
 .overlap-pair-details summary { cursor:pointer; }
 .comic-series-list { display:grid; gap:12px; }
+.library-access-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:6px; font-size:.85rem; }
+.library-access-actions button { padding:4px 8px; }
+.library-access-actions label { display:inline-flex; align-items:center; gap:4px; }
+.library-access-actions details label { display:flex; margin-block:6px; }
+.quick-access-preview { max-height:35vh; overflow:auto; margin-bottom:12px; }
+.quick-access-preview label { display:flex; align-items:baseline; gap:8px; padding-block:6px; overflow-wrap:anywhere; }
+.quick-access-editor fieldset > label { display:grid; gap:4px; margin-bottom:12px; }
+.quick-access-editor fieldset > button { margin-right:8px; }
 .comic-series-card-title { display:flex; align-items:baseline; gap:6px; }
 .comic-series-card-title h3 { flex:1; margin-block:1em; min-width:0; }
 .comic-series-card-title .comic-series-rename { flex:none; padding:3px 6px; background:transparent; color:var(--gh-link); }

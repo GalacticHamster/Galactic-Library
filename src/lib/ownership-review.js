@@ -5,9 +5,10 @@ import {identityEvidence,validIsbn,titleIdentity} from './identity.js';
 const uuid=value=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(value);
 export function validateOwnershipReview(value){
   object(value,'Ownership confirmation');const ownership=text(value.ownership,20,'Ownership');
-  if(!OWNERSHIP_STATES.includes(ownership)||!['manual-confirmation','local-purchase-history'].includes(value.source))throw new Error('Invalid ownership confirmation.');
-  const note=text(value.note,2000,'Ownership evidence');if(!note)throw new Error('Describe the ownership evidence.');
-  const evidenceDate=date(value.evidenceDate,'Evidence date');if(!evidenceDate)throw new Error('An evidence date is required.');
+  if(!OWNERSHIP_STATES.includes(ownership)||!['manual-confirmation','local-purchase-history','user-correction'].includes(value.source))throw new Error('Invalid ownership confirmation.');
+  const quick=value.source==='user-correction';
+  const note=text(value.note,2000,'Ownership evidence');if(!quick&&!note)throw new Error('Describe the ownership evidence.');
+  const evidenceDate=date(value.evidenceDate,'Evidence date');if(!quick&&!evidenceDate)throw new Error('An evidence date is required.');
   const expiresAt=date(value.expiresAt,'Access expiry');if(expiresAt&&!['rental','borrowed','subscription'].includes(ownership))throw new Error('Access expiry applies only to temporary access.');
   if(!uuid(value.reviewRef))throw new Error('Invalid ownership confirmation reference.');
   const confirmedAt=date(value.confirmedAt);if(!confirmedAt)throw new Error('An ownership confirmation date is required.');
