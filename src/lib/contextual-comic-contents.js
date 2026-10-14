@@ -170,7 +170,7 @@ export function contextualComicInput(statement,title,context={}){
  const plainHost=s=>identityKey(s.replace(/\s*\(\d{4}(?:[-–—]\d{0,4})?\)$/u,''));
  const otherHostBefore=index=>[...body.slice(0,index).matchAll(/(?:^|[,;]\s*|\s+and\s+)([\p{Lu}][^#;,]{1,180}?)\s+(?:issues?\s*)?#\s*\d/gu)].some(m=>plainHost(m[1])!==plainHost(anchor??''));
  // A date identifies an annual PUBLICATION, not annual #2022 or regular #1.
- body=body.replace(/(?:^|[,;]\s*(?:and\s+)?|\s+(?:and|as well as)\s+)(?:the\s+)?((?:19|20)\d{2}(?:\s+and\s+(?:19|20)\d{2})*)\s+Annuals?\b(?!\s*#?\d)/giu,(all,years,index)=>{
+ body=body.replace(/(?:^|[,;]\s*(?:(?:and|plus)\s+)?|\s+(?:and|plus|as well as)\s+)(?:the\s+)?((?:19|20)\d{2}(?:\s+and\s+(?:19|20)\d{2})*)\s+Annuals?\b(?!\s*#?\d)/giu,(all,years,index)=>{
    if(!anchor||otherHostBefore(index))return all;const observed=clean(context.subjectSeries),parent=observed&&!/\bcollection\b/iu.test(observed)&&identityKey(anchor).startsWith(identityKey(observed)+' ')?observed:anchor;
    for(const year of years.match(/\d{4}/gu))named.push({series:parent.replace(/\s*\(\d{4}(?:[-–—]\d{0,4})?\)$/u,'')+' Annual',run:'publication '+year,unitType:'annual',number:'unnumbered',language:'',completeness:extentAt(index)});
    changed=true;evidence.push({kind:'dated-annual',years});return '; ';

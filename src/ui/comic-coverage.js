@@ -7,6 +7,7 @@ import {loadCoverageProjection} from './collection-overlap-projection.js';
 import {comicRange,comicIssuePage,comicCoverageSummary,comicGroupCounts,comicSequenceOffset,validateNumberingTransitions} from '../lib/comic-coverage.js';
 import {createPagination} from './pagination.js';
 import {accountLabel} from './item-presentation.js';
+import {publicationEvidence} from './contents-interpretation.js';
 import {bookHref} from './contents-navigation.js';
 import {comicSeriesTitle,comicSeriesLabel,coverageSegments,comicGridPage,seriesMergeTargets} from './comic-coverage-presentation.js';
 export {comicSeriesLabel} from './comic-coverage-presentation.js';
@@ -43,6 +44,7 @@ export function createComicCoverageView(database,{starts={},transitions={},names
     const li=el('li');li.append(link,el('span',source.completeness==='excerpt'?' — Partial coverage':' — Complete issue'));
     if(source.seriesScope)li.append(el('span',' — '+source.seriesScope.series+(source.seriesScope.run?' ('+source.seriesScope.run+')':'')));
     if(source.runInference){const note=el('span',' (Run inferred: '+source.runInference.run+'. '+source.runInference.reason+'. '),review=el('a','Review contents');review.href=bookHref('contents',record.recordRef);note.append(review,')');li.append(note);}
+    if(source.publicationResolution)li.append(publicationEvidence([source.publicationResolution]));
     if(source.statement){const evidence=el('details');evidence.append(el('summary','Source evidence'),el('blockquote',source.statement));if(source.annualInference){const original=source.annualInference,review=el('a','Review contents');review.href=bookHref('contents',record.recordRef);evidence.append(el('p','Original annual label: '+original.series+(original.year?' ('+original.year+')':original.run?' ('+original.run+')':'')+'. Grouped using saved collection and series context.'),review);}li.append(evidence);}list.append(li);
   }
   function select(group){

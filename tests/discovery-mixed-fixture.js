@@ -4,7 +4,7 @@ import {excerptBook} from './excerpt-extent-fixture.js';
 import {coverageDatabase} from './inferred-coverage-fixture.js';
 import {collectionContents} from '../src/lib/inferred-coverage.js';
 
-export const discoveryCounts=[7,8,10,3,4,16,11,1,8,2,7,7,16,13,5,12,8,7];
+export const discoveryCounts=[7,8,10,3,4,16,11,1,8,9,15,15,16,13,5,12,8,7];
 export function discoveryBook(c,index=0){
  const book=excerptBook(c,index),source=book.metadata.enrichment.kindleProductComicContents;
  source.manifest=validateManifest(source.manifest,c.title);return book;
@@ -22,9 +22,9 @@ export function checkDiscoveryCase(c,index,assert){
  if(index===5){assert(p.entries.every(e=>e.completeness==='excerpt'),'Story completeness became full host coverage');assert(p.entries.filter(e=>e.number==='124').length===1,'Repeated #124');assert(p.unparsed.join(' ').includes('full-length tale'),'Complete story evidence lost');assert(p.supportingStatements.some(s=>s.includes('#124-129')),'Compatible same-sentence claim lost');}
  if(index===7)assert(p.entries[0].number==='150'&&p.entries[0].completeness==='full','Issue/volume equivalence lost');
  if(index===8)assert(p.entries.filter(e=>e.unitType==='annual').length===1,'Annual lost');
- if(index===9){assert(comic.every(e=>e.series==='ROBIN 3000'),'Mixed named work became an issue');assert(p.entries.filter(e=>e.unitType==='component').length===7&&p.entries.some(e=>e.number==='BATMAN: THE BLUE, THE GREY, AND THE BAT'),'Named publications or title commas discarded');}
- if(index===10)assert(p.entries.every(e=>e.series==='Teenage Mutant Ninja Turtles'),'Wrong postposed series');
- if(index===11)assert(p.entries.filter(e=>e.unitType==='issue').length===6&&p.entries.some(e=>e.unitType==='special'&&e.run==='publication 2015'&&e.number==='unnumbered'),'Ongoing series/FCBD lost');
+ if(index===9){assert(comic.filter(e=>e.unitType==='issue').every(e=>e.series==='ROBIN 3000'),'Mixed named work became a numbered issue');assert(p.entries.filter(e=>e.unitType==='special'&&e.number==='unnumbered').length===7&&p.entries.some(e=>e.series==='Batman: The Blue, the Grey, and the Bat'),'Named publications or title commas discarded');}
+ if(index===10)assert(p.entries.filter(e=>e.series==='Teenage Mutant Ninja Turtles').length===7,'Wrong postposed series');
+ if(index===11)assert(p.entries.filter(e=>e.series==='Teenage Mutant Ninja Turtles'&&e.unitType==='issue').length===6&&p.entries.some(e=>e.unitType==='special'&&e.run==='publication 2015'&&e.number==='unnumbered'),'Ongoing series/FCBD lost');
  if(index===12){assert(p.entries.filter(e=>e.completeness==='full').length===10,'Doom Patrol subject extent lost');assert(p.entries.filter(e=>e.completeness==='excerpt').length===6,'Anthology host promoted');}
  if(index===13)assert(p.entries.filter(e=>e.unitType==='issue').length===12&&p.entries.some(e=>e.unitType==='annual'&&e.number==='2'),'Arc/annual scope lost');
  assert(JSON.stringify(c)===before,'Changed captured evidence');return {p,book,db};

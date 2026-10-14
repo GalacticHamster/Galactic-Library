@@ -4,6 +4,7 @@ import {effectiveOwnershipRecord,coverageAccessExclusion} from './ownership.js';
 import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
 import {inferCoverageRuns} from './coverage-run-context.js';
 import {resolveAnnualCoverage,annualHintForEntry} from './coverage-annual-context.js';
+import {resolvePublicationRun} from './comic-publications.js';
 
 // Local collection tools only. Companion matching retains its reviewed-only
 // index. Proposals are derived from current selected source, never history or
@@ -158,7 +159,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   // Access gates participation, not the identity evidence available locally.
   for(const original of Object.values(database.providerItems??{})){
     if(original.mediaType!=='book')continue;
-    const contents=collectionContents(original,database),entries=resolvedContentsEntries(contents,original);
+    const contents=collectionContents(original,database),entries=resolvedContentsEntries(contents,original).map(entry=>contents.review||runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))?entry:resolvePublicationRun(entry,original.metadata?.enrichment?.kindleProductComicContents));
     const standalone=contents.confidence==='rejected'?[]:standaloneContents(original).map(entry=>resolveCoverageEntry(entry,original));
     rows.push({original,contents,entries,standalone});
     for(const entry of [...entries,...standalone]){

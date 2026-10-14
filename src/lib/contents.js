@@ -5,7 +5,7 @@ import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} fr
 import {contextualComicInput} from './contextual-comic-contents.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 14;
+export const CONTENTS_PARSER_VERSION = 15;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -532,7 +532,7 @@ export function seriesCoverage(database,options={}) {
     const group=groups.get(key)??{series:entry.series,run:entry.run,language:entry.language,unitType:entry.unitType,entries:[],...(component?{parentItemId,parentTitle:parent.title,mediaType:parent.mediaType}:{})};
     const supporting=provisional?evidence.filter(value=>value.item.id===parent.id):evidence;
     const complete=supporting.filter(value=>value.entry.completeness==='full'),primary=complete.length?complete:supporting;
-    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(entry.runInference?{runInference:entry.runInference}:{}),...(entry.annualInference?{annualInference:entry.annualInference}:{}),...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
+    group.entries.push({number:entry.number,confidence:primary.some(value=>value.review)?'verified':primary.some(value=>value.confidence==='direct')?'direct':'inferred',provisional,...(options.includeExcerpts?{partial:!complete.length}:{}),sources:supporting.map(({item,confidence,entry,statement})=>({id:item.id,title:item.title,provider:item.provider,confidence,...(entry.runInference?{runInference:entry.runInference}:{}),...(entry.annualInference?{annualInference:entry.annualInference}:{}),...(entry.publicationResolution?{publicationResolution:entry.publicationResolution}:{}),...(options.includeExcerpts?{completeness:entry.completeness,statement}: {})}))});groups.set(key,group);
   }
   return [...groups.values()].map((group)=>{
     const numeric=group.unitType==='component'?[]:group.entries.map((entry)=>/^\d+$/u.test(entry.number)?Number(entry.number):null).filter((number)=>number!==null).sort((a,b)=>a-b);

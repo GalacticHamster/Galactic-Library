@@ -171,5 +171,7 @@
   "src/lib/display-title.js",
   "src/ui/relationship-picker.js",
   "src/ui/coverage-exclusions.js",
-  "shared/natural-title-sort.js"
+  "shared/natural-title-sort.js",
+  "src/lib/comic-publications.js",
+  "src/lib/publication-reference-data.js"
 ]

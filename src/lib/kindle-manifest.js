@@ -1,5 +1,6 @@
 import {proposeContentsForReview,contentKey} from './contents.js';
 import {assessContentsQuality,naturalContentsClaims,recoveredNaturalContents} from './contents-quality.js';
+import {resolveNamedPublications} from './comic-publications.js';
 
 // Source acquisition stays in the classic adapter. Assessment stays beside the
 // existing review parser in the worker; no page-side module/permission changes.
@@ -227,7 +228,7 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
   const recovered=recoveredNaturalContents(saved);
   if(recovered&&(!statement||sameSourceText(statement,recovered.raw))){
     const proposal=proposeContentsForReview(recovered.input,title,{...context,allowTitleBinding:true,naturalCollection:true,extentDescription:saved.manifest.blocks.map(b=>b.text).join('\n')});
-    return {...proposal,manifestEvidence:recovered.raw,recoveredFromDescription:true,descriptionMayBeIncomplete:Boolean(saved.manifest?.descriptionMayBeIncomplete)};
+    return resolveNamedPublications({...proposal,manifestEvidence:recovered.raw,recoveredFromDescription:true,descriptionMayBeIncomplete:Boolean(saved.manifest?.descriptionMayBeIncomplete)},saved,recovered.input);
   }
   // Old selections remain source history. Reinterpret only a proven parent of
   // that exact saved child, never a better-ranked unrelated secondary claim.
@@ -272,10 +273,11 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
         const following=block.slice(interpreted.end),supplement=/^\s*Also\s+(includes?\s+(?:prose story|a sketchbook|a special sketchbook)[^\n]{0,400}?)(?=\n|$)/iu.exec(following);
         if(supplement){unparsed.push(supplement[1]);supportingStatements.push(supplement[0].trim());}
       }
-      return {...proposal,unparsed,...(supportingStatements.length?{supportingStatements}:{}),outcome:incomplete&&proposal.outcome==='full'||unparsed.length&&proposal.entries.length?'partial':proposal.outcome,parseBinding:proposal.parseBinding==='explicit-statement'?interpreted.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete,...(interpreted.whole||!sameSourceText(interpreted.raw,saved.statement)?{manifestEvidence:interpreted.raw,manifestCoverage:incomplete?'bounded':interpreted.whole?'whole-clause':'same-source-enumeration'}: {})};
+      return resolveNamedPublications({...proposal,unparsed,...(supportingStatements.length?{supportingStatements}:{}),outcome:incomplete&&proposal.outcome==='full'||unparsed.length&&proposal.entries.length?'partial':proposal.outcome,parseBinding:proposal.parseBinding==='explicit-statement'?interpreted.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete,...(interpreted.whole||!sameSourceText(interpreted.raw,saved.statement)?{manifestEvidence:interpreted.raw,manifestCoverage:incomplete?'bounded':interpreted.whole?'whole-clause':'same-source-enumeration'}: {})},saved,interpreted.raw);
     }
   }
-  return proposeContentsForReview(statement,title,reviewContext);
+  const proposal=proposeContentsForReview(statement,title,reviewContext);
+  return reviewContext.allowTitleBinding?resolveNamedPublications(proposal,saved,statement):proposal;
 }
 
 // Recompute inputs/ranks from bounded source. A parser upgrade must not replace

@@ -1,0 +1,775 @@
+{
+  "note": "Bounded public description and captured publisher/series inputs for named-publication resolution. Synthetic automatic-selection flags. No account, purchase, record identifiers, timestamps or private library data.",
+  "cases": [
+    {
+      "title": "Civil War: Iron Man",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects Iron Man/Captain America: Casualties of War, Iron Man #13-14, Civil War: The Confession.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Civil War: Iron Man",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Collects Iron Man/Captain America: Casualties of War, Iron Man #13-14, Civil War: The Confession.\nIn the midst of CIVIL WAR, Captain America and Iron Man meet secretly, one last time, to see if there's any hope of working things out before further tragedy occurs. How could these two men, once the closest of friends, end up leading opposing super hero armies?\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 0,
+              "end": 97,
+              "contextStart": 0,
+              "contextEnd": 97,
+              "raw": "Collects Iron Man/Captain America: Casualties of War, Iron Man #13-14, Civil War: The Confession.",
+              "parserInput": "Collects Iron Man/Captain America: Casualties of War, Iron Man #13-14, Civil War: The Confession",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0,
+              "rank": [
+                2,
+                2,
+                2,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 2,
+              "unresolved": 2
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00AWR00JM",
+          "sourceUrl": "https://www.amazon.com/dp/B00AWR00JM",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Marvel",
+              "value": "Marvel",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Civil War: Iron Man",
+              "value": "Part of: Civil War: Iron Man",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JJKN59K"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B00AWR00JM"
+      }
+    },
+    {
+      "title": "John Constantine, Hellblazer Vol. 8: Rake at the Gates of Hell (Hellblazer (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "collecting issues #72-83 as well as the special one-shot HEARTLAND.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "John Constantine, Hellblazer Vol. 8: Rake at the Gates of Hell (Hellblazer (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "John Constantine heads towards a final showdown with a revenge-crazed Satan during a raging race riot, and in addition to desperately trying to save his dwindling number of living friends, Constantine also has one final reunion with his lost love Kit.\nThis re-cut volume features Garth Ennis' and Steve Dillon's final JOHN CONSTANTINE, HELLBLAZER arc, collecting issues #72-83 as well as the special one-shot HEARTLAND.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 352,
+              "end": 419,
+              "contextStart": 0,
+              "contextEnd": 419,
+              "raw": "collecting issues #72-83 as well as the special one-shot HEARTLAND.",
+              "parserInput": "Collects John Constantine, Hellblazer issues #72-83 as well as the special one-shot HEARTLAND",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.8205128205128205,
+              "rank": [
+                2,
+                2,
+                12,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 12,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00K7EIX58",
+          "sourceUrl": "https://www.amazon.com/dp/B00K7EIX58",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Hellblazer",
+              "value": "Part of: Hellblazer",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHNZ8T1"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B00K7EIX58"
+      }
+    },
+    {
+      "title": "Elseworlds: Batman Vol. 1 (DC Elseworlds)",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Elseworlds: Batman Vol. 1 (DC Elseworlds)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "For the first time ever, Batman's Elseworlds tales are featured in a new graphic novel collection.\nIn Elseworlds, heroes are taken from their usual settings and put into strange times and places-some that have existed, or might have existed; and others that can't, couldn't or shouldn't exist. The result: stories that make characters who are as familiar as yesterday seem as fresh as tomorrow.\nFeaturing Batman as a holy priest, Harry Houdini alongside the Dark Knight, Dr. Wayne reanimating a Frankenstein-like Bat-Man, Batman as a Green Lantern, a supernatural Bat-Man fighting the evil wizard known as the Dark Joker, a future Robin fighting off an alien invasion, and other tales!\nCollects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 686,
+              "end": 923,
+              "contextStart": 86,
+              "contextEnd": 923,
+              "raw": "Collects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!",
+              "parserInput": "Collects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7352625937834941,
+              "rank": [
+                2,
+                2,
+                9,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 9,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B01D40MJ7E",
+          "sourceUrl": "https://www.amazon.com/dp/B01D40MJ7E",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: DC Elseworlds",
+              "value": "Part of: DC Elseworlds",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JJ7C2VR"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B01D40MJ7E"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 3",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "collects issues #21–28 of the Teenage Mutant Ninja Turtles ongoing series and the Old Hob, Alopex, Karai, Hun, Bebop and Rocksteady, and Shredder Micro-Series one-shots, plus the 2012 Annual.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 3",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Violence and carnage rage across the city as Shredder's master plan unfolds. When tragedy strikes the Turtles, the brothers will have to hold the line against an attack from within, but with allegiances shifting they must formulate a plan to fight back against their deadliest enemy. Volume 3 collects issues #21–28 of the Teenage Mutant Ninja Turtles ongoing series and the Old Hob, Alopex, Karai, Hun, Bebop and Rocksteady, and Shredder Micro-Series one-shots, plus the 2012 Annual.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 293,
+              "end": 484,
+              "contextStart": 0,
+              "contextEnd": 484,
+              "raw": "collects issues #21–28 of the Teenage Mutant Ninja Turtles ongoing series and the Old Hob, Alopex, Karai, Hun, Bebop and Rocksteady, and Shredder Micro-Series one-shots, plus the 2012 Annual.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #21-28",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.5931174089068826,
+              "rank": [
+                2,
+                2,
+                8,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 8,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B077H5GYVL",
+          "sourceUrl": "https://www.amazon.com/dp/B077H5GYVL",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B077H5GYVL"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 4",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects issues #29–37 of the Teenage Mutant Ninja Turtles ongoing series, Utrom Empire, and the 2014 Annual.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 4",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The IDW Collection presents the TMNT stories in recommended reading order. Recovering from the events of \"City Fall,\" the Turtles seek sanctuary in the countryside, but questions remain unanswered and tension festers among the brothers. Meanwhile, in New York, Shredder tightens his grip on the city in their absence and Krang's plan to destroy the Earth is ramping up, but Baxter Stockman has ideas of his own. Collects issues #29–37 of the Teenage Mutant Ninja Turtles ongoing series, Utrom Empire, and the 2014 Annual.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 412,
+              "end": 521,
+              "contextStart": 0,
+              "contextEnd": 521,
+              "raw": "Collects issues #29–37 of the Teenage Mutant Ninja Turtles ongoing series, Utrom Empire, and the 2014 Annual.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #29-37",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.775894538606403,
+              "rank": [
+                2,
+                2,
+                9,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 9,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B078KPZ7MB",
+          "sourceUrl": "https://www.amazon.com/dp/B078KPZ7MB",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B078KPZ7MB"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 5",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "including one-shots, crossovers, and event series.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 5",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want. After meeting a good-natured inter dimensional time traveler named Renet, the Turtles become unstuck in time and go spinning into the past! Meanwhile, Shredder and Krang finally meet up--but will they be able to overcome their differences and join forces?--and Old Hob has perfected the art of making mutants! Plus, when a new invention goes haywire, the Turtles are sent to a whole new type of New York City. One with a whole lot more ghosts--and Ghostbusters! Collects Turtles in Time, issues #38–44 of the Teenage Mutant Ninja Turtles ongoing series, and the TMNT/Ghostbusters crossover.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 67,
+              "end": 117,
+              "contextStart": 0,
+              "contextEnd": 117,
+              "raw": "including one-shots, crossovers, and event series.",
+              "parserInput": "including one-shots, crossovers, and event series",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.08535031847133757,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 647,
+              "end": 775,
+              "contextStart": 47,
+              "contextEnd": 775,
+              "raw": "Collects Turtles in Time, issues #38–44 of the Teenage Mutant Ninja Turtles ongoing series, and the TMNT/Ghostbusters crossover.",
+              "parserInput": "Collects Turtles in Time, issues #38-44 of the Teenage Mutant Ninja Turtles ongoing series, and the TMNT/Ghostbusters crossover",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.824203821656051,
+              "rank": [
+                2,
+                2,
+                7,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 7,
+              "unresolved": 2
+            }
+          ],
+          "selected": 0,
+          "secondary": [
+            1
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B079F6WSW4",
+          "sourceUrl": "https://www.amazon.com/dp/B079F6WSW4",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B079F6WSW4"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 6",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "including one-shots, crossovers, and event series.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 6",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want.\nOld Hob, Slash, and their crew have become a force to be reckoned with, but a kidnapping leads them on an adventure more wild and dangerous than they could ever have imagined. Then, the Turtles return from Burnow Island to find unimaginable tragedy. Meanwhile, Casey prepares for a final showdown with Hun, and April has come into possession of an ancient scroll that seems to point to answers regarding the Pantheon. It all leads to a final showdown as Karai decrees a Gauntlet battle between Splinter and Shredder.\nCollects the Mutanimals mini-series, issues #45–50 of the ongoing series, the 2015 Free Comic Book Day issue, and the Casey & April mini-series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 67,
+              "end": 117,
+              "contextStart": 0,
+              "contextEnd": 117,
+              "raw": "including one-shots, crossovers, and event series.",
+              "parserInput": "including one-shots, crossovers, and event series",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.07827102803738317,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 702,
+              "end": 846,
+              "contextStart": 102,
+              "contextEnd": 846,
+              "raw": "Collects the Mutanimals mini-series, issues #45–50 of the ongoing series, the 2015 Free Comic Book Day issue, and the Casey & April mini-series.",
+              "parserInput": "Collects the Mutanimals mini-series, issues #45-50 of the ongoing series, the 2015 Free Comic Book Day issue, and the Casey & April mini-series",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.8200934579439252,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -3
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 3
+            }
+          ],
+          "selected": 0,
+          "secondary": [
+            1
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B079RT7J7D",
+          "sourceUrl": "https://www.amazon.com/dp/B079RT7J7D",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B079RT7J7D"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 9",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects issues #67-72 of the ongoing TEENAGE MUTANT NINJA TURTLES series, TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #9-15, and the TMNT/USAGI YOJIMBO crossover.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 9",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Agent Bishop’s long-gestating hunt for mutants begins in earnest and no one is safe! The Mutanimals are the first targets, but the Turtles’ turn will come soon enough, and they’ll be hounded like never before. Alopex and Nobody are looking for a little rest and relaxation but get more than they ask for when they become the unwilling guests of a never-ending party thrown by the hedonistic Toad Baron! Plus, Karai has always embodied the Foot Clan. With the Clan under the control of Splinter, what path will she take during her travels in Japan? Danger and intrigue await her, Koya, and Bludgeon! Collects issues #67-72 of the ongoing TEENAGE MUTANT NINJA TURTLES series, TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #9-15, and the TMNT/USAGI YOJIMBO crossover.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 599,
+              "end": 763,
+              "contextStart": 0,
+              "contextEnd": 763,
+              "raw": "Collects issues #67-72 of the ongoing TEENAGE MUTANT NINJA TURTLES series, TEENAGE MUTANT NINJA TURTLES UNIVERSE issues #9-15, and the TMNT/USAGI YOJIMBO crossover.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #67-72",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.7749029754204398,
+              "rank": [
+                2,
+                2,
+                6,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 6,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07N6JGR9K",
+          "sourceUrl": "https://www.amazon.com/dp/B07N6JGR9K",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B07N6JGR9K"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 10",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects Teenage Mutant Ninja Turtles Universe issues #19–20, issues #73–75 of the ongoing Teenage Mutant Ninja Turtles series, the Dimension X miniseries, and the TMNT/Ghostbusters 2 crossover miniseries.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 10",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Turtles... in space! Krang is set to go on trial in Dimension X, but he has hired the cybernetic assassin Hakk-R to eliminate the witnesses set to testify against him. Meanwhile, the Turtles race to different planets in Dimension X to escort the witnesses to safety before Hakk-R gets to them first! Then, an enemy from Master Splinter's past is back and hungry for revenge. To get it, he'll summon the most dangerous foe that the Turtles have ever encountered—the Collectors, shape-shifting demons that can pass through dimensions at will and cannot be stopped once they have been summoned to harvest a soul. To save themselves, the Turtles team up with the Ghostbusters, the only people who have ever faced the Collectors and lived to tell the tale. Collects Teenage Mutant Ninja Turtles Universe issues #19–20, issues #73–75 of the ongoing Teenage Mutant Ninja Turtles series, the Dimension X miniseries, and the TMNT/Ghostbusters 2 crossover miniseries.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 752,
+              "end": 957,
+              "contextStart": 152,
+              "contextEnd": 957,
+              "raw": "Collects Teenage Mutant Ninja Turtles Universe issues #19–20, issues #73–75 of the ongoing Teenage Mutant Ninja Turtles series, the Dimension X miniseries, and the TMNT/Ghostbusters 2 crossover miniseries.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles Universe issues #19-20, issues #73-75 of the ongoing Teenage Mutant Ninja Turtles series, the Dimension X miniseries, and the TMNT/Ghostbusters 2 crossover miniseries",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7776628748707343,
+              "rank": [
+                2,
+                2,
+                5,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 5,
+              "unresolved": 2
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07VT5G297",
+          "sourceUrl": "https://www.amazon.com/dp/B07VT5G297",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B07VT5G297"
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 12",
+      "source": {
+        "source": "amazon-product-page",
+        "statement": "Collects Teenage Mutant Ninja Turtles: Macro-Series: Michelangelo and Macro-Series: Leonardo, Teenage Mutant Ninja Turtles Universe #23–25, Teenage Mutant Ninja Turtles #85–89, and Teenage Mutant Ninja Turtles: Bebop and Rocksteady Hit the Road.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 12",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presenting the complete TMNT stories in recommended reading order. Donatello understands that more is at stake than his brothers realize. In order to prepare for the coming conflict, Don will aim to repair his relationship with his mentor, Harold... and his malicious robotic counterpart, Metalhead! Then, Michelangelo's deteriorating relationship with his father, Splinter, reaches a point of no return! Will Mikey fight those he loves to save those who need him the most? Plus, multiple sources of conflict collide as the maniacal Agent Bishop goes to war with the alien forces on Earth, driving the Turtles to embrace unsavory alliances and race to stop a massacre. And, everyone's favorite mutant warthog and rhino are on a road trip back to NYC, but can they make it before they become completely human again? Collects Teenage Mutant Ninja Turtles: Macro-Series: Michelangelo and Macro-Series: Leonardo, Teenage Mutant Ninja Turtles Universe #23–25, Teenage Mutant Ninja Turtles #85–89, and Teenage Mutant Ninja Turtles: Bebop and Rocksteady Hit the Road.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 815,
+              "end": 1060,
+              "contextStart": 215,
+              "contextEnd": 1060,
+              "raw": "Collects Teenage Mutant Ninja Turtles: Macro-Series: Michelangelo and Macro-Series: Leonardo, Teenage Mutant Ninja Turtles Universe #23–25, Teenage Mutant Ninja Turtles #85–89, and Teenage Mutant Ninja Turtles: Bebop and Rocksteady Hit the Road.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles: Macro-Series: Michelangelo and Macro-Series: Leonardo, Teenage Mutant Ninja Turtles Universe #23-25, Teenage Mutant Ninja Turtles #85-89, and Teenage Mutant Ninja Turtles: Bebop and Rocksteady Hit the Road",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7616822429906542,
+              "rank": [
+                2,
+                2,
+                8,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 8,
+              "unresolved": 2
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B08DRSZX7B",
+          "sourceUrl": "https://www.amazon.com/dp/B08DRSZX7B",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        },
+        "sourceUrl": "https://www.amazon.com/dp/B08DRSZX7B"
+      }
+    }
+  ]
+}

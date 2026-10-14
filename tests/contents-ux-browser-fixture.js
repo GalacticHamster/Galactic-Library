@@ -32,6 +32,7 @@ import {quickAccessFixture} from './quick-access-fixture.js';
 import {openQuickAccessEditor} from '../src/ui/quick-access.js';
 import {excerptBook} from './excerpt-extent-fixture.js';
 import {checkDiscoveryCase,checkDiscoverySafety,discoveryBook} from './discovery-mixed-fixture.js';
+import {checkNamedPublication,namedBook} from './named-publications-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -56,6 +57,18 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const fixture=await (await fetch('/tests/fixtures/kindle/named-publications.json')).json();
+    fixture.cases.forEach((c,i)=>checkNamedPublication(c,i,assert));
+    const book=namedBook(fixture.cases[2],2),db=coverageDatabase(book),before=JSON.stringify(db),editor=createContentsEditor(book,null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(editor);
+    assert(editor.querySelectorAll('[data-contents-field="number"]').length===9&&[...editor.querySelectorAll('[data-contents-field="number"]')].filter(n=>n.value==='unnumbered').length===7,'One-shots disappeared or received invented numbers in the editor');
+    assert(editor.querySelector('.contents-publication-evidence')?.textContent.includes('not purchase evidence')&&editor.querySelectorAll('.contents-publication-evidence a').length===7,'Publication provenance is not visible');editor.remove();
+    const view=createComicCoverageView(db);document.body.append(view);const result=await view.ready,group=result.groups.find(g=>g.series==='Batman: Holy Terror');assert(group?.covered===1&&group.unitType==='special','Unnumbered publication missing from Comic Coverage');
+    button([...view.querySelectorAll('[data-comic-series]')].find(n=>n.dataset.comicSeries===group.id),'Inspect issues').click();
+    const cell=view.querySelector('[data-comic-grid-issue="unnumbered"]');assert(cell,'Unnumbered issue cannot be inspected');cell.click();
+    assert(view.querySelector('.comic-issue-sources .contents-publication-evidence a')?.href.includes('comics.org'),'Supporting book lacks its publication reference');assert(view.querySelector('.comic-issue-sources').textContent.includes(book.title),'Supporting book link missing');view.remove();assert(JSON.stringify(db)===before,'Named-publication UI changed disposable source data');
+    checks.push('Named publications show actual numbered ranges and unnumbered one-shots consistently, with inspectable source books and cited bibliography in the editor and coverage');
+  }
   {
     const fixture=await (await fetch('/tests/fixtures/kindle/discovery-mixed.json')).json();
     fixture.cases.forEach((c,i)=>checkDiscoveryCase(c,i,assert));checkDiscoverySafety(assert);

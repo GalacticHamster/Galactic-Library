@@ -109,7 +109,9 @@ Parser generation 6 makes the existing local reparse planner recognize older der
 
 Public source-span regressions for all 35 audited cases and four adjacent controls live in `tests/fixtures/kindle/numbered-wrappers.json`; private corpus comparisons remain under ignored audit artifacts.
 
-## Current discovery interpretation (parser 14 / manifest 4)
+## Current discovery interpretation (parser 15 / manifest 4)
+
+Named miniseries and one-shots can additionally use the bounded, cited [publication resolver](publication-resolution.md). Its bibliographic facts remain separate from captured inclusion statements and ownership; source selection and human reviews remain authoritative.
 
 Captured description blocks and historical selected windows remain source
 evidence. A projection may replace an **explicitly automatic** empty proposal
