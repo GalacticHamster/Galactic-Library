@@ -60,7 +60,7 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
  const choose=el('select');choose.setAttribute('aria-label','Contents publication to resolve');
  const unresolved=el('optgroup'),resolved=el('optgroup'),informational=el('optgroup');unresolved.label='Needs resolution';resolved.label='Resolved - select to inspect or edit';informational.label='Excluded / informational';
  for(const [key,obs]of groups){const kind=componentState(obs[0]),section=kind==='unresolved'?unresolved:kind==='resolved'?resolved:informational;section.append(Object.assign(el('option',(kind==='unresolved'?'Unresolved: ':kind==='resolved'?'Resolved: ':'Informational: ')+obs[0].resolved.series+(obs[0].resolved.run?' ('+obs[0].resolved.run+')':'')+' - '+obs[0].resolved.unitType+' ('+obs.length+')'),{value:key}));}
- row.references.forEach((r,i)=>{if(!r.ignored)(r.actionable&&row.accessEligible?unresolved:informational).append(Object.assign(el('option',(r.actionable&&row.accessEligible?'Unresolved: ':'Informational: ')+r.fragment),{value:'reference:'+i}));});
+ row.references.forEach((r,i)=>{if(!r.ignored&&!r.resolved)(r.actionable&&row.accessEligible?unresolved:informational).append(Object.assign(el('option',(r.actionable&&row.accessEligible?'Unresolved: ':'Informational: ')+r.fragment),{value:'reference:'+i}));});
  for(const section of [unresolved,resolved,informational])if(section.children.length)choose.append(section);
  choose.value=unresolved.querySelector('option')?.value??choose.querySelector('option')?.value??'';
  const issues=el('details');issues.append(el('summary','Choose individual observations'));const issueList=el('div'),issueCount=el('p');

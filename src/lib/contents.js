@@ -451,7 +451,11 @@ export function validateContentReview(value) {
   if(referenceOnly&&(rejected||!Array.isArray(value.entries)||value.entries.length))throw Error('Reference decisions cannot confirm or reject issue entries.');
   const referenceDecisions=value.referenceDecisions??[];
   if(!Array.isArray(referenceDecisions)||referenceDecisions.length>500)throw Error('Too many reference decisions.');
-  if(referenceOnly&&!referenceDecisions.length)throw Error('A reference-only review must contain a reference decision.');
+  const coverageResolutions=value.coverageResolutions??[];
+  if(!Array.isArray(coverageResolutions)||coverageResolutions.length>2000)throw Error('Too many scoped coverage corrections.');
+  const scoped=coverageResolutions.map(entry=>{object(entry,'Scoped coverage correction');const key=text(entry.key,24000,'Correction key'),referenceKey=entry.referenceKey===undefined?undefined:text(entry.referenceKey,24000,'Correction reference');if(!key||referenceKey&&key!=='reference:'+referenceKey||!referenceKey&&!key.startsWith('entry:'))throw Error('Invalid scoped coverage correction.');return {key,entry:validateContents([entry.entry])[0],verifiedAt:date(entry.verifiedAt),...(referenceKey?{referenceKey}:{})};});
+  if(new Set(scoped.map(e=>e.key)).size!==scoped.length)throw Error('Repeated scoped coverage corrections.');
+  if(referenceOnly&&!referenceDecisions.length&&!scoped.length)throw Error('An annotation-only review must contain a reference decision or scoped correction.');
   const decisions=referenceDecisions.map(entry=>{object(entry,'Reference decision');if(!['incorrect-extraction','not-included'].includes(entry.reason))throw Error('Invalid reference decision.');return {key:text(entry.key,24000,'Reference key'),fragment:text(entry.fragment,10000,'Reference text'),reason:entry.reason,decidedAt:date(entry.decidedAt,'Reference decision date')};});
   if(decisions.some(d=>!d.key||!d.fragment)||new Set(decisions.map(d=>d.key)).size!==decisions.length)throw Error('Invalid or repeated reference decision.');
   if(value.status!==undefined&&!rejected)throw Error('Invalid contents review status.');
@@ -462,7 +466,8 @@ export function validateContentReview(value) {
     if(baseline.version!==1||!['statement','description'].includes(baseline.kind))throw Error('Invalid contents source baseline.');
     sourceBaseline={version:1,kind:baseline.kind,text:text(baseline.text,50000,'Contents source baseline text')};
   }
-  return {entries:rejected||referenceOnly?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date'),...(sourceBaseline?{sourceBaseline}:{}),...(referenceOnly?{referenceOnly:true}:{}),...(decisions.length?{referenceDecisions:decisions}:{})};
+  let coverageResolutionBaseline;if(scoped.length){const basis=object(value.coverageResolutionBaseline,'Scoped correction source');if(basis.version!==1||!['statement','description'].includes(basis.kind))throw Error('Invalid scoped correction source.');coverageResolutionBaseline={version:1,kind:basis.kind,text:text(basis.text,50000,'Scoped correction source text')};}
+  return {entries:rejected||referenceOnly?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date'),...(sourceBaseline?{sourceBaseline}:{}),...(referenceOnly?{referenceOnly:true}:{}),...(decisions.length?{referenceDecisions:decisions}:{}),...(scoped.length?{coverageResolutions:scoped,coverageResolutionBaseline}:{})};
 }
 
 // Reference annotations do not verify the parsed issue list.

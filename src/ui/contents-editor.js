@@ -1,3 +1,4 @@
+import {scopedContents} from '../lib/scoped-coverage.js';
 import {reviewedContents} from '../lib/contents.js';
 import {labeledControl,presentAction} from './form-presentation.js';
 import {performAction} from './operation-feedback.js';
@@ -13,7 +14,7 @@ function sourcePage(value) {
   try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?`${url.origin}${url.pathname}`:'';}catch{return '';}
 }
 export function createContentsEditor(record, review, actions, {expanded=false,focusEntry}={}) {
-  review=reviewedContents(review);const root=document.createElement('details');root.className='contents-editor';
+  const annotations=review;review=reviewedContents(review);const root=document.createElement('details');root.className='contents-editor';
   root.append(element('summary', expanded?'Review included works':`Review included contents \u2014 ${record.title}`));
   let populated=false;
   const populate=()=>{
@@ -51,8 +52,10 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
     }
     const remove=element('button','Remove');remove.type='button';presentAction(remove);remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
   };
-  const initialProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
-  for(const entry of review?.entries??initialProposal?.entries??[])addRow(entry);
+  const sourceProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
+  const initialProposal=!review&&sourceProposal?scopedContents(sourceProposal,record,annotations):sourceProposal;
+  const currentEntries=review?scopedContents({entries:review.entries,unparsed:[],confidence:review.status==='rejected'?'rejected':'verified'},record,annotations).entries:initialProposal?.entries??[];
+  for(const entry of currentEntries)addRow(entry);
   if(review)status.textContent=review.status==='rejected'?'Suggestions rejected: excluded from coverage until you save corrected entries or undo the rejection.':`${review.entries.length} reviewed entries saved. Edit to correct them, or undo the review.`;
   else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not reviewed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
   else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';

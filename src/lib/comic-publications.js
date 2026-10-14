@@ -104,5 +104,6 @@ export function resolvePublicationRun(entry,saved){
 // Only an explicitly saved matching publication can retire its own fragment.
 export function reviewedPublicationReference(fragment,entries,saved){
  const context=publicationContext(saved),text=' '+key(fragment)+' ';
- return [...references,...COVERAGE_RESOLUTION_REFERENCES].some(p=>p.kind==='one-shot'&&scoped(p,context)&&aliases(p).some(alias=>text.includes(' '+alias+' '))&&p.numbers.every(number=>entries.some(e=>key(e.series)===key(p.title)&&e.run===p.run&&e.number===number)));
+ const explicitYear=/\((\d{4})\)\.?$/u.exec(fragment.trim())?.[1];
+ return [...references,...COVERAGE_RESOLUTION_REFERENCES].some(p=>p.kind==='one-shot'&&(!explicitYear||explicitYear===p.run)&&scoped(p,context)&&aliases(p).some(alias=>text.includes(' '+alias+' '))&&p.numbers.every(number=>entries.some(e=>key(e.series)===key(p.title)&&e.run===p.run&&e.number===number)));
 }

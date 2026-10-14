@@ -1,3 +1,4 @@
+import {scopedCoverageTests} from './scoped-coverage.js';
 import {coverageReferenceTests} from './coverage-reference-decisions.js';
 import {coverageBrowseTests} from './coverage-browse.js';
 import assert from 'node:assert/strict';
@@ -30,6 +31,7 @@ import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 import {mergeDialogTests} from './merge-dialog.js';
 import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
+ ...scopedCoverageTests,
  ...coverageReferenceTests,
  ...coverageBrowseTests,
  ...coverageResolutionTests,

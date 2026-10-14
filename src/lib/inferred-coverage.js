@@ -1,3 +1,4 @@
+import {scopedContents} from './scoped-coverage.js';
 import {reviewedContents} from './contents.js';
 import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCoverage,proposeContentsForReview,reviewSeriesAnchor,CONTENTS_PARSER_VERSION} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
@@ -12,6 +13,9 @@ import {coverageIdentityDecision,dispositionObservation,dispositionReferences,su
 // index. Proposals are derived from current selected source, never history or
 // a union of independent claims. No ownership/source/review is written here.
 export function collectionContents(record,database,context={}) {
+  const base=baseCollectionContents(record,database,context);return context.ignoreScoped?base:scopedContents(base,record,database.contentReviews?.[record.id]);
+}
+function baseCollectionContents(record,database,context={}) {
   const review=reviewedContents(database.contentReviews?.[record.id]);
   if(review){
     const source=record.metadata?.enrichment?.kindleProductComicContents;
@@ -165,7 +169,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   // Access gates participation, not the identity evidence available locally.
   for(const original of Object.values(database.providerItems??{})){
     if(original.mediaType!=='book')continue;
-    const contents=collectionContents(original,database),entries=resolvedContentsEntries(contents,original).map(entry=>contents.review||runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))?entry:resolvePublicationRun(entry,original.metadata?.enrichment?.kindleProductComicContents));
+    const contents=collectionContents(original,database,{ignoreScoped:true}),entries=resolvedContentsEntries(contents,original).map(entry=>contents.review||runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))?entry:resolvePublicationRun(entry,original.metadata?.enrichment?.kindleProductComicContents));
     const standalone=contents.confidence==='rejected'?[]:standaloneContents(original).map(entry=>resolveCoverageEntry(entry,original));
     rows.push({original,contents,entries,standalone});
     for(const entry of [...entries,...standalone]){
@@ -177,7 +181,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   const contextRows=rows.filter(row=>!row.contents.review?.source?.startsWith('coverage-resolution'));
   const regularRuns=[...new Map(contextRows.flatMap(row=>[...row.entries,...row.standalone]).filter(entry=>entry.unitType==='issue'&&entry.run).map(entry=>[JSON.stringify([identityKey(entry.series),entry.run]),{series:entry.series,run:entry.run}])).values()];
   for(const row of rows)if(row.contents.annualRunHints?.some(hint=>!hint.resolvedRun)){
-    row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=resolvedContentsEntries(row.contents,row.original);
+    row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns,ignoreScoped:true});row.entries=resolvedContentsEntries(row.contents,row.original);
   }
   resolveAnnualCoverage(contextRows,{parentSeries:capturedCoverageSeries});
   inferCoverageRuns(rows,{resolveEntry:resolveCoverageEntry,hasConflict:(entry,parent)=>Boolean(parentSeriesContext(entry,parent).conflict),excludedScopes:runInferenceExclusions});
@@ -194,7 +198,8 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     evidence.push({item,entry,confidence,provisional,...(includeExcerpts?{statement}:{}),...(review?{review}:{})});index.set(key,evidence);
     return key;
   };
-  for(const {original,contents,entries,standalone} of rows){
+  for(const {original,contents:base,entries:inferred,standalone} of rows){
+    const contents=scopedContents({...base,entries:inferred},original,database.contentReviews?.[original.id],{sourceEntries:base.entries}),entries=contents.entries;
     const item=effectiveOwnershipRecord(original,database);
     const viewExcluded=excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id),access=coverageAccessExclusion(original,database);
     const disposition={id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,ownership:item.ownership,accessEligible:!access,confidence:contents.confidence,reviewed:Boolean(contents.review),rejected:contents.confidence==='rejected',statement:contents.review?.statement||contents.manifestEvidence||contentsStatement(original),observations:[],references:dispositionReferences(contents,database.contentReviews?.[original.id]?.referenceDecisions)};
@@ -204,10 +209,10 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     }
     for(const [entryIndex,entry]of entries.entries()){
       const unresolvedAnnual=Boolean(entry.unitType==='annual'&&!entry.run&&(entry.annualHint||contents.annualRunHints?.some(hint=>!hint.resolvedRun&&identityKey(hint.series)===identityKey(entry.series)&&hint.numbers.includes(entry.number))));
-      const decision=decisionFor(item,entry,Boolean(contents.review)||['explicit-statement','explicit-clause','natural-reprint'].includes(contents.parseBinding),unresolvedAnnual);
-      const indexKey=!access&&!viewExcluded?add(item,entry,contents.confidence,contents.review,decision,disposition.statement):null;
-      const protectedMerge=runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))||runInferenceExclusions.includes(JSON.stringify([identityKey(contents.entries[entryIndex]?.series),identityKey(contents.entries[entryIndex]?.run),entry.unitType,identityKey(entry.language)]));
-      disposition.observations.push(dispositionObservation({entry,extracted:contents.entries[entryIndex],entryIndex,decision,access,viewExcluded,indexed:indexKey!==null,indexKey,protectedMerge}));
+      const decision=decisionFor(item,entry,Boolean(contents.review)||Boolean(entry.scopedResolution)||['explicit-statement','explicit-clause','natural-reprint'].includes(contents.parseBinding),unresolvedAnnual);
+      const indexKey=!access&&!viewExcluded?add(item,entry,entry.scopedResolution?'verified':contents.confidence,contents.review,decision,disposition.statement):null;
+      const protectedMerge=runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))||runInferenceExclusions.includes(JSON.stringify([identityKey(base.entries[entryIndex]?.series),identityKey(base.entries[entryIndex]?.run),entry.unitType,identityKey(entry.language)]));
+      disposition.observations.push(dispositionObservation({entry,extracted:base.entries[entryIndex]??entry,entryIndex,decision,access,viewExcluded,indexed:indexKey!==null,indexKey,protectedMerge}));
       if(!access&&!viewExcluded&&((entry.completeness!=='full'&&!includeExcerpts)||!comicUnit(entry)))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
     }
     if(!access&&!viewExcluded)for(const fragment of contents.unparsed??[])unresolved.push({item,fragment,reason:'unparsed source'});

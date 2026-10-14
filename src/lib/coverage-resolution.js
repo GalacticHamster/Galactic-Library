@@ -1,4 +1,6 @@
 import {reviewedContents} from './contents.js';
+import {scopedEntryKeys,sameCoverageBasis} from './scoped-coverage.js';
+import {includedPublicationTitle} from './coverage-disposition.js';
 import {collectionContents,libraryCoverageIndex,coverageLanguage} from './inferred-coverage.js';
 import {identityKey,identityEvidence} from './identity.js';
 import {contentKey,validateContentReview,contentsSourceBaseline,contentsStatement} from './contents.js';
@@ -29,13 +31,14 @@ export function applyCoverageReferenceDecision(database,request,{now=new Date().
  const nextDecisions=decisions.filter(d=>d.key!==request.key);
  if(request.reason!=='restore')nextDecisions.push({key:reference.key,fragment:reference.fragment,reason:request.reason,decidedAt:now});
  const reviews={...database.contentReviews};
- if(!nextDecisions.length&&old?.referenceOnly)delete reviews[record.id];
+ if(!nextDecisions.length&&old?.referenceOnly&&!old.coverageResolutions?.length)delete reviews[record.id];
  else reviews[record.id]=validateContentReview({...old,...(!old?{referenceOnly:true,entries:[],statement:'',source:'coverage-reference-decisions',verifiedAt:null}:{}),referenceDecisions:nextDecisions});
  return {...database,contentReviews:reviews};
 }
 export function resolutionCandidates(collection,dispositions,database,ids){
  const record=recordFor(database,collection.recordRef);if(!record)return [];
  const selected=collection.observations.filter(o=>ids.includes(o.id)),reference=collection.references.find((r,i)=>ids.includes('reference:'+i));
+ if(reference&&(reference.ignored||reference.resolved||!reference.actionable))return [];
  if(!reference&&(!selected.length||selected.some(o=>o.origin!=='contents'||!o.parsed)||new Set(selected.map(o=>scope(o.resolved))).size!==1))return [];
  const e=selected[0]?.resolved,choices=new Map();
  if(!reference)for(const row of dispositions)for(const o of row.observations){
@@ -51,7 +54,9 @@ export function resolutionCandidates(collection,dispositions,database,ids){
  for(const p of facts){
   if(!scoped(p,record))continue;
   if(reference){
-   if(reference.code!=='named-publication-unresolved'||!/\bone-shots?\b/iu.test(reference.fragment)||/\b(?:selected|material|excerpts?|portions?|story|stories|preview)\b/iu.test(reference.fragment))continue;
+   const named=includedPublicationTitle(reference.fragment,collectionContents(record,database,{ignoreScoped:true}));
+   if(reference.code!=='named-publication-unresolved'||(!named&&!/\bone-shots?\b/iu.test(reference.fragment))||/\b(?:selected|material|excerpts?|portions?|story|stories|preview)\b/iu.test(reference.fragment))continue;
+   if(named&&(identityKey(named.title)!==identityKey(p.title)&&!p.aliases.some(a=>identityKey(a)===identityKey(named.title))||named.run!==p.run))continue;
    if(p.kind!=='one-shot'||!p.complete||p.numbers.length!==1||!p.numbers.every(n=>n==='unnumbered'||/^\d+$/u.test(n)))continue;
    const text=identityKey(reference.fragment);if(![p.title,...p.aliases].some(name=>(' '+text+' ').includes(' '+identityKey(name)+' ')))continue;
   }else if(p.kind!=='ongoing'||identityKey(p.title)!==identityKey(e.series)||e.unitType!=='issue'||!selected.every(o=>p.numbers.includes(o.resolved.number)))continue;
@@ -103,8 +108,20 @@ export function previewCoverageResolutions(database,requests,{merges={},disposit
   // a small run correction implicitly confirm another unresolved publication
   // or discard a source-only run inference elsewhere in a mixed collection.
   const limited=!reviewedContents(database.contentReviews?.[record.id])||database.contentReviews[record.id].source==='coverage-resolution';
-  if(limited&&row.observations.some(o=>o.origin==='contents'&&!ids.includes(o.id)&&(o.reasons.some(r=>['publication-unresolved','annual-run-unresolved','containment-unresolved'].includes(r.code))||o.extracted.run!==o.resolved.run||o.extracted.series!==o.resolved.series)))throw Error('Other entries in this collection depend on unresolved identities or inferred runs. Review the complete list in the contents editor so this correction cannot change their coverage implicitly.');
+  const needsScoped=Boolean(reviewedContents(database.contentReviews?.[record.id])&&database.contentReviews[record.id].source!=='coverage-resolution')||database.contentReviews?.[record.id]?.coverageResolutions?.length||limited&&row.observations.some(o=>o.origin==='contents'&&!ids.includes(o.id)&&(o.reasons.some(r=>['publication-unresolved','annual-run-unresolved','containment-unresolved'].includes(r.code))||o.extracted.run!==o.resolved.run||o.extracted.series!==o.resolved.series));
   const target=resolutionCandidates(row,dispositions,database,ids).find(t=>t.id===request.targetId);if(!target)throw Error('The selected publication identity is no longer available for these observations.');
+  if(needsScoped){
+   const raw=database.contentReviews?.[record.id],base=collectionContents(record,database,{ignoreScoped:true});
+   if(raw?.coverageResolutions?.length&&!sameCoverageBasis(record,raw))throw Error('The source changed after an earlier scoped correction. Review the changed contents before adding another correction.');
+   const patches=new Map((raw?.coverageResolutions??[]).map(p=>[p.key,p])),entryKeys=scopedEntryKeys(base.entries);
+   for(const observation of selected){
+    const referenceKey=observation.resolved.scopedResolution?.referenceKey,key=observation.resolved.scopedResolution?.key??entryKeys[observation.entryIndex];
+    patches.set(key,{key,entry:{...observation.resolved,series:target.series,run:target.run,language:target.language},verifiedAt:now,...(referenceKey?{referenceKey}:{})});
+   }
+   if(reference){const key='reference:'+reference.key;patches.set(key,{key,referenceKey:reference.key,entry:{series:target.series,run:target.run,unitType:target.unitType,number:target.number,language:target.language,completeness:'full'},verifiedAt:now});}
+   next.contentReviews[record.id]=validateContentReview({...raw,...(!raw?{referenceOnly:true,entries:[],statement:'',source:'coverage-resolution-scoped',verifiedAt:null}:{}),coverageResolutions:[...patches.values()],coverageResolutionBaseline:contentsSourceBaseline(record)});
+   changes.push({recordRef:record.recordRef,title:record.title,selected:ids.length,before:selected.map(o=>o.resolved),after:collectionContents(record,next).entries,reference:reference?.fragment,target});continue;
+  }
   const contents=collectionContents(record,database),entries=contents.entries.map((e,i)=>selected.some(o=>o.entryIndex===i)?{...e,series:target.series,run:target.run,language:target.language}:e);
   if(reference)entries.push({series:target.series,run:target.run,unitType:target.unitType,number:target.number,language:target.language,completeness:'full'});
   const raw=database.contentReviews?.[record.id],old=reviewedContents(raw),review=validateContentReview({...old,referenceDecisions:raw?.referenceDecisions,entries,statement:old?.statement||row.statement||contentsStatement(record),sourceUrl:old?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||'',source:old&&old.source!=='coverage-resolution'?'coverage-resolution-reviewed':'coverage-resolution',sourceBaseline:contentsSourceBaseline(record),verifiedAt:now});

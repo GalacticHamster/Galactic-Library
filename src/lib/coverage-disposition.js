@@ -32,22 +32,30 @@ export function dispositionObservation({entry,extracted=entry,entryIndex,origin=
  const actionable=parsed&&!access&&!viewExcluded&&Boolean(decision.reason),canAssignRun=parsed&&!['containment-unresolved'].includes(decision.reason)&&!protectedMerge;
  return {id:origin+':'+entryIndex,entryIndex,origin,parsed,extracted,resolved:entry,extent:entry.completeness,accessEligible:!access,provisional:decision.provisional,indexed,indexKey,countedFull:parsed&&indexed&&!decision.provisional&&entry.completeness==='full',countedPartial:parsed&&indexed&&!decision.provisional&&entry.completeness==='excerpt',protectedMerge,reasons,actionable,actions:[...(canAssignRun?['assign-run']:[]),'edit-contents',...(access?['change-access']:[])]};
 }
+export function includedPublicationTitle(fragment,contents){
+ const input=contents.parseInput||contents.manifestEvidence||'';
+ if(!/^\s*(?:collects?|collecting|includes?|contains?|reprints?)\b/iu.test(input)||!['explicit-clause','explicit-statement','natural-reprint'].includes(contents.parseBinding))return null;
+ const match=/^([\p{L}\p{N}][\p{L}\p{N}\s:'’/&!,.-]{1,240}?)\s*\((\d{4})\)[.!]?$/u.exec(fragment.trim());
+ if(!match||/^(?:of|in|from|by|with|featuring|presented|published|originally|including|the first)\b/iu.test(match[1])||/\b(?:material|selected|excerpts?|portions?|pages|chapters?|stories|story|preview|appears?|mentioned|advertis\w*|inspired)\b/iu.test(match[1]))return null;
+ return {title:match[1].trim(),run:match[2]};
+}
 export function dispositionReferences(contents,decisions=[]){
+ const source=contents.referenceSource??contents;
  const occurrences=new Map();const references=[
-  ...(contents.provisionalRanges??[]).map(range=>({fragment:'#'+range.first+(range.last!==range.first?'–'+range.last:''),code:'enumeration-incomplete',explanation:range.reason,actionable:true,actions:['edit-contents']})),
-  ...(contents.unparsed??[]).map(fragment=>{
-   const known=(contents.publicationResolutions??[]).find(r=>r.sourceFragment===fragment&&r.enumeration==='unresolved');
+  ...(source.provisionalRanges??[]).map(range=>({fragment:'#'+range.first+(range.last!==range.first?'–'+range.last:''),code:'enumeration-incomplete',explanation:range.reason,actionable:true,actions:['edit-contents']})),
+  ...(source.unparsed??[]).map(fragment=>{
+   const known=(source.publicationResolutions??[]).find(r=>r.sourceFragment===fragment&&r.enumeration==='unresolved');
    // A trailing description of an already enumerated event is not a named work.
    // Keep it as inspectable source text; do not discard genuine titled miniseries.
    const promotional=/^of the (?:thrilling |exciting |acclaimed |hit )?(?:mini-?series|crossover) event presented by\b/iu.test(fragment.trim());
-   const named=!promotional&&/\b(?:mini-?series|one-shots?|crossovers?|micro-series|macro-series)\b/iu.test(fragment)&&!/^including one-shots, crossovers, and event series\.?$/iu.test(fragment.trim());
+   const named=!promotional&&(/\b(?:mini-?series|one-shots?|crossovers?|micro-series|macro-series)\b/iu.test(fragment)||includedPublicationTitle(fragment,source))&&!/^including one-shots, crossovers, and event series\.?$/iu.test(fragment.trim());
    const code=known?'enumeration-incomplete':named?'named-publication-unresolved':'unsupported-source';
    return {fragment,code,explanation:known?.reason??COVERAGE_REASONS[code],actionable:Boolean(known||named),actions:['edit-contents']};
   })
  ].map(reference=>{
   const base=JSON.stringify([reference.code,reference.fragment.replace(/\s+/gu,' ').trim()]),occurrence=occurrences.get(base)??0;occurrences.set(base,occurrence+1);
-  const key=JSON.stringify([base,occurrence]),decision=decisions.find(d=>d.key===key);
-  return {...reference,key,...(decision?{ignored:true,decision,actionable:false}:{})};
+  const key=JSON.stringify([base,occurrence]),legacyKey=JSON.stringify([JSON.stringify(['unsupported-source',reference.fragment.replace(/\s+/gu,' ').trim()]),occurrence]),decision=decisions.find(d=>d.key===key||reference.code==='named-publication-unresolved'&&d.key===legacyKey);
+  return {...reference,key:decision?.key??key,...((contents.resolvedReferenceKeys??[]).includes(key)?{resolved:true,actionable:false,explanation:'Included publication confirmed for this collection.'}:{}),...(decision?{ignored:true,decision,actionable:false}:{})};
  });
  // Retain reversible decisions even if a later extraction omits the fragment.
  for(const decision of decisions)if(!references.some(r=>r.key===decision.key))references.push({key:decision.key,fragment:decision.fragment,code:'ignored-reference',explanation:'Previously ignored source reference.',ignored:true,decision,actionable:false,actions:[]});

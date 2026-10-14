@@ -177,5 +177,6 @@
   "src/lib/publication-reference-data.js",
   "src/lib/coverage-disposition.js",
   "src/lib/coverage-resolution.js",
+  "src/lib/scoped-coverage.js",
   "src/ui/coverage-resolution.js"
 ]

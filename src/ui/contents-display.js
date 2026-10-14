@@ -20,6 +20,7 @@ export function createContentsDisplay({limit=200,interpret=null}={}){
       }else fallback=contentsStatement(record);
       incomplete ||= saved?.parseOutcome==='partial'||Boolean(unresolved.length);
     }
+    if(database.contentReviews?.[record.id]?.coverageResolutions?.length){const proposal=collectionContents(record,database);entries=proposal.entries;unresolved=proposal.unparsed;}
     const result={entries,groups:groupContents(entries),reviewed:Boolean(review),incomplete,unresolved,fallback,
       source:accountLabel(record,database),basis:review?.status==='rejected'?'Rejected':review?'Human reviewed':entries.length?'Inferred contents':saved?'From book description':'From saved metadata'};
     cache.set(record.recordRef,result);while(cache.size>limit)cache.delete(cache.keys().next().value);
