@@ -1,3 +1,4 @@
+import {reviewedContents} from './contents.js';
 import {collectionContents,libraryCoverageIndex,coverageLanguage} from './inferred-coverage.js';
 import {identityKey,identityEvidence} from './identity.js';
 import {contentKey,validateContentReview,contentsSourceBaseline,contentsStatement} from './contents.js';
@@ -17,6 +18,21 @@ export function resolutionStamp(record,database){
  const p=collectionContents(record,database);
  return JSON.stringify([record.id,record.recordRef,record.profileId,record.title,p.entries,contentsSourceBaseline(record),publicationContext(record.metadata?.enrichment?.kindleProductComicContents),database.contentReviews?.[record.id],database.ownershipReviews?.[record.recordRef],database.ownershipPolicy,record.ownership,record.metadata?.series,record.metadata?.edition,record.metadata?.language]);
 }
+export function applyCoverageReferenceDecision(database,request,{now=new Date().toISOString()}={}){
+ const record=recordFor(database,request?.recordRef);
+ if(!record||request.expected!==resolutionStamp(record,database))throw Error('Saved source or reviews changed. Reopen this collection before changing a reference.');
+ const old=database.contentReviews?.[record.id],decisions=old?.referenceDecisions??[];
+ if(!['incorrect-extraction','not-included','restore'].includes(request.reason))throw Error('Choose Incorrect extraction, Not included contents, or Restore.');
+ const reference=libraryCoverageIndex(database,{includeExcerpts:true}).dispositions.find(r=>r.recordRef===record.recordRef)?.references.find(r=>r.key===request.key);
+ const existing=decisions.find(d=>d.key===request.key);
+ if(request.reason==='restore'?!existing:!reference||reference.ignored)throw Error('This reference is no longer available. Reopen the collection.');
+ const nextDecisions=decisions.filter(d=>d.key!==request.key);
+ if(request.reason!=='restore')nextDecisions.push({key:reference.key,fragment:reference.fragment,reason:request.reason,decidedAt:now});
+ const reviews={...database.contentReviews};
+ if(!nextDecisions.length&&old?.referenceOnly)delete reviews[record.id];
+ else reviews[record.id]=validateContentReview({...old,...(!old?{referenceOnly:true,entries:[],statement:'',source:'coverage-reference-decisions',verifiedAt:null}:{}),referenceDecisions:nextDecisions});
+ return {...database,contentReviews:reviews};
+}
 export function resolutionCandidates(collection,dispositions,database,ids){
  const record=recordFor(database,collection.recordRef);if(!record)return [];
  const selected=collection.observations.filter(o=>ids.includes(o.id)),reference=collection.references.find((r,i)=>ids.includes('reference:'+i));
@@ -26,7 +42,7 @@ export function resolutionCandidates(collection,dispositions,database,ids){
   const t=o.resolved;if(!o.parsed||!t.run||scope(t)!==scope(e))continue;
   const target={series:t.series,run:t.run,unitType:t.unitType,language:coverageLanguage(t.language)},id=targetId(target);
   if(!choices.has(id))choices.set(id,{...target,id,label:t.series+' ('+t.run+') — '+t.unitType,evidence:'Existing saved publication identity. Check it against this collection’s source.',suggested:false,sources:[]});
-  const anchor=database.providerItems[row.id],sameFamily=family(record)&&anchor&&family(record)===family(anchor),review=database.contentReviews?.[row.id];
+  const anchor=database.providerItems[row.id],sameFamily=family(record)&&anchor&&family(record)===family(anchor),review=reviewedContents(database.contentReviews?.[row.id]);
   if(sameFamily&&o.extracted.run===t.run&&!o.protectedMerge&&!review?.source?.startsWith('coverage-resolution')){
    const url=review?.sourceUrl||anchor.metadata?.enrichment?.kindleProductComicContents?.sourceUrl;
    choices.set(id,{...target,id,label:t.series+' ('+t.run+') — '+t.unitType,evidence:'The saved contents of “'+row.title+'” explicitly identify this run within the same captured publisher and collection family.',suggested:true,referenceId:'local:'+id,sources:url?[url]:[]});
@@ -51,12 +67,12 @@ function family(record){
 }
 export function compatibleResolutionCollections(collection,ids,target,dispositions,database){
  const source=recordFor(database,collection.recordRef),selected=collection.observations.filter(o=>ids.includes(o.id)),key=source&&family(source);
- if(!key||!selected.length||selected.some(o=>o.protectedMerge)||database.contentReviews?.[source.id])return [];
+ if(!key||!selected.length||selected.some(o=>o.protectedMerge)||reviewedContents(database.contentReviews?.[source.id]))return [];
  const scopes=new Set(selected.map(o=>scope(o.resolved)));if(scopes.size!==1)return [];
  const results=[];
  for(const row of dispositions){
   const record=recordFor(database,row.recordRef);
-  if(row.recordRef===collection.recordRef||!record||family(record)!==key||!row.accessEligible||row.rejected||database.contentReviews?.[record.id])continue;
+  if(row.recordRef===collection.recordRef||!record||family(record)!==key||!row.accessEligible||row.rejected||reviewedContents(database.contentReviews?.[record.id]))continue;
   const candidates=row.observations.filter(o=>o.origin==='contents'&&o.parsed&&scopes.has(scope(o.resolved)));
   if(!candidates.length||candidates.some(o=>o.protectedMerge||o.resolved.run&&identityKey(o.resolved.run)!==identityKey(target.run)||o.reasons.some(r=>['run-conflict','containment-unresolved'].includes(r.code))))continue;
   const unresolved=candidates.filter(o=>o.provisional&&!o.resolved.run);if(!unresolved.length)continue;
@@ -86,12 +102,12 @@ export function previewCoverageResolutions(database,requests,{merges={},disposit
   // A saved review has broader semantics than an inferred proposal. Do not let
   // a small run correction implicitly confirm another unresolved publication
   // or discard a source-only run inference elsewhere in a mixed collection.
-  const limited=!database.contentReviews?.[record.id]||database.contentReviews[record.id].source==='coverage-resolution';
+  const limited=!reviewedContents(database.contentReviews?.[record.id])||database.contentReviews[record.id].source==='coverage-resolution';
   if(limited&&row.observations.some(o=>o.origin==='contents'&&!ids.includes(o.id)&&(o.reasons.some(r=>['publication-unresolved','annual-run-unresolved','containment-unresolved'].includes(r.code))||o.extracted.run!==o.resolved.run||o.extracted.series!==o.resolved.series)))throw Error('Other entries in this collection depend on unresolved identities or inferred runs. Review the complete list in the contents editor so this correction cannot change their coverage implicitly.');
   const target=resolutionCandidates(row,dispositions,database,ids).find(t=>t.id===request.targetId);if(!target)throw Error('The selected publication identity is no longer available for these observations.');
   const contents=collectionContents(record,database),entries=contents.entries.map((e,i)=>selected.some(o=>o.entryIndex===i)?{...e,series:target.series,run:target.run,language:target.language}:e);
   if(reference)entries.push({series:target.series,run:target.run,unitType:target.unitType,number:target.number,language:target.language,completeness:'full'});
-  const old=database.contentReviews?.[record.id],review=validateContentReview({...old,entries,statement:old?.statement||row.statement||contentsStatement(record),sourceUrl:old?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||'',source:old&&old.source!=='coverage-resolution'?'coverage-resolution-reviewed':'coverage-resolution',sourceBaseline:contentsSourceBaseline(record),verifiedAt:now});
+  const raw=database.contentReviews?.[record.id],old=reviewedContents(raw),review=validateContentReview({...old,referenceDecisions:raw?.referenceDecisions,entries,statement:old?.statement||row.statement||contentsStatement(record),sourceUrl:old?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||'',source:old&&old.source!=='coverage-resolution'?'coverage-resolution-reviewed':'coverage-resolution',sourceBaseline:contentsSourceBaseline(record),verifiedAt:now});
   next.contentReviews[record.id]=review;changes.push({recordRef:record.recordRef,title:record.title,selected:ids.length,before:selected.map(o=>o.resolved),after:review.entries,reference:reference?.fragment,target});
  }
  return {database:next,changes};

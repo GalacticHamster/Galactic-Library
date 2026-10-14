@@ -51,7 +51,7 @@ import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 import { compareTitles } from '../lib/title-sort.js';
-import { saveContentReview, removeContentReview,saveCoverageResolutions } from '../lib/storage.js';
+import { saveContentReview, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision } from '../lib/storage.js';
 import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
@@ -161,6 +161,7 @@ const contentsReviewActions={
 const coverageResolutionActions={
   canLeave:()=>drafts.allowNavigation(),
   save:async request=>{database=await drafts.commit(()=>saveCoverageResolutions(request));return database;},
+  saveReference:async request=>{database=await drafts.commit(()=>saveCoverageReferenceDecision(request));return database;},
   saveReview:async(id,value)=>{database=await drafts.commit(()=>saveContentReview(id,value));return database;},
   removeReview:async id=>{database=await drafts.commit(()=>removeContentReview(id));return database;},
   resolved:async next=>{database=next;comicCoverageDatabase=null;render();}

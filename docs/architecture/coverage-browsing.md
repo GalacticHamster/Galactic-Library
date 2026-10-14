@@ -60,3 +60,33 @@ partial issues needing complete coverage. No known gaps explicitly leaves the
 published extent unverified; neither classification nor filtering establishes
 that a published run is complete. Global index totals and filtered group counts
 are labeled separately.
+
+## Incorrect or irrelevant source references
+
+Unresolved references offer Incorrect extraction and Not included contents in
+the resolution dialog and on their coverage cards. Ignored references remain
+available under Coverage resolution → Ignored references, with Restore, even
+when the collection has no other actionable problems. This list follows the
+current search and renders a bounded batch of references.
+
+Decisions use the existing account-scoped `contentReviews` record. Each decision
+identifies a reference by its classification, whitespace-normalized fragment and
+occurrence within that collection; identical text in another book/account or a
+second occurrence is independent. Source text is retained. Decisions for
+fragments no longer produced by extraction remain inspectable and reversible.
+
+`referenceDecisions` is an optional validated review annotation. When there is
+no human issue review, `referenceOnly: true` stores no issue entries or
+verification date. All issue-review readers distinguish this annotation from a
+verified list, including contents display, acquisition status and bibliographic
+resolution. Ordinary review saves/undo retain these decisions. Existing backup,
+restore, profile isolation and reimport paths carry the same review structure;
+older backups require no migration. Dismiss/Restore checks the authoritative
+record/source/review stamp, saves atomically, then refreshes coverage. It never
+changes captured descriptions, parsed issues or ownership.
+
+The actionable-reference classifier also recognizes the narrowly defined
+promotional suffix “of the … miniseries event presented by …” as informational
+source text. It remains captured and inspectable. Merely containing “miniseries”
+no longer turns that suffix into a publication; genuine named miniseries and
+explicit publication evidence remain actionable.

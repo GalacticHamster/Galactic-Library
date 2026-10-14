@@ -1,3 +1,4 @@
+import {reviewedContents} from '../lib/contents.js';
 import {createRelationshipPicker} from './relationship-picker.js';
 import {preferredDisplayTitle} from '../lib/display-title.js';
 import {performAction} from './operation-feedback.js';
@@ -75,7 +76,7 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         }
         const enrichmentLink=sourceLink(enrichment.sourceUrl,'View enrichment source');if(enrichmentLink)section.append(enrichmentLink);
       }
-      const review=database.contentReviews?.[record.id];
+      const review=reviewedContents(database.contentReviews?.[record.id]);
       if(review){
         section.append(element('p',`Contents confirmed ${review.verifiedAt||'date unknown'} · ${review.entries.length} entries · ${review.source}`));
         const contents=element('ul','');

@@ -1,3 +1,4 @@
+import {reviewedContents} from '../lib/contents.js';
 import {contentsStatement} from '../lib/contents.js';
 import {collectionContents} from '../lib/inferred-coverage.js';
 import {accountLabel} from './item-presentation.js';
@@ -9,7 +10,7 @@ export function createContentsDisplay({limit=200,interpret=null}={}){
   return (record,database)=>{
     if(current!==database){current=database;cache.clear();}
     if(cache.has(record.recordRef))return cache.get(record.recordRef);
-    const review=database.contentReviews?.[record.id],saved=record.metadata?.enrichment?.kindleProductComicContents;
+    const review=reviewedContents(database.contentReviews?.[record.id]),saved=record.metadata?.enrichment?.kindleProductComicContents;
     let entries=review?.entries??[],unresolved=[],fallback='',incomplete=Boolean(saved?.descriptionMayBeIncomplete);
     if(!review){
       if(!interpret||saved?.parseInput&&['full','partial'].includes(saved.parseOutcome)){

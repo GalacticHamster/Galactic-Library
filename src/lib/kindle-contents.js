@@ -1,3 +1,4 @@
+import {reviewedContents} from './contents.js';
 import '../providers/kindle-ownership.js';
 import '../providers/kindle.js';
 import {contentsStatement, contentsReviewChanged,proposeContentsForReview, CONTENTS_PARSER_VERSION} from './contents.js';
@@ -27,7 +28,7 @@ export function kindleContentsState(item, database = {}) {
     : saved.availability === 'unavailable' ? 'unavailable' : statement ? 'statement-found'
     : saved.availability === 'no-statement' ? 'no-statement' : 'legacy-unknown';
   const parse = contentsParseState(item);
-  const review = database.contentReviews?.[item.id];
+  const review = reviewedContents(database.contentReviews?.[item.id]);
   return {fetchOutcome,...parse,reviewStatus:review ? review.status==='rejected'?'rejected':'verified' : statement ? 'unverified' : 'none',
     reviewChanged:contentsReviewChanged(item,review),
     needsReparse:Boolean(statement && (saved.parserVersion !== CONTENTS_PARSER_VERSION || saved.filterVersion !== CONTENTS_FILTER_VERSION || saved.parseOutcome !== parse.parseOutcome || saved.manifest && saved.parseInput !== parse.parseInput)),

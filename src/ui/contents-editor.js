@@ -1,3 +1,4 @@
+import {reviewedContents} from '../lib/contents.js';
 import {labeledControl,presentAction} from './form-presentation.js';
 import {performAction} from './operation-feedback.js';
 import {createContentsInterpretation} from './contents-interpretation.js';
@@ -12,7 +13,7 @@ function sourcePage(value) {
   try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?`${url.origin}${url.pathname}`:'';}catch{return '';}
 }
 export function createContentsEditor(record, review, actions, {expanded=false,focusEntry}={}) {
-  const root=document.createElement('details');root.className='contents-editor';
+  review=reviewedContents(review);const root=document.createElement('details');root.className='contents-editor';
   root.append(element('summary', expanded?'Review included works':`Review included contents \u2014 ${record.title}`));
   let populated=false;
   const populate=()=>{

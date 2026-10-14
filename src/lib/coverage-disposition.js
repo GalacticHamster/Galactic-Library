@@ -32,16 +32,26 @@ export function dispositionObservation({entry,extracted=entry,entryIndex,origin=
  const actionable=parsed&&!access&&!viewExcluded&&Boolean(decision.reason),canAssignRun=parsed&&!['containment-unresolved'].includes(decision.reason)&&!protectedMerge;
  return {id:origin+':'+entryIndex,entryIndex,origin,parsed,extracted,resolved:entry,extent:entry.completeness,accessEligible:!access,provisional:decision.provisional,indexed,indexKey,countedFull:parsed&&indexed&&!decision.provisional&&entry.completeness==='full',countedPartial:parsed&&indexed&&!decision.provisional&&entry.completeness==='excerpt',protectedMerge,reasons,actionable,actions:[...(canAssignRun?['assign-run']:[]),'edit-contents',...(access?['change-access']:[])]};
 }
-export function dispositionReferences(contents){
- return [
+export function dispositionReferences(contents,decisions=[]){
+ const occurrences=new Map();const references=[
   ...(contents.provisionalRanges??[]).map(range=>({fragment:'#'+range.first+(range.last!==range.first?'–'+range.last:''),code:'enumeration-incomplete',explanation:range.reason,actionable:true,actions:['edit-contents']})),
   ...(contents.unparsed??[]).map(fragment=>{
    const known=(contents.publicationResolutions??[]).find(r=>r.sourceFragment===fragment&&r.enumeration==='unresolved');
-   const named=/\b(?:mini-?series|one-shots?|crossovers?|micro-series|macro-series)\b/iu.test(fragment)&&!/^including one-shots, crossovers, and event series\.?$/iu.test(fragment.trim());
+   // A trailing description of an already enumerated event is not a named work.
+   // Keep it as inspectable source text; do not discard genuine titled miniseries.
+   const promotional=/^of the (?:thrilling |exciting |acclaimed |hit )?(?:mini-?series|crossover) event presented by\b/iu.test(fragment.trim());
+   const named=!promotional&&/\b(?:mini-?series|one-shots?|crossovers?|micro-series|macro-series)\b/iu.test(fragment)&&!/^including one-shots, crossovers, and event series\.?$/iu.test(fragment.trim());
    const code=known?'enumeration-incomplete':named?'named-publication-unresolved':'unsupported-source';
    return {fragment,code,explanation:known?.reason??COVERAGE_REASONS[code],actionable:Boolean(known||named),actions:['edit-contents']};
   })
- ];
+ ].map(reference=>{
+  const base=JSON.stringify([reference.code,reference.fragment.replace(/\s+/gu,' ').trim()]),occurrence=occurrences.get(base)??0;occurrences.set(base,occurrence+1);
+  const key=JSON.stringify([base,occurrence]),decision=decisions.find(d=>d.key===key);
+  return {...reference,key,...(decision?{ignored:true,decision,actionable:false}:{})};
+ });
+ // Retain reversible decisions even if a later extraction omits the fragment.
+ for(const decision of decisions)if(!references.some(r=>r.key===decision.key))references.push({key:decision.key,fragment:decision.fragment,code:'ignored-reference',explanation:'Previously ignored source reference.',ignored:true,decision,actionable:false,actions:[]});
+ return references;
 }
 export function summarizeDisposition(collection){
  const observations=collection.observations.filter(o=>o.parsed),references=collection.references??[];

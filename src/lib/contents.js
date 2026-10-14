@@ -431,7 +431,7 @@ export function contentsSourceBaseline(item){
   return {version:1,kind:descriptions.length?'description':'statement',text:descriptions.length?JSON.stringify(descriptions):contentsStatement(item)};
 }
 export function contentsReviewChanged(item,review){
-  if(!review)return false;
+  if(!review||review.referenceOnly)return false;
   if(review.sourceBaseline){const current=contentsSourceBaseline(item);return current.kind!==review.sourceBaseline.kind||current.text!==review.sourceBaseline.text;}
   // Older reviews have no separate baseline. Quick Add appended a labelled
   // manual section; compare its original prefix, never the authored additions.
@@ -446,6 +446,14 @@ export function validateContentReview(value) {
   const sourceUrl=url(value.sourceUrl);
   if(value.sourceUrl && !sourceUrl)throw new Error('Contents source must be an HTTP(S) page without credentials.');
   const rejected=value.status==='rejected';
+  const referenceOnly=value.referenceOnly===true;
+  if(value.referenceOnly!==undefined&&typeof value.referenceOnly!=='boolean')throw Error('Invalid reference review flag.');
+  if(referenceOnly&&(rejected||!Array.isArray(value.entries)||value.entries.length))throw Error('Reference decisions cannot confirm or reject issue entries.');
+  const referenceDecisions=value.referenceDecisions??[];
+  if(!Array.isArray(referenceDecisions)||referenceDecisions.length>500)throw Error('Too many reference decisions.');
+  if(referenceOnly&&!referenceDecisions.length)throw Error('A reference-only review must contain a reference decision.');
+  const decisions=referenceDecisions.map(entry=>{object(entry,'Reference decision');if(!['incorrect-extraction','not-included'].includes(entry.reason))throw Error('Invalid reference decision.');return {key:text(entry.key,24000,'Reference key'),fragment:text(entry.fragment,10000,'Reference text'),reason:entry.reason,decidedAt:date(entry.decidedAt,'Reference decision date')};});
+  if(decisions.some(d=>!d.key||!d.fragment)||new Set(decisions.map(d=>d.key)).size!==decisions.length)throw Error('Invalid or repeated reference decision.');
   if(value.status!==undefined&&!rejected)throw Error('Invalid contents review status.');
   if(rejected&&(!Array.isArray(value.entries)||value.entries.length))throw Error('Rejected contents must have an empty entry list.');
   let sourceBaseline;
@@ -454,8 +462,11 @@ export function validateContentReview(value) {
     if(baseline.version!==1||!['statement','description'].includes(baseline.kind))throw Error('Invalid contents source baseline.');
     sourceBaseline={version:1,kind:baseline.kind,text:text(baseline.text,50000,'Contents source baseline text')};
   }
-  return {entries:rejected?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date'),...(sourceBaseline?{sourceBaseline}:{})};
+  return {entries:rejected||referenceOnly?[]:validateContents(value.entries),...(rejected?{status:'rejected'}:{}),statement:text(value.statement,10000,'Contents statement'),sourceUrl,source:text(value.source || 'manual-review',100,'Contents source'),verifiedAt:date(value.verifiedAt,'Contents review date'),...(sourceBaseline?{sourceBaseline}:{}),...(referenceOnly?{referenceOnly:true}:{}),...(decisions.length?{referenceDecisions:decisions}:{})};
 }
+
+// Reference annotations do not verify the parsed issue list.
+export const reviewedContents=review=>review?.referenceOnly?undefined:review;
 
 export function ownedContentIndex(database, {excludeProviders = [], excludeItemIds = []} = {}) {
   const byKey=new Map();

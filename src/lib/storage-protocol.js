@@ -79,6 +79,7 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'interruptKindleContentsRefresh',
   'saveContentReview',
   'saveCoverageResolutions',
+  'saveCoverageReferenceDecision',
   'removeContentReview',
   'getUiPreferences',
   'saveUiPreferences',

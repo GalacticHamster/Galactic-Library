@@ -22,7 +22,7 @@ import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh,KINDLE_
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
 import {contentsSourceBaseline} from '../lib/contents.js';
-import {applyCoverageResolutions} from '../lib/coverage-resolution.js';
+import {applyCoverageResolutions,applyCoverageReferenceDecision} from '../lib/coverage-resolution.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase,validateDatabaseAsync } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
@@ -1232,7 +1232,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function saveContentReview(itemId, value) {
     const database=await getDatabase();
     if (!database.providerItems[itemId] || !['book','game'].includes(database.providerItems[itemId].mediaType)) throw new Error('Contents can be reviewed only for a current book or game record.');
-    database.contentReviews[itemId]=validateContentReview({...value,sourceBaseline:contentsSourceBaseline(database.providerItems[itemId]),verifiedAt:new Date().toISOString()});
+    database.contentReviews[itemId]=validateContentReview({...value,referenceDecisions:database.contentReviews[itemId]?.referenceDecisions,sourceBaseline:contentsSourceBaseline(database.providerItems[itemId]),verifiedAt:new Date().toISOString()});
     return persistDatabase(database);
   }
 
@@ -1242,8 +1242,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(result.database);
   }
 
+  async function saveCoverageReferenceDecision(request){
+    const database=await getDatabase();return persistDatabase(applyCoverageReferenceDecision(database,request));
+  }
   async function removeContentReview(itemId) {
-    const database=await getDatabase();delete database.contentReviews[itemId];return persistDatabase(database);
+    const database=await getDatabase(),decisions=database.contentReviews[itemId]?.referenceDecisions;delete database.contentReviews[itemId];
+    if(decisions?.length)database.contentReviews[itemId]=validateContentReview({referenceOnly:true,entries:[],referenceDecisions:decisions,statement:'',source:'coverage-reference-decisions'});
+    return persistDatabase(database);
   }
 
   async function addAllowedExternalClientId(id) {
@@ -1392,7 +1397,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     saveManualMatchDecision, savePreferredDisplayTitle, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
-    saveContentReview, removeContentReview,saveCoverageResolutions,
+    saveContentReview, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
   };

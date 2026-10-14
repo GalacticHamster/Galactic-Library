@@ -1,3 +1,4 @@
+import {reviewedContents} from './contents.js';
 import {identityEvidence} from './identity.js';
 
 export function enrichmentQuery(canonical,records){
@@ -15,7 +16,7 @@ export function enrichmentStages(records,database={}){
     work:entries.some(entry=>approved(entry.openLibrary)),
     edition:entries.some(entry=>entry.googleBooks?.volumeId||approved(entry.localMetadata)),
     creators:records.some(record=>identityEvidence(record).authors.length||identityEvidence(record).contributors.length),
-    contents:records.some(record=>database.contentReviews?.[record.id]),
+    contents:records.some(record=>reviewedContents(database.contentReviews?.[record.id])),
     contentsLookup:entries.some(entry=>entry.kindleProductComicContents),
   };
 }

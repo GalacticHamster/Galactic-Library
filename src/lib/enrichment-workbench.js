@@ -1,3 +1,4 @@
+import {reviewedContents} from './contents.js';
 import {enrichmentStages} from './enrichment.js';
 import {editionEnrichmentConflicts} from './identity.js';
 import {contentsStatement,contentsReviewChanged,proposeContentsForReview} from './contents.js';
@@ -26,7 +27,7 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
   }
   for(const record of records.values()){
     const statement=contentsStatement(record);
-    const review = database.contentReviews[record.id];
+    const review = reviewedContents(database.contentReviews[record.id]);
     if (includeContents && statement && (!review || contentsReviewChanged(record,review))) {
       const saved=record.metadata.enrichment?.kindleProductComicContents;
       const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);

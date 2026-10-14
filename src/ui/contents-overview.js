@@ -1,3 +1,4 @@
+import {reviewedContents} from '../lib/contents.js';
 import {compareTitles} from '../lib/title-sort.js';
 import {contentsStatement,contentsReviewChanged} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
@@ -12,7 +13,7 @@ export function contentsSummary(record, database) {
   const saved=record.metadata?.enrichment?.kindleProductComicContents;
   const local=record.metadata?.enrichment?.localMetadata;
   const statement=contentsStatement(record);
-  const review=database.contentReviews?.[record.id];
+  const review=reviewedContents(database.contentReviews?.[record.id]);
   const attempt=database.kindleContentsObservations?.[record.recordRef]?.latestAttempt ?? saved;
   const candidate=saved?.manifest?.candidates?.[saved.manifest.selected];
   const changed=contentsReviewChanged(record,review);

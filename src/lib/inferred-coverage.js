@@ -1,3 +1,4 @@
+import {reviewedContents} from './contents.js';
 import {contentsStatement,contentKey,ownedContentIndex,contentCoverage,seriesCoverage,proposeContentsForReview,reviewSeriesAnchor,CONTENTS_PARSER_VERSION} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
 import {effectiveOwnershipRecord,coverageAccessExclusion} from './ownership.js';
@@ -11,7 +12,7 @@ import {coverageIdentityDecision,dispositionObservation,dispositionReferences,su
 // index. Proposals are derived from current selected source, never history or
 // a union of independent claims. No ownership/source/review is written here.
 export function collectionContents(record,database,context={}) {
-  const review=database.contentReviews?.[record.id];
+  const review=reviewedContents(database.contentReviews?.[record.id]);
   if(review){
     const source=record.metadata?.enrichment?.kindleProductComicContents;
     const pending=review.source==='coverage-resolution'&&review.status!=='rejected'?manifestReviewProposal(source,record.title,contentsStatement(record,{recoverNatural:true}),{series:record.metadata?.series}):null;
@@ -196,7 +197,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
   for(const {original,contents,entries,standalone} of rows){
     const item=effectiveOwnershipRecord(original,database);
     const viewExcluded=excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id),access=coverageAccessExclusion(original,database);
-    const disposition={id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,ownership:item.ownership,accessEligible:!access,confidence:contents.confidence,reviewed:Boolean(contents.review),rejected:contents.confidence==='rejected',statement:contents.review?.statement||contents.manifestEvidence||contentsStatement(original),observations:[],references:dispositionReferences(contents)};
+    const disposition={id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,ownership:item.ownership,accessEligible:!access,confidence:contents.confidence,reviewed:Boolean(contents.review),rejected:contents.confidence==='rejected',statement:contents.review?.statement||contents.manifestEvidence||contentsStatement(original),observations:[],references:dispositionReferences(contents,database.contentReviews?.[original.id]?.referenceDecisions)};
     if(!viewExcluded&&access){
       const typed=[...new Map([...entries,...standalone].filter(comicUnit).map(e=>[contentKey(e)+':'+e.completeness,e])).values()];
       if(typed.length)excluded.push({id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,...access,entries:typed,entrySource:entries.some(comicUnit)?'contents':'standalone-title'});
