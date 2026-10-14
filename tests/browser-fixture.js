@@ -172,7 +172,7 @@ try{
   assert(comparison.textContent.includes('3 of 5 requested entries')&&comparison.textContent.includes('issue 2')&&comparison.textContent.includes('issue 4'),'Explicit target gaps are incorrect.');
   comparison.querySelector('[aria-label="Target language"]').value='ja';button(comparison,'Compare coverage').click();assert(comparison.textContent.includes('0 of 5 requested entries'),'Different-language coverage overclaimed.');
   checks.push('target collection comparison reports missing units and respects language');
-  const filter=document.querySelector('[aria-label="Filter reviewed series"]');filter.value='missing series';filter.dispatchEvent(new Event('input'));assert(group.hidden,'Series filter did not hide unmatched scope.');
+  const filter=document.querySelector('[aria-label="Filter covered series"]');filter.value='missing series';filter.dispatchEvent(new Event('input'));assert(group.hidden,'Series filter did not hide unmatched scope.');
   checks.push('series search filters reviewed scopes');
   await writer.mergeProviderItems('humble',[{providerItemId:'review-manga',title:'Review manga Vol. 1',mediaType:'book',ownership:'unknown'}]);
   const enrichmentTransfer=new DataTransfer();enrichmentTransfer.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'enrichment.json',{type:'application/json'}));
