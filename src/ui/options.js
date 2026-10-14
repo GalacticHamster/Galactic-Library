@@ -105,6 +105,8 @@ function updateAccessSelection(){
 }
 function editAccess(records,bulk=false){
   if(!drafts.allowNavigation())return;
+  updateAccessSelection();
+  if(bulk||records.some(record=>selectedAccessRecords.has(record.recordRef))){bulk=true;records=Object.values(database.providerItems).filter(record=>selectedAccessRecords.has(record.recordRef));}
   openQuickAccessEditor(records,database,{selectedRefs:bulk?records.map(r=>r.recordRef):undefined,save:(targets,value)=>saveOwnershipCorrections(targets,value),saved:(updated,count,cleared)=>{database=updated;selectedAccessRecords.clear();accessResult.textContent=count+' '+(count===1?'copy':'copies')+(cleared?' restored to provider-derived access.':' updated.');render();}});
 }
 const unlinkedAddOnsSection = document.querySelector('#unlinked-add-ons-section');

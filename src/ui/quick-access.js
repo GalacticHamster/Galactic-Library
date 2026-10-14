@@ -32,7 +32,7 @@ export function openQuickAccessEditor(records,database,{save,saved,selectedRefs=
   function validate(){apply.disabled=busy||!selected.size||!choice.value;}
   choice.addEventListener('change',validate);
   const access=node('label','Access '),notes=node('label','Note (optional) ');access.append(choice);notes.append(note);
-  fieldset.append(preview,access,notes,cancel,apply);dialog.append(node('h3','Change access'),node('p',records.length>1?'Choose the account copies to change. Original provider information and contents stay unchanged.':'Your correction changes access for this account copy. Original provider information and contents stay unchanged.'),fieldset,status);
+  fieldset.append(preview,access,notes,cancel,apply);dialog.append(node('h3',records.length>1?'Change access for '+records.length+' copies':'Change access'),node('p',records.length>1?'Choose the account copies to change. Original provider information and contents stay unchanged.':'Your correction changes access for this account copy. Original provider information and contents stay unchanged.'),fieldset,status);
   dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();else dialog.remove();});
   validate();document.body.append(dialog);dialog.showModal();choice.focus();return dialog;
 }

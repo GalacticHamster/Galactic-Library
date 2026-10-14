@@ -12,6 +12,8 @@ copies** so you can choose exactly which provider/accounts to change. The editor
 previews every chosen copy and its current status before Save. Changes apply
 atomically to up to 500 selected account copies; an outdated selection must be
 reloaded rather than partially applied. Selection can span pages and filters.
+**Change access** on any selected card opens the same selected group. On an
+unselected card, it edits that card's copies only.
 
 Choose **Use provider status (clear correction)** in the same editor to remove
 your correction. Quick corrections use the existing ownership-review storage,
