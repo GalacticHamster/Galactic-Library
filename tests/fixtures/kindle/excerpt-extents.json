@@ -1,5 +1,5 @@
 {
-  "note": "Minimal captured public descriptions and selected windows for six extent corrections and four precision controls. No account, order, history, workbook or library record identifiers. Counts are parser proposals, not verified ownership.",
+  "note": "Minimal captured public descriptions and selected windows for seven extent corrections and four precision controls. No account, order, history, workbook or library record identifiers. Counts are parser proposals, not verified ownership.",
   "cases": [
     {
       "title": "Deadman: Book Five (Deadman (DC Universe) 5)",
@@ -798,6 +798,83 @@
       "beforePartial": 6,
       "expectedPartial": 6,
       "expectedFull": 0
+    },
+    {
+      "title": "Batman and the Outsiders (1983-1987) Vol. 3",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07NLLLN1T",
+        "statement": "Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman and the Outsiders (1983-1987) Vol. 3",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "After Halo gets mixed up with a mysterious cult, Batman and the Outsiders are thrust into a battle with Kobra that will take them into outer space! And when Emily Briggs is abducted, Batman and the Outsiders will discover a long-buried secret from her past that will shake the team to its core. Will they be able to overcome these new revelations? Or will they call it quits once and for all? Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 392,
+              "end": 492,
+              "contextStart": 0,
+              "contextEnd": 492,
+              "raw": "Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83.",
+              "parserInput": "Find out in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.7808764940239044,
+              "rank": [
+                2,
+                2,
+                11,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 11,
+              "unresolved": 1
+            },
+            {
+              "block": 0,
+              "start": 402,
+              "end": 491,
+              "contextStart": 0,
+              "contextEnd": 491,
+              "raw": "in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83",
+              "parserInput": "in these tales from BATMAN AND THE OUTSIDERS #24-32, ANNUAL #2 and DC COMICS PRESENTS #83",
+              "binding": "natural-reprint",
+              "structural": false,
+              "position": 0.8007968127490039,
+              "rank": [
+                2,
+                2,
+                11,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 11,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1
+      },
+      "expectedFull": 10,
+      "expectedPartial": 1
     }
   ]
 }

@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 11;
+export const CONTENTS_PARSER_VERSION = 12;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -144,7 +144,8 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
   let previous=null;
   const headingExtent=extentPrefix.test(body)?'excerpt':'full';
   let clauseExtent=headingExtent;
-  let ordinaryStoryScope=/^(?:stories|tales)\s+from\b/iu.test(body);
+  const narrativeHeading=Boolean(narrativeStoryPayload(body));
+  let ordinaryStoryScope=narrativeHeading||/^(?:stories|tales)\s+from\b/iu.test(body);
   for(const {raw,following,reset} of chunks){
     if(!raw)continue;
     if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
@@ -166,7 +167,9 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     if(/\bstories?\s+(?:["“][^"”]{1,80}["”]\s+)?from\s+/iu.test(chunk))clauseExtent='excerpt';
     // A bounded grammatical run qualifier precedes a title, not an issue.
     chunk=chunk.replace(/^[^#;,]{1,80}['’]s\s+run\s+on\s+/iu,'');
-    if(/^[^#;,]{1,80}\s+(?:backup\s+)?stories\s+from\s+/iu.test(chunk)){
+    const narrative=narrativeStoryPayload(chunk);
+    if(narrative?.limited)ordinaryStoryScope=false;
+    if(!narrative&&/^[^#;,]{1,80}\s+(?:backup\s+)?stories\s+from\s+/iu.test(chunk)){
       chunk=chunk.replace(/^[^#;,]{1,80}\s+(?:backup\s+)?stories\s+from\s+/iu,'stories from ');
     }
     const qualified=extentPrefix.test(chunk);chunk=chunk.replace(extentPrefix,'').replace(/^the (?:entire|complete) miniseries\s+/iu,'');
@@ -175,7 +178,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     chunk=chunk.replace(/^in single magazine form as\s+/iu,'');
     // Interpret only bounded collection/attribution grammar, not arbitrary
     // words preceding '#'. Keep the literal wrappers as unresolved evidence.
-    const wrapped=numberedCollectionPayload(chunk,collectionTitle,collectionClaim||/\bare collected here in\b/iu.test(body));
+    const wrapped=narrative??numberedCollectionPayload(chunk,collectionTitle,collectionClaim||/\bare collected here in\b/iu.test(body));
     if(wrapped){chunk=wrapped.payload;unparsed.push(wrapped.prefix);if(wrapped.excerpt)clauseExtent='excerpt';}
     if(/\bare collected here in\b/iu.test(chunk)){unparsed.push(raw);previous=null;continue;}
     if(qualified)clauseExtent='excerpt';
@@ -245,7 +248,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       || (!label && !previous) || (after && !boundedTail)){unparsed.push(raw);previous=null;continue;}
     if(after){unparsed.push(after.trim());}
     const descriptor=label?reviewSeriesDescriptor(label,explicitRun):{...previous,run:explicitRun||previous.run};
-    const completeness=clauseExtent==='excerpt'&&collectionClaim&&ordinaryStoryScope&&fullSubjectStory(descriptor,collectionTitle,context)?'full':clauseExtent;
+    const completeness=clauseExtent==='excerpt'&&(collectionClaim||narrativeHeading)&&ordinaryStoryScope&&fullSubjectStory(descriptor,collectionTitle,context)?'full':clauseExtent;
     const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness,...(annualYear?{annualYear}:{})};
     const match=/^(\d+(?:\/\d+|\.\d+)?)(?:\s*[-–—]\s*#?(\d+))?$/u.exec(numbers);
     const end=match?reviewRangeEnd(match[1],match[2]):NaN;
@@ -288,6 +291,17 @@ function fullSubjectStory(entry,title,context){
     if(!a||!b||a[1]!==b[1])return false;
   }
   return true;
+}
+
+function narrativeStoryPayload(chunk){
+  // Bounded promotional introductions are not subset evidence by themselves.
+  // Keep their literal wording unresolved and default their list to partial;
+  // only the collection's own subject can pass fullSubjectStory below.
+  const hit=/^((?:Find out|Discover (?:what happens|what comes next)|(?:The |Their |This )?adventures? continues?)\s+in (?:these )?(?:tales|stories) from\s+)(.+)$/iu.exec(chunk);
+  if(!hit)return null;
+  const limit=extentPrefix.exec(hit[2])??/^(?:(?:selected|backup|short)\s+)?tales\s+from\s+/iu.exec(hit[2]);
+  const payload=hit[2].slice(limit?.[0].length??0);
+  return /^[\p{Lu}][^#;]{0,180}#\s*\d/u.test(payload)?{prefix:(hit[1]+(limit?.[0]??'')).trim(),payload,excerpt:true,limited:Boolean(limit)}:null;
 }
 
 function numberedCollectionPayload(chunk,title,collectionClaim){

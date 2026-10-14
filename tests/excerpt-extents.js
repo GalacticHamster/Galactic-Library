@@ -30,6 +30,30 @@ export const excerptExtentTests=[
    const extra=parse('Collects stories from Alpha #1-2; includes backup stories from Alpha #3','Alpha Vol. 2');assert(extra.entries.filter(e=>e.number==='3').every(e=>e.completeness==='excerpt'));
    const special=parse('Collects stories from Alpha #0, #1/2, Alpha Annual #1; Digital Chapters 1-4','Alpha Vol. 2');assert(special.entries.some(e=>e.number==='1/2'));assert(special.unparsed.some(s=>s.includes('Digital Chapters')));assert(!special.entries.some(e=>/Digital/u.test(e.series)));
  }],
+ ['promotional numbered wrappers use subject scope without upgrading cross-title appearances or subsets',()=>{
+   const title='Alpha (2001-2006) Vol. 2';
+   for(const prefix of ['Find out in these tales from','Discover what happens in stories from','Discover what comes next in these tales from','The adventure continues in these tales from','Their adventures continue in stories from']){
+     const p=parse(prefix+' Alpha #1-3, Annual #1, Beta #9',title);
+     assert.equal(p.entries.length,5,prefix);assert.equal(p.entries.filter(e=>e.completeness==='full').length,4,prefix);assert.equal(p.entries.find(e=>e.series==='Beta').completeness,'excerpt');assert(p.unparsed.includes(prefix));
+     for(const other of ['Unrelated Vol. 2','Alpha anthology Vol. 2','Aquaman: 80 Years of the King of the Seven Seas'])assert(parse(prefix+' Alpha #1-3',other).entries.every(e=>e.completeness==='excerpt'));
+     for(const qualifier of ['selected stories from','backup stories from','excerpts from','selected pages from']){const limited=parse(prefix+' '+qualifier+' Alpha #1-3',title);assert(!limited.entries.some(e=>e.completeness==='full'),prefix+' '+qualifier);}
+     const conflict=parse(prefix+' Alpha (2011) #1-3',title);assert(conflict.entries.every(e=>e.completeness==='excerpt'));
+     assert(parse(prefix+' Alpha #1-3',title,{extentDescription:'This anthology collects individual backup stories.'}).entries.every(e=>e.completeness==='excerpt'));
+   }
+   const mixed=parse('Find out in these tales from Alpha #1-2, Annual #1, Beta #9, material from Alpha #4, Alpha #5',title);
+   assert.equal(mixed.entries.filter(e=>e.completeness==='full').length,3);assert(mixed.entries.filter(e=>['9','4','5'].includes(e.number)).every(e=>e.completeness==='excerpt'));
+   const explicit=parse('Find out in these tales from Alpha #1-2, Collects Beta #9',title);assert.equal(explicit.entries.find(e=>e.series==='Beta').completeness,'full');
+   const credited=parse('Collects Jane Writer\'s story from Alpha #1','Alpha Vol. 1');assert(!credited.entries.some(e=>e.completeness==='full'));
+ }],
+ ['saved Outsiders wrapper preserves separate issue types, source, user review and access eligibility',()=>{
+   const c=cases.find(c=>c.title.includes('Outsiders')),book=excerptBook(c),overlap=coverageBook('outsiders-overlap','Collects Batman and the Outsiders (1983-1987) #24-26'),db=coverageDatabase(book,overlap),before=JSON.stringify(db);
+   const view=comicCoverageForLibrary(db),regular=view.groups.find(g=>g.series.toLowerCase()==='batman and the outsiders'&&g.unitType==='issue'),annual=view.groups.find(g=>g.series.toLowerCase()==='batman and the outsiders'&&g.unitType==='annual');
+   assert.equal(regular.run,'1983-1987');assert.equal(regular.covered,9);assert.equal(regular.duplicates,3);assert.equal(annual.covered,1);assert.equal(annual.run,'1983-1987');assert.equal(JSON.stringify(db),before);
+   const host=view.groups.find(g=>g.series.toLowerCase()==='dc comics presents');assert.equal(host.covered,0);assert.equal(host.partial,1);
+   const source=JSON.stringify(book.metadata);db.contentReviews[book.id]=confirmed([issue('24',{series:'Batman and the Outsiders',run:'1983-1987',completeness:'excerpt'})]);
+   const restored=parseBackup(createBackup(db));assert.equal(collectionContents(restored.providerItems[book.id],restored).entries.length,1);assert.equal(collectionContents(restored.providerItems[book.id],restored).entries[0].completeness,'excerpt');assert.equal(JSON.stringify(book.metadata),source);
+   delete db.contentReviews[book.id];for(const ownership of ['returned','revoked','expired','borrowed','subscription','unknown']){db.ownershipReviews[book.recordRef]={ownership,source:'user-correction'};const excluded=comicCoverageForLibrary(db);assert(excluded.excluded.some(r=>r.recordRef===book.recordRef));assert.equal(excluded.groups.find(g=>g.series.toLowerCase()==='batman and the outsiders').duplicates,0);}
+ }],
  ['existing Perez full run, manual partial reviews, ownership exclusions and backup remain authoritative',()=>{
    const perez=wonderBook('perez','Wonder Woman by George Perez Vol. 4 (Wonder Woman (1987-2006))',perezStatement),endgame=excerptBook(cases.find(c=>c.title.includes('Endgame'))),overlap=coverageBook('overlap','Collects Batman (2011-2016) #35-40'),database=coverageDatabase(perez,endgame,overlap);
    assert(collectionContents(perez,database).entries.every(e=>e.completeness==='full'));

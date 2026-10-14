@@ -1,6 +1,6 @@
 # Kindle contents discovery
 
-Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **11**, and filtering version **1**.
+Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **12**, and filtering version **1**.
 
 ## Eligibility and priority
 
@@ -52,6 +52,8 @@ Actual acquisition lazily pins the earlier source with its timestamp, generation
 ## Extraction and proposals
 
 An ordinary collected volume saying “collects stories from” its own series can contribute complete issues as inferred coverage. Explicit excerpts, selected pages, backup features and anthology-story context retain partial coverage. Human-reviewed contents take precedence. A fully parsed statement can still describe partial issues: parsing success and complete-issue coverage are separate.
+
+Promotional introductions such as “Find out in these tales from” use the same subject and context checks. A separately named crossover or host issue remains partial unless its own clause establishes complete contents; it does not inherit full coverage from the collection’s main series.
 
 Parser 5 improves explicit numbered contents: it preserves conjunctions inside series titles, prevents unit words inside titles from becoming markers, and recovers some numbered clauses followed by credits or supplemental material. Unresolved prose remains visible and keeps a proposal Partial. This is a numbered precision update; it does not add general named-story/novel parsing.
 
