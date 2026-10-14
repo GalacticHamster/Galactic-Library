@@ -1,5 +1,6 @@
 import {validIsbn} from './identity.js';
 import {zipMetadataReader} from './zip-metadata.js';
+import '../providers/kindle-ownership.js';
 import '../providers/kindle.js';
 
 function xmlDocument(text){

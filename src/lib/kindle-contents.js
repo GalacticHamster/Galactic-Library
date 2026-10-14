@@ -1,3 +1,4 @@
+import '../providers/kindle-ownership.js';
 import '../providers/kindle.js';
 import {contentsStatement, contentsReviewChanged,proposeContentsForReview, CONTENTS_PARSER_VERSION} from './contents.js';
 import {isConfirmedComicManga} from './genre-hints.js';

@@ -323,7 +323,7 @@ const tests = [
     assert.equal(ownershipFromOriginType('Purchase'), 'owned');
     assert.equal(ownershipFromOriginType('KindleUnlimited'), 'subscription');
     assert.equal(ownershipFromOriginType('ComicsUnlimited'), 'subscription');
-    assert.equal(ownershipFromOriginType('Comixology'), 'unknown');
+    assert.equal(ownershipFromOriginType('Comixology'), 'owned');
     assert.equal(ownershipFromOriginType('Pottermore'), 'unknown');
     assert.equal(ownershipFromOriginType('PublicLibraryLending'), 'borrowed');
     assert.equal(ownershipFromOriginType('PersonalLending'), 'borrowed');

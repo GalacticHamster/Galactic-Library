@@ -54,13 +54,7 @@
   }
 
   function ownershipFromOriginType(originType) {
-    const origin = compactText(originType).toLocaleLowerCase();
-    if (origin === 'purchase') return 'owned';
-    if (origin === 'rental') return 'rental';
-    if (/(publiclibrarylending|personallending|rfflending)/u.test(origin)) return 'borrowed';
-    if (/(kindleunlimited|comicsunlimited|prime|koll|freetrial)/u.test(origin)) return 'subscription';
-    // Comixology records need purchase evidence before they can be treated as owned.
-    return 'unknown';
+    return global.GalacticKindleOwnership.fromOriginType(originType);
   }
 
   function kindleItemFromOwnershipItem(item, origin = global.location?.origin ?? 'https://www.amazon.com', libraryCategory = 'books') {
@@ -73,11 +67,12 @@
     const publisher = firstText(item?.publisher, item?.publisherName);
     const publicationDate = firstText(item?.publicationDate, item?.publishedDate, item?.publication_date);
     const format = firstText(item?.format, item?.fileFormat, item?.fileExtension);
+    const access=global.GalacticKindleOwnership.classify({originType,itemStatus,contentType,libraryCategory,ownershipType:item?.ownershipType,sourceType:item?.sourceType});
     return {
       providerItemId,
       title,
       mediaType: 'book',
-      ownership: ownershipFromOriginType(originType),
+      ownership: access.ownership,
       acquiredAt: acquiredAtFromValue(item?.acquiredDate ?? item?.acquisitionDate ?? item?.dateAcquired ?? item?.purchaseDate),
       metadata: {
         ...(global.GalacticProviderMetadata?.extract(item) ?? {}),
@@ -88,6 +83,7 @@
         series: stringValues(item?.series ?? item?.seriesName),
         collections: stringValues(item?.collections ?? item?.collectionNames ?? item?.collection),
         originType,
+        ...(access.ownership==='unknown'&&access.basis?{ownershipBasis:access.basis}:{}),
         contentType,
         itemStatus,
         publisher,

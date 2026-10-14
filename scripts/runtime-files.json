@@ -94,6 +94,7 @@
   "src/providers/humble-content.js",
   "src/providers/humble.js",
   "src/providers/kindle-content.js",
+  "src/providers/kindle-ownership.js",
   "src/providers/kindle.js",
   "src/providers/kobo-content.js",
   "src/providers/kobo-ownership.js",
@@ -167,5 +168,6 @@
   "src/ui/library-acquisitions.js",
   "src/lib/display-title.js",
   "src/ui/relationship-picker.js",
+  "src/ui/coverage-exclusions.js",
   "shared/natural-title-sort.js"
 ]

@@ -1,5 +1,19 @@
 # Treat library items as owned
 
+Kindle purchases migrated from Comixology are recognized from the saved Kindle
+library context. This is separate from the optional override below: it does not
+include Comics Unlimited, Kindle Unlimited, loans, rentals, samples or conflicting
+access evidence. Older imports retain their original observation, and Library
+details explain the recognized purchase. Existing ownership corrections take
+precedence; a receipt or order ID is not required for provider-context recognition.
+
+In **Library → Comic Coverage**, expand **Books excluded by access** to search
+books whose issue information is available but whose access does not establish
+ownership. Each entry shows its status, exclusion reason and issue ranges.
+**Review ownership** opens that book's existing ownership correction directly.
+Saving a correction updates coverage without rescanning the provider or editing
+the book's contents. The section stays collapsed during ordinary browsing.
+
 In **Settings → Ownership display and matching**, enable **Treat everything as owned** to count every item in the active imported libraries as owned. This includes unknown ownership, subscriptions, borrowed or rented items and expired/unavailable keys. Each connected provider also has a **Treat all [provider] items as owned** checkbox for applying the same choice to that library alone.
 
 The global choice takes precedence. Provider checkboxes are disabled while it is on, but their saved choices remain intact and resume when it is turned off. All choices start off.

@@ -19,7 +19,7 @@ function providerContext(provider, fetch, overrides = {}) {
     },
     ...overrides
   });
-  for (const file of ['provider-snapshot', provider]) {
+  for (const file of ['provider-snapshot',...(provider==='kindle'?['kindle-ownership']:[]),provider]) {
     vm.runInContext(readFileSync(new URL(`../src/providers/${file}.js`, import.meta.url), 'utf8'), context, { filename: `${file}.js` });
   }
   return context;

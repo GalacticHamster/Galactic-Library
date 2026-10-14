@@ -1,4 +1,5 @@
 import '../providers/kobo-ownership.js';
+import '../providers/kindle-ownership.js';
 import {PROVIDERS} from './constants.js';
 
 export const defaultOwnershipPolicy = () => ({allOwned:false,providers:{}});
@@ -28,6 +29,10 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
     const {ownershipOverride,...original}=item;
     item={...original,ownership:ownershipOverride.observedOwnership};
   }
+  if(item.ownershipInference){
+    const {ownershipInference,...original}=item;
+    item={...original,ownership:ownershipInference.observedOwnership};
+  }
   const policy=database.ownershipPolicy;
   if(!ignoreOverride&&(policy?.allOwned===true||policy?.providers?.[item.provider]===true)){
     return {...item,ownership:'owned',ownershipOverride:{observedOwnership:item.ownership,
@@ -42,12 +47,33 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
       &&[undefined,'','library-presence-only','kobo-plus-availability'].includes(item.metadata?.ownershipBasis)){
       return {...item,ownership:'owned',ownershipOverride:{observedOwnership:item.ownership,scope:'profile-unconfirmed'}};
     }
-    return expiredKey?{...item,ownership:'unknown'}:item;
+    if(expiredKey)return {...item,ownership:'unknown'};
+    const inferred=globalThis.GalacticKindleOwnership.infer(item);
+    return inferred?{...item,ownership:inferred.ownership,ownershipInference:{observedOwnership:item.ownership,basis:inferred.basis}}:item;
   }
   const expired=review.expiresAt&&Date.parse(review.expiresAt)<=now;
   const negativeKey=expiredKey||item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
   const ownership=expired||negativeKey&&['owned','claimed'].includes(review.ownership)?'unknown':review.ownership;
   return {...item,ownership,manualOwnershipEvidence:{source:review.source,confirmedAt:review.confirmedAt,evidenceDate:review.evidenceDate,expiresAt:review.expiresAt}};
+}
+
+export function coverageAccessExclusion(item,database={},now=Date.now()){
+  const effective=effectiveOwnershipRecord(item,database,now);
+  if(['owned','claimed'].includes(effective.ownership))return null;
+  const review=database.ownershipReviews?.[item.recordRef];
+  if(review?.expiresAt&&Date.parse(review.expiresAt)<=now)return {ownership:effective.ownership,reason:'expired',explanation:'The saved temporary access has expired.'};
+  const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
+  if(key&&(item.metadata?.keyStatus==='expired'||item.metadata?.expiresAt&&Date.parse(item.metadata.expiresAt)<=now))return {ownership:effective.ownership,reason:'expired',explanation:'The saved key access has expired.'};
+  if(review?.ownership==='unknown')return {ownership:effective.ownership,reason:'user-unconfirmed',explanation:'Your saved ownership correction leaves this book unconfirmed.'};
+  if(item.provider==='kindle'){
+    if(/^(?:expired|access expired|loan expired)$/iu.test(item.metadata?.itemStatus??''))return {ownership:effective.ownership,reason:'expired',explanation:'The provider reports expired access.'};
+    const access=globalThis.GalacticKindleOwnership.classify(item.metadata??{});
+    if(access.basis==='expired-access')return {ownership:effective.ownership,reason:'expired',explanation:'The provider reports expired access.'};
+    if(['inactive-access','conflicting-access-evidence'].includes(access.basis))return {ownership:effective.ownership,reason:access.basis,explanation:'The saved provider access is inactive or contains conflicting ownership information.'};
+    if(String(item.metadata?.originType).toLowerCase()==='sample')return {ownership:effective.ownership,reason:'sample',explanation:'A sample does not establish ownership of the complete book.'};
+  }
+  const captions={subscription:'Subscription access does not establish permanent ownership.',borrowed:'This book is borrowed.',rental:'This book is rented.',unknown:'Permanent ownership is not established by the saved provider evidence.'};
+  return {ownership:effective.ownership,reason:effective.ownership,explanation:captions[effective.ownership]??captions.unknown};
 }
 
 // A reseller purchase is evidence of the purchase, never of activation at its

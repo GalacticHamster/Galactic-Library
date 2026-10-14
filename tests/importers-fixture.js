@@ -189,7 +189,7 @@ try{
   await setMode('scan');start.click();await finished();db=await writer.getDatabase();
   assert(requests.length===2&&!requests.some(url=>url.endsWith('B000000004')),'Normal scan fetched saved or unavailable pages.');
   assert(providerRecord(db,'kindle','B000000001').metadata.enrichment.kindleProductComicContents.parserVersion===CONTENTS_PARSER_VERSION,'Saved text was not locally reparsed.');
-  assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 no contents statement found/.test(status.textContent),'Discovery progress lost local/found/empty counts.');
+  assert(/1 statements reprocessed locally/.test(status.textContent)&&/1 contents found/.test(status.textContent)&&/1 contents not extracted/.test(status.textContent),'Discovery progress lost local/found/empty counts: '+status.textContent);
   assert(providerRecord(db,'kindle','B000000002').metadata.enrichment.kindleProductComicContents.parseOutcome==='full'&&!Object.keys(db.contentReviews).length,'Named proposal disappeared or became verified.');
   checks.push('Kindle contents controls scan prose, locally reparse legacy text and skip unavailable pages');
   assert(!contentsMessages.some(request=>request.diagnosticLookupId),'Disabled diagnostics sent timing requests.');

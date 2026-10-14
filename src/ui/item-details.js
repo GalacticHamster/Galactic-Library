@@ -36,7 +36,8 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     const help=text('details','');help.className='context-help';help.append(text('summary','How account access works'),text('p','Access belongs to each account separately. Grouping copies does not grant access to another account. Ownership preferences and human reviews are labeled; the original observation remains available.'));node.append(help);
     for(const entry of presentation.records){const record=text('div','');record.className='item-account';record.dataset.itemRecord=entry.record.recordRef;
       record.append(text('strong',entry.label),text('p',entry.access+(entry.override?' — user ownership preference':entry.reviewed?' — human ownership review':'')));
-      if(entry.override||entry.reviewed)record.append(text('small','Original provider observation: '+entry.observedAccess));
+      if(entry.inferred)record.append(text('small','Ownership recognized from saved Kindle / Comixology provider context.'));
+      if(entry.override||entry.reviewed||entry.inferred)record.append(text('small','Original provider observation: '+entry.observedAccess));
       if(entry.acquiredAt)record.append(text('small','Acquired / added: '+formatDate(entry.acquiredAt,{time:false})));
       if(entry.observedAt)record.append(text('small','Last observed: '+formatDate(entry.observedAt,{time:false})));
       if(entry.reading)record.append(text('p',entry.reading));node.append(record);
