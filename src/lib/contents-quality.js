@@ -1,4 +1,5 @@
 /** Discovery quality is independent of bibliographic identity and ownership. */
+import {identityKey} from './identity.js';
 export const CONTENTS_FILTER_VERSION = 1;
 const introduction = /^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu;
 const units = /#\s*-?\d|\b(?:issues?|volumes?|vols?\.?|books?|chapters?|parts?)\s*#?\d|\b\d+\s*[-–—]\s*\d+\s+of\b/iu;
@@ -6,9 +7,9 @@ const works = /\b(?:novels?|stories|story|tales?|antholog(?:y|ies)|omnibus|trilo
 
 // Positive reprint grammar followed by a finite, explicitly named issue list.
 // A bare "from the pages of" or "originally published in" is not a claim.
-export function naturalContentsClaims(text){
+export function naturalContentsClaims(text,title=''){
   text=String(text??'').slice(0,12000);const claims=[];
-  const cue=/\b(?:in these (?:\d{4}s\s+)?(?:stories|tales|adventures) from (?:the pages of\s+)?|these (?:stories|tales|issues) (?:were )?originally published in\s+|(?:this|the) (?:volume|collection) (?:reprints|collects|presents) (?:the )?(?:stories|issues) originally published in\s+|(?:is|are) (?:now )?collected in (?:a single|this|one|a) (?:volume|collection) from the pages of\s+)/giu;
+  const cue=/\b(?:in these (?:final\s+|\d{4}s\s+)?(?:stories|tales|adventures) from (?:the pages of\s+)?|series with (?:tales|stories) from\s+|these (?:stories|tales|issues) (?:were )?originally published in\s+|(?:this|the) (?:volume|collection) (?:reprints|collects|presents) (?:the )?(?:stories|issues) originally published in\s+|(?:is|are) (?:now )?collected in (?:a single|this|one|a) (?:volume|collection) from the pages of\s+)/giu;
   const number='\\d+(?:/\\d+|\\.\\d+)?(?:\\s*[-–—]\\s*#?\\d+)?';
   const named=new RegExp('^([\\p{L}][^#;,!?\\n]{0,160}?)\\s*#\\s*'+number,'u'),bare=new RegExp('^#\\s*'+number,'u');
   for(const match of text.matchAll(cue)){
@@ -24,24 +25,32 @@ export function naturalContentsClaims(text){
       const next=text.slice(end+separator[0].length);if(!named.test(next)&&!bare.test(next))break;
       end+=separator[0].length;
     }
-    if(count){const raw=text.slice(match.index,end),payload=raw.slice(match[0].length);claims.push({raw,input:'Collects '+payload,start:match.index,end});}
-  }return claims;
+    if(count){const raw=text.slice(match.index,end),payload=raw.slice(match[0].length),feature=/^series with|\bfinal (?:tales|stories)\b/iu.test(match[0]);
+      if(/^series with/iu.test(match[0])&&!/\b(?:volume|vol\.?|book|collection)\b/iu.test(prefix))continue;
+      claims.push({raw,input:'Collects '+(feature?'stories from ':'')+payload,start:match.index,end});}
+  }
+  // Explicit product/issue equivalence, not an arbitrary marketing mention.
+  // A complete issue is stated to double as this volume in the next sentence.
+  const equivalence=/\b([\p{Lu}][\p{L}\d &'’:\-]{1,120})\s+#(\d+)\s+is here!\s+Doubling as the (?:final )?volume of the series\b/gu;
+  const product=/^(.+?)\s+(?:vol(?:ume)?\.?|book)\s+(?:\d+|one|two|three|four|five)\b/iu.exec(title);
+  for(const m of text.matchAll(equivalence))if(product&&identityKey(product[1])===identityKey(m[1])&&!/\b(?:also available|not included|not reprinted)\b/iu.test(text.slice(Math.max(0,m.index-100),m.index)))claims.push({raw:m[0],input:'Collects '+m[1]+' #'+m[2],start:m.index,end:m.index+m[0].length});
+  return claims;
 }
 export function recoveredNaturalContents(saved){
   if(saved?.statement||!Array.isArray(saved?.manifest?.blocks)||saved.manifest.blocks.length>8)return null;
-  const claims=[...new Map(saved.manifest.blocks.flatMap(block=>naturalContentsClaims(block.text)).map(claim=>[claim.raw,claim])).values()];
+  const claims=[...new Map(saved.manifest.blocks.flatMap(block=>naturalContentsClaims(block.text,saved.manifest.title)).map(claim=>[claim.raw,claim])).values()];
   // Independent descriptions are never blindly combined or silently selected.
   return claims.length===1?claims[0]:null;
 }
 
-export function normalizeContentsInput(statement) {
+export function normalizeContentsInput(statement,collectionTitle='') {
   // Never replace the saved evidence with this parsing-only copy.
   let input=String(statement ?? '').replace(/\s+/gu,' ').trim();
   input=input.replace(/^(?:reprints?|reprinting)\b/iu,'Collects');
   // A captured header can lose its separating DOM whitespace. Repair only
   // the parsing copy of a numbered claim at a capitalized title boundary.
   if(/#\s*\d/u.test(input))input=input.replace(/^(Collects|Collecting)(?=\p{Lu})/u,'$1 ');
-  const natural=naturalContentsClaims(input).find(claim=>claim.start===0);
+  const natural=naturalContentsClaims(input,collectionTitle).find(claim=>claim.start===0);
   if(natural)input=natural.input;
   // Only locally parse an already-captured numbered claim. The marker may
   // indicate an unhydrated description; removing it never establishes source
@@ -54,7 +63,7 @@ export function normalizeContentsInput(statement) {
 }
 
 export function assessContentsQuality(statement, collectionTitle = '') {
-  const normalizedInput=normalizeContentsInput(statement),body=normalizedInput.replace(introduction,'');
+  const normalizedInput=normalizeContentsInput(statement,collectionTitle),body=normalizedInput.replace(introduction,'');
   const descriptionMayBeIncomplete=/\s+Read more\s*$/iu.test(String(statement??''));
   const result=(quality,qualityReason)=>({quality,qualityReason,normalizedInput,descriptionMayBeIncomplete,filterVersion:CONTENTS_FILTER_VERSION});
   if(descriptionMayBeIncomplete && /\s+Read more\s*$/iu.test(normalizedInput))return result('uncertain','The description may be incomplete; no captured numbered claim can safely be normalized.');

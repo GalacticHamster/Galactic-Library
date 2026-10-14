@@ -764,9 +764,9 @@
                      "url":  "https://www.amazon.com/dp/B0849K8NVN",
                      "id":  "sample-5-1228",
                      "expected":  [
-                                      "partial",
-                                      7,
-                                      1
+                                      "full",
+                                      16,
+                                      0
                                   ]
                  },
                  {

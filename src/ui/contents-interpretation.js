@@ -6,10 +6,12 @@ const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:v
 export function createContentsInterpretation({statement,proposal,reviewed=false,capturedAt,technical}={}){
   const root=text('div','');root.className='contents-interpretation';
   root.append(text('h4','Original description'),text('blockquote',statement||'No description statement is available.'));
+  for(const claim of proposal?.supportingStatements??[])root.append(text('blockquote',claim));
   root.append(text('h4','Suggested included works'));
   const list=text('ul','');for(const group of groupContents(proposal?.entries??[]))list.append(text('li',group.text));
   if(list.children.length)root.append(list);else root.append(text('p','No included works could be identified from this statement.'));
   for(const range of proposal?.provisionalRanges??[])root.append(text('p','Issue numbers found: #'+range.first+(range.last!==range.first?'–'+range.last:'')+'. The series is unresolved; these numbers do not contribute to owned coverage. Specify the series before saving.'));
+  if(proposal?.contextualEvidence?.some(e=>e.kind==='complete-story-not-host'))root.append(text('p','A complete story is listed, but that does not establish that its entire source issue is included. The issue remains partial.'));
   root.append(text('p','From the description'+(capturedAt?' captured '+formatDate(capturedAt):'')+'. '+(reviewed?'A separate human review is saved; these are the description suggestions.':'Not reviewed. Check names, numbers, series version, language and full works versus excerpts before saving.')));
   if(proposal?.unparsed?.length)root.append(text('p','Still to check: '+proposal.unparsed.join('; ')));
   if(proposal?.descriptionMayBeIncomplete)root.append(text('p','The captured description may be incomplete; later included material may be missing.'));

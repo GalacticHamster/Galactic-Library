@@ -5,7 +5,7 @@ import {assessContentsQuality,naturalContentsClaims,recoveredNaturalContents} fr
 // existing review parser in the worker; no page-side module/permission changes.
 export const MANIFEST_LIMITS=Object.freeze({blocks:8,total:24000,block:12000,candidates:32,window:2000,evidence:16000});
 // Interpretation of existing source, independent of capture/parser generations.
-export const MANIFEST_INTERPRETATION_VERSION=3;
+export const MANIFEST_INTERPRETATION_VERSION=4;
 const trigger=/\b(?:collects?|collecting|contains?|containing|includes?|including|comprises?|comprising|reprints?|reprinting)\b/giu;
 const semanticClaim=new RegExp(trigger.source,'iu');
 const clean=value=>String(value??'').replace(/\s+/gu,' ').trim();
@@ -149,9 +149,9 @@ export function discoverManifestCandidates(blocks,title='') {
   blocks=validateDescriptionBlocks(blocks);const windows=[],candidates=[],seen=new Set();let evidenceSize=0;
   for(let block=0;block<blocks.length;block++){
     const text=blocks[block].text;
-    for(const claim of naturalContentsClaims(text)){
+    for(const claim of naturalContentsClaims(text,title)){
       if(seen.has(claim.raw))continue;seen.add(claim.raw);
-      windows.push({block,start:claim.start,end:claim.end,raw:claim.raw,structural:false,natural:true,syntax:3,contextStart:Math.max(0,claim.start-600),contextEnd:claim.end});
+      windows.push({block,start:claim.start,end:claim.end,raw:claim.raw,naturalInput:claim.input,structural:false,natural:true,syntax:3,contextStart:Math.max(0,claim.start-600),contextEnd:claim.end});
     }
     for(const sentence of sentences(text)){
       const body=text.slice(sentence.start,sentence.end);
@@ -190,8 +190,8 @@ export function discoverManifestCandidates(blocks,title='') {
   for(const window of windows.slice(0,MANIFEST_LIMITS.candidates)){
         const {block,start,end,raw,structural,contextStart,contextEnd,manifestRange,whole,truncated}=window,text=blocks[block].text;
         const context=text.slice(contextStart,contextEnd);
-        const normalized=parserInput(raw,context,title),contextual=assessContentsQuality(raw,title);
-        const proposal=proposeContentsForReview(contextual.quality==='filtered'?raw:normalized.input,title);
+        const normalized=window.naturalInput?{input:window.naturalInput,binding:'natural-reprint'}:parserInput(raw,context,title),contextual=assessContentsQuality(raw,title);
+        const proposal=proposeContentsForReview(contextual.quality==='filtered'?raw:normalized.input,title,{allowTitleBinding:true,extentDescription:text});
         if(contextual.quality==='filtered')normalized.input=raw;
         if(evidenceSize+raw.length+normalized.input.length>MANIFEST_LIMITS.evidence)continue;
         evidenceSize+=raw.length+normalized.input.length;
@@ -226,7 +226,7 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
   if(subjects.length===1)context={...context,subjectSeries:subjects[0]};
   const recovered=recoveredNaturalContents(saved);
   if(recovered&&(!statement||sameSourceText(statement,recovered.raw))){
-    const proposal=proposeContentsForReview(recovered.raw,title,{...context,allowTitleBinding:true});
+    const proposal=proposeContentsForReview(recovered.input,title,{...context,allowTitleBinding:true,naturalCollection:true,extentDescription:saved.manifest.blocks.map(b=>b.text).join('\n')});
     return {...proposal,manifestEvidence:recovered.raw,recoveredFromDescription:true,descriptionMayBeIncomplete:Boolean(saved.manifest?.descriptionMayBeIncomplete)};
   }
   // Old selections remain source history. Reinterpret only a proven parent of
@@ -234,16 +234,45 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
   const manifest=saved?.manifest?.interpretationVersion===MANIFEST_INTERPRETATION_VERSION?saved.manifest:saved?.manifest?validateManifest(saved.manifest):null;
   let reviewContext={...context,allowTitleBinding:sameSourceText(statement,saved?.statement)};
   if(manifest){
-    const candidate=manifest.candidates[manifest.selected];
-    if(candidate&&sameSourceText(candidate.raw,saved.statement)){
+    let candidate=manifest.candidates[manifest.selected];
+    // Re-rank only an explicitly AUTOMATIC, empty interpretation. Unknown or
+    // human-approved selections remain authoritative. The source is unchanged:
+    // this is a projection over one uniquely enumerable claim in the same block.
+    const automatic=saved.approved===false&&saved.matchBasis==='source-evidence';
+    if(automatic&&candidate){
+      const current=proposeContentsForReview(candidate.parserInput,title,{...context,allowTitleBinding:true,sourceText:candidate.raw});
+      if(!current.entries.some(e=>e.unitType!=='component')){
+        const alternatives=manifest.candidates.filter(c=>c.block===candidate.block&&c.quality==='containment'&&(/^(?:collects?|collecting|includes?|contains?|reprints?)\b/iu.test(c.raw)||c.binding==='natural-reprint'&&clean(saved.statement).includes(clean(c.raw)))&&proposeContentsForReview(c.parserInput,title,{...context,allowTitleBinding:true,sourceText:c.binding==='natural-reprint'?c.parserInput:c.raw,extentDescription:manifest.blocks[c.block].text}).entries.some(e=>e.unitType!=='component'));
+        if(alternatives.length===1&&(sameSourceText(statement,saved.statement)||sameSourceText(statement,alternatives[0].raw)))candidate=alternatives[0];
+      }
+    }
+    if(!candidate&&!statement&&manifest.candidates.length===1&&manifest.candidates[0].binding==='natural-reprint')candidate=manifest.candidates[0];
+    if(candidate&&(sameSourceText(candidate.raw,saved.statement)||automatic&&(sameSourceText(statement,saved.statement)||sameSourceText(statement,candidate.raw))||!statement&&candidate.binding==='natural-reprint')){
       const parent=candidate.manifestRange&&!candidate.whole?manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange.start===candidate.manifestRange.start&&c.manifestRange.end===candidate.manifestRange.end):null;
-      if(!sameSourceText(statement,saved.statement)&&!sameSourceText(statement,parent?.raw))return proposeContentsForReview(statement,title,reviewContext);
+      if(!sameSourceText(statement,saved.statement)&&!sameSourceText(statement,parent?.raw)&&!(automatic&&sameSourceText(statement,candidate.raw)))return proposeContentsForReview(statement,title,reviewContext);
       reviewContext={...context,allowTitleBinding:true};
-      const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,{...reviewContext,sourceText:interpreted.raw,extentDescription:manifest.blocks[interpreted.block].text});
+      const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,{...reviewContext,sourceText:interpreted.binding==='natural-reprint'?interpreted.parserInput:interpreted.raw,naturalCollection:interpreted.binding==='natural-reprint',extentDescription:manifest.blocks[interpreted.block].text});
       const incomplete=interpreted.truncated||candidate.manifestRange&&!candidate.whole&&!parent;
       const remainder=interpreted.whole?manifest.blocks[interpreted.block].text.slice(interpreted.end,interpreted.manifestRange.end):incomplete?manifest.blocks[candidate.block].text.slice(candidate.manifestRange.start,candidate.manifestRange.end):'';
       const unparsed=incomplete?[...proposal.unparsed,remainder]:proposal.unparsed;
-      return {...proposal,unparsed,outcome:incomplete&&proposal.outcome==='full'?'partial':proposal.outcome,parseBinding:proposal.parseBinding==='explicit-statement'?interpreted.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete,...(interpreted.whole?{manifestEvidence:interpreted.raw,manifestCoverage:incomplete?'bounded':'whole-clause'}: {})};
+      const supportingStatements=[];
+      if(automatic){
+        if(saved.statement&&!sameSourceText(interpreted.raw,saved.statement)&&!interpreted.whole){supportingStatements.push(saved.statement);unparsed.push(saved.statement);}
+        const block=manifest.blocks[interpreted.block].text;
+        // A same-sentence feature prelude is explicitly connected by 'and'
+        // to this very claim. Retain partial host extent and deduplicate the
+        // repeated issue, rather than unioning unrelated page candidates.
+        const preceding=block.slice(Math.max(0,interpreted.start-250),interpreted.start);
+        const prelude=/\bStories from ([\p{Lu}][^#;.!?]{1,120}#\s*\d+(?:\s*[-–—]\s*\d+)?)\s+and\s*$/u.exec(preceding);
+        if(prelude&&proposal.contextualEvidence?.some(e=>e.kind==='story-feature')){
+          const extra=proposeContentsForReview('Includes material from '+prelude[1],title,{...context,allowTitleBinding:true});
+          const entries=new Map(proposal.entries.map(e=>[contentKey(e),e]));for(const e of extra.entries)if(!entries.has(contentKey(e)))entries.set(contentKey(e),e);
+          proposal.entries=[...entries.values()];supportingStatements.push(prelude[0].replace(/\s+and\s*$/u,''));
+        }
+        const following=block.slice(interpreted.end),supplement=/^\s*Also\s+(includes?\s+(?:prose story|a sketchbook|a special sketchbook)[^\n]{0,400}?)(?=\n|$)/iu.exec(following);
+        if(supplement){unparsed.push(supplement[1]);supportingStatements.push(supplement[0].trim());}
+      }
+      return {...proposal,unparsed,...(supportingStatements.length?{supportingStatements}:{}),outcome:incomplete&&proposal.outcome==='full'||unparsed.length&&proposal.entries.length?'partial':proposal.outcome,parseBinding:proposal.parseBinding==='explicit-statement'?interpreted.binding:proposal.parseBinding,descriptionMayBeIncomplete:manifest.descriptionMayBeIncomplete,...(interpreted.whole||!sameSourceText(interpreted.raw,saved.statement)?{manifestEvidence:interpreted.raw,manifestCoverage:incomplete?'bounded':interpreted.whole?'whole-clause':'same-source-enumeration'}: {})};
     }
   }
   return proposeContentsForReview(statement,title,reviewContext);

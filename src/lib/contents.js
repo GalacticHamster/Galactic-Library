@@ -5,7 +5,7 @@ import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} fr
 import {contextualComicInput} from './contextual-comic-contents.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 13;
+export const CONTENTS_PARSER_VERSION = 14;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -80,7 +80,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   // Retain an existing source-bound explicit series/run normalization when
   // the new helper only repeats ordinary title inheritance. New count, mixed
   // publication and finite-tail grammar can still reinterpret the raw clause.
-  if(prepared&&context.sourceText&&prepared.evidence.every(e=>['implicit-series','unresolved-series-range'].includes(e.kind))&&!/\bthrough\b|\bwhich\s+(?:serve|serves|are|is)\b/iu.test(context.sourceText)&&!/^(?:collects?|collecting|includes?|contains?)\s+issues?\b/iu.test(quality.normalizedInput))prepared=null;
+  if(prepared&&context.sourceText&&prepared.evidence.some(e=>['implicit-series','unresolved-series-range'].includes(e.kind))&&prepared.evidence.every(e=>['implicit-series','unresolved-series-range','series-attribution'].includes(e.kind))&&!/\bthrough\b|\bwhich\s+(?:serve|serves|are|is)\b/iu.test(context.sourceText)&&!/^(?:collects?|collecting|includes?|contains?)\s+(?:the\s+)?(?:issues?\b|#?\d)/iu.test(quality.normalizedInput))prepared=null;
   const body=(prepared?.input??quality.normalizedInput).replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu,'');
   let parseBinding='explicit-statement',parseInput=prepared?.input??quality.normalizedInput;
   const finish=(entries,unparsed)=>({...quality,parseBinding,parseInput,entries,unparsed,...(prepared?{contextualEvidence:prepared.evidence,...(prepared.provisionalRanges?{provisionalRanges:prepared.provisionalRanges}:{})}:{}),outcome:quality.quality==='filtered'?'filtered':quality.quality==='uncertain'?'uncertain':!entries.length?'failed':unparsed.length?'partial':'full'});
@@ -92,7 +92,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
   if(contextual){
     input=contextual;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
-  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),{...context,naturalCollection:naturalContentsClaims(statement).some(claim=>claim.start===0)});
+  const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),{...context,naturalCollection:context.naturalCollection||naturalContentsClaims(statement).some(claim=>claim.start===0)});
   if(prepared){proposal.entries=[...proposal.entries,...prepared.named];proposal.unparsed.push(...prepared.unparsed);if(proposal.entries.length)proposal.entries=validateContents(proposal.entries);}
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return {...finish(proposal.entries,proposal.unparsed),...(proposal.annualRunHints?.length?{annualRunHints:proposal.annualRunHints}:{})};
   // This fallback is discovery/editor-only; ordinary matching still uses
@@ -292,7 +292,7 @@ function fullSubjectStory(entry,title,context){
   const subjectTitle=title.replace(/:\s*(?:the\s+)?(?:golden|silver|bronze|modern) age(?=\s+(?:vol(?:ume)?\.?|book)\b)/iu,'');
   const subject=reviewSeriesAnchor(subjectTitle,{allowTitleBinding:true});if(!subject)return false;
   const descriptor=reviewSeriesDescriptor(subject.series);
-  if(identityKey(descriptor.series)!==identityKey(entry.series))return false;
+  if(identityKey(descriptor.series)!==identityKey(entry.series)&&identityKey(descriptor.series)!==identityKey(entry.series.replace(/^The\s+/u,'')))return false;
   if(descriptor.run&&entry.run&&identityKey(descriptor.run)!==identityKey(entry.run)){
     const a=/^(\d{4})(?:-|$)/u.exec(descriptor.run),b=/^(\d{4})(?:-|$)/u.exec(entry.run);
     if(!a||!b||a[1]!==b[1])return false;

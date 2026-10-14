@@ -30,6 +30,12 @@ export const kindleWholeManifestTests=[
      }
      assert.ok(expected.entries.length,r.title);assert.deepEqual(q.entries,expected.entries,r.title);assert.deepEqual(q.unparsed,expected.unparsed,r.title);assert.equal(q.outcome,expected.outcome,r.title);assert.equal(b.statement,a.statement,r.title);
    }
+   else if(r.title==='Teenage Mutant Ninja Turtles: The IDW Collection Vol. 11'){
+     // Postposed explicit host names must win over the previous series. The
+     // frozen old interpreter incorrectly attached #76–84 to Universe.
+     assert.deepEqual(q.entries.map(e=>[e.series,e.number,e.completeness]),[...Array.from({length:7},(_,n)=>['TEENAGE MUTANT NINJA TURTLES UNIVERSE',String(n+16),'full']),...Array.from({length:9},(_,n)=>['TEENAGE MUTANT NINJA TURTLES',String(n+76),'full'])]);
+     assert.deepEqual(q.unparsed,[]);assert.equal(q.outcome,'full');assert.equal(b.statement,a.statement);
+   }
    else{assert.deepEqual(q.entries,p.entries,r.title);assert.deepEqual(q.unparsed,p.unparsed,r.title);assert.equal(q.outcome,p.outcome,r.title);assert.equal(b.statement,a.statement,r.title);}
   }
  }]

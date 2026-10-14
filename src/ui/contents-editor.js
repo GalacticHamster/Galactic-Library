@@ -120,7 +120,7 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
     const interpreted=manifestReviewProposal(evidence,record.title);
     if(interpreted.manifestEvidence){
       details.append(element('p','Source manifest used for proposals (unverified):'),element('blockquote',interpreted.manifestEvidence));
-      if(interpreted.manifestEvidence!==evidence.statement)details.append(button('Use complete captured collection statement',()=>{statement.value=interpreted.manifestEvidence;status.textContent='Whole source manifest loaded for review. Parse and check its unresolved evidence before saving; your saved review has not changed.';}));
+      if(interpreted.manifestEvidence!==evidence.statement)details.append(button(interpreted.manifestCoverage==='whole-clause'?'Use complete captured collection statement':'Use captured contents statement',()=>{statement.value=interpreted.manifestEvidence;status.textContent='Captured text loaded for review. Parse and check its unresolved evidence before saving; your saved review has not changed.';}));
     }
     for(const index of [evidence.manifest.selected,...evidence.manifest.secondary]){
       const candidate=evidence.manifest.candidates[index];if(!candidate)continue;

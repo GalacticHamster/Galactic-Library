@@ -109,6 +109,34 @@ Parser generation 6 makes the existing local reparse planner recognize older der
 
 Public source-span regressions for all 35 audited cases and four adjacent controls live in `tests/fixtures/kindle/numbered-wrappers.json`; private corpus comparisons remain under ignored audit artifacts.
 
+## Current discovery interpretation (parser 14 / manifest 4)
+
+Captured description blocks and historical selected windows remain source
+evidence. A projection may replace an **explicitly automatic** empty proposal
+(`approved: false`, `matchBasis: source-evidence`) with one uniquely enumerable
+claim from the same block. Competing enumerable claims, different source blocks,
+human-approved/unspecified selections and substantively edited drafts do not use
+this fallback. The displaced statement remains reviewable. Reviewed entries
+always take precedence; this does not write selections, source history or reviews.
+
+Bounded natural collection claims can recover a previously empty selection.
+An explicit same-title issue doubling as the collected volume is eligible;
+an incidental issue in promotional prose is not. A same-sentence feature prelude
+explicitly connected to the selected claim may supply partial host references.
+Independent claims are not unioned. Duplicate references to one issue in a
+collection remain one identity, not another acquisition.
+
+Parsing copies recognize labelled `to` ranges, issue ordinals, bounded attribution
+and promotional tails, explicitly postposed series names, and safely anchored
+complete miniseries/saga counts. Explicit years and hosts retain precedence.
+Named works in a bounded mixed enumeration use parent-scoped components, never
+invented issue numbers. Other unnamed or unsupported publications remain literal
+unresolved evidence. A complete story does not establish a complete host issue;
+story wording is retained while its issue remains partial. Source descriptions,
+manual reviews, access restrictions and ordinary companion matching are unchanged.
+
+The following named-component contract applies to both old and new proposals.
+
 ## Named components: parent-local identity
 
 The existing entry has series, run, unit type, number/name, language and full/excerpt extent. Generic `component` holds a named containment assertion: **this particular parent contains this named component**. Shared names or collection display labels do not establish cross-parent work identity. Cross-parent equivalence requires stronger, separately reviewed identity evidence; it is not supplied by this contents contract.

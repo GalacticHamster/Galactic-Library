@@ -7,7 +7,7 @@ const parse=s=>proposeContentsForReview(s,'Collection');
 const equal=(a,b,message)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(message+': '+JSON.stringify(a));};
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const nums=(a,b)=>Array.from({length:b-a+1},(_,n)=>String(a+n));
-add('parser 13 retains bounded numbered precision with contextual comic inference',()=>equal(CONTENTS_PARSER_VERSION,13,'Parser version'));
+add('parser 14 retains bounded numbered precision with source-aware comic inference',()=>equal(CONTENTS_PARSER_VERSION,14,'Parser version'));
 for(const title of ['Batman and Robin','Sword and Sorcery','Cloak and Dagger']){
  add('conjunction stays inside numbered title: '+title,()=>{
   for(const label of [title,title.toLowerCase()])for(const s of [`Collects ${label} #1-3`,`Collects issues #1-3 of ${label}, part of the event`]){
@@ -60,9 +60,12 @@ add('excerpt conjunction and credit tail never establish full-unit scope',()=>{
 add('explicit adventures wrapper now recovers units while retaining its source prose',()=>{
  const p=parse('Collects the early adventures of heroes from Explorer #1-3');equal(p.entries.map(e=>e.number),nums(1,3),'Bounded wrapper');equal(p.unparsed,['the early adventures of heroes from'],'Wrapper evidence');equal(p.outcome,'partial','Source prose retained');
 });
-for(const source of ['Collects scripts from Explorer #1-3','Includes recommendations for Explorer #1-3','Collects Explorer #1-3 from pages 4-5','Collects Explorer #1-3 from pages selected by the creators','Collects Explorer #1-3 of an unknown book','Collects Explorer #1-3 There are two sides to every story','Collects Explorer #1-3abc','Collects Explorer #1Written by Jane Doe','Collects Explorer #1-3.5','Collects Explorer #1-3–5','Collects more than Explorer #1-3']){
+for(const source of ['Collects scripts from Explorer #1-3','Includes recommendations for Explorer #1-3','Collects Explorer #1-3 from pages 4-5','Collects Explorer #1-3 from pages selected by the creators','Collects Explorer #1-3 of an unknown book','Collects Explorer #1-3abc','Collects Explorer #1Written by Jane Doe','Collects Explorer #1-3.5','Collects Explorer #1-3–5','Collects more than Explorer #1-3']){
  add('unsafe prose or number attachment remains unresolved: '+source,()=>equal(parse(source).entries,[],'Unsafe numbered clause'));
 }
+add('an explicit collected range survives a separate promotional sentence without absorbing it',()=>{
+ const p=parse('Collects Explorer #1-3 There are two sides to every story');equal(p.entries.map(e=>e.number),nums(1,3),'Explicit range');equal(p.unparsed,['There are two sides to every story'],'Promotional prose retained');
+});
 add('bare numbering never finds a unit substring inside a title',()=>equal(parse('Collects Explorerbook 1').entries.map(e=>[e.series,e.unitType,e.number]),[['Explorerbook','issue','1']],'Bare unit boundary'));
 add('literal Adventures of title and descriptive postposed tail remain separate',()=>{
  equal(parse('Collects Adventures of Explorer #1-2').entries.map(e=>e.series),['Adventures of Explorer','Adventures of Explorer'],'Literal title');

@@ -31,6 +31,7 @@ import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/libr
 import {quickAccessFixture} from './quick-access-fixture.js';
 import {openQuickAccessEditor} from '../src/ui/quick-access.js';
 import {excerptBook} from './excerpt-extent-fixture.js';
+import {checkDiscoveryCase,checkDiscoverySafety,discoveryBook} from './discovery-mixed-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -55,6 +56,19 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const fixture=await (await fetch('/tests/fixtures/kindle/discovery-mixed.json')).json();
+    fixture.cases.forEach((c,i)=>checkDiscoveryCase(c,i,assert));checkDiscoverySafety(assert);
+    const doom=discoveryBook(fixture.cases[12],12),editor=createContentsEditor(doom,null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(editor);
+    assert(editor.querySelectorAll('[data-contents-field="number"]').length===16&&editor.querySelector('[aria-label="Original contents statement"]').value.includes('series with tales from'),'Captured Doom Patrol evidence is invisible');
+    assert([...editor.querySelectorAll('[data-contents-field="completeness"]')].filter(n=>n.value==='excerpt').length===6,'Doom Patrol anthology hosts became full');editor.remove();
+    const snow=createContentsEditor(discoveryBook(fixture.cases[5],5),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(snow);
+    assert(snow.querySelectorAll('[data-contents-field="number"]').length===16&&[...snow.querySelectorAll('[data-contents-field="number"]')].filter(n=>n.value==='124').length===1,'Mixed story issue repeated or missing');assert(snow.textContent.includes('does not establish that its entire source issue is included')&&snow.textContent.includes('Stories from FABLES #124-129'),'Story completeness or supporting claim hidden');snow.remove();
+    const fables=createContentsEditor(discoveryBook(fixture.cases[1],1),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(fables);assert(fables.querySelectorAll('[data-contents-field="number"]').length===8&&fables.querySelector('[aria-label="Original contents statement"]').value.startsWith('Collects 11-18'),'Weak automatic selection still shown');button(fables,'Parse statement for review').click();assert(fables.querySelectorAll('[data-contents-field="number"]').length===8,'Reparsing the displayed source lost context');fables.remove();
+    const data=coverageDatabase(...fixture.cases.map((c,i)=>discoveryBook(c,i))),view=createComicCoverageView(data);document.body.append(view);const result=await view.ready,main=result.groups.find(g=>g.series==='Fables');assert(main.covered===27&&main.partial===16&&main.duplicates===0,'Recovered contents/partial evidence miscounted in coverage');assert(result.groups.find(g=>g.series==='My Greatest Adventure').partial===6,'Host partials missing from coverage');view.remove();
+    const absent=createContentsEditor(coverageBook('no-capture','',{title:'No captured description'}),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(absent);assert(!absent.querySelector('[aria-label="Original contents statement"]').value&&absent.textContent.includes('No contents statement is available'),'Missing source silently fabricated');absent.remove();
+    checks.push('Captured descriptions, stronger automatic candidates and mixed host/story extents reach the contents editor without invented evidence or repeated issues');
+  }
   {
     const fixture=await (await fetch('/tests/fixtures/kindle/contextual-comics.json')).json(),books=fixture.cases.map((c,i)=>excerptBook(c,i)),data=coverageDatabase(...books,coverageBook('context-idw','Collects Teenage Mutant Ninja Turtles (2011) #131-139'),coverageBook('context-mirage','Collects Teenage Mutant Ninja Turtles (1984) #1-12')),before=JSON.stringify(data),view=createComicCoverageView(data);document.body.append(view);const result=await view.ready;
     const main=result.groups.find(g=>g.series==='Teenage Mutant Ninja Turtles'&&g.run==='2011');assert(main.covered===9&&main.duplicates===9,'Contextual source corroboration lost IDW issue ranges');assert(result.groups.find(g=>g.series==='Teenage Mutant Ninja Turtles'&&g.run==='1984').duplicates===0,'Mirage and IDW numbering collided');

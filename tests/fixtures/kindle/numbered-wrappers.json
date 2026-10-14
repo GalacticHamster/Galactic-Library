@@ -386,8 +386,9 @@
       "expected": [],
       "unresolved": [
         "the Bat and the Cat's road to the altar in issues #33-44",
-        "Annual #2 of the ongoing hit series by Tom King (Grayson",
-        "The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson)"
+          "Annual #2",
+          "of the ongoing hit series",
+          "by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson)."
       ],
       "outcome": "failed"
     },
@@ -1517,15 +1518,15 @@
       "outcome": "partial"
     },
     {
-      "title": "G.I. Joe: Classics Vol. 2",
+        "title": "G.I. Joe: Classics Vol. 2",
       "statement": "collects classic Marvel Comics G.I. Joe #11 to 20.",
       "parserInput": "collects classic Marvel Comics G.I. Joe #11 to 20",
       "binding": "explicit-clause",
-      "expected": [],
-      "unresolved": [
-        "classic Marvel Comics G.I. Joe #11 to 20"
-      ],
-      "outcome": "failed"
+        "expected": [{"series":"G.I. Joe","run":"","unitType":"issue","language":"","completeness":"full","numbers":["11","12","13","14","15","16","17","18","19","20"]}],
+        "unresolved": [
+          "classic Marvel Comics"
+        ],
+        "outcome": "partial"
     }
   ],
   "controls": [

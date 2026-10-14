@@ -1,0 +1,1089 @@
+{
+  "note": "Bounded public description/selection inputs for discovery and mixed-extent regressions. No account, purchase, record IDs or timestamps. Automatic selection flags are synthetic; original selection/source text is retained.",
+  "cases": [
+    {
+      "title": "Fables Vol. 15: Rose Red (Fables (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0064W64IU",
+        "statement": "Collects issues #94-99 and the special oversized 100th issue in Bill Willingham's Eisner Award-winning series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 15: Rose Red (Fables (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "WINNER OF FOURTEEN EISNER AWARDS. Rose Red, sister of Snow White, has finally hit rock bottom. Does she stay there, or is it time to start the long, tortuous climb back up? The Farm is in chaos, as many factions compete to fill the void of her missing leadership. And there's a big magical fight brewing down in the town square, right under her window. Collects issues #94-99 and the special oversized 100th issue in Bill Willingham's Eisner Award-winning series. Also includes prose story, \"Pinnocchio's Army,\" and a special sketchbook section from Mark Buckingham.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 353,
+              "end": 463,
+              "raw": "Collects issues #94-99 and the special oversized 100th issue in Bill Willingham's Eisner Award-winning series."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0064W64IU",
+          "sourceUrl": "https://www.amazon.com/dp/B0064W64IU",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "250 pages",
+              "value": "250",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Fables",
+              "value": "Part of: Fables",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHDS8T8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Fables Vol. 3: Storybook Love (Fables (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0064W66BA",
+        "statement": "Includes the 4-part story \"Storybook Love.\" Also included are the 2-part \"A Sharp Operator\" and the single-issue tales \"Bag o' Bones\" and \"Barleycorn Brides.\"",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 3: Storybook Love (Fables (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "WINNER OF FOURTEEN EISNER AWARDS. In the Fables' world, there isn't a lot of happily-ever-after to go around. As refugees from the lands of make-believe, the Fables have been driven from their storybook realms and forced to blend in with our gritty, mundane reality. Includes the 4-part story \"Storybook Love.\" Also included are the 2-part \"A Sharp Operator\" and the single-issue tales \"Bag o' Bones\" and \"Barleycorn Brides.\" Collects 11-18 of creator Bill Willingham's celebrated Vertigo series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 267,
+              "end": 426,
+              "raw": "Includes the 4-part story \"Storybook Love.\" Also included are the 2-part \"A Sharp Operator\" and the single-issue tales \"Bag o' Bones\" and \"Barleycorn Brides.\""
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0064W66BA",
+          "sourceUrl": "https://www.amazon.com/dp/B0064W66BA",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "185 pages",
+              "value": "185",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Fables",
+              "value": "Part of: Fables",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHDS8T8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "G.I. Joe: Classics Vol. 2",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0097EV324",
+        "statement": "collects classic Marvel Comics G.I. Joe #11 to 20.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "G.I. Joe: Classics Vol. 2",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "235 pages!\nThe original Marvel Comics adventures of America's elite special-missions force continue with the recruitment of Roadblock and Duke; the emergence of the enigmatic ninja known as Storm Shadow; and the debut of the duplicitous Zartan, master of disguise! This action-packed volume collects classic Marvel Comics G.I. Joe #11 to 20.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 291,
+              "end": 341,
+              "raw": "collects classic Marvel Comics G.I. Joe #11 to 20."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0097EV324",
+          "sourceUrl": "https://www.amazon.com/dp/B0097EV324",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "235 pages",
+              "value": "235",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: G.I. Joe: Classics",
+              "value": "Part of: G.I. Joe: Classics",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JJZMBQ4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Green Arrow: The Longbow Hunters",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B009CEXA8Y",
+        "statement": "collecting the 3-issue 1987 miniseries.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Green Arrow: The Longbow Hunters",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "A new edition of Green Arrow: The Longbow Hunters collecting the 3-issue 1987 miniseries. Oliver Queen gives up his trick arrows and settles down in Seattle with Dinah Lance. But Ollie's world collides with one of unspeakable violence involving the beautiful and mysterious archer known as Shado.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 50,
+              "end": 89,
+              "raw": "collecting the 3-issue 1987 miniseries."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B009CEXA8Y",
+          "sourceUrl": "https://www.amazon.com/dp/B009CEXA8Y",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "126 pages",
+              "value": "126",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Green Arrow: The Longbow Hunters",
+              "value": "Part of: Green Arrow: The Longbow Hunters",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JK5TWF5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Thor & Loki: Blood Brothers (Loki (2004))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00AAJR2P2",
+        "statement": "Collects Loki (2004) #1-4 There are two sides to every story.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Thor & Loki: Blood Brothers (Loki (2004))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Collects Loki (2004) #1-4 There are two sides to every story. You've heard Thor's -- now it's time to hear Loki's. Odin's least favorite son rewrites Asgardian lore from his perspective.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 0,
+              "end": 61,
+              "raw": "Collects Loki (2004) #1-4 There are two sides to every story."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00AAJR2P2",
+          "sourceUrl": "https://www.amazon.com/dp/B00AAJR2P2",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Marvel",
+              "value": "Marvel",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "148 pages",
+              "value": "148",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Loki (2004)",
+              "value": "Part of: Loki (2004)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JK5MZCN"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Fables Vol. 19: Snow White (Fables (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00DD1JYLY",
+        "statement": "collects stories starring Bufkin and Lily from issues #114-124 and the full-length tale from #124.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 19: Snow White (Fables (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "With Castle Dark now back in the hands of the Fables, mysteries both young and old begin to challenge the residents of Fabletown. Bigsby and Stinky set off from Fabletown in Rose Red's blood-fueled sports car to track down the two abducted cubs. Unfortunately for Snow White, besides suffering the trauma of having two of her cubs go missing, a long forgotten secret uncovered in Castle Dark threatens to sabatoge her and Bigsby's marriage. Stories from FABLES #124-129 and collects stories starring Bufkin and Lily from issues #114-124 and the full-length tale from #124.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 474,
+              "end": 572,
+              "raw": "collects stories starring Bufkin and Lily from issues #114-124 and the full-length tale from #124."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00DD1JYLY",
+          "sourceUrl": "https://www.amazon.com/dp/B00DD1JYLY",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "157 pages",
+              "value": "157",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Fables",
+              "value": "Part of: Fables",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHDS8T8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Fables Vol. 20: Camelot (Fables (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00KRKITE2",
+        "statement": "Collects issues #130-140 of this 14-time Eisner-Award-winning series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 20: Camelot (Fables (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Rose Red finally and formally takes on the mantle of Paladin of Hope to heroically rally the Fables in the tragic aftermath of \"Snow White.\" A new dark age calls for a new Round Table, with modern knights willing to take on a sacred quest to reassemble the shattered pieces of Fabletown. Collects issues #130-140 of this 14-time Eisner-Award-winning series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 288,
+              "end": 357,
+              "raw": "Collects issues #130-140 of this 14-time Eisner-Award-winning series."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00KRKITE2",
+          "sourceUrl": "https://www.amazon.com/dp/B00KRKITE2",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "250 pages",
+              "value": "250",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Fables",
+              "value": "Part of: Fables",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHDS8T8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Fables Vol. 22: Farewell",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00ZKA9DQW",
+        "statement": "",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 22: Farewell",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The New York Times Best-selling Series and Winner of 14 Eisner Awards! Completing more than thirteen years of critically-acclaimed storytelling, FABLES #150 is here! Doubling as the final volume of the series, creator Bill Willingham, artist Mark Buckingham and a host of the industry’s finest artists deliver the end to this legendary Vertigo series that sees the final fates of beloved characters Bigby Wolf, Snow White, Rose Red, Boy Blue, Pinocchio and countless others. Ready or not, ever after is here.\nRead more"
+            }
+          ],
+          "candidates": [],
+          "selected": -1
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00ZKA9DQW",
+          "sourceUrl": "https://www.amazon.com/dp/B00ZKA9DQW",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "130 pages",
+              "value": "130",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Fables",
+              "value": "Part of: Fables",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JHDS8T8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "New Teen Titans (1980-1988) Vol. 4 (The New Teen Titans Graphic Novel)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B018YP1QWI",
+        "statement": "Collects THE NEW TEEN TITANS #21-27 of the classic title as well as the pivotal THE NEW TEEN TITANS ANNUAL #1.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "New Teen Titans (1980-1988) Vol. 4 (The New Teen Titans Graphic Novel)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The original Teen Titans always stood in the shadows of their larger-than-life mentors-young heroes like Robin, Wonder Girl and Kid Flash saw plenty of action, but it was Batman, Wonder Woman and The Flash who ultimately called the shots.\nAll that changed, however, with the arrival of THE NEW TEEN TITANS in 1980-and the lives of DC's adolescent adventurers would never be the same!\nCrafted by comics legends Marv Wolfman and George Pérez, this all-new super-team featured greater dangers, fiercer emotions and more tangled relationships than any that had come before. The Titans' celebrated stories have ensured that the names of Starfire, Cyborg, Raven and Changeling will be passed down through history. Collects THE NEW TEEN TITANS #21-27 of the classic title as well as the pivotal THE NEW TEEN TITANS ANNUAL #1.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 708,
+              "end": 818,
+              "raw": "Collects THE NEW TEEN TITANS #21-27 of the classic title as well as the pivotal THE NEW TEEN TITANS ANNUAL #1."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B018YP1QWI",
+          "sourceUrl": "https://www.amazon.com/dp/B018YP1QWI",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "220 pages",
+              "value": "220",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: New Teen Titans (1980-1988)",
+              "value": "Part of: New Teen Titans (1980-1988)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JX5V8JJ"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Elseworlds: Batman Vol. 1 (DC Elseworlds)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B01D40MJ7E",
+        "statement": "Collects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Elseworlds: Batman Vol. 1 (DC Elseworlds)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "For the first time ever, Batman's Elseworlds tales are featured in a new graphic novel collection.\nIn Elseworlds, heroes are taken from their usual settings and put into strange times and places-some that have existed, or might have existed; and others that can't, couldn't or shouldn't exist. The result: stories that make characters who are as familiar as yesterday seem as fresh as tomorrow.\nFeaturing Batman as a holy priest, Harry Houdini alongside the Dark Knight, Dr. Wayne reanimating a Frankenstein-like Bat-Man, Batman as a Green Lantern, a supernatural Bat-Man fighting the evil wizard known as the Dark Joker, a future Robin fighting off an alien invasion, and other tales!\nCollects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 686,
+              "end": 923,
+              "raw": "Collects BATMAN: HOLY TERROR, BATMAN: THE BLUE, THE GREY, AND THE BAT, ROBIN 3000 #1-2, BATMAN/DARK JOKER: THE WILD, BATMAN/HOUDINI: THE DEVIL'S WORKSHOP, BATMAN: CASTLE OF THE BAT, BATMAN: IN DARKEST KNIGHT and BATMAN: DARK ALLEGIANCES!"
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B01D40MJ7E",
+          "sourceUrl": "https://www.amazon.com/dp/B01D40MJ7E",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "534 pages",
+              "value": "534",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: DC Elseworlds",
+              "value": "Part of: DC Elseworlds",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JJ7C2VR"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 5",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B079F6WSW4",
+        "statement": "including one-shots, crossovers, and event series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 5",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want. After meeting a good-natured inter dimensional time traveler named Renet, the Turtles become unstuck in time and go spinning into the past! Meanwhile, Shredder and Krang finally meet up--but will they be able to overcome their differences and join forces?--and Old Hob has perfected the art of making mutants! Plus, when a new invention goes haywire, the Turtles are sent to a whole new type of New York City. One with a whole lot more ghosts--and Ghostbusters! Collects Turtles in Time, issues #38–44 of the Teenage Mutant Ninja Turtles ongoing series, and the TMNT/Ghostbusters crossover.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 67,
+              "end": 117,
+              "raw": "including one-shots, crossovers, and event series."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B079F6WSW4",
+          "sourceUrl": "https://www.amazon.com/dp/B079F6WSW4",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "373 pages",
+              "value": "373",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 6",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B079RT7J7D",
+        "statement": "including one-shots, crossovers, and event series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The IDW Collection Vol. 6",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presenting the complete TMNT stories in recommended reading order, including one-shots, crossovers, and event series. Everything a beginner could need, everything a diehard could want.\nOld Hob, Slash, and their crew have become a force to be reckoned with, but a kidnapping leads them on an adventure more wild and dangerous than they could ever have imagined. Then, the Turtles return from Burnow Island to find unimaginable tragedy. Meanwhile, Casey prepares for a final showdown with Hun, and April has come into possession of an ancient scroll that seems to point to answers regarding the Pantheon. It all leads to a final showdown as Karai decrees a Gauntlet battle between Splinter and Shredder.\nCollects the Mutanimals mini-series, issues #45–50 of the ongoing series, the 2015 Free Comic Book Day issue, and the Casey & April mini-series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 67,
+              "end": 117,
+              "raw": "including one-shots, crossovers, and event series."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B079RT7J7D",
+          "sourceUrl": "https://www.amazon.com/dp/B079RT7J7D",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "374 pages",
+              "value": "374",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The IDW Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBB2JM"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Doom Patrol: The Silver Age Vol. 1 (Doom Patrol (1964-1968))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07FCXRL1H",
+        "statement": "",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Doom Patrol: The Silver Age Vol. 1 (Doom Patrol (1964-1968))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Out of the Silver Age of Comics came a very different comic book team, featuring a new breed of superheroes. Cast out of society due to their deformities, the Doom Patrol were a group of misfit loners not blessed, but cursed, with unnatural powers. These human oddities—Elasti-Girl, Negative Man, Robotman and the Chief—save the world one strange case at a time.\nSee them take on such equally bizarre villains like the undying criminal mastermind General Immortus, shape-shifting Animal-Vegetable-Mineral Man, the Brotherhood of Evil and more!\nDoom Patrol: The Silver Age Volume One kicks off Arnold Drake and Bruno Premiani’s beloved series with tales from My Greatest Adventure #80-85 and The Doom Patrol #86-95.\nRead more"
+            }
+          ],
+          "candidates": [],
+          "selected": -1
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07FCXRL1H",
+          "sourceUrl": "https://www.amazon.com/dp/B07FCXRL1H",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "374 pages",
+              "value": "374",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Doom Patrol (1964-1968)",
+              "value": "Part of: Doom Patrol (1964-1968)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JK57J3Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Batman (2016-): The Rebirth Deluxe Edition - Book 3",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07KXFM6S8",
+        "statement": "collects the Bat and the Cat's road to the altar in issues #33-44 and Annual #2 of the ongoing hit series by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson).",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman (2016-): The Rebirth Deluxe Edition - Book 3",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "\"Fresh and different… exciting and unpredictable.\" -IGN\n\"This is a must have.\" -Comicosity\nBEFORE THE WEDDING OF THE CENTURY...THE BATTLE OF A LIFETIME!\nThe modern-classic Batman run from writer Tom King continues, as Batman and Catwoman inch closer to their wedding day. But the course of true love never did run smooth...and before happily ever after, the couple will have to face unthinkable obstacles!\nFirst, there's the small matter of Catwoman being framed for 237 murders. To clear her name, she and Batman have to venture to a forbidden kingdom-one under the control of the mother of Batman's son, Talia al Ghul! Talia is reputed to be the most dangerous woman alive...but she's never met Selina Kyle!\nAnd when Poison Ivy takes control of every being on the planet, it's just Batman and Catwoman alone against the world. They might be able to stop Ivy...but can they take down Superman, the Flash and every other hero under her power?\nBatman: The Rebirth Deluxe Edition Book 3 collects the Bat and the Cat's road to the altar in issues #33-44 and Annual #2 of the ongoing hit series by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson).\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 985,
+              "end": 1211,
+              "raw": "collects the Bat and the Cat's road to the altar in issues #33-44 and Annual #2 of the ongoing hit series by Tom King (Grayson, The Vision) and artists Joëlle Jones (Supergirl: Being Super, Catwoman) and Mikel Janín (Grayson)."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07KXFM6S8",
+          "sourceUrl": "https://www.amazon.com/dp/B07KXFM6S8",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "311 pages",
+              "value": "311",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman (2016-)",
+              "value": "Part of: Batman (2016-)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JJ67YP4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "The Department of Truth Vol. 1: The End of the World",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B08PW7VVR8",
+        "statement": "Collects THE DEPARTMENT OF TRUTH #1-5\nSelect praise:\n\"Genuinely one of the best comics you'll read this year.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "The Department of Truth Vol. 1: The End of the World",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "SPECIAL LOW INTRODUCTORY PRICE OF $9.99!\nCOLE TURNER has studied conspiracy theories all his life, but he isn’t prepared for what happens when he discovers that all of them are true, from the JFK Assassination to Flat Earth Theory and Reptilian Shapeshifters. One organization has been covering them up for generations. What is the deep, dark secret behind the Department of Truth?\nFrom bestselling writer JAMES TYNION IV (Batman, Something is Killing the Children) and breakout artist MARTIN SIMMONDS (Dying is Easy)!\nCollects THE DEPARTMENT OF TRUTH #1-5\nSelect praise:\n\"Genuinely one of the best comics you'll read this year. Do not miss it.\"—Scott Snyder\n“A story for our zeitgeist. SIMMONDS' art invokes Bill Sienkiewicz.”—Entertainment Weekly\n\"A wonderfully dizzy mixture of Men in Black, John Carpenter, Stephen King, The Matrix, and 1970s conspiracy thrillers.\"—Forbes\n\"It is FANTASTIC. Can’t wait to read the whole series!\"—Patton Oswalt\n\"A new conspiracy thriller comic that should appeal to anyone with a fondness for The X-Files.\"—IGN\n\"The hype on this is real.\"—Brian Michael Bendis\n“Hickmanian conspiracy games, Burroughsian crime, Sienkiewiczian style. The Truth: you want it.” —Kieron Gillen\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 519,
+              "end": 628,
+              "raw": "Collects THE DEPARTMENT OF TRUTH #1-5\nSelect praise:\n\"Genuinely one of the best comics you'll read this year."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B08PW7VVR8",
+          "sourceUrl": "https://www.amazon.com/dp/B08PW7VVR8",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Image",
+              "value": "Image",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "129 pages",
+              "value": "129",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: The Department of Truth",
+              "value": "Part of: The Department of Truth",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B08PXRBZ6S"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Transmetropolitan: Book Five",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B095KX7XGP",
+        "statement": "The forces of darkness are closing in on outlaw journalist Spider Jerusalem and his merry, filthy band in these final tales from Transmetropolitan #49-60.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Transmetropolitan: Book Five",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "In a future where consumerism, superficiality, and corruption reign supreme, outlaw journalist Spider Jerusalem has decided to stop sitting idly by and watching the world crumble around him. With Spider back in the saddle, no one in the City is safe.\nThe forces of darkness are closing in on outlaw journalist Spider Jerusalem and his merry, filthy band in these final tales from Transmetropolitan #49-60.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 250,
+              "end": 405,
+              "raw": "The forces of darkness are closing in on outlaw journalist Spider Jerusalem and his merry, filthy band in these final tales from Transmetropolitan #49-60."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B095KX7XGP",
+          "sourceUrl": "https://www.amazon.com/dp/B095KX7XGP",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "Vertigo",
+              "value": "Vertigo",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "294 pages",
+              "value": "294",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Transmetropolitan",
+              "value": "Part of: Transmetropolitan",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07NPJCMZP"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "OMAC (1974-1975): One Man Army Corps by Jack Kirby",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B098FJ2W4N",
+        "statement": "collects the complete eight-issue Kirby OMAC saga, along with an introduction by Kirby!",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "OMAC (1974-1975): One Man Army Corps by Jack Kirby",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "One of Jack Kirby’s final projects for DC Comics in the 1970s presents a dystopian future in which ordinary people are pushed to violence to relieve their stress, and a corporate nobody called Buddy Blank is recruited by the Global Peace Agency to become the super-powered being known as OMAC- the One Man Army Corps. In these tales from the 1970s, Jack Kirby introduces OMAC! Powered by the sentient satellite known as Brother Eye, OMAC has been charged by the Global Peace Agency with stopping the evil schemes of power-hungry millionaires who seek to exploit those less fortunate than them. It’s a vision of the future unlike any you’ve seen before! OMAC: One Man Army Corps by Jack Kirby collects the complete eight-issue Kirby OMAC saga, along with an introduction by Kirby!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 692,
+              "end": 779,
+              "raw": "collects the complete eight-issue Kirby OMAC saga, along with an introduction by Kirby!"
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B098FJ2W4N",
+          "sourceUrl": "https://www.amazon.com/dp/B098FJ2W4N",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "177 pages",
+              "value": "177",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: OMAC (1974-1975)",
+              "value": "Part of: OMAC (1974-1975)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B08KRVM31W"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Batman & The Joker: The Deadly Duo (2022-): The Deluxe Edition",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0CFYVZ35V",
+        "statement": "Collects issues #1-7 of the smash-hit series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman & The Joker: The Deadly Duo (2022-): The Deluxe Edition",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The Joker will go to any lengths to get Harley Quinn back after she is abducted by a strange culprit. But who? Mysterious, Joker-like monsters are stalking the streets of Gotham, collecting severed heads. But why? Jim Gordon is missing, and after receiving a package containing a bloody piece of Gotham's commissioner, Batman knows he must be willing to do anything to save him. But how? When the Joker proposes an uneasy alliance with Batman, the answers to those questions begin to become clear-and they will shake Gotham City and the Bat-Family to their core. This meticulously crafted tale of the Dark Knight's deadliest team-up will introduce you to a grim and gritty Gotham that only Marc Silvestri could bring you. You are not ready. Collects issues #1-7 of the smash-hit series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 741,
+              "end": 786,
+              "raw": "Collects issues #1-7 of the smash-hit series."
+            }
+          ],
+          "selected": 0
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0CFYVZ35V",
+          "sourceUrl": "https://www.amazon.com/dp/B0CFYVZ35V",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "DC",
+              "value": "DC",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "pageCount",
+              "label": "Print length",
+              "raw": "263 pages",
+              "value": "263",
+              "status": "parsed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman & The Joker: The Deadly Duo (2022-)",
+              "value": "Part of: Batman & The Joker: The Deadly Duo (2022-)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B0BVM67GNH"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
