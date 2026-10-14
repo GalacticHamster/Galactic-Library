@@ -37,6 +37,7 @@ export function recoveredNaturalContents(saved){
 export function normalizeContentsInput(statement) {
   // Never replace the saved evidence with this parsing-only copy.
   let input=String(statement ?? '').replace(/\s+/gu,' ').trim();
+  input=input.replace(/^(?:reprints?|reprinting)\b/iu,'Collects');
   // A captured header can lose its separating DOM whitespace. Repair only
   // the parsing copy of a numbered claim at a capitalized title boundary.
   if(/#\s*\d/u.test(input))input=input.replace(/^(Collects|Collecting)(?=\p{Lu})/u,'$1 ');

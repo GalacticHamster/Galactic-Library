@@ -30,6 +30,7 @@ import {createOwnershipReviewTools} from '../src/ui/ownership-review.js';
 import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
 import {quickAccessFixture} from './quick-access-fixture.js';
 import {openQuickAccessEditor} from '../src/ui/quick-access.js';
+import {excerptBook} from './excerpt-extent-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -54,6 +55,13 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const fixtures=await (await fetch('/tests/fixtures/kindle/excerpt-extents.json')).json(),c=fixtures.cases.find(c=>c.title.includes('Endgame')),anthology=fixtures.cases.find(c=>c.title.startsWith('Batman: Urban Legends'));
+    const book=excerptBook(c),subset=excerptBook(anthology,1),overlap=coverageBook('endgame-other','Collects Batman (2011-2016) #35-37'),data=coverageDatabase(book,subset,overlap),original=JSON.stringify(data),view=createComicCoverageView(data);document.body.append(view);const result=await view.ready;
+    const group=result.groups.find(g=>g.series.toLowerCase()==='batman');assert(group.covered===6&&group.duplicates===3&&group.partial===0,'Endgame extent or duplicate counts did not reach coverage');const anthologyGroup=result.groups.find(g=>g.series==='Batman: Urban Legends');assert(anthologyGroup.partial===6&&anthologyGroup.covered===0,'Captured anthology context became full issues');
+    button([...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===group.id),'Inspect issues').click();assert(view.querySelector('[data-comic-grid-issue="35"]').dataset.coverage==='duplicate'&&view.querySelector('[data-comic-grid-issue="40"]').dataset.coverage==='owned','Endgame grid retained partial cells');view.querySelector('[data-comic-grid-issue="40"]').click();assert(view.querySelector('.comic-issue-sources').textContent.includes('Collects stories from BATMAN #35-40'),'Full issue lost source phrase');view.remove();
+    const editor=createContentsEditor(book,null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(editor);assert(editor.querySelectorAll('[data-contents-field="completeness"] option:checked').length===6&&[...editor.querySelectorAll('[data-contents-field="completeness"]')].every(select=>select.value==='full'),'Contents editor disagrees with coverage extent');editor.remove();assert(JSON.stringify(data)===original,'Extent UI changed frozen evidence');checks.push('Captured Endgame shows six full issues, correct duplicate cells and source evidence in coverage/editor while the captured Urban Legends anthology remains partial');
+  }
   {
     const fixture=quickAccessFixture();let calls=0;
     let dialog=openQuickAccessEditor(fixture.miles,fixture.database,{save:async()=>{calls++;throw Error('Fixture failure');}});

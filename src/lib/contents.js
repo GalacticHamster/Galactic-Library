@@ -4,7 +4,7 @@ import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} from './contents-quality.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 10;
+export const CONTENTS_PARSER_VERSION = 11;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -144,6 +144,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
   let previous=null;
   const headingExtent=extentPrefix.test(body)?'excerpt':'full';
   let clauseExtent=headingExtent;
+  let ordinaryStoryScope=/^(?:stories|tales)\s+from\b/iu.test(body);
   for(const {raw,following,reset} of chunks){
     if(!raw)continue;
     if(reset)clauseExtent=clauseExtent!=='full' && headingExtent==='full'?'uncertain':headingExtent;
@@ -157,6 +158,11 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
     // Sentence punctuation can terminate a range; an abbreviation at the end
     // of a postposed title remains part of its literal label.
     if(!/^issues?\s*#?\s*\d+(?:\s*[-–—]\s*\d+)?\s+of\s+/iu.test(chunk))chunk=chunk.replace(/[.!]+$/u,'');
+    // Only the unqualified collection heading can support whole-issue
+    // inference. A later subset qualifier keeps its own scope and is never
+    // upgraded merely because it names the collection's subject again.
+    if(extentPrefix.test(chunk)&&!/^(?:stories|tales)\s+from\b/iu.test(chunk))ordinaryStoryScope=false;
+    if(/\b(?:backup|back-up|selected|short)\s+(?:stories|tales)|\b(?:material|excerpts?|pages?|portions?)\s+from\b/iu.test(chunk))ordinaryStoryScope=false;
     if(/\bstories?\s+(?:["“][^"”]{1,80}["”]\s+)?from\s+/iu.test(chunk))clauseExtent='excerpt';
     // A bounded grammatical run qualifier precedes a title, not an issue.
     chunk=chunk.replace(/^[^#;,]{1,80}['’]s\s+run\s+on\s+/iu,'');
@@ -239,7 +245,7 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       || (!label && !previous) || (after && !boundedTail)){unparsed.push(raw);previous=null;continue;}
     if(after){unparsed.push(after.trim());}
     const descriptor=label?reviewSeriesDescriptor(label,explicitRun):{...previous,run:explicitRun||previous.run};
-    const completeness=clauseExtent;
+    const completeness=clauseExtent==='excerpt'&&collectionClaim&&ordinaryStoryScope&&fullSubjectStory(descriptor,collectionTitle,context)?'full':clauseExtent;
     const base={series:descriptor.series,run:descriptor.run,unitType:type,language:'',completeness,...(annualYear?{annualYear}:{})};
     const match=/^(\d+(?:\/\d+|\.\d+)?)(?:\s*[-–—]\s*#?(\d+))?$/u.exec(numbers);
     const end=match?reviewRangeEnd(match[1],match[2]):NaN;
@@ -266,6 +272,22 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
 export function annualParentRunEligible(run,year){
   const match=/^(\d{4})(?:-(\d{4})?)?$/u.exec(run??'');
   return Boolean(match&&Number(match[1])<=Number(year)&&(!match[2]||Number(match[2])>=Number(year)));
+}
+
+function fullSubjectStory(entry,title,context){
+  // Product metadata can name a host anthology rather than the collected
+  // feature. Use the volume's own literal subject, never that host as an alias.
+  const descriptive=title+' '+(context.extentDescription??'');
+  if(/\bantholog(?:y|ies)|\b(?:backup|back-up|selected|short|standalone)\s+(?:stories|tales|features)|\bselected material\b/iu.test(descriptive))return false;
+  const subjectTitle=title.replace(/:\s*(?:the\s+)?(?:golden|silver|bronze|modern) age(?=\s+(?:vol(?:ume)?\.?|book)\b)/iu,'');
+  const subject=reviewSeriesAnchor(subjectTitle,{allowTitleBinding:true});if(!subject)return false;
+  const descriptor=reviewSeriesDescriptor(subject.series);
+  if(identityKey(descriptor.series)!==identityKey(entry.series))return false;
+  if(descriptor.run&&entry.run&&identityKey(descriptor.run)!==identityKey(entry.run)){
+    const a=/^(\d{4})(?:-|$)/u.exec(descriptor.run),b=/^(\d{4})(?:-|$)/u.exec(entry.run);
+    if(!a||!b||a[1]!==b[1])return false;
+  }
+  return true;
 }
 
 function numberedCollectionPayload(chunk,title,collectionClaim){

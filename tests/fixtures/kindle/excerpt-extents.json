@@ -1,0 +1,803 @@
+{
+  "note": "Minimal captured public descriptions and selected windows for six extent corrections and four precision controls. No account, order, history, workbook or library record identifiers. Counts are parser proposals, not verified ownership.",
+  "cases": [
+    {
+      "title": "Deadman: Book Five (Deadman (DC Universe) 5)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00J4ZT9MM",
+        "statement": "Collects stories from DEADMAN #1-4, SECRET ORIGINS #15, CHALLENGERS OF THE UNKNOWN #85-87.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Deadman: Book Five (Deadman (DC Universe) 5)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Deadman, the groundbreaking undead super hero driven to find his own murderer, returns in this fourth collection of his 1970s adventures. Featuring appearances by Swamp Thing, the Challengers of the Unknown and more, this title finds Deadman continuing his quest to bring his killer to justice while battling occult menaces throughout the DC Universe.\nCollects stories from DEADMAN #1-4, SECRET ORIGINS #15, CHALLENGERS OF THE UNKNOWN #85-87.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 352,
+              "end": 442,
+              "contextStart": 0,
+              "contextEnd": 442,
+              "raw": "Collects stories from DEADMAN #1-4, SECRET ORIGINS #15, CHALLENGERS OF THE UNKNOWN #85-87.",
+              "parserInput": "Collects stories from DEADMAN #1-4, SECRET ORIGINS #15, CHALLENGERS OF THE UNKNOWN #85-87",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7787610619469026,
+              "rank": [
+                2,
+                2,
+                8,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 8,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00J4ZT9MM",
+          "sourceUrl": "https://www.amazon.com/dp/B00J4ZT9MM",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Deadman (DC Universe)",
+              "value": "Part of: Deadman (DC Universe)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 8,
+      "expectedPartial": 4,
+      "expectedFull": 4
+    },
+    {
+      "title": "Batman (2011-2016) Vol. 7: Endgame (Batman Graphic Novel)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B013TGYL4M",
+        "statement": "Collects stories from BATMAN #35-40.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman (2011-2016) Vol. 7: Endgame (Batman Graphic Novel)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Batman's greatest foe has returned for one last gag-but this time, not even the Joker is laughing. In their last encounter, the Dark Knight failed to live up to the Joker's grand plans, so now the Joker is deadly serious.\nThe games are over and, for their final showdown, the Clown Prince of Crime won't be staging a comedy. No more macabre mind games. No more perverse pranks. The crazed killer who has elevated evil to an art is about to paint his masterpiece: the utter destruction of Batman and everything he holds dear. He'll turn the Justice League against Batman. He'll turn the people of Gotham into giggling psychopaths. But that's just the setup-the punchline is even more terrifying.\nThe #1 New York Times best-selling team of Scott Snyder and Greg Capullo create the ultimate face-off between the greatest hero and villain in all of comics in BATMAN VOLUME 7: ENDGAME-and it's no laughing matter. Collects stories from BATMAN #35-40.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 694,
+              "end": 908,
+              "contextStart": 94,
+              "contextEnd": 908,
+              "raw": "The #1 New York Times best-selling team of Scott Snyder and Greg Capullo create the ultimate face-off between the greatest hero and villain in all of comics in BATMAN VOLUME 7: ENDGAME-and it's no laughing matter.",
+              "parserInput": "The #1 New York Times best-selling team of Scott Snyder and Greg Capullo create the ultimate face-off between the greatest hero and villain in all of comics in BATMAN VOLUME 7: ENDGAME-and it's no laughing matter",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.7267015706806282,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 909,
+              "end": 945,
+              "contextStart": 309,
+              "contextEnd": 945,
+              "raw": "Collects stories from BATMAN #35-40.",
+              "parserInput": "Collects stories from BATMAN #35-40",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9518324607329843,
+              "rank": [
+                2,
+                2,
+                6,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 6,
+              "unresolved": 0
+            }
+          ],
+          "selected": 1,
+          "secondary": [
+            0
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B013TGYL4M",
+          "sourceUrl": "https://www.amazon.com/dp/B013TGYL4M",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman (2011-2016)",
+              "value": "Part of: Batman (2011-2016)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 6,
+      "expectedPartial": 0,
+      "expectedFull": 6
+    },
+    {
+      "title": "Batman (2016-) Vol. 3: I Am Bane",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B074Q1FRTQ",
+        "statement": "Collects stories from BATMAN #16-20, 23-24 and BATMAN ANNUAL #1.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman (2016-) Vol. 3: I Am Bane",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Superstar artist David Finch (WONDER WOMAN) completes his run on the Dark Knight in BATMAN VOL. 3: I AM BANE, the stunning new chapter in writer Tom King’s (THE SHERIFF OF BABYLON) wildly acclaimed Batman saga.\nHe is not a joke. He is not a riddle. He is not a bird or a cat or a penguin, not a scarecrow or a plant or a puppet. He is not a fairy tale or a circus act, a broken friend or a regretful mentor. He is no rich boy pretending to be a knight.\nHe is Bane. The Batman invaded his home, scarred his mind and broke his back. Now Bane has returned to Gotham City for a single purpose: break the Batman once and for all. But first, he’ll destroy everyone the Dark Knight has ever loved…or loathed.\nThe young heroes who’ve worn the mantle of Robin. The cops, crime-fighters and vigilantes who make up Batman’s army of allies. Even the madmen and monsters that haunt the halls of Arkham Asylum. Batman will need all of their help—and more—to fend off this unstoppable challenger.\nBecause both Bane and Batman know one thing: only one of them will walk away from their final confrontation unbroken…\nCollects stories from BATMAN #16-20, 23-24 and BATMAN ANNUAL #1.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 1100,
+              "end": 1164,
+              "contextStart": 500,
+              "contextEnd": 1164,
+              "raw": "Collects stories from BATMAN #16-20, 23-24 and BATMAN ANNUAL #1.",
+              "parserInput": "Collects stories from BATMAN #16-20, 23-24 and BATMAN ANNUAL #1",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9369676320272572,
+              "rank": [
+                2,
+                2,
+                8,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 8,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B074Q1FRTQ",
+          "sourceUrl": "https://www.amazon.com/dp/B074Q1FRTQ",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman (2016-)",
+              "value": "Part of: Batman (2016-)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 8,
+      "expectedPartial": 0,
+      "expectedFull": 8
+    },
+    {
+      "title": "Teen Titans: The Silver Age Vol. 1 (Teen Titans (1966-1978))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0784HT7NR",
+        "statement": "collects stories from THE BRAVE AND THE BOLD #54 and #60, SHOWCASE #59 and TEEN TITANS #1-11, from such talented writers and artists as Nick Cardy and Bob Haney.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teen Titans: The Silver Age Vol. 1 (Teen Titans (1966-1978))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Only a short while after the first superheroes entered the scene, they were followed by a host of scrappy teenage sidekicks. Batman had Robin. The Flash had Kid Flash. Green Arrow had Speedy. Aquaman had Aqualad.\nBy 1964 there were enough of these young heroes-in-training to form their own team—the Teen Titans! This youthful Junior Justice League came together to aid other youngsters and stomp out evil wherever they found it—all with the style and slang of the swinging ’60s. Dig it?\nTEEN TITANS: THE SILVER AGE OMNIBUS VOLUME 1 collects stories from THE BRAVE AND THE BOLD #54 and #60, SHOWCASE #59 and TEEN TITANS #1-11, from such talented writers and artists as Nick Cardy and Bob Haney.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 533,
+              "end": 694,
+              "contextStart": 0,
+              "contextEnd": 694,
+              "raw": "collects stories from THE BRAVE AND THE BOLD #54 and #60, SHOWCASE #59 and TEEN TITANS #1-11, from such talented writers and artists as Nick Cardy and Bob Haney.",
+              "parserInput": "collects stories from THE BRAVE AND THE BOLD #54 and #60, SHOWCASE #59 and TEEN TITANS #1-11, from such talented writers and artists as Nick Cardy and Bob Haney",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7571022727272727,
+              "rank": [
+                2,
+                2,
+                14,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 14,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "unparsed",
+        "parseOutcome": "partial",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0784HT7NR",
+          "sourceUrl": "https://www.amazon.com/dp/B0784HT7NR",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teen Titans (1966-1978)",
+              "value": "Part of: Teen Titans (1966-1978)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 14,
+      "expectedPartial": 3,
+      "expectedFull": 11
+    },
+    {
+      "title": "The Flash (2016-) Vol. 6: Cold Day in Hell",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07B8DV5MG",
+        "statement": "Collects stories from The Flash #34-38 and Annual #1.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "The Flash (2016-) Vol. 6: Cold Day in Hell",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Iron Heights is the toughest penitentiary in Central City—tough enough to hold rogues like Captain Cold and Mirror Master. But lately it’s been a prison of sorts for Barry Allen as well, ever since Barry was pulled off his job as a CSI and sent to the facility to work in crime scene preservation. From his new post, the Fastest Man Alive witnesses for the first time what life is like for criminals after their arrest. And thanks to Iron Heights’ tough-as-nails Warden Wolfe, it isn’t pretty.\nBut now life in prison has turned into a death sentence for one inmate, and since Barry’s no longer working at the crime lab, he isn’t able to help the murder investigation. As the Flash, however, he’s determined to get to the bottom of the mystery, even if it runs him headlong into a trap.\nA new player has been giving Copperhead, Central City’s leading crime lord, a run for her money, and whoever it is has ties to the prison...and the murder. Can the Flash solve the mystery and take down a rising crime boss, or is there really no escaping Iron Heights?\nWriter Joshua Williamson (Justice League vs. Suicide Squad), along with artists Pop Mhan (Injustice: Ground Zero), Christian Duce (Detective Comics) and more trap the Fastest Man Alive behind bars with his deadliest enemies in The Flash Vol. 6: Cold Day in Hell. Collects stories from The Flash #34-38 and Annual #1.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 1317,
+              "end": 1370,
+              "contextStart": 717,
+              "contextEnd": 1370,
+              "raw": "Collects stories from The Flash #34-38 and Annual #1.",
+              "parserInput": "Collects stories from The Flash #34-38 and Annual #1",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9543478260869566,
+              "rank": [
+                2,
+                2,
+                6,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 6,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07B8DV5MG",
+          "sourceUrl": "https://www.amazon.com/dp/B07B8DV5MG",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: The Flash (2016-)",
+              "value": "Part of: The Flash (2016-)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 6,
+      "expectedPartial": 0,
+      "expectedFull": 6
+    },
+    {
+      "title": "Wonder Woman: The Golden Age Vol. 3 (Sensation Comics (1942-1952))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07W4X912F",
+        "statement": "Collects stories from Sensation Comics #25-36, Wonder Woman #8-11 and COMIC CAVALCADE #6-8.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Wonder Woman: The Golden Age Vol. 3 (Sensation Comics (1942-1952))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Disclaimer - This book contains images and content that may be offensive to readers but does not reflect the opinions and views of DC Comics.\nIn these World War II-era tales, Wonder Woman and the Holliday Girls face smugglers and spies as well as evildoers including Paula von Gunther and others! Collects stories from Sensation Comics #25-36, Wonder Woman #8-11 and COMIC CAVALCADE #6-8.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 23,
+              "end": 141,
+              "contextStart": 0,
+              "contextEnd": 141,
+              "raw": "contains images and content that may be offensive to readers but does not reflect the opinions and views of DC Comics.",
+              "parserInput": "contains images and content that may be offensive to readers but does not reflect the opinions and views of DC Comics.",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.05778894472361809,
+              "rank": [
+                0,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "filtered",
+              "outcome": "filtered",
+              "entries": 0,
+              "unresolved": 1
+            },
+            {
+              "block": 0,
+              "start": 257,
+              "end": 296,
+              "contextStart": 0,
+              "contextEnd": 296,
+              "raw": "including Paula von Gunther and others!",
+              "parserInput": "including Paula von Gunther and others",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.6457286432160804,
+              "rank": [
+                1,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "uncertain",
+              "outcome": "uncertain",
+              "entries": 0,
+              "unresolved": 1
+            },
+            {
+              "block": 0,
+              "start": 297,
+              "end": 388,
+              "contextStart": 0,
+              "contextEnd": 388,
+              "raw": "Collects stories from Sensation Comics #25-36, Wonder Woman #8-11 and COMIC CAVALCADE #6-8.",
+              "parserInput": "Collects stories from Sensation Comics #25-36, Wonder Woman #8-11 and COMIC CAVALCADE #6-8",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.7462311557788944,
+              "rank": [
+                2,
+                2,
+                19,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 19,
+              "unresolved": 0
+            }
+          ],
+          "selected": 2,
+          "secondary": [
+            1
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07W4X912F",
+          "sourceUrl": "https://www.amazon.com/dp/B07W4X912F",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Sensation Comics (1942-1952)",
+              "value": "Part of: Sensation Comics (1942-1952)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 19,
+      "expectedPartial": 15,
+      "expectedFull": 4
+    },
+    {
+      "title": "Batman: Knightfall Vol. 1",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B008RNGCAO",
+        "statement": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane\nRead more",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman: Knightfall Vol. 1",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "#1 New York Times Bestseller\nThe villainous Bane breaks the Bat in one of the most popular and well-known Batman tales! The inmates of Arkham Asylum have broken free and Batman must push himself to the limits to re-apprehend the Joker, Poison Ivy, the Riddler, Killer Croc and more. Pushed to the limits, he comes face-to-face against the monstrosity known as Bane, who delivers a crippling blow destined to change the Caped Crusader forever! Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 443,
+              "end": 607,
+              "contextStart": 0,
+              "contextEnd": 607,
+              "raw": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane\nRead more",
+              "parserInput": "Collects Batman vol. 1 #491-500, Detective Comics vol. 1 #659-666, Batman: Shadow of the Bat #16-18, stories from Showcase '93 #7-8, and Vengeance of Bane Read more",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.729818780889621,
+              "rank": [
+                2,
+                2,
+                23,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 23,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "unparsed",
+        "parseOutcome": "partial",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B008RNGCAO",
+          "sourceUrl": "https://www.amazon.com/dp/B008RNGCAO",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman: Knightfall",
+              "value": "Part of: Batman: Knightfall",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 2,
+      "expectedPartial": 2,
+      "expectedFull": 21
+    },
+    {
+      "title": "Supergirl: The Silver Age Vol. 1 (Action Comics (1938-2011))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B073JXP1ZW",
+        "statement": "Collects Supergirl’s backup stories from ACTION COMICS #252-284.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Supergirl: The Silver Age Vol. 1 (Action Comics (1938-2011))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Presented by a team of talented writers and artists such as Jerry Siegel, Jim Mooney, Otto Binder and more is a collection of stories featuring Supergirl at her best in SUPERGIRL: THE SILVER AGE VOL. 1.\nFor many years, Superman believed himself to be the only survivor of his planet’s destruction, until one day a spacecraft crashed on Earth with a young girl inside—a Supergirl from Krypton, possessing all the same powers as the Man of Steel. And this Maid of Might wasn’t just any Kryptonian survivor, but Superman’s cousin, Kara Zor-El. The story of one of history’s greatest female heroes begins here!\nCollects Supergirl’s backup stories from ACTION COMICS #252-284.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 607,
+              "end": 671,
+              "contextStart": 7,
+              "contextEnd": 671,
+              "raw": "Collects Supergirl’s backup stories from ACTION COMICS #252-284.",
+              "parserInput": "Collects Supergirl’s backup stories from ACTION COMICS #252-284",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.8913362701908958,
+              "rank": [
+                2,
+                2,
+                33,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 33,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B073JXP1ZW",
+          "sourceUrl": "https://www.amazon.com/dp/B073JXP1ZW",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Action Comics (1938-2011)",
+              "value": "Part of: Action Comics (1938-2011)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 33,
+      "expectedPartial": 33,
+      "expectedFull": 0
+    },
+    {
+      "title": "The Huntress: Origins",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B083TP8MJW",
+        "statement": "collects stories from DC Super Stars #17, Batman Family #18-20, and Wonder Woman #271-287, #289, #290, #294, and #295.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "The Huntress: Origins",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "These are the 1970s stories that first introduced the Huntress: daughter of Batman and Catwoman of Earth-2! But after her mother is murdered, Helena dons a costume of her own. With her crossbow as her weapon, the Huntress vows to avenge her mother's death. This title collects stories from DC Super Stars #17, Batman Family #18-20, and Wonder Woman #271-287, #289, #290, #294, and #295.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 268,
+              "end": 386,
+              "contextStart": 0,
+              "contextEnd": 386,
+              "raw": "collects stories from DC Super Stars #17, Batman Family #18-20, and Wonder Woman #271-287, #289, #290, #294, and #295.",
+              "parserInput": "collects stories from DC Super Stars #17, Batman Family #18-20, and Wonder Woman #271-287, #289, #290, #294, and #295",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.6767676767676768,
+              "rank": [
+                2,
+                2,
+                25,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 25,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B083TP8MJW",
+          "sourceUrl": "https://www.amazon.com/dp/B083TP8MJW",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: The Huntress: Origins",
+              "value": "Part of: The Huntress: Origins",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 25,
+      "expectedPartial": 25,
+      "expectedFull": 0
+    },
+    {
+      "title": "Batman: Urban Legends (2021-) Vol. 1",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B09KMGRP2V",
+        "statement": "collects stories from Batman: Urban Legends #1-6.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman: Urban Legends (2021-) Vol. 1",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Two of Gotham City's edgiest heroes, Red Hood and Grifter, cross paths with Batman himself in this collection of stories from the new anthology series Batman: Urban Legends. Two top comics writers, Matthew Rosenberg and Chip Zdarsky, enter the world of Gotham City with new tales of Batman, Red Hood, and Grifter in the first volume collecting stories from the thrilling new anthology series Batman: Urban Legends. First, writer Chip Zdarsky and artist Eddy Barrows chronicle Red Hood's investigation of a new drug in Gotham City called Cheerdrops. But this night will NOT go as planned--and as a result, he will end up back in Batman's crosshairs! Then, writer Matthew Rosenberg joins forces with artist Ryan Benjamin for a new tale of Cole Cash--better known as Grifter. Picking up story points from recent Batman issues, readers will learn why Cole is in Gotham to begin with. Plus, discover the truth about the mysterious organization known as HALO, and witness round two of Batman versus Grifter. This title collects stories from Batman: Urban Legends #1-6.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 333,
+              "end": 414,
+              "contextStart": 0,
+              "contextEnd": 414,
+              "raw": "collecting stories from the thrilling new anthology series Batman: Urban Legends.",
+              "parserInput": "collecting stories from the thrilling new anthology series Batman: Urban Legends",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.310634328358209,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            },
+            {
+              "block": 0,
+              "start": 1013,
+              "end": 1062,
+              "contextStart": 413,
+              "contextEnd": 1062,
+              "raw": "collects stories from Batman: Urban Legends #1-6.",
+              "parserInput": "collects stories from Batman: Urban Legends #1-6",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9449626865671642,
+              "rank": [
+                2,
+                2,
+                6,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 6,
+              "unresolved": 0
+            }
+          ],
+          "selected": 1,
+          "secondary": [
+            0
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "availability": "statement-found",
+        "parseStatus": "parsed",
+        "parseOutcome": "full",
+        "parserVersion": 5,
+        "extractorVersion": 5,
+        "filterVersion": 1,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B09KMGRP2V",
+          "sourceUrl": "https://www.amazon.com/dp/B09KMGRP2V",
+          "observations": [
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Batman: Urban Legends (2021-)",
+              "value": "Part of: Batman: Urban Legends (2021-)",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div"
+            }
+          ]
+        }
+      },
+      "beforePartial": 6,
+      "expectedPartial": 6,
+      "expectedFull": 0
+    }
+  ]
+}

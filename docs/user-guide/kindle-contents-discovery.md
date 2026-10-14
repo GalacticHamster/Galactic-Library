@@ -1,6 +1,6 @@
 # Kindle contents discovery
 
-Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **5**, and filtering version **1**.
+Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **11**, and filtering version **1**.
 
 ## Eligibility and priority
 
@@ -16,7 +16,7 @@ The signed-in Kindle panel has a contents mode selector. Contents actions remain
 |---|---|---|
 | Scan eligible books | Never checked, legacy unknown blanks, temporary failures, empty results from extractor versions before 2, and legacy no-statement results without an extractor version | Reparse saved statements processed by an older/unknown parser |
 | Retry incomplete checks | Temporary failures and legacy unknown blanks | Reparse outdated saved statements |
-| Refresh all eligible books | Every currently eligible book, including successful G2/G5, failed, empty and unavailable results | Parse fresh source with parser 5; preserve the earlier source before acquisition is saved |
+| Refresh all eligible books | Every currently eligible book, including successful G2/G5, failed, empty and unavailable results | Parse fresh source with the current parser; preserve the earlier source before acquisition is saved |
 | Reparse saved text (no requests) | None | Reparse every eligible saved Kindle statement |
 
 Legacy statements with no extractor version are handled locally during a normal scan. They are not automatically fetched again merely because versions were absent. Unavailable pages without a source version, or from generation 2 or later, wait for explicit refresh. Empty generation-1 checks, including unavailable outcomes, can be revisited by normal scan. A newer unavailable attempt takes precedence over an older retained generation-1 blank for this decision. Later source generations and existing statements require explicit refresh for fresh page evidence; a version increment does not automatically refetch them. Parser/filter updates can reprocess saved text locally. Refresh replaces the previous **Rescan previous results** action; there is no duplicate fifth mode.
@@ -50,6 +50,8 @@ Normal use and local reparse use the newest trustworthy current observation. Suc
 Actual acquisition lazily pins the earlier source with its timestamp, generation, parser metadata and bounded evidence in an optional backup-preserved history store. Repeated refreshes keep that baseline, current source, at most one latest failed/unavailable attempt and one new undo selection; they do not append an unlimited log. Existing legacy undo entries are retained. Books never processed gain no history. Backup restore preserves observations but discards the old running refresh checkpoint. See [refresh architecture](../architecture/kindle-refresh.md) for exact retention and offline export behavior.
 
 ## Extraction and proposals
+
+An ordinary collected volume saying “collects stories from” its own series can contribute complete issues as inferred coverage. Explicit excerpts, selected pages, backup features and anthology-story context retain partial coverage. Human-reviewed contents take precedence. A fully parsed statement can still describe partial issues: parsing success and complete-issue coverage are separate.
 
 Parser 5 improves explicit numbered contents: it preserves conjunctions inside series titles, prevents unit words inside titles from becoming markers, and recovers some numbered clauses followed by credits or supplemental material. Unresolved prose remains visible and keeps a proposal Partial. This is a numbered precision update; it does not add general named-story/novel parsing.
 
