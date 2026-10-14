@@ -211,6 +211,11 @@ function discoveryNumberedContents(body,collectionTitle,collectionClaim=false,co
       unparsed.push(raw);previous=null;continue;
     }
     if(/\bannuals?$/iu.test(label)&&!literalName){
+      const subject=reviewSeriesDescriptor(compact(context.subjectSeries)).series;
+      // After a separately named constituent, bare "Annual" can refer back
+      // to the main series. Keep it unresolved rather than inventing an annual
+      // of the most recently listed one-shot or another constituent.
+      if(/^annuals?$/iu.test(label)&&!explicitRun&&previous&&subject&&identityKey(subject)!==identityKey(previous.series)&&entries.some(e=>e.unitType==='issue'&&identityKey(e.series)===identityKey(subject))){unparsed.push(raw);previous=null;continue;}
       type='annual';label=label.replace(/\s*annuals?$/iu,'').trim();if(/^the$/iu.test(label)&&previous)label='';
       // A bare Annual (year) is contextual. Its date is the annual's
       // publication year, not a replacement for the preceding series run.
@@ -289,10 +294,11 @@ function numberedCollectionPayload(chunk,title,collectionClaim){
     const literal=s=>s.replace(/\s+(?:and|&)\s+/giu,' and ').trim().toLowerCase();
     if(credit&&by&&literal(credit[1].replace(/['’]s\s+$/u,''))===literal(by[2])&&literal(credit[2].split('#')[0])===literal(by[1]))return result(credit);
   }
-  // Explicit 'these tales' framing survives a narrative lead; it never turns
-  // arbitrary plot summaries into numbered products or confirms full issues.
+  // A continuing collected run describes the numbered issues, not selected
+  // material from them. A standalone story/"Find out" wrapper remains partial.
   const tales=/^((?:Find out|[^#;]{0,160}\brun\b[^#;]{0,80}\bcontinues)\s+in these tales from\s+)(.+)$/iu.exec(chunk);
-  return result(tales,true);
+  const continuing=tales&&/\brun\b[^#;]{0,80}\bcontinues\s+in these tales from\s*$/iu.test(tales[1]);
+  return result(tales,!continuing);
 }
 
 function reviewSeriesDescriptor(label,run='') {

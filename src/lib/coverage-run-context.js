@@ -32,12 +32,34 @@ function yearHints(text,series){
 // This is a read projection: neither parser proposals nor saved sources change.
 export function inferCoverageRuns(rows,{resolveEntry,hasConflict,excludedScopes=[]}={}){
   const catalogue=new Map(),bridges=new Map(),excluded=new Set(excludedScopes);
-  for(const row of rows)for(const entry of [...row.entries,...row.standalone]){
-    if(!unit(entry)||!entry.run||period(entry.run))continue;
-    const contextual=resolveEntry({...entry,run:''},row.original,!row.contents.review);
-    if(!period(contextual.run))continue;
-    const key=JSON.stringify([scope(entry),identityKey(entry.run)]),runs=bridges.get(key)??new Set();runs.add(contextual.run);bridges.set(key,runs);
+  for(const row of rows){
+    if(row.contents.review)continue;
+    const sourceRuns=new Map(),contexts=new Map();
+    for(const entry of row.entries)if(entry.run){const key=scope(entry),runs=sourceRuns.get(key)??new Set();runs.add(identityKey(entry.run));sourceRuns.set(key,runs);}
+    for(const entry of row.entries){
+      if(entry.unitType!=='issue'||!entry.run)continue;
+      // A publication-volume/year alias needs an unambiguous same-series source
+      // context. Never learn it from the collected book's volume number or from
+      // a multi-era anthology's parent label.
+      if(sourceRuns.get(scope(entry))?.size!==1)continue;
+      if(!/^\d{4}$|^volume \d+$/u.test(entry.run))continue;
+      if(!contexts.has(scope(entry)))contexts.set(scope(entry),resolveEntry({...entry,run:''},row.original,true));
+      const contextual=contexts.get(scope(entry));
+      const target=period(contextual.run),original=period(entry.run);
+      if(!target||contextual.run===entry.run)continue;
+      if(original&&(original[0]!==target[0]||!/^\d{4}$/u.test(entry.run)))continue;
+      if(!original&&!/^volume \d+$/u.test(entry.run))continue;
+      const key=JSON.stringify([scope(entry),identityKey(entry.run)]),runs=bridges.get(key)??new Set();runs.add(contextual.run);bridges.set(key,runs);
+    }
   }
+  const alias=entry=>{
+    const targets=bridges.get(JSON.stringify([scope(entry),identityKey(entry.run)]));
+    return targets?.size===1?[...targets][0]:'';
+  };
+  for(const row of rows)if(!row.contents.review)row.entries=row.entries.map(entry=>{
+    const run=alias(entry);
+    return run&&!excluded.has(member(entry))?{...entry,run,runInference:{run,sourceRun:entry.run,reason:'Saved same-series context establishes this publication-run alias'}}:entry;
+  });
   for(const row of rows)for(const entry of [...row.entries,...row.standalone]){
     if(!unit(entry)||!entry.run)continue;
     const bridge=bridges.get(JSON.stringify([scope(entry),identityKey(entry.run)]));
@@ -68,6 +90,7 @@ export function inferCoverageRuns(rows,{resolveEntry,hasConflict,excludedScopes=
       const local=clauseRuns.get(signature(entry))??new Set(row.entries.filter(e=>scope(e)===scope(entry)&&e.run).map(e=>identityKey(e.run)));
       let chosen,reason;
       if((clauseRuns.has(signature(entry))?!unsafeClauses.has(signature(entry)):!mixed)&&local.size===1){chosen=candidates.find(c=>local.has(identityKey(c.run)));reason='Other issues in this contents clause identify the run';}
+      if(entry.runContextConflict&&!chosen)return entry;
       if(!chosen){
         // Test the complete same-series numbering cohort, not each issue in
         // isolation. A later #1-3 run cannot explain a runless #1-13 collection.
@@ -84,11 +107,11 @@ export function inferCoverageRuns(rows,{resolveEntry,hasConflict,excludedScopes=
         // context can identify lower numbers not yet represented in that run,
         // even if a later reset also contains them. A competing high-numbered
         // envelope remains a contradiction rather than being copied backward.
-        if(contextual&&(!inside.length||inside.includes(contextual)||cohort.every(e=>numberValue(e.number)<=contextual.numbers.get(numberKind(entry.number)).max))){chosen=contextual;reason='The collection era agrees with saved evidence for this series';}
+        if(contextual&&(!inside.some(c=>c.period)||inside.includes(contextual)||cohort.every(e=>numberValue(e.number)<=contextual.numbers.get(numberKind(entry.number)).max))){chosen=contextual;reason='The collection era agrees with saved evidence for this series';}
         else if(inside.length===1&&!periods.length){chosen=inside[0];reason='Only one saved run supports this issue range';}
         else if(inside.length===1&&mixed){chosen=inside[0];reason='Only one saved run supports this range; explicit eras stay separate';}
       }
-      return chosen?{...entry,run:chosen.run,runInference:{run:chosen.run,reason}}:entry;
+      return chosen?{...entry,run:chosen.run,...(entry.runContextConflict?{runContextConflict:false}:{}),runInference:{run:chosen.run,reason}}:entry;
     });
   }
 }

@@ -37,6 +37,9 @@ export function recoveredNaturalContents(saved){
 export function normalizeContentsInput(statement) {
   // Never replace the saved evidence with this parsing-only copy.
   let input=String(statement ?? '').replace(/\s+/gu,' ').trim();
+  // A captured header can lose its separating DOM whitespace. Repair only
+  // the parsing copy of a numbered claim at a capitalized title boundary.
+  if(/#\s*\d/u.test(input))input=input.replace(/^(Collects|Collecting)(?=\p{Lu})/u,'$1 ');
   const natural=naturalContentsClaims(input).find(claim=>claim.start===0);
   if(natural)input=natural.input;
   // Only locally parse an already-captured numbered claim. The marker may

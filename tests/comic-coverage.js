@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {wonderWomanCoverageTests} from './wonder-woman-coverage.js';
 import {contextualCollectionCoverageTests} from './contextual-collection-coverage.js';
 import {readFile} from 'node:fs/promises';
 import {dcContentsRecoveryCases,checkDcFixture} from './dc-contents-recovery-fixture.js';
@@ -19,6 +20,7 @@ import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 import {mergeDialogTests} from './merge-dialog.js';
 import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
+ ...wonderWomanCoverageTests,
  ...contextualCollectionCoverageTests,
  ...comicSeriesNameTests,
  ...mergeDialogTests,

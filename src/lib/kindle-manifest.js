@@ -222,6 +222,8 @@ export function selectManifest(blocks,title='') {
 }
 
 export function manifestReviewProposal(saved,title,statement=saved?.statement??'',context={}) {
+  const subjects=[...new Set((saved?.productDetailsEvidence?.observations??[]).filter(o=>o.field==='series'&&o.status==='observed'&&/^Part of:\s*/iu.test(o.value??o.raw??'')).map(o=>(o.value??o.raw).replace(/^Part of:\s*/iu,'')))];
+  if(subjects.length===1)context={...context,subjectSeries:subjects[0]};
   const recovered=recoveredNaturalContents(saved);
   if(recovered&&(!statement||sameSourceText(statement,recovered.raw))){
     const proposal=proposeContentsForReview(recovered.raw,title,{...context,allowTitleBinding:true});

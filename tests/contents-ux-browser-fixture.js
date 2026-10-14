@@ -23,6 +23,7 @@ import {selectManifest} from '../src/lib/kindle-manifest.js';
 import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
 import {checkTitleSorting} from './natural-title-sort-fixture.mjs';
 import {compareTitles} from '../src/lib/title-sort.js';
+import {perezStatement,wonderBook} from './wonder-woman-coverage-fixture.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -47,6 +48,14 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const book=wonderBook('perez','Wonder Woman by George Perez Vol. 4 (Wonder Woman (1987-2006))',perezStatement),source=book.metadata.enrichment.kindleProductComicContents;source.statement=perezStatement;source.manifest.selected=0;
+    const gods=wonderBook('gods','Wonder Woman (1987-2006) Vol. 1: Gods and Mortals','Collects Wonder Woman Vol. 2 #1-7'),overlap=wonderBook('overlap','Wonder Woman by George Perez Vol. 1 (Wonder Woman (1987-2006))','Collects Wonder Woman #1-14'),data=coverageDatabase(book,gods,overlap);
+    const view=createComicCoverageView(data);document.body.append(view);const result=await view.ready,regular=result.groups.find(g=>g.unitType==='issue'),annual=result.groups.find(g=>g.unitType==='annual');
+    assert(regular.covered===24&&regular.duplicates===7&&annual.covered===1,'Wonder Woman full coverage, publication volume or annual isolation failed');
+    const card=[...view.querySelectorAll('[data-comic-series]')].find(row=>row.dataset.comicSeries===regular.id);button(card,'Inspect issues').click();assert(view.textContent.includes('36')&&view.textContent.includes('45'),'Recovered full issues missing from packaged view');view.remove();
+    checks.push('Wonder Woman full run, separate annuals and publication-volume duplicates reach the packaged coverage view');
+  }
   checkTitleSorting({...globalThis.LibraryTitleSort,compare:compareTitles},assert);checks.push('packaged title sorting uses written and numeric book, volume and part order');
   {
     const title='Saga of the Swamp Thing: Book Three',source=selectManifest([{selector:'description',text:'Continuing the run on THE SAGA OF THE SWAMP THING. Collecting issues #35-42.'}],title),book=coverageBook('contextual-three',source.statement,{title});

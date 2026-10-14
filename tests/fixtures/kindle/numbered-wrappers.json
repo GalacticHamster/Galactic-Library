@@ -1331,7 +1331,7 @@
           "run": "",
           "unitType": "issue",
           "language": "",
-          "completeness": "excerpt",
+          "completeness": "full",
           "numbers": [
             "36",
             "37",
@@ -1350,7 +1350,7 @@
           "run": "",
           "unitType": "annual",
           "language": "",
-          "completeness": "excerpt",
+          "completeness": "full",
           "numbers": [
             "2"
           ]

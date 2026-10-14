@@ -27,7 +27,8 @@ export const coverageRunContextTests=[
    ].map(([title,numbers],i)=>book('case-'+i,'Collects Detective Comics #'+numbers,{title}));
    const db=database(...anchors(),bridge,...cases),before=JSON.stringify(db);
    for(const record of cases){const values=entries(db,record.id);assert(values.length);assert(values.every(e=>e.run==='1937-2011'&&e.runInference));assert(collectionContents(record,db).entries.every(e=>!e.run));}
-   assert(entries(db,bridge.id).every(e=>e.run==='volume 1'&&!e.runInference),'Explicit numbered run must remain unchanged');
+   assert(entries(db,bridge.id).every(e=>e.run==='1937-2011'&&e.runInference?.sourceRun==='volume 1'),'Source-supported publication-volume alias did not resolve');
+   assert(collectionContents(bridge,db).entries.every(e=>e.run==='volume 1'),'Original publication-volume evidence was rewritten');
    const group=comicCoverageForLibrary(db).groups.find(g=>g.series==='Detective Comics'&&g.run==='1937-2011');assert(group.issues.find(i=>i.number==='156').sources[0].runInference);assert.equal(JSON.stringify(db),before);
    const comparable=db=>comicCoverageForLibrary(db).groups.map(g=>({id:g.id,issues:g.issues.map(i=>({number:i.number,partial:i.partial,copies:i.copies,sources:i.sources.map(s=>({id:s.id,runInference:s.runInference}))}))}));assert.deepEqual(comparable(parseBackup(createBackup(db))),comparable(db));
  }],

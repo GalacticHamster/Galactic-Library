@@ -128,3 +128,16 @@ HB/FAN contents requests are unscoped. Their typed contents serializers preserve
 Parent-local identity does not depend on the parser upgrade. Novel/story type, source attribution and named-versus-numbered overlap must not be inferred from title equality. Original scripts/apparatus and unknown overlap remain review evidence.
 
 See the [historical audit index](../audits/README.md) for the failure modes behind these invariants, and [matching policy](matching-policy.md) for conservative Owned and broader Possible behavior.
+
+## Local coverage run aliases
+
+Comic Coverage can resolve a source's publication-volume label (for example,
+`Series Vol. 2 #1`) to a calendar run when the same collection independently
+identifies one matching series/run. The collected book's own volume number is
+never an alias seed. Multiple explicit runs in an anthology cannot seed aliases;
+conflicting alias targets stay separate. A source-supported start-year label can
+likewise join its same-start bounded run. These are transient coverage projections,
+with the original run retained in inference evidence. Reviews and user-merged
+member scopes retain their identities; imported records and companion matching
+are unchanged. Explicitly mixed eras block parent-run inheritance unless the
+individual contents clause supplies its own unambiguous context.

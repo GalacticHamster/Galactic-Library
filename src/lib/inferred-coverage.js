@@ -100,8 +100,16 @@ export function resolveCoverageEntry(entry,parent,allowSubjectAlias=true){
     language:coverageLanguage(entry.language||identityEvidence(parent).language)};
 }
 function resolvedContentsEntries(contents,parent){
+  const runs=new Map();
+  for(const entry of contents.entries){
+    if(!entry.run||!comicUnit(entry))continue;
+    const key=identityKey(entry.series),values=runs.get(key)??new Set();values.add(identityKey(entry.run));runs.set(key,values);
+  }
   return contents.entries.map(entry=>{
     const result=resolveCoverageEntry(entry,parent,!contents.review);
+    // An anthology's own era cannot date a runless constituent when its
+    // contents explicitly distinguish several publication runs of that series.
+    if(!contents.review&&entry.unitType==='issue'&&!entry.run&&(runs.get(identityKey(entry.series))?.size??0)>1){result.run='';result.runContextConflict=true;}
     // An unresolved annual publication date must not acquire a conflicting
     // parent run through the ordinary undated-series fallback.
     if(entry.unitType==='annual'){
@@ -139,7 +147,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     if(!['issue','annual','special'].includes(entry.unitType))return;
     const context=parentSeriesContext(entry,item);
     const named=explicitSeries&&meaningfulSeries(identityKey(entry.series));
-    const provisional=unresolvedAnnual||!entry.run&&(context.conflict||!context.strong&&!named||(knownRuns.get(scopeKey(entry))?.size??0)>1);
+    const provisional=unresolvedAnnual||entry.runContextConflict===true||!entry.run&&(context.conflict||!context.strong&&!named||(knownRuns.get(scopeKey(entry))?.size??0)>1);
     const key=contentKey(entry)+(provisional?':parent:'+item.id:'');
     const evidence=index.get(key)??[];
     evidence.push({item,entry,confidence,provisional,...(includeExcerpts?{statement}:{}),...(review?{review}:{})});index.set(key,evidence);
