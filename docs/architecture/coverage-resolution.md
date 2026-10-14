@@ -1,0 +1,37 @@
+# Coverage disposition and reviewed resolution
+
+## One admission decision
+
+`libraryCoverageIndex` emits `dispositions` alongside its existing index, unresolved list and access exclusions. `coverageIdentityDecision` contains the original provisional-admission predicate. The exact decision is used both to insert index evidence and to describe the observation; UI code does not independently guess why an entry disappeared.
+
+Each collection identifies its provider record/account, effective access, original statement and review/source basis. Its observations retain an origin (`contents` or `standalone`), stable source entry position, extracted entry, resolved entry, extent, provisional status, actual index key/admission, full/partial counted status, merge protection, reasons and available actions. Unknown run text alone is not an error: the existing engine can legitimately count sufficiently identified run-unspecified issues. Only its actual provisional decision creates an actionable blocker.
+
+Reasons distinguish ambiguous runs, conflicting context, annual-parent ambiguity, unresolved publication identity, uncertain containment, partial material, access exclusions and non-comic units. Partial-only material and excluded access are informational. Unparsed text remains separate from parsed observations: named-publication and enumeration problems may be actionable, while unsupported prose and digital chapters never become invented issues. A grouped source fragment is counted as one unresolved **reference**, not assumed to be one independently published work.
+
+`librarySeriesCoverage` and `comicCoverage` carry the same dispositions to the UI worker. Comic Coverage and Contents share the committed-object/merge-scope projection promise. Access-expiry epochs invalidate reuse when a review/key expiry boundary passes. Replaced database objects, changed merge preferences and failed calculations invalidate reuse; stale asynchronous results cannot replace a newer Contents result. No overlap all-pairs calculation runs for these diagnostics. UI lists and observation pickers are paginated.
+
+## Existing review persistence
+
+`coverage-resolution.js` builds a read-only plan from current source positions and a selected existing/cited publication identity. It patches only selected entries' series/run/language; numbers, types, extents and other entries stay intact. A separately confirmed named one-shot can append its actual documented issue number, including `unnumbered` where applicable. Unknown enumeration cannot be expanded by this workflow.
+
+The plan uses existing `contentReviews`, `validateContentReview`, current source baselines and the atomic database writer. There is no parallel identity alias or coverage override table, no migration, and no new provider evidence. `saveCoverageResolutions` checks confirmation, exact record/account/source/review/access stamps, current merge preferences, available targets, selections and bulk compatibility against authoritative saved state, then performs one atomic save. A failed or stale batch cannot partially save.
+
+A mixed collection is routed to the inline detailed editor if a limited review would implicitly confirm another unresolved publication or discard an unselected entry's source-only run inference. The dialog explains that exact restriction. A run-only choice cannot establish uncertain containment or full extent.
+
+New source-only corrections use review source `coverage-resolution`. Other unresolved captured fragments remain visible after that limited correction, unless an explicitly saved matching publication retires its own reference. Updating an existing full human review uses `coverage-resolution-reviewed` and retains its chosen entries; it does not reintroduce automatically discarded fragments. Normal full review/editor behavior and old backups are unchanged. The existing editor and Undo review remain available; normal manual review intentionally confirms the resulting list rather than pretending to be a scoped run-only correction.
+
+These two review sources do not seed automatic run/annual inference in other collections. Their exact selected entries still count in their own reviewed coverage. They do not establish a global alias. Existing ordinary human review and automatic inference semantics remain unchanged.
+
+## Candidate and bulk safety
+
+The picker shows same-name/type/language runs already represented in local saved evidence and bounded, cited choices supported by captured publisher/collection context. Source evidence, bibliography, user confirmation and access are labeled separately. Substantive title matching and automatic ownership are unchanged.
+
+`COVERAGE_RESOLUTION_REFERENCES` adds three **confirmation-only** choices outside the automatic resolver: Mirage Volume 1 (1984), Image Volume 3 (1996) with its later Urban Legends conclusion, and Raphael's documented 1985 #1. The Image label explicitly states that original Image #1–23 and later IDW #24–26 share a continuing numbering choice; it does not assert those last three were published in 1996. Citations and the original source remain inspectable. No arbitrary undated TMNT #1 receives one of these choices automatically.
+
+Bulk suggestions require the same provider/account, one captured publisher, one exact captured collection family, compatible edition/language scope, the same cited suggestion or explicit same-family saved publication run, and unassigned compatible source observations. Existing reviews, explicit conflicting runs, containment conflicts and manually merged scopes are excluded. New limited corrections cannot serve as local bibliography seeds. The writer repeats these checks; the UI cannot authorize cross-family propagation by sending extra targets. Selection, search or candidate changes invalidate a previous preview.
+
+The dialog previews exact books/observations and recomputed coverage without writes. Saving reports success only after persistence and a fresh projection complete. If persistence succeeds but recalculation fails, the message distinguishes the saved correction from the failed recheck. Complex cases open the existing editable contents rows inside the dialog, focused on the selected entry. Draft guards, source-change warnings, backup/restore and reimport retention continue to apply.
+
+## Offline validation
+
+`scripts/audit-coverage-dispositions.mjs PRIVATE_BACKUP [OUTPUT]` audits the supplied backup without acquisition, simulates the five TMNT corrections in disposable copies, validates round-trip/reimport retention, and checks that input bytes, original database, source records, ownership corrections and review counts remain protected. Generated results stay under ignored `audit-artifacts/coverage-resolution/`. Tests use minimal public source captures and synthetic accounts, never a personal extension profile.

@@ -35,6 +35,8 @@ This catalogue is maintained as reviewed source code: verify original publicatio
 
 ## Limits and extension points
 
+The separate confirmation-only choices and per-collection review workflow are documented in [Coverage disposition and reviewed resolution](coverage-resolution.md). They never participate in automatic named parsing or run assignment.
+
 This is deliberately bounded. The existing parser continues using explicit captured ranges/counts and product context; the existing run resolver continues using local saved publication identities. The new resolver can accept another validated reference set, but does not build one automatically from title similarity, workbook values, local maximum issue numbers or unrelated collection claims. Related descriptions can corroborate a reviewed fact but are not blindly unioned into a collection. No runtime network dependency, new permissions, broad enrichment scan or silent reference acquisition is introduced.
 
 Unknown publications, ambiguous runs, selected/miniseries subsets, unnumbered stories inside anthology issues and unsupported partial enumeration still require better evidence or an explicit user review. The frozen audit output belongs under ignored `audit-artifacts/named-publications/`; source-only tests use minimal public captures and synthetic evidence, without private library inputs.

@@ -11,7 +11,7 @@ const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent
 function sourcePage(value) {
   try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?`${url.origin}${url.pathname}`:'';}catch{return '';}
 }
-export function createContentsEditor(record, review, actions, {expanded=false}={}) {
+export function createContentsEditor(record, review, actions, {expanded=false,focusEntry}={}) {
   const root=document.createElement('details');root.className='contents-editor';
   root.append(element('summary', expanded?'Review included works':`Review included contents \u2014 ${record.title}`));
   let populated=false;
@@ -150,6 +150,6 @@ export function createContentsEditor(record, review, actions, {expanded=false}={
   root.append(element('p','Accept all verifies the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave unverified to keep inferred coverage without saving.'),status);
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
-  if(expanded){root.open=true;populated=true;populate();}
+  if(expanded){root.open=true;populated=true;populate();if(Number.isInteger(focusEntry))queueMicrotask(()=>{const row=root.querySelector('tbody')?.children[focusEntry];row?.setAttribute('data-coverage-selected','true');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});});}
   return root;
 }

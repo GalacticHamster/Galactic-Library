@@ -1,0 +1,463 @@
+{
+  "note": "Minimal public saved-description, selected-region and publisher/series evidence for coverage visibility. No library IDs, account state, purchases, review data or timestamps. Automatic selection flags are synthetic.",
+  "cases": [
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 1",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00PR4E2CG",
+        "statement": "Rediscover the underground roots of Teenage Mutant Ninja Turtles, starting with this special edition collection of Mirage Studios'' issues #1-7 along with the Raphael one-shot by creators Kevin Eastman and Peter Laird!",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 1",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Rediscover the underground roots of Teenage Mutant Ninja Turtles, starting with this special edition collection of Mirage Studios'' issues #1-7 along with the Raphael one-shot by creators Kevin Eastman and Peter Laird! With over 300 pages of mutated-martial arts action, this volume is perfect for fans to relive the glorious days of the Turtles' origins as well as an excellent place for new readers to see where the TMNT phenomena began.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 0,
+              "end": 218,
+              "contextStart": 0,
+              "contextEnd": 218,
+              "raw": "Rediscover the underground roots of Teenage Mutant Ninja Turtles, starting with this special edition collection of Mirage Studios'' issues #1-7 along with the Raphael one-shot by creators Kevin Eastman and Peter Laird!",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #1-7;  along with the Raphael one-shot by creators Kevin Eastman and Peter Laird",
+              "binding": "explicit-description-title-anchor",
+              "structural": true,
+              "position": 0,
+              "rank": [
+                2,
+                2,
+                7,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 7,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00PR4E2CG",
+          "sourceUrl": "https://www.amazon.com/dp/B00PR4E2CG",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBTW8W"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 2",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00PR4E35W",
+        "statement": "In this outing, uncover issues #8-11, along with the Michaelangelo, Leonardo, and Donatello \"micro-series\" one-shots - you've never seen the TURTLES like this!",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 2",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The classic Teenage Mutant Ninja Turtles action continues in the second volume of IDW's Ultimate Collections! In this outing, uncover issues #8-11, along with the Michaelangelo, Leonardo, and Donatello \"micro-series\" one-shots - you've never seen the TURTLES like this!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 109,
+              "end": 269,
+              "contextStart": 0,
+              "contextEnd": 269,
+              "raw": "In this outing, uncover issues #8-11, along with the Michaelangelo, Leonardo, and Donatello \"micro-series\" one-shots - you've never seen the TURTLES like this!",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #8-11; along with the Michaelangelo, Leonardo, and Donatello \"micro-series\" one-shots - you've never seen the TURTLES like this",
+              "binding": "explicit-description-title-anchor",
+              "structural": true,
+              "position": 0.3906810035842294,
+              "rank": [
+                2,
+                2,
+                4,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 4,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00PR4E35W",
+          "sourceUrl": "https://www.amazon.com/dp/B00PR4E35W",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBTW8W"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 3",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B01GOTQIP6",
+        "statement": "In this outing, you''ll find issues #12, 14, 15, 17, and 19-21, featuring stories like \"Survivalists,\" \"The Unmentionables,\" \"Dome Doom,\" and the multi-part \"Return to New York.\" Featuring annotations from Eastman and Laird, you''ve never seen the TURTLES like this!",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: The Ultimate B&W Collection Vol. 3",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The classic Teenage Mutant Ninja Turtles action continues in the third volume of IDW''s Ultimate Collections! In this outing, you''ll find issues #12, 14, 15, 17, and 19-21, featuring stories like \"Survivalists,\" \"The Unmentionables,\" \"Dome Doom,\" and the multi-part \"Return to New York.\" Featuring annotations from Eastman and Laird, you''ve never seen the TURTLES like this!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 109,
+              "end": 376,
+              "contextStart": 0,
+              "contextEnd": 376,
+              "raw": "In this outing, you''ll find issues #12, 14, 15, 17, and 19-21, featuring stories like \"Survivalists,\" \"The Unmentionables,\" \"Dome Doom,\" and the multi-part \"Return to New York.\" Featuring annotations from Eastman and Laird, you''ve never seen the TURTLES like this!",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #12; 14, 15, 17, and 19-21, featuring stories like \"Survivalists,\" \"The Unmentionables,\" \"Dome Doom,\" and the multi-part \"Return to New York.\" Featuring annotations from Eastman and Laird, you''ve never seen the TURTLES like this",
+              "binding": "explicit-description-title-anchor",
+              "structural": true,
+              "position": 0.2823834196891192,
+              "rank": [
+                2,
+                2,
+                7,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 7,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B01GOTQIP6",
+          "sourceUrl": "https://www.amazon.com/dp/B01GOTQIP6",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Ultimate B&W Collection",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07JKBTW8W"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: Urban Legends Vol. 1",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07PVD2ZJP",
+        "statement": "Collects issues #1–13 of the 26-issue series.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: Urban Legends Vol. 1",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "This is it, fans! You demanded it—the entire Image Comics TMNT run (a.k.a. TMNT Volume 3) reproduced for the first time ever in full, four-color glory! Join creators Gary Carlson and Frank Fosco as they take the Heroes in a Half-Shell on some of their most amazing, dangerous, and bizarre adventures ever... culminating in three brand-new issues by Carlson and Fosco to properly close out this long-beloved storyline at last! Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators. Collects issues #1–13 of the 26-issue series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 74,
+              "end": 151,
+              "contextStart": 0,
+              "contextEnd": 151,
+              "raw": "TMNT Volume 3) reproduced for the first time ever in full, four-color glory!",
+              "parserInput": "TMNT Volume 3) reproduced for the first time ever in full, four-color glory",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.1140215716486903,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 425,
+              "end": 593,
+              "contextStart": 0,
+              "contextEnd": 593,
+              "raw": "Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators.",
+              "parserInput": "Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.6548536209553159,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 594,
+              "end": 639,
+              "contextStart": 0,
+              "contextEnd": 639,
+              "raw": "Collects issues #1–13 of the 26-issue series.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #1-13",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.9152542372881356,
+              "rank": [
+                2,
+                2,
+                13,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 13,
+              "unresolved": 0
+            }
+          ],
+          "selected": 2,
+          "secondary": [
+            0,
+            1
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07PVD2ZJP",
+          "sourceUrl": "https://www.amazon.com/dp/B07PVD2ZJP",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: Urban Legends",
+              "value": "Part of: Teenage Mutant Ninja Turtles: Urban Legends",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07Q2H9B4H"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: Urban Legends Vol. 2",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B08LX97SVQ",
+        "statement": "Collects the final 13 issues, #14–26, of the series.",
+        "manifest": {
+          "interpretationVersion": 4,
+          "title": "Teenage Mutant Ninja Turtles: Urban Legends Vol. 2",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "This is it, fans! You demanded it–the entire Image Comics TMNT run (a.k.a. TMNT Volume 3) reproduced for the first time ever in full, four-color glory, capped with three all-new issues to complete the unfinished series! Join creators Gary Carlson and Frank Fosco as they take the Heroes in a Half-Shell on some of their most amazing, dangerous, and bizarre adventures ever... culminating in three brand-new issues by Carlson and Fosco to properly close out this long-beloved storyline at last! Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators. Collects the final 13 issues, #14–26, of the series.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 74,
+              "end": 219,
+              "contextStart": 0,
+              "contextEnd": 219,
+              "raw": "TMNT Volume 3) reproduced for the first time ever in full, four-color glory, capped with three all-new issues to complete the unfinished series!",
+              "parserInput": "TMNT Volume 3) reproduced for the first time ever in full, four-color glory, capped with three all-new issues to complete the unfinished series",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.10220994475138122,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 493,
+              "end": 661,
+              "contextStart": 0,
+              "contextEnd": 661,
+              "raw": "Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators.",
+              "parserInput": "Long out of print and incomplete, Teenage Mutant Ninja Turtles Volume 3 is one of comics' lost treasures, now uncovered at last and completed by the original creators",
+              "binding": "explicit-clause",
+              "structural": true,
+              "position": 0.680939226519337,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -2
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 2
+            },
+            {
+              "block": 0,
+              "start": 662,
+              "end": 714,
+              "contextStart": 62,
+              "contextEnd": 714,
+              "raw": "Collects the final 13 issues, #14–26, of the series.",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles issues #14-26",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.914364640883978,
+              "rank": [
+                2,
+                2,
+                13,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 13,
+              "unresolved": 0
+            }
+          ],
+          "selected": 2,
+          "secondary": [
+            0,
+            1
+          ],
+          "descriptionMayBeIncomplete": true
+        },
+        "approved": false,
+        "matchBasis": "source-evidence",
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B08LX97SVQ",
+          "sourceUrl": "https://www.amazon.com/dp/B08LX97SVQ",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "raw": "IDW",
+              "value": "IDW",
+              "status": "observed",
+              "selector": "#detailBullets_feature_div"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: Urban Legends",
+              "value": "Part of: Teenage Mutant Ninja Turtles: Urban Legends",
+              "status": "observed",
+              "selector": "#seriesBulletWidget_feature_div",
+              "url": "https://www.amazon.com/dp/B07Q2H9B4H"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

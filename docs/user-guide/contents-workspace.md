@@ -126,3 +126,13 @@ See [Kindle discovery](kindle-contents-discovery.md), [book enrichment](comic-ma
 Contents uses the same top/bottom pagination controls and **Items per page** preference as Library: 20, 50, 100 or 200 (default 50). Each Contents card represents one qualifying book/account record, so a page contains at most the selected number of cards even when several accounts share one catalog item. The header keeps catalog and account totals separate; the displayed range counts the account cards.
 
 Changing page size starts at page one and updates both rows. Search/filter/sort also reset the page. Page navigation scrolls back to the upper results controls after rendering. The choice survives reopening but is excluded from backups. See [Library pages](library-browsing.md#pages-and-items-per-page).
+
+## Find and resolve coverage problems
+
+Contents cards now show the actual Comic Coverage result, such as **7 parsed · 0 counted · Publication unresolved**. Open **Coverage details** to see which issues count, which are partial, and what blocks the others. This is separate from whether a description was parsed or human-reviewed.
+
+In **Library → Comic Coverage → Series Coverage**, open **Coverage resolution**. Search by series, collected-book title or unresolved source name; matching unresolved books appear even when no series card can count them. Use the category selector to distinguish publication problems from access exclusions, partial material and intentionally rejected contents.
+
+Choose **Resolve coverage** from either screen. Select a publication/run, inspect its explanation and **Preview coverage changes**. You can select individual observations and optionally include compatible related collections. Nothing changes until **Save reviewed contents**. The resulting counts are rechecked before success is shown. Other source entries, ownership and original descriptions remain intact. A missing issue count is not guessed.
+
+For a complicated reference, **Open contents editor** expands the existing editor in the same dialog. Unsupported publications still need information you have checked. You can undo a saved correction through the existing **Undo contents review** control. Corrections survive reloads, provider reimports and backup/restore.

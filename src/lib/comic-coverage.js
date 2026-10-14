@@ -12,7 +12,7 @@ export function comicGroupCounts(group){
   return {covered:group.issues.filter(issue=>!issue.partial).length,partial:group.issues.filter(issue=>issue.partial).length,duplicates:group.issues.filter(issue=>!issue.partial&&issue.copies>1).length};
 }
 export function comicCoverage(database,{copiesForSources=()=>1,runInferenceExclusions=[]}={}){
-  const {groups,unresolved,excluded}=librarySeriesCoverage(database,{includeExcerpts:true,runInferenceExclusions});
+  const {groups,unresolved,excluded,dispositions}=librarySeriesCoverage(database,{includeExcerpts:true,runInferenceExclusions});
   const recognized=groups.filter(group=>!group.provisional&&['issue','annual','special'].includes(group.unitType)).map(group=>{
     const issues=group.entries.map(entry=>{
       const sources=entry.sources.map(source=>({...source,record:database.providerItems[source.id]})).filter(source=>source.record);
@@ -21,7 +21,7 @@ export function comicCoverage(database,{copiesForSources=()=>1,runInferenceExclu
     return {id:comicSeriesKey(group),series:group.series,run:group.run,unitType:group.unitType,language:group.language,issues,...comicGroupCounts({issues})};
   });
   const unassigned=groups.filter(group=>group.provisional).map(group=>({series:group.series,run:group.run,unitType:group.unitType,numbers:group.entries.map(entry=>entry.number),sources:[...new Map(group.entries.flatMap(entry=>entry.sources).map(source=>[source.id,{id:source.id,title:source.title,recordRef:database.providerItems[source.id]?.recordRef}])).values()]}));
-  return {groups:recognized,unassigned,excluded,provisional:groups.filter(group=>group.provisional).reduce((sum,group)=>sum+group.entries.length,0),unresolved:unresolved.length};
+  return {groups:recognized,unassigned,excluded,dispositions,provisional:groups.filter(group=>group.provisional).reduce((sum,group)=>sum+group.entries.length,0),unresolved:unresolved.length};
 }
 export function validateNumberingTransitions(value){
   if(!Array.isArray(value)||value.length>100)throw Error('Use at most 100 numbering transitions.');

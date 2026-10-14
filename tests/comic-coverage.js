@@ -6,6 +6,7 @@ import {excerptExtentTests} from './excerpt-extents.js';
 import {contextualComicTests} from './contextual-comics.js';
 import {discoveryMixedTests} from './discovery-mixed.js';
 import {namedPublicationTests} from './named-publications.js';
+import {coverageResolutionTests} from './coverage-resolution.js';
 import {wonderWomanCoverageTests} from './wonder-woman-coverage.js';
 import {contextualCollectionCoverageTests} from './contextual-collection-coverage.js';
 import {readFile} from 'node:fs/promises';
@@ -27,6 +28,7 @@ import {contentsSourceBaselineTests} from './contents-source-baseline.js';
 import {mergeDialogTests} from './merge-dialog.js';
 import {comicSeriesNameTests} from './comic-series-names.js';
 export const comicCoverageTests=[
+ ...coverageResolutionTests,
  ...namedPublicationTests,
  ...ownershipCoverageTests,
  ...kindleReturnTests,

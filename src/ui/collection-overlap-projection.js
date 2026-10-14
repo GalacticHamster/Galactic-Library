@@ -10,7 +10,20 @@ export function overlapProjectionInput(database){
 export async function loadOverlapProjection(database){
   return loadCoverageProjection(database);
 }
+const committedViews=new WeakMap();
+// Ownership reviews and key access can expire without a database mutation.
+export function coverageProjectionKey(database,merges={},now=Date.now()){
+  const expired=[...Object.values(database.providerItems??{}).map(r=>r.metadata?.expiresAt),...Object.values(database.ownershipReviews??{}).map(r=>r.expiresAt)].filter(value=>value&&Date.parse(value)<=now).length;
+  return JSON.stringify(merges)+'|'+expired;
+}
 export async function loadCoverageProjection(database,mode='overlap',merges={}){
+  if(mode!=='comic-coverage')return calculateCoverageProjection(database,mode,merges);
+  let views=committedViews.get(database);if(!views){views=new Map();committedViews.set(database,views);}
+  const key=coverageProjectionKey(database,merges);if(views.has(key))return views.get(key);
+  const pending=calculateCoverageProjection(database,mode,merges).catch(error=>{views.delete(key);throw error;});
+  views.set(key,pending);while(views.size>3)views.delete(views.keys().next().value);return pending;
+}
+async function calculateCoverageProjection(database,mode,merges){
   // Paint the existing loading state before preparing the read-only input.
   await new Promise(resolve=>setTimeout(resolve,0));
   const input=overlapProjectionInput(database);

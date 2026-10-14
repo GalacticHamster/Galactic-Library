@@ -39,3 +39,12 @@ export const PUBLICATION_REFERENCES=[
  {id:'idw-universe-2016',title:tmnt+' Universe',run:'2016',publishers:idw,contexts:family,kind:'ongoing',numbers:Array.from({length:25},(_,n)=>String(n+1)),complete:false,aliases:[],sources:['https://www.comics.org/series/105889/']},
  {id:'idw-ongoing-2011',title:tmnt,run:'2011',publishers:idw,contexts:family,kind:'ongoing',numbers:Array.from({length:150},(_,n)=>String(n+1)),complete:false,aliases:[],sources:['https://www.comics.org/series/60636/']}
 ];
+
+// Choices for explicit user confirmation only. Never used by automatic parsing
+// or resolvePublicationRun. A run denotes the continuing numbering identity,
+// not the publication date of every issue/reprint in that sequence.
+export const COVERAGE_RESOLUTION_REFERENCES=[
+ {id:'mirage-tmnt-1984',title:tmnt,run:'1984',label:'Mirage Volume 1 (1984)',publishers:idw,contexts:['Teenage Mutant Ninja Turtles: The Ultimate B&W Collection'],kind:'ongoing',numbers:Array.from({length:62},(_,n)=>String(n+1)),complete:false,aliases:[],sources:['https://www.comics.org/series/13912/'],note:'The original Mirage publication begins in 1984. The saved Ultimate B&W family and Mirage description support this choice.'},
+ {id:'image-tmnt-1996',title:tmnt,run:'1996',label:'Image Volume 3 (1996), with Urban Legends conclusion',publishers:idw,contexts:['Teenage Mutant Ninja Turtles: Urban Legends'],kind:'ongoing',numbers:Array.from({length:26},(_,n)=>String(n+1)),complete:false,aliases:[],sources:['https://www.comics.org/series/12901/','https://www.comics.org/issue/2138395/'],note:'Image originally published #1–23. Urban Legends reprints that sequence and adds the later #24–26 conclusion. This user-confirmed coverage choice keeps the continuing numbering together; it does not date those three issues to 1996.'},
+ {...single('mirage-raphael-1985','Raphael, Teenage Mutant Ninja Turtle','1985',['Raphael'],'https://www.comics.org/series/43495/',idw,['Teenage Mutant Ninja Turtles: The Ultimate B&W Collection']),numbers:['1'],label:'Raphael, Teenage Mutant Ninja Turtle (1985) #1',note:'The Mirage one-shot is actually numbered #1. Later reprintings are not additional issue numbers.'}
+];

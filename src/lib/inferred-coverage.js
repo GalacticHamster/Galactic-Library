@@ -4,14 +4,19 @@ import {effectiveOwnershipRecord,coverageAccessExclusion} from './ownership.js';
 import {identityEvidence,identityKey,titleIdentity,compact} from './identity.js';
 import {inferCoverageRuns} from './coverage-run-context.js';
 import {resolveAnnualCoverage,annualHintForEntry} from './coverage-annual-context.js';
-import {resolvePublicationRun} from './comic-publications.js';
+import {resolvePublicationRun,reviewedPublicationReference} from './comic-publications.js';
+import {coverageIdentityDecision,dispositionObservation,dispositionReferences,summarizeDisposition} from './coverage-disposition.js';
 
 // Local collection tools only. Companion matching retains its reviewed-only
 // index. Proposals are derived from current selected source, never history or
 // a union of independent claims. No ownership/source/review is written here.
 export function collectionContents(record,database,context={}) {
   const review=database.contentReviews?.[record.id];
-  if(review)return {entries:review.entries,unparsed:[],confidence:review.status==='rejected'?'rejected':'verified',review};
+  if(review){
+    const source=record.metadata?.enrichment?.kindleProductComicContents;
+    const pending=review.source==='coverage-resolution'&&review.status!=='rejected'?manifestReviewProposal(source,record.title,contentsStatement(record,{recoverNatural:true}),{series:record.metadata?.series}):null;
+    return {entries:review.entries,unparsed:(pending?.unparsed??[]).filter(fragment=>!reviewedPublicationReference(fragment,review.entries,source)),confidence:review.status==='rejected'?'rejected':'verified',review};
+  }
   const statement=contentsStatement(record,{recoverNatural:true});
   if(!statement)return {entries:[],unparsed:[],confidence:'unresolved'};
   const source=record.metadata?.enrichment?.kindleProductComicContents;
@@ -152,7 +157,7 @@ function resolveContextualSeries(rows,excludedScopes=[]){
 }
 
 export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[],includeExcerpts=false,runInferenceExclusions=[]}={}) {
-  const index=new Map(),unresolved=[],excluded=[];
+  const index=new Map(),unresolved=[],excluded=[],dispositions=[];
   const rows=[],knownRuns=new Map();
   const scopeKey=entry=>JSON.stringify([identityKey(entry.series),identityKey(entry.language)]);
   // Contradictions remain visible when the caller excludes a provider/parent.
@@ -168,44 +173,55 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
     }
   }
   resolveContextualSeries(rows,runInferenceExclusions);
-  const regularRuns=[...new Map(rows.flatMap(row=>[...row.entries,...row.standalone]).filter(entry=>entry.unitType==='issue'&&entry.run).map(entry=>[JSON.stringify([identityKey(entry.series),entry.run]),{series:entry.series,run:entry.run}])).values()];
+  const contextRows=rows.filter(row=>!row.contents.review?.source?.startsWith('coverage-resolution'));
+  const regularRuns=[...new Map(contextRows.flatMap(row=>[...row.entries,...row.standalone]).filter(entry=>entry.unitType==='issue'&&entry.run).map(entry=>[JSON.stringify([identityKey(entry.series),entry.run]),{series:entry.series,run:entry.run}])).values()];
   for(const row of rows)if(row.contents.annualRunHints?.some(hint=>!hint.resolvedRun)){
     row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=resolvedContentsEntries(row.contents,row.original);
   }
-  resolveAnnualCoverage(rows,{parentSeries:capturedCoverageSeries});
+  resolveAnnualCoverage(contextRows,{parentSeries:capturedCoverageSeries});
   inferCoverageRuns(rows,{resolveEntry:resolveCoverageEntry,hasConflict:(entry,parent)=>Boolean(parentSeriesContext(entry,parent).conflict),excludedScopes:runInferenceExclusions});
-  const add=(item,entry,confidence,review,explicitSeries=false,statement='',unresolvedAnnual=false)=>{
-    if(entry.completeness!=='full'&&!(includeExcerpts&&entry.completeness==='excerpt'))return;
-    if(!['issue','annual','special'].includes(entry.unitType))return;
+  const decisionFor=(item,entry,explicitSeries,unresolvedAnnual)=>{
     const context=parentSeriesContext(entry,item);
     const named=explicitSeries&&meaningfulSeries(identityKey(entry.series));
-    const provisional=unresolvedAnnual||entry.containmentUncertain===true||entry.runContextConflict===true||!entry.run&&(context.conflict||!context.strong&&!named||(knownRuns.get(scopeKey(entry))?.size??0)>1);
+    return coverageIdentityDecision(entry,{context,named,knownRunCount:knownRuns.get(scopeKey(entry))?.size??0,unresolvedAnnual});
+  };
+  const add=(item,entry,confidence,review,decision,statement='')=>{
+    if(entry.completeness!=='full'&&!(includeExcerpts&&entry.completeness==='excerpt')||!comicUnit(entry))return null;
+    const {provisional}=decision;
     const key=contentKey(entry)+(provisional?':parent:'+item.id:'');
     const evidence=index.get(key)??[];
     evidence.push({item,entry,confidence,provisional,...(includeExcerpts?{statement}:{}),...(review?{review}:{})});index.set(key,evidence);
+    return key;
   };
   for(const {original,contents,entries,standalone} of rows){
     const item=effectiveOwnershipRecord(original,database);
-    if(item.mediaType!=='book'||excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id))continue;
-    if(!['owned','claimed'].includes(item.ownership)){
+    const viewExcluded=excludeProviders.includes(item.provider)||excludeItemIds.includes(item.id),access=coverageAccessExclusion(original,database);
+    const disposition={id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,ownership:item.ownership,accessEligible:!access,confidence:contents.confidence,reviewed:Boolean(contents.review),rejected:contents.confidence==='rejected',statement:contents.review?.statement||contents.manifestEvidence||contentsStatement(original),observations:[],references:dispositionReferences(contents)};
+    if(!viewExcluded&&access){
       const typed=[...new Map([...entries,...standalone].filter(comicUnit).map(e=>[contentKey(e)+':'+e.completeness,e])).values()];
-      if(typed.length)excluded.push({id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,...coverageAccessExclusion(original,database),entries:typed,entrySource:entries.some(comicUnit)?'contents':'standalone-title'});
-      continue;
+      if(typed.length)excluded.push({id:original.id,recordRef:original.recordRef,title:original.title,provider:original.provider,profileId:original.profileId,...access,entries:typed,entrySource:entries.some(comicUnit)?'contents':'standalone-title'});
     }
-    for(const entry of entries){
+    for(const [entryIndex,entry]of entries.entries()){
       const unresolvedAnnual=Boolean(entry.unitType==='annual'&&!entry.run&&(entry.annualHint||contents.annualRunHints?.some(hint=>!hint.resolvedRun&&identityKey(hint.series)===identityKey(entry.series)&&hint.numbers.includes(entry.number))));
-      add(item,entry,contents.confidence,contents.review,Boolean(contents.review)||['explicit-statement','explicit-clause','natural-reprint'].includes(contents.parseBinding),contents.review?.statement||contents.manifestEvidence||contentsStatement(original),unresolvedAnnual);
-      if((entry.completeness!=='full'&&!includeExcerpts)||!comicUnit(entry))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
+      const decision=decisionFor(item,entry,Boolean(contents.review)||['explicit-statement','explicit-clause','natural-reprint'].includes(contents.parseBinding),unresolvedAnnual);
+      const indexKey=!access&&!viewExcluded?add(item,entry,contents.confidence,contents.review,decision,disposition.statement):null;
+      const protectedMerge=runInferenceExclusions.includes(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))||runInferenceExclusions.includes(JSON.stringify([identityKey(contents.entries[entryIndex]?.series),identityKey(contents.entries[entryIndex]?.run),entry.unitType,identityKey(entry.language)]));
+      disposition.observations.push(dispositionObservation({entry,extracted:contents.entries[entryIndex],entryIndex,decision,access,viewExcluded,indexed:indexKey!==null,indexKey,protectedMerge}));
+      if(!access&&!viewExcluded&&((entry.completeness!=='full'&&!includeExcerpts)||!comicUnit(entry)))unresolved.push({item,entry,reason:entry.completeness==='excerpt'?'excerpt':'unsupported or named material'});
     }
-    for(const fragment of contents.unparsed??[])unresolved.push({item,fragment,reason:'unparsed source'});
-    for(const entry of standalone)add(item,entry,'direct',undefined,true);
+    if(!access&&!viewExcluded)for(const fragment of contents.unparsed??[])unresolved.push({item,fragment,reason:'unparsed source'});
+    for(const [entryIndex,entry]of standalone.entries()){
+      const decision=decisionFor(item,entry,true,false),indexKey=!access&&!viewExcluded?add(item,entry,'direct',undefined,decision):null;
+      disposition.observations.push(dispositionObservation({entry,entryIndex,origin:'standalone',decision,access,viewExcluded,indexed:indexKey!==null,indexKey}));
+    }
+    if(disposition.observations.length||disposition.references.some(r=>r.actionable)||disposition.rejected){disposition.summary=summarizeDisposition(disposition);dispositions.push(disposition);}
   }
   // Preserve the existing verified volume and parent-local component tools.
   for(const [key,evidence]of ownedContentIndex(database,{excludeProviders,excludeItemIds})){
     const retained=evidence.filter(value=>!['issue','annual','special'].includes(value.entry.unitType)).map(value=>({...value,confidence:'verified'}));
     if(retained.length)index.set(key,retained);
   }
-  return {index,unresolved,excluded};
+  return {index,unresolved,excluded,dispositions};
 }
 
 export function libraryContentCoverage(database,requested,options={}) {
@@ -218,7 +234,7 @@ export function libraryContentCoverage(database,requested,options={}) {
 }
 
 export function librarySeriesCoverage(database,options={}) {
-  const {index,unresolved,excluded}=libraryCoverageIndex(database,options);
+  const {index,unresolved,excluded,dispositions}=libraryCoverageIndex(database,options);
   const groups=seriesCoverage(database,{contentIndex:index,requireIdentityScope:true,resolvedScope:true,includeExcerpts:options.includeExcerpts});
   for(const group of groups){
     group.provisional=group.entries.some(entry=>entry.provisional);
@@ -229,5 +245,5 @@ export function librarySeriesCoverage(database,options={}) {
     // run-unspecified groups have useful overlap/gaps without inventing a run.
     if(group.provisional){group.possibleGaps=group.gaps;group.gaps=[];group.overlap=[];}
   }
-  return {groups,unresolved,excluded};
+  return {groups,unresolved,excluded,dispositions};
 }

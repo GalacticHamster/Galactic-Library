@@ -60,7 +60,7 @@ export function inferCoverageRuns(rows,{resolveEntry,hasConflict,excludedScopes=
     const run=alias(entry);
     return run&&!excluded.has(member(entry))?{...entry,run,runInference:{run,sourceRun:entry.run,reason:'Saved same-series context establishes this publication-run alias'}}:entry;
   });
-  for(const row of rows)for(const entry of [...row.entries,...row.standalone]){
+  for(const row of rows)for(const entry of row.contents.review?.source?.startsWith('coverage-resolution')?[]:[...row.entries,...row.standalone]){
     if(!unit(entry)||!entry.run)continue;
     const bridge=bridges.get(JSON.stringify([scope(entry),identityKey(entry.run)]));
     const run=bridge?.size===1?[...bridge][0]:entry.run,key=scope(entry),runs=catalogue.get(key)??new Map();

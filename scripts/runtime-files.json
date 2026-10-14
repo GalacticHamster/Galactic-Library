@@ -173,5 +173,8 @@
   "src/ui/coverage-exclusions.js",
   "shared/natural-title-sort.js",
   "src/lib/comic-publications.js",
-  "src/lib/publication-reference-data.js"
+  "src/lib/publication-reference-data.js",
+  "src/lib/coverage-disposition.js",
+  "src/lib/coverage-resolution.js",
+  "src/ui/coverage-resolution.js"
 ]

@@ -6,6 +6,8 @@ import {createLibraryBrowseProjection,libraryBrowseResults} from './library-brow
 import {emptyBrowseView} from '../lib/ui-preferences.js';
 import {bookHref} from './contents-navigation.js';
 import {createPagination} from './pagination.js';
+import {loadCoverageProjection,coverageProjectionKey} from './collection-overlap-projection.js';
+import {createCoverageDisposition} from './coverage-resolution.js';
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const button=(label,action)=>{const node=text('button',label);node.type='button';node.addEventListener('click',action);return presentAction(node);};
 const providerName=id=>({kindle:'Kindle',humble:'Humble Bundle',fanatical:'Fanatical',kobo:'Kobo'}[id]??id);
@@ -40,6 +42,17 @@ export function createContentsWorkspace(actions={}) {
   const header=text('div','');header.className='results-header';header.append(counter,paging.sizeContainer);
   listView.append(controls,header,paging.top,list,paging.bottom);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not reviewed means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
   const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,pageSize=50,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
+  let coverage,coverageFor,coverageKey='',coverageError='',coverageRows=new Map();
+  const resolutionActions=()=>({...actions.resolutionActions,canLeave:actions.canLeave,...actions.coverageOptions?.(),resolved:async(next,projection)=>{database=next;coverageFor=next;coverageKey=coverageProjectionKey(next,actions.coverageOptions?.().merges??{});coverage=projection;coverageRows=new Map(projection.dispositions.map(r=>[r.id,r]));rows=project(database);if(selected)open(selected);else renderList();await actions.resolutionActions?.resolved?.(next,projection);}});
+  function coverageStatus(record){
+    const row=coverageRows.get(record.id);if(coverage&&row)return createCoverageDisposition(row,database,coverage,resolutionActions());
+    const node=text('p',coverageError?'Coverage could not be checked: '+coverageError:coverage?'No parsed comic observations.':'Checking comic coverage…');node.className='contents-coverage-disposition';if(coverageError)node.append(button('Recheck coverage',()=>{coverageFor=null;requestCoverage();}));return node;
+  }
+  function refreshCoverageDetail(){const slot=detail.querySelector('.contents-coverage-slot'),record=Object.values(database.providerItems).find(r=>r.recordRef===selected);if(slot&&record)slot.replaceChildren(coverageStatus(record));}
+  function requestCoverage(){
+    const merges=actions.coverageOptions?.().merges??{},key=coverageProjectionKey(database,merges);if(coverageFor===database&&key===coverageKey)return;const current=database;coverageFor=current;coverageKey=key;coverage=null;coverageRows=new Map();coverageError='';
+    loadCoverageProjection(current,'comic-coverage',merges).then(projection=>{if(database!==current||coverageKey!==key)return;coverage=projection;coverageRows=new Map(projection.dispositions.map(r=>[r.id,r]));renderList();refreshCoverageDetail();}).catch(error=>{if(database!==current||coverageKey!==key)return;coverageError=error.message;renderList();refreshCoverageDetail();});
+  }
   function setPageSize(size,{reset=false}={}){pageSize=size;if(reset){page=0;view.page=0;view.anchor='';}}
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
   function readView(){return {...view,page,anchor:selected??result?.rows[0]?.qualifying[0]?.record.recordRef??view.anchor};}
@@ -62,6 +75,7 @@ export function createContentsWorkspace(actions={}) {
       else if(!row.failed)node.append(Object.assign(text('p',row.label),{className:'contents-card-status'}));
       if(row.failed)node.append(text('p',row.retained?'Could not retrieve the latest description. Earlier contents and reviews are retained.':'Could not retrieve contents. Retry from the Kindle library page.'));
       if(row.changed)node.append(text('p','Description changed since your review. Your review is retained.'));
+      node.append(coverageStatus(database.providerItems[row.id]));
       const inspect=button('Inspect contents',()=>open(row.recordRef));inspect.className='contents-inspect';node.append(inspect);return node;
     }));
   }
@@ -78,6 +92,7 @@ export function createContentsWorkspace(actions={}) {
     openedEvidence=evidenceKey(record);
     const notice=text('p','');notice.className='contents-review-notice';notice.setAttribute('role','status');detail.append(notice);
     const summary=contentsSummary(record,database);detail.append(text('p',summary.label));
+    const coverageSlot=text('div','');coverageSlot.className='contents-coverage-slot';coverageSlot.append(coverageStatus(record));detail.append(coverageSlot);
     if(summary.updatedAt)detail.append(text('small','Last contents activity: '+formatDate(summary.updatedAt)));
     if(summary.failed)detail.append(text('p',summary.retained?'Could not retrieve the latest description. Earlier contents below are retained. Retry on the Kindle library page.':'Could not retrieve contents. Retry on the Kindle library page, or enter contents from a source you checked.'));
     if(actions.review)detail.append(actions.review(record,database));
@@ -88,7 +103,7 @@ export function createContentsWorkspace(actions={}) {
   }
   for(const [key,control]of Object.entries({...shared,status}))control.addEventListener(control===search?'input':'change',()=>{view[key]=control.value;view.anchor='';page=0;renderList();actions.changed?.();});
   return {element,open,close,applyView,readView,setPageSize,get selected(){return selected;},get scroll(){return returnScroll;},
-    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;paging.select.disabled=!database;if(!active&&!selected)return;const projected=project(database);
+    update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;paging.select.disabled=!database;if(!active&&!selected)return;requestCoverage();const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
         overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest retrievals failed.`;
         for(const option of status.options){const key=option.value;

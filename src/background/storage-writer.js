@@ -22,6 +22,7 @@ import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh,KINDLE_
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
 import {contentsSourceBaseline} from '../lib/contents.js';
+import {applyCoverageResolutions} from '../lib/coverage-resolution.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase,validateDatabaseAsync } from '../lib/models.js';
 import { STORAGE_OPERATIONS } from '../lib/storage-protocol.js';
@@ -1235,6 +1236,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database);
   }
 
+  async function saveCoverageResolutions(request){
+    const database=await getDatabase(),preferences=await getUiPreferences();
+    const result=applyCoverageResolutions(database,request,{merges:preferences.comicCoverageMerges??{}});
+    return persistDatabase(result.database);
+  }
+
   async function removeContentReview(itemId) {
     const database=await getDatabase();delete database.contentReviews[itemId];return persistDatabase(database);
   }
@@ -1385,7 +1392,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     saveManualMatchDecision, savePreferredDisplayTitle, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
-    saveContentReview, removeContentReview,
+    saveContentReview, removeContentReview,saveCoverageResolutions,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
   };

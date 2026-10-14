@@ -51,7 +51,7 @@ import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 import { compareTitles } from '../lib/title-sort.js';
-import { saveContentReview, removeContentReview } from '../lib/storage.js';
+import { saveContentReview, removeContentReview,saveCoverageResolutions } from '../lib/storage.js';
 import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
@@ -158,7 +158,14 @@ const contentsReviewActions={
   remove:async(id)=>{database=await drafts.commit(()=>removeContentReview(id));},
   refresh:()=>{render();contentsWorkspace.refreshReview();}
 };
-const contentsWorkspace=createContentsWorkspace({projection:browseProjection,canLeave:()=>drafts.allowNavigation(),pageSizeChanged:size=>changePageSize(size),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
+const coverageResolutionActions={
+  canLeave:()=>drafts.allowNavigation(),
+  save:async request=>{database=await drafts.commit(()=>saveCoverageResolutions(request));return database;},
+  saveReview:async(id,value)=>{database=await drafts.commit(()=>saveContentReview(id,value));return database;},
+  removeReview:async id=>{database=await drafts.commit(()=>removeContentReview(id));return database;},
+  resolved:async next=>{database=next;comicCoverageDatabase=null;render();}
+};
+const contentsWorkspace=createContentsWorkspace({projection:browseProjection,resolutionActions:coverageResolutionActions,coverageOptions:()=>({merges:comicCoverageMerges}),canLeave:()=>drafts.allowNavigation(),pageSizeChanged:size=>changePageSize(size),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
   if(!reviewOrigin)reviewOrigin={workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll,ref};
   if(!restoringRoute)pushRoute(bookHref('contents',ref));
 },review:(record,current)=>{
@@ -1024,7 +1031,7 @@ function renderCollectionCoverage(){
   document.querySelector('#overlap-workspace').hidden=coverageView!=='overlap';
   for(const button of document.querySelectorAll('[data-coverage-view]'))button.setAttribute('aria-pressed',String(button.dataset.coverageView===coverageView));
   if(database&&workspace.workspace==='comic-coverage'&&coverageView==='series'&&comicCoverageDatabase!==database){
-    document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{starts:comicCoverageStarts,transitions:comicCoverageTransitions,names:comicCoverageNames,saveName:async(key,value)=>{const prefs=await saveUiPreferences({comicCoverageNames:{[key]:value}});comicCoverageNames=prefs.comicCoverageNames;return comicCoverageNames;},saveTransitions:async(key,value)=>{const prefs=await saveUiPreferences({comicCoverageTransitions:{[key]:value}});comicCoverageTransitions=prefs.comicCoverageTransitions;return comicCoverageTransitions;},merges:comicCoverageMerges,saveMerge:async(source,target,title,continuity)=>{const prefs=await saveComicCoverageMerge(source,target,title,continuity);comicCoverageMerges=prefs.comicCoverageMerges;comicCoverageNames=prefs.comicCoverageNames;return comicCoverageMerges;},undoMerge:async id=>{const prefs=await removeComicCoverageMerge(id);comicCoverageMerges=prefs.comicCoverageMerges;comicCoverageNames=prefs.comicCoverageNames;return comicCoverageMerges;},openRecord:(ref,options)=>openLibraryRecord(ref,options),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
+    document.querySelector('#comic-coverage-view').replaceChildren(createComicCoverageView(database,{resolutionActions:coverageResolutionActions,starts:comicCoverageStarts,transitions:comicCoverageTransitions,names:comicCoverageNames,saveName:async(key,value)=>{const prefs=await saveUiPreferences({comicCoverageNames:{[key]:value}});comicCoverageNames=prefs.comicCoverageNames;return comicCoverageNames;},saveTransitions:async(key,value)=>{const prefs=await saveUiPreferences({comicCoverageTransitions:{[key]:value}});comicCoverageTransitions=prefs.comicCoverageTransitions;return comicCoverageTransitions;},merges:comicCoverageMerges,saveMerge:async(source,target,title,continuity)=>{const prefs=await saveComicCoverageMerge(source,target,title,continuity);comicCoverageMerges=prefs.comicCoverageMerges;comicCoverageNames=prefs.comicCoverageNames;return comicCoverageMerges;},undoMerge:async id=>{const prefs=await removeComicCoverageMerge(id);comicCoverageMerges=prefs.comicCoverageMerges;comicCoverageNames=prefs.comicCoverageNames;return comicCoverageMerges;},openRecord:(ref,options)=>openLibraryRecord(ref,options),saveStart:async(key,value)=>{const preferences=await saveUiPreferences({comicCoverageStarts:{[key]:value}});comicCoverageStarts=preferences.comicCoverageStarts;return comicCoverageStarts;}}));comicCoverageDatabase=database;
   }
   if(database&&workspace.workspace==='comic-coverage'&&coverageView==='overlap'&&overlapDatabase!==database){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;

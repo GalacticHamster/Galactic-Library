@@ -1,4 +1,4 @@
-import {PUBLICATION_REFERENCES,PUBLICATION_REFERENCE_VERSION} from './publication-reference-data.js';
+import {PUBLICATION_REFERENCES,PUBLICATION_REFERENCE_VERSION,COVERAGE_RESOLUTION_REFERENCES} from './publication-reference-data.js';
 import {contentKey} from './contents.js';
 
 // Literal bibliographic aliases, not product matching or fuzzy title aliases.
@@ -98,4 +98,11 @@ export function resolvePublicationRun(entry,saved){
  const context=publicationContext(saved),matches=references.filter(p=>p.kind==='ongoing'&&scoped(p,context)&&aliases(p).includes(key(entry.series))&&p.numbers.includes(entry.number));
  if(matches.length!==1)return entry;
  const p=matches[0];return {...entry,run:p.run,publicationResolution:{referenceId:p.id,title:p.title,run:p.run,kind:p.kind,sources:p.sources,referenceVersion:PUBLICATION_REFERENCE_VERSION,enumeration:'already explicit',sourceFragment:entry.series+' #'+entry.number}};
+}
+
+// A scoped publication correction must not hide other unresolved source names.
+// Only an explicitly saved matching publication can retire its own fragment.
+export function reviewedPublicationReference(fragment,entries,saved){
+ const context=publicationContext(saved),text=' '+key(fragment)+' ';
+ return [...references,...COVERAGE_RESOLUTION_REFERENCES].some(p=>p.kind==='one-shot'&&scoped(p,context)&&aliases(p).some(alias=>text.includes(' '+alias+' '))&&p.numbers.every(number=>entries.some(e=>key(e.series)===key(p.title)&&e.run===p.run&&e.number===number)));
 }

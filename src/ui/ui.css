@@ -279,3 +279,12 @@ button.danger { background:var(--gh-danger-fill); }
 .comic-issue-cell[aria-pressed=true] { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-cell:focus-visible { outline:3px solid var(--gh-link); outline-offset:2px; }
 .comic-issue-sources { border:1px solid var(--gh-border); border-radius:6px; padding:12px; margin:12px 0; }
+.coverage-resolution-queue { margin: 1rem 0; padding: .6rem; border: 1px solid var(--gh-border); border-radius: .4rem; }
+.coverage-resolution-queue > summary { cursor: pointer; font-weight: 600; }
+.contents-coverage-disposition { font-size: .9rem; }
+.contents-coverage-disposition > p { margin: .4rem 0; }
+.coverage-resolution-dialog { width: min(62rem, 94vw); max-height: 88vh; overflow: auto; }
+.coverage-resolution-dialog select, .coverage-resolution-dialog input[type="search"] { display: block; width: 100%; margin: .5rem 0; }
+.coverage-resolution-dialog label { display: block; margin: .4rem 0; }
+.coverage-resolution-dialog > button, .coverage-resolution-dialog > a { margin: .5rem .5rem .5rem 0; }
+[data-coverage-selected="true"] { outline: 2px solid var(--gh-accent); }
