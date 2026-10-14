@@ -1,0 +1,1057 @@
+{
+  "note": "Bounded public selected-source inputs for seven contextual TMNT regressions and existing successful normalization controls. No account, ownership, review, order or record identifiers. Expected semantics are asserted in tests.",
+  "cases": [
+    {
+      "title": "Batman/Teenage Mutant Ninja Turtles II (2017-2018)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B07B88MS6C",
+        "statement": "collects all six issues of the thrilling miniseries event presented by DC Comics and IDW Publishing.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Batman/Teenage Mutant Ninja Turtles II (2017-2018)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "“Williams’ storytelling and character work is topnotch, some of the best stuff happening in comics right now.” —Nerdist\n“If you enjoyed the original, theres absolutely no reason not to stick around for Round 2.” —IGN\nThe Dark Knight and the heroes in a half shell reunite! The team behind the smash-hit crossover series brings Batman and Robin to the Teenage Mutant Ninja Turtles’ New York to fight the menace Bane! But will Donatello’s attempt to fix things create an even deadlier threat?\nWhen Donatello opens a portal to Gotham City in search of the Turtles’ recent ally, Batman, he accidentally gets sent to Gotham City and someone else comes through—Bane! The villain who broke Batman finds a new world to conquer, developing a new strain of Venom to inflict on the Big Apple’s unsuspecting population. Donnie manages to bring Batman and Robin (Damian Wayne) to his world to join the fight, but when they, Master Splinter, and the rest of the Turtles—Leonardo, Michelangelo, and Raphael—disagree with his plans, the dejected Donatello takes matters into his own hands…with disastrous results!\nWritten by James Tynion IV (Detective Comics) and Ryan Ferrier (Teenage Mutant Ninja Turtles: Dimension X) and illustrated by Freddie E. Williams II (Robin), Batman/Teenage Mutant Ninja Turtles Ii collects all six issues of the thrilling miniseries event presented by DC Comics and IDW Publishing.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 1295,
+              "end": 1395,
+              "contextStart": 695,
+              "contextEnd": 1395,
+              "raw": "collects all six issues of the thrilling miniseries event presented by DC Comics and IDW Publishing.",
+              "parserInput": "collects all six issues of the thrilling miniseries event presented by DC Comics and IDW Publishing",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9217081850533808,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B07B88MS6C",
+          "sourceUrl": "https://www.amazon.com/dp/B07B88MS6C",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Batman/Teenage Mutant Ninja Turtles II (2017-2018)",
+              "raw": "Part of: Batman/Teenage Mutant Ninja Turtles II (2017-2018)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: Reborn Vol. 6: Game Changers",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0BFFWJJSY",
+        "statement": "Collects the 2022 Annual, issues #131 and 132 of Teenage Mutant Ninja Turtles, and the 2022 Free Comic Book Day TMNT issue.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: Reborn Vol. 6: Game Changers",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The game is afoot as the Turtles must decide if they can trust an old enemy! First, the Turtles embark on a secret mission, but a mysterious creature hunts them relentlessly, and they'll have to find a new way to come together to escape their foe—and the pain that haunts them. In the wake of TMNT: The Armageddon Game—Opening Moves, Oroku Saki, the Shredder, has revealed himself to the Turtles. In order to counter the newest evil machinations of the Pantheon’s trickster god, the Rat King, he seeks an alliance with the sons of his former archenemy, the late Master Splinter. But are the Turtles prepared to join forces with their merciless executioner from a past life? Can Shredder truly be redeemed? No matter the case, the Armageddon Game is fast approaching, and the only place to find the answers to these burning questions is in…Northampton! Collects the 2022 Annual, issues #131 and 132 of Teenage Mutant Ninja Turtles, and the 2022 Free Comic Book Day TMNT issue.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 852,
+              "end": 975,
+              "contextStart": 252,
+              "contextEnd": 975,
+              "raw": "Collects the 2022 Annual, issues #131 and 132 of Teenage Mutant Ninja Turtles, and the 2022 Free Comic Book Day TMNT issue.",
+              "parserInput": "Collects the 2022 Annual, issues #131 and 132 of Teenage Mutant Ninja Turtles, and the 2022 Free Comic Book Day TMNT issue",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.86497461928934,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -3
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 3
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0BFFWJJSY",
+          "sourceUrl": "https://www.amazon.com/dp/B0BFFWJJSY",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles",
+              "raw": "Part of: Teenage Mutant Ninja Turtles"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: Reborn Vol. 7: Isolation",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0C956XP97",
+        "statement": "Collects issues #133—139 which serve as a direct tie-in to the exciting TMNT: The Armageddon Game event!",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: Reborn Vol. 7: Isolation",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The TMNT face one of their biggest challenges yet as the diabolical Rat King sets off a chain of events that nearly brings Mutant Town to its knees! With Leonardo, Michelangelo, and Raphael away in search of new allies to join the good guys against Rat King’s latest deadly gambit, it falls on Donatello and Jennika to lead the fight in Mutant Town against the terrible trio of Mayor Baxter Stockman, General Krang, and Madame Null. But will a dangerous quartet of masked mutant ninja turtles and a mad vivisectionist bent on revenge—not to mention E.P.F. invaders and angry Utrom soldiers!—sabotage their efforts before they can even begin to dig in? Collects issues #133—139 which serve as a direct tie-in to the exciting TMNT: The Armageddon Game event!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 652,
+              "end": 756,
+              "contextStart": 52,
+              "contextEnd": 756,
+              "raw": "Collects issues #133—139 which serve as a direct tie-in to the exciting TMNT: The Armageddon Game event!",
+              "parserInput": "Collects Teenage Mutant Ninja Turtles: Reborn issues #133-139 which serve as a direct tie-in to the exciting TMNT: The Armageddon Game event",
+              "binding": "explicit-product-series-volume-title",
+              "structural": false,
+              "position": 0.8511749347258486,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0C956XP97",
+          "sourceUrl": "https://www.amazon.com/dp/B0C956XP97",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles",
+              "raw": "Part of: Teenage Mutant Ninja Turtles"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Armageddon Game",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0CGSNXHJ1",
+        "statement": "Collects all eight issues of Teenage Mutant Ninja Turtles: The Armageddon Game.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The Armageddon Game",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The next big TMNT event is here! As the Rat King sets the game in motion, the Turtles are forced to respond and Mutant Town is put at risk. Under the leadership of the Shredder, the TMNT begin a dangerous quest to seek out allies against Rat King's trio of terror: LeatherKrang, Baxter Stockman, and Madame Null. It's a mission that will see the Turtles spread out across New York City…and across multiple dimensions! But time is short because their enemies are already on the march, and things are not looking good for Mutant Town while most of our heroes are away. Desperate measures, false flag attacks, mysterious new villains, and unexpected alliances are all part of this dangerous game! Written by longtime TMNT scribe Tom Waltz (The Last Ronin) and illustrated by artist Vincenzo Federici (Jennifer Blood, Red Sonja), the time has come at last to find out who is playing…and who is being played! Collects all eight issues of Teenage Mutant Ninja Turtles: The Armageddon Game.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 904,
+              "end": 983,
+              "contextStart": 304,
+              "contextEnd": 983,
+              "raw": "Collects all eight issues of Teenage Mutant Ninja Turtles: The Armageddon Game.",
+              "parserInput": "Collects all eight issues of Teenage Mutant Ninja Turtles: The Armageddon Game",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9103726082578046,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0CGSNXHJ1",
+          "sourceUrl": "https://www.amazon.com/dp/B0CGSNXHJ1",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Armageddon Game",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Armageddon Game"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0C9545BT8",
+        "statement": "Collecting all six issues by Erik Burnham, Roi Mercado, Will Robson, Juni Ba, Sophie Campbell, Paul Allor, and Pablo Verdugo, Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance breaks all the rules!",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The game has begun and the Turtles will need all the help they can get! As the Rat King and his new Trio of Terror—Madame Null, General Krang, and Baxter Stockman—unleash the Armageddon Game on the denizens of New York City and Mutant Town, the TMNT—under the leadership of the newly reformed Shredder—turn to allies old and new to help them in their desperate quest to stop the Rat King’s nefarious plot. Karai, Casey Jones, April O’Neil, Nobody, Alopex, Bludgeon, and Venus—each play an important part in the apocalyptic contest for the world. But can this coalition withstand the Rat King’s latest gambit…or will a new and unexpected alliance form in its wake? Collecting all six issues by Erik Burnham, Roi Mercado, Will Robson, Juni Ba, Sophie Campbell, Paul Allor, and Pablo Verdugo, Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance breaks all the rules!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 664,
+              "end": 874,
+              "contextStart": 64,
+              "contextEnd": 874,
+              "raw": "Collecting all six issues by Erik Burnham, Roi Mercado, Will Robson, Juni Ba, Sophie Campbell, Paul Allor, and Pablo Verdugo, Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance breaks all the rules!",
+              "parserInput": "Collecting all six issues by Erik Burnham, Roi Mercado, Will Robson, Juni Ba, Sophie Campbell, Paul Allor, and Pablo Verdugo, Teenage Mutant Ninja Turtles: The Armageddon Game—The Alliance breaks all the rules",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.751131221719457,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0C9545BT8",
+          "sourceUrl": "https://www.amazon.com/dp/B0C9545BT8",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Armageddon Game",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Armageddon Game"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Last Ronin",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B09XZK3Y98",
+        "statement": "Collects the complete five-issue miniseries in a new graphic novel, an adventure as fulfilling for longtime Turtles fans as it is accessible for readers just discovering the heroes in a half-shell.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The Last Ronin",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Who is the Last Ronin? In a future, battle-ravaged New York City, a lone surviving Turtle embarks on a seemingly hopeless mission seeking justice for the family he lost. From legendary TMNT co-creators Kevin Eastman and Peter Laird, get ready for the final story of the Teenage Mutant Ninja Turtles three decades in the making! What terrible events destroyed his family and left New York a crumbling, post-apocalyptic nightmare? All will be revealed in this climactic Turtle tale that sees longtime friends becoming enemies and new allies emerging in the most unexpected places. Can the surviving Turtle triumph? Eastman and Laird are joined by writer Tom Waltz, who penned the first 100 issues of IDW’s ongoing TMNT series, and artists Esau & Isaac Escorza (Heavy Metal) and Ben Bishop (The Far Side of the Moon) with an Introduction by filmmaker Robert Rodriguez! Collects the complete five-issue miniseries in a new graphic novel, an adventure as fulfilling for longtime Turtles fans as it is accessible for readers just discovering the heroes in a half-shell.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 866,
+              "end": 1063,
+              "contextStart": 266,
+              "contextEnd": 1063,
+              "raw": "Collects the complete five-issue miniseries in a new graphic novel, an adventure as fulfilling for longtime Turtles fans as it is accessible for readers just discovering the heroes in a half-shell.",
+              "parserInput": "Collects the complete five-issue miniseries in a new graphic novel, an adventure as fulfilling for longtime Turtles fans as it is accessible for readers just discovering the heroes in a half-shell",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.8070829450139795,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B09XZK3Y98",
+          "sourceUrl": "https://www.amazon.com/dp/B09XZK3Y98",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Last Ronin",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Last Ronin"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Teenage Mutant Ninja Turtles: The Last Ronin—Lost Years (Teenage Mutant Ninja Turtles: The Last Ronin—The Lost Years)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0CGSPRCLN",
+        "statement": "Collects the five-issue series and the TMNT: Lost Day Special.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Teenage Mutant Ninja Turtles: The Last Ronin—Lost Years (Teenage Mutant Ninja Turtles: The Last Ronin—The Lost Years)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "RETURN TO THE RONIN-VERSE! In TMNT: The Last Ronin, readers were taken on a pulse-pounding trek through time—past, present, future—to witness the final gut-wrenching days of the Heroes in a Half-Shell. In Last Ronin–Lost Years, new secrets of the Turtles’ past are revealed as we learn more about the devastating series of events leading up to the Last Ronin’s final battle, as well as its aftermath. For Michelangelo in particular, the march to his heartbreaking last battle was long and dangerous, taking him from New York City, to Japan, across Asia and Europe, and then back home again to administer final justice against those guilty of killing his family. But what happened during those fateful years when he had only the need for vengeance and Master Splinter’s journal to guide him? What battles did he fight? What hard lessons did he learn? The time has come to find out as original miniseries writers Kevin Eastman and Tom Waltz join artist Ben Bishop (TMNT: The Last Ronin) and SL Gallant (G.I. Joe: A Real American Hero) to finally reveal what adventures the Last Ronin experienced during his vengeful journey. While in the present, a new master, Casey Marie Jones, prepares her young terrapin students to be the next generation of…Teenage Mutant Ninja Turtles! Collects the five-issue series and the TMNT: Lost Day Special.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 1274,
+              "end": 1336,
+              "contextStart": 674,
+              "contextEnd": 1336,
+              "raw": "Collects the five-issue series and the TMNT: Lost Day Special.",
+              "parserInput": "Collects the five-issue series and the TMNT: Lost Day Special",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.9465081723625557,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0CGSPRCLN",
+          "sourceUrl": "https://www.amazon.com/dp/B0CGSPRCLN",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "IDW",
+              "raw": "IDW"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Teenage Mutant Ninja Turtles: The Last Ronin—The Lost Years",
+              "raw": "Part of: Teenage Mutant Ninja Turtles: The Last Ronin—The Lost Years"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "controls": [
+    {
+      "title": "Fables Vol. 8: Wolves (Fables (Graphic Novels))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0064W6552",
+        "statement": "Collects issues #48-51 in Bill Willingham's Eisner Award-winning Vertigo series.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Fables Vol. 8: Wolves (Fables (Graphic Novels))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "WINNER OF FOURTEEN EISNER AWARDS. The community of Fables living undercover in our midst has endured plenty of suffering at the hands of their longtime antagonist, the Adversary. Now it's time to return the favor and put the would-be conqueror on notice that the cost of subjugating this last stronghold of independent magic will be higher than even he can bear. The one Fable who can accomplish this mission, however, has hidden himself in the wild and will take some convincing--if he can ever be found. Luckily for Fabletown, there is something more than a trip behind enemy lines awaiting Bigby Wolf's return.... Collects issues #48-51 in Bill Willingham's Eisner Award-winning Vertigo series. Also features a bran-new set of maps detailing the Fable Territories in the Mundane World as well as Willingham's complete original script for the landmark 50th issue.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 617,
+              "end": 697,
+              "contextStart": 17,
+              "contextEnd": 697,
+              "raw": "Collects issues #48-51 in Bill Willingham's Eisner Award-winning Vertigo series.",
+              "parserInput": "Collects Fables issues #48-51",
+              "binding": "explicit-product-series-volume-title",
+              "structural": false,
+              "position": 0.7051428571428572,
+              "rank": [
+                2,
+                2,
+                4,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 4,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0064W6552",
+          "sourceUrl": "https://www.amazon.com/dp/B0064W6552",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "Vertigo",
+              "raw": "Vertigo"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Fables",
+              "raw": "Part of: Fables"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Frankenstein: Agent of S.H.A.D.E. (2011-2013) Vol. 1: War of the Monsters (Frankenstein, Agent of SHADE (2011-2013))",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B008RCDN48",
+        "statement": "collects issues #1-6 of FRANKENSTEIN, AGENT OF S.H.A.D.E., part of the DC Comics--The New 52 event.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Frankenstein: Agent of S.H.A.D.E. (2011-2013) Vol. 1: War of the Monsters (Frankenstein, Agent of SHADE (2011-2013))",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "As a part of the acclaimed DC Comics--The New 52 event of September 2011, it's Frankenstein as you've never seen him before, in a dark new series from acclaimed writer Jeff Lemire and artist Alberto Ponticelli!\nFrankenstein is part of a network of strange beings who work for an even stranger government organization: The Super Human Advanced Defense Executive, also known as S.H.A.D.E. Leading his new field team, The Creature Commandos, Frankenstein and company must fight against supernatural threats even more strange and dangerous than themselves.\nThis volume collects issues #1-6 of FRANKENSTEIN, AGENT OF S.H.A.D.E., part of the DC Comics--The New 52 event.\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 565,
+              "end": 664,
+              "contextStart": 0,
+              "contextEnd": 664,
+              "raw": "collects issues #1-6 of FRANKENSTEIN, AGENT OF S.H.A.D.E., part of the DC Comics--The New 52 event.",
+              "parserInput": "collects issues #1-6 of FRANKENSTEIN, AGENT OF S.H.A.D.E., part of the DC Comics--The New 52 event",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.8382789317507419,
+              "rank": [
+                2,
+                2,
+                6,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 6,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B008RCDN48",
+          "sourceUrl": "https://www.amazon.com/dp/B008RCDN48",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Frankenstein, Agent of SHADE (2011-2013)",
+              "raw": "Part of: Frankenstein, Agent of SHADE (2011-2013)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "New Teen Titans (1980-1988) Vol. 8",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B077QM3K65",
+        "statement": "collects issues #49-58 of TALES OF THE TEEN TITANS and features the legendary wedding of Donna Troy, as well as the never-before-reprinted tales “The Trial of the Terminator,” “Jericho’s Story” and more!",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "New Teen Titans (1980-1988) Vol. 8",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The original Teen Titans always stood in the shadows of their larger-than-life mentors—young heroes like Robin, Wonder Girl and Kid Flash saw plenty of action, but it was Batman, Wonder Woman and the Flash who ultimately called the shots.\nAll that changed, however, with the arrival of THE NEW TEEN TITANS in 1980—and the lives of DC’s adolescent adventurers would never be the same!\nCrafted by comics legends Marv Wolfman and George Pérez, this all-new super-title featured greater dangers, fiercer emotions and more tangled relationships than any that had come before. The Titans’ celebrated stories have ensured that the names of Starfire, Cyborg, Raven and Changeling will be passed down through history alongside those famous aliases employed by Dick Grayson, Donna Troy and Wally West.\nNow, for the first time, the saga of Wolfman and Pérez’s NEW TEEN TITANS is available in a comprehensive series of trade paperback editions. THE NEW TEEN TITANS VOL. 8 collects issues #49-58 of TALES OF THE TEEN TITANS and features the legendary wedding of Donna Troy, as well as the never-before-reprinted tales “The Trial of the Terminator,” “Jericho’s Story” and more!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 960,
+              "end": 1163,
+              "contextStart": 360,
+              "contextEnd": 1163,
+              "raw": "collects issues #49-58 of TALES OF THE TEEN TITANS and features the legendary wedding of Donna Troy, as well as the never-before-reprinted tales “The Trial of the Terminator,” “Jericho’s Story” and more!",
+              "parserInput": "collects issues #49-58 of TALES OF THE TEEN TITANS and features the legendary wedding of Donna Troy, as well as the never-before-reprinted tales “The Trial of the Terminator,” “Jericho’s Story” and more",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.8184143222506394,
+              "rank": [
+                2,
+                2,
+                10,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 10,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B077QM3K65",
+          "sourceUrl": "https://www.amazon.com/dp/B077QM3K65",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: New Teen Titans (1980-1988)",
+              "raw": "Part of: New Teen Titans (1980-1988)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Hellboy in Hell Volume 2: The Death Card",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B01J1XIC1U",
+        "statement": "Collects issues #6–#10.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Hellboy in Hell Volume 2: The Death Card",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "The final chapter!\nAfter facing off for a second time against the Vampire of Prague, Hellboy, dead and in Hell, comes down with a fatal illness and seeks the help of an incompetent team of doctors. As he explores the geography of Hell, learning little from a confused pair of mapmakers, Hellboy gets a glimpse of the new World Tree that he helped to create, stands accused by his own sister of a terrible murder, and causes the destruction of Pandemonium itself in the climactic chapter of the series that the LA Times calls “the best work of [Mike Mignola’s] career.” Collects issues #6–#10.\n“Mike Mignola and Dave Stewart work magic on those pages.”—Multiversity\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 569,
+              "end": 592,
+              "contextStart": 0,
+              "contextEnd": 592,
+              "raw": "Collects issues #6–#10.",
+              "parserInput": "Collects Hellboy in Hell issues #6-#10",
+              "binding": "explicit-product-series-volume-title",
+              "structural": false,
+              "position": 0.844213649851632,
+              "rank": [
+                2,
+                2,
+                5,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 5,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B01J1XIC1U",
+          "sourceUrl": "https://www.amazon.com/dp/B01J1XIC1U",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "Dark Horse Books",
+              "raw": "Dark Horse Books"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Hellboy",
+              "raw": "Part of: Hellboy"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Animal Man (2011-2014) Vol. 2: Animal vs. Man",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00B14FN9W",
+        "statement": "Collects issues #0, 7-11, Animal Man Annual #1\nRead more",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Animal Man (2011-2014) Vol. 2: Animal vs. Man",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Ever since he discovered his daughter's connection to the Red--the strange source of his powers and the mystical connective tissue between all life on the planet--Buddy Baker and his family have been on the run. But when Buddy goes missing, his family receives assistance from John Constantine and the Justice League Dark. Plus, learn the history between The Red, the Green, and the Rot! Collects issues #0, 7-11, Animal Man Annual #1\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 388,
+              "end": 444,
+              "contextStart": 0,
+              "contextEnd": 444,
+              "raw": "Collects issues #0, 7-11, Animal Man Annual #1\nRead more",
+              "parserInput": "Collects Animal Man (2011-2014) issues #0, 7-11, Animal Man Annual #1 Read more",
+              "binding": "explicit-product-series-volume-title",
+              "structural": false,
+              "position": 0.8738738738738738,
+              "rank": [
+                2,
+                2,
+                7,
+                1,
+                0
+              ],
+              "quality": "containment",
+              "outcome": "full",
+              "entries": 7,
+              "unresolved": 0
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00B14FN9W",
+          "sourceUrl": "https://www.amazon.com/dp/B00B14FN9W",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Animal Man (2011-2014)",
+              "raw": "Part of: Animal Man (2011-2014)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Ex Machina: Book Three",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00NGUWRDY",
+        "statement": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Ex Machina: Book Three",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "In this volume, Mayor Mitchell Hundred - formerly known as the super hero The Great Machine --faces difficult decisions regarding New York City's drug laws. But will a string of brazen, violent robberies and a shocking suicide affect the the Mayor's policy? And in a second story, \"Power Down,\" set during the New York blackout of 2003, the mayor must deal with a city gone dark.\nAward-winning writer Brian K. Vaughan (Saga, Y: THE LAST MAN) deftly combines big city politics and superheroes in this critically acclaimed series.\nCollects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 529,
+              "end": 620,
+              "contextStart": 0,
+              "contextEnd": 620,
+              "raw": "Collects issues #21-29, Ex Machina: Inside the Machine, and Ex Machina Special #3\nRead more",
+              "parserInput": "Collects Ex Machina issues #21-29, Ex Machina: Inside the Machine; Ex Machina Special #3 Read more",
+              "binding": "explicit-description-title-anchor",
+              "structural": false,
+              "position": 0.853225806451613,
+              "rank": [
+                2,
+                2,
+                10,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "partial",
+              "entries": 10,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00NGUWRDY",
+          "sourceUrl": "https://www.amazon.com/dp/B00NGUWRDY",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "Vertigo",
+              "raw": "Vertigo"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Ex Machina",
+              "raw": "Part of: Ex Machina"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Superman: Birthright",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B00BPFV5DU",
+        "statement": "collects the 12-issue miniseries that features the entire modern-day retelling of Superman by writer Mark Waid and artists Leinil Francis Yu and Gerry Alanguilan.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "Superman: Birthright",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "This volume collects the 12-issue miniseries that features the entire modern-day retelling of Superman by writer Mark Waid and artists Leinil Francis Yu and Gerry Alanguilan. Plus, an introduction by Smallville television producers Al Gough and Miles Millar and a sketchbook section!\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 12,
+              "end": 174,
+              "contextStart": 0,
+              "contextEnd": 174,
+              "raw": "collects the 12-issue miniseries that features the entire modern-day retelling of Superman by writer Mark Waid and artists Leinil Francis Yu and Gerry Alanguilan.",
+              "parserInput": "collects the 12-issue miniseries that features the entire modern-day retelling of Superman by writer Mark Waid and artists Leinil Francis Yu and Gerry Alanguilan",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.040955631399317405,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B00BPFV5DU",
+          "sourceUrl": "https://www.amazon.com/dp/B00BPFV5DU",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: Superman: Birthright",
+              "raw": "Part of: Superman: Birthright"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "The Flash: Rebirth (2009-2010) (The Flash: Rebirth series)",
+      "source": {
+        "source": "amazon-product-page",
+        "sourceUrl": "https://www.amazon.com/dp/B0064W66OC",
+        "statement": "collecting the fast-paced 6-issue miniseries.",
+        "manifest": {
+          "interpretationVersion": 3,
+          "title": "The Flash: Rebirth (2009-2010) (The Flash: Rebirth series)",
+          "blocks": [
+            {
+              "selector": "#bookDescription_feature_div",
+              "text": "Geoff Johns and Ethan Van Sciver, the writer/artist team behind the blockbuster GREEN LANTERN: REBIRTH and THE SINESTRO CORPS WAR, create an explosive, jaw-dropping epic that reintroduces Barry Allen as The Flash in this volume collecting the fast-paced 6-issue miniseries. But how will this greatest of all Flashes find his place in the twenty-first century?\nRead more"
+            }
+          ],
+          "candidates": [
+            {
+              "block": 0,
+              "start": 228,
+              "end": 273,
+              "contextStart": 0,
+              "contextEnd": 273,
+              "raw": "collecting the fast-paced 6-issue miniseries.",
+              "parserInput": "collecting the fast-paced 6-issue miniseries",
+              "binding": "explicit-clause",
+              "structural": false,
+              "position": 0.6178861788617886,
+              "rank": [
+                2,
+                0,
+                0,
+                0,
+                -1
+              ],
+              "quality": "containment",
+              "outcome": "failed",
+              "entries": 0,
+              "unresolved": 1
+            }
+          ],
+          "selected": 0,
+          "secondary": [],
+          "descriptionMayBeIncomplete": true
+        },
+        "extractorVersion": 5,
+        "productDetailsEvidence": {
+          "version": 1,
+          "asin": "B0064W66OC",
+          "sourceUrl": "https://www.amazon.com/dp/B0064W66OC",
+          "observations": [
+            {
+              "field": "publisher",
+              "label": "Publisher",
+              "selector": "#detailBullets_feature_div",
+              "status": "observed",
+              "value": "DC",
+              "raw": "DC"
+            },
+            {
+              "field": "series",
+              "label": "Series",
+              "selector": "#seriesBulletWidget_feature_div",
+              "status": "observed",
+              "value": "Part of: The Flash: Rebirth (2009-2010)",
+              "raw": "Part of: The Flash: Rebirth (2009-2010)"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

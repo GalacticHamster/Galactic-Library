@@ -239,7 +239,7 @@ export function manifestReviewProposal(saved,title,statement=saved?.statement??'
       const parent=candidate.manifestRange&&!candidate.whole?manifest.candidates.find(c=>c.whole&&c.block===candidate.block&&c.manifestRange.start===candidate.manifestRange.start&&c.manifestRange.end===candidate.manifestRange.end):null;
       if(!sameSourceText(statement,saved.statement)&&!sameSourceText(statement,parent?.raw))return proposeContentsForReview(statement,title,reviewContext);
       reviewContext={...context,allowTitleBinding:true};
-      const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,{...reviewContext,extentDescription:manifest.blocks[interpreted.block].text});
+      const interpreted=parent??candidate,proposal=proposeContentsForReview(interpreted.parserInput,title,{...reviewContext,sourceText:interpreted.raw,extentDescription:manifest.blocks[interpreted.block].text});
       const incomplete=interpreted.truncated||candidate.manifestRange&&!candidate.whole&&!parent;
       const remainder=interpreted.whole?manifest.blocks[interpreted.block].text.slice(interpreted.end,interpreted.manifestRange.end):incomplete?manifest.blocks[candidate.block].text.slice(candidate.manifestRange.start,candidate.manifestRange.end):'';
       const unparsed=incomplete?[...proposal.unparsed,remainder]:proposal.unparsed;

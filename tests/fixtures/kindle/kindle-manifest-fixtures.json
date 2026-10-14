@@ -189,10 +189,17 @@
     ],
     "series": "Teenage Mutant Ninja Turtles",
     "unresolved": [
-      "Annual",
       "Jennika"
     ],
-    "source": "User-supplied manifest excerpt"
+    "source": "User-supplied manifest excerpt",
+    "named": [
+      {
+        "series": "Teenage Mutant Ninja Turtles Annual",
+        "run": "publication 2020",
+        "unitType": "annual",
+        "number": "unnumbered"
+      }
+    ]
   },
   {
     "title": "Teenage Mutant Ninja Turtles: Urban Legends Vol. 2",

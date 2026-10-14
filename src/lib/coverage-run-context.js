@@ -70,7 +70,7 @@ export function inferCoverageRuns(rows,{resolveEntry,hasConflict,excludedScopes=
   }
   for(const runs of catalogue.values())for(const candidate of runs.values())for(const [kind,numbers]of candidate.numbers)candidate.numbers.set(kind,{min:Math.min(...numbers),max:Math.max(...numbers)});
   for(const row of rows){
-    if(row.contents.review||!['explicit-statement','explicit-clause','natural-reprint'].includes(row.contents.parseBinding)||!row.entries.some(e=>unit(e)&&!e.run))continue;
+    if(row.contents.review||!['explicit-statement','explicit-clause','natural-reprint'].includes(row.contents.parseBinding)&&!row.contents.contextualEvidence?.length||!row.entries.some(e=>unit(e)&&!e.run))continue;
     const text=row.contents.parseInput||row.contents.manifestEvidence||'',periods=sourcePeriods(row),clauseRuns=new Map(),unsafeClauses=new Set();
     // Semicolons delimit claims. Associate explicit same-series run context only
     // with entries in that clause, rather than carrying it across the manifest.

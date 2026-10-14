@@ -90,7 +90,7 @@ export const contentsParserV4Tests=[
    assert.notEqual(prior.selected,current.selected,'parser change demonstrably changes winner');
    const restored=validateManifest(prior);assert.equal(restored.candidates[restored.selected].raw,prior.candidates[prior.selected].raw);assert.deepEqual(restored.blocks,prior.blocks);
    const forged=structuredClone(prior);forged.candidates[forged.selected].raw='Collects Fake #1-99';forged.candidates[0].parserInput='Collects Fake #1-99';assert.deepEqual(validateManifest(forged),current);
-   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,12);
+   assert.equal(old.module.CONTENTS_PARSER_VERSION,3);assert.equal(CONTENTS_PARSER_VERSION,13);
  }],
  ['ordinary proposal semantics remain independent of discovery grammar',async()=>{
    const old=await oldParser();for(const f of fixtures)assert.deepEqual(proposeContents(f.statement),old.module.proposeContents(f.statement));

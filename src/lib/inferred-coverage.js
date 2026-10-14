@@ -124,6 +124,32 @@ function resolvedContentsEntries(contents,parent){
   });
 }
 
+// A sibling volume can corroborate an elliptical collection label only when
+// its explicit source, captured series widget and publisher agree. Counts of
+// standalone miniseries and explicitly named other series are never aliases.
+function resolveContextualSeries(rows,excludedScopes=[]){
+  const excluded=new Set(excludedScopes);
+  const family=row=>{
+    const source=row.original.metadata?.enrichment?.kindleProductComicContents;
+    const title=reviewSeriesAnchor(row.original.title,{allowTitleBinding:true})?.series;
+    const labels=capturedCoverageSeries(row.original),publishers=[...new Set((source?.productDetailsEvidence?.observations??[]).filter(o=>o.field==='publisher'&&o.status==='observed').map(o=>identityKey(o.value??o.raw)))];
+    return title&&labels.length===1&&publishers.length===1?{title,label:labels[0],key:JSON.stringify([identityKey(title),identityKey(labels[0].series),labels[0].run,publishers[0]])}:null;
+  };
+  const families=new Map();
+  for(const row of rows){
+    if(row.contents.review||!row.contents.contextualEvidence?.some(e=>e.kind==='postposed-series'))continue;
+    const context=family(row);if(!context)continue;
+    const names=[...new Set(row.entries.filter(e=>e.unitType==='issue').map(e=>identityKey(e.series)))];
+    if(names.length!==1||names[0]!==identityKey(context.label.series))continue;
+    const targets=families.get(context.key)??new Set();targets.add(context.label.series);families.set(context.key,targets);
+  }
+  for(const row of rows){
+    if(row.contents.review||!row.contents.contextualEvidence?.some(e=>e.kind==='implicit-series'))continue;
+    const context=family(row),targets=context&&families.get(context.key);if(targets?.size!==1)continue;
+    const series=[...targets][0];row.entries=row.entries.map(entry=>entry.unitType==='issue'&&identityKey(entry.series)===identityKey(context.title)&&!entry.run&&!excluded.has(JSON.stringify([identityKey(entry.series),identityKey(entry.run),entry.unitType,identityKey(entry.language)]))?{...entry,series,contextualSeriesInference:{series:entry.series,reason:'A sibling volume explicitly names the captured product series'}}:entry);
+  }
+}
+
 export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemIds=[],includeExcerpts=false,runInferenceExclusions=[]}={}) {
   const index=new Map(),unresolved=[],excluded=[];
   const rows=[],knownRuns=new Map();
@@ -140,6 +166,7 @@ export function libraryCoverageIndex(database,{excludeProviders=[],excludeItemId
       const key=scopeKey(entry),runs=knownRuns.get(key)??new Set();runs.add(identityKey(entry.run));knownRuns.set(key,runs);
     }
   }
+  resolveContextualSeries(rows,runInferenceExclusions);
   const regularRuns=[...new Map(rows.flatMap(row=>[...row.entries,...row.standalone]).filter(entry=>entry.unitType==='issue'&&entry.run).map(entry=>[JSON.stringify([identityKey(entry.series),entry.run]),{series:entry.series,run:entry.run}])).values()];
   for(const row of rows)if(row.contents.annualRunHints?.some(hint=>!hint.resolvedRun)){
     row.contents=collectionContents(row.original,database,{annualParentRuns:regularRuns});row.entries=resolvedContentsEntries(row.contents,row.original);

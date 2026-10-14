@@ -17,6 +17,7 @@
   "src/lib/kobo-observations.js",
   "src/lib/contents-performance.js",
   "src/lib/contents-quality.js",
+  "src/lib/contextual-comic-contents.js",
   "src/lib/contents.js",
   "src/lib/quick-contents.js",
   "src/lib/inferred-coverage.js",

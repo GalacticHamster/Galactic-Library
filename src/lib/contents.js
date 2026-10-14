@@ -2,9 +2,10 @@ import { compact, identityKey } from './identity.js';
 import { object, text, date, url } from './validation.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 import {assessContentsQuality,recoveredNaturalContents,naturalContentsClaims} from './contents-quality.js';
+import {contextualComicInput} from './contextual-comic-contents.js';
 
 const UNIT_TYPES = new Set(['issue', 'volume', 'annual', 'special', 'component']);
-export const CONTENTS_PARSER_VERSION = 12;
+export const CONTENTS_PARSER_VERSION = 13;
 export function seriesDescriptor(series, run = '') {
   const text = compact(series); const year = /\s*\((\d{4})\)\s*$/u.exec(text);
   return {series: year ? text.slice(0, year.index).trim() : text, run: compact(run || year?.[1], 100)};
@@ -18,7 +19,7 @@ export function validateContents(entries) {
     const unitType = text(entry.unitType,20,'Unit type'); const number = text(entry.number,80,'Unit number');
     const completeness = entry?.completeness ?? 'full';
     if (!series || !UNIT_TYPES.has(unitType) || !number || !['full','excerpt'].includes(completeness)) throw new Error('Each contents entry needs a series, unit type, number, and full/excerpt scope.');
-    if (['issue','volume','annual'].includes(unitType) && (!/^(?:\d{1,6}\/\d{1,6}|\d{1,6}(?:\.\d{1,6})?)$/u.test(number) || /\/0+$/u.test(number))) throw new Error('Issue/volume/annual numbers must be numeric, decimal, or fractional.');
+    if (['issue','volume','annual'].includes(unitType) && !(unitType==='annual'&&number==='unnumbered') && (!/^(?:\d{1,6}\/\d{1,6}|\d{1,6}(?:\.\d{1,6})?)$/u.test(number) || /\/0+$/u.test(number))) throw new Error('Issue/volume/annual numbers must be numeric, decimal, or fractional; an unnumbered annual may use unnumbered.');
     return {series,run,unitType,number,language:text(entry.language,80,'Language').toLowerCase(),completeness};
   });
   return [...new Map(result.map((entry) => [`${contentKey(entry)}:${entry.completeness}`, entry])).values()];
@@ -75,9 +76,14 @@ export function proposeContents(statement) {
 /** Discovery/editor-only proposals. Never used to index ordinary title matches. */
 export function proposeContentsForReview(statement, collectionTitle = '', context = {}) {
   const quality=assessContentsQuality(compact(statement,10000),collectionTitle);
-  const body=quality.normalizedInput.replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu,'');
-  let parseBinding='explicit-statement',parseInput=quality.normalizedInput;
-  const finish=(entries,unparsed)=>({...quality,parseBinding,parseInput,entries,unparsed,outcome:quality.quality==='filtered'?'filtered':quality.quality==='uncertain'?'uncertain':!entries.length?'failed':unparsed.length?'partial':'full'});
+  let prepared=quality.quality==='containment'?contextualComicInput(context.sourceText??quality.normalizedInput,collectionTitle,context):null;
+  // Retain an existing source-bound explicit series/run normalization when
+  // the new helper only repeats ordinary title inheritance. New count, mixed
+  // publication and finite-tail grammar can still reinterpret the raw clause.
+  if(prepared&&context.sourceText&&prepared.evidence.every(e=>['implicit-series','unresolved-series-range'].includes(e.kind))&&!/\bthrough\b|\bwhich\s+(?:serve|serves|are|is)\b/iu.test(context.sourceText)&&!/^(?:collects?|collecting|includes?|contains?)\s+issues?\b/iu.test(quality.normalizedInput))prepared=null;
+  const body=(prepared?.input??quality.normalizedInput).replace(/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b\s*[:\-]?\s*/iu,'');
+  let parseBinding='explicit-statement',parseInput=prepared?.input??quality.normalizedInput;
+  const finish=(entries,unparsed)=>({...quality,parseBinding,parseInput,entries,unparsed,...(prepared?{contextualEvidence:prepared.evidence,...(prepared.provisionalRanges?{provisionalRanges:prepared.provisionalRanges}:{})}:{}),outcome:quality.quality==='filtered'?'filtered':quality.quality==='uncertain'?'uncertain':!entries.length?'failed':unparsed.length?'partial':'full'});
   if(quality.quality!=='containment')return finish([],body?[body]:[]);
   const anchor=reviewSeriesAnchor(collectionTitle,context);
   if(!anchor&&/^issues?\s*#?\s*\d[^;]*\bof (?:this|the) (?:(?:seminal|classic|original|comic(?: book)?) )?series\b|^the first \w+ issues of (?:this|the) series\b/iu.test(body))return finish([],[body]);
@@ -87,6 +93,7 @@ export function proposeContentsForReview(statement, collectionTitle = '', contex
     input=contextual;parseBinding=anchor.basis;parseInput='Collects '+input;
   }
   const proposal=discoveryNumberedContents(input,collectionTitle,/^(?:collects?|collecting|contains?|containing|includes?|including|comprises?)\b/iu.test(quality.normalizedInput),{...context,naturalCollection:naturalContentsClaims(statement).some(claim=>claim.start===0)});
+  if(prepared){proposal.entries=[...proposal.entries,...prepared.named];proposal.unparsed.push(...prepared.unparsed);if(proposal.entries.length)proposal.entries=validateContents(proposal.entries);}
   if(proposal.entries.length || /#|\b(?:issues?|volumes?|vols?\.?|books?|chapters?)\s*#?\d|\d+\s*[-–—]\s*\d+/iu.test(body))return {...finish(proposal.entries,proposal.unparsed),...(proposal.annualRunHints?.length?{annualRunHints:proposal.annualRunHints}:{})};
   // This fallback is discovery/editor-only; ordinary matching still uses
   // proposeContents above. Unsupported numeric syntax never becomes a name.

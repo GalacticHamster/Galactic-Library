@@ -12,7 +12,8 @@ const proposal=s=>manifestReviewProposal(s,s.manifest.title);
 export const kindleManifestTests=[
  ...fixtures.map(f=>['manifest regression: '+f.title,()=>{
    const s=select(f.text,f.title),p=proposal(s);
-   assert.deepEqual(p.entries.map(e=>e.number),f.numbers);assert.ok(p.entries.every(e=>e.series.toLowerCase()===f.series.toLowerCase()));
+   const numbered=p.entries.filter(e=>e.number!=='unnumbered');assert.deepEqual(numbered.map(e=>e.number),f.numbers);assert.ok(numbered.every(e=>e.series.toLowerCase()===f.series.toLowerCase()));
+   assert.deepEqual(p.entries.filter(e=>e.number==='unnumbered').map(({series,run,unitType,number})=>({series,run,unitType,number})),f.named??[]);
    for(const word of f.unresolved??[])assert.ok(p.unparsed.join(' ').includes(word),word);
    assert.ok(s.manifest.candidates.length);assert.deepEqual(validateManifest(s.manifest),s.manifest);
  }]),

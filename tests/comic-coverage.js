@@ -3,6 +3,7 @@ import {ownershipCoverageTests} from './ownership-coverage.js';
 import {kindleReturnTests} from './kindle-returns.js';
 import {quickOwnershipTests} from './quick-ownership.js';
 import {excerptExtentTests} from './excerpt-extents.js';
+import {contextualComicTests} from './contextual-comics.js';
 import {wonderWomanCoverageTests} from './wonder-woman-coverage.js';
 import {contextualCollectionCoverageTests} from './contextual-collection-coverage.js';
 import {readFile} from 'node:fs/promises';
@@ -28,6 +29,7 @@ export const comicCoverageTests=[
  ...kindleReturnTests,
  ...quickOwnershipTests,
  ...excerptExtentTests,
+ ...contextualComicTests,
  ...wonderWomanCoverageTests,
  ...contextualCollectionCoverageTests,
  ...comicSeriesNameTests,
