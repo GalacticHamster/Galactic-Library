@@ -4,6 +4,7 @@ import {providerLabel,accessLabel,formatDate} from './formatters.js';
 import {parsePurchaseEvidence} from '../lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {accountLabel} from './item-presentation.js';
+import {OWNERSHIP_STATES} from '../lib/constants.js';
 
 const node=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const input=(label,type='text')=>{const field=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')field.type=type;field.setAttribute('aria-label',label);return field;};
@@ -13,14 +14,15 @@ export function createOwnershipReviewTools(records,database,actions){
   const root=node('details');root.className='ownership-review-tools';root.append(node('summary','Confirm ownership with dated evidence'));let ready=false;
   root.addEventListener('toggle',()=>{
     if(!root.open||ready)return;ready=true;
-    root.append(node('p','Record a purchase, permanent claim or temporary access with its evidence date. This keeps the provider observation intact. Reseller key status still cannot establish destination activation.'));
+    root.append(node('p','Record a purchase, temporary access, return or refund with its evidence date. Returned, revoked and expired books stay in your library but do not count as owned. This keeps the provider observation intact. Reseller key status still cannot establish destination activation.'));
     for(const record of records){
       const prior=database.ownershipReviews[record.recordRef],section=node('div'),effective=effectiveOwnershipRecord(record,database);section.dataset.ownershipRecord=record.recordRef;section.append(node('strong',`${record.title} — ${accountLabel(record,database)}`),node('p',`Provider reports: ${accessLabel(record.ownership)}; shown as: ${accessLabel(effective.ownership)}${effective.ownershipOverride?' — your ownership preference':''}${prior?`; confirmed ${formatDate(prior.confirmedAt)}`:''}.`));
-      const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of ['owned','claimed','subscription','borrowed','rental','unknown'])ownership.append(Object.assign(node('option',accessLabel(state)),{value:state}));ownership.value=prior?.ownership??'owned';
+      const ownership=node('select');ownership.setAttribute('aria-label','Confirmed ownership');for(const state of OWNERSHIP_STATES)ownership.append(Object.assign(node('option',accessLabel(state)),{value:state}));ownership.value=prior?.ownership??(['returned','revoked','expired'].includes(effective.ownership)?effective.ownership:'owned');
       const evidence=input('Ownership evidence','textarea');evidence.maxLength=2000;evidence.placeholder='Receipt, order history or another checked source';evidence.value=prior?.note??'';
       const date=input('Ownership evidence date','date');date.value=(prior?.evidenceDate??new Date().toISOString()).slice(0,10);
       const source=input('Ownership evidence URL','url');source.placeholder='Optional source URL';source.value=prior?.sourceUrl??'';
       const expiry=input('Temporary access expiry','datetime-local');expiry.value=prior?.expiresAt?new Date(Date.parse(prior.expiresAt)-new Date(prior.expiresAt).getTimezoneOffset()*60000).toISOString().slice(0,16):'';
+      const updateExpiry=()=>{expiry.disabled=['returned','revoked','expired'].includes(ownership.value);if(expiry.disabled)expiry.value='';};ownership.addEventListener('change',updateExpiry);updateExpiry();
       const label=node('label'),confirm=input('Confirm checked ownership evidence','checkbox');label.append(confirm,' I checked this evidence for this record and account.');
       const status=node('p');status.setAttribute('role','status');
       const save=button('Save ownership confirmation',async()=>{if(!confirm.checked){status.textContent='Check the evidence confirmation first.';return;}save.disabled=true;try{await performAction({status,name:'Saving ownership confirmation...',task:()=>actions.save(record.recordRef,{ownership:ownership.value,note:evidence.value,evidenceDate:date.value,sourceUrl:source.value,expiresAt:expiry.value?new Date(expiry.value).toISOString():null},prior?.reviewRef??null)});actions.refresh();}catch(error){status.textContent=error.message;save.disabled=false;}});

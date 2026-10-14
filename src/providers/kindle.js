@@ -83,7 +83,7 @@
         series: stringValues(item?.series ?? item?.seriesName),
         collections: stringValues(item?.collections ?? item?.collectionNames ?? item?.collection),
         originType,
-        ...(access.ownership==='unknown'&&access.basis?{ownershipBasis:access.basis}:{}),
+        ...(access.ownership!=='owned'&&access.basis?{ownershipBasis:access.basis}:{}),
         contentType,
         itemStatus,
         publisher,

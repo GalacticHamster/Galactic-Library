@@ -11,10 +11,14 @@
   }
   function classify(metadata){
     const origin=key(metadata?.originType),ownership=fromOriginType(origin);
+    const status=key(metadata?.itemStatus);
+    // Exact completed states only: pending returns and page/action text are not
+    // evidence. Apply before origin-based purchase and migration inference.
+    if(/^(?:returned|return complete|refunded|refund complete|refund completed)$/u.test(status))return {ownership:'returned',basis:'returned-access'};
+    if(/^(?:revoked|access revoked)$/u.test(status))return {ownership:'revoked',basis:'revoked-access'};
+    if(/^(?:expired|access expired|loan expired)$/u.test(status))return {ownership:'expired',basis:'expired-access'};
+    if(/^(?:deleted|removed|inactive|cancelled|canceled)$/u.test(status))return {ownership:'unknown',basis:'inactive-access'};
     if(origin!=='comixology')return {ownership};
-    const status=key(metadata.itemStatus);
-    if(/^(?:expired|access expired|loan expired)$/u.test(status))return {ownership:'unknown',basis:'expired-access'};
-    if(/^(?:returned|revoked|deleted|removed|inactive|cancelled|canceled)$/u.test(status))return {ownership:'unknown',basis:'inactive-access'};
     const other=[metadata.ownershipType,metadata.sourceType,metadata.contentType,metadata.itemStatus].map(key);
     if(['conflicting-access-evidence','expired-access','inactive-access'].includes(metadata.ownershipBasis)||other.some(value=>/^(?:sample|borrowed|rental|subscription|kindleunlimited|comicsunlimited|comixologyunlimited|publiclibrarylending|personallending|rfflending|prime|koll|freetrial)$/u.test(value)))return {ownership:'unknown',basis:'conflicting-access-evidence'};
     if(metadata.libraryCategory!=='books')return {ownership:'unknown',basis:'unconfirmed-library-category'};

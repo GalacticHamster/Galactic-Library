@@ -26,6 +26,8 @@ import {compareTitles} from '../src/lib/title-sort.js';
 import {perezStatement,wonderBook} from './wonder-woman-coverage-fixture.js';
 import {ownershipCoverageFixture} from './ownership-coverage-fixture.js';
 import {createCoverageExclusions} from '../src/ui/coverage-exclusions.js';
+import {createOwnershipReviewTools} from '../src/ui/ownership-review.js';
+import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
 const snapshot=items=>completeProviderSnapshot('kindle',items,['books','personal-documents'].map(id=>{const n=id==='books'?items.length:0;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 let discardAllowed=true;globalThis.confirm=()=>discardAllowed;
 const checks=[],assert=(value,message)=>{if(!value)throw Error(message);};
@@ -50,6 +52,15 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+  {
+    const previous=await writer.getDatabase(),book=coverageBook('returned-ui','Collects Alpha (2001) #1-3'),other=coverageBook('retained-ui','Collects Alpha (2001) #2-3');await writer.restoreDatabase(coverageDatabase(book,other));const database=await writer.getDatabase(),rawBefore=JSON.stringify(database.providerItems);let saved=false;
+    const tools=createOwnershipReviewTools([database.providerItems[book.id]],database,{save:async(ref,value,expected)=>writer.saveOwnershipReview(ref,value,expected),refresh:()=>{saved=true;}});document.body.append(tools);tools.open=true;tools.dispatchEvent(new Event('toggle'));
+    const choice=tools.querySelector('[aria-label="Confirmed ownership"]');assert([...choice.options].some(o=>o.value==='returned'&&o.textContent==='Returned / Refunded'),'Return correction unavailable');tools.querySelector('[aria-label="Temporary access expiry"]').value='2026-01-01T12:00';change(choice,'returned');assert(tools.querySelector('[aria-label="Temporary access expiry"]').disabled&&!tools.querySelector('[aria-label="Temporary access expiry"]').value,'Return retained a temporary expiry');change(tools.querySelector('[aria-label="Ownership evidence"]'),'Exact order item shows Return complete');tools.querySelector('[aria-label="Confirm checked ownership evidence"]').checked=true;button(tools,'Save ownership confirmation').click();await wait(()=>saved,'Return correction did not save');tools.remove();
+    const db=await writer.getDatabase(),result=comicCoverageForLibrary(db);assert(result.groups[0].covered===2&&result.groups[0].duplicates===0&&result.excluded[0].reason==='returned','Return inflated coverage or removed legitimate support');assert(JSON.stringify(db.providerItems)===rawBefore,'Return rewrote source data');
+    const browse=createLibraryBrowseProjection()(db);assert(libraryBrowseResults(browse,{query:book.title}).total===1&&libraryBrowseResults(browse,{filters:{ownership:'returned'}}).total===1&&libraryBrowseResults(browse,{filters:{acquisitions:'1'}}).total===1,'Returned book is hidden or counts as owned');
+    const exclusions=createCoverageExclusions(result.excluded,db);document.body.append(exclusions);exclusions.open=true;exclusions.dispatchEvent(new Event('toggle'));assert(exclusions.textContent.includes('Returned / Refunded')&&exclusions.textContent.includes('does not establish current ownership')&&exclusions.querySelector('a').textContent==='Review ownership','Return exclusion is unclear');exclusions.remove();
+    assert(document.querySelector('#ownership-filter option[value="returned"]'),'Library Access filter omits returns');await writer.restoreDatabase(previous);checks.push('Returned/refunded correction saves without source changes, remains searchable/filterable, explains coverage exclusion and retains other owned issues');
+  }
   {
     const fixture=ownershipCoverageFixture(),before=JSON.stringify(fixture.database);let destination;
     const view=createComicCoverageView(fixture.database,{openRecord:(ref,options)=>{destination={ref,...options};}});document.body.append(view);const result=await view.ready;

@@ -25,7 +25,7 @@ export const ownershipCoverageTests=[
    for(const [originType,state]of [['Purchase','owned'],['Comixology','owned'],['ComicsUnlimited','subscription'],['ComixologyUnlimited','subscription'],['KindleUnlimited','subscription'],['Prime','subscription'],['PublicLibraryLending','borrowed'],['PersonalLending','borrowed'],['Rental','rental'],['Sample','unknown']]){
      const item=importer.kindleItemFromOwnershipItem({asin:'B012345678',title:'Provider fixture',originType});assert.equal(item.ownership,state,originType);
    }
-   for(const patch of [{itemStatus:'Expired'},{itemStatus:'Returned'},{ownershipType:'ComicsUnlimited'},{contentType:'Sample'}]){
+   for(const patch of [{ownershipType:'ComicsUnlimited'},{contentType:'Sample'}]){
      const item=importer.kindleItemFromOwnershipItem({asin:'B012345678',title:'Conflict',originType:'Comixology',...patch});assert.equal(item.ownership,'unknown');
      assert.equal(effectiveOwnershipRecord(normalizeProviderItem({...item,provider:'kindle'})).ownership,'unknown','Normalization or projection resurrected conflicting access');
    }
@@ -33,7 +33,7 @@ export const ownershipCoverageTests=[
  ['explicit access, missing context, account corrections and expiry override legacy inference',()=>{
    const {gods,database}=ownershipCoverageFixture();
    for(const state of ['owned','claimed','borrowed','subscription','rental'])assert.equal(effectiveOwnershipRecord({...gods,ownership:state},database).ownership,state);
-   for(const patch of [{source:'other-source'},{libraryCategory:'personal-documents'},{itemStatus:'Expired'},{itemStatus:'Borrowed'},{originType:'ComixologyUnlimited'}])assert.equal(effectiveOwnershipRecord({...gods,metadata:{...gods.metadata,...patch}},database).ownership,'unknown');
+   for(const patch of [{source:'other-source'},{libraryCategory:'personal-documents'},{itemStatus:'Borrowed'},{originType:'ComixologyUnlimited'}])assert.equal(effectiveOwnershipRecord({...gods,metadata:{...gods.metadata,...patch}},database).ownership,'unknown');
    database.ownershipReviews[gods.recordRef]=review('unknown');assert.equal(effectiveOwnershipRecord(gods,database).ownership,'unknown');assert.equal(coverageAccessExclusion(gods,database).reason,'user-unconfirmed');
    database.ownershipReviews[gods.recordRef]=review('subscription','2020-01-01');assert.equal(effectiveOwnershipRecord(gods,database).ownership,'unknown');assert.equal(coverageAccessExclusion(gods,database).reason,'expired');
    const derived=effectiveOwnershipRecord(gods,{});assert.equal(effectiveOwnershipRecord(derived,database).ownership,'unknown','A reused projection bypassed the current review');

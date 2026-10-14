@@ -25,7 +25,7 @@ export function createContentsWorkspace(actions={}) {
     ['mediaType','Media',[['all','All media'],['book','Books'],['audiobook','Audiobooks'],['game','Games'],['software','Software'],['movie','Movies'],['tv','TV']]],
     ['provider','Provider',[['all','All providers']]],['account','Saved account',[['all','All accounts']]],
     ['series','Series',[['all','Any series']]],['genre','Genre',[['all','Any genre']]],
-    ['ownership','Access',[['all','Any access'],['owned','Owned'],['claimed','Permanently claimed'],['borrowed','Borrowed'],['subscription','Subscription access'],['rental','Rented'],['unknown','Ownership unconfirmed']]],
+    ['ownership','Access',[['all','Any access'],['owned','Owned'],['claimed','Permanently claimed'],['borrowed','Borrowed'],['subscription','Subscription access'],['rental','Rented'],['unknown','Ownership unconfirmed'],['returned','Returned / Refunded'],['revoked','Access revoked'],['expired','Access expired']]],
     ['reading','Reading',[['all','Any reading state'],['not-saved','No saved reading status'],['unread','Explicitly unread'],['reading','Reading'],['completed','Completed']]]
   ]){const field=text('select','');field.id='contents-'+key;field.setAttribute('aria-label','Contents '+label.toLowerCase());for(const [value,label]of options)field.append(Object.assign(text('option',label),{value}));const wrapper=text('label',label);wrapper.append(field);( ['series','genre','ownership','reading'].includes(key)?extra:primary).append(wrapper);shared[key]=field;}
   const provider=shared.provider;

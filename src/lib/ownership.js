@@ -16,6 +16,11 @@ export function validateOwnershipPolicy(value) {
 }
 
 export function providerOwnership(provider, ownership, metadata) {
+  if(['returned','revoked','expired'].includes(ownership))return ownership;
+  if(provider==='kindle'){
+    const access=globalThis.GalacticKindleOwnership.classify(metadata??{});
+    if(['returned-access','revoked-access','expired-access','inactive-access','conflicting-access-evidence'].includes(access.basis))return access.ownership;
+  }
   if(provider==='kobo')return globalThis.GalacticKoboOwnership.fromMetadata(ownership,metadata);
   if(provider==='humble'&&metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(metadata.keyStatus))return 'unknown';
   return ownership;
@@ -33,12 +38,19 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
     const {ownershipInference,...original}=item;
     item={...original,ownership:ownershipInference.observedOwnership};
   }
+  const review=database.ownershipReviews?.[item.recordRef];
+  // Explicit loss of access is not uncertainty to assume away. Keep the raw
+  // observation intact; a saved user return also survives subsequent imports.
+  const terminal=state=>['returned','revoked','expired'].includes(state);
+  if(terminal(review?.ownership))return {...item,ownership:review.ownership,manualOwnershipEvidence:{source:review.source,confirmedAt:review.confirmedAt,evidenceDate:review.evidenceDate,expiresAt:review.expiresAt}};
+  const observed=providerOwnership(item.provider,item.ownership,item.metadata);
+  if(terminal(item.ownership)||terminal(observed))return {...item,ownership:terminal(observed)?observed:item.ownership};
+  if(item.provider==='kindle'&&observed==='unknown'&&observed!==item.ownership)item={...item,ownership:observed};
   const policy=database.ownershipPolicy;
   if(!ignoreOverride&&(policy?.allOwned===true||policy?.providers?.[item.provider]===true)){
     return {...item,ownership:'owned',ownershipOverride:{observedOwnership:item.ownership,
       scope:policy.allOwned?'all':'provider'}};
   }
-  const review=database.ownershipReviews?.[item.recordRef];
   const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
   const expiredKey=key&&item.metadata?.expiresAt&&Date.parse(item.metadata.expiresAt)<=now;
   if(!review){
@@ -60,6 +72,8 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
 export function coverageAccessExclusion(item,database={},now=Date.now()){
   const effective=effectiveOwnershipRecord(item,database,now);
   if(['owned','claimed'].includes(effective.ownership))return null;
+  const unavailable={returned:'This book was returned or refunded and does not establish current ownership.',revoked:'Access to this book was revoked.',expired:'Access to this book has expired.'};
+  if(unavailable[effective.ownership])return {ownership:effective.ownership,reason:effective.ownership,explanation:unavailable[effective.ownership]};
   const review=database.ownershipReviews?.[item.recordRef];
   if(review?.expiresAt&&Date.parse(review.expiresAt)<=now)return {ownership:effective.ownership,reason:'expired',explanation:'The saved temporary access has expired.'};
   const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);

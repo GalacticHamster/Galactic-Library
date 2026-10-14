@@ -34,6 +34,11 @@ const fixtures=[
   ['fandango-at-home','fandango-at-home','GalacticFandangoAtHome','readFandangoGrid','/content/browse/mylibrary']
 ];
 try{
+  await import('../src/providers/kindle-ownership.js');await import('../src/providers/kindle.js');
+  for(const originType of ['Purchase','Comixology'])for(const [itemStatus,ownership]of [['Return complete','returned'],['Revoked','revoked'],['Expired','expired']]){
+    const item=globalThis.GalacticKindle.kindleItemFromOwnershipItem({asin:'B012345678',title:'Kindle access fixture',originType,itemStatus});assert(item.ownership===ownership&&item.metadata.itemStatus===itemStatus&&item.metadata.ownershipBasis,'Kindle negative access status lost');
+  }
+  checks.push('Kindle library item statuses preserve exact return/refund, revocation and expiry evidence before purchase-origin inference');
   for(const [provider,file,globalName,method,path] of fixtures){
     history.replaceState({},'',path);
     const mediaType=provider==='kindle'||provider==='kobo'||provider==='humble'?'book':provider==='audible'?'audiobook':provider==='amazon-video'||provider==='fandango-at-home'?'movie':'game';

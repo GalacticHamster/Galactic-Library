@@ -30,13 +30,14 @@ export const ownershipPolicyTests=[
     assert.equal(query(migrated).owned,false);
     assert.deepEqual(migrated.providerItems[item.id],{...item,profileId:migrated.providers[item.provider].activeProfileId});
   }],
-  ['global override covers every provider, media type and ownership state without mutating records',()=>{
+  ['global override covers every provider and uncertain access but respects explicit loss of access without mutating records',()=>{
     for(const provider of PROVIDERS)for(const ownership of OWNERSHIP_STATES){
       const item=record(provider,ownership);const before=structuredClone(item);
       const db=database([item],{allOwned:true,providers:{}});
       const effective=effectiveOwnershipRecord(item,db);
-      assert.equal(effective.ownership,'owned');assert.equal(effective.ownershipOverride.observedOwnership,item.ownership);
-      assert.equal(query(db).owned,true);assert.deepEqual(item,before);
+      const terminal=['returned','revoked','expired'].includes(ownership);
+      assert.equal(effective.ownership,terminal?ownership:'owned');if(!terminal)assert.equal(effective.ownershipOverride.observedOwnership,item.ownership);
+      assert.equal(query(db).owned,!terminal);assert.deepEqual(item,before);
     }
     for(const mediaType of ['game','software','audiobook','book','movie','tv','game-addon']){
       const item=record('humble','unknown',{mediaType});
