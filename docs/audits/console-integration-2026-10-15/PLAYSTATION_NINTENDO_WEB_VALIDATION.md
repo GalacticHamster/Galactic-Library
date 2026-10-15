@@ -93,6 +93,17 @@ one-page cookie-only test reuses an observed safe query, never copied headers or
 client credentials. Both changes help distinguish observed website access from
 an independently usable importer contract before any production implementation.
 
+The live 0.1.2 Nintendo summary still reports zero candidate requests. All three
+bootstrap blocks parse, but no recognized endpoint, root account field or
+card/application array is found, and no bound is reached. This does not establish
+that the blocks are empty: the aggregate omitted their types and shapes. Version
+**0.1.3** adds allowlisted structural shapes, nested endpoint discovery, hook
+replacement/call counters, and host/kind-only resource timing summaries. It does
+not acquire additional pages or change any production importer. Nintendo's public
+`account/js/common.js` confirms `data-json` parsing but is not authenticated
+evidence about this account's current card delivery mechanism. No actual source
+contract or Nintendo authorization blocker has yet been demonstrated.
+
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
 membership/access fields. Purchased-view naming alone must not mark all rows owned.
@@ -109,7 +120,7 @@ failure and move to the other provider. No legacy-console recovery is in scope.
 
 ## Validation
 
-Passed: **12 focused synthetic tests**, installed-helper checks for both providers
+Passed: **16 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation

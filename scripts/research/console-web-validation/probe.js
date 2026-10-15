@@ -5,7 +5,7 @@
   const provider=C.providerForLocation(location);if(!provider)return;
   const ledger=C.createLedger(provider),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true,psQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'};
+  let active=true,psQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
   async function inspect(response,info){
     if(!active||!info)return;
     try{
@@ -19,6 +19,7 @@
     }catch{if(active)ledger.observe(info,response.status,null);/* Never log private errors. */}
   }
   function wrappedFetch(...args){
+    fetchCalls++;
     const result=Reflect.apply(originalFetch,this,args);
     // Request headers, cookies and token fields are deliberately never inspected.
     const info=C.requestInfo(provider,args[0],args[1]);
@@ -30,6 +31,7 @@
     const result=Reflect.apply(originalOpen,this,[method,url,...rest]);xhrInfo.set(this,{method,url});return result;
   }
   function wrappedSend(body){
+    xhrCalls++;
     const input=xhrInfo.get(this),info=input?C.requestInfo(provider,input.url,{method:input.method,body}):null;
     if(info)this.addEventListener('loadend',()=>{
       if(!active)return;
@@ -44,7 +46,7 @@
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
       typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check'].includes(event.data.action))return;
     if(event.data.action==='stop')stop();
-    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck}:{bootstrap:C.bootstrapSummary(document)})}},location.origin);
+    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
     if(event.data.action==='check'&&active&&provider==='playstation'&&psQuery&&cookieCheck.state==='ready'){
       cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
     }

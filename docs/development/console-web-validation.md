@@ -21,10 +21,15 @@ providers remain gated on actual signed-in results. Xbox is outside this task.
 3. Repeat on [Nintendo Virtual Game Cards](https://accounts.nintendo.com/portal/vgcs/).
    Browse/scroll its card list before updating the summary. The current
    user-reported comparison target is **115 visible cards**, not automatically
-   115 products or permanent purchases. Helper 0.1.2 also checks initial page
+   115 products or permanent purchases. Helper 0.1.3 also checks initial page
    data: its `bootstrap` section reports declared Nintendo GraphQL endpoints,
    aggregate card-array counts, and account-identity field names without values.
    Reload the helper and the website when upgrading the helper.
+   The panel and exported `helperVersion` identify the loaded version. If the
+   recognized arrays remain empty, `observerState` distinguishes replaced hooks
+   from installed hooks; `resources` summarizes browser-observed Nintendo hosts
+   and request kinds without paths or queries. Bootstrap `structure` reports
+   only allowlisted field names, value types and key counts, never field values.
 4. Return only these aggregate summaries, browser name and whether the observed
    counts correspond to the displayed view. If no panel appears, or zero requests
    are observed, report that rather than copying a HAR or authenticated requests.
@@ -89,6 +94,11 @@ reports are diagnostic evidence, not authority to import or classify purchases.
   `meta` JSON blocks, 2 MiB per block and 2,000 visited nodes. Only arrays with
   card and application identifiers are counted; their values are never exported.
   Bootstrap arrays do not establish pagination or account-wide completeness.
+  Structural summaries are limited to 12 distinct object shapes per block;
+  arbitrary property names are omitted. Resource summaries inspect at most
+  1,000 timing entries and retain at most 30 Nintendo-host/request-kind groups.
+  Neither source makes a network request. An installed hook is not proof that
+  all requests pass through it; cached functions, frames and workers may differ.
 - Only string fetch bodies and ordinary XHR bodies are parsed. Unknown operations
   are counted without exporting their text. Non-JSON/oversized recognized responses
   are reported as malformed, without their error bodies.

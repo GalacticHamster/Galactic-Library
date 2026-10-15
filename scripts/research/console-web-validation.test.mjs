@@ -9,6 +9,11 @@ const psRequest=(start=0,size=2,more={})=>C.requestInfo('playstation','https://w
 const psBody=(offset,games,isLast)=>({data:{purchasedTitlesRetrieve:{games,pageInfo:{offset,size:games.length,isLast}}}});
 const nRequest=(offset=0)=>C.requestInfo('nintendo','https://api.ec.nintendo.com/public/graphql',{method:'POST',body:JSON.stringify({query:'query getVgcs($idToken: String!){account { vgc { vgcViewsV2(isHidden: false) { views { id } } } }}',variables:{offset,limit:300,idToken:'private-token',country:'US'}})});
 const nBody=(offset,views,total)=>({data:{account:{vgc:{vgcViews:{views,offsetInfo:{offset,total}}}}}});
+
+test('Helper version in aggregate reports agrees with the installable manifest',async()=>{
+  const manifest=JSON.parse(await readFile(new URL('manifest.json',dir),'utf8'));
+  assert.equal(C.sanitizeReport(C.createLedger('nintendo').report()).helperVersion,manifest.version);
+});
 test('Nintendo portal works with and without trailing slash; adjacent and login paths are excluded',()=>{
   for(const path of ['/portal/vgcs','/portal/vgcs/','/portal/vgcs/list'])assert.equal(C.providerForLocation({origin:'https://accounts.nintendo.com',pathname:path}),'nintendo');
   for(const path of ['/portal/vgcs-other','/login','/portal'])assert.equal(C.providerForLocation({origin:'https://accounts.nintendo.com',pathname:path}),null);
@@ -67,8 +72,20 @@ test('Fetch interception returns the original promise, never calls the network i
   await new Promise(resolve=>setTimeout(resolve,20));
   vm.runInContext(`globalThis.dispatchSummary=()=>{for(const fn of globalThis.testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});};`,context);
   context.testListeners=listeners;context.dispatchSummary();assert.equal(posts.at(-1)[0].report.scopes[0].rows,1);assert(!JSON.stringify(posts).includes('private'));
+  assert.equal(posts.at(-1)[0].report.observerState.fetchHookInstalled,true);assert.equal(posts.at(-1)[0].report.observerState.fetchCalls,1);
   vm.runInContext(`for(const fn of globalThis.testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'stop'}});`,context);
   assert.equal(context.fetch,original);assert.equal(calls,1);
+});
+
+test('Observer diagnostics distinguish replaced hooks from an empty library and Stop preserves the replacement',async()=>{
+  const listeners=[],posts=[],replacement=()=>Promise.resolve('replacement');
+  const context=vm.createContext({URL,TextDecoder,Uint8Array,document:{getElementById:()=>null},location:{origin:'https://accounts.nintendo.com',pathname:'/portal/vgcs'},fetch:()=>Promise.resolve('original'),addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
+  context.window=context;context.postMessage=value=>posts.push(value);context.testListeners=listeners;
+  vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);context.fetch=replacement;
+  vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
+  assert.equal(posts[0].report.active,true);assert.equal(posts[0].report.observerState.fetchHookInstalled,false);assert.equal(posts[0].report.observerState.fetchCalls,0);
+  vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'stop'}});`,context);
+  assert.equal(context.fetch,replacement);assert.equal(posts.at(-1).report.active,false);
 });
 
 test('XHR interception preserves calls and reports auth expiry without reading headers or forwarding identifiers',async()=>{
@@ -89,6 +106,10 @@ test('XHR interception preserves calls and reports auth expiry without reading h
     vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
     assert.equal(posts[0].report.failedRequests,1);assert.equal(posts[0].report.requestContracts[0].transport,'xhr');assert(!JSON.stringify(posts).includes('private-token'));
     vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:'https://untrusted.example',data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);assert.equal(posts.length,1);
+    assert.equal(posts[0].report.observerState.xhrOpenHookInstalled,true);assert.equal(posts[0].report.observerState.xhrSendHookInstalled,true);
+    context.XMLHttpRequest=class ReplacementXHR{open(){}send(){}};
+    vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
+    assert.equal(posts.at(-1).report.observerState.xhrOpenHookInstalled,false);assert.equal(posts.at(-1).report.observerState.xhrSendHookInstalled,false);
   }finally{XHR.prototype.open=oldOpen;XHR.prototype.send=oldSend;}
 });
 
@@ -98,6 +119,25 @@ test('Nintendo declared endpoint and bootstrap card arrays are inspected without
   const bootstrap=plain(C.bootstrapSummary(document));assert.deepEqual(bootstrap.declaredGraphqlEndpoints,['https://api.ecsv.nintendo.com/graphql']);assert.equal(bootstrap.cardArrays[0].rows,115);assert.deepEqual(bootstrap.accountIdentityFieldPaths,['state.user.id']);
   const r=C.sanitizeReport({format:1,provider:'nintendo',bootstrap});assert(!JSON.stringify(r).includes('private'));assert(!JSON.stringify(r).includes('Private title'));
   const info=C.requestInfo('nintendo','https://api.ecsv.nintendo.com/graphql',{method:'POST',body:JSON.stringify({query:'query getVgcs { account { vgc { views { id } } } }',variables:{offset:0}})});assert(info);assert.equal(C.requestInfo('nintendo','https://api.ecsv.nintendo.com.evil.example/graphql',{method:'POST',body:'{}'}),null);
+});
+
+test('Nintendo structural diagnostics expose types/counts and nested endpoints, never bootstrap values or arbitrary keys',()=>{
+  const blocks={data:{props:{shopGraphQLApiUrl:'https://api.ecsv.nintendo.com/graphql',idToken:'private-token'},'private-account-key':{user:{id:'private-account'}}},state:'private-encoded-state',meta:{items:[{applicationName:'Private title'}]}};
+  const document={getElementById:name=>({getAttribute:()=>JSON.stringify(blocks[name])})};
+  const bootstrap=C.bootstrapSummary(document),r=plain(C.sanitizeReport({format:1,provider:'nintendo',bootstrap}));
+  assert.deepEqual(r.bootstrap.declaredGraphqlEndpoints,['https://api.ecsv.nintendo.com/graphql']);
+  assert.equal(r.bootstrap.blocks[0].keyCount,2);assert.equal(r.bootstrap.blocks[1].type,'string');
+  assert(r.bootstrap.structure.some(row=>row.fields.idToken==='string'));assert(!JSON.stringify(r).includes('private'));assert(!JSON.stringify(r).includes('Private title'));
+  const hostile=C.sanitizeReport({format:1,provider:'nintendo',bootstrap:{blocks:[{block:'data',type:'private',keyCount:1,fields:{'private-account':'string',id:'private'}}],structure:[{block:'state',type:'object',fields:{idToken:'private',views:'array'}}]}});
+  assert(!JSON.stringify(hostile).includes('private'));assert.equal(hostile.bootstrap.structure[0].fields.views,'array');
+});
+
+test('Resource diagnostics report Nintendo hosts and request kinds without private paths, queries or credentials',()=>{
+  const resources=C.resourceSummary({getEntriesByType:()=>[{name:'https://api.ecsv.nintendo.com/graphql?token=private',initiatorType:'xmlhttprequest'},{name:'https://accounts.nintendo.com/private-account/private-card',initiatorType:'fetch'},{name:'https://untrusted.example/private',initiatorType:'fetch'}]});
+  const result=plain(C.sanitizeReport({format:1,provider:'nintendo',resources,observerState:{fetchHookInstalled:false,xhrOpenHookInstalled:true,xhrSendHookInstalled:true,fetchCalls:0,xhrCalls:4,private:'secret'}}));
+  assert.equal(result.resources.groups.length,2);assert.equal(result.resources.groups[0].graphqlPaths,1);assert.equal(result.observerState.fetchHookInstalled,false);assert.equal(result.observerState.xhrCalls,4);assert(!JSON.stringify(result).includes('private'));assert(!JSON.stringify(result).includes('untrusted'));
+  assert.equal(C.resourceSummary({getEntriesByType:()=>Array.from({length:1001},()=>({name:'https://accounts.nintendo.com/',initiatorType:'fetch'}))}).boundReached,true);
+  const hostile=C.sanitizeReport({format:1,provider:'nintendo',resources:{groups:[{host:'private.nintendo.com/untrusted',kind:'fetch',count:1,graphqlPaths:0},{host:'api.ec.nintendo.com',kind:'private',count:1,graphqlPaths:0}]}});assert.equal(hostile.resources.groups.length,0);
 });
 
 test('PlayStation cookie-only check uses an observed safe query, one page, no copied authorization headers or fallback',async()=>{

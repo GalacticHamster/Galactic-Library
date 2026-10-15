@@ -69,6 +69,7 @@ try{
       if(report?.scopes[0]?.rows===3)break;await pause(100);
     }
     assert.equal(report.scopes[0].rows,3);assert.equal(report.scopes[0].distinctRowIds,3);assert.equal(report.scopes[0].observedScopeTraversal,'terminal-range-observed');assert(!JSON.stringify(report).includes('private'));
+    assert.equal(report.observerState.fetchHookInstalled,true);assert.equal(report.observerState.fetchCalls,2);
     if(route==='/nintendo'){
       assert.equal(report.bootstrap.cardArrays[0].rows,115);assert.equal(report.bootstrap.cardArrays[0].distinctRowIds,115);
       assert.deepEqual(report.bootstrap.accountIdentityFieldPaths,['state.user.id']);
