@@ -1,5 +1,7 @@
 # Xbox ownership: consumer web-source follow-up
 
+**Updated direction:** The user's signed-in test showed 37 visible Owned games from a `CLOUDGAMING` request despite hundreds of purchases. The [beyond-cloud investigation](XBOX_OWNERSHIP_BEYOND_CLOUD.md) supersedes the CAS-first recommendation below, prioritizing consumer Collections authorization and legacy/order-history coverage. The unobserved raw response must not be equated with those 37 cards.
+
 Research date: **2026-10-15**. GL baseline `0eb8b6d`. This supersedes the Xbox **Defer** recommendation in the [initial audit](XBOX_INTEGRATION_AUDIT.md). Research only: no production provider, permissions, saved accounts or libraries changed. No signed-in Microsoft account was accessed. No third-party application code was executed.
 
 ## Decision: CONDITIONAL GO for a useful partial importer
