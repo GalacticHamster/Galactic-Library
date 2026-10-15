@@ -8,7 +8,7 @@ Xbox research/harness files are preserved without further investigation.
 
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
-| PlayStation — PS4/PS5 web library | Live helper observed 60 rows / 59 product IDs across 3 terminal pages; 58 PS4 and 2 PS5 rows, all active with membership NONE | Actual website fetch and extension observation demonstrated. Independent cookie-only replay, account binding and product/title relationships remain to check. **No production importer yet.** |
+| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Live independent 0.1.6 GET succeeds with 24 purchase rows and HTTP 200 | Browser-managed session access demonstrated after fixing JSON Content-Type. Account binding and product/title relationships remain to check. **No production importer yet.** |
 | Nintendo — Switch Virtual Game Cards | Live 0.1.5 helper reconciles 115 rows / 115 card IDs / 115 software IDs, one terminal page; all four queries HTTP 200 | Authenticated website source and extension observation demonstrated. Account isolation, access semantics and independent acquisition remain to validate. **No production importer yet.** |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
@@ -178,6 +178,46 @@ An independent importer request and its account/save-time guards remain separate
 from observing a successful website-owned request. The PlayStation one-page
 cookie-only test has been requested while these production gates remain open.
 
+## PlayStation independent-request rejection: confirmed test-format defect
+
+The user's 0.1.5 export reports successful website GETs at offsets 0 and 48 (size
+24), including repeated offset-zero requests. The observed pages contain 36 rows
+and 35 distinct product IDs, all active with membership NONE. Offset 24 is absent,
+so traversal is correctly `not-established`. This partial capture does not revise
+the earlier 60-row/59-product result or imply that saved games disappeared.
+
+The separate one-page test returned HTTP 400, not a recognized purchase page.
+The user then supplied only its error message: it explicitly identifies potential
+Cross-Site Request Forgery and requires an appropriate content type or Apollo
+preflight/operation header. Therefore the test failed the server's request-format
+check; it did not establish an authentication blocker. Versions through 0.1.5
+sent only Accept. The response is a bare error array, not an `errors` envelope.
+
+Version **0.1.6** sends fixed Accept and Content-Type values of application/json,
+following the error's stated requirement and [Apollo's GET CSRF documentation](https://www.apollographql.com/docs/apollo-server/security/cors#preventing-cross-site-request-forgery-csrf).
+It does not copy authorization headers, Sony client identity, cookies, NPSSO or
+tokens. It still requests only one observed safe persisted-query page, without
+retry or alternate authentication. Bounded error inspection exports only
+allowlisted error categories/codes and request-format metadata; raw server text
+stays out of diagnostics.
+
+The user's live 0.1.6 result now confirms independent success: HTTP 200,
+recognized-purchase-page, 24 rows, pagesRequested 1, requestFormat
+json-content-type, extraAuthorizationHeaders false. The test uses the observed
+safe query and browser-managed session. This establishes the narrow independent
+purchase-page access gate without copied credentials or a Sony client identity.
+It does not establish full pagination or account isolation: the accompanying
+website observation contains only offset zero, 24 rows / 23 product IDs, and is
+correctly incomplete. The earlier complete 60-row observation remains separate.
+
+The same export has false fetch/open hook-identity flags but a true send flag and
+30 fetch / 8 XHR callback counts. Those flags do not establish why offset 24 was
+missed: replacing a function can delegate through the previous observer. A
+regression control demonstrates that exact false-identity/working-observation
+case. No hook reinstallation, timers or website lifecycle changes are justified
+from this export. The missing page remains an explicit completeness gap, with
+zero ownership or import implications.
+
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
 membership/access fields. Purchased-view naming alone must not mark all rows owned.
@@ -194,7 +234,7 @@ failure and move to the other provider. No legacy-console recovery is in scope.
 
 ## Validation
 
-Passed: **19 focused synthetic tests**, installed-helper checks for both providers
+Passed: **22 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation

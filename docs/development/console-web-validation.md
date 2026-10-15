@@ -17,11 +17,16 @@ providers remain gated on actual signed-in results. Xbox is outside this task.
    signed in normally. Use its Purchased view, browse/scroll through the games,
    then click **Update summary** in the helper panel. Once available, click
    **Test one read-only request** to check one purchase page using the browser's
-   existing session, without copying authorization headers. Click **Copy summary**.
+   existing session, without copying authorization headers. The test sends fixed
+   JSON Accept/Content-Type headers to satisfy the demonstrated CSRF requirement;
+   it does not copy a Sony client identity or authentication header. Click
+   **Copy summary**. To check full observed pagination, visit every Purchased
+   page rather than only the first and last pages; the one-page test does not
+   fill gaps in the observation ledger.
 3. Repeat on [Nintendo Virtual Game Cards](https://accounts.nintendo.com/portal/vgcs/).
    Browse/scroll its card list before updating the summary. The current
    user-reported comparison target is **115 visible cards**, not automatically
-   115 products or permanent purchases. Helper 0.1.5 also checks initial page
+   115 products or permanent purchases. Helper 0.1.6 also checks initial page
    data: its `bootstrap` section reports declared Nintendo GraphQL endpoints,
    aggregate card-array counts, and account-identity field names without values.
    Reload the helper and the website when upgrading the helper.
@@ -54,6 +59,15 @@ ignores mutation documents, authorization headers and
 cookies. Nintendo credential-variable **presence** is reported; its value is
 never retained or exported. Body parsing is transient and only allowlisted
 nonsecret request metadata is retained.
+
+The test's fixed `Content-Type: application/json` follows the server's observed
+CSRF rejection and [Apollo's documented GET requirements](https://www.apollographql.com/docs/apollo-server/security/cors#preventing-cross-site-request-forgery-csrf).
+The browser may issue its normal CORS preflight; there is still only one requested
+GraphQL purchase page, with no retry. The export includes `requestFormat` and,
+on failure, an allowlisted `errorCategory` / `errorCodes`. Error bodies/messages,
+identifiers and credentials are never copied into the summary. Error inspection
+uses the same 2 MiB response bound and accepts both GraphQL error envelopes and
+bare error arrays.
 
 Current candidate contracts:
 
@@ -109,6 +123,9 @@ reports are diagnostic evidence, not authority to import or classify purchases.
   1,000 timing entries and retain at most 30 Nintendo-host/request-kind groups.
   Neither source makes a network request. An installed hook is not proof that
   all requests pass through it; cached functions, frames and workers may differ.
+  Conversely, a false hook-identity flag does not prove observation stopped:
+  a website wrapper can still delegate through the observer. Missing pages remain
+  incomplete regardless of the hook flags; the helper never fights/reinstalls hooks.
 - Only string fetch bodies and ordinary XHR bodies are parsed. Unknown operations
   are counted without exporting their text. Non-JSON/oversized recognized responses
   are reported as malformed, without their error bodies.

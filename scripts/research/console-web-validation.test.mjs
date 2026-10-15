@@ -199,9 +199,41 @@ test('Resource diagnostics report Nintendo hosts and request kinds without priva
 test('PlayStation cookie-only check uses an observed safe query, one page, no copied authorization headers or fallback',async()=>{
   const url=new URL('https://web.np.playstation.com/api/graphql/v1/op');url.search=new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:48,size:24,isActive:true,platform:['ps4','ps5']}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})});
   const safe=C.psCookieQuery(url.href);assert.equal(JSON.parse(new URL(safe).searchParams.get('variables')).start,0);
-  let calls=0;const r=await C.checkPsCookieAccess(safe,async(input,options)=>{calls++;assert.equal(options.credentials,'include');assert.equal(options.redirect,'error');assert.deepEqual(plain(options.headers),{Accept:'application/json'});return new Response(JSON.stringify(psBody(0,[{productId:'private-product',name:'Private title'}],false)),{status:200});});
+  let calls=0;const r=await C.checkPsCookieAccess(safe,async(input,options)=>{calls++;assert.equal(options.credentials,'include');assert.equal(options.redirect,'error');assert.deepEqual(plain(options.headers),{Accept:'application/json','Content-Type':'application/json'});return new Response(JSON.stringify(psBody(0,[{productId:'private-product',name:'Private title'}],false)),{status:200});});
   assert.equal(calls,1);assert.equal(r.recognizedPurchasedPage,true);assert.equal(r.rows,1);assert(!JSON.stringify(r).includes('private'));
   const denied=await C.checkPsCookieAccess(safe,async()=>new Response('private',{status:401}));assert.equal(denied.reason,'request-rejected');assert.equal(denied.httpStatus,401);
   const bad=new URL(url);const vars=JSON.parse(bad.searchParams.get('variables'));vars.token='private';bad.searchParams.set('variables',JSON.stringify(vars));assert.equal(C.psCookieQuery(bad.href),null);
   assert.equal((await C.checkPsCookieAccess('https://untrusted.example',()=>{throw Error('Must not request');})).state,'unavailable');
+});
+
+test('PlayStation test satisfies the demonstrated CSRF header requirement and exports only allowlisted error categories',async()=>{
+  const url=new URL('https://web.np.playstation.com/api/graphql/v1/op');url.search=new URLSearchParams({operationName:'getPurchasedGameList',variables:'{"start":0,"size":24}',extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})});
+  const csrf=[{message:'This operation has been blocked as a potential Cross-Site Request Forgery (CSRF). private-account',extensions:{}}];
+  let calls=0;
+  const server=async(input,options)=>{calls++;return options.headers['Content-Type']==='application/json'?new Response(JSON.stringify(psBody(0,[],true)),{status:200}):new Response(JSON.stringify(csrf),{status:400});};
+  assert.equal((await server(url.href,{headers:{Accept:'application/json'}})).status,400);calls=0;
+  const success=await C.checkPsCookieAccess(url.href,server);assert.equal(success.recognizedPurchasedPage,true);assert.equal(success.requestFormat,'json-content-type');assert.equal(calls,1);
+  const rejected=await C.checkPsCookieAccess(url.href,async()=>new Response(JSON.stringify(csrf),{status:400}));assert.equal(rejected.httpStatus,400);assert.equal(rejected.errorCategory,'csrf-request-headers');assert.equal(rejected.reason,'request-rejected');
+  const auth=await C.checkPsCookieAccess(url.href,async()=>new Response(JSON.stringify({errors:[{message:'private-auth',extensions:{code:'UNAUTHENTICATED',private:'private'}}]}),{status:401}));assert.equal(auth.errorCategory,'authentication');assert.deepEqual(plain(auth.errorCodes),['UNAUTHENTICATED']);
+  const persisted=await C.checkPsCookieAccess(url.href,async()=>new Response(JSON.stringify({errors:[{message:'private-persisted',extensions:{code:'PERSISTED_QUERY_NOT_FOUND'}}]}),{status:200}));assert.equal(persisted.errorCategory,'persisted-query');assert.equal(persisted.recognizedPurchasedPage,false);
+  const unknown=await C.checkPsCookieAccess(url.href,async()=>new Response(JSON.stringify({errors:[{message:'private-message',extensions:{code:'PRIVATE_CODE'}}]}),{status:400}));assert.equal(unknown.errorCategory,'unclassified');assert.equal(unknown.errorCodes,undefined);
+  const report=C.sanitizeReport({format:1,provider:'playstation',readOnlyCookieCheck:{...rejected,errorCodes:['BAD_REQUEST','private'],message:'private-message'}});assert.equal(report.readOnlyCookieCheck.errorCategory,'csrf-request-headers');assert.deepEqual(plain(report.readOnlyCookieCheck.errorCodes),['BAD_REQUEST']);
+  for(const value of [rejected,auth,persisted,unknown,report])assert(!JSON.stringify(value).includes('private'));
+});
+
+test('PlayStation partial capture with offsets 0 and 48 cannot establish traversal of the missing middle page',()=>{
+  const ledger=C.createLedger('playstation');
+  const rows=(offset,count)=>Array.from({length:count},(_,i)=>({titleId:'private-title-'+(offset+i),productId:'private-product-'+(offset+i),name:'Private title'}));
+  ledger.observe(psRequest(0,24),200,psBody(0,rows(0,24),false));ledger.observe(psRequest(48,24),200,psBody(48,rows(48,12),true));
+  const report=plain(C.sanitizeReport(ledger.report()));assert.equal(report.scopes[0].rows,36);assert.equal(report.scopes[0].observedScopeTraversal,'not-established');assert(!JSON.stringify(report).includes('private'));
+});
+
+test('A delegating page fetch wrapper reports a replaced hook without proving observation was lost',async()=>{
+  const listeners=[],posts=[];const context=vm.createContext({URL,TextDecoder,Uint8Array,location:{origin:'https://library.playstation.com',pathname:'/'},fetch:()=>Promise.resolve(new Response(JSON.stringify(psBody(0,[{productId:'private-product'}],true)))),addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
+  context.window=context;context.postMessage=value=>posts.push(value);context.testListeners=listeners;
+  vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
+  const observed=context.fetch;context.fetch=(...args)=>observed(...args);
+  await context.fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:'{"start":0,"size":1}'}));await new Promise(resolve=>setTimeout(resolve,20));
+  vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
+  assert.equal(posts[0].report.observerState.fetchHookInstalled,false);assert.equal(posts[0].report.observerState.fetchCalls,1);assert.equal(posts[0].report.scopes[0].rows,1);
 });

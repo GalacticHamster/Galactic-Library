@@ -10,6 +10,17 @@
   const operations={playstation:{getPurchasedGameList:'library'},nintendo:{getVgcs:'library',getVgcsVgcs:'library',getVgcTotalsVgcs:'auxiliary',getDevicesVgcs:'auxiliary',getAllDevicesVgcs:'auxiliary'}};
   const operationKind=(provider,name)=>typeof name==='string'&&Object.hasOwn(operations[provider]??{},name)?operations[provider][name]:null;
   const responsePaths=['data','data.account','data.account.vgc','data.account.vgc.vgcViews','data.account.vgc.vgcViewsV2'];
+  const psErrorCategories=['csrf-request-headers','authentication','persisted-query','request-format','unclassified'];
+  const psErrorCodes=['BAD_REQUEST','UNAUTHENTICATED','FORBIDDEN','GRAPHQL_VALIDATION_FAILED','PERSISTED_QUERY_NOT_FOUND','PERSISTED_QUERY_NOT_SUPPORTED'];
+  function psErrorSummary(body,status){
+    const errors=(Array.isArray(body)?body:Array.isArray(body?.errors)?body.errors:[]).slice(0,20);
+    const errorCodes=[...new Set(errors.map(error=>error?.extensions?.code).filter(code=>psErrorCodes.includes(code)))];
+    const errorCategory=errors.some(error=>typeof error?.message==='string'&&/blocked as a potential Cross-Site Request Forgery \(CSRF\)/i.test(error.message))?'csrf-request-headers'
+      :[401,403].includes(status)||errorCodes.some(code=>['UNAUTHENTICATED','FORBIDDEN'].includes(code))?'authentication'
+      :errorCodes.some(code=>code.startsWith('PERSISTED_QUERY_'))?'persisted-query'
+      :errorCodes.some(code=>['BAD_REQUEST','GRAPHQL_VALIDATION_FAILED'].includes(code))?'request-format':'unclassified';
+    return {errorCategory,...(errorCodes.length?{errorCodes}:{})};
+  }
   const bootstrapFields=[...knownFields,'data','state','meta','user','account','vgc','vgcs','vgcViews','vgcViewsV2','views','cards','items','results','list','nodes','edges','node','initial','initialState','props','pageProps','countryId','country','lang','language','countries','shopGraphQLApiUrl','shopGraphqlApiUrl','savannaClientId','idToken','accountId','naId','offsetInfo','total','offset','limit','count'];
   const valueType=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
   const shape=value=>({type:valueType(value),...(value&&typeof value==='object'?{keyCount:Object.keys(value).length,fields:Object.fromEntries(Object.keys(value).filter(key=>bootstrapFields.includes(key)).map(key=>[key,valueType(value[key])]))}:{})});
@@ -69,14 +80,18 @@
   async function checkPsCookieAccess(url,fetchImpl=fetch){
     const safe=psCookieQuery(url);if(!safe)return {state:'unavailable',reason:'no-observed-safe-query'};
     try{
-      const response=await fetchImpl(safe,{credentials:'include',redirect:'error',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
-      const result={state:'complete',httpStatus:response.status,pagesRequested:1,extraAuthorizationHeaders:false};
-      if(response.status!==200)return {...result,reason:'request-rejected',recognizedPurchasedPage:false};
-      const reader=response.body?.getReader();if(!reader)return {...result,reason:'unrecognized-response',recognizedPurchasedPage:false};
+      // JSON content type satisfies Apollo's CSRF/preflight requirement for GET.
+      // These fixed protocol headers contain no Sony client/authentication data.
+      const response=await fetchImpl(safe,{credentials:'include',redirect:'error',headers:{Accept:'application/json','Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});
+      const result={state:'complete',httpStatus:response.status,pagesRequested:1,extraAuthorizationHeaders:false,requestFormat:'json-content-type'};
+      const rejected=response.status!==200,failure={...result,reason:rejected?'request-rejected':'unrecognized-response',recognizedPurchasedPage:false};
+      const reader=response.body?.getReader();if(!reader)return {...failure,...(rejected?psErrorSummary(null,response.status):{})};
       const chunks=[];let size=0;try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2097152){void reader.cancel();return {...result,reason:'response-bound',recognizedPurchasedPage:false};}chunks.push(value);}}finally{reader.releaseLock();}
       const bytes=new Uint8Array(size);let start=0;for(const chunk of chunks){bytes.set(chunk,start);start+=chunk.length;}
-      const body=JSON.parse(new TextDecoder().decode(bytes)),list=body?.data?.purchasedTitlesRetrieve;
-      if(body?.errors?.length||!Array.isArray(list?.games)||list.games.length>1000||typeof list.pageInfo?.isLast!=='boolean')return {...result,reason:'unrecognized-response',recognizedPurchasedPage:false};
+      let body;try{body=JSON.parse(new TextDecoder().decode(bytes));}catch{return {...failure,...(rejected?psErrorSummary(null,response.status):{})};}
+      if(rejected)return {...failure,...psErrorSummary(body,response.status)};
+      const list=body?.data?.purchasedTitlesRetrieve;
+      if(body?.errors?.length||!Array.isArray(list?.games)||list.games.length>1000||typeof list.pageInfo?.isLast!=='boolean')return {...failure,...psErrorSummary(body,response.status)};
       return {...result,recognizedPurchasedPage:true,rows:list.games.length,reason:'recognized-purchase-page'};
     }catch{return {state:'complete',reason:'transport-or-response-failure',recognizedPurchasedPage:false,pagesRequested:1,extraAuthorizationHeaders:false};}
   }
@@ -182,7 +197,7 @@
         scope.pages.push(page);for(const value of page.identifiers)scope.ids.add(value);for(const value of page.software)scope.software.add(value);
         for(const key of ['fields','platforms','flags','relations'])for(const [name,count]of Object.entries(page[key]))scope[key][name]=(scope[key][name]??0)+count;
       }
-      return {format:1,helperVersion:'0.1.5',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
+      return {format:1,helperVersion:'0.1.6',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
         requestContracts:observations,scopes:[...scopes].map(([scope,s])=>{
           const pages=s.pages.sort((a,b)=>a.offset-b.offset);let end=0,contiguous=true;
           for(const p of pages){if(p.offset!==end)contiguous=false;end=p.offset+p.count;}
@@ -207,7 +222,7 @@
     const safeShape=row=>({type:['object','array','string','number','boolean','null','undefined'].includes(row.type)?row.type:'unknown',...(integer(row.keyCount)?{keyCount:row.keyCount}:{}),fields:Object.fromEntries(Object.entries(row.fields??{}).filter(([key,type])=>bootstrapFields.includes(key)&&['object','array','string','number','boolean','null','undefined'].includes(type)))});
     const result={format:1,provider:input.provider,readOnly:true,...numbers(input),boundReached:input.boundReached===true,
       active:input.active===true,accountIsolationValidated:false,ownershipSemanticsValidated:false,accountLibraryComplete:false};
-    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
+    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5','0.1.6'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
     result.requestContracts=(Array.isArray(input.requestContracts)?input.requestContracts:[]).slice(0,20).flatMap(r=>{
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}
@@ -217,7 +232,7 @@
     });
     result.scopes=(Array.isArray(input.scopes)?input.scopes:[]).slice(0,64).map(s=>({...numbers(s),scope:safeVariables(s.scope),reportedTotals:(Array.isArray(s.reportedTotals)?s.reportedTotals:[]).filter(integer).slice(0,64),observedScopeTraversal:s.observedScopeTraversal==='terminal-range-observed'?'terminal-range-observed':'not-established',presentFields:counts(s.presentFields,key=>knownFields.includes(key)),platforms:counts(s.platforms,key=>platform(key)===key),flags:counts(s.flags,flags),ownerUserRelations:counts(s.ownerUserRelations,key=>['sameOwnerAndUser','differentOwnerAndUser','ownerOrUserAbsent'].includes(key))}));
     if(input.observerState){const r=input.observerState;result.observerState={fetchHookInstalled:r.fetchHookInstalled===true,xhrOpenHookInstalled:r.xhrOpenHookInstalled===true,xhrSendHookInstalled:r.xhrSendHookInstalled===true,fetchCalls:integer(r.fetchCalls)?r.fetchCalls:0,xhrCalls:integer(r.xhrCalls)?r.xhrCalls:0};}
-    if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{})};}
+    if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
     if(input.bootstrap&&input.provider==='nintendo'){
       const b=input.bootstrap;result.bootstrap={blocks:(Array.isArray(b.blocks)?b.blocks:[]).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,parsed:row.parsed===true,...safeShape(row)})),boundReached:b.boundReached===true,
         structure:(Array.isArray(b.structure)?b.structure:[]).slice(0,40).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,...safeShape(row)})),

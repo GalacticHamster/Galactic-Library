@@ -29,11 +29,12 @@ files.set('fixture.js',Buffer.from(`
   window.fixtureNetworkCalls=0;window.fetch=(input,options)=>{
     window.fixtureNetworkCalls++;
     const ps=location.pathname==='/ps',u=new URL(input),v=ps?JSON.parse(u.searchParams.get('variables')):JSON.parse(options.body).variables,offset=v.start??v.offset;
+    if(ps&&options?.headers?.['Content-Type']!=='application/json')return Promise.resolve(new Response(JSON.stringify([{message:'This operation has been blocked as a potential Cross-Site Request Forgery (CSRF).',extensions:{}}]),{status:400}));
     const rows=offset===0?[{id:'private-one',productId:'private-p1',applicationId:'private-s1',name:'Private title',isLending:false},{id:'private-two',productId:'private-p2',applicationId:'private-s2'}]:[{id:'private-three',productId:'private-p3',applicationId:'private-s3'}];
     const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViewsV2:{views:rows,offsetInfo:{offset,total:3}}}}}};
     return Promise.resolve(new Response(JSON.stringify(body),{status:200}));
   };
-  window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})})):
+  window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})}),{headers:{'Content-Type':'application/json'}}):
     fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName:'getVgcsVgcs',query:'query getVgcsVgcs { account { vgc { vgcViewsV2 { views { id } } } } }',variables:{offset,limit:2,idToken:'private-token'}})});
   if(location.pathname!=='/ps')window.fixtureAux=async()=>{for(const operationName of ['getVgcTotalsVgcs','getDevicesVgcs','getAllDevicesVgcs'])await fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName,variables:{}})});};
 `));
@@ -80,6 +81,7 @@ try{
     if(route==='/ps'){
       const check=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check]").disabled};');
       assert.equal(check.report.readOnlyCookieCheck.recognizedPurchasedPage,true);assert.equal(check.calls,3);assert.equal(check.disabled,true);
+      assert.equal(check.report.readOnlyCookieCheck.requestFormat,'json-content-type');
     }
     const stopped=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=stop]").click();await new Promise(r=>setTimeout(r,20));return {report:JSON.parse(s.querySelector("textarea").value),text:s.querySelector("[role=status]").textContent,visible:document.querySelector("#gl-console-validation").getBoundingClientRect().width>0};');
     assert.equal(stopped.report.active,false);assert(stopped.visible);assert.match(stopped.text,/stopped/);
