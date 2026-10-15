@@ -70,7 +70,7 @@ In **Settings → Ownership display and matching**, enable **Treat everything as
 
 The global choice takes precedence. Provider checkboxes are disabled while it is on, but their saved choices remain intact and resume when it is turned off. All choices start off.
 
-This is a display and matching preference. It does not change stored provider observations, ownership confirmations, media type, purchase provenance, access dates, reading/download states or receipts. **Details → Advanced → Matching, editions and source evidence** shows the original ownership and identifies the display override. Switching the setting off restores the normal ownership rules, including dated confirmations and key/access expiry checks.
+This is a display and matching preference. It does not change stored provider observations, ownership confirmations, media type, purchase provenance, access dates, reading/download states or receipts. **Details → Advanced → Account sources and technical evidence** shows the original ownership and identifies the display override. Switching the setting off restores the normal ownership rules, including dated confirmations and key/access expiry checks.
 
 Owned filters, provider labels, reading ownership, matching and owned reviewed contents use the preference. Original access and key reminders retain their source evidence. It does not create records for other account archives or missing purchases, invent collection contents, establish platform activation, or bypass title, edition, identifier, author or scope matching. A related edition can still be Possible.
 

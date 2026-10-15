@@ -9,9 +9,16 @@ async function wait(predicate,message){for(let n=0;n<100;n++){if(predicate())ret
 const button=(root,label)=>[...root.querySelectorAll('button')].find(b=>b.textContent===label);
 const navigate=name=>document.querySelector(`#workspace-navigation [data-workspace="${name}"]`).click();
 const account=id=>document.querySelector(`[data-account="${id}"]`);
-const storageListeners=[],runtimeListeners=[],operations=[],opened=[],state={};
+const storageListeners=[],runtimeListeners=[],operations=[],opened=[],state={},syncCalls=[];let connected=null,confirmSync=false;globalThis.confirm=()=>confirmSync;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...state}),set:async changes=>Object.assign(state,structuredClone(changes)),remove:async keys=>{for(const k of keys)delete state[k];}});
 globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{addListener:fn=>runtimeListeners.push(fn)},sendMessage:async request=>{
+ if(request.type==='GH_PURCHASE_ACTION'){
+  syncCalls.push(request);const accounts=[{stableId:'personal',label:'Personal',count:2},{stableId:'family',label:'Family',count:3}];
+  if(request.action==='syncState')return {ok:true,state:connected,accounts};
+  if(request.action==='syncChoices')return {ok:true,state:connected,accounts,remoteAccounts:accounts,peerId:'verified-fixture'};
+  if(request.action==='syncConnect'){assert(request.confirmed&&request.sameAccount,'Sync consent missing');connected={confirmed:true,remoteConfirmed:true,status:'synced',lastSuccess:new Date().toISOString()};return {ok:true};}
+  if(request.action==='pending')return {ok:true,offer:null};return {ok:false,error:'Manual transfers disabled in fixture'};
+ }
  if(request.type==='GET_KINDLE_CONTENTS_SCAN_PROGRESS')return {ok:true,runs:[]};
  if(request.type==='GL_CONTENTS_UI_TIMING')return {ok:true};
  if(request.type!=='LIBRARY_STORAGE_OPERATION')throw Error('Unexpected acquisition/network request: '+request.type);
@@ -22,11 +29,22 @@ async function reconcile(){for(const fn of storageListeners)fn({[DATABASE_STORAG
 function closeDialog(){const d=document.querySelector('dialog');if(d)button(d,'Cancel').click();}
 const book={providerItemId:'B000000001',title:'Synthetic Collection',mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B000000001'}};
 try{
+ await import('../shared/purchase-handoff-ui.js');await import('../shared/purchase-sync-ui.js');
  await import('../src/ui/options.js');
  await wait(()=>!document.querySelector('#empty-library').hidden,'Empty Library onboarding did not load.');
- assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Contents|Settings','Wrong main navigation.');
+ assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Books & Contents|Settings','Wrong main navigation.');
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
  assert(document.querySelectorAll('.provider-card').length===11,'Supported provider choices missing.');
+ const syncHost=document.querySelector('#purchase-sharing-humble [data-purchase-handoff]'),manual=syncHost.querySelector('[data-purchase-manual]');
+ assert(document.querySelector('.provider-card[data-provider="humble"]').contains(syncHost)&&document.querySelectorAll('#purchase-sharing-humble').length===1,'Connection is separate or duplicated');
+ assert(!document.querySelector('#settings-workspace #official-companion-status')&&document.querySelector('#providers-workspace #official-companion-status'),'Connection checks still scattered across Settings');
+
+
+ const humbleCard=document.querySelector('.provider-card[data-provider="humble"]');humbleCard.open=true;await wait(()=>!syncHost.querySelector('[data-sync-connect]').disabled,'Connection state did not load');syncHost.querySelector('[data-sync-connect]').click();await wait(()=>syncHost.querySelector('[data-sync-advanced]').open,'Multiple accounts were not exposed');
+ assert(!syncCalls.some(r=>r.action==='syncConnect')&&syncHost.querySelector('[data-sync-connect]').disabled,'Ambiguous accounts were automatically connected');
+ for(const selector of ['[data-sync-local]','[data-sync-remote]']){const field=syncHost.querySelector(selector);field.value='personal';field.dispatchEvent(new Event('change'));}
+ syncHost.querySelector('[data-sync-connect]').click();await delay();assert(!syncCalls.some(r=>r.action==='syncConnect'),'Cancelled connection still sent consent');confirmSync=true;syncHost.querySelector('[data-sync-connect]').click();await wait(()=>syncHost.querySelector('[data-sync-status]').textContent==='Synced','Confirmed connection status missing');assert(syncCalls.filter(r=>r.action==='syncConnect').length===1,'Setup sent duplicate authorization');
+ checks.push('Colocated sync UI requires exact account selections and confirmation before sending existing setup requests');
  assert(!operations.includes('beginProviderScan')&&opened.length===0,'Onboarding started an import.');checks.push('Empty Library routes to all 11 providers without acquisition');
 
  let d=await writer.replaceProviderItems('kindle',[book],{profileLabel:'',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[book]));const a=d.providers.kindle.activeProfileId,ref=Object.values(d.providerItems)[0].recordRef;
@@ -34,7 +52,7 @@ try{
  await reconcile();await wait(()=>account(a),'Migrated account missing.');const kindle=document.querySelector('[data-provider="kindle"]');kindle.open=true;await delay();
  assert(!document.querySelector('#unnamed-accounts-help').hidden,'Naming guidance missing.');assert(button(account(a),'Quick Update').disabled,'Unnamed account update offered.');
  button(account(a),'Name this account').click();let dialog=document.querySelector('dialog');dialog.querySelector('input').value='Personal';button(dialog,'Save nickname').click();await wait(()=>!document.querySelector('dialog'),'Rename did not finish.');
- d=await writer.getDatabase();assert(d.providerProfiles[a].nickname==='Personal'&&Object.values(d.providerItems)[0].recordRef===ref,'Rename changed identity.');assert(Object.keys(d.contentReviews).length===1,'Rename erased review.');checks.push('Migrated account naming preserves identity and reviewed contents');
+ d=await writer.getDatabase();assert(d.providerProfiles[a].nickname==='Personal'&&Object.values(d.providerItems)[0].recordRef===ref,'Rename changed identity.');assert(Object.keys(d.contentReviews).length===1,'Rename erased review.');checks.push('Migrated account naming preserves identity and reviewed contents');assert(document.querySelector('#purchase-sharing-humble [data-purchase-handoff]')===syncHost&&syncHost.querySelector('[data-purchase-manual]')===manual&&!manual.open,'Account reconciliation replaced or expanded manual connection controls');checks.push('Each provider retains one connection panel and its staged controls across account refreshes');
 
  d=await writer.replaceProviderItems('kindle',[{...book,ownership:'borrowed'}],{profileLabel:'Other',fullSyncAt:'2026-10-02'},snapshotFixture('kindle',[book]));const b=d.providers.kindle.activeProfileId;
  await reconcile();await wait(()=>account(b),'Second account missing.');

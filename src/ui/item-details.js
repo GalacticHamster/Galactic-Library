@@ -57,8 +57,13 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not reviewed. A reviewed list describes included material for that account; it does not create separate purchases of those works. Browse issue coverage and collection overlap in Library → Comic Coverage. Use Review contents above to correct the included works for this account copy.'));node.append(help);
   },true);
   if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());const bulk=text('a','Bulk book information and review');bulk.href='#books';bulk.dataset.goWorkspace='books';node.append(bulk);});
+  if(tools.matching){
+    const matching=tools.matching();matching.dataset.itemSection='matching';
+    matching.addEventListener('toggle',()=>{if(!matching.isConnected)return;if(matching.open)state.sections.add('matching');else state.sections.delete('matching');});
+    if(state.sections.has('matching'))matching.open=true;root.append(matching);
+  }
   section('advanced','Advanced',node=>{
-    node.append(text('p','Inspect matching, edition grouping, source provenance and recovery. Identity decisions are separate from ownership confirmations.'));
+    node.append(text('p','Inspect source identifiers, technical provenance, alternate titles and recovery. Use Matching and editions above for product relationships; use Change access for ownership corrections.'));
     if(tools.advanced)node.append(tools.advanced());
   });
   if(tools.extras)root.append(tools.extras());

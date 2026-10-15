@@ -1,6 +1,6 @@
 # Inspecting an item in Library
 
-Open **Details** on a Library result. The main navigation remains **Library | Providers | Contents | Settings**. Missing artwork, authors or edition identifiers do not prevent inspection.
+Open **Details** on a Library result. The main navigation remains **Library | Providers | Books & Contents | Settings**. Missing artwork, authors or edition identifiers do not prevent inspection.
 
 For result search, combined account filters, sorting and remembered browsing position, see [Library browsing](library-browsing.md).
 
@@ -38,9 +38,9 @@ Open Library work information describes a work across editions; its aggregate IS
 
 **Sources and undo** builds its comparison tables only when expanded and labels each account, source, approval/basis and date. **Bulk book information and review** keeps batch discovery and cross-library review available. Existing automatic batch acceptance rules and checkpointing are unchanged. An accepted suggestion may remain in the pending-review store under the existing API; dismiss it when finished if it is still listed.
 
-## Advanced
+## Matching and editions
 
-Expand **Advanced**, then **Matching, editions and source evidence** to review the consequences and choose account copies. **Account sources and technical evidence** keeps identifiers, observations and provenance available beneath the relationship controls. The controls retain their actual semantics:
+Expand **Matching and editions** to review the consequences and choose account copies. **Advanced → Account sources and technical evidence** keeps raw identifiers, observations and provenance separate from relationship controls. The controls retain their actual semantics:
 
 | Existing operation | Meaning |
 | --- | --- |
@@ -62,9 +62,9 @@ Canonical identity decisions are not ownership confirmations. Contents source hi
 | --- | --- |
 | Individual Google Books/Open Library lookup, local EPUB/ComicInfo/OPF or publisher metadata, ISBN edition lookup | Item Book information; shared review and writer operations. |
 | Source preview, conflicts, approval, dismissal, retry and source undo | Item review / Sources and undo; also bulk Book information. |
-| Bulk discovery, pause/resume/reset and cross-library suggestion queues | Library's Book information workbench; `#books` remains valid. |
+| Bulk discovery, pause/resume/reset and cross-library suggestion queues | Books & Contents’ Book information workbench; `#books` remains valid. |
 | Reading states, custom orders, rename/reorder/remove and historical order entries | Item Your library and Reading orders and progress; `#reading` remains valid. |
-| Duplicate decisions, local receipts, Comixology review export, key/access reminders and notification preferences | Item Advanced or retained Ownership and access workbench; `#ownership` remains valid. |
+| Duplicate decisions, local receipts, Comixology review export, key/access reminders and notification preferences | Edition relationships in Matching and editions; receipts, reminders and Comixology export in Library’s Ownership and access workbench; `#ownership` remains valid. |
 | Detailed included works, confirmations, overlap, series gaps and source history | Exact-record Contents workspace; `#contents?record=…`. |
 | Direct item inspection | `#library?record=…`; durable account-specific record reference. |
 | Ownership policies, external client pairing, backups and diagnostics | Settings. |

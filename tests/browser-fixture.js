@@ -22,7 +22,7 @@ const pause=()=>new Promise(done=>setTimeout(done,20));
 const wait=async(predicate,message)=>{for(let n=0;n<100;n++){if(predicate())return;await pause();}throw new Error(message);};
 async function confirmRestore(){await wait(()=>document.querySelector('.confirmation-dialog[open]'),'Restore confirmation missing');button(document.querySelector('.confirmation-dialog'),'Replace library').click();}
 const button=(root,label)=>[...root.querySelectorAll('button')].find(node=>node.textContent===label);
-const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}for(const section of node?.querySelectorAll('[data-item-section]')??[]){section.open=true;section.dispatchEvent(new Event('toggle'));}return node;};
+const card=title=>{const node=[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);const details=node?.querySelector('.item-details');if(details&&!details.open){details.open=true;details.dispatchEvent(new Event('toggle'));}for(const section of node?.querySelectorAll('[data-item-section]')??[]){if(section.dataset.itemSection==='matching')continue;section.open=true;section.dispatchEvent(new Event('toggle'));}return node;};
 const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
 const contentsRuntimeListeners=[],contentsStorageListeners=[],contentsUiTimings=[];
@@ -100,10 +100,10 @@ try{
   let inspector=card('Collection A').querySelector('.evidence-inspector');
   assert(!inspector.querySelector('select'),'Closed evidence controls should be lazy.');
   await open(inspector);
-  assert(inspector.textContent.includes('9780306406157')&&inspector.textContent.includes('Account / profileUnknown')&&inspector.textContent.includes('Last observed at provider'),'Evidence fields missing.');
+  assert(card('Collection A').querySelector('.identity-technical-details').textContent.includes('9780306406157')&&card('Collection A').querySelector('.identity-technical-details').textContent.includes('Account / profileUnknown')&&card('Collection A').querySelector('.identity-technical-details').textContent.includes('Last observed at provider'),'Evidence fields missing.');
   assert(!inspector.querySelector('a[href^="javascript:"]'),'Unsafe provider source link.');
   checks.push('evidence inspector exposes dates, identities and unknown account scope safely');
-  assert(inspector.textContent.includes('Reseller purchase evidenceconfirmed')&&inspector.textContent.includes('Destination activationnot-applicable'),'Direct purchase evidence missing.');
+  assert(card('Collection A').querySelector('.identity-technical-details').textContent.includes('Reseller purchase evidenceconfirmed')&&card('Collection A').querySelector('.identity-technical-details').textContent.includes('Destination activationnot-applicable'),'Direct purchase evidence missing.');
   checks.push('reseller purchase evidence is displayed separately from destination activation');
   const pickComparison=async(root,id)=>{const db=await writer.getDatabase(),input=root.querySelector('[aria-label="Search comparison records"]');input.value=db.providerItems[id].title;input.dispatchEvent(new Event('input'));const select=root.querySelector('[aria-label="Compare with library record"]');select.value=id;select.dispatchEvent(new Event('change'));};
   await pickComparison(inspector,'humble:c');
@@ -163,7 +163,7 @@ try{
   assert((await writer.getDatabase()).contentReviews['humble:a'].entries.length===2,'Backup lost contents.');
   checks.push('actual backup import restores reviewed evidence and refreshes the UI');
   showWorkspace('contents');
-  await open(document.querySelector('#series-coverage-panel'));
+  showWorkspace('comparisons');
   const group=await open(document.querySelector('.series-groups details'));
   assert(group.textContent.includes('2, 4')&&group.textContent.includes('Collection A — Humble Bundle')&&group.textContent.includes('Collection B — Kindle')&&group.textContent.includes('Yes'),'Union, gaps or overlap missing.');
   checks.push('series dashboard shows gaps, overlap and union across providers');
@@ -330,7 +330,7 @@ try{
   const policyFilter=document.querySelector('#ownership-filter');policyFilter.value='owned';policyFilter.dispatchEvent(new Event('change'));
   assert(card('Override borrowed example'),'Provider override did not update the Owned filter.');
   assert(!card('Override unknown example'),'Provider override affected a different provider.');
-  const overrideInspector=await open(card('Override borrowed example').querySelector('.evidence-inspector'));
+  await open(card('Override borrowed example').querySelector('.evidence-inspector'));const overrideInspector=card('Override borrowed example').querySelector('.identity-technical-details');
   assert(overrideInspector.textContent.includes('Ownership evidenceborrowed')&&overrideInspector.textContent.includes('Owned (user preference; original evidence retained)')&&overrideInspector.textContent.includes('Original Writer'),'Override hid original ownership or media provenance.');
   assert(overrideInspector.textContent.includes('Your preference treats this record and its reviewed contents as owned.')&&!overrideInspector.textContent.includes('Temporary or unconfirmed access cannot supply owned contents.'),'Inspector contradicted the active ownership override.');
   checks.push('provider checkbox updates Owned display and filters while the inspector retains original ownership and provenance');

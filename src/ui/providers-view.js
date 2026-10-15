@@ -13,6 +13,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
  const status=node('p');status.setAttribute('role','status');
  const cards=node('div');cards.className='provider-cards';element.append(status,cards);
  const openCards=new Set();
+ const companionCards=new Map(['humble','fanatical'].map(provider=>[provider,document.querySelector('#purchase-sharing-'+provider)]));
  const actions=createAccountActions({read:()=>database,select,rename});
  const management=createProfileManagementActions({read:()=>database,preview,remove,reset});
  function button(label,run){const b=node('button',label);b.type='button';b.disabled=busy;b.addEventListener('click',()=>{if(!busy)run();});return b;}
@@ -94,16 +95,16 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
  function update(next){
    database=next;if(busy)return;
    cards.replaceChildren(...providerAccounts(database).map(site=>{
-     const card=node('details');card.className='tool-card provider-card';card.dataset.provider=site.provider;card.open=openCards.has(site.provider);
-     const selected=site.accounts.find(p=>p.active),summary=node('summary');summary.append(node('strong',site.name),node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${site.accounts.reduce((n,p)=>n+p.recordCount,0)} items`:'Not imported'));card.append(summary);
-     card.addEventListener('toggle',()=>{if(!card.isConnected)return;if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});
+     const card=companionCards.get(site.provider)??node('details');card.className='tool-card provider-card';card.dataset.provider=site.provider;card.open=openCards.has(site.provider)||card.open;
+     const selected=site.accounts.find(p=>p.active),summary=card.querySelector(':scope > summary')??node('summary');summary.replaceChildren();summary.append(node('strong',site.name),node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${site.accounts.reduce((n,p)=>n+p.recordCount,0)} items`:'Not imported'));card.prepend(summary);
+     if(!card.dataset.accountEvents){card.dataset.accountEvents='true';card.addEventListener('toggle',()=>{if(!card.isConnected)return;if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});}
+     card.querySelector(':scope > .provider-account-body')?.remove();const body=node('div');body.className='provider-account-body';card.append(body);
      const companion=['humble','fanatical'].includes(site.provider),accountTools=node('details');
      if(companion){
-       card.append(node('p','Connect your companion extension to sync saved purchases. Nicknames are optional; no website scan is needed.'));
-       const connect=button('Connect and sync',()=>document.dispatchEvent(new CustomEvent('gh-purchase-connect',{detail:{provider:site.provider}})));connect.dataset.purchaseConnect=site.provider;card.append(connect);
-       accountTools.append(node('summary','Advanced: saved accounts and store scans'));card.append(accountTools);
+       body.append(node('p','Saved accounts and store imports below are separate from the purchase-sync connection above. Connecting does not start a website scan.'));
+       accountTools.append(node('summary','Saved accounts and store imports'));body.append(accountTools);
      }
-     const accountHost=companion?accountTools:card;
+     const accountHost=companion?accountTools:body;
      accountHost.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
      const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';accountHost.append(link);
      if(!site.accounts.length)accountHost.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));

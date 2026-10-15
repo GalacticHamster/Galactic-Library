@@ -18,7 +18,7 @@ Existing extension authorization and old manual offers do not enable automatic s
 
 The earlier guided transfer controls remain under **Advanced: manual purchase sharing and recovery**. They still require their own account confirmation and final import approval. Read-only comparison, previews, technical details and exports remain available there. Disconnect automatic sync before using manual recovery to maintain an intentionally different local account.
 
-In GL, open **Providers -> Humble connection** or **Fanatical connection**. Settings contains direct links to these sections. In HB/FAN, open **Galactic Library connection -> Purchase sync -> Advanced: manual purchase sharing and recovery**.
+In GL, open **Providers -> Humble Bundle** or **Fanatical**. Settings contains direct links to these sections. In HB/FAN, open **Galactic Library connection -> Purchase sync -> Advanced: manual purchase sharing and recovery**.
 
 Account choices load when the section opens; no store scan runs. A single eligible source and a single receiving account are suggested. Multiple accounts require a choice, even if nicknames match. Empty receiving accounts are allowed. Choose **Create a separate saved account** to enter a new nickname. Confirm explicitly that both accounts represent the same store account.
 

@@ -1,6 +1,6 @@
 # Contents: discover, review and compare included works
 
-Open **Contents** to see included works for books from every remembered account. Library and Contents share search, media, provider, saved account, genre, access, reading, series and sorting. Contents-specific status filters remain separate and clearly marked. Contents is book-only; an incompatible media filter produces an honest empty result, not a reinterpreted selection.
+Open **Books & Contents → Included contents** to see included works for books from every remembered account. Library and Contents share search, media, provider, saved account, genre, access, reading, series and sorting. Contents-specific status filters remain separate and clearly marked. Contents is book-only; an incompatible media filter produces an honest empty result, not a reinterpreted selection.
 
 Pages follow the same catalog ordering as Library, with separate cards for qualifying accounts and a shared adjustable page size. The same product in two accounts keeps its own descriptions and reviews. Switching follows the current item/first visible group, and clamps the saved page when that item no longer qualifies. See [Library browsing](library-browsing.md) for exact filter and position semantics.
 
@@ -105,7 +105,7 @@ Expand **Unresolved contents** in Series Coverage to find saved issue lists that
 
 Choose **Library → Comic Coverage → Collection Overlap**. Switching between the two internal views retains their current search and page. It lists pairs of owned collections with comparable shared comic issues, including inferred contents by default. Search either collection's source or display title, sort by shared issue count or title, and choose **Inspect overlap** to expand shared issues directly beneath that pair; **Collapse overlap** closes it without leaving the list. See shared issues and entries listed only in each collection. Expand an issue to see its supporting source books; the links open those exact Library records. Shared issues are verified only when both collections have reviewed evidence for them. Old `#overlap` links still open this internal view.
 
-The pair list is paginated, and issue lists show 50 entries at a time with **Show more issues**. Its read-only calculation runs on demand in a separate UI worker; ordinary Library browsing does not calculate collection pairs. Unknown/provisional identities do not become definite overlap or unique-issue claims. “Listed only” compares saved contents, not guaranteed absence from an incomplete description. The existing series-gap and target-range tools remain in Contents below.
+The pair list is paginated, and issue lists show 50 entries at a time with **Show more issues**. Its read-only calculation runs on demand in a separate UI worker; ordinary Library browsing does not calculate collection pairs. Unknown/provisional identities do not become definite overlap or unique-issue claims. “Listed only” compares saved contents, not guaranteed absence from an incomplete description. The existing series-gap and target-range tools are in Books & Contents → Compare collections.
 
 **Overlap with other owned collections** compares this record's extracted or reviewed full entries with qualifying owned records. It excludes this record so a collection does not report overlap with itself. It shows inferred versus verified evidence and supporting book/account names. For comic coverage, missing language defaults to English without changing provider metadata; explicit other languages remain separate. A missing series run can use matching parent series/year context. Conflicting runs or unclear series context remain possible overlap and cannot hide a missing issue. Excerpts and digital chapters never count as complete print issues.
 
@@ -151,3 +151,15 @@ reverses it. A collection leaves Needs resolution when no actionable components
 remain. Explicitly included named standalone publications can be resolved;
 promotional prose should be ignored. Creating new publication runs is not part
 of this workflow.
+
+## Navigation and compatibility
+
+Books & Contents has Included contents, Book information and Compare collections.
+The Library is the only normal item catalog; metadata review opens its existing
+item Details rather than another catalog/editor. Compare collections preserves
+the older series/volume comparison and explicit target-list tools. Comic Coverage
+and its collection-pair browser remain under Library.
+
+Existing #contents and #books routes retain their destinations; #overlap opens
+Library Comic Coverage’s Collection Overlap, and #ownership remains valid. Exact
+record links and Back/Forward preserve account scope and return context.

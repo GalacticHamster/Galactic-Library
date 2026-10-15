@@ -166,7 +166,7 @@ const coverageResolutionActions={
   removeReview:async id=>{database=await drafts.commit(()=>removeContentReview(id));return database;},
   resolved:async next=>{database=next;comicCoverageDatabase=null;render();}
 };
-const contentsWorkspace=createContentsWorkspace({projection:browseProjection,resolutionActions:coverageResolutionActions,coverageOptions:()=>({merges:comicCoverageMerges}),canLeave:()=>drafts.allowNavigation(),pageSizeChanged:size=>changePageSize(size),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='library'||reviewOrigin?.workspace==='books'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
+const contentsWorkspace=createContentsWorkspace({projection:browseProjection,resolutionActions:coverageResolutionActions,coverageOptions:()=>({merges:comicCoverageMerges}),canLeave:()=>drafts.allowNavigation(),pageSizeChanged:size=>changePageSize(size),changed:()=>workspace.rememberView(),backLabel:()=>reviewOrigin?.workspace==='books'?'Back to book information':reviewOrigin?.workspace==='library'?'Back to Library results':'Back to Contents results',back:returnFromContents,collection:()=>{reviewOrigin=null;pushRoute('#contents');},library:ref=>openLibraryRecord(ref,{returnToOrigin:true}),opened:ref=>{
   if(!reviewOrigin)reviewOrigin={workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll,ref};
   if(!restoringRoute)pushRoute(bookHref('contents',ref));
 },review:(record,current)=>{
@@ -251,7 +251,7 @@ function returnFromContents(){
   const origin=reviewOrigin??{workspace:'contents',view:contentsWorkspace.readView(),scroll:contentsWorkspace.scroll};
   if(!drafts.allowNavigation())return;
   contentsWorkspace.close();workspace.select(origin.workspace,{view:origin.view,history:false});
-  if(origin.workspace==='library'||origin.workspace==='books'){
+  if(origin.workspace==='library'){
     const ref=origin.ref,card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
     if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});}
     else document.querySelector('#workspace-status').textContent='The original book moved or is no longer in these results. Your browsing filters are retained.';
@@ -262,7 +262,7 @@ function openContentsRecord(ref){
   if(!drafts.allowNavigation())return;
   if(!restoringRoute)rememberNavigationEntry();
   if(['library','books'].includes(workspace.workspace)){
-    workspace.rememberView();contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
+    workspace.rememberView();if(workspace.workspace==='library')contentsLibraryOrigin={ref,workspace:workspace.workspace,search:search.value,filters:Object.fromEntries(Object.entries(viewControls).map(([key,field])=>[key,field.value])),sort:librarySort.value,page:libraryPage,scroll:globalThis.scrollY};
     reviewOrigin={workspace:workspace.workspace,view:{...workspace.savedView,anchor:ref},scroll:globalThis.scrollY,ref};
   }
   if(!workspace.select('contents',{history:false}))return;
@@ -271,7 +271,7 @@ function openContentsRecord(ref){
 function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   const record=Object.values(database.providerItems).find(record=>record.recordRef===ref);
   if(!record){document.querySelector('#workspace-status').textContent='That record is no longer in the current library.';return;}
-  const restoredOrigin=reviewOrigin?.ref===ref&&['library','books'].includes(reviewOrigin.workspace)?{ref,workspace:reviewOrigin.workspace,search:reviewOrigin.view.search,filters:reviewOrigin.view,sort:reviewOrigin.view.sort,page:reviewOrigin.view.page,scroll:reviewOrigin.scroll}:null;
+  const restoredOrigin=reviewOrigin?.ref===ref&&reviewOrigin.workspace==='library'?{ref,workspace:reviewOrigin.workspace,search:reviewOrigin.view.search,filters:reviewOrigin.view,sort:reviewOrigin.view.sort,page:reviewOrigin.view.page,scroll:reviewOrigin.scroll}:null;
   const origin=returnToOrigin?(restoredOrigin??(contentsLibraryOrigin?.ref===ref?contentsLibraryOrigin:null)):null;
   const findCard=()=>[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
   if(!workspace.select(origin?.workspace??'library',{history:false}))return;
@@ -297,6 +297,7 @@ function restoreNavigation(){
   restoringRoute=true;
   try{
     const saved=globalThis.history?.state?.gl,route=bookRoute(globalThis.location.hash);
+    if(globalThis.location.hash.startsWith('#overlap'))coverageView='overlap';
     reviewOrigin=saved?.origin??null;
     if(saved)workspace.select(saved.workspace,{view:saved.view,history:false});
     else workspace.select(route?.workspace??globalThis.location.hash,{history:false});
@@ -842,6 +843,7 @@ function render(timing = null) {
     const context=records.map(record=>itemDetailContexts.get(record.recordRef)).find(value=>value&&records.some(record=>record.recordRef===value.anchor))??{anchor:records[0].recordRef,sections:new Set(),open:false};
     for(const record of records)itemDetailContexts.set(record.recordRef,context);
     const build=()=>{if(built)return;built=true;
+    let inspector;const identityInspector=()=>inspector??=createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision,title)=>{database=await saveManualMatchDecision(candidate,decision,title);},preferredTitle:async(id,title)=>{database=await savePreferredDisplayTitle(id,title);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render},{separateTechnical:true});
     body.append(createItemDetailsBody(canonicalItem,records,database,{
       reading:['book','audiobook'].includes(canonicalItem.mediaType)?()=>createReadingTools(records,database,{save:async(...args)=>{database=await drafts.commit(()=>saveReadingState(...args));},remove:async(...args)=>{database=await drafts.commit(()=>removeReadingState(...args));},refresh:render}):null,
       ownership:()=>createOwnershipReviewTools(records,database,{save:async(...args)=>{database=await drafts.commit(()=>saveOwnershipReview(...args));},remove:async(...args)=>{database=await drafts.commit(()=>removeOwnershipReview(...args));},refresh:render}),
@@ -856,7 +858,8 @@ function render(timing = null) {
         review.element.open=true;review.update(database);root.append(review.element,createEnrichmentEvidence(records,database,async ref=>{database=await undoEnrichmentSelection(ref);render();},context));
         return root;
       },
-      advanced:()=>{const root=document.createElement('div');root.append(createEvidenceInspector(canonicalItem,records,database,{split:async id=>{database=await separateEdition(id);},undoSplit:async ref=>{database=await undoEditionSeparation(ref);},save:async(candidate,decision,title)=>{database=await saveManualMatchDecision(candidate,decision,title);},preferredTitle:async(id,title)=>{database=await savePreferredDisplayTitle(id,title);},remove:async id=>{database=await removeManualMatchDecision(id);},refresh:render}),createTitleAliasTools(records,database,async(...args)=>{database=await drafts.commit(()=>saveTitleAliases(...args));render();}));
+      matching:()=>identityInspector(),
+      advanced:()=>{const root=document.createElement('div');root.append(identityInspector().technical,createTitleAliasTools(records,database,async(...args)=>{database=await drafts.commit(()=>saveTitleAliases(...args));render();}));
         if(canonicalItem.mediaType==='game')for(const record of records)root.append(createContentsEditor(record,database.contentReviews?.[record.id],contentsReviewActions));return root;
       },
       extras:()=>{const root=document.createElement('div');for(const create of [()=>createGenreTags(records),()=>createComicMangaCandidateTag(records)]){const value=create();if(value)root.append(value);}if(linkedAddOns.length)root.append(createAddOnList(linkedAddOns));return root;}
@@ -1040,11 +1043,11 @@ function renderCollectionCoverage(){
   if(database&&workspace.workspace==='comic-coverage'&&coverageView==='overlap'&&overlapDatabase!==database){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{state:comicCoverageBrowseState.overlap??(comicCoverageBrowseState.overlap={}),openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;
   }
-  if(!database||!document.querySelector('#series-coverage-panel').open||coverageDatabase===database)return;
+  if(!database||workspace.workspace!=='comparisons'||coverageDatabase===database)return;
   document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
 }
 document.querySelector('#comic-coverage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-coverage-view]');if(button){coverageView=button.dataset.coverageView;renderCollectionCoverage();}});
-document.querySelector('#series-coverage-panel').addEventListener('toggle',renderCollectionCoverage);
+
 const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,container:document.querySelector('#contents-progress-slot'),reconcile:()=>refresh(recentContentsDiagnosticId())});
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};

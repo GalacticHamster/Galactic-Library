@@ -23,7 +23,7 @@ export function createCollectionComparison(record,database) {
     const possibleSources=[...new Set(result.possibleCovered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(possibleSources.length)root.append(text('p','Possible overlap through (identity needs more detail): '+possibleSources.join('; ')));
     if(result.missing.length)root.append(text('p','No sufficiently identified match in other collections: '+result.missing.map(entry=>`${entry.series} ${entry.unitType} ${entry.number}`).join('; ')));
-    root.append(text('p','No sufficiently identified match does not prove the material is absent from your accounts. Series-wide gaps and target ranges are available under Collection overlap and series gaps.'));
+    root.append(text('p','No sufficiently identified match does not prove the material is absent from your accounts. Comic issue grids are in Library → Comic Coverage. Explicit target ranges and manga volumes are in Books & Contents → Compare collections.'));
   });return root;
 }
 export function createContentsBookDetails(record,database,actions) {

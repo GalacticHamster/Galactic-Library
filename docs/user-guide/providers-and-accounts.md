@@ -1,6 +1,6 @@
 # Providers and saved accounts
 
-Galactic Library has four main sections: **Library, Providers, Contents and
+Galactic Library has four main sections: **Library, Providers, Books & Contents and
 Settings**. Library combines every remembered account. Selecting an account in
 Providers chooses where future updates go; it does not hide the other accounts
 or change their ownership.
@@ -135,12 +135,13 @@ remembered-hint lookup, message round trips, and when the nickname becomes
 visible versus verified. Export immediately after reproducing the delay or
 completing a Quick update, before the worker idles and loses its timing buffers.
 
-Library retains All items, Book information, Reading, and Ownership and access
+Library retains All items, Comic Coverage, Reading, and Ownership and access
 as secondary views. Existing filters, item details, enrichment and reviews
 remain available there.
 
-Contents contains the Kindle discovery instructions, current scan progress and
-reviewed collection overlap/gaps. Acquisition, Pause/Resume and Refresh All
+Books & Contents groups Included contents, Book information, and Compare collections.
+Included contents has Kindle discovery instructions and scan progress. Compare
+collections retains explicit target ranges and manga-volume comparisons. Acquisition, Pause/Resume and Refresh All
 still run from the signed-in Kindle panel. Navigating between sections preserves
 progress and never starts a refresh. Other providers' contents discovery is not
 implemented by this UI phase.
@@ -151,3 +152,15 @@ Provider accounts and import controls are in Providers. Older saved book,
 reading and ownership views remain valid Library destinations.
 
 Contents discovery, integrated review and collection comparison are described in [Contents workspace](contents-workspace.md).
+
+## Connections in provider cards
+
+Humble Bundle and Fanatical each have one provider card containing purchase-sync
+status, Connect and sync, Sync now and Disconnect. Saved accounts and store imports
+are in the same card. Advanced manual sharing remains collapsed and separate
+from automatic sync. Multi-account setup still requires exact choices and consent.
+Account-list refreshes preserve the existing connection form and staged choices.
+
+Providers also contains Advanced companion communication checks. These only test
+communication; they do not import or synchronize. Settings retains developer pairing
+and links back to the appropriate provider card.

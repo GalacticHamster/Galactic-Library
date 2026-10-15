@@ -7,14 +7,12 @@ and [privacy policy](PRIVACY.md).
 
 ## Find your way around
 
-The current main navigation is **Library | Providers | Contents | Settings**.
-The agreed 1.0 destination **Books & Contents** will bring book tools together in
-a later phase; it has not replaced Contents yet.
+The main navigation is **Library | Providers | Books & Contents | Settings**.
 
 - **Library → All items:** search all saved items, including unconfirmed,
   borrowed, subscription and returned records. Equivalent products can appear as
   one entry while retaining their original account copies and purchase history.
-- **Library → Book information:** run bulk book lookups and review metadata
+- **Books & Contents → Book information:** run bulk book lookups and review metadata
   suggestions. Its primary review controls open immediately. Individual book
   lookups and source undo are available in item Details.
 - **Library → Reading:** track book/audiobook progress and create custom reading
@@ -27,8 +25,9 @@ a later phase; it has not replaced Contents yet.
   local purchase evidence, and manage key/access reminders.
 - **Providers:** import or update signed-in libraries, manage saved accounts,
   connect companion purchase sync, and inspect update health.
-- **Contents:** inspect an exact book/account's included works, review or enter
-  contents, inspect captured evidence, and compare an explicit target list.
+- **Books & Contents → Included contents:** inspect an exact book/account's included works, review or enter
+  contents, and inspect captured evidence. **Compare collections** retains explicit
+  target issue ranges and manga-volume comparisons in its own secondary view.
 - **Settings:** appearance, ownership assumptions, book-service configuration,
   backups, diagnostics and advanced developer pairing.
 
@@ -65,7 +64,7 @@ See [purchase sync](docs/user-guide/purchase-sharing.md).
 These are separate questions:
 
 - **Product identity:** do records represent the same edition or related works?
-  Use **Details → Advanced → Matching, editions and source evidence**. Same Work
+  Use **Details → Matching and editions**. Same Work
   keeps editions separate; Same Edition can consolidate their display. Neither
   establishes a purchase. Preferred display titles preserve original source titles.
 - **Ownership / access:** is this account copy owned, borrowed, subscribed,

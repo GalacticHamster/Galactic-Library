@@ -23,13 +23,15 @@ function sourceLink(url,label) {
 }
 
 /** Populate on expansion so thousands of closed cards stay inexpensive. */
-export function createEvidenceInspector(canonical, records, database, actions) {
+export function createEvidenceInspector(canonical, records, database, actions, {separateTechnical=false}={}) {
   const root=document.createElement('details');root.className='evidence-inspector';
-  root.append(element('summary','Matching, editions and source evidence'));
+  root.append(element('summary',separateTechnical?'Matching and editions':'Matching, editions and source evidence'));
+  const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'));root.technical=technical;
   let populated=false;
-  root.addEventListener('toggle',()=>{if(!root.open||populated)return;populated=true;
+  function populate(){if(populated)return;populated=true;
     root.append(element('p','Same work keeps editions separate and supports Possible warnings for related copies. Same edition groups copies only when known identity details agree. Different works prevents that relationship and grouping. These choices do not confirm a purchase. Separating a copy keeps it in its own edition.'));
-    const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'),element('p',`Persistent edition IDs: ${(canonical.sourceCanonicalIds??[canonical.id]).join(', ')}`));
+    technical.append(element('p',`Persistent edition IDs: ${(canonical.sourceCanonicalIds??[canonical.id]).join(', ')}`));
+    const editions=element('div','');editions.className='edition-record-actions';
     for(const record of records){
       const identity=identityEvidence(record);const provider=database.providerProfiles?.[record.profileId]?.state??database.providers[record.provider]??{},effective=effectiveOwnershipRecord(record,database);
       const section=element('section','');section.append(element('h4',`${record.title} — ${accountLabel(record,database)}`));
@@ -86,17 +88,18 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         section.append(element('p',`Other owned records cover ${coverage.owned}/${coverage.total} full entries in this collection. ${coverage.missing.length} entries are not established elsewhere.${coverage.scopeUncertain?' Run/language uncertainty prevents a complete-coverage claim.':''}`));
         const evidenceLink=sourceLink(review.sourceUrl,'View contents evidence');if(evidenceLink)section.append(evidenceLink);
       }else section.append(element('p','No confirmed contents. Title or category hints do not establish collected coverage.'));
+      const edition=element('section','');edition.append(element('h4',`${record.title} - ${accountLabel(record,database)}`));
       const relationships=Object.entries(database.manualMatchDecisions??{}).filter(([,decision])=>decision.itemIds.includes(record.id));
       if(records.length>1){
         const split=element('button','Separate this record into its own edition');split.type='button';presentAction(split);
         split.addEventListener('click',async()=>{try{await performAction({status,name:'Separating this edition...',task:()=>actions.split(record.id)});actions.refresh();}catch(error){status.textContent=error.message;}});
-        section.append(split);
+        edition.append(split);
       }
       for(const [ref,separation]of Object.entries(database.editionSeparations??{}).filter(([,value])=>value.itemId===record.id)){
         const row=element('p',`Edition kept separate from ${separation.otherItemIds.length} other record(s) · reviewed ${separation.updatedAt||'date unknown'} `);
         const undo=element('button','Undo edition separation');undo.type='button';presentAction(undo);
         undo.addEventListener('click',async()=>{try{await performAction({status,name:'Undoing edition separation...',task:()=>actions.undoSplit(ref)});actions.refresh();}catch(error){status.textContent=error.message;}});
-        row.append(undo);section.append(row);
+        row.append(undo);edition.append(row);
       }
       for(const [id,decision]of relationships){
         const other=database.providerItems[decision.itemIds.find(itemId=>itemId!==record.id)];
@@ -105,8 +108,9 @@ export function createEvidenceInspector(canonical, records, database, actions) {
           const conflicts=identityConflicts(record,other);
           if(conflicts.length)row.append(element('span',`Current evidence conflicts with this review: ${conflicts.join(', ')}. `));
         }
-        const undo=element('button','Undo relationship');undo.type='button';undo.addEventListener('click',async()=>{try{await performAction({status,name:'Removing saved relationship...',task:()=>actions.remove(id)});actions.refresh();}catch(error){status.textContent=error.message;}});row.append(undo);section.append(row);
+        const undo=element('button','Undo relationship');undo.type='button';undo.addEventListener('click',async()=>{try{await performAction({status,name:'Removing saved relationship...',task:()=>actions.remove(id)});actions.refresh();}catch(error){status.textContent=error.message;}});row.append(undo);edition.append(row);
       }
+      if(edition.querySelector('button'))editions.append(edition);
       technical.append(section);
     }
     const status=element('p','');status.setAttribute('role','status');
@@ -162,7 +166,9 @@ export function createEvidenceInspector(canonical, records, database, actions) {
         }catch(error){status.textContent=`Could not save display title: ${error.message}`;}
       });editor.append(save);comparison.prepend(editor);
     }
-    root.append(comparison,status,technical);
-  });
+    root.append(comparison,editions,status);if(!separateTechnical)root.append(technical);
+  }
+  root.addEventListener('toggle',()=>{if(root.open)populate();});
+  technical.addEventListener('toggle',()=>{if(technical.open)populate();});
   return root;
 }

@@ -1,6 +1,6 @@
 # Remaining Galactic Library features
 
-Individual reading, ownership, book enrichment and identity actions are organized in [Library item details](item-details.md). Cross-library workbenches remain available through Library's Book information, Reading, and Ownership and access routes. Detailed book contents review lives in [Contents](contents-workspace.md).
+Individual reading, ownership, book enrichment and identity actions are organized in [Library item details](item-details.md). Cross-library workbenches are in Books & Contents (Book information), and Library (Reading and Ownership and access). Detailed book contents review lives in [Contents](contents-workspace.md).
 
 ## Unicode and alternate titles (GL-17)
 
@@ -67,16 +67,16 @@ Sharing is manual. A complete staged upload replaces a client's prior feed atomi
 
 In Settings, **Restore backup** first validates the selected file and asks before replacing this browser's saved library, accounts and reviews. It does not merge libraries. Choose **Cancel**, **Export current backup**, or **Replace library**. A changed saved library invalidates the open confirmation; select the file again. Private API keys and companion links are not included in a library backup.
 
-**Book information** keeps bulk lookup and cross-library suggestion review separate from ordinary browsing. **Browse individual books here** is collapsed by default; **Browse books in Library** opens the catalog. **Clear saved lookup queue** asks before abandoning incomplete progress and keeps already saved metadata.
+**Book information** keeps bulk lookup and cross-library suggestion review separate from ordinary browsing. **Browse books in Library** opens the single catalog; book tools do not contain a second catalog. **Clear saved lookup queue** asks before abandoning incomplete progress and keeps already saved metadata.
 
 **Performance diagnostics** in Settings exports recent companion queries and worker/Options timings without Amazon or acquisition tracing. Detailed worker buffers are in memory and reset when that worker restarts; only a tiny previous-worker breadcrumb may survive within the browser session. Detailed scan tracing on Kindle is separate and resets with that tab.
 
 ## Primary workbenches and terminology
 
-Library → Reading and Library → Book information open their primary workbenches
+Library → Reading and Books & Contents → Book information open their primary workbenches
 without another expansion. Technical details, source history and optional lookup
-help remain collapsed. Current top-level navigation is unchanged; the planned
-Books & Contents destination belongs to a later phase.
+help remain collapsed. Book information, Included contents and Compare collections are secondary views
+under Books & Contents. Comic Coverage remains under Library.
 
 **Review matching products and editions** concerns product identity, not whether
 you purchased it. **Copies owned** counts distinct confirmed acquisition groups;
