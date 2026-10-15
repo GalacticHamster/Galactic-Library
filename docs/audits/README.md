@@ -7,6 +7,7 @@ These selected records explain architectural turning points. Their versions, cou
 - [Xbox consumer ownership follow-up](console-integration-2026-10-15/XBOX_OWNERSHIP_FOLLOWUP.md): first-party web access endpoint, Playnite entitlement heuristics and safe signed-in validation; supersedes the initial Xbox deferral.
 - [Xbox ownership beyond cloud gaming](console-integration-2026-10-15/XBOX_OWNERSHIP_BEYOND_CLOUD.md): signed-in cloud-scope evidence, consumer Collections authorization gates and legacy 360 coverage; supersedes the CAS-first recommendation.
 - [Xbox Collections authorization experiment](console-integration-2026-10-15/XBOX_COLLECTIONS_AUTH_EXPERIMENT.md): own-registration Code + PKCE research harness, exact user setup and untested resource-permission gates; no production integration.
+- [Xbox mobile library investigation](console-integration-2026-10-15/XBOX_MOBILE_LIBRARY_INVESTIGATION.md): 245-game account comparison target, traced adjacent service implementations, and the unresolved mobile caller/independent-authorization boundary.
 - [Contents quality audit](kindle-contents-quality-audit.md) and [quality implementation](kindle-contents-quality-pass.md): topic/credit false positives and excerpt scope.
 - [Performance instrumentation](kindle-contents-performance.md) and [bounded persistence fix](kindle-contents-performance-fix-2026-10-04.md): whole-database costs, checkpoint bounds and lightweight progress.
 - [Amazon extraction reconnaissance](kindle-amazon-extraction-reconnaissance.md): first-trigger selection versus incomplete hydration.
