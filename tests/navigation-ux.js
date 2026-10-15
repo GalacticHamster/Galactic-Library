@@ -3,8 +3,23 @@ import {readFile} from 'node:fs/promises';
 import {createWorkspaceNavigation} from '../src/ui/workspaces.js';
 import {defaultUiPreferences,validateUiPreferences,workspaceTarget} from '../src/lib/ui-preferences.js';
 import {validateRuntime} from '../scripts/release.mjs';
+import {bookReviewCounts,receiptReviewCounts,workbenchReviewCounts} from '../src/ui/review-status.js';
 
 export const navigationUxTests=[
+ ['Review presentation counts separate decisions, failed lookups, waiting receipts and saved sources without changing evidence',()=>{
+   const database={providerItems:{a:{recordRef:'a',profileId:'personal',mediaType:'book'},b:{recordRef:'b',profileId:'family',mediaType:'book'}},enrichmentReviews:{ready:{recordRefs:['a'],status:'candidates'},conflict:{recordRefs:['b'],status:'conflict'},failed:{recordRefs:['a'],status:'failed'},empty:{recordRefs:['a'],status:'no-results'},old:{recordRefs:['absent'],status:'candidates'}},ownershipProposals:{ready:{recordRefs:['a'],profileId:'personal'},wrongAccount:{recordRefs:['a'],profileId:'family'},waiting:{recordRefs:[],profileId:'personal'}}},before=JSON.stringify(database);
+   assert.deepEqual(bookReviewCounts(database),{attention:2,lookups:2});assert.deepEqual(receiptReviewCounts(database),{attention:1,waiting:2});
+   const retry=structuredClone(database);retry.providerItems.a.metadata={enrichment:{kindleProductComicContents:{availability:'temporary-failure'}}};assert.deepEqual(bookReviewCounts(retry),{attention:2,lookups:3});
+   assert.deepEqual(workbenchReviewCounts([{category:'candidates',review:{}},{category:'conflicts',review:{}},{category:'failed',review:{}},{category:'unparsed'},{category:'undo'},{category:'missing'},{category:'conflicts'}]),{attention:2,sourceConflicts:1,lookups:1,contents:1,saved:1});assert.equal(JSON.stringify(database),before);
+ }],
+ ['Ownership workbench separates corrections, product identities, optional receipts and access reminders without replacing legacy controls',async()=>{
+   const html=await readFile(new URL('../options.html',import.meta.url),'utf8');
+   for(const id of ['ownership-corrections-heading','identity-review-heading','purchase-evidence-slot','access-reminders-slot','duplicate-review-panel','download-comixology-list'])assert(html.includes(`id="${id}"`));
+   assert(html.includes('Change access'));assert(html.includes('Details &rarr; Matching and editions'));assert(!html.includes('purchase or product reviews'));
+ }],
+ ['Contents attention filter persists alongside legacy unreviewed and failure filters',()=>{
+   for(const status of ['attention','review','failure'])assert.equal(validateUiPreferences({contents:{status}}).contents.status,status);
+ }],
  ['Options has four primary destinations and keeps existing tools in reachable secondary homes',async()=>{
    const html=await readFile(new URL('../options.html',import.meta.url),'utf8');
    const primary=html.match(/<nav id="workspace-navigation"[\s\S]*?<\/nav>/u)[0];

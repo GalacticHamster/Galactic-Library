@@ -288,3 +288,6 @@ button.danger { background:var(--gh-danger-fill); }
 .coverage-resolution-dialog label { display: block; margin: .4rem 0; }
 .coverage-resolution-dialog > button, .coverage-resolution-dialog > a { margin: .5rem .5rem .5rem 0; }
 [data-coverage-selected="true"] { outline: 2px solid var(--gh-accent); }
+.collection-target textarea { width:100%; box-sizing:border-box; }
+.collection-comparison-result:not(:empty) { margin-top:1rem; padding:1rem; border:1px solid var(--gh-border); border-radius:6px; }
+.series-groups table ul { padding-left:1.2rem; margin:.25rem 0; }

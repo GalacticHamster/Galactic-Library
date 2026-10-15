@@ -5,9 +5,10 @@ import {formatDate} from './formatters.js';
 import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
 import {enrichmentWorkbenchRows} from '../lib/enrichment-workbench.js';
 import {accountLabel} from './item-presentation.js';
+import {workbenchReviewCounts} from './review-status.js';
 
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-const labels={all:'All suggestions and gaps',missing:'Missing book information',candidates:'Suggestions to review',conflicts:'Conflicting suggestions',failed:'Lookups to retry',unparsed:'Contents to review',undo:'Saved sources to undo'};
+const labels={all:'All suggestions and gaps',attention:'Suggestions needing a decision',missing:'Missing book information (optional)',candidates:'Suggestions to review',conflicts:'Conflicting suggestions or selected sources',failed:'Lookup failures / no results',unparsed:'Unreviewed or changed contents',undo:'Saved sources to undo'};
 
 export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={}){
   const element=document.createElement('details');if(!item)element.id='enrichment-workbench';element.className=item?'tool-card item-enrichment-review':'tool-card';
@@ -15,9 +16,9 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
   const category=document.createElement('select');category.setAttribute('aria-label','Enrichment queue');
   for(const [key,label]of Object.entries(labels))if(!item||!['missing','unparsed'].includes(key))category.append(Object.assign(text('option',label),{value:key}));
   const search=document.createElement('input');search.type='search';search.placeholder='Filter enrichment titles';search.setAttribute('aria-label','Filter enrichment titles');
-  const status=text('p','');status.setAttribute('role','status');const counter=text('p','');
+  const status=text('p','');status.setAttribute('role','status');const counter=text('p',''),totals=text('p','');totals.className='muted';
   const list=document.createElement('ol');list.className='review-items';
-  const controls=document.createElement('p');controls.className='actions';const categoryLabel=labeledControl('Suggestions to show',category),searchLabel=labeledControl('Find a title',search);body.append(categoryLabel,searchLabel,controls,status,counter,list);
+  const controls=document.createElement('p');controls.className='actions';const categoryLabel=labeledControl('Suggestions to show',category),searchLabel=labeledControl('Find a title',search);body.append(totals,categoryLabel,searchLabel,controls,status,counter,list);
   if(item){categoryLabel.hidden=true;searchLabel.hidden=true;controls.hidden=true;}
   const choices=new Map(),selected=new Set();let rows=[];let currentRecords=new Map();let busy=false;let page=0;let database,dirty=false;
   const button=(label,run)=>{const node=text('button',label);node.type='button';node.addEventListener('click',run);return presentAction(node);};
@@ -40,9 +41,12 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
     if(dirty){
       currentRecords=new Map(Object.values(database.providerItems).filter(record=>!recordRefs||recordRefs.includes(record.recordRef)).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database,{recordRefs,includeContents:!item,includeMissing:!item});
       const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);
-      heading.textContent=`${item?'Review suggestions for this item':'Review book suggestions'} — ${rows.filter(row=>row.review||row.category==='unparsed').length} pending`;dirty=false;
+      const counts=workbenchReviewCounts(rows);
+      totals.textContent=`${counts.attention} suggestions needing a decision · ${counts.lookups} lookup failures / no results · ${counts.contents} unreviewed or changed contents · ${counts.saved} saved source selections${counts.sourceConflicts?' · '+counts.sourceConflicts+' selected sources to check':''}. Missing information and unreviewed contents are not automatically ownership or coverage problems.`;
+      heading.textContent=`${item?'Review suggestions for this item':'Review book suggestions'} — ${counts.attention} suggestions needing a decision`;
+      heading.title=`${counts.lookups} lookup failures/no results; ${counts.contents} unreviewed or changed contents; ${counts.saved} saved source selections; ${counts.sourceConflicts} selected sources to check. These are separate from pending suggestions.`;dirty=false;
     }
-    const filtered=rows.filter(row=>(category.value==='all'||row.category===category.value)&&row.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()));
+    const filtered=rows.filter(row=>(category.value==='all'||category.value==='attention'&&row.review&&['candidates','conflicts'].includes(row.category)||row.category===category.value)&&row.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()));
     page=Math.min(Math.max(page,0),Math.max(0,Math.ceil(filtered.length/50)-1));previous.disabled=busy||page===0;next.disabled=busy||(page+1)*50>=filtered.length;
     for(const node of [apply,dismiss,undo])node.disabled=busy||!selected.size||selected.size>50;
     counter.textContent=item?filtered.length?`${filtered.length} saved suggestions and source selections. Check a candidate before accepting it. Dismiss removes a pending suggestion, not provider data.`:'No pending book suggestions for this item. Request a lookup above or use a file or publisher page.':`${filtered.length} entries; page ${page+1} of ${Math.max(1,Math.ceil(filtered.length/50))}; ${selected.size} selected (maximum 50). Nothing changes until you choose an action.`;
@@ -83,5 +87,5 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
     }
   }
   category.addEventListener('change',()=>{page=0;refresh();});search.addEventListener('input',()=>{page=0;refresh();});element.addEventListener('toggle',refresh);
-  return {element,showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(next){if(database!==next){database=next;dirty=true;heading.textContent=item?'Review suggestions for this item':'Review book suggestions';}refresh();}};
+  return {element,showCategory(value){if(!labels[value])return;category.value=value;search.value='';page=0;element.open=true;refresh();},showTitle(title){category.value='all';search.value=title;page=0;element.open=true;refresh();},update(next){if(database!==next){database=next;dirty=true;heading.textContent=item?'Review suggestions for this item':'Review book suggestions';}refresh();}};
 }

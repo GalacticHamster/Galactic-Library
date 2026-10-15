@@ -1,5 +1,27 @@
 # Contents: discover, review and compare included works
 
+## Review status and comparisons
+
+**Contents to check** counts changed, incomplete or uncertain saved descriptions.
+It is separate from **Unreviewed or changed contents**, which also includes usable
+inferred descriptions, and **Latest retrieval failed**, which can retain earlier
+useful contents. These filters are navigable from Contents status; they do not
+resolve or discard evidence. A successful inferred description is not an urgent
+review merely because it has not been manually verified.
+
+In **Books & Contents → Compare collections**, the target form is open immediately.
+Enter an explicit comic issue range or manga-volume list. **Compare against** shows
+all saved accounts by default, or a specific saved account. Library filters do not
+silently restrict these results. The same scope applies to the saved-series browser
+below it. Publication run and language remain optional qualifiers.
+
+Results link each supporting book to its exact Library record. Use browser Back
+to return to the comparison. Search, target text, qualifiers and account selection
+remain in this Options tab across navigation and reconciliation; they are not saved
+contents or a persistent draft backup. Editing a target marks its old result out of
+date until you compare again. Unmatched or unresolved material is explicitly shown;
+it is not proof that the corresponding issue is absent from your books.
+
 Open **Books & Contents → Included contents** to see included works for books from every remembered account. Library and Contents share search, media, provider, saved account, genre, access, reading, series and sorting. Contents-specific status filters remain separate and clearly marked. Contents is book-only; an incompatible media filter produces an honest empty result, not a reinterpreted selection.
 
 Pages follow the same catalog ordering as Library, with separate cards for qualifying accounts and a shared adjustable page size. The same product in two accounts keeps its own descriptions and reviews. Switching follows the current item/first visible group, and clamps the saved page when that item no longer qualifies. See [Library browsing](library-browsing.md) for exact filter and position semantics.
@@ -27,7 +49,7 @@ Adding appends editable rows without replacing existing corrections or duplicati
 | Not checked yet | No acquired contents source is recorded. Automated acquisition currently supports eligible Kindle books only; manual review is available for other books. |
 | Couldn't retrieve description | Acquisition did not produce usable source evidence. Retry/recovery belongs on the signed-in Kindle page. |
 
-The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Needs contents review** finds unconfirmed statements and statements that differ from the saved review. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
+The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Unreviewed or changed contents** retains the former Needs contents review filter: it finds unconfirmed statements and statements that differ from the saved review. **Contents to check** narrows attention to changed, incomplete or uncertain descriptions. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
 
 List counts refer to saved human-reviewed entries, not a guessed total number of issues in the book. Statuses use stored interpretation fields. Visible previews reuse human entries or interpret the selected captured statement and its proven parent manifest in a 200-record snapshot cache. This uses the same source context as coverage and inspection, without refreshing a provider or reparsing the entire library on list navigation. Where interpretation is unavailable, saved description text remains visible.
 

@@ -45,7 +45,7 @@ if(window.parent!==window){
   const total=name=>name==='Library'?13000:14000;
   const assertRows=name=>{
     const [top,bottom]=rows(name);assert(top&&bottom,'Missing repeated controls');
-    assert(top.nextElementSibling===list(name)&&list(name).nextElementSibling===bottom,'Pagination not immediately adjacent to results');
+    assert(top.nextElementSibling===list(name)&&list(name).nextElementSibling===bottom,`Pagination not immediately adjacent to ${name} results: ${top.nextElementSibling?.id}/${list(name).nextElementSibling?.id}`);
     assert(top.querySelector('.pagination-info').textContent===bottom.querySelector('.pagination-info').textContent,'Rows diverged');
     for(let n=0;n<3;n++){const a=top.children[n],b=bottom.children[n];assert(a.disabled===b.disabled,'Control states diverged');if(n!==1){assert(!a.classList.contains('secondary')&&!b.classList.contains('secondary'),'Enabled control inherits secondary style');const expected=a.disabled?'rgb(75, 85, 99)':'rgb(124, 58, 237)';assert(getComputedStyle(a).backgroundColor===expected,'Incorrect button color');}}
     const rect=top.querySelector('.pagination-info').getBoundingClientRect(),outer=top.getBoundingClientRect();assert(Math.abs((rect.left+rect.right)-(outer.left+outer.right))<2,'Page information not centered');

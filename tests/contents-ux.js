@@ -6,6 +6,14 @@ import assert from 'node:assert/strict';
 import {contentsSummary,contentsPage,createContentsProjection} from '../src/ui/contents-overview.js';
 const book=(id,source)=>({id,recordRef:id,profileId:'a',title:'Collection '+id,provider:'kindle',mediaType:'book',metadata:{enrichment:source?{kindleProductComicContents:source}:{}}});
 export const contentsUxTests=[
+ ['Contents attention is distinct from usable unreviewed evidence, failed lookups and completed reviews',()=>{
+   const full=book('full',{statement:'Collects Example #1',parseOutcome:'full'}),partial=book('partial',{statement:'Collects Example #1; bonus',parseOutcome:'partial'}),failed=book('failed',{availability:'unavailable'});
+   const rows=[full,partial,failed].map(record=>contentsSummary(record,{}));
+   assert(rows[0].needsReview&&!rows[0].needsAttention);assert(rows[1].needsAttention);assert(!rows[2].needsAttention&&rows[2].failed);
+   assert.equal(contentsPage(rows,{status:'attention'}).total,1);assert.equal(contentsPage(rows,{status:'review'}).total,2);assert.equal(contentsPage(rows,{status:'failure'}).total,1);
+   const db={contentReviews:{full:{statement:'Collects Example #1',entries:[{series:'Example',number:'1',unitType:'issue',completeness:'full'}],verifiedAt:'2026-10-01'}}};
+   assert(!contentsSummary(full,db).needsAttention);full.metadata.enrichment.kindleProductComicContents.statement='Collects Example #1-2';assert(contentsSummary(full,db).needsAttention);
+ }],
  ['Contents states distinguish suggestions, unresolved text, empty capture, failure and never acquired',()=>{
    const db={};
    for(const [source,status] of [[null,'unattempted'],[{availability:'no-statement'},'missing'],[{availability:'unavailable'},'failed'],[{statement:'Collects Example #1',parseOutcome:'full'},'identified'],[{statement:'Collects Example #1; bonus',parseOutcome:'partial'},'partial'],[{statement:'Contains something',parseOutcome:'uncertain'},'uncertain'],[{statement:'Collects Example #1',parseOutcome:'full',descriptionMayBeIncomplete:true},'partial']])assert.equal(contentsSummary(book('a',source),db).status,status);

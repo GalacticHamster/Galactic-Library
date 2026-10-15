@@ -2,6 +2,23 @@
 
 Individual reading, ownership, book enrichment and identity actions are organized in [Library item details](item-details.md). Cross-library workbenches are in Books & Contents (Book information), and Library (Reading and Ownership and access). Detailed book contents review lives in [Contents](contents-workspace.md).
 
+## Choose the right ownership task
+
+**Library → Ownership and access** keeps four tasks separate:
+
+- **Correct ownership or access:** find the item in Library and use **Change access**, including bulk corrections. For optional dated evidence, use Details → Your library.
+- **Match products and editions:** open an item's Details → Matching and editions, or browse related product pairs here. A product relationship is not a purchase confirmation.
+- **Match purchase receipts:** expand **Receipt files** to import local evidence. **Ready to match** counts receipts with a candidate in the same saved account; **Waiting for an account copy** is separate. Both remain available in the Receipt status filter. Nothing confirms automatically.
+- **Manage keys and access reminders:** expand the existing reminders. Informational activation status, deadlines and dismissed reminders are separate from ownership corrections.
+
+The Comixology investigation download remains under its own disclosure. Provider accounts and purchase synchronization stay in **Providers**. Product-pair decisions and earlier saved relationships are retained; this organization does not resolve anything for you.
+
+## Understand review counts
+
+Library alerts separate **book suggestions needing a decision**, **lookup failures / no results**, and **receipts ready to match**. Each opens its matching queue. Unmatched receipts, saved decisions and successful source selections are not included in these actionable counts. A lookup failure is a retrieval result, not proof of incorrect ownership or missing contents.
+
+Book information shows suggestions, failures, unreviewed contents and saved source selections separately. Missing book information is optional enrichment. Included contents has a **Contents to check** filter for changed, incomplete or uncertain descriptions, separate from **Unreviewed or changed contents** and **Latest retrieval failed**. Usable inferred contents do not require a human review to contribute to coverage. Review totals count records or suggestions, not purchases or comic issues.
+
 ## Unicode and alternate titles (GL-17)
 
 Comparison keys preserve Unicode letters, combining marks, Japanese voicing and composed Korean. Latin accent simplification remains available without deleting script-specific marks. Stored original titles are unchanged.
@@ -24,7 +41,7 @@ A full rescan is needed to recover historical origins that older versions discar
 
 Expand **Confirm ownership with dated evidence** on any current record. Select purchase/permanent claim, temporary access or unknown, describe the checked evidence and its date, optionally cite a source URL and temporary access expiry, and explicitly confirm the record/account. Undo restores provider evidence. A separate source confirmation never rewrites the provider's ownership or observation dates. It survives resync and backup/restore through the persistent record reference; stale confirmations and undo requests cannot override a newer review or another profile.
 
-The **Local purchase evidence** workbench accepts CSV/JSON exports under 5 MB, up to 1,000 entries per import. Use `title`, `acquiredAt`/`Purchase Date` (ISO date), optional `asin`, `isbn`, `providerItemId`/`Catalog ID`, `provider`, and `mediaType`. Select Kindle for Comixology evidence or Audible for audiobook receipts. Unknown customer/payment/redemption fields are discarded immediately; raw receipts never leave the browser and are not retained. This is structured-export import, not PDF/email/OCR extraction.
+The **Library → Ownership and access → Match purchase receipts → Receipt files** workbench accepts CSV/JSON exports under 5 MB, up to 1,000 entries per import. Use `title`, `acquiredAt`/`Purchase Date` (ISO date), optional `asin`, `isbn`, `providerItemId`/`Catalog ID`, `provider`, and `mediaType`. Select Kindle for Comixology evidence or Audible for audiobook receipts. Unknown customer/payment/redemption fields are discarded immediately; raw receipts never leave the browser and are not retained. This is structured-export import, not PDF/email/OCR extraction.
 
 ASIN/ISBN/catalog IDs take priority when generating candidates. Title-only candidates remain proposals. Select and explicitly confirm the actual current edition/account before a receipt establishes a dated purchase confirmation. Known identifier/unit/edition conflicts reject approval. Unmatched receipts stay pending; sync the provider and refresh their candidates. Refresh never silently moves a receipt to a different profile. This reconciles existing library records; it does not invent provider records for unmatched receipts.
 

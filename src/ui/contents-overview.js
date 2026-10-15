@@ -3,8 +3,8 @@ import {compareTitles} from '../lib/title-sort.js';
 import {contentsStatement,contentsReviewChanged} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
-  rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Contents found · Not reviewed',
-  partial:'Some contents found · Not reviewed', uncertain:'Contents need review',
+  rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Inferred contents available',
+  partial:'Incomplete contents to check', uncertain:'Uncertain contents to check',
   missing:'Contents not extracted', unattempted:'Not checked yet',
   failed:"Couldn't retrieve description"
 };
@@ -29,7 +29,7 @@ export function contentsSummary(record, database) {
   // Count reviewed entries only; obtain exact proposed counts lazily in the editor.
   return {id:record.id,recordRef:record.recordRef,title:record.title,provider:record.provider,
     nickname:database.providerProfiles?.[record.profileId]?.nickname || 'Unnamed account',
-    status,label:CONTENTS_STATUSES[status],needsReview,changed,incomplete,
+    status,label:CONTENTS_STATUSES[status],needsReview,needsAttention:changed||!review&&['partial','uncertain'].includes(status),changed,incomplete,
     failed:failed(attempt?.availability),retained:Boolean(failed(attempt?.availability)&&(statement||review)),
     attempt:attempt?.availability??'never-checked',count:review?.entries?.length??null,
     updatedAt,
@@ -47,7 +47,7 @@ export function createContentsProjection() {
 }
 export function contentsPage(rows,{query='',status='all',provider='all',page=0,size=50}={}) {
   const text=query.trim().toLocaleLowerCase();
-  const filtered=rows.filter(row=>(status==='all'?true:status==='review'?row.needsReview:status==='failure'?row.failed:row.status===status)
+  const filtered=rows.filter(row=>(status==='all'?true:status==='attention'?row.needsAttention:status==='review'?row.needsReview:status==='failure'?row.failed:row.status===status)
     && (provider==='all'||row.provider===provider)
     && `${row.title} ${row.nickname}`.toLocaleLowerCase().includes(text));
   const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.max(0,Math.min(page,pages-1));

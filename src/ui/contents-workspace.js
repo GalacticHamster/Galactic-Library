@@ -18,7 +18,7 @@ export function createContentsWorkspace(actions={}) {
   const controls=text('div','');controls.className='contents-filters';
   const search=text('input','');search.type='search';search.maxLength=500;search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
   const status=text('select','');status.setAttribute('aria-label','Contents status');
-  for(const [value,label] of [['all','All imported books'],['review','Needs contents review'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
+  for(const [value,label] of [['all','All imported books'],['attention','Contents to check'],['review','Unreviewed or changed contents'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
   const shared={search};
   const primary=text('div','');primary.className='library-filters';
   const more=text('details','');more.append(text('summary','More filters'));const extra=text('div','');extra.className='library-filters';more.append(extra);
@@ -40,7 +40,7 @@ export function createContentsWorkspace(actions={}) {
   const paging=createPagination({name:'Contents',loading:true,ids:{size:'contents-items-per-page'},onPage:next=>{if(actions.canLeave?.()===false)return false;page=next;view.anchor='';renderList();actions.changed?.();},onSize:size=>actions.pageSizeChanged?actions.pageSizeChanged(size):(setPageSize(size,{reset:true}),renderList())});
   paging.select.disabled=true;
   const header=text('div','');header.className='results-header';header.append(counter,paging.sizeContainer);
-  listView.append(controls,header,paging.top,list,paging.bottom);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Not reviewed means a description suggestion, not a checked list of everything in the book. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
+  listView.append(controls,header,paging.top,list,paging.bottom);const help=text('details','');help.className='context-help';help.append(text('summary','About contents and account filters'),text('p','Search, sort and common filters follow Library. Contents status applies only here. Each account has its own description and review. Inferred contents can already contribute to coverage. Unreviewed contents alone do not require action. Contents to check includes changed, incomplete or uncertain descriptions; latest retrieval failures are a separate filter and can retain useful earlier evidence. A failed latest retrieval can retain earlier contents. Filters must match one account record; no saved reading status is separate from explicitly unread.'));element.append(overview,listView,detail,help);
   const project=createContentsProjection(),browse=actions.projection??createLibraryBrowseProjection();let database,rows=[],page=0,pageSize=50,selected=null,active=false,returnScroll=0,openedEvidence='',view={...emptyBrowseView(),status:'all'},result;
   let coverage,coverageFor,coverageKey='',coverageError='',coverageRows=new Map();
   const resolutionActions=()=>({...actions.resolutionActions,canLeave:actions.canLeave,...actions.coverageOptions?.(),resolved:async(next,projection)=>{database=next;coverageFor=next;coverageKey=coverageProjectionKey(next,actions.coverageOptions?.().merges??{});coverage=projection;coverageRows=new Map(projection.dispositions.map(r=>[r.id,r]));rows=project(database);if(selected)open(selected);else renderList();await actions.resolutionActions?.resolved?.(next,projection);}});
@@ -56,7 +56,7 @@ export function createContentsWorkspace(actions={}) {
   function setPageSize(size,{reset=false}={}){pageSize=size;if(reset){page=0;view.page=0;view.anchor='';}}
   function applyView(next){view={...view,...next};page=view.page;for(const [key,field]of Object.entries(shared)){field.value=view[key];if(!field.value)field.dataset.pendingValue=view[key];}status.value=view.status;}
   function readView(){return {...view,page,anchor:selected??result?.rows[0]?.qualifying[0]?.record.recordRef??view.anchor};}
-  const qualifies=row=>view.status==='all'||(view.status==='review'?row.needsReview:view.status==='failure'?row.failed:row.status===view.status);
+  const qualifies=row=>view.status==='all'||(view.status==='attention'?row.needsAttention:view.status==='review'?row.needsReview:view.status==='failure'?row.failed:row.status===view.status);
   const evidenceKey=record=>JSON.stringify([database.contentReviews?.[record.id],record.metadata?.enrichment?.kindleProductComicContents,record.metadata?.enrichment?.localMetadata]);
   function renderList(){
     if(!database||!active||selected)return;
@@ -105,10 +105,10 @@ export function createContentsWorkspace(actions={}) {
   return {element,open,close,applyView,readView,setPageSize,get selected(){return selected;},get scroll(){return returnScroll;},
     update(nextDatabase,isActive=false){database=nextDatabase;active=isActive;paging.select.disabled=!database;if(!active&&!selected)return;requestCoverage();const projected=project(database);
       if(projected!==rows){rows=projected;const counts={};for(const row of rows)counts[row.status]=(counts[row.status]??0)+1;
-        overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsReview).length} need review · ${rows.filter(r=>r.failed).length} latest retrievals failed.`;
+        overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsAttention).length} contents to check · ${rows.filter(r=>r.needsReview&&!r.needsAttention).length} unreviewed contents available · ${rows.filter(r=>r.failed).length} latest retrievals failed. Use Contents status to open each group.`;
         for(const option of status.options){const key=option.value;
-          const count=key==='all'?rows.length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
-          const label=key==='all'?'All imported books':key==='review'?'Needs contents review':key==='failure'?'Latest retrieval failed':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
+          const count=key==='all'?rows.length:key==='attention'?rows.filter(row=>row.needsAttention).length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
+          const label=key==='all'?'All imported books':key==='attention'?'Contents to check':key==='review'?'Unreviewed or changed contents':key==='failure'?'Latest retrieval failed':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
         }
         const projection=browse(database);
         for(const [key,options]of [['provider',[...new Set([...projection.records.values()].map(v=>v.record.provider))].sort().map(id=>({value:id,label:providerName(id)}))],['account',projection.accountOptions],['series',projection.seriesOptions.map(value=>({value,label:value}))],['genre',projection.genreOptions.map(value=>({value,label:value}))]]){

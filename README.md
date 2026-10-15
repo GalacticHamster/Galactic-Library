@@ -21,13 +21,16 @@ The main navigation is **Library | Providers | Books & Contents | Settings**.
 - **Library → Comic Coverage:** browse Series Coverage and Collection Overlap.
   Inspect complete, partial, repeated and missing issue coverage, supporting
   books, and unresolved publications.
-- **Library → Ownership and access:** review related products/editions, reconcile
-  local purchase evidence, and manage key/access reminders.
+- **Library → Ownership and access:** choose ownership corrections, product/edition
+  relationships, optional receipt matching, or key/access reminders. Quick corrections
+  remain on Library cards; ordinary edition decisions remain in item Details.
 - **Providers:** import or update signed-in libraries, manage saved accounts,
   connect companion purchase sync, and inspect update health.
 - **Books & Contents → Included contents:** inspect an exact book/account's included works, review or enter
   contents, and inspect captured evidence. **Compare collections** retains explicit
-  target issue ranges and manga-volume comparisons in its own secondary view.
+  target issue ranges and manga-volume comparisons with explicit account scope and
+  links to supporting books. Review counts separate pending decisions, failed lookups
+  and usable unreviewed contents.
 - **Settings:** appearance, ownership assumptions, book-service configuration,
   backups, diagnostics and advanced developer pairing.
 

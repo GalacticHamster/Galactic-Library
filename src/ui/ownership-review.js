@@ -5,6 +5,7 @@ import {parsePurchaseEvidence} from '../lib/ownership-review.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {accountLabel} from './item-presentation.js';
 import {OWNERSHIP_STATES} from '../lib/constants.js';
+import {receiptReviewCounts} from './review-status.js';
 
 const node=(tag,text='')=>Object.assign(document.createElement(tag),{textContent:text});
 const input=(label,type='text')=>{const field=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')field.type=type;field.setAttribute('aria-label',label);return field;};
@@ -33,7 +34,9 @@ export function createOwnershipReviewTools(records,database,actions){
 }
 
 export function createPurchaseEvidenceWorkbench(database,actions){
-  const root=node('details');root.id='purchase-evidence-workbench';root.className='tool-card';root.append(node('summary',`Local purchase evidence — ${Object.keys(database.ownershipProposals).length} pending receipts`));let ready=false;
+  const counts=receiptReviewCounts(database);
+  const records=new Map(Object.values(database.providerItems).map(record=>[record.recordRef,record]));
+  const root=node('details');root.id='purchase-evidence-workbench';root.className='tool-card';root.append(node('summary',`Receipt files — ${counts.attention} ready to match · ${counts.waiting} waiting for an account copy`));let ready=false;
   root.addEventListener('toggle',()=>{
     if(!root.open||ready)return;ready=true;
     root.append(node('p','Import a local CSV/JSON export with title, purchase date and optional ASIN/ISBN/catalog ID. Choose Kindle for Comixology receipts or Audible for audiobooks. Customer, payment and redemption fields are discarded. Every candidate needs review. Unmatched receipts stay pending; sync the relevant provider and refresh candidates.'));
@@ -42,10 +45,11 @@ export function createPurchaseEvidenceWorkbench(database,actions){
     const file=input('Local purchase history file','file');file.accept='.json,.csv,application/json,text/csv';const status=node('p');status.setAttribute('role','status');
     file.addEventListener('change',async()=>{const selected=file.files?.[0];if(!selected)return;file.disabled=true;try{if(selected.size>5*1024*1024)throw new Error('Choose a file under 5 MB.');await performAction({status,name:'Reading and importing receipt evidence...',task:async()=>actions.import(parsePurchaseEvidence(await selected.text(),{provider:provider.value,sourceLabel:source.value}))});actions.refresh();}catch(error){status.textContent=error.message;file.disabled=false;}});
     root.append(labeledControl('Store / provider',provider),labeledControl('Source label',source),labeledControl('Purchase history file',file),button('Refresh receipt candidates',async()=>{try{await performAction({status,name:'Refreshing receipt candidates...',task:()=>actions.retry()});actions.refresh();}catch(error){status.textContent=error.message;}}),status);
-    const filter=input('Filter receipt titles','search');root.append(labeledControl('Find a receipt',filter));const list=node('ol');list.className='review-items';root.append(list);let page=0;
+    const filter=input('Filter receipt titles','search'),state=node('select');state.setAttribute('aria-label','Receipt status');for(const [value,label]of [['all','All saved receipts'],['ready','Ready to match'],['waiting','Waiting for an account copy']])state.append(Object.assign(node('option',label),{value}));root.append(labeledControl('Find a receipt',filter),labeledControl('Receipt status',state));const list=node('ol');list.className='review-items';root.append(list);let page=0;
     const paging=node('p'),previous=button('Previous receipt page',()=>{page--;render();}),next=button('Next receipt page',()=>{page++;render();});paging.append(previous,next);root.append(paging);
     function render(){
-      const entries=Object.entries(database.ownershipProposals).filter(([,proposal])=>proposal.evidence.title.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase()));page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(entries.length/50)-1)));previous.disabled=page===0;next.disabled=(page+1)*50>=entries.length;list.replaceChildren();
+      const entries=Object.entries(database.ownershipProposals).filter(([,proposal])=>{const ready=proposal.recordRefs.some(ref=>records.get(ref)?.profileId===proposal.profileId&&records.has(ref));return (state.value==='all'||(state.value==='ready'?ready:!ready))&&proposal.evidence.title.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase());});page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(entries.length/50)-1)));previous.disabled=page===0;next.disabled=(page+1)*50>=entries.length;list.replaceChildren();
+      if(!entries.length)list.append(node('li',filter.value?'No saved receipts match this title.':'No saved receipt suggestions. Import a file only if you want to document a purchase.'));
       for(const [id,proposal]of entries.slice(page*50,(page+1)*50)){
         const entry=node('li'),evidence=proposal.evidence;entry.append(node('strong',evidence.title),node('p',`${providerLabel(evidence.provider)} · ${database.providerProfiles?.[proposal.profileId]?.nickname||proposal.profileLabel||'Account not assigned'} · ${formatDate(evidence.acquiredAt)} · ${evidence.asin||evidence.isbn||evidence.providerItemId||'title-only evidence'}`));
         const current=Object.values(database.providerItems).filter(item=>proposal.recordRefs.includes(item.recordRef)&&item.profileId===proposal.profileId);
@@ -57,6 +61,6 @@ export function createPurchaseEvidenceWorkbench(database,actions){
         entry.append(button('Dismiss receipt proposal',async()=>{try{await performAction({status,name:'Dismissing receipt proposal...',task:()=>actions.dismiss(id)});actions.refresh();}catch(error){status.textContent=error.message;}}));list.append(entry);
       }
     }
-    filter.addEventListener('input',()=>{page=0;render();});render();
+    filter.addEventListener('input',()=>{page=0;render();});state.addEventListener('change',()=>{page=0;render();});render();
   });return root;
 }

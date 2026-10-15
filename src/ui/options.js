@@ -42,6 +42,7 @@ import {createSyncHealthView} from './sync-health.js';
 import {cancelProviderScan} from '../lib/storage.js';
 import {saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence} from '../lib/storage.js';
 import {createEnrichmentWorkbench} from './enrichment-workbench.js';
+import {bookReviewCounts,receiptReviewCounts} from './review-status.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, parseBackupPreferences, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision,savePreferredDisplayTitle, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
@@ -95,7 +96,7 @@ const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
 const selectedAccessRecords=new Map(),accessSelection=document.createElement('div'),accessResult=document.createElement('p');
 accessSelection.className='actions';accessSelection.setAttribute('aria-label','Selected access changes');accessSelection.hidden=true;accessResult.setAttribute('role','status');
-items.before(accessSelection,accessResult);
+document.querySelector('#library-pagination').before(accessSelection,accessResult);
 function updateAccessSelection(){
   const current=new Map(Object.values(database?.providerItems??{}).map(record=>[record.recordRef,record]));for(const [ref,scope]of selectedAccessRecords){const record=current.get(ref);if(!record||record.provider!==scope.provider||record.profileId!==scope.profileId)selectedAccessRecords.delete(ref);}
   accessSelection.hidden=!selectedAccessRecords.size;accessSelection.replaceChildren();if(!selectedAccessRecords.size)return;
@@ -210,6 +211,7 @@ let libraryPage = 0;
 let browseAnchor='',lastBrowseResult,selectedBrowseRef;
 let unlinkedPage=0;
 let coverageDatabase;
+const comparisonViewState={};
 let overlapDatabase;
 const comicCoverageBrowseState={};
 let comicCoverageDatabase,comicCoverageStarts={},comicCoverageTransitions={},comicCoverageMerges={},comicCoverageNames={};
@@ -398,7 +400,7 @@ function populateBrowseFilters(browse){
 function renderActiveFilters(filters){
   const root=document.querySelector('#library-active-filters');root.replaceChildren();
   if(search.value.trim())root.append(actionButton('Search: '+search.value.trim()+' - clear',()=>{search.value='';viewChanged();}));
-  const labels={provider:'Provider',mediaType:'Media',account:'Account',genre:'Genre',ownership:'Access',acquisitions:'Ownership',reading:'Reading',series:'Series',information:'Information',dlc:'DLC'};
+  const labels={provider:'Provider',mediaType:'Media',account:'Account',genre:'Genre',ownership:'Access',acquisitions:'Copies owned',reading:'Reading',series:'Series',information:'Information',dlc:'DLC'};
   for(const [key,value]of Object.entries(filters))if(value!==filterDefault(key)){const field=viewControls[key];root.append(actionButton(labels[key]+': '+field.selectedOptions[0]?.textContent+' - clear',()=>{field.value=filterDefault(key);viewChanged();}));}
   root.hidden=!root.children.length;
 }
@@ -754,7 +756,7 @@ function render(timing = null) {
     apply:async(...args)=>{database=await applyPurchaseEvidence(...args);},dismiss:async id=>{database=await dismissPurchaseEvidence(id);},refresh:render
   });
   const priorReceipts=document.querySelector('#purchase-evidence-workbench');receiptWorkbench.open=priorReceipts?.open??false;
-  if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else document.querySelector('#ownership-workspace').append(receiptWorkbench);
+  if(priorReceipts)priorReceipts.replaceWith(receiptWorkbench);else document.querySelector('#purchase-evidence-slot').append(receiptWorkbench);
   const syncDashboard=createSyncHealthView(database,{cancel:async(...args)=>{database=await cancelProviderScan(...args);},refresh:render});
   const priorSync=document.querySelector('#sync-health-dashboard');syncDashboard.open=priorSync?.open??false;
   if(priorSync)priorSync.replaceWith(syncDashboard);else document.querySelector('#providers-workspace').append(syncDashboard);
@@ -762,7 +764,7 @@ function render(timing = null) {
     removeFeed:async clientId=>{await removeCompanionFeed(clientId);database=await getDatabase();},review:async(...args)=>{database=await saveReminderReview(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'}),
     requestPermission:()=>requestReminderPermissions(chrome),notificationSettings:getReminderNotificationSettings,notifications:saveReminderNotificationSettings,reviewSource:reviewCompanionSource
   });const priorReminders=document.querySelector('#entitlement-reminders');reminderDashboard.open=priorReminders?.open??false;
-  if(priorReminders)priorReminders.replaceWith(reminderDashboard);else receiptWorkbench.after(reminderDashboard);
+  if(priorReminders)priorReminders.replaceWith(reminderDashboard);else document.querySelector('#access-reminders-slot').append(reminderDashboard);
   const priorReading=document.querySelector('#reading-workbench');
   const readingWorkbench=createReadingWorkbench(database,{
     canLeave:()=>drafts.allowNavigation(),order:async(...args)=>{const result=await drafts.commit(()=>saveReadingOrder(...args));database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'})
@@ -892,9 +894,11 @@ function render(timing = null) {
   endSegment?.();endSegment=timing?.begin('options_coverage');
   renderCollectionCoverage();
   const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
-  const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+(duplicateReviewDatabase===database?duplicateReviewItems.children.length:0);
-  if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
-  if(ownershipCount)alerts.append(actionButton(ownershipCount+' purchase or product reviews',()=>workspace.select('ownership')));
+  const bookCounts=bookReviewCounts(database),receiptCounts=receiptReviewCounts(database);
+  const openBookQueue=value=>{if(workspace.select('books'))enrichmentWorkbench.showCategory(value);};
+  if(bookCounts.attention)alerts.append(actionButton(bookCounts.attention+' book suggestions needing a decision',()=>openBookQueue('attention')));
+  if(bookCounts.lookups)alerts.append(actionButton(bookCounts.lookups+' lookup failures / no results',()=>openBookQueue('failed')));
+  if(receiptCounts.attention)alerts.append(actionButton(receiptCounts.attention+' receipts ready to match',()=>{if(workspace.select('ownership')){const panel=document.querySelector('#purchase-evidence-workbench');panel.open=true;panel.dispatchEvent(new Event('toggle'));const filter=panel.querySelector('[aria-label="Receipt status"]');filter.value='ready';filter.dispatchEvent(new Event('change'));panel.querySelector('summary').focus();panel.scrollIntoView({block:'start'});}}));
   alerts.hidden=!alerts.children.length;
   } finally {endSegment?.();}
 }
@@ -1044,7 +1048,7 @@ function renderCollectionCoverage(){
     document.querySelector('#collection-overlap-view').replaceChildren(createCollectionOverlapView(database,{state:comicCoverageBrowseState.overlap??(comicCoverageBrowseState.overlap={}),openRecord:ref=>openLibraryRecord(ref)}));overlapDatabase=database;
   }
   if(!database||workspace.workspace!=='comparisons'||coverageDatabase===database)return;
-  document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database));coverageDatabase=database;
+  document.querySelector('#series-coverage-view').replaceChildren(createSeriesCoverageView(database,{state:comparisonViewState,openRecord:ref=>openLibraryRecord(ref,{returnToOrigin:true})}));coverageDatabase=database;
 }
 document.querySelector('#comic-coverage-navigation').addEventListener('click',event=>{const button=event.target.closest('[data-coverage-view]');if(button){coverageView=button.dataset.coverageView;renderCollectionCoverage();}});
 

@@ -41,7 +41,7 @@ function validateView(view,defaults){
     if(key==='page'){if(!Number.isSafeInteger(value)||value<0||value>1000000)throw Error('Invalid library page.');}
     else if(typeof value!=='string'||value.length>(['search','series'].includes(key)?500:200))throw Error('Invalid library filter.');
   }
-  const enums={acquisitions:['all','1','2','3','4','5'],mediaType:['all','game','software','book','audiobook','movie','tv'],ownership:['all','owned','claimed','unknown','rental','borrowed','subscription','returned','revoked','expired'],dlc:['all','with','without'],reading:['all','not-saved','unread','reading','completed'],information:['all','missing','review'],sort:['title-asc','title-desc','added','updated','creator','series'],status:['all','review','failure','reviewed','rejected','identified','partial','uncertain','missing','unattempted','failed']};
+  const enums={acquisitions:['all','1','2','3','4','5'],mediaType:['all','game','software','book','audiobook','movie','tv'],ownership:['all','owned','claimed','unknown','rental','borrowed','subscription','returned','revoked','expired'],dlc:['all','with','without'],reading:['all','not-saved','unread','reading','completed'],information:['all','missing','review'],sort:['title-asc','title-desc','added','updated','creator','series'],status:['all','attention','review','failure','reviewed','rejected','identified','partial','uncertain','missing','unattempted','failed']};
   for(const [key,choices]of Object.entries(enums))if(key in output&&!choices.includes(output[key]))throw Error('Unknown library filter.');
   return output;
 }
