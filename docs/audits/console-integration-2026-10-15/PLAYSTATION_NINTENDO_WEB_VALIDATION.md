@@ -9,7 +9,7 @@ Xbox research/harness files are preserved without further investigation.
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
 | PlayStation — PS4/PS5 web library | Live helper observed 60 rows / 59 product IDs across 3 terminal pages; 58 PS4 and 2 PS5 rows, all active with membership NONE | Actual website fetch and extension observation demonstrated. Independent cookie-only replay, account binding and product/title relationships remain to check. **No production importer yet.** |
-| Nintendo — Switch Virtual Game Cards | User sees 115 cards; Savanna GraphQL endpoint and four website operation names confirmed | Host filter fixed in 0.1.4; current query recognition fixed in 0.1.5. Live response/pagination/access semantics still pending. **No production importer yet.** |
+| Nintendo — Switch Virtual Game Cards | Live 0.1.5 helper reconciles 115 rows / 115 card IDs / 115 software IDs, one terminal page; all four queries HTTP 200 | Authenticated website source and extension observation demonstrated. Account isolation, access semantics and independent acquisition remain to validate. **No production importer yet.** |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
 Do not list either new source as an available provider until the signed-in gate
@@ -136,6 +136,47 @@ visible. Legacy `getVgcs` support remains. One `vgcViews` or `vgcViewsV2` envelo
 can be read, never a union of both. Fixed-path response shapes expose types/counts
 without values if the actual envelope differs. Synthetic fixtures cover both
 envelopes; neither is claimed as an authenticated response until the live rerun.
+
+## Successful live Nintendo reconciliation
+
+The user's 0.1.5 aggregate export now confirms the current website contract:
+
+- POST to the portal-declared Savanna endpoint, using XHR. All four known queries
+  return HTTP 200; there are zero GraphQL failures, unknown operations, malformed
+  card pages or bounds reached. Three queries are auxiliary, not card sources.
+- `getVgcsVgcs` uses offset 0, limit 300, shopId 3, ACTIVATED_DATE / ASC and
+  `isHidden: false`. A credential variable is present, but no value or request
+  header was exported. Browser-default XHR mode is not proof of cookie-only access.
+- The actual response uses `data.account.vgc.vgcViewsV2`, containing `views` and
+  `offsetInfo`. One page has 115 rows, 115 distinct card/view IDs, 115 distinct
+  application IDs and a reported total of 115. That exactly reconciles the user's
+  visible-card baseline for the observed non-hidden scope; it is not a claim about
+  every Nintendo purchase, hidden cards, other accounts or legacy platforms.
+- Every row exposes id, applicationId/name, apparentPlatform, ownerNaId, userNaId,
+  hidden/lending/partial-lending flags, lending expiry, inserted device ID, and
+  released-application/add-on/upgrade flags. All 115 platform labels are NX;
+  all owner/user pairs match, and all hidden/lending/partial-lending flags are false.
+- Released base-application flags are true on 112 cards and false on 3. Released
+  add-on flags are true on 13 cards and false on 102; released-upgrade flags are
+  false on all 115. These are overlapping flag counts, not mutually exclusive
+  product categories. The export does not retain joint counts or prove the three
+  base-flag-false cards are DLC-only rather than another state such as unreleased.
+
+The earlier absence of cards was due to helper contract assumptions: excluding
+the real `.nintendo.net` endpoint, expecting the reference client's `getVgcs`
+operation, and only reading its `vgcViews` response alias. No Nintendo authorization
+failure or absent-card condition was demonstrated.
+
+This passes the authenticated response-observation and visible-count check. The
+helper deliberately still reports accountIsolationValidated,
+ownershipSemanticsValidated and accountLibraryComplete as false: it imports no
+data, proves no profile-switch behavior, and has no live lending/borrowing case.
+Owner/user equality is useful access evidence, but the field relationship must
+not be substituted for an independently established signed-in account identity.
+No provider-specific root account ID was found by the currently checked paths.
+An independent importer request and its account/save-time guards remain separate
+from observing a successful website-owned request. The PlayStation one-page
+cookie-only test has been requested while these production gates remain open.
 
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
