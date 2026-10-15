@@ -3,6 +3,7 @@
 These selected records explain architectural turning points. Their versions, counts, implementation status and recommendations are historical. Use [current architecture](../architecture/contents-evidence.md) and [user documentation](../README.md) for current contracts. Generated ledgers/appendices are local, not required to read these reports.
 
 - [Generalized qualifier matching](qualifier-matching-2026-10-03.md): preserve purchasing warnings across edition/revision wording while separating identity from access.
+- [Console provider feasibility](console-integration-2026-10-15/CONSOLE_INTEGRATION_RECOMMENDATIONS.md): independent Xbox, PlayStation and Nintendo ownership-source audits, validation gates and pre-1.0 recommendations.
 - [Contents quality audit](kindle-contents-quality-audit.md) and [quality implementation](kindle-contents-quality-pass.md): topic/credit false positives and excerpt scope.
 - [Performance instrumentation](kindle-contents-performance.md) and [bounded persistence fix](kindle-contents-performance-fix-2026-10-04.md): whole-database costs, checkpoint bounds and lightweight progress.
 - [Amazon extraction reconnaissance](kindle-amazon-extraction-reconnaissance.md): first-trigger selection versus incomplete hydration.
