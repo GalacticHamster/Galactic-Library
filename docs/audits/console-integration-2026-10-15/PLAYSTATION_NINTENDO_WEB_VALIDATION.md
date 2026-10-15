@@ -9,7 +9,7 @@ Xbox research/harness files are preserved without further investigation.
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
 | PlayStation — PS4/PS5 web library | Live helper observed 60 rows / 59 product IDs across 3 terminal pages; 58 PS4 and 2 PS5 rows, all active with membership NONE | Actual website fetch and extension observation demonstrated. Independent cookie-only replay, account binding and product/title relationships remain to check. **No production importer yet.** |
-| Nintendo — Switch Virtual Game Cards | User can see 115 cards; helper 0.1.1 is active but observed zero candidate requests | Initial-data and dynamic-host diagnostics added in 0.1.2; actual source remains unverified. **No production importer yet.** |
+| Nintendo — Switch Virtual Game Cards | User sees 115 cards; portal declares `https://wb.lp1.savanna.srv.nintendo.net/graphql`; 0.1.3 hooks saw four XHRs but filtered out this host | Confirmed helper host-filter defect corrected in 0.1.4; live response/pagination/access semantics still pending. **No production importer yet.** |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
 Do not list either new source as an available provider until the signed-in gate
@@ -104,6 +104,23 @@ not acquire additional pages or change any production importer. Nintendo's publi
 evidence about this account's current card delivery mechanism. No actual source
 contract or Nintendo authorization blocker has yet been demonstrated.
 
+The user's live 0.1.3 result confirms all hooks are installed, four XHR calls
+reached them, and `data.shopGraphQLApiUrl` is present as a string. The user then
+read only that URL (excluding query parameters), establishing the exact address
+`https://wb.lp1.savanna.srv.nintendo.net/graphql`. The helper accepted only
+`nintendo.com` hosts, so it discarded this configured endpoint and could not
+observe its responses or include it in resource diagnostics. This is a confirmed
+helper allowlist defect, not evidence of denied authentication or missing cards.
+It does not establish that all four XHRs were card requests.
+
+Version **0.1.4** accepts that exact HTTPS origin and `/graphql` path consistently
+in request observation, bootstrap endpoint reporting, resource summaries and
+isolated-world sanitization. Unrelated `nintendo.net` hosts, suffix lookalikes,
+credentials in URLs, alternate ports and different paths remain rejected. Synthetic
+XHR tests observe 115 cards and then an expired-session response without exporting
+IDs, titles or credentials. The number is a synthetic regression control; live card
+count reconciliation and the production importer gate remain open.
+
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
 membership/access fields. Purchased-view naming alone must not mark all rows owned.
@@ -120,7 +137,7 @@ failure and move to the other provider. No legacy-console recovery is in scope.
 
 ## Validation
 
-Passed: **16 focused synthetic tests**, installed-helper checks for both providers
+Passed: **17 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation

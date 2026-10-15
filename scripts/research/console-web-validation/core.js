@@ -10,8 +10,11 @@
   const bootstrapFields=[...knownFields,'data','state','meta','user','account','vgc','vgcs','vgcViews','vgcViewsV2','views','cards','items','results','list','nodes','edges','node','initial','initialState','props','pageProps','countryId','country','lang','language','countries','shopGraphQLApiUrl','shopGraphqlApiUrl','savannaClientId','idToken','accountId','naId','offsetInfo','total','offset','limit','count'];
   const valueType=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
   const shape=value=>({type:valueType(value),...(value&&typeof value==='object'?{keyCount:Object.keys(value).length,fields:Object.fromEntries(Object.keys(value).filter(key=>bootstrapFields.includes(key)).map(key=>[key,valueType(value[key])]))}:{})});
-  const nintendoHost=hostname=>/^[a-z0-9.-]+$/.test(hostname)&&hostname.endsWith('.nintendo.com');
-  const nintendoEndpoint=url=>url.protocol==='https:'&&!url.username&&!url.password&&url.hostname.endsWith('.nintendo.com')&&/^\/[a-zA-Z0-9/_-]{0,100}graphql\/?$/i.test(url.pathname);
+  // Exact Savanna host supplied by the signed-in portal's shopGraphQLApiUrl.
+  // Do not turn this into an allowlist for arbitrary nintendo.net subdomains.
+  const nintendoHost=hostname=>/^[a-z0-9.-]+$/.test(hostname)&&(hostname.endsWith('.nintendo.com')||hostname==='wb.lp1.savanna.srv.nintendo.net');
+  const nintendoEndpoint=url=>url.protocol==='https:'&&!url.username&&!url.password&&
+    (url.origin==='https://wb.lp1.savanna.srv.nintendo.net'?url.pathname==='/graphql':url.hostname.endsWith('.nintendo.com')&&/^\/[a-zA-Z0-9/_-]{0,100}graphql\/?$/i.test(url.pathname));
   function providerForLocation(location){
     if(location.origin==='https://library.playstation.com')return 'playstation';
     if(location.origin==='https://accounts.nintendo.com'&&/^\/portal\/vgcs(?:\/|$)/.test(location.pathname))return 'nintendo';
@@ -166,7 +169,7 @@
         scope.pages.push(page);for(const value of page.identifiers)scope.ids.add(value);for(const value of page.software)scope.software.add(value);
         for(const key of ['fields','platforms','flags','relations'])for(const [name,count]of Object.entries(page[key]))scope[key][name]=(scope[key][name]??0)+count;
       }
-      return {format:1,helperVersion:'0.1.3',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,malformedPages:malformed,boundReached:bounded,
+      return {format:1,helperVersion:'0.1.4',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,malformedPages:malformed,boundReached:bounded,
         requestContracts:observations,scopes:[...scopes].map(([scope,s])=>{
           const pages=s.pages.sort((a,b)=>a.offset-b.offset);let end=0,contiguous=true;
           for(const p of pages){if(p.offset!==end)contiguous=false;end=p.offset+p.count;}
@@ -190,7 +193,7 @@
     const flags=key=>/^(?:isActive|isTrial|isHidden|isLending|isPartialLending|hasApplication|hasReleasedApplication|hasAddOnContents|hasReleasedAddOnContents|hasUpgrade|hasReleasedUpgrade):(?:true|false)$/.test(key)||/^(?:subscriptionService|membership):(?:NONE|PS_PLUS|PSPLUS|PS_NOW|PSNOW|PLUS|EA_PLAY|null|true|false|other-or-structured)$/.test(key);
     const result={format:1,provider:input.provider,readOnly:true,...numbers(input),boundReached:input.boundReached===true,
       active:input.active===true,accountIsolationValidated:false,ownershipSemanticsValidated:false,accountLibraryComplete:false};
-    if(['0.1.1','0.1.2','0.1.3'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
+    if(['0.1.1','0.1.2','0.1.3','0.1.4'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
     result.requestContracts=(Array.isArray(input.requestContracts)?input.requestContracts:[]).slice(0,20).flatMap(r=>{
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}

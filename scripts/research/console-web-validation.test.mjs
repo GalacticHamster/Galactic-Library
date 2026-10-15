@@ -26,6 +26,26 @@ test('Only specific read-only endpoints/operations are recognized; no headers or
   const options={credentials:'include'};Object.defineProperty(options,'headers',{get(){throw Error('Must not inspect auth headers');}});
   assert(C.requestInfo('playstation','https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:'{"start":0,"size":24}'}),options));
 });
+
+test('Verified Nintendo Savanna endpoint is recognized consistently in requests, bootstrap, resources and redacted exports',()=>{
+  const endpoint='https://wb.lp1.savanna.srv.nintendo.net/graphql';
+  const options={method:'POST',body:JSON.stringify({operationName:'getVgcs',query:'query getVgcs { account { vgc { vgcViews { views { id } } } } }',variables:{offset:0,limit:300,idToken:'private-token'}})};
+  Object.defineProperty(options,'headers',{get(){throw Error('Must not inspect authorization headers');}});
+  const request=C.requestInfo('nintendo',endpoint,options);assert.equal(request?.operation,'getVgcs');assert.equal(request.endpoint,endpoint);
+  const ledger=C.createLedger('nintendo');ledger.observe(request,200,nBody(0,Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'})),115),'xhr');
+  const bootstrap=C.bootstrapSummary({getElementById:name=>name==='data'?{getAttribute:()=>JSON.stringify({shopGraphQLApiUrl:endpoint,idToken:'private-token'})}:null});
+  const resources=C.resourceSummary({getEntriesByType:()=>[{name:endpoint+'?private-token',initiatorType:'xmlhttprequest'}]});
+  const result=plain(C.sanitizeReport({...ledger.report(),bootstrap,resources}));
+  assert.equal(result.requestContracts[0].endpoint,endpoint);assert.equal(result.requestContracts[0].transport,'xhr');assert.equal(result.requestContracts[0].credentialVariablePresent,true);
+  assert.equal(result.scopes[0].rows,115);assert.equal(result.scopes[0].distinctRowIds,115);assert.equal(result.scopes[0].distinctSoftwareProductIds,115);assert.equal(result.scopes[0].observedScopeTraversal,'terminal-range-observed');
+  assert.deepEqual(result.bootstrap.declaredGraphqlEndpoints,[endpoint]);assert.equal(result.resources.groups[0].host,'wb.lp1.savanna.srv.nintendo.net');
+  assert(!JSON.stringify(result).includes('private'));assert(!JSON.stringify(result).includes('Private title'));assert.equal(result.accountLibraryComplete,false);assert.equal(result.ownershipSemanticsValidated,false);
+  for(const bad of ['https://unrelated.nintendo.net/graphql','https://wb.lp1.savanna.srv.nintendo.net.evil.example/graphql','https://user:password@wb.lp1.savanna.srv.nintendo.net/graphql','http://wb.lp1.savanna.srv.nintendo.net/graphql','https://wb.lp1.savanna.srv.nintendo.net:8443/graphql','https://wb.lp1.savanna.srv.nintendo.net/other/graphql']){
+    assert.equal(C.requestInfo('nintendo',bad,options),null,bad);
+    assert.equal(C.sanitizeReport({format:1,provider:'nintendo',requestContracts:[{endpoint:bad}]}).requestContracts.length,0,bad);
+  }
+});
+
 test('Purchase paging, repeated requests, missing prefix and filter scopes stay distinct',()=>{
   const l=C.createLedger('playstation');l.observe(psRequest(),200,psBody(0,[{id:'one',productId:'p1'},{id:'two',productId:'p2'}],false));
   l.observe(psRequest(2),200,psBody(2,[{id:'three',productId:'p3'}],true));
@@ -88,7 +108,7 @@ test('Observer diagnostics distinguish replaced hooks from an empty library and 
   assert.equal(context.fetch,replacement);assert.equal(posts.at(-1).report.active,false);
 });
 
-test('XHR interception preserves calls and reports auth expiry without reading headers or forwarding identifiers',async()=>{
+test('XHR interception observes 115 synthetic Savanna cards and reports auth expiry without forwarding identifiers',async()=>{
   const listeners=[],posts=[];
   class XHR{
     open(...args){this.openArgs=args;return 'opened';}
@@ -100,11 +120,15 @@ test('XHR interception preserves calls and reports auth expiry without reading h
   const oldOpen=XHR.prototype.open,oldSend=XHR.prototype.send;
   vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
   try{
-    const request=new XHR();assert.equal(request.open('POST','https://api.ec.nintendo.com/public/graphql'),'opened');
+    const successful=new XHR();successful.open('POST','https://wb.lp1.savanna.srv.nintendo.net/graphql');
+    successful.send(JSON.stringify({operationName:'getVgcs',variables:{offset:0,limit:300,idToken:'private-token'}}));
+    successful.status=200;successful.responseType='json';successful.response=nBody(0,Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'})),115);successful.loaded();
+    const request=new XHR();assert.equal(request.open('POST','https://wb.lp1.savanna.srv.nintendo.net/graphql'),'opened');
     const body=JSON.stringify({query:'query getVgcs { account { vgc { views { id } } } }',variables:{offset:0,limit:300,idToken:'private-token'}});
     assert.equal(request.send(body),'sent');assert.equal(request.sent,body);request.status=401;Object.defineProperty(request,'responseText',{get(){throw Error('Do not inspect auth-error response');}});request.loaded();
     vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
     assert.equal(posts[0].report.failedRequests,1);assert.equal(posts[0].report.requestContracts[0].transport,'xhr');assert(!JSON.stringify(posts).includes('private-token'));
+    assert.equal(posts[0].report.scopes[0].rows,115);assert.equal(posts[0].report.scopes[0].distinctRowIds,115);assert(!JSON.stringify(posts).includes('Private title'));assert(!JSON.stringify(posts).includes('private-card'));
     vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:'https://untrusted.example',data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);assert.equal(posts.length,1);
     assert.equal(posts[0].report.observerState.xhrOpenHookInstalled,true);assert.equal(posts[0].report.observerState.xhrSendHookInstalled,true);
     context.XMLHttpRequest=class ReplacementXHR{open(){}send(){}};
