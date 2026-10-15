@@ -9,7 +9,7 @@ Xbox research/harness files are preserved without further investigation.
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
 | PlayStation — PS4/PS5 web library | Live helper observed 60 rows / 59 product IDs across 3 terminal pages; 58 PS4 and 2 PS5 rows, all active with membership NONE | Actual website fetch and extension observation demonstrated. Independent cookie-only replay, account binding and product/title relationships remain to check. **No production importer yet.** |
-| Nintendo — Switch Virtual Game Cards | User can see 115 cards; no current outgoing loans | Phase A helper ready; live aggregate result pending. **No production importer yet.** |
+| Nintendo — Switch Virtual Game Cards | User can see 115 cards; helper 0.1.1 is active but observed zero candidate requests | Initial-data and dynamic-host diagnostics added in 0.1.2; actual source remains unverified. **No production importer yet.** |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
 Do not list either new source as an available provider until the signed-in gate
@@ -42,8 +42,9 @@ tabs. This is a tooling/session boundary, **not a platform authorization failure
 ## Concrete gate prepared
 
 A separate [read-only validation helper](../../development/console-web-validation.md)
-is installable in Chrome and Firefox. It observes only requests initiated by the
-website, exposes bounded aggregate diagnostics through a strictly projected
+is installable in Chrome and Firefox. Its observer forwards website requests
+unchanged; an explicit PlayStation test button checks one purchase page without
+copied authorization headers. It exposes bounded aggregate diagnostics through a strictly projected
 MAIN/isolated bridge, and has no GL import, database, credentials or storage API.
 It requests no new host access in the production GL extension.
 
@@ -75,8 +76,22 @@ The user's first Nintendo helper attempt exposed a slashless-route bug, not an
 authentication failure: `/portal/vgcs` was rejected by the MAIN-world observer's
 trailing-slash-only check. Helper **0.1.1** recognizes both URL forms with a shared
 strict route classifier. Adjacent prefixes and login pages remain excluded. The
-fixed version passes focused and installed Chrome/Firefox tests; live Nintendo
-results are still pending.
+fixed version passes focused and installed Chrome/Firefox tests. The subsequent
+live result reports an active observer but zero candidate requests, failures or
+scopes despite 115 visible cards. That establishes neither an empty library nor
+an authentication failure. The original host allowlist was narrower than the
+public client's dynamically supplied Nintendo endpoint contract, and the helper
+did not inspect initial page data. Either could explain the missing observations;
+the actual delivery mechanism is not yet established.
+
+Helper **0.1.2** passively recognizes Nintendo GraphQL subdomains and inspects
+the portal's bounded `data-json` bootstrap blocks. Only aggregate card counts,
+declared API addresses and account-field paths leave the page; credential,
+account-ID and title values do not. Synthetic initial-data tests use 115 cards;
+that number is not claimed as an authenticated result. PlayStation's explicit
+one-page cookie-only test reuses an observed safe query, never copied headers or
+client credentials. Both changes help distinguish observed website access from
+an independently usable importer contract before any production implementation.
 
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
@@ -94,7 +109,7 @@ failure and move to the other provider. No legacy-console recovery is in scope.
 
 ## Validation
 
-Passed: **10 focused synthetic tests**, installed-helper checks for both providers
+Passed: **12 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation

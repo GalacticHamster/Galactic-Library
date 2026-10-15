@@ -15,11 +15,16 @@ providers remain gated on actual signed-in results. Xbox is outside this task.
    not a replacement Galactic Library extension.
 2. First open/reload [PlayStation Library](https://library.playstation.com/) while
    signed in normally. Use its Purchased view, browse/scroll through the games,
-   then click **Update summary** in the helper panel. Click **Copy summary**.
+   then click **Update summary** in the helper panel. Once available, click
+   **Test one read-only request** to check one purchase page using the browser's
+   existing session, without copying authorization headers. Click **Copy summary**.
 3. Repeat on [Nintendo Virtual Game Cards](https://accounts.nintendo.com/portal/vgcs/).
    Browse/scroll its card list before updating the summary. The current
    user-reported comparison target is **115 visible cards**, not automatically
-   115 products or permanent purchases.
+   115 products or permanent purchases. Helper 0.1.2 also checks initial page
+   data: its `bootstrap` section reports declared Nintendo GraphQL endpoints,
+   aggregate card-array counts, and account-identity field names without values.
+   Reload the helper and the website when upgrading the helper.
 4. Return only these aggregate summaries, browser name and whether the observed
    counts correspond to the displayed view. If no panel appears, or zero requests
    are observed, report that rather than copying a HAR or authenticated requests.
@@ -36,7 +41,11 @@ title list or screenshot of account details is required.
 
 The MAIN-world observer starts at document start. It forwards original fetch/XHR
 calls unchanged and observes only candidate read-only GraphQL requests. It makes
-**no requests itself**. It ignores mutation documents, authorization headers and
+**no requests itself**. The separate PlayStation test button explicitly makes
+one read-only request, using an observed public persisted-query hash and safe
+paging variables at the fixed PlayStation endpoint. It never copies headers,
+retries, falls back to other authentication, or imports the response. The observer
+ignores mutation documents, authorization headers and
 cookies. Nintendo credential-variable **presence** is reported; its value is
 never retained or exported. Body parsing is transient and only allowlisted
 nonsecret request metadata is retained.
@@ -46,8 +55,9 @@ Current candidate contracts:
 - PlayStation `getPurchasedGameList` at
   `https://web.np.playstation.com/api/graphql/v1/op`, GET/POST metadata, public
   paging/filter variables, `data.purchasedTitlesRetrieve.games` and `pageInfo`.
-- Nintendo `getVgcs` at an `ec.nintendo.com` / `api.ec.nintendo.com` GraphQL
-  path, with `data.account.vgc.vgcViews.views` and `offsetInfo`. These paths and
+- Nintendo `getVgcs` at a Nintendo HTTPS subdomain's GraphQL
+  path, with `data.account.vgc.vgcViews.views` and `offsetInfo`. The passive
+  observer does not assume a particular API hostname. These paths and
   shapes are based on inspected client code, **not yet authenticated observations**.
 
 It reports request method/endpoint/recognized operation, paging and scope, raw
@@ -69,11 +79,16 @@ reports are diagnostic evidence, not authority to import or classify purchases.
 
 ## Limits and interpretation
 
-- This validates observation and the page-to-extension handoff, **not independent
-  extension-issued authenticated requests**. The website supplies any real access.
+- Observation validates the page-to-extension handoff, **not independent
+  extension-issued authenticated requests**. Only a successful explicit PlayStation
+  test demonstrates one independent cookie-only page fetch in that browser session.
   Zero observations can mean caching, a captured original fetch, an unsupported
   Request/batched GraphQL shape, a worker-owned request, changed operation/host,
   or failed injection. It does not mean an empty library or an authentication denial.
+- Nintendo bootstrap inspection is bounded to the portal's `data`, `state` and
+  `meta` JSON blocks, 2 MiB per block and 2,000 visited nodes. Only arrays with
+  card and application identifiers are counted; their values are never exported.
+  Bootstrap arrays do not establish pagination or account-wide completeness.
 - Only string fetch bodies and ordinary XHR bodies are parsed. Unknown operations
   are counted without exporting their text. Non-JSON/oversized recognized responses
   are reported as malformed, without their error bodies.
@@ -99,4 +114,6 @@ the existing ZIP writer. No audit response or inventory is packaged. Native test
 install the actual helper scripts in disposable Chrome/Firefox profiles, with
 only the origin classifier/match patterns adapted to synthetic localhost pages.
 Provider fetches are mocked. Those tests prove installed script worlds, the UI,
-pagination diagnostics, redaction and Stop; they do not prove Sony/Nintendo access.
+pagination diagnostics, redaction, the explicit one-page test and Stop; they do not
+prove Sony/Nintendo access. Native tests also count 115 synthetic bootstrap cards
+without exposing their IDs; bootstrap privacy and bounds have focused unit tests.

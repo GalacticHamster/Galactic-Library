@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
 import vm from 'node:vm';
 const dir=new URL('./console-web-validation/',import.meta.url),core=await readFile(new URL('core.js',dir),'utf8');
-const ctx=vm.createContext({URL});vm.runInContext(core,ctx);const C=ctx.GLConsoleValidationCore;
+const ctx=vm.createContext({URL,URLSearchParams,AbortSignal,TextDecoder,Uint8Array});vm.runInContext(core,ctx);const C=ctx.GLConsoleValidationCore;
 const plain=value=>JSON.parse(JSON.stringify(value));
 const psRequest=(start=0,size=2,more={})=>C.requestInfo('playstation','https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start,size,isActive:true,platform:['ps4','ps5'],...more})}),{credentials:'include'});
 const psBody=(offset,games,isLast)=>({data:{purchasedTitlesRetrieve:{games,pageInfo:{offset,size:games.length,isLast}}}});
@@ -78,7 +78,7 @@ test('XHR interception preserves calls and reports auth expiry without reading h
     send(body){this.sent=body;return 'sent';}
     addEventListener(name,fn){this.loaded=fn;}
   }
-  const context=vm.createContext({URL,TextDecoder,Uint8Array,location:{origin:'https://accounts.nintendo.com',pathname:'/portal/vgcs/'},fetch:()=>{throw Error('No network');},XMLHttpRequest:XHR,addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
+  const context=vm.createContext({URL,TextDecoder,Uint8Array,document:{getElementById:()=>null},location:{origin:'https://accounts.nintendo.com',pathname:'/portal/vgcs/'},fetch:()=>{throw Error('No network');},XMLHttpRequest:XHR,addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
   context.window=context;context.postMessage=value=>posts.push(value);context.testListeners=listeners;
   const oldOpen=XHR.prototype.open,oldSend=XHR.prototype.send;
   vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
@@ -90,4 +90,22 @@ test('XHR interception preserves calls and reports auth expiry without reading h
     assert.equal(posts[0].report.failedRequests,1);assert.equal(posts[0].report.requestContracts[0].transport,'xhr');assert(!JSON.stringify(posts).includes('private-token'));
     vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:'https://untrusted.example',data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);assert.equal(posts.length,1);
   }finally{XHR.prototype.open=oldOpen;XHR.prototype.send=oldSend;}
+});
+
+test('Nintendo declared endpoint and bootstrap card arrays are inspected without exporting credentials or IDs',()=>{
+  const blocks={data:{shopGraphQLApiUrl:'https://api.ecsv.nintendo.com/graphql',idToken:'private-token'},state:{user:{id:'private-account'},initial:{views:Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-software-'+i,applicationName:'Private title',isHidden:false}))}}};
+  const document={getElementById:name=>blocks[name]?{getAttribute:()=>JSON.stringify(blocks[name])}:null};
+  const bootstrap=plain(C.bootstrapSummary(document));assert.deepEqual(bootstrap.declaredGraphqlEndpoints,['https://api.ecsv.nintendo.com/graphql']);assert.equal(bootstrap.cardArrays[0].rows,115);assert.deepEqual(bootstrap.accountIdentityFieldPaths,['state.user.id']);
+  const r=C.sanitizeReport({format:1,provider:'nintendo',bootstrap});assert(!JSON.stringify(r).includes('private'));assert(!JSON.stringify(r).includes('Private title'));
+  const info=C.requestInfo('nintendo','https://api.ecsv.nintendo.com/graphql',{method:'POST',body:JSON.stringify({query:'query getVgcs { account { vgc { views { id } } } }',variables:{offset:0}})});assert(info);assert.equal(C.requestInfo('nintendo','https://api.ecsv.nintendo.com.evil.example/graphql',{method:'POST',body:'{}'}),null);
+});
+
+test('PlayStation cookie-only check uses an observed safe query, one page, no copied authorization headers or fallback',async()=>{
+  const url=new URL('https://web.np.playstation.com/api/graphql/v1/op');url.search=new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:48,size:24,isActive:true,platform:['ps4','ps5']}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})});
+  const safe=C.psCookieQuery(url.href);assert.equal(JSON.parse(new URL(safe).searchParams.get('variables')).start,0);
+  let calls=0;const r=await C.checkPsCookieAccess(safe,async(input,options)=>{calls++;assert.equal(options.credentials,'include');assert.equal(options.redirect,'error');assert.deepEqual(plain(options.headers),{Accept:'application/json'});return new Response(JSON.stringify(psBody(0,[{productId:'private-product',name:'Private title'}],false)),{status:200});});
+  assert.equal(calls,1);assert.equal(r.recognizedPurchasedPage,true);assert.equal(r.rows,1);assert(!JSON.stringify(r).includes('private'));
+  const denied=await C.checkPsCookieAccess(safe,async()=>new Response('private',{status:401}));assert.equal(denied.reason,'request-rejected');assert.equal(denied.httpStatus,401);
+  const bad=new URL(url);const vars=JSON.parse(bad.searchParams.get('variables'));vars.token='private';bad.searchParams.set('variables',JSON.stringify(vars));assert.equal(C.psCookieQuery(bad.href),null);
+  assert.equal((await C.checkPsCookieAccess('https://untrusted.example',()=>{throw Error('Must not request');})).state,'unavailable');
 });

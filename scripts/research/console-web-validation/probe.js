@@ -1,11 +1,11 @@
-/* Runs in the website's MAIN world. No extension API, storage or new requests. */
+/* MAIN world. No extension API/storage; only an explicit PS check sends a request. */
 (function(){
   'use strict';
   const C=globalThis.GLConsoleValidationCore;if(!C)return;
   const provider=C.providerForLocation(location);if(!provider)return;
   const ledger=C.createLedger(provider),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true;
+  let active=true,psQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'};
   async function inspect(response,info){
     if(!active||!info)return;
     try{
@@ -22,6 +22,7 @@
     const result=Reflect.apply(originalFetch,this,args);
     // Request headers, cookies and token fields are deliberately never inspected.
     const info=C.requestInfo(provider,args[0],args[1]);
+    if(provider==='playstation'&&!psQuery){psQuery=C.psCookieQuery(args[0],args[1]);if(psQuery)cookieCheck={state:'ready'};}
     if(info)void result.then(response=>inspect(response,info),()=>{if(active)ledger.observe(info,0,null);});
     return result;
   }
@@ -39,11 +40,15 @@
   }
   globalThis.fetch=wrappedFetch;if(xhr){xhr.open=wrappedOpen;xhr.send=wrappedSend;}
   function stop(){active=false;if(globalThis.fetch===wrappedFetch)globalThis.fetch=originalFetch;if(xhr?.open===wrappedOpen)xhr.open=originalOpen;if(xhr?.send===wrappedSend)xhr.send=originalSend;}
-  addEventListener('message',event=>{
+  addEventListener('message',async event=>{
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
-      typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop'].includes(event.data.action))return;
+      typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check'].includes(event.data.action))return;
     if(event.data.action==='stop')stop();
-    window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active}},location.origin);
+    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck}:{bootstrap:C.bootstrapSummary(document)})}},location.origin);
+    if(event.data.action==='check'&&active&&provider==='playstation'&&psQuery&&cookieCheck.state==='ready'){
+      cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
+    }
+    reply();
   });
   setTimeout(stop,15*60*1000);
 })();

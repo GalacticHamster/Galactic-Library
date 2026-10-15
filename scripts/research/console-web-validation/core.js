@@ -7,6 +7,7 @@
   const knownFields=['id','titleId','productId','name','platform','platforms','membership','subscriptionService','isActive','isTrial','expirationDate','conceptId','contentId','edition','applicationId','applicationName','apparentPlatform','ownerNaId','userNaId','isHidden','isLending','isPartialLending','lendingExpireDatetime','insertedNsDeviceId','hasApplication','hasReleasedApplication','hasAddOnContents','hasReleasedAddOnContents','hasUpgrade','hasReleasedUpgrade'];
   const safeEnums=['ACTIVE_DATE','ACTIVATED_DATE','asc','desc','ASC','DESC','ALL','OWNED','LENDING','BORROWED'];
   const variableNames=['start','size','offset','limit','shopId','isActive','isHidden','platform','sortBy','sortDirection','order','vgcViewType','vgcViewStatus','fixedHiddenFalse'];
+  const nintendoEndpoint=url=>url.protocol==='https:'&&!url.username&&!url.password&&url.hostname.endsWith('.nintendo.com')&&/^\/[a-zA-Z0-9/_-]{0,100}graphql\/?$/i.test(url.pathname);
   function providerForLocation(location){
     if(location.origin==='https://library.playstation.com')return 'playstation';
     if(location.origin==='https://accounts.nintendo.com'&&/^\/portal\/vgcs(?:\/|$)/.test(location.pathname))return 'nintendo';
@@ -26,7 +27,7 @@
       const url=new URL(typeof input==='string'||input instanceof URL?input:input.url);
       if(url.protocol!=='https:'||url.username||url.password)return null;
       if(provider==='playstation'&&(url.origin!=='https://web.np.playstation.com'||url.pathname!=='/api/graphql/v1/op'))return null;
-      if(provider==='nintendo'&&(!/^(?:api\.)?ec\.nintendo\.com$/.test(url.hostname)||!/graphql/i.test(url.pathname)))return null;
+      if(provider==='nintendo'&&!nintendoEndpoint(url))return null;
       const method=String(options.method??input?.method??'GET').toUpperCase();
       const payload=method==='GET'?Object.fromEntries(url.searchParams):typeof options.body==='string'&&options.body.length<=262144?JSON.parse(options.body):null;
       if(!payload||!['GET','POST'].includes(method))return null;
@@ -42,6 +43,61 @@
         cookieMode:['include','same-origin','omit'].includes(credentials)?credentials:'browser-default',
         fixedHiddenFalse:/\bisHidden\s*:\s*false\b/.test(query)};
     }catch{return null;}
+  }
+  function psCookieQuery(input,options={}){
+    const info=requestInfo('playstation',input,options);if(!info||info.method!=='GET'||info.operation!=='getPurchasedGameList')return null;
+    try{
+      const original=new URL(typeof input==='string'||input instanceof URL?input:input.url);
+      const variables=JSON.parse(original.searchParams.get('variables'));
+      const extensions=JSON.parse(original.searchParams.get('extensions'));
+      if(!variables||Object.keys(variables).some(key=>!Object.hasOwn(info.variables,key))||!integer(variables.size)||variables.size<1||variables.size>100)return null;
+      if(extensions?.persistedQuery?.version!==1||! /^[a-f0-9]{64}$/i.test(extensions.persistedQuery.sha256Hash))return null;
+      const url=new URL(info.endpoint);url.search=new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({...info.variables,start:0}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:extensions.persistedQuery.sha256Hash}})});
+      return url.href;
+    }catch{return null;}
+  }
+  async function checkPsCookieAccess(url,fetchImpl=fetch){
+    const safe=psCookieQuery(url);if(!safe)return {state:'unavailable',reason:'no-observed-safe-query'};
+    try{
+      const response=await fetchImpl(safe,{credentials:'include',redirect:'error',headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+      const result={state:'complete',httpStatus:response.status,pagesRequested:1,extraAuthorizationHeaders:false};
+      if(response.status!==200)return {...result,reason:'request-rejected',recognizedPurchasedPage:false};
+      const reader=response.body?.getReader();if(!reader)return {...result,reason:'unrecognized-response',recognizedPurchasedPage:false};
+      const chunks=[];let size=0;try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2097152){void reader.cancel();return {...result,reason:'response-bound',recognizedPurchasedPage:false};}chunks.push(value);}}finally{reader.releaseLock();}
+      const bytes=new Uint8Array(size);let start=0;for(const chunk of chunks){bytes.set(chunk,start);start+=chunk.length;}
+      const body=JSON.parse(new TextDecoder().decode(bytes)),list=body?.data?.purchasedTitlesRetrieve;
+      if(body?.errors?.length||!Array.isArray(list?.games)||list.games.length>1000||typeof list.pageInfo?.isLast!=='boolean')return {...result,reason:'unrecognized-response',recognizedPurchasedPage:false};
+      return {...result,recognizedPurchasedPage:true,rows:list.games.length,reason:'recognized-purchase-page'};
+    }catch{return {state:'complete',reason:'transport-or-response-failure',recognizedPurchasedPage:false,pagesRequested:1,extraAuthorizationHeaders:false};}
+  }
+  function bootstrapSummary(document){
+    const result={blocks:[],declaredGraphqlEndpoints:[],cardArrays:[],accountIdentityFieldPaths:[],boundReached:false};
+    let visited=0;
+    for(const blockId of ['data','state','meta']){
+      const text=document.getElementById(blockId)?.getAttribute('data-json');if(!text)continue;
+      if(text.length>2097152){result.boundReached=true;continue;}
+      let object;try{object=JSON.parse(text);}catch{result.blocks.push({block:blockId,parsed:false});continue;}
+      result.blocks.push({block:blockId,parsed:true});
+      for(const field of ['shopGraphQLApiUrl','shopGraphqlApiUrl']){
+        try{const url=new URL(object?.[field]);if(nintendoEndpoint(url))result.declaredGraphqlEndpoints.push(url.origin+url.pathname);}catch{}
+      }
+      for(const parent of ['user','account'])for(const field of ['id','naId','accountId']){
+        const value=object?.[parent]?.[field];if(typeof value==='string'||typeof value==='number')result.accountIdentityFieldPaths.push(blockId+'.'+parent+'.'+field);
+      }
+      const queue=[object];
+      for(let index=0;index<queue.length;index++){
+        if(++visited>2000){result.boundReached=true;break;}
+        const value=queue[index];if(!value||typeof value!=='object')continue;
+        if(Array.isArray(value)&&value.length&&value.some(row=>row&&typeof row==='object'&&typeof row.applicationId==='string'&&typeof row.id==='string')){
+          if(value.length>1000||result.cardArrays.length>=8){result.boundReached=true;continue;}
+          const ledger=createLedger('nintendo');ledger.observe({provider:'nintendo',operation:'getVgcs',variables:{offset:0},fixedHiddenFalse:false},200,{data:{account:{vgc:{vgcViews:{views:value,offsetInfo:{offset:0}}}}}});
+          const scope=ledger.report().scopes[0];if(scope)result.cardArrays.push({block:blockId,rows:scope.rows,distinctRowIds:scope.distinctRowIds,distinctSoftwareProductIds:scope.distinctSoftwareProductIds,presentFields:scope.presentFields,platforms:scope.platforms,flags:scope.flags,ownerUserRelations:scope.ownerUserRelations});
+          continue;
+        }
+        for(const child of Object.values(value).slice(0,500))if(child&&typeof child==='object'&&queue.length<2000)queue.push(child);
+      }
+    }
+    result.declaredGraphqlEndpoints=[...new Set(result.declaredGraphqlEndpoints)];return result;
   }
   function createLedger(provider){
     const pages=new Map();let requests=0,failures=0,unknownOperations=0,malformed=0,bounded=false;
@@ -117,11 +173,18 @@
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}
       if(url.search||url.hash||url.username||url.password||url.protocol!=='https:'||
-        !(input.provider==='playstation'?url.href==='https://web.np.playstation.com/api/graphql/v1/op':/^(?:api\.)?ec\.nintendo\.com$/.test(url.hostname)&&/^\/[a-zA-Z0-9/_-]{0,100}graphql\/?$/i.test(url.pathname)))return [];
+        !(input.provider==='playstation'?url.href==='https://web.np.playstation.com/api/graphql/v1/op':nintendoEndpoint(url)))return [];
       return [{provider:input.provider,endpoint:url.origin+url.pathname,method:['GET','POST'].includes(r.method)?r.method:'unrecognized',operation:['getPurchasedGameList','getVgcs','unrecognized'].includes(r.operation)?r.operation:'unrecognized',variables:safeVariables(r.variables),credentialVariablePresent:r.credentialVariablePresent===true,cookieMode:['include','same-origin','omit','browser-default'].includes(r.cookieMode)?r.cookieMode:'unrecognized',fixedHiddenFalse:r.fixedHiddenFalse===true,transport:r.transport==='xhr'?'xhr':'fetch',httpStatus:integer(r.httpStatus)&&r.httpStatus<=599?r.httpStatus:0}];
     });
     result.scopes=(Array.isArray(input.scopes)?input.scopes:[]).slice(0,64).map(s=>({...numbers(s),scope:safeVariables(s.scope),reportedTotals:(Array.isArray(s.reportedTotals)?s.reportedTotals:[]).filter(integer).slice(0,64),observedScopeTraversal:s.observedScopeTraversal==='terminal-range-observed'?'terminal-range-observed':'not-established',presentFields:counts(s.presentFields,key=>knownFields.includes(key)),platforms:counts(s.platforms,key=>platform(key)===key),flags:counts(s.flags,flags),ownerUserRelations:counts(s.ownerUserRelations,key=>['sameOwnerAndUser','differentOwnerAndUser','ownerOrUserAbsent'].includes(key))}));
+    if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{})};}
+    if(input.bootstrap&&input.provider==='nintendo'){
+      const b=input.bootstrap;result.bootstrap={blocks:(Array.isArray(b.blocks)?b.blocks:[]).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,parsed:row.parsed===true})),boundReached:b.boundReached===true,
+        declaredGraphqlEndpoints:(Array.isArray(b.declaredGraphqlEndpoints)?b.declaredGraphqlEndpoints:[]).slice(0,3).filter(value=>{try{const u=new URL(value);return nintendoEndpoint(u)&&!u.search&&!u.hash;}catch{return false;}}),
+        accountIdentityFieldPaths:(Array.isArray(b.accountIdentityFieldPaths)?b.accountIdentityFieldPaths:[]).filter(value=>/^(data|state|meta)\.(user|account)\.(id|naId|accountId)$/.test(value)),
+        cardArrays:(Array.isArray(b.cardArrays)?b.cardArrays:[]).slice(0,8).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,...numbers(row),presentFields:counts(row.presentFields,key=>knownFields.includes(key)),platforms:counts(row.platforms,key=>platform(key)===key),flags:counts(row.flags,flags),ownerUserRelations:counts(row.ownerUserRelations,key=>['sameOwnerAndUser','differentOwnerAndUser','ownerOrUserAbsent'].includes(key))}))};
+    }
     return result;
   }
-  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport});
+  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport,psCookieQuery,checkPsCookieAccess,bootstrapSummary});
 })(globalThis);

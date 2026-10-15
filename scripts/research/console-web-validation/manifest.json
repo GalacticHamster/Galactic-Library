@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GL Console Library Validation (read only)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Observe aggregate library request diagnostics. Does not import or save library data.",
   "minimum_chrome_version": "111",
   "browser_specific_settings": {"gecko": {"id": "console-validation@galactic-library.invalid", "strict_min_version": "128.0"}},

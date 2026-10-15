@@ -13,7 +13,8 @@ const root=new URL('./console-web-validation/',import.meta.url),files=new Map();
 for(const name of ['manifest.json','core.js','probe.js','panel.js'])files.set(name,await readFile(new URL(name,root)));
 const server=createServer((req,res)=>{
   res.setHeader('Content-Type','text/html; charset=utf-8');
-  res.end('<!doctype html><html><body><h1>Synthetic provider library</h1><button id="fixture">Observe two pages</button><script>document.querySelector("#fixture").onclick=async()=>{await window.fixtureFetch(0);await window.fixtureFetch(2);};</script></body></html>');
+  const initial=req.url==='/nintendo'?'<div id="state" data-json=\''+JSON.stringify({user:{id:'private-account'},views:Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'}))})+'\'></div>':'';
+  res.end('<!doctype html><html><body><h1>Synthetic provider library</h1>'+initial+'<button id="fixture">Observe two pages</button><script>document.querySelector("#fixture").onclick=async()=>{await window.fixtureFetch(0);await window.fixtureFetch(2);};</script></body></html>');
 });await new Promise(done=>server.listen(0,'127.0.0.1',done));
 const origin='http://127.0.0.1:'+server.address().port;
 const manifest=JSON.parse(files.get('manifest.json'));
@@ -25,13 +26,14 @@ files.set('manifest.json',Buffer.from(JSON.stringify(manifest)));
 // installed MAIN/isolated scripts, collector, messaging and UI are otherwise real.
 files.set('core.js',Buffer.from(files.get('core.js').toString().replace('function providerForLocation(location){',`function providerForLocation(location){if(location.origin===${JSON.stringify(origin)})return location.pathname==='/ps'?'playstation':'nintendo';`)));
 files.set('fixture.js',Buffer.from(`
-  window.fetch=(input,options)=>{
+  window.fixtureNetworkCalls=0;window.fetch=(input,options)=>{
+    window.fixtureNetworkCalls++;
     const ps=location.pathname==='/ps',u=new URL(input),v=ps?JSON.parse(u.searchParams.get('variables')):JSON.parse(options.body).variables,offset=v.start??v.offset;
     const rows=offset===0?[{id:'private-one',productId:'private-p1',applicationId:'private-s1',name:'Private title',isLending:false},{id:'private-two',productId:'private-p2',applicationId:'private-s2'}]:[{id:'private-three',productId:'private-p3',applicationId:'private-s3'}];
     const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViews:{views:rows,offsetInfo:{offset,total:3}}}}}};
     return Promise.resolve(new Response(JSON.stringify(body),{status:200}));
   };
-  window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2})})):
+  window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})})):
     fetch('https://api.ec.nintendo.com/public/graphql',{method:'POST',body:JSON.stringify({operationName:'getVgcs',query:'query getVgcs { account { vgc { vgcViews { views { id } } } } }',variables:{offset,limit:2,idToken:'private-token'}})});
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-console-helper-'));let child,driver,session,exited;
@@ -67,6 +69,14 @@ try{
       if(report?.scopes[0]?.rows===3)break;await pause(100);
     }
     assert.equal(report.scopes[0].rows,3);assert.equal(report.scopes[0].distinctRowIds,3);assert.equal(report.scopes[0].observedScopeTraversal,'terminal-range-observed');assert(!JSON.stringify(report).includes('private'));
+    if(route==='/nintendo'){
+      assert.equal(report.bootstrap.cardArrays[0].rows,115);assert.equal(report.bootstrap.cardArrays[0].distinctRowIds,115);
+      assert.deepEqual(report.bootstrap.accountIdentityFieldPaths,['state.user.id']);
+    }
+    if(route==='/ps'){
+      const check=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check]").disabled};');
+      assert.equal(check.report.readOnlyCookieCheck.recognizedPurchasedPage,true);assert.equal(check.calls,3);assert.equal(check.disabled,true);
+    }
     const stopped=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=stop]").click();await new Promise(r=>setTimeout(r,20));return {report:JSON.parse(s.querySelector("textarea").value),text:s.querySelector("[role=status]").textContent,visible:document.querySelector("#gl-console-validation").getBoundingClientRect().width>0};');
     assert.equal(stopped.report.active,false);assert(stopped.visible);assert.match(stopped.text,/stopped/);
     console.log('PASS '+(firefox?'Firefox':'Chrome')+' installed helper '+route+': MAIN/isolated handoff, paging, redacted summary, visible controls and Stop.');
