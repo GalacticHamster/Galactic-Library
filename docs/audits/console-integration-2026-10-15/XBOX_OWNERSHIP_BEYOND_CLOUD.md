@@ -1,5 +1,7 @@
 # Xbox ownership beyond cloud gaming
 
+Follow-up: [Collections authorization experiment](XBOX_COLLECTIONS_AUTH_EXPERIMENT.md) provides a standalone own-registration test and exact setup instructions. Real authorization remains pending; the user subsequently confirmed the order-history UI reaches only approximately seven years back.
+
 Research date: **2026-10-15**, GL baseline `8c1acfb`. Third-stage follow-up to the [initial audit](XBOX_INTEGRATION_AUDIT.md) and [consumer web investigation](XBOX_OWNERSHIP_FOLLOWUP.md). Research only; no production code, permissions, library/account data, HB or FAN changes. Public implementations were inspected, not executed. No authenticated Microsoft session or GL-owned Microsoft application registration was available.
 
 ## Decision and correction to the previous recommendation
