@@ -1,0 +1,32 @@
+/* ISOLATED world. Displays aggregate diagnostics only; no privileged writes. */
+(function(){
+  'use strict';
+  if(!globalThis.GLConsoleValidationCore?.providerForLocation(location))return;
+  if(document.getElementById('gl-console-validation'))return;
+  const bytes=crypto.getRandomValues(new Uint8Array(16)),nonce=[...bytes].map(n=>n.toString(16).padStart(2,'0')).join('');
+  const host=document.createElement('div');host.id='gl-console-validation';
+  host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(420px,95vw);font:14px system-ui;color:#f8fafc';
+  const shadow=host.attachShadow({mode:'open'});
+  shadow.innerHTML='<style>section{background:#1e293b;border:1px solid #64748b;border-radius:10px;padding:14px;box-shadow:0 4px 20px #0006}p{margin:8px 0}button{font:inherit;padding:6px 9px;margin:4px 5px 4px 0}textarea{box-sizing:border-box;width:100%;height:170px;font:11px monospace}details{margin-top:8px}</style><section><strong>GL console validation — read only</strong><p>No purchases are imported or changed. This helper observes library requests the website makes; it makes none itself.</p><p role="status">Waiting for the page observer…</p><button data-action="report">Update summary</button><button data-action="copy">Copy summary</button><button data-action="stop">Stop observing</button><details><summary>Aggregate diagnostics</summary><textarea readonly aria-label="Aggregate diagnostics"></textarea></details></section>';
+  const status=shadow.querySelector('[role=status]'),output=shadow.querySelector('textarea');let summary='';
+  const send=action=>window.postMessage({channel:'gl-console-validation-request',nonce,action},location.origin);
+  addEventListener('message',event=>{
+    if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-report'||event.data.nonce!==nonce)return;
+    const report=globalThis.GLConsoleValidationCore.sanitizeReport(event.data.report);
+    if(!report||report.format!==1||!['playstation','nintendo'].includes(report.provider)||report.readOnly!==true)return;
+    const json=JSON.stringify(report,null,2);if(json.length>50000)return;
+    summary=json;output.value=json;
+    const rows=Array.isArray(report.scopes)?report.scopes.reduce((sum,s)=>sum+(Number.isSafeInteger(s.rows)?s.rows:0),0):0;
+    status.textContent=report.active?`${report.requestsObserved} requests observed · ${rows} rows in observed library scopes. Browse or scroll the website, then update the summary. These are diagnostics, not an import.`:'Observation stopped. Reload the page to start a fresh check.';
+  });
+  shadow.addEventListener('click',async event=>{
+    const action=event.target?.dataset?.action;
+    if(action==='copy'){
+      if(!summary){status.textContent='Update the summary first.';return;}
+      try{await navigator.clipboard.writeText(summary);status.textContent='Aggregate summary copied. It contains no titles, account IDs or credentials.';}
+      catch{shadow.querySelector('details').open=true;output.focus();output.select();status.textContent='Copy the selected aggregate summary with Ctrl+C.';}
+    }else if(['report','stop'].includes(action))send(action);
+  });
+  document.documentElement.append(host);send('report');
+  setTimeout(()=>{if(!summary)status.textContent='The page observer has not responded. Reload this library page after loading the helper and check that it is enabled for this site. Chrome 111+ or Firefox 128+ is required.';},3000);
+})();

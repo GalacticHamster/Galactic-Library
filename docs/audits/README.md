@@ -4,6 +4,7 @@ These selected records explain architectural turning points. Their versions, cou
 
 - [Generalized qualifier matching](qualifier-matching-2026-10-03.md): preserve purchasing warnings across edition/revision wording while separating identity from access.
 - [Console provider feasibility](console-integration-2026-10-15/CONSOLE_INTEGRATION_RECOMMENDATIONS.md): independent Xbox, PlayStation and Nintendo ownership-source audits, validation gates and pre-1.0 recommendations.
+- [PlayStation/Nintendo web validation](console-integration-2026-10-15/PLAYSTATION_NINTENDO_WEB_VALIDATION.md): current release scope, read-only signed-in helper, and the production implementation gate.
 - [Xbox consumer ownership follow-up](console-integration-2026-10-15/XBOX_OWNERSHIP_FOLLOWUP.md): first-party web access endpoint, Playnite entitlement heuristics and safe signed-in validation; supersedes the initial Xbox deferral.
 - [Xbox ownership beyond cloud gaming](console-integration-2026-10-15/XBOX_OWNERSHIP_BEYOND_CLOUD.md): signed-in cloud-scope evidence, consumer Collections authorization gates and legacy 360 coverage; supersedes the CAS-first recommendation.
 - [Xbox Collections authorization experiment](console-integration-2026-10-15/XBOX_COLLECTIONS_AUTH_EXPERIMENT.md): own-registration Code + PKCE research harness, exact user setup and untested resource-permission gates; no production integration.
