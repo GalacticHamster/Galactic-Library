@@ -15,6 +15,10 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 - [Ownership display overrides](user-guide/ownership-overrides.md)
 - [Firefox setup](user-guide/firefox.md)
 
+- [Appearance](user-guide/appearance.md)
+- [Automatic saved-purchase sync](user-guide/purchase-sharing.md)
+- [Amazon Product Details and offline category recovery](user-guide/product-details-and-category-recovery.md)
+
 ## Architecture
 
 - [Matching policy](architecture/matching-policy.md) and [matching philosophy](../MATCHING_PHILOSOPHY.md)

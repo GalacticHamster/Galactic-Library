@@ -61,7 +61,7 @@ Book lookup metadata, contents suggestions, human corrections and ownership/acce
 
 ### Comic Coverage
 
-Choose **Library → Comic Coverage → Series Coverage** (the default view). Search a series name, sort by covered/duplicate/missing counts, and choose **Inspect issues**. Series titles show a known publication run in parentheses; language and issue type appear only when needed to distinguish otherwise identical names.
+Choose **Library → Comic Coverage → Series Coverage** (the default view). Search a series name, sort by covered/duplicate/missing counts, and choose **Inspect issues**. Series titles show a known publication run in parentheses; language appears when needed to distinguish entries. The issue-type label remains visible independently of custom names.
 
 The dedicated series view opens in **Grid** mode. A range bar shows the actual covered and missing positions; green numbered cells are owned, purple cells are owned multiple times, and dashed cells are missing. The legend and cell labels also identify these states without relying on color alone. Hover a bar segment for its exact issue range and status; click it to jump to and highlight that range in the grid. The compact square legend identifies the colors. Click a cell to see its supporting books and links to their exact Library records. Long series show 100 whole-number positions at a time with **Previous range / Next range**. Other covered numbers, including #0, fractions and numbers below your chosen start, remain available separately.
 
@@ -136,3 +136,18 @@ In **Library → Comic Coverage → Series Coverage**, open **Coverage resolutio
 Choose **Resolve coverage** from either screen. Select a publication/run, inspect its explanation and **Preview coverage changes**. You can select individual observations and optionally include compatible related collections. Nothing changes until **Save reviewed contents**. The resulting counts are rechecked before success is shown. Other source entries, ownership and original descriptions remain intact. A missing issue count is not guessed.
 
 For a complicated reference, **Open contents editor** expands the existing editor in the same dialog. Unsupported publications still need information you have checked. You can undo a saved correction through the existing **Undo contents review** control. Corrections survive reloads, provider reimports and backup/restore.
+
+### Scoped corrections and ignored references
+
+Resolve the first actionable unresolved component, preview, and save. Unrelated
+entries do not need to be approved. Resolved components stay marked and protected;
+use **Edit existing resolution** to correct a prior assignment. Preview preparation
+shows progress and does not enable a stale selection.
+
+For a source fragment that is not a publication, choose **Incorrect extraction**
+or **Not included contents**. The decision affects only that reference and leaves
+the captured description and parsed issues intact. **Ignored references → Restore**
+reverses it. A collection leaves Needs resolution when no actionable components
+remain. Explicitly included named standalone publications can be resolved;
+promotional prose should be ignored. Creating new publication runs is not part
+of this workflow.

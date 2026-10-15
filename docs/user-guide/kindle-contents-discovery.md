@@ -17,7 +17,7 @@ The signed-in Kindle panel has a contents mode selector. Contents actions remain
 | Scan eligible books | Never checked, legacy unknown blanks, temporary failures, empty results from extractor versions before 2, and legacy no-statement results without an extractor version | Reparse saved statements processed by an older/unknown parser |
 | Retry incomplete checks | Temporary failures and legacy unknown blanks | Reparse outdated saved statements |
 | Refresh all eligible books | Every currently eligible book, including successful G2/G5, failed, empty and unavailable results | Parse fresh source with the current parser; preserve the earlier source before acquisition is saved |
-| Reparse saved text (no requests) | None | Reparse every eligible saved Kindle statement |
+| Recheck saved text (no requests) | None | Reparse every eligible saved Kindle statement |
 
 Legacy statements with no extractor version are handled locally during a normal scan. They are not automatically fetched again merely because versions were absent. Unavailable pages without a source version, or from generation 2 or later, wait for explicit refresh. Empty generation-1 checks, including unavailable outcomes, can be revisited by normal scan. A newer unavailable attempt takes precedence over an older retained generation-1 blank for this decision. Later source generations and existing statements require explicit refresh for fresh page evidence; a version increment does not automatically refetch them. Parser/filter updates can reprocess saved text locally. Refresh replaces the previous **Rescan previous results** action; there is no duplicate fifth mode.
 
@@ -63,7 +63,7 @@ Parser 5 improves explicit numbered contents: it preserves conjunctions inside s
 
 Shortened integer endpoints such as `#645-50` can now expand to `#645-650`. At least two endpoint digits and an increasing result within the same prefix are required. `#100-05` means `#100-105`; ambiguous forms such as `#99-01`, `#199-02` and `#645-5` stay unresolved for review.
 
-After reloading the extension, **Reparse saved text (no requests)** applies these improvements to existing source. It retains captured statements and existing verified reviews. It cannot recover an uncaptured ending or establish ownership automatically.
+After reloading the extension, **Recheck saved text (no requests)** applies these improvements to existing source. It retains captured statements and existing verified reviews. It cannot recover an uncaptured ending or establish ownership automatically.
 
 The extractor retains bounded description blocks, preserves paragraph/list boundaries, and records multiple candidate containment statements with their source coordinates. It recognizes collecting, containing, including, comprising and reprinting phrases. A semicolon-delimited manifest can be evaluated as a whole while its child clauses remain diagnostic evidence. It selects a primary candidate rather than blindly merging every nearby mention. Static source capture cannot guarantee that a dynamically expanded description is complete: a terminal **Read more** can indicate missing/hydrating text and remains review evidence.
 

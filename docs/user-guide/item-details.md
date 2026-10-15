@@ -10,9 +10,12 @@ The collapsed row shows title, media, creator and series. **Edition details and 
 
 Each provider/account has a separate access observation, acquisition/observation dates when saved, and reading status where applicable. For example, Kindle — Personal can be Owned while Kindle — Family is Borrowed on the same canonical item. Grouping those records does not establish ownership in every account.
 
-Reading status is **not saved** until a reading state exists. Expand **Reading, access and downloads** to edit the exact account's existing reading, percentage, access and local-download fields. These self-reports never confirm ownership. **Reading orders and progress** keeps the cross-library ordering workbench available.
+Reading status is **not saved** until a reading state exists. Expand **Reading, access and downloads** to edit the exact account's existing reading, percentage, access and local-download fields. The field **Availability (self-reported)** describes whether you can use the copy; it never changes ownership. **Reading orders and progress** keeps the cross-library ordering workbench available.
 
-Expand **Confirm ownership with dated evidence** to record or undo an existing supported ownership decision. The original provider observation remains separate. User ownership preferences are explicitly labeled, and expiry dates remain visible. Global and provider preferences remain in Settings. **Ownership duplicates, purchase evidence and reminders** opens the existing workbench for those cross-library tasks.
+For an ordinary correction, use **Change access** on the Library card, including
+selected account copies for bulk changes. No dated evidence is required.
+
+Expand **Confirm ownership with dated evidence** to record or undo an existing supported ownership decision. The original provider observation remains separate. User ownership preferences are explicitly labeled, and expiry dates remain visible. Global and provider preferences remain in Settings. **Edition relationships, purchase evidence and reminders** opens the existing workbench for those cross-library tasks.
 
 ## Contents
 
@@ -49,7 +52,7 @@ Expand **Advanced**, then **Matching, editions and source evidence** to review t
 
 To compare records, type a title, provider or edition into the search picker and choose one of up to 20 results. The current record and its confirmed Same Edition group are excluded. Same Work relates different editions without establishing identical products; Same Edition confirms the same specific product, subject to existing conflict checks.
 
-When confirming Same Edition, choose which source title the library should display. You can change it later with **Preferred library display title ? Save display title** in this section. Imports and synchronization preserve your choice; backups include it. All original source titles and purchase histories remain intact. If groups with previously chosen titles are combined, the most recently saved choice supplies the display title; separating records retains each choice with its source record.
+When confirming Same Edition, choose which source title the library should display. You can change it later with **Preferred library display title → Save display title** in this section. Imports and synchronization preserve your choice; backups include it. All original source titles and purchase histories remain intact. If groups with previously chosen titles are combined, the most recently saved choice supplies the display title; separating records retains each choice with its source record.
 
 Canonical identity decisions are not ownership confirmations. Contents source history and independent claims remain available through the exact record in Contents. Existing game contents tools remain under Advanced because the current Contents workspace lists books.
 

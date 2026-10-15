@@ -22,6 +22,18 @@ try{
   const records=Object.values(db.providerItems),one=records.find(r=>r.providerItemId==='one'),two=records.find(r=>r.providerItemId==='two');
   await writer.saveReadingState(two.recordRef,{status:'unread',progress:0,access:'unknown',downloaded:false});
   await import('../src/ui/options.js');await wait(()=>document.querySelector('#library-items li'),'Library failed to load');
+  const navigationBefore=[...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|');
+  assert(navigationBefore==='Library|Providers|Contents|Settings','Phase 1 changed top-level navigation');
+  const copies=document.querySelector('#acquisitions-filter');assert(copies.closest('label').textContent.startsWith('Copies owned')&&copies.value==='all','Copies filter label/default wrong');
+  assert(document.querySelector('#ownership-filter').closest('label').textContent.startsWith('Ownership / access'),'Access status label ambiguous');
+  const beforeVisits=JSON.stringify((await writer.getDatabase()).providerItems);
+  navigate('books');await wait(()=>document.querySelector('#enrichment-workbench').open&&document.querySelector('#enrichment-workbench [aria-label="Enrichment queue"]'),'Book review is hidden');
+  assert(!document.querySelector('#book-catalog-disclosure').open&&!document.querySelector('#book-service-setup').open,'Optional catalog or technical setup opened');
+  navigate('reading');await wait(()=>document.querySelector('#reading-workbench').open&&document.querySelector('#reading-workbench [aria-label="Reading order title"]'),'Reading still requires disclosure');
+  assert(document.querySelector('#reading-workbench [aria-label="Reading order title"]').getClientRects().length,'Reading controls not visible');
+  navigate('library');assert(JSON.stringify((await writer.getDatabase()).providerItems)===beforeVisits,'Navigation changed provider records');
+  assert(document.querySelector('#acquisitions-filter').value==='all','Navigation changed ownership filter');
+  checks.push('Phase 1 preserves navigation/data/default filters and exposes Reading and book review without opening advanced tools');
   navigate('settings');const preference=document.querySelector('#ownership-policy-settings details');open(preference);await pause();for(const label of document.querySelectorAll('.ownership-provider-choice')){const box=label.getBoundingClientRect();assert(box.left>=0&&box.right<=innerWidth,'Ownership preference escapes viewport');}assert(document.documentElement.scrollWidth<=innerWidth+1,'Settings document overflows');
   const primary=getComputedStyle(document.querySelector('#workspace-navigation button')),secondary=getComputedStyle(document.querySelector('#library-navigation button'));assert(parseFloat(primary.fontSize)>=parseFloat(secondary.fontSize),'Primary navigation is smaller than secondary navigation');checks.push('Expanded Settings preferences stay inside the viewport; primary navigation is at least as prominent as secondary navigation');const backup=createBackup(await writer.getDatabase()),writes=()=>operations.filter(n=>n==='restoreDatabase').length;
   selectBackup(backup);await wait(dialog,'Restore decision missing');assert(/does not merge/.test(dialog().textContent)&&/Export current backup/.test(dialog().textContent),'Restore replacement consequences missing');assert(writes()===0,'File selection restored immediately');click(dialog(),'Cancel');await pause();assert(writes()===0&&Object.keys((await writer.getDatabase()).providerItems).length===2,'Cancel mutated database');checks.push('Restore is explicit, describes replacement, offers export, and Cancel invokes no writer');

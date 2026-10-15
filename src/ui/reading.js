@@ -14,17 +14,17 @@ function lazy(root,build){root.addEventListener('toggle',()=>{if(root.open&&!roo
 export function createReadingTools(records,database,actions){
   const root=node('details');root.className='reading-tools';root.append(node('summary','Reading, access and downloads'));
   return lazy(root,()=>{
-    root.append(node('p','Self-reported reading, access and download states are independent of ownership. Reading or downloading never confirms a purchase.'));
+    root.append(node('p','Reading progress, availability and downloads describe your use of this copy. They do not change ownership. To mark a purchase, loan or refund, use Change access on its Library card.'));
     for(const item of records.filter(record=>READING_MEDIA.includes(record.mediaType))){
       const saved=database.readingStates?.[item.recordRef],evidence=readingEvidence(item,database),section=node('section'),status=node('p');status.setAttribute('role','status');
       section.dataset.readingRecord=item.recordRef;
       section.append(node('h4',`${accountLabel(item,database)}: ${item.title}`),node('p',readingSummary(item,database)));
-      const reading=select('Reading status',['unread','reading','completed'],evidence.status),access=select('Current access',['unknown','accessible','unavailable'],evidence.access);
+      const reading=select('Reading status',['unread','reading','completed'],evidence.status),access=select('Availability (self-reported)',['unknown','accessible','unavailable'],evidence.access);
       const progress=node('input');progress.type='number';progress.min='0';progress.max='100';progress.step='1';progress.value=evidence.progress;progress.setAttribute('aria-label','Reading percentage');
       const downloaded=node('input');downloaded.type='checkbox';downloaded.checked=evidence.downloaded;downloaded.setAttribute('aria-label','Downloaded locally');const downloadLabel=node('label','Downloaded locally ');downloadLabel.append(downloaded);
       reading.addEventListener('change',()=>{if(reading.value==='completed')progress.value='100';else if(reading.value==='unread')progress.value='0';else if(progress.value==='100')progress.value='0';});
       const run=operation=>performAction({status,name:'Saving reading state...',task:async()=>{await operation();actions.refresh();}}).catch(()=>{});
-      section.append(labeledControl('Reading status',reading),labeledControl('Progress (%)',progress),labeledControl('Current access',access),downloadLabel,button('Save reading state',()=>run(()=>actions.save(item.recordRef,{status:reading.value,progress:Number(progress.value),access:access.value,downloaded:downloaded.checked},saved?.revisionRef??null))));
+      section.append(labeledControl('Reading status',reading),labeledControl('Progress (%)',progress),labeledControl('Availability (self-reported)',access),downloadLabel,button('Save reading state',()=>run(()=>actions.save(item.recordRef,{status:reading.value,progress:Number(progress.value),access:access.value,downloaded:downloaded.checked},saved?.revisionRef??null))));
       if(saved)section.append(button('Clear reading state',()=>run(()=>actions.remove(item.recordRef,saved.revisionRef))));section.append(status);root.append(section);
     }
   });

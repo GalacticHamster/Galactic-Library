@@ -581,11 +581,11 @@ function renderDuplicateReview() {
   const unresolved = candidates.filter((candidate) => !candidate.decision);
   const reviewed = candidates.filter((candidate) => candidate.decision);
   duplicateReviewSummary.textContent = unresolved.length
-    ? `${unresolved.length} possible duplicate${unresolved.length === 1 ? '' : 's'} need review. They remain separate until you confirm them.`
-    : 'No possible duplicates need review.';
+    ? `${unresolved.length} related product pair${unresolved.length === 1 ? '' : 's'} to review. A relationship decision does not confirm ownership.`
+    : 'No related product pairs to review.';
   duplicateReviewItems.replaceChildren(...unresolved.map((candidate) => createReviewRow(candidate)));
   reviewedDuplicates.hidden = reviewed.length === 0;
-  reviewedDuplicatesSummary.textContent = `${reviewed.length} saved duplicate decision${reviewed.length === 1 ? '' : 's'}`;
+  reviewedDuplicatesSummary.textContent = `${reviewed.length} saved product relationship${reviewed.length === 1 ? '' : 's'}`;
   reviewedDuplicateItems.replaceChildren(...reviewed.map((candidate) => createReviewRow(candidate, true)));
 }
 
@@ -745,6 +745,7 @@ function render(timing = null) {
       retry:retryEnrichmentReview,inspect:inspectEnrichmentRecords,refresh:render
     });document.querySelector('#books-workspace').append(enrichmentWorkbench.element);
   }
+  if(workspace.workspace==='books')enrichmentWorkbench.element.open=true;
   enrichmentWorkbench.update(database);
   endSegment?.();endSegment=timing?.begin('options_dashboards');
   const receiptWorkbench=createPurchaseEvidenceWorkbench(database,{
@@ -764,7 +765,7 @@ function render(timing = null) {
   const priorReading=document.querySelector('#reading-workbench');
   const readingWorkbench=createReadingWorkbench(database,{
     canLeave:()=>drafts.allowNavigation(),order:async(...args)=>{const result=await drafts.commit(()=>saveReadingOrder(...args));database=result.database;return result;},deleteOrder:async(...args)=>{database=await removeReadingOrder(...args);},refresh:render,inspect:ref=>openLibraryRecord(ref,{section:'library'})
-  },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=priorReading?.open??false;
+  },priorReading?.dataset.selectedOrder??'');readingWorkbench.open=workspace.workspace==='reading'||(priorReading?.open??false);
   if(priorReading)priorReading.replaceWith(readingWorkbench);else document.querySelector('#reading-workspace').append(readingWorkbench);
   endSegment?.();endSegment=timing?.begin('options_filters');
   const providerEntries = Object.entries(combinedProviderStates(database)).sort(([left], [right]) => left.localeCompare(right));
@@ -890,7 +891,7 @@ function render(timing = null) {
   const alerts=document.querySelector('#library-alerts');alerts.replaceChildren();
   const pending=Object.keys(database.enrichmentReviews??{}).length;const ownershipCount=Object.keys(database.ownershipProposals??{}).length+(duplicateReviewDatabase===database?duplicateReviewItems.children.length:0);
   if(pending)alerts.append(actionButton(pending+' book suggestions to review',()=>{workspace.select('books');enrichmentWorkbench.element.open=true;}));
-  if(ownershipCount)alerts.append(actionButton(ownershipCount+' ownership reviews',()=>workspace.select('ownership')));
+  if(ownershipCount)alerts.append(actionButton(ownershipCount+' purchase or product reviews',()=>workspace.select('ownership')));
   alerts.hidden=!alerts.children.length;
   } finally {endSegment?.();}
 }

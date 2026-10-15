@@ -8,7 +8,7 @@ or change their ownership.
 ## Add your first library
 
 Choose **Add a library** from an empty Library or the toolbar popup. In Providers,
-expand a provider and open its website. Sign in, enter a recognizable **Account
+expand a provider and open its website. For a first store scan, sign in, enter a recognizable **Account
 nickname** on the Galactic Library panel, and confirm that it describes the
 signed-in account. Start **Full rescan** for the first import, or **Sync library**
 on Epic. Keep the provider tab open until the import finishes. Return to Library
@@ -17,6 +17,12 @@ to browse the saved items. The **Add a library: import instructions** disclosure
 A nickname is a label you choose, not a website login verified by GL. The
 importer records the access the provider reports; loans and subscriptions are
 not automatically permanent ownership.
+
+For Humble and Fanatical, you can instead choose **Connect and sync** to use
+saved companion purchases without a new store scan. This setup supports unnamed
+default accounts and one confirmation for both verified extensions. If both
+sides contain purchases, confirm they are the same store account. See
+[purchase sync](purchase-sharing.md).
 
 ## Use remembered accounts
 

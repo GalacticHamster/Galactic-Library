@@ -46,7 +46,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     }
     for(const build of [tools.reading,tools.ownership])if(build)node.append(build());
     const settings=text('a','Ownership preferences in Settings');settings.href='#settings';settings.dataset.goWorkspace='settings';node.append(settings);
-    for(const [target,label]of [['reading','Reading orders and progress'],['ownership','Ownership duplicates, purchase evidence and reminders']]){const link=text('a',label);link.href='#'+target;link.dataset.goWorkspace=target;const paragraph=text('p','');paragraph.append(link);node.append(paragraph);}
+    for(const [target,label]of [['reading','Reading orders and progress'],['ownership','Edition relationships, purchase evidence and reminders']]){const link=text('a',label);link.href='#'+target;link.dataset.goWorkspace=target;const paragraph=text('p','');paragraph.append(link);node.append(paragraph);}
   },true);
   if(canonical.mediaType==='book')section('contents','Contents',node=>{
     for(const entry of presentation.records){node.append(text('strong',entry.label),text('p',entry.contents.label+(entry.contents.count!==null?` · ${entry.contents.count} reviewed entries`:'')));
@@ -54,7 +54,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
       const preview=createContentsReadOnly(entry.record,database,{showSource:false,showCaption:false});if(preview)node.append(preview);if(entry.contents.incomplete)node.append(text('small','Some description details still need review; this is not necessarily a complete contents list.'));
       const link=text('a','Review contents');link.href=bookHref('contents',entry.record.recordRef);link.dataset.contentsRecord=entry.record.recordRef;node.append(link);
     }
-    const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not reviewed. A reviewed list describes included material for that account; it does not create separate purchases of those works. Overlap and coverage comparisons are available in Contents.'));node.append(help);
+    const help=text('details','');help.className='context-help';help.append(text('summary','About collected works'),text('p','A description suggestion is not reviewed. A reviewed list describes included material for that account; it does not create separate purchases of those works. Browse issue coverage and collection overlap in Library → Comic Coverage. Use Review contents above to correct the included works for this account copy.'));node.append(help);
   },true);
   if(canonical.mediaType==='book')section('books','Book information',node=>{if(tools.books)node.append(tools.books());const bulk=text('a','Bulk book information and review');bulk.href='#books';bulk.dataset.goWorkspace='books';node.append(bulk);});
   section('advanced','Advanced',node=>{

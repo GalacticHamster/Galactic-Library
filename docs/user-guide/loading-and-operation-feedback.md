@@ -6,7 +6,7 @@ Longer actions show text describing the current work and disable their initiatin
 
 ## Exporting a backup
 
-In Settings, **Export Library** shows preparation, validation and browser-handoff feedback. Repeated clicks while it is preparing do not start another export. The completion message means Galactic Library handed the download to your browser. Check your browser's downloads to confirm the file was saved: Galactic Library cannot detect a cancelled save dialog or a silently blocked anchor download.
+In Settings, **Export backup** shows preparation, validation and browser-handoff feedback. Repeated clicks while it is preparing do not start another export. The completion message means Galactic Library handed the download to your browser. Check your browser's downloads to confirm the file was saved: Galactic Library cannot detect a cancelled save dialog or a silently blocked anchor download.
 
 ## Restoring a backup
 

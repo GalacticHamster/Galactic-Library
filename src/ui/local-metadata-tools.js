@@ -4,7 +4,7 @@ import {localMetadataFromFile} from '../lib/local-metadata.js';
 import {identityEvidence,validIsbn} from '../lib/identity.js';
 
 export function createLocalMetadataTools(records,actions){
-  const root=document.createElement('details');root.className='local-metadata-tools';const heading=document.createElement('summary');heading.textContent='Use a file or publisher page';root.append(heading);let ready=false;
+  const root=document.createElement('details');root.className='local-metadata-tools';const heading=document.createElement('summary');heading.textContent='Use a metadata file, ISBN or publisher details';root.append(heading);let ready=false;
   root.addEventListener('toggle',()=>{if(!root.open||ready)return;ready=true;
     const status=document.createElement('p');status.setAttribute('role','status');
     const queue=async candidate=>{await actions.queue({recordRefs:records.map(record=>record.recordRef),source:'localMetadata',status:'candidates',title:records[0].title,reason:'Confirm this source describes the edition in your library.',candidates:[candidate]});status.textContent='Suggestion queued. Choose it in Review book suggestions and preview the fields before applying.';actions.refresh();};

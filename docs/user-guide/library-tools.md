@@ -6,7 +6,7 @@ Individual reading, ownership, book enrichment and identity actions are organize
 
 Comparison keys preserve Unicode letters, combining marks, Japanese voicing and composed Korean. Latin accent simplification remains available without deleting script-specific marks. Stored original titles are unchanged.
 
-Expand **Alternate titles and aliases** on a library card to add translations/transliterations and their source or explanation. These dated, record-scoped aliases generate Possible candidates only. Edition identifiers or reviewed edition relationships remain necessary for stronger claims. Known conflicting creators, runs and unit numbers still prevent unrelated aliases from supplying candidates. Aliases cannot attach to another account's record when a provider reuses its native ID. Database schema 7 preserves aliases and accepts schemas 1–6.
+Open **Details → Advanced → Alternate titles and aliases** on a library card to add translations/transliterations and their source or explanation. These dated, record-scoped aliases generate Possible candidates only. Edition identifiers or reviewed edition relationships remain necessary for stronger claims. Known conflicting creators, runs and unit numbers still prevent unrelated aliases from supplying candidates. Aliases cannot attach to another account's record when a provider reuses its native ID. Database schema 7 preserves aliases and accepts schemas 1–6.
 
 ## Software (GL-12)
 
@@ -70,3 +70,17 @@ In Settings, **Restore backup** first validates the selected file and asks befor
 **Book information** keeps bulk lookup and cross-library suggestion review separate from ordinary browsing. **Browse individual books here** is collapsed by default; **Browse books in Library** opens the catalog. **Clear saved lookup queue** asks before abandoning incomplete progress and keeps already saved metadata.
 
 **Performance diagnostics** in Settings exports recent companion queries and worker/Options timings without Amazon or acquisition tracing. Detailed worker buffers are in memory and reset when that worker restarts; only a tiny previous-worker breadcrumb may survive within the browser session. Detailed scan tracing on Kindle is separate and resets with that tab.
+
+## Primary workbenches and terminology
+
+Library → Reading and Library → Book information open their primary workbenches
+without another expansion. Technical details, source history and optional lookup
+help remain collapsed. Current top-level navigation is unchanged; the planned
+Books & Contents destination belongs to a later phase.
+
+**Review matching products and editions** concerns product identity, not whether
+you purchased it. **Copies owned** counts distinct confirmed acquisition groups;
+**Ownership / access** filters the account copy’s effective status. Reading’s
+**Availability (self-reported)** records whether you can currently use a copy and
+does not change that ownership status. Comic issue coverage is a separate view
+of material included in owned books.
