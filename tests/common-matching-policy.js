@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import vm from 'node:vm';
 import { normalizeProviderItem, rebuildCanonicalItems } from '../src/lib/models.js';
 import { matchItems } from '../src/lib/matcher.js';
 const cases=JSON.parse(readFileSync(new URL('./common-matching-cases.json',import.meta.url),'utf8'));
@@ -28,21 +29,41 @@ commonMatchingPolicyTests.push(['excluded provider ISBN hits cannot suppress an 
   assert.equal(result.matches.length,1);
   assert.equal(result.matches[0].provider,'fanatical');
 }]);
-commonMatchingPolicyTests.push(['HB, FAN and GL ship identical shared identity rules and decision fixtures',()=>{
-  const common=readFileSync(new URL('../src/lib/matching-policy.js',import.meta.url),'utf8').replace(/\r\n/g,'\n').trim();
-  const fixture=readFileSync(new URL('./common-matching-cases.json',import.meta.url),'utf8').trim();
+commonMatchingPolicyTests.push(['HB, FAN and GL agree on shared policy behavior and matching outcomes',async()=>{
+  const policies=[['GL',globalThis.LibraryMatchingPolicy]];
+  const sorted=rows=>[...rows].sort((a,b)=>a.label.localeCompare(b.label));
   for(const [code,data]of [['../../HB/shared.js','../../HB/tests/common-matching-cases.json'],['../../Fanatical/src/shared.js','../../Fanatical/tests/common-matching-cases.json']]){
     const path=new URL(code,import.meta.url);if(!existsSync(path))continue;
-    const source=readFileSync(path,'utf8').replace(/\r\n/g,'\n');
-    assert.equal(source.slice(source.indexOf('// BEGIN SHARED MATCHING POLICY'),source.indexOf('// END SHARED MATCHING POLICY')+'// END SHARED MATCHING POLICY'.length).trim(),common);
-    assert.equal(readFileSync(new URL(data,import.meta.url),'utf8').trim(),fixture);
+    const source=readFileSync(path,'utf8'),context=vm.createContext({});
+    vm.runInContext(source.slice(source.indexOf('// BEGIN SHARED MATCHING POLICY'),source.indexOf('// END SHARED MATCHING POLICY')),context);
+    policies.push([code,context.LibraryMatchingPolicy]);
+    assert.deepEqual(sorted(JSON.parse(readFileSync(new URL(data,import.meta.url),'utf8'))),sorted(cases),'Shared case content must agree; formatting and order need not.');
+    const {fixture}=await import(new URL(code.startsWith('../../HB')?'../../HB/tests/matching-fixture.mjs':'../../Fanatical/tests/matching-fixture.mjs',import.meta.url));
+    for(const row of cases.filter(row=>!row.fanOnly||code.includes('Fanatical'))){
+      const result=await fixture(row.records,row.media??'book',row.offer).classify();
+      assert.equal(result.match.state,row.expected,code+': '+row.label);
+    }
   }
+  const observations=policy=>cases.flatMap(row=>{
+    const kind=row.media??'book',kinds=kind==='book'?['book','comic']:[kind];
+    return kinds.flatMap(kind=>row.records.map(record=>({
+      offered:policy.presentationTitle(row.offer.title,kind),stored:policy.ownershipTitleKeys(record.title,kind),
+      exact:policy.fullTitleMatches(row.offer.title,record.title,kind),revision:policy.revisionWordingConflict(row.offer.title,record.title,kind),
+      offeredParts:policy.revisionTitleParts(row.offer.title,kind),storedParts:policy.revisionTitleParts(record.title,kind),
+      related:Boolean(policy.relatedPresentationReason(row.offer.title,record.title,kind)),
+      collection:policy.numberedCollectionRelation(row.offer.title,record.title,kind)===null?null:Boolean(policy.numberedCollectionRelation(row.offer.title,record.title,kind))
+    })));
+  });
+  for(const [name,policy]of policies){assert.deepEqual(JSON.parse(JSON.stringify(observations(policy))),JSON.parse(JSON.stringify(observations(policies[0][1]))),name+' shared policy outcomes');checkFormatPresentation(policy);}
 }]);
 
 function checkFormatPresentation(policy) {
   const p = (title, kind = 'book') => policy.presentationTitle(title, kind);
   assert.equal(p('FREE AGENTS TP VOL 01 (Digital)'), p('FREE AGENTS, VOL. 1'));
   assert.equal(p('FREE AGENTS TPB VOLUME 001 (Digital)'), p('FREE AGENTS, VOL. 1'));
+  assert.equal(p('FREE AGENTS TP VOL 01 (Digital)','comic'),p('FREE AGENTS, VOL. 1','book'));
+  assert.equal(policy.revisionWordingConflict('Algorithmic Thinking','Algorithmic Thinking, 2nd Edition','comic'),true);
+  assert(policy.numberedCollectionRelation('Astro City Vol. 1','Astro City Vol. 1: Another Story','comic'));
   for (const [left,right,kind] of [
     ['The Room','Room','book'], ['The Room Vol. 1','Room Vol. 1','book'],
     ['The Complete Guide Vol. 1','Complete Guide Vol. 1','book'],
@@ -70,5 +91,19 @@ commonMatchingPolicyTests.push(['format identity cannot invent permanent ownersh
     assert.equal(result.owned,false,ownership);
     assert.equal(result.matches[0].relationship,'same-edition');
     assert.equal(item.ownership,ownership);
+  }
+}]);
+commonMatchingPolicyTests.push(['software identity keeps release/tier differences through media labels and preserves canonical ownership evidence',()=>{
+  for(const mediaType of ['book','game','software'])for(const [left,right]of [
+    ['Forest Builder Pro 2025','Forest Builder Pro 2026'],
+    ['Forest Builder Pro v2','Forest Builder Pro v3'],
+    ['Forest Builder Pro Standard Edition','Forest Builder Pro Enterprise Edition']
+  ]){
+    assert.equal(globalThis.LibraryMatchingPolicy.fullTitleMatches(left,right,mediaType),false);
+    const items=[left,right].map((title,i)=>normalizeProviderItem({provider:'humble',providerItemId:'media-safety-'+i,title,mediaType,ownership:i?'unknown':'owned'}));
+    const records=Object.fromEntries(items.map(item=>[item.id,item])),before=JSON.stringify(records);
+    assert.equal(Object.keys(rebuildCanonicalItems(records)).length,2);
+    assert.equal(matchItems(records,[{title:right,mediaType}])[0].owned,false,'Neither a related owned release nor an exact unknown record establishes ownership');
+    assert.equal(JSON.stringify(records),before);
   }
 }]);

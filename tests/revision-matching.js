@@ -48,9 +48,10 @@ revisionMatchingTests.push(['revision contract: identity confidence is independe
   }
 }]);
 revisionMatchingTests.push(['revision contract: three repos retain the same permanent regression matrix',()=>{
-  const own=readFileSync(new URL('./revision-matching-cases.json',import.meta.url),'utf8').trim();
+  const semantic=value=>JSON.parse(value).sort((a,b)=>a.label.localeCompare(b.label));
+  const own=semantic(readFileSync(new URL('./revision-matching-cases.json',import.meta.url),'utf8'));
   for(const project of ['HB','Fanatical']){
     const path=new URL('../../'+project+'/tests/revision-matching-cases.json',import.meta.url);
-    if(existsSync(path))assert.equal(readFileSync(path,'utf8').trim(),own);
+    if(existsSync(path))assert.deepEqual(semantic(readFileSync(path,'utf8')),own);
   }
 }]);
