@@ -7,6 +7,9 @@
   const knownFields=['id','titleId','productId','name','platform','platforms','membership','subscriptionService','isActive','isTrial','expirationDate','conceptId','contentId','edition','applicationId','applicationName','apparentPlatform','ownerNaId','userNaId','isHidden','isLending','isPartialLending','lendingExpireDatetime','insertedNsDeviceId','hasApplication','hasReleasedApplication','hasAddOnContents','hasReleasedAddOnContents','hasUpgrade','hasReleasedUpgrade'];
   const safeEnums=['ACTIVE_DATE','ACTIVATED_DATE','asc','desc','ASC','DESC','ALL','OWNED','LENDING','BORROWED'];
   const variableNames=['start','size','offset','limit','shopId','isActive','isHidden','platform','sortBy','sortDirection','order','vgcViewType','vgcViewStatus','fixedHiddenFalse'];
+  const operations={playstation:{getPurchasedGameList:'library'},nintendo:{getVgcs:'library',getVgcsVgcs:'library',getVgcTotalsVgcs:'auxiliary',getDevicesVgcs:'auxiliary',getAllDevicesVgcs:'auxiliary'}};
+  const operationKind=(provider,name)=>typeof name==='string'&&Object.hasOwn(operations[provider]??{},name)?operations[provider][name]:null;
+  const responsePaths=['data','data.account','data.account.vgc','data.account.vgc.vgcViews','data.account.vgc.vgcViewsV2'];
   const bootstrapFields=[...knownFields,'data','state','meta','user','account','vgc','vgcs','vgcViews','vgcViewsV2','views','cards','items','results','list','nodes','edges','node','initial','initialState','props','pageProps','countryId','country','lang','language','countries','shopGraphQLApiUrl','shopGraphqlApiUrl','savannaClientId','idToken','accountId','naId','offsetInfo','total','offset','limit','count'];
   const valueType=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
   const shape=value=>({type:valueType(value),...(value&&typeof value==='object'?{keyCount:Object.keys(value).length,fields:Object.fromEntries(Object.keys(value).filter(key=>bootstrapFields.includes(key)).map(key=>[key,valueType(value[key])]))}:{})});
@@ -42,7 +45,7 @@
       if(/\bmutation\b/.test(query))return null;
       const operation=payload.operationName??query.match(/^\s*query\s+([A-Za-z_]\w*)/)?.[1];
       // Unknown operations are counted, but their names/variables never leave the page.
-      const recognized=provider==='playstation'?operation==='getPurchasedGameList':operation==='getVgcs';
+      const recognized=operationKind(provider,operation)!==null;
       const variables=typeof payload.variables==='string'?JSON.parse(payload.variables):payload.variables??{};
       const credentials=options.credentials??input?.credentials;
       return {provider,endpoint:url.origin+url.pathname,method,operation:recognized?operation:'unrecognized',variables:safeVariables(variables),
@@ -124,15 +127,25 @@
     return {groups:[...groups.values()],boundReached:boundReached||entries.length>1000};
   }
   function createLedger(provider){
-    const pages=new Map();let requests=0,failures=0,unknownOperations=0,malformed=0,bounded=false;
+    const pages=new Map();let requests=0,failures=0,unknownOperations=0,auxiliary=0,malformed=0,bounded=false;
     const observations=[];
     function observe(request,status,body,transport='fetch'){
       if(!request||request.provider!==provider)return;
       requests++;
-      if(!['getPurchasedGameList','getVgcs'].includes(request.operation)){unknownOperations++;return;}
-      if(observations.length<20)observations.push({...request,transport,httpStatus:integer(status)&&status<=599?status:0});
+      const kind=operationKind(provider,request.operation);
+      if(!kind){unknownOperations++;return;}
+      if(kind==='auxiliary')auxiliary++;
+      // Fixed paths and field types only: enough to diagnose an unrecognized
+      // response envelope without exporting values, rows or account identifiers.
+      const responseShape=provider==='nintendo'&&kind==='library'?responsePaths.flatMap(path=>{
+        const value=path.split('.').reduce((node,key)=>node?.[key],body);return value&&typeof value==='object'?[{path,...shape(value)}]:[];
+      }):[];
+      if(observations.length<20)observations.push({...request,transport,httpStatus:integer(status)&&status<=599?status:0,...(responseShape.length?{responseShape}:{})});
       if(status!==200||body?.errors?.length){failures++;return;}
-      const list=provider==='playstation'?body?.data?.purchasedTitlesRetrieve:body?.data?.account?.vgc?.vgcViews;
+      if(kind==='auxiliary')return;
+      const vgc=body?.data?.account?.vgc;
+      const listFields=vgc&&typeof vgc==='object'?['vgcViews','vgcViewsV2'].filter(key=>Object.hasOwn(vgc,key)):[];
+      const list=provider==='playstation'?body?.data?.purchasedTitlesRetrieve:listFields.length===1?vgc[listFields[0]]:null;
       const rows=provider==='playstation'?list?.games:list?.views;
       const paging=provider==='playstation'?list?.pageInfo:list?.offsetInfo;
       const offset=paging?.offset??request.variables.start??request.variables.offset;
@@ -169,7 +182,7 @@
         scope.pages.push(page);for(const value of page.identifiers)scope.ids.add(value);for(const value of page.software)scope.software.add(value);
         for(const key of ['fields','platforms','flags','relations'])for(const [name,count]of Object.entries(page[key]))scope[key][name]=(scope[key][name]??0)+count;
       }
-      return {format:1,helperVersion:'0.1.4',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,malformedPages:malformed,boundReached:bounded,
+      return {format:1,helperVersion:'0.1.5',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
         requestContracts:observations,scopes:[...scopes].map(([scope,s])=>{
           const pages=s.pages.sort((a,b)=>a.offset-b.offset);let end=0,contiguous=true;
           for(const p of pages){if(p.offset!==end)contiguous=false;end=p.offset+p.count;}
@@ -187,25 +200,25 @@
   // fields supplied by a webpage into an export. This is not an import authority.
   function sanitizeReport(input){
     if(!input||input.format!==1||!['playstation','nintendo'].includes(input.provider))return null;
-    const numericKeys=['requestsObserved','failedRequests','unrecognizedOperations','malformedPages','pagesObserved','rows','distinctRowIds','distinctSoftwareProductIds'];
+    const numericKeys=['requestsObserved','failedRequests','unrecognizedOperations','auxiliaryRequests','malformedPages','pagesObserved','rows','distinctRowIds','distinctSoftwareProductIds'];
     const numbers=value=>Object.fromEntries(numericKeys.filter(key=>integer(value?.[key])).map(key=>[key,value[key]]));
     const counts=(value,valid)=>Object.fromEntries(Object.entries(value??{}).slice(0,100).filter(([key,count])=>valid(key)&&integer(count)));
     const flags=key=>/^(?:isActive|isTrial|isHidden|isLending|isPartialLending|hasApplication|hasReleasedApplication|hasAddOnContents|hasReleasedAddOnContents|hasUpgrade|hasReleasedUpgrade):(?:true|false)$/.test(key)||/^(?:subscriptionService|membership):(?:NONE|PS_PLUS|PSPLUS|PS_NOW|PSNOW|PLUS|EA_PLAY|null|true|false|other-or-structured)$/.test(key);
+    const safeShape=row=>({type:['object','array','string','number','boolean','null','undefined'].includes(row.type)?row.type:'unknown',...(integer(row.keyCount)?{keyCount:row.keyCount}:{}),fields:Object.fromEntries(Object.entries(row.fields??{}).filter(([key,type])=>bootstrapFields.includes(key)&&['object','array','string','number','boolean','null','undefined'].includes(type)))});
     const result={format:1,provider:input.provider,readOnly:true,...numbers(input),boundReached:input.boundReached===true,
       active:input.active===true,accountIsolationValidated:false,ownershipSemanticsValidated:false,accountLibraryComplete:false};
-    if(['0.1.1','0.1.2','0.1.3','0.1.4'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
+    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
     result.requestContracts=(Array.isArray(input.requestContracts)?input.requestContracts:[]).slice(0,20).flatMap(r=>{
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}
       if(url.search||url.hash||url.username||url.password||url.protocol!=='https:'||
         !(input.provider==='playstation'?url.href==='https://web.np.playstation.com/api/graphql/v1/op':nintendoEndpoint(url)))return [];
-      return [{provider:input.provider,endpoint:url.origin+url.pathname,method:['GET','POST'].includes(r.method)?r.method:'unrecognized',operation:['getPurchasedGameList','getVgcs','unrecognized'].includes(r.operation)?r.operation:'unrecognized',variables:safeVariables(r.variables),credentialVariablePresent:r.credentialVariablePresent===true,cookieMode:['include','same-origin','omit','browser-default'].includes(r.cookieMode)?r.cookieMode:'unrecognized',fixedHiddenFalse:r.fixedHiddenFalse===true,transport:r.transport==='xhr'?'xhr':'fetch',httpStatus:integer(r.httpStatus)&&r.httpStatus<=599?r.httpStatus:0}];
+      return [{provider:input.provider,endpoint:url.origin+url.pathname,method:['GET','POST'].includes(r.method)?r.method:'unrecognized',operation:operationKind(input.provider,r.operation)?r.operation:'unrecognized',variables:safeVariables(r.variables),credentialVariablePresent:r.credentialVariablePresent===true,cookieMode:['include','same-origin','omit','browser-default'].includes(r.cookieMode)?r.cookieMode:'unrecognized',fixedHiddenFalse:r.fixedHiddenFalse===true,transport:r.transport==='xhr'?'xhr':'fetch',httpStatus:integer(r.httpStatus)&&r.httpStatus<=599?r.httpStatus:0,...(Array.isArray(r.responseShape)?{responseShape:r.responseShape.slice(0,responsePaths.length).filter(row=>row&&responsePaths.includes(row.path)).map(row=>({path:row.path,...safeShape(row)}))}:{})}];
     });
     result.scopes=(Array.isArray(input.scopes)?input.scopes:[]).slice(0,64).map(s=>({...numbers(s),scope:safeVariables(s.scope),reportedTotals:(Array.isArray(s.reportedTotals)?s.reportedTotals:[]).filter(integer).slice(0,64),observedScopeTraversal:s.observedScopeTraversal==='terminal-range-observed'?'terminal-range-observed':'not-established',presentFields:counts(s.presentFields,key=>knownFields.includes(key)),platforms:counts(s.platforms,key=>platform(key)===key),flags:counts(s.flags,flags),ownerUserRelations:counts(s.ownerUserRelations,key=>['sameOwnerAndUser','differentOwnerAndUser','ownerOrUserAbsent'].includes(key))}));
     if(input.observerState){const r=input.observerState;result.observerState={fetchHookInstalled:r.fetchHookInstalled===true,xhrOpenHookInstalled:r.xhrOpenHookInstalled===true,xhrSendHookInstalled:r.xhrSendHookInstalled===true,fetchCalls:integer(r.fetchCalls)?r.fetchCalls:0,xhrCalls:integer(r.xhrCalls)?r.xhrCalls:0};}
     if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{})};}
     if(input.bootstrap&&input.provider==='nintendo'){
-      const safeShape=row=>({type:['object','array','string','number','boolean','null','undefined'].includes(row.type)?row.type:'unknown',...(integer(row.keyCount)?{keyCount:row.keyCount}:{}),fields:Object.fromEntries(Object.entries(row.fields??{}).filter(([key,type])=>bootstrapFields.includes(key)&&['object','array','string','number','boolean','null','undefined'].includes(type)))});
       const b=input.bootstrap;result.bootstrap={blocks:(Array.isArray(b.blocks)?b.blocks:[]).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,parsed:row.parsed===true,...safeShape(row)})),boundReached:b.boundReached===true,
         structure:(Array.isArray(b.structure)?b.structure:[]).slice(0,40).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,...safeShape(row)})),
         declaredGraphqlEndpoints:(Array.isArray(b.declaredGraphqlEndpoints)?b.declaredGraphqlEndpoints:[]).slice(0,3).filter(value=>{try{const u=new URL(value);return nintendoEndpoint(u)&&!u.search&&!u.hash;}catch{return false;}}),

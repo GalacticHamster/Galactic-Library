@@ -9,7 +9,7 @@ Xbox research/harness files are preserved without further investigation.
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
 | PlayStation — PS4/PS5 web library | Live helper observed 60 rows / 59 product IDs across 3 terminal pages; 58 PS4 and 2 PS5 rows, all active with membership NONE | Actual website fetch and extension observation demonstrated. Independent cookie-only replay, account binding and product/title relationships remain to check. **No production importer yet.** |
-| Nintendo — Switch Virtual Game Cards | User sees 115 cards; portal declares `https://wb.lp1.savanna.srv.nintendo.net/graphql`; 0.1.3 hooks saw four XHRs but filtered out this host | Confirmed helper host-filter defect corrected in 0.1.4; live response/pagination/access semantics still pending. **No production importer yet.** |
+| Nintendo — Switch Virtual Game Cards | User sees 115 cards; Savanna GraphQL endpoint and four website operation names confirmed | Host filter fixed in 0.1.4; current query recognition fixed in 0.1.5. Live response/pagination/access semantics still pending. **No production importer yet.** |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
 Do not list either new source as an available provider until the signed-in gate
@@ -121,6 +121,22 @@ XHR tests observe 115 cards and then an expired-session response without exporti
 IDs, titles or credentials. The number is a synthetic regression control; live card
 count reconciliation and the production importer gate remain open.
 
+The live 0.1.4 result observes all four XHRs at the confirmed endpoint but marks
+all operations unrecognized. The user checked only public operation names in
+DevTools: `getVgcTotalsVgcs`, `getVgcsVgcs`, `getDevicesVgcs`, and
+`getAllDevicesVgcs`. The helper incorrectly assumed the public reference client's
+`getVgcs` operation name was the website contract. Its zero failed-request count
+did not establish success: unknown operations returned before response validation.
+
+Version **0.1.5** retains the actual website operation names in the projected
+summary. `getVgcsVgcs` is the library candidate; the totals and two device queries
+are auxiliary and cannot create card pages or inflate card counts, even if a
+synthetic response contains card-like fields. Their HTTP/GraphQL failures remain
+visible. Legacy `getVgcs` support remains. One `vgcViews` or `vgcViewsV2` envelope
+can be read, never a union of both. Fixed-path response shapes expose types/counts
+without values if the actual envelope differs. Synthetic fixtures cover both
+envelopes; neither is claimed as an authenticated response until the live rerun.
+
 For PlayStation: current operation/request shape, pagination termination, stable
 product versus title IDs, account-scope evidence, available platforms/editions and
 membership/access fields. Purchased-view naming alone must not mark all rows owned.
@@ -137,7 +153,7 @@ failure and move to the other provider. No legacy-console recovery is in scope.
 
 ## Validation
 
-Passed: **17 focused synthetic tests**, installed-helper checks for both providers
+Passed: **19 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation

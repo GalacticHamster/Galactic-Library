@@ -14,7 +14,7 @@ for(const name of ['manifest.json','core.js','probe.js','panel.js'])files.set(na
 const server=createServer((req,res)=>{
   res.setHeader('Content-Type','text/html; charset=utf-8');
   const initial=req.url==='/nintendo'?'<div id="state" data-json=\''+JSON.stringify({user:{id:'private-account'},views:Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'}))})+'\'></div>':'';
-  res.end('<!doctype html><html><body><h1>Synthetic provider library</h1>'+initial+'<button id="fixture">Observe two pages</button><script>document.querySelector("#fixture").onclick=async()=>{await window.fixtureFetch(0);await window.fixtureFetch(2);};</script></body></html>');
+  res.end('<!doctype html><html><body><h1>Synthetic provider library</h1>'+initial+'<button id="fixture">Observe two pages</button><script>document.querySelector("#fixture").onclick=async()=>{if(window.fixtureAux)await window.fixtureAux();await window.fixtureFetch(0);await window.fixtureFetch(2);};</script></body></html>');
 });await new Promise(done=>server.listen(0,'127.0.0.1',done));
 const origin='http://127.0.0.1:'+server.address().port;
 const manifest=JSON.parse(files.get('manifest.json'));
@@ -30,11 +30,12 @@ files.set('fixture.js',Buffer.from(`
     window.fixtureNetworkCalls++;
     const ps=location.pathname==='/ps',u=new URL(input),v=ps?JSON.parse(u.searchParams.get('variables')):JSON.parse(options.body).variables,offset=v.start??v.offset;
     const rows=offset===0?[{id:'private-one',productId:'private-p1',applicationId:'private-s1',name:'Private title',isLending:false},{id:'private-two',productId:'private-p2',applicationId:'private-s2'}]:[{id:'private-three',productId:'private-p3',applicationId:'private-s3'}];
-    const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViews:{views:rows,offsetInfo:{offset,total:3}}}}}};
+    const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViewsV2:{views:rows,offsetInfo:{offset,total:3}}}}}};
     return Promise.resolve(new Response(JSON.stringify(body),{status:200}));
   };
   window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})})):
-    fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName:'getVgcs',query:'query getVgcs { account { vgc { vgcViews { views { id } } } } }',variables:{offset,limit:2,idToken:'private-token'}})});
+    fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName:'getVgcsVgcs',query:'query getVgcsVgcs { account { vgc { vgcViewsV2 { views { id } } } } }',variables:{offset,limit:2,idToken:'private-token'}})});
+  if(location.pathname!=='/ps')window.fixtureAux=async()=>{for(const operationName of ['getVgcTotalsVgcs','getDevicesVgcs','getAllDevicesVgcs'])await fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName,variables:{}})});};
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-console-helper-'));let child,driver,session,exited;
 try{
@@ -69,11 +70,12 @@ try{
       if(report?.scopes[0]?.rows===3)break;await pause(100);
     }
     assert.equal(report.scopes[0].rows,3);assert.equal(report.scopes[0].distinctRowIds,3);assert.equal(report.scopes[0].observedScopeTraversal,'terminal-range-observed');assert(!JSON.stringify(report).includes('private'));
-    assert.equal(report.observerState.fetchHookInstalled,true);assert.equal(report.observerState.fetchCalls,2);
+    assert.equal(report.observerState.fetchHookInstalled,true);assert.equal(report.observerState.fetchCalls,route==='/ps'?2:5);
     if(route==='/nintendo'){
       assert.equal(report.bootstrap.cardArrays[0].rows,115);assert.equal(report.bootstrap.cardArrays[0].distinctRowIds,115);
       assert.deepEqual(report.bootstrap.accountIdentityFieldPaths,['state.user.id']);
       assert.equal(report.requestContracts[0].endpoint,'https://wb.lp1.savanna.srv.nintendo.net/graphql');
+      assert.equal(report.auxiliaryRequests,3);assert.equal(report.unrecognizedOperations,0);assert.equal(report.requestContracts[3].operation,'getVgcsVgcs');
     }
     if(route==='/ps'){
       const check=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check]").disabled};');

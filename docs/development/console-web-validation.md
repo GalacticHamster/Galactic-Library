@@ -21,7 +21,7 @@ providers remain gated on actual signed-in results. Xbox is outside this task.
 3. Repeat on [Nintendo Virtual Game Cards](https://accounts.nintendo.com/portal/vgcs/).
    Browse/scroll its card list before updating the summary. The current
    user-reported comparison target is **115 visible cards**, not automatically
-   115 products or permanent purchases. Helper 0.1.4 also checks initial page
+   115 products or permanent purchases. Helper 0.1.5 also checks initial page
    data: its `bootstrap` section reports declared Nintendo GraphQL endpoints,
    aggregate card-array counts, and account-identity field names without values.
    Reload the helper and the website when upgrading the helper.
@@ -60,14 +60,20 @@ Current candidate contracts:
 - PlayStation `getPurchasedGameList` at
   `https://web.np.playstation.com/api/graphql/v1/op`, GET/POST metadata, public
   paging/filter variables, `data.purchasedTitlesRetrieve.games` and `pageInfo`.
-- Nintendo `getVgcs` at a Nintendo HTTPS subdomain's GraphQL
+- Nintendo `getVgcsVgcs` (current website) and `getVgcs` (inspected client) at a Nintendo HTTPS subdomain's GraphQL
   path, including the exact portal-declared endpoint
   `https://wb.lp1.savanna.srv.nintendo.net/graphql`, with
   `data.account.vgc.vgcViews.views` and `offsetInfo`. The signed-in user confirmed
   that endpoint from `shopGraphQLApiUrl`. Versions through 0.1.3 incorrectly
   excluded it because it is not under `nintendo.com`. Version 0.1.4 recognizes
   that exact Savanna origin/path without allowing arbitrary `nintendo.net` hosts.
-  The response shape still requires authenticated validation.
+  `getVgcTotalsVgcs`, `getDevicesVgcs` and `getAllDevicesVgcs` are reported
+  separately as auxiliary queries and never supply card rows or pagination totals.
+  The helper recognizes either `vgcViews` or `vgcViewsV2` as one list; it rejects
+  responses containing both instead of combining independent lists. The current
+  website's response shape still requires authenticated validation. Bounded
+  `responseShape` diagnostics expose only fixed paths, field types and key counts
+  if the response differs, so raw response contents are unnecessary.
 
 It reports request method/endpoint/recognized operation, paging and scope, raw
 rows per observed page, distinct response IDs, distinct product/application IDs,

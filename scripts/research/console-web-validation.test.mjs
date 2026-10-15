@@ -46,6 +46,38 @@ test('Verified Nintendo Savanna endpoint is recognized consistently in requests,
   }
 });
 
+test('Current Nintendo website operation counts cards while totals and device queries never add card rows',()=>{
+  const endpoint='https://wb.lp1.savanna.srv.nintendo.net/graphql';
+  const request=operationName=>C.requestInfo('nintendo',endpoint,{method:'POST',body:JSON.stringify({operationName,query:'query '+operationName+' { account { vgc { vgcViewsV2 { views { id } } } } }',variables:{offset:0,limit:300,idToken:'private-token'}})});
+  const views=Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'}));
+  const body={data:{account:{vgc:{vgcViewsV2:{views,offsetInfo:{offset:0,total:115}}}}}};
+  const ledger=C.createLedger('nintendo');
+  for(const operation of ['getVgcTotalsVgcs','getDevicesVgcs','getAllDevicesVgcs']){
+    const info=request(operation);assert.equal(info.operation,operation);ledger.observe(info,200,body,'xhr');
+  }
+  assert.equal(ledger.report().scopes.length,0,'Auxiliary queries cannot become library pages even with card-like responses.');
+  ledger.observe(request('getVgcsVgcs'),200,body,'xhr');
+  const report=plain(C.sanitizeReport(ledger.report()));assert.equal(report.requestsObserved,4);assert.equal(report.auxiliaryRequests,3);assert.equal(report.unrecognizedOperations,0);assert.equal(report.malformedPages,0);
+  assert.equal(report.scopes.length,1);assert.equal(report.scopes[0].rows,115);assert.equal(report.scopes[0].distinctRowIds,115);assert.equal(report.scopes[0].observedScopeTraversal,'terminal-range-observed');
+  assert.equal(report.requestContracts[3].operation,'getVgcsVgcs');assert.equal(report.requestContracts[3].responseShape.at(-1).path,'data.account.vgc.vgcViewsV2');
+  assert.equal(report.requestContracts[0].responseShape,undefined);assert(!JSON.stringify(report).includes('private'));assert(!JSON.stringify(report).includes('Private title'));
+  const viaDocument=C.requestInfo('nintendo',endpoint,{method:'POST',body:JSON.stringify({query:'query getVgcsVgcs { account { vgc { vgcViewsV2 { views { id } } } } }',variables:{offset:0}})});assert.equal(viaDocument.operation,'getVgcsVgcs');
+  assert.equal(request('getVgcsVgcsUnknown').operation,'unrecognized');
+  assert.equal(C.requestInfo('nintendo',endpoint,{method:'POST',body:JSON.stringify({operationName:'getVgcsVgcs',query:'mutation getVgcsVgcs { loanCard }'})}),null);
+  assert.equal(C.requestInfo('playstation','https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getVgcsVgcs'})).operation,'unrecognized');
+});
+
+test('Unexpected card envelopes remain incomplete with bounded redacted shape diagnostics; independent aliases are not unioned',()=>{
+  const endpoint='https://wb.lp1.savanna.srv.nintendo.net/graphql';
+  const request=C.requestInfo('nintendo',endpoint,{method:'POST',body:JSON.stringify({operationName:'getVgcsVgcs',variables:{offset:0,limit:300}})});
+  const ledger=C.createLedger('nintendo');ledger.observe(request,200,{data:{account:{vgc:{private:'private-token','private-account-key':[{id:'private-card'}]}}}},'xhr');
+  const report=plain(C.sanitizeReport(ledger.report()));assert.equal(report.malformedPages,1);assert.equal(report.scopes.length,0);assert.equal(report.requestContracts[0].responseShape.at(-1).path,'data.account.vgc');assert(!JSON.stringify(report).includes('private'));
+  const both=C.createLedger('nintendo');both.observe(request,200,{data:{account:{vgc:{vgcViews:{views:[],offsetInfo:{offset:0,total:0}},vgcViewsV2:{views:[],offsetInfo:{offset:0,total:0}}}}}});assert.equal(both.report().scopes.length,0);assert.equal(both.report().malformedPages,1);
+  const failed=C.createLedger('nintendo');failed.observe({...request,operation:'getDevicesVgcs'},401,{private:'secret'});assert.equal(failed.report().failedRequests,1);assert.equal(failed.report().auxiliaryRequests,1);assert.equal(failed.report().scopes.length,0);
+  const hostile=C.sanitizeReport({format:1,provider:'nintendo',requestContracts:[{endpoint,operation:'private-operation',responseShape:[null,{path:'data.account.private-id',type:'object',fields:{id:'string'}},{path:'data.account',type:'object',fields:{private:'string',views:'array'}}]}]});
+  assert.equal(hostile.requestContracts[0].operation,'unrecognized');assert.equal(hostile.requestContracts[0].responseShape.length,1);assert(!JSON.stringify(hostile).includes('private'));
+});
+
 test('Purchase paging, repeated requests, missing prefix and filter scopes stay distinct',()=>{
   const l=C.createLedger('playstation');l.observe(psRequest(),200,psBody(0,[{id:'one',productId:'p1'},{id:'two',productId:'p2'}],false));
   l.observe(psRequest(2),200,psBody(2,[{id:'three',productId:'p3'}],true));
@@ -121,8 +153,8 @@ test('XHR interception observes 115 synthetic Savanna cards and reports auth exp
   vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
   try{
     const successful=new XHR();successful.open('POST','https://wb.lp1.savanna.srv.nintendo.net/graphql');
-    successful.send(JSON.stringify({operationName:'getVgcs',variables:{offset:0,limit:300,idToken:'private-token'}}));
-    successful.status=200;successful.responseType='json';successful.response=nBody(0,Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'})),115);successful.loaded();
+    successful.send(JSON.stringify({operationName:'getVgcsVgcs',variables:{offset:0,limit:300,idToken:'private-token'}}));
+    successful.status=200;successful.responseType='json';successful.response={data:{account:{vgc:{vgcViewsV2:{views:Array.from({length:115},(_,i)=>({id:'private-card-'+i,applicationId:'private-app-'+i,applicationName:'Private title'})),offsetInfo:{offset:0,total:115}}}}}};successful.loaded();
     const request=new XHR();assert.equal(request.open('POST','https://wb.lp1.savanna.srv.nintendo.net/graphql'),'opened');
     const body=JSON.stringify({query:'query getVgcs { account { vgc { views { id } } } }',variables:{offset:0,limit:300,idToken:'private-token'}});
     assert.equal(request.send(body),'sent');assert.equal(request.sent,body);request.status=401;Object.defineProperty(request,'responseText',{get(){throw Error('Do not inspect auth-error response');}});request.loaded();
