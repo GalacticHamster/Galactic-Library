@@ -1,5 +1,7 @@
 # Xbox integration feasibility
 
+**Superseded Xbox recommendation:** The [consumer ownership follow-up](XBOX_OWNERSHIP_FOLLOWUP.md) found the current Xbox web Content Access caller and an MSA Collections implementation. It revises Xbox to **Conditional Go for a validated partial importer**. The initial evidence, ranking and estimates below are historical.
+
 Research date: **2026-10-15**. GL baseline: `a0c199b`, database schema 13. Research only; no account access or production changes. Public documentation and implementation inspection establish capabilities, not successful authentication against a personal library.
 
 ## Decision: DEFER before 1.0

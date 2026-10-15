@@ -1,5 +1,7 @@
 # Console integration recommendations
 
+**Xbox follow-up:** The Xbox decision/ranking and estimates below are historical. The [ownership-source investigation](XBOX_OWNERSHIP_FOLLOWUP.md) supersedes Xbox Defer with **Conditional Go for a validated partial importer**, prioritizing the consumer web Content Access service. It does not establish authenticated completeness or revise the PlayStation/Nintendo findings.
+
 Research date: **2026-10-15**. Historical decision record based on GL `a0c199b`, schema 13, public platform documentation and inspected open-source implementations. No production integration or live-account import was implemented.
 
 ## Recommendation
