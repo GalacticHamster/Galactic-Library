@@ -3,7 +3,7 @@ import {scopedEntryKeys,sameCoverageBasis} from './scoped-coverage.js';
 import {includedPublicationTitle} from './coverage-disposition.js';
 import {collectionContents,libraryCoverageIndex,coverageLanguage} from './inferred-coverage.js';
 import {identityKey,identityEvidence} from './identity.js';
-import {contentKey,validateContentReview,contentsSourceBaseline,contentsStatement} from './contents.js';
+import {contentKey,validateContents,validateContentReview,contentsSourceBaseline,contentsStatement} from './contents.js';
 import {publicationContext,validatePublicationReferences} from './comic-publications.js';
 import {PUBLICATION_REFERENCES,COVERAGE_RESOLUTION_REFERENCES} from './publication-reference-data.js';
 
@@ -65,6 +65,37 @@ export function resolutionCandidates(collection,dispositions,database,ids){
  }
  return [...choices.values()].sort((a,b)=>Number(b.suggested)-Number(a.suggested)||a.label.localeCompare(b.label,undefined,{numeric:true}));
 }
+// User-defined runs use the same series/run/type/language fields as Contents.
+// They are drafts carried by a scoped review request, never separate records.
+export function newResolutionPublication(collection,ids,definition,dispositions,database){
+ const selected=collection.observations.filter(o=>ids.includes(o.id));
+ if(!selected.length||selected.length!==ids.length||selected.some(o=>!o.parsed||o.origin!=='contents'||o.protectedMerge)||new Set(selected.map(o=>scope(o.resolved))).size!==1)throw Error('Choose parsed contents from one publication. Named or unnumbered references needing more information can be entered in the contents editor.');
+ if(!definition||typeof definition!=='object'||Array.isArray(definition)||Object.keys(definition).some(k=>!['series','startYear','endYear'].includes(k)))throw Error('Enter a series title and publication years.');
+ const series=typeof definition.series==='string'?definition.series.trim():'',start=String(definition.startYear??'').trim(),end=String(definition.endYear??'').trim();
+ if(!/^[1-9]\d{3}$/u.test(start)||end&&!/^[1-9]\d{3}$/u.test(end))throw Error('Enter a four-digit starting year and, optionally, a four-digit ending year.');
+ if(end&&Number(end)<Number(start))throw Error('The ending year must not be earlier than the starting year.');
+ if(!series||series.length>500)throw Error('Enter a series title of 1-500 characters.');
+ if(/\(\s*\d{4}(?:\s*[-\u2013\u2014]\s*\d{0,4})?\s*\)\s*$/u.test(series))throw Error('Enter the series title without its year suffix; use the year fields below.');
+ const source=selected[0].resolved,run=end&&end!==start?start+'-'+end:start;
+ const entry=validateContents([{...source,series,run,language:coverageLanguage(source.language)}])[0],target={series:entry.series,run:entry.run,unitType:entry.unitType,language:entry.language};
+ const existing=new Map(resolutionCandidates(collection,dispositions,database,ids).map(t=>[t.id,t]));
+ for(const row of dispositions)for(const o of row.observations){const t=o.resolved;if(!o.parsed||!t.run||identityKey(t.series)!==identityKey(target.series)||t.unitType!==target.unitType||coverageLanguage(t.language)!==target.language)continue;const candidate={series:t.series,run:t.run,unitType:t.unitType,language:coverageLanguage(t.language)},id=targetId(candidate);if(!existing.has(id))existing.set(id,{...candidate,id,label:t.series+' ('+t.run+') - '+t.unitType,evidence:'Existing saved publication identity.',sources:[],suggested:false});}
+ const same=[...existing.values()].filter(t=>identityKey(t.series)===identityKey(target.series)&&t.unitType===target.unitType&&t.language===target.language),equivalent=[];
+ for(const known of same){
+  const years=/^(\d{4})(?:\s*[-\u2013\u2014]\s*(\d{4})?)?$/u.exec(known.run.trim());
+  if(!years){if(new RegExp('\\b'+start+'\\b','u').test(known.run))throw Error('An existing run has additional publication-volume or numbering information for this year. Select that definition or inspect it in the contents editor.');continue;}
+  if(years[1]!==start)continue;
+  if(years[2]&&end&&years[2]!==end)throw Error('An existing run starts in '+start+' but has a different ending year. Select or correct the existing definition instead of creating a conflicting run.');
+  equivalent.push(known);
+ }
+ if(equivalent.length>1)throw Error('Several existing definitions match this starting year. Select the correct existing publication rather than creating another.');
+ if(equivalent.length===1)return {...equivalent[0],newPublication:{series:target.series,startYear:start,endYear:end},evidence:'This run is already saved. Using the existing publication; no new definition will be added.'};
+ return {...target,id:targetId(target),label:target.series+' ('+target.run+') - '+target.unitType+' - new user-defined run',evidence:'New user-defined publication. Preview and save to confirm only the selected contents; no publication is saved yet.',sources:[],suggested:false,newPublication:{series:target.series,startYear:start,endYear:end}};
+}
+function requestTarget(row,request,dispositions,database){
+ const target=request.newPublication?newResolutionPublication(row,request.observationIds,request.newPublication,dispositions,database):resolutionCandidates(row,dispositions,database,request.observationIds).find(t=>t.id===request.targetId);
+ if(!target||target.id!==request.targetId)throw Error('The selected publication identity is no longer available or an equivalent definition changed. Reload the preview.');return target;
+}
 function family(record){
  const c=publicationContext(record.metadata?.enrichment?.kindleProductComicContents);
  if(new Set(c.publishers.map(identityKey)).size!==1||new Set(c.contexts.map(identityKey)).size!==1)return null;
@@ -90,7 +121,7 @@ export function compatibleResolutionCollections(collection,ids,target,dispositio
 }
 export function coverageResolutionRequest(collection,ids,target,database){
  const record=recordFor(database,collection.recordRef);if(!record)throw Error('This collection is no longer saved.');
- return {recordRef:collection.recordRef,observationIds:[...ids],targetId:target.id,expected:resolutionStamp(record,database)};
+ return {recordRef:collection.recordRef,observationIds:[...ids],targetId:target.id,...(target.newPublication?{newPublication:target.newPublication}:{}),expected:resolutionStamp(record,database)};
 }
 export function previewCoverageResolutions(database,requests,{merges={},dispositions,now=new Date().toISOString()}={}){
  if(!Array.isArray(requests)||!requests.length||requests.length>50||new Set(requests.map(r=>r.recordRef)).size!==requests.length)throw Error('Select 1–50 distinct saved collections.');
@@ -108,8 +139,8 @@ export function previewCoverageResolutions(database,requests,{merges={},disposit
   // a small run correction implicitly confirm another unresolved publication
   // or discard a source-only run inference elsewhere in a mixed collection.
   const limited=!reviewedContents(database.contentReviews?.[record.id])||database.contentReviews[record.id].source==='coverage-resolution';
-  const needsScoped=Boolean(reviewedContents(database.contentReviews?.[record.id])&&database.contentReviews[record.id].source!=='coverage-resolution')||database.contentReviews?.[record.id]?.coverageResolutions?.length||limited&&row.observations.some(o=>o.origin==='contents'&&!ids.includes(o.id)&&(o.reasons.some(r=>['publication-unresolved','annual-run-unresolved','containment-unresolved'].includes(r.code))||o.extracted.run!==o.resolved.run||o.extracted.series!==o.resolved.series));
-  const target=resolutionCandidates(row,dispositions,database,ids).find(t=>t.id===request.targetId);if(!target)throw Error('The selected publication identity is no longer available for these observations.');
+  const needsScoped=Boolean(request.newPublication)||Boolean(reviewedContents(database.contentReviews?.[record.id])&&database.contentReviews[record.id].source!=='coverage-resolution')||database.contentReviews?.[record.id]?.coverageResolutions?.length||limited&&row.observations.some(o=>o.origin==='contents'&&!ids.includes(o.id)&&(o.reasons.some(r=>['publication-unresolved','annual-run-unresolved','containment-unresolved'].includes(r.code))||o.extracted.run!==o.resolved.run||o.extracted.series!==o.resolved.series));
+  const target=requestTarget(row,request,dispositions,database);
   if(needsScoped){
    const raw=database.contentReviews?.[record.id],base=collectionContents(record,database,{ignoreScoped:true});
    if(raw?.coverageResolutions?.length&&!sameCoverageBasis(record,raw))throw Error('The source changed after an earlier scoped correction. Review the changed contents before adding another correction.');
@@ -136,7 +167,7 @@ export function applyCoverageResolutions(database,request,{merges={},now}={}){
  for(const target of request.targets){const record=recordFor(database,target.recordRef);if(!record||target.expected!==resolutionStamp(record,database))throw Error('Saved contents or access changed. Reload the coverage preview before saving.');}
  const dispositions=libraryCoverageIndex(database,{includeExcerpts:true,runInferenceExclusions:Object.values(merges).flatMap(m=>m.members??[])}).dispositions;
  if(request.targets?.length>1){
-  const first=request.targets[0],row=dispositions.find(r=>r.recordRef===first.recordRef),target=row&&resolutionCandidates(row,dispositions,database,first.observationIds).find(t=>t.id===first.targetId);
+  const first=request.targets[0],row=dispositions.find(r=>r.recordRef===first.recordRef),target=row&&requestTarget(row,first,dispositions,database);
   const compatible=row&&target?compatibleResolutionCollections(row,first.observationIds,target,dispositions,database):[];
   for(const other of request.targets.slice(1))if(!compatible.some(c=>c.collection.recordRef===other.recordRef&&c.target.id===other.targetId&&JSON.stringify(c.ids)===JSON.stringify(other.observationIds)))throw Error('Bulk resolution includes a different collection family, account, explicit run, review or manual merge. Resolve it separately.');
  }

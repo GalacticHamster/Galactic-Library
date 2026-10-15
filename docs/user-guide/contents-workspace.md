@@ -149,8 +149,7 @@ or **Not included contents**. The decision affects only that reference and leave
 the captured description and parsed issues intact. **Ignored references → Restore**
 reverses it. A collection leaves Needs resolution when no actionable components
 remain. Explicitly included named standalone publications can be resolved;
-promotional prose should be ignored. Creating new publication runs is not part
-of this workflow.
+promotional prose should be ignored. If the publication run is missing, you can define it here as described below.
 
 ## Navigation and compatibility
 
@@ -163,3 +162,33 @@ and its collection-pair browser remain under Library.
 Existing #contents and #books routes retain their destinations; #overlap opens
 Library Comic Coverage’s Collection Overlap, and #ownership remains valid. Exact
 record links and Back/Forward preserve account scope and return context.
+
+### Create a missing publication run
+
+In **Resolve coverage**, keep the selected issue component and search for the
+correct run. If it is absent, choose **Create new publication run** (also available
+when similarly named runs are listed). Enter the series title without a year suffix,
+a four-digit starting year, and an optional ending year. Issue type and language
+are retained from the selected contents. Search text such as `Lucifer (2000-2006)`
+prepopulates these fields.
+
+Choose **Use this publication run**, then **Preview coverage changes** and
+**Save reviewed contents**. The draft is labelled as a new user-defined run.
+Nothing is persisted by creating the draft or previewing. Cancel new run, Escape
+inside the form, or closing the dialog leaves no publication record behind.
+
+An equivalent saved run is reused. Conflicting ending years or additional
+publication-volume/numbering qualifiers require selecting or correcting the
+existing definition; they are not silently merged. Later runs such as Lucifer
+(2015-2017) and Lucifer (2018) remain distinct from Lucifer (2000-2006).
+
+Saving uses existing scoped contents corrections and preserves unselected entries,
+ownership and captured source text. The saved series/run becomes an existing
+choice for other collections. It does not automatically resolve them. Existing
+Edit existing resolution and Undo contents review controls remain available.
+Runs remain discoverable through saved contents; this is not a separate permanent
+publication catalog. Removing the last supporting review can remove that choice.
+
+This shortcut requires parsed issue observations. Named references without
+checked issue details still need the Contents editor; the form never invents
+issue numbers. New run choices and corrections survive normal backup/restore.

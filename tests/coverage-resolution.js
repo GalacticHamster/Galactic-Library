@@ -1,10 +1,11 @@
+import {newPublicationFixture} from './new-publication-fixture.js';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {coverageResolutionFixture} from './coverage-resolution-fixture.js';
 import {coverageBook,coverageDatabase,confirmed,issue} from './inferred-coverage-fixture.js';
 import {collectionContents,libraryCoverageIndex} from '../src/lib/inferred-coverage.js';
 import {comicCoverageForLibrary} from '../src/ui/comic-coverage-projection.js';
-import {resolutionCandidates,compatibleResolutionCollections,coverageResolutionRequest,previewCoverageResolutions,applyCoverageResolutions} from '../src/lib/coverage-resolution.js';
+import {newResolutionPublication,resolutionCandidates,compatibleResolutionCollections,coverageResolutionRequest,previewCoverageResolutions,applyCoverageResolutions} from '../src/lib/coverage-resolution.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {DATABASE_STORAGE_KEY} from '../src/lib/constants.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
@@ -84,3 +85,55 @@ export const coverageResolutionTests=[
   const record=saved.providerItems[books[3].id],imported=await writer.mergeProviderItems('kindle',[{providerItemId:record.providerItemId,title:record.title,mediaType:'book',ownership:record.ownership,metadata:{}}],{profileId:record.profileId});assert.deepEqual(imported.contentReviews,saved.contentReviews);assert.equal(find(comicCoverageForLibrary(imported),record).summary.full,13);
  }]
 ];
+
+coverageResolutionTests.push(
+ ['new publication preview stages only selected Lucifer observations and saves through scoped contents without source or ownership changes',()=>{
+  const f=newPublicationFixture(),before=JSON.stringify(f.database),target=newResolutionPublication(f.row,f.ids,f.definition,f.projection.dispositions,f.database);
+  assert(target.newPublication);assert.equal(target.run,'2000-2006');assert(resolutionCandidates(f.row,f.projection.dispositions,f.database,f.ids).some(t=>t.run==='2015-2017'));
+  const request=coverageResolutionRequest(f.row,f.ids,target,f.database),now='2026-10-14T12:00:00Z',preview=previewCoverageResolutions(f.database,[request],{dispositions:f.projection.dispositions,now});assert.equal(JSON.stringify(f.database),before);
+  const saved=applyCoverageResolutions(f.database,{confirmed:true,mergeStamp:'{}',targets:[request]},{now}).database,p=comicCoverageForLibrary(saved),row=find(p,f.first);
+  assert.equal(row.observations.filter(o=>o.resolved.series==='Lucifer'&&o.resolved.run==='2000-2006'&&o.countedFull).length,8);
+  assert.deepEqual(row.observations.find(o=>o.resolved.series==='Hellblazer'),f.row.observations.find(o=>o.resolved.series==='Hellblazer'));
+  assert.deepEqual(find(p,f.second).observations,find(f.projection,f.second).observations,'Creation must not automatically infer a run for another collection');
+  assert.equal(saved.contentReviews[f.first.id].referenceOnly,true);assert.equal(saved.contentReviews[f.first.id].entries.length,0);assert.equal(saved.contentReviews[f.first.id].coverageResolutions.length,8);
+  assert.deepEqual(saved.providerItems,f.database.providerItems);assert.deepEqual(saved.ownershipReviews,f.database.ownershipReviews);assert.deepEqual(preview.database.contentReviews,saved.contentReviews);
+ }],
+ ['new confirmed runs are reusable, backup-safe and reversible through existing review removal',()=>{
+  const f=newPublicationFixture(),target=newResolutionPublication(f.row,f.ids,f.definition,f.projection.dispositions,f.database),request=coverageResolutionRequest(f.row,f.ids,target,f.database);
+  const db=applyCoverageResolutions(f.database,{confirmed:true,mergeStamp:'{}',targets:[request]}).database,restored=parseBackup(createBackup(db)),p=comicCoverageForLibrary(restored),row=find(p,f.second),ids=row.observations.map(o=>o.id);
+  const reusable=resolutionCandidates(row,p.dispositions,restored,ids).find(t=>t.run==='2000-2006');assert(reusable);assert(!reusable.newPublication);
+  const second=applyCoverageResolutions(restored,{confirmed:true,mergeStamp:'{}',targets:[coverageResolutionRequest(row,ids,reusable,restored)]}).database;
+  assert.equal(find(comicCoverageForLibrary(second),f.second).observations.filter(o=>o.countedFull).length,4);
+  delete second.contentReviews[f.first.id];assert.deepEqual(find(comicCoverageForLibrary(second),f.first).observations,f.row.observations);assert(resolutionCandidates(f.row,comicCoverageForLibrary(second).dispositions,second,f.ids).some(t=>t.run==='2000-2006'));
+ }],
+ ['duplicate runs reuse saved identity; conflicting bounds, publication volumes and incompatible definitions fail',()=>{
+  const f=newPublicationFixture(),known=coverageBook('known','Collects Lucifer (2000) #40.'),db=coverageDatabase(...Object.values(f.database.providerItems),known),p=comicCoverageForLibrary(db);
+  const duplicate=newResolutionPublication(find(p,f.first),f.ids,f.definition,p.dispositions,db);assert.equal(duplicate.run,'2000');assert(duplicate.newPublication);assert(!duplicate.label.includes('new user-defined'));
+  const bounded=coverageBook('bounds','Collects Lucifer (2000-2005) #40.'),conflictDb=coverageDatabase(...Object.values(f.database.providerItems),bounded),conflicts=comicCoverageForLibrary(conflictDb);
+  // Use reviewed entries for exact run strings, as the Contents editor does.
+  conflictDb.contentReviews[bounded.id]=confirmed([issue('40',{series:'Lucifer',run:'2000-2005'})]);const cp=comicCoverageForLibrary(conflictDb);
+  assert.throws(()=>newResolutionPublication(find(cp,f.first),f.ids,f.definition,cp.dispositions,conflictDb),/different ending year/);
+  conflictDb.contentReviews[bounded.id]=confirmed([issue('40',{series:'Lucifer',run:'volume 2 (2000)'})]);const vp=comicCoverageForLibrary(conflictDb);assert.throws(()=>newResolutionPublication(find(vp,f.first),f.ids,f.definition,vp.dispositions,conflictDb),/numbering information/);
+  for(const patch of [{startYear:'20'},{endYear:'1999'},{series:''},{series:'Lucifer (2015)'},{unitType:'annual'}])assert.throws(()=>newResolutionPublication(f.row,f.ids,{...f.definition,...patch},f.projection.dispositions,f.database));
+  assert.throws(()=>newResolutionPublication(f.row,['reference:0'],f.definition,f.projection.dispositions,f.database),/Choose parsed contents/);
+ }],
+ ['new run corrections preserve existing human reviews and selected issue types',()=>{
+  const f=newPublicationFixture();f.database.contentReviews[f.first.id]=confirmed([issue('1',{series:'Lucifer',run:'2015-2017'}),issue('2',{series:'Lucifer',run:'2015-2017',unitType:'annual'}),issue('3',{series:'Beta',run:'1980'})]);const p=comicCoverageForLibrary(f.database),row=find(p,f.first),obs=row.observations.find(o=>o.resolved.unitType==='annual'),original=structuredClone(f.database.contentReviews[f.first.id]);
+  const target=newResolutionPublication(row,[obs.id],f.definition,p.dispositions,f.database);assert.equal(target.unitType,'annual');
+  const saved=applyCoverageResolutions(f.database,{confirmed:true,mergeStamp:'{}',targets:[coverageResolutionRequest(row,[obs.id],target,f.database)]}).database;
+  assert.deepEqual(saved.contentReviews[f.first.id].entries,original.entries);const after=find(comicCoverageForLibrary(saved),f.first);assert.equal(after.observations.find(o=>o.resolved.unitType==='annual').resolved.run,'2000-2006');assert.equal(after.observations.find(o=>o.resolved.series==='Beta').resolved.run,'1980');
+ }],
+ ['new run writer commits atomically and rejects stale or unconfirmed requests without orphan state',async()=>{
+  const f=newPublicationFixture(),state={[DATABASE_STORAGE_KEY]:structuredClone(f.database)};let fail=false,writes=0;const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...state}),set:async values=>{if(fail)throw Error('Synthetic save failure');writes++;Object.assign(state,structuredClone(values));}});
+  const db=await writer.getDatabase(),p=comicCoverageForLibrary(db),row=find(p,f.first),ids=row.observations.filter(o=>o.resolved.series==='Lucifer').map(o=>o.id),target=newResolutionPublication(row,ids,f.definition,p.dispositions,db),request={confirmed:true,mergeStamp:'{}',targets:[coverageResolutionRequest(row,ids,target,db)]},before=JSON.stringify(state),count=writes;
+  await assert.rejects(writer.saveCoverageResolutions({...request,confirmed:false}),/Confirm/);assert.equal(writes,count);fail=true;await assert.rejects(writer.saveCoverageResolutions(request),/Synthetic save failure/);assert.equal(JSON.stringify(state),before);fail=false;
+  const saved=await writer.saveCoverageResolutions(request);assert.equal(writes,count+1);assert(saved.contentReviews[f.first.id].coverageResolutions.length);const after=writes;await assert.rejects(writer.saveCoverageResolutions(request),/Reload/);assert.equal(writes,after);
+  const restored=parseBackup(createBackup(saved));assert.deepEqual(restored.contentReviews,saved.contentReviews);
+  const record=saved.providerItems[f.first.id],imported=await writer.mergeProviderItems('kindle',[{providerItemId:record.providerItemId,title:record.title,mediaType:record.mediaType,ownership:record.ownership,metadata:{}}],{profileId:record.profileId});assert.deepEqual(imported.contentReviews,saved.contentReviews);
+ }],
+ ['a conflicting run introduced after preview rejects creation without changing the library',()=>{
+  const f=newPublicationFixture(),target=newResolutionPublication(f.row,f.ids,f.definition,f.projection.dispositions,f.database),request={confirmed:true,mergeStamp:'{}',targets:[coverageResolutionRequest(f.row,f.ids,target,f.database)]};
+  const other=coverageBook('concurrent-run'),db={...f.database,providerItems:{...f.database.providerItems,[other.id]:other},contentReviews:{...f.database.contentReviews,[other.id]:confirmed([issue('50',{series:'Lucifer',run:'2000-2005'})])}},before=JSON.stringify(db);
+  assert.throws(()=>applyCoverageResolutions(db,request),/different ending year/);assert.equal(JSON.stringify(db),before);
+ }]
+);

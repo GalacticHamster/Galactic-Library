@@ -1,5 +1,5 @@
 import {createConfirmation} from './confirmation.js';
-import {resolutionCandidates,compatibleResolutionCollections,coverageResolutionRequest,previewCoverageResolutions,resolutionStamp} from '../lib/coverage-resolution.js';
+import {newResolutionPublication,resolutionCandidates,compatibleResolutionCollections,coverageResolutionRequest,previewCoverageResolutions,resolutionStamp} from '../lib/coverage-resolution.js';
 import {loadCoverageProjection} from './collection-overlap-projection.js';
 import {groupContents} from './contents-display.js';
 import {accountLabel} from './item-presentation.js';
@@ -50,7 +50,7 @@ export function createCoverageDisposition(row,database,projection,actions={}){
  return root;
 }
 export function openCoverageResolution(initialRow,initialDatabase,initialProjection,actions={}){
- let database=initialDatabase,projection=initialProjection,row=initialRow,ids=[],target=null,preview=null,busy=false,persisted=false,issuePage=0,issueSize=50,preparing=false,preparation=0,editing=false;const candidateCache=new Map(),relatedCache=new Map();
+ let database=initialDatabase,projection=initialProjection,row=initialRow,ids=[],target=null,preview=null,busy=false,persisted=false,issuePage=0,issueSize=50,preparing=false,preparation=0,editing=false;let draftTarget=null;const candidateCache=new Map(),relatedCache=new Map();
  const merges=actions.merges??{},dialog=el('dialog');dialog.className='coverage-resolution-dialog';dialog.setAttribute('aria-label','Resolve comic coverage');
  dialog.append(el('h3','Resolve coverage — '+row.title),el('p','Choose a publication for the selected contents. Saving uses the existing reviewed-contents record; other entries and the captured description stay unchanged. It does not change ownership.'));
  const summary=el('p',coverageDispositionSummary(row)),notice=el('p');notice.setAttribute('role','status');notice.className='operation-status';dialog.append(summary);
@@ -69,6 +69,27 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
  const candidates=el('select');candidates.size=5;candidates.setAttribute('aria-label','Publication run candidates');
  const why=el('p'),links=el('p'),bulk=el('div'),previewArea=el('div'),editorArea=el('div');let related=[],includeRelated=false;
  const previewButton=button('Preview coverage changes',previewChanges),save=button('Save reviewed contents',saveChanges),close=button('Close',()=>{if(!busy&&actions.canLeave?.()!==false)dialog.remove();});save.disabled=true;previewButton.dataset.coveragePreview='true';
+ const creation=el('fieldset');creation.hidden=true;creation.id='new-publication-'+crypto.randomUUID();creation.append(el('legend','New publication run'));
+ const seriesName=el('input'),startYear=el('input'),endYear=el('input'),creationStatus=el('p');creationStatus.setAttribute('role','status');
+ seriesName.maxLength=500;for(const input of [startYear,endYear]){input.type='number';input.min='1000';input.max='9999';input.step='1';}
+ function field(label,input){input.setAttribute('aria-label',label);const wrapper=el('label',label);wrapper.className='stacked-label';wrapper.append(input);return wrapper;}
+ const runScope=el('p'),useRun=button('Use this publication run',stagePublication),cancelRun=button('Cancel new run',cancelCreation);
+ creation.append(el('p','Define the publication containing the selected issues. This draft is saved only with Save reviewed contents. Original source text and other issues stay unchanged.'),field('Series title',seriesName),field('Starting year',startYear),field('Ending year (optional)',endYear),runScope,useRun,cancelRun,creationStatus);
+ const createRun=button('Create new publication run',()=>{
+  if(busy||preparing||!canCreateRun())return;draftTarget=null;target=null;cancelPreview();creation.hidden=false;createRun.setAttribute('aria-expanded','true');
+  const current=groups.get(choose.value)?.[0]?.resolved,query=search.value.trim(),years=/^(.*?)\s*\((\d{4})(?:\s*[-\u2013\u2014]\s*(\d{4})?)?\)\s*$/u.exec(query);
+  seriesName.value=years?.[1]?.trim()||(/^\d{4}$/u.test(query)?current?.series:query)||current?.series||'';startYear.value=years?.[2]??(/^\d{4}$/u.test(query)?query:'');endYear.value=years?.[3]??'';
+  runScope.textContent='Issue type: '+current.unitType+'; language: '+(current.language||'en')+'. These stay the same as the selected contents.';creationStatus.textContent='Nothing has been saved.';refreshCandidates();seriesName.focus();
+ });createRun.setAttribute('aria-expanded','false');createRun.setAttribute('aria-controls',creation.id);
+ function canCreateRun(){const selected=row.observations.filter(o=>ids.includes(o.id));return !persisted&&selected.length>0&&selected.length===ids.length&&selected.every(o=>o.parsed&&o.origin==='contents'&&!o.protectedMerge);}
+ function cancelCreation(){creation.hidden=true;createRun.setAttribute('aria-expanded','false');if(draftTarget){target=null;draftTarget=null;}cancelPreview();refreshCandidates();createRun.focus();}
+ function stagePublication(){
+  if(busy||preparing||!canCreateRun())return;
+  try{draftTarget=newResolutionPublication(row,ids,{series:seriesName.value,startYear:startYear.value,endYear:endYear.value},projection.dispositions,database);target=draftTarget;creation.hidden=true;createRun.setAttribute('aria-expanded','false');refreshCandidates();candidates.focus();}
+  catch(error){creationStatus.textContent=error.message;}
+ }
+ for(const input of [seriesName,startYear,endYear])input.addEventListener('input',()=>{draftTarget=null;target=null;cancelPreview();creationStatus.textContent='Draft changed. Use this publication run again before previewing.';refreshCandidates();});
+ creation.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();cancelCreation();}else if(event.key==='Enter'){event.preventDefault();stagePublication();}});
  const editExisting=button('Edit existing resolution',async()=>{
   const confirmation=createConfirmation({title:'Edit existing resolution?',message:'Replace the selected publication assignment only after previewing and saving. Other entries and original source evidence stay unchanged.',confirmLabel:'Edit assignment'});if(!await confirmation.result)return;editing=true;changeGroup(true);
  });
@@ -81,13 +102,13 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
  const contents=el('a','Open source collection in Contents');contents.href=bookHref('contents',row.recordRef);
  contents.addEventListener('click',event=>{if(busy||actions.canLeave?.()===false)event.preventDefault();else dialog.remove();});
  const cancelPreview=()=>{preview=null;save.disabled=true;previewArea.replaceChildren();};
- function setBusy(){for(const n of controls.querySelectorAll('input,select,button'))n.disabled=busy||n.dataset.locked==='true';candidates.disabled=busy||preparing;previewButton.disabled=busy||preparing||!target||!ids.length||persisted;previewButton.textContent=preparing?'Preparing preview...':'Preview coverage changes';notice.setAttribute('aria-busy',String(preparing||busy));editExisting.disabled=busy||preparing;save.disabled=busy||!preview||persisted;close.disabled=busy;edit.disabled=busy;}
+ function setBusy(){for(const n of controls.querySelectorAll('input,select,button'))n.disabled=busy||n.dataset.locked==='true';candidates.disabled=busy||preparing;previewButton.disabled=busy||preparing||!target||!ids.length||persisted;previewButton.textContent=preparing?'Preparing preview...':'Preview coverage changes';notice.setAttribute('aria-busy',String(preparing||busy));editExisting.disabled=busy||preparing;createRun.disabled=busy||preparing||!canCreateRun();useRun.disabled=busy||preparing||!canCreateRun();save.disabled=busy||!preview||persisted;close.disabled=busy;edit.disabled=busy;}
  function renderIssues(){
   const obs=groups.get(choose.value)??[];issuePage=pager.update({total:obs.length,page:issuePage,size:issueSize}).page;issueCount.textContent=ids.length+' selected';issueList.replaceChildren();
   for(const o of obs.slice(issuePage*issueSize,(issuePage+1)*issueSize)){const label=el('label'),check=el('input');check.type='checkbox';check.checked=ids.includes(o.id);const locked=o.protectedMerge||!o.actionable&&!editing;check.disabled=locked;check.dataset.locked=String(locked);check.dataset.resolutionObservation=o.id;check.addEventListener('change',()=>{ids=check.checked?[...ids,o.id]:ids.filter(id=>id!==o.id);cancelPreview();refreshCandidates();renderIssues();});label.append(check,' #'+o.resolved.number+' · '+(o.resolved.run||'run unresolved')+' · '+o.extent+(o.protectedMerge?' · controlled by a manual merge':''));issueList.append(label);}
  }
  function remember(cache,key,value){cache.set(key,value);if(cache.size>20)cache.delete(cache.keys().next().value);return value;}
- function candidatesForSelection(){const key=JSON.stringify(ids);if(!candidateCache.has(key))remember(candidateCache,key,resolutionCandidates(row,projection.dispositions,database,ids));return candidateCache.get(key);}
+ function candidatesForSelection(){const key=JSON.stringify(ids);if(!candidateCache.has(key))remember(candidateCache,key,resolutionCandidates(row,projection.dispositions,database,ids));const existing=candidateCache.get(key);return draftTarget&&!existing.some(t=>t.id===draftTarget.id)?[draftTarget,...existing]:existing.map(t=>t.id===draftTarget?.id?draftTarget:t);}
  async function refreshCandidates(){
   const token=++preparation;preparing=true;cancelPreview();bulk.replaceChildren();notice.textContent=ids.length?'Preparing preview... Validating the selected publication.':'Select an unresolved component, or explicitly edit a resolved assignment.';setBusy();
   // Give the browser a turn to show feedback before bounded bibliographic work.
@@ -96,11 +117,13 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
    const all=ids.length?candidatesForSelection():[],matches=all.filter(c=>c.label.toLowerCase().includes(search.value.trim().toLowerCase()));target=all.find(c=>c.id===target?.id)??null;
    candidates.replaceChildren(...matches.slice(0,50).map(c=>Object.assign(el('option',c.label+(c.suggested?' - suggested':'')),{value:c.id})));candidates.value=target?.id??'';
    const current=groups.get(choose.value)?.[0]?.resolved;
-   why.textContent=target?'Selected: '+target.label+'. '+target.evidence:!ids.length&&current?'Existing assignment: '+current.series+(current.run?' ('+current.run+')':'')+' - '+current.unitType+'. '+(componentState(groups.get(choose.value)[0])==='resolved'?'Choose Edit existing resolution to change it.':'Use the contents editor for excluded or informational material.'):all.length?'Select a publication, then preview the changes.':'No safe existing publication choice covers this selection. Use the contents editor to specify the publication or resolve unsupported text.';
+   createRun.title=canCreateRun()?'Define the run for the selected contents.':'Select parsed issues from one publication; use the contents editor for references without issue details.';
+   why.textContent=target?'Selected: '+target.label+'. '+target.evidence:!ids.length&&current?'Existing assignment: '+current.series+(current.run?' ('+current.run+')':'')+' - '+current.unitType+'. '+(componentState(groups.get(choose.value)[0])==='resolved'?'Choose Edit existing resolution to change it.':'Use the contents editor for excluded or informational material.'):!matches.length?'No publication runs match this search. Create a new publication run below, or change the search.':'Select an existing publication, or create the missing run below, then preview the changes.';
+   if(!target&&ids.some(id=>id.startsWith('reference:')))why.textContent='Select an existing publication for this named reference. To define one with checked issue details, use Open contents editor.';
    links.replaceChildren();for(const url of target?.sources??[]){const link=el('a','Publication evidence');link.href=url;link.target='_blank';link.rel='noopener noreferrer';links.append(link,' ');}
    related=[];includeRelated=false;
-   if(target&&!editing){const key=JSON.stringify([ids,target.id,editing]);if(relatedCache.has(key)){related=relatedCache.get(key);renderRelated();}else bulk.append(button('Find matching collections',findRelated));}
-   notice.textContent=target?'Ready to preview the selected changes.':ids.length?(all.length?'Choose a target publication to prepare a preview.':'No safe target is available. Open the contents editor to review this component.'):'Select an unresolved component, or choose Edit existing resolution.';
+   if(target&&!editing&&!target.newPublication){const key=JSON.stringify([ids,target.id,editing]);if(relatedCache.has(key)){related=relatedCache.get(key);renderRelated();}else bulk.append(button('Find matching collections',findRelated));}
+   notice.textContent=target?'Ready to preview the selected changes.':ids.length?(matches.length?'Choose a target publication or create a new run.':'No matching run is available. Create a new publication run below.'):'Select an unresolved component, or choose Edit existing resolution.';
   }catch(error){target=null;notice.textContent='Could not prepare preview: '+error.message+'. Choose another component or reopen the dialog.';}
   finally{if(token===preparation){preparing=false;setBusy();}}
  }
@@ -117,7 +140,7 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
  }
  function changeGroup(keepEditing=false){
   referenceArea.replaceChildren();const selectedReference=choose.value.startsWith('reference:')?row.references[Number(choose.value.slice(10))]:null;if(selectedReference&&!selectedReference.ignored)referenceArea.append(referenceControls(row,selectedReference,database,{...actions,referenceBusy:value=>{busy=value;setBusy();},resolved:next=>reconcile(next)}));
-  if(!keepEditing)editing=false;const obs=groups.get(choose.value)??[],reference=choose.value.startsWith('reference:')?row.references[Number(choose.value.slice(10))]:null;
+  draftTarget=null;creation.hidden=true;createRun.setAttribute('aria-expanded','false');if(!keepEditing)editing=false;const obs=groups.get(choose.value)??[],reference=choose.value.startsWith('reference:')?row.references[Number(choose.value.slice(10))]:null;
   ids=reference?(reference.actionable&&row.accessEligible?[choose.value]:[]):obs.filter(o=>!o.protectedMerge&&(o.actionable||editing&&o.accessEligible)).map(o=>o.id);
   editExisting.hidden=!(obs.length&&obs.every(o=>componentState(o)==='resolved'&&!o.protectedMerge)&&!editing);target=null;issuePage=0;cancelPreview();renderIssues();refreshCandidates();
  }
@@ -140,7 +163,7 @@ export function openCoverageResolution(initialRow,initialDatabase,initialProject
   catch(error){notice.textContent=(persisted?'Saved, but coverage could not be rechecked: ':'Nothing was confirmed as saved: ')+error.message;if(persisted)notice.append(button('Recheck coverage',async()=>{try{await reconcile(database);}catch(e){notice.textContent='Saved; recheck failed: '+e.message;}}));}
   finally{busy=false;setBusy();}
  }
- controls.append(choose,referenceArea,editExisting,issues,search,candidates,why,links,bulk,previewButton);dialog.append(controls,previewArea,notice,save,edit,contents,close,editorArea);choose.addEventListener('change',()=>changeGroup());search.addEventListener('input',()=>{cancelPreview();refreshCandidates();});candidates.addEventListener('change',()=>{target=candidatesForSelection().find(c=>c.id===candidates.value)??null;cancelPreview();refreshCandidates();});dialog.addEventListener('cancel',event=>{if(busy||actions.canLeave?.()===false)event.preventDefault();else dialog.remove();});document.body.append(dialog);dialog.showModal();changeGroup();choose.focus();return dialog;
+ controls.append(choose,referenceArea,editExisting,issues,search,candidates,why,createRun,creation,links,bulk,previewButton);dialog.append(controls,previewArea,notice,save,edit,contents,close,editorArea);choose.addEventListener('change',()=>changeGroup());search.addEventListener('input',()=>{cancelPreview();refreshCandidates();});candidates.addEventListener('change',()=>{target=candidatesForSelection().find(c=>c.id===candidates.value)??null;cancelPreview();refreshCandidates();});dialog.addEventListener('cancel',event=>{if(busy||actions.canLeave?.()===false)event.preventDefault();else dialog.remove();});document.body.append(dialog);dialog.showModal();changeGroup();choose.focus();return dialog;
 }
 
 export function createCoverageResolutionQueue(database,projection,actions={}){
