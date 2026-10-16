@@ -9,13 +9,48 @@
   const variableNames=['start','size','offset','limit','shopId','isActive','isHidden','platform','sortBy','sortDirection','order','vgcViewType','vgcViewStatus','fixedHiddenFalse'];
   const operations={playstation:{getPurchasedGameList:'library',getProfileOracle:'identity'},nintendo:{getVgcs:'library',getVgcsVgcs:'library',getVgcTotalsVgcs:'auxiliary',getDevicesVgcs:'auxiliary',getAllDevicesVgcs:'auxiliary'}};
   const operationKind=(provider,name)=>typeof name==='string'&&Object.hasOwn(operations[provider]??{},name)?operations[provider][name]:null;
+  const psHeaders=['accept','content-type','authorization','x-psn-store-locale','x-psn-request-scope','x-psn-platform','x-psn-account-id','x-apollo-operation-name','apollo-require-preflight','apollographql-client-name','apollographql-client-version'];
+  const psContextHeader=name=>psHeaders.includes(name)||typeof name==='string'&&/^x-(?:psn|apollo|sony)-[a-z][a-z0-9-]{0,47}$/u.test(name);
+  const psParameters=['operationName','variables','extensions','query','locale','features','operationType'];
+  function psRequestContext(input,options={}){
+    // Field presence only. Never construct/copy a Headers object or read an
+    // authorization value, client ID, query/variable value into diagnostics.
+    const info=requestInfo('playstation',input,options);if(!info||info.operation!=='getProfileOracle')return null;
+    try{
+      const u=new URL(typeof input==='string'||input instanceof URL?input:input.url),keys=[...u.searchParams.keys()];
+      let payload=info.method==='GET'?Object.fromEntries(u.searchParams):JSON.parse(options.body);
+      let extensions;try{extensions=typeof payload.extensions==='string'?JSON.parse(payload.extensions):payload.extensions;}catch{}
+      const knownExtensionKeys=['persistedQuery','clientLibrary','clientLibraryVersion'];
+      let names=[],contentType='absent',observable=false;
+      try{
+        const h=options.headers??(typeof input==='object'?input.headers:null);
+        if(h){
+          if(Array.isArray(h))names=h.slice(0,100).map(entry=>Array.isArray(entry)?entry[0]:null);
+          else if(typeof h.keys==='function'){for(const key of h.keys()){names.push(key);if(names.length>=100)break;}}
+          else if(typeof h==='object')names=Object.keys(h).slice(0,100);
+          names=names.filter(v=>typeof v==='string').map(v=>v.toLowerCase());observable=true;
+          // Content-Type is a fixed protocol classification, not an arbitrary value.
+          const contentKey=!Array.isArray(h)&&typeof h.get!=='function'?Object.keys(h).find(k=>k.toLowerCase()==='content-type'):null;
+          const actual=typeof h.get==='function'?h.get('content-type'):Array.isArray(h)?h.slice(0,100).find(entry=>Array.isArray(entry)&&typeof entry[0]==='string'&&entry[0].toLowerCase()==='content-type')?.[1]:contentKey?h[contentKey]:null;
+          if(actual!=null)contentType=typeof actual==='string'&&/^application\/json(?:\s*;.*)?$/iu.test(actual)?'application/json':typeof actual==='string'&&/^text\/plain(?:\s*;.*)?$/iu.test(actual)?'text/plain':'other';
+        }
+      }catch{/* A page-owned getter may prevent inspection; report unavailable. */}
+      return {endpoint:info.endpoint,method:info.method,queryParameterNames:keys.filter(k=>psParameters.includes(k)),otherQueryParameters:keys.filter(k=>!psParameters.includes(k)).length,
+        queryDocumentPresent:typeof payload.query==='string'&&payload.query.length>0,
+        knownQueryFields:['oracleUserProfileRetrieve','userProfilesRetrieve','accountId','onlineId'].filter(k=>typeof payload.query==='string'&&new RegExp('\\b'+k+'\\b','u').test(payload.query)),
+        extensionFields:extensions&&typeof extensions==='object'?Object.keys(extensions).filter(k=>knownExtensionKeys.includes(k)):[],
+        otherExtensionFields:extensions&&typeof extensions==='object'?Object.keys(extensions).filter(k=>!knownExtensionKeys.includes(k)).length:0,
+        headersObservable:observable,headerNames:[...new Set(names.filter(psContextHeader))],otherHeaders:names.filter(k=>!psContextHeader(k)).length,contentType};
+    }catch{return null;}
+  }
   const responsePaths=['data','data.account','data.account.vgc','data.account.vgc.vgcViews','data.account.vgc.vgcViewsV2'];
-  const psErrorCategories=['csrf-request-headers','authentication','persisted-query','request-format','unclassified'];
+  const psErrorCategories=['csrf-request-headers','schema-contract','authentication','persisted-query','request-format','unclassified'];
   const psErrorCodes=['BAD_REQUEST','UNAUTHENTICATED','FORBIDDEN','GRAPHQL_VALIDATION_FAILED','PERSISTED_QUERY_NOT_FOUND','PERSISTED_QUERY_NOT_SUPPORTED'];
   function psErrorSummary(body,status){
     const errors=(Array.isArray(body)?body:Array.isArray(body?.errors)?body.errors:[]).slice(0,20);
     const errorCodes=[...new Set(errors.map(error=>error?.extensions?.code).filter(code=>psErrorCodes.includes(code)))];
     const errorCategory=errors.some(error=>typeof error?.message==='string'&&/blocked as a potential Cross-Site Request Forgery \(CSRF\)/i.test(error.message))?'csrf-request-headers'
+      :errors.some(error=>typeof error?.message==='string'&&/Cannot query field\s+"(?:oracleUserProfileRetrieve|userProfilesRetrieve)"\s+on type\s+"Query"/u.test(error.message))?'schema-contract'
       :[401,403].includes(status)||errorCodes.some(code=>['UNAUTHENTICATED','FORBIDDEN'].includes(code))?'authentication'
       :errorCodes.some(code=>code.startsWith('PERSISTED_QUERY_'))?'persisted-query'
       :errorCodes.some(code=>['BAD_REQUEST','GRAPHQL_VALIDATION_FAILED'].includes(code))?'request-format':'unclassified';
@@ -230,7 +265,7 @@
         scope.accountRelations.candidatePresent&&=page.accountRelations.candidatePresent;
         for(const key of ['ownerMatchesAccount','userMatchesAccount','neitherMatchesAccount','ownerOrUserAbsent'])scope.accountRelations[key]+=page.accountRelations[key];
       }
-      return {format:1,helperVersion:'0.1.7',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
+      return {format:1,helperVersion:'0.1.9',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
         accountIdentity:provider==='playstation'?{source:'getProfileOracle',responsesObserved:accountResponses,accountIdPresent,onlineIdPresent,accountChanged}:{source:'state.user.obfuscatedId',candidatePresent:priorAccount!==null,accountChanged},
         requestContracts:observations,scopes:[...scopes].map(([scope,s])=>{
           const pages=s.pages.sort((a,b)=>a.offset-b.offset);let end=0,contiguous=true;
@@ -256,7 +291,7 @@
     const safeShape=row=>({type:['object','array','string','number','boolean','null','undefined'].includes(row.type)?row.type:'unknown',...(integer(row.keyCount)?{keyCount:row.keyCount}:{}),fields:Object.fromEntries(Object.entries(row.fields??{}).filter(([key,type])=>bootstrapFields.includes(key)&&['object','array','string','number','boolean','null','undefined'].includes(type)))});
     const result={format:1,provider:input.provider,readOnly:true,...numbers(input),boundReached:input.boundReached===true,
       active:input.active===true,accountIsolationValidated:false,ownershipSemanticsValidated:false,accountLibraryComplete:false};
-    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5','0.1.6','0.1.7'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
+    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5','0.1.6','0.1.7','0.1.8','0.1.9'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
     result.requestContracts=(Array.isArray(input.requestContracts)?input.requestContracts:[]).slice(0,20).flatMap(r=>{
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}
@@ -272,9 +307,10 @@
     if(input.accountIdentity){const r=input.accountIdentity;result.accountIdentity=input.provider==='playstation'?
       {source:'getProfileOracle',responsesObserved:integer(r.responsesObserved)?r.responsesObserved:0,accountIdPresent:r.accountIdPresent===true,onlineIdPresent:r.onlineIdPresent===true,accountChanged:r.accountChanged===true}:
       {source:'state.user.obfuscatedId',candidatePresent:r.candidatePresent===true,accountChanged:r.accountChanged===true};}
+    if(input.provider==='playstation'&&input.accountRequestContext){const r=input.accountRequestContext;result.accountRequestContext={endpoint:'https://web.np.playstation.com/api/graphql/v1/op',method:['GET','POST'].includes(r.method)?r.method:'unrecognized',queryParameterNames:(Array.isArray(r.queryParameterNames)?r.queryParameterNames:[]).filter(k=>psParameters.includes(k)).slice(0,psParameters.length),otherQueryParameters:integer(r.otherQueryParameters)?r.otherQueryParameters:0,queryDocumentPresent:r.queryDocumentPresent===true,knownQueryFields:(Array.isArray(r.knownQueryFields)?r.knownQueryFields:[]).filter(k=>['oracleUserProfileRetrieve','userProfilesRetrieve','accountId','onlineId'].includes(k)).slice(0,4),extensionFields:(Array.isArray(r.extensionFields)?r.extensionFields:[]).filter(k=>['persistedQuery','clientLibrary','clientLibraryVersion'].includes(k)).slice(0,3),otherExtensionFields:integer(r.otherExtensionFields)?r.otherExtensionFields:0,headersObservable:r.headersObservable===true,headerNames:(Array.isArray(r.headerNames)?r.headerNames:[]).filter(psContextHeader).slice(0,100),otherHeaders:integer(r.otherHeaders)?r.otherHeaders:0,contentType:['absent','application/json','text/plain','other'].includes(r.contentType)?r.contentType:'other'};}
     if(input.observerState){const r=input.observerState;result.observerState={fetchHookInstalled:r.fetchHookInstalled===true,xhrOpenHookInstalled:r.xhrOpenHookInstalled===true,xhrSendHookInstalled:r.xhrSendHookInstalled===true,fetchCalls:integer(r.fetchCalls)?r.fetchCalls:0,xhrCalls:integer(r.xhrCalls)?r.xhrCalls:0};}
     if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
-    if(input.provider==='playstation'&&input.readOnlyAccountCheck){const r=input.readOnlyAccountCheck;result.readOnlyAccountCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-account-profile','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedAccountProfile:r.recognizedAccountProfile===true,accountIdPresent:r.accountIdPresent===true,onlineIdPresent:r.onlineIdPresent===true,extraAuthorizationHeaders:false,...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
+    if(input.provider==='playstation'&&input.readOnlyAccountCheck){const r=input.readOnlyAccountCheck;result.readOnlyAccountCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-account-profile','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedAccountProfile:r.recognizedAccountProfile===true,accountIdPresent:r.accountIdPresent===true,onlineIdPresent:r.onlineIdPresent===true,...(r.fetchContext==='page-current'?{fetchContext:'page-current',helperCopiedAuthorizationHeaders:false}:{extraAuthorizationHeaders:false}),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
     if(input.bootstrap&&input.provider==='nintendo'){
       const b=input.bootstrap;result.bootstrap={blocks:(Array.isArray(b.blocks)?b.blocks:[]).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,parsed:row.parsed===true,...safeShape(row)})),boundReached:b.boundReached===true,
         structure:(Array.isArray(b.structure)?b.structure:[]).slice(0,40).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,...safeShape(row)})),
@@ -285,5 +321,5 @@
     if(input.resources&&input.provider==='nintendo')result.resources={boundReached:input.resources.boundReached===true,groups:(Array.isArray(input.resources.groups)?input.resources.groups:[]).slice(0,30).filter(row=>typeof row.host==='string'&&nintendoHost(row.host)&&['fetch','xmlhttprequest','script','iframe','other'].includes(row.kind)&&integer(row.count)&&integer(row.graphqlPaths)).map(row=>({host:row.host,kind:row.kind,count:row.count,graphqlPaths:row.graphqlPaths}))};
     return result;
   }
-  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport,psCookieQuery,checkPsCookieAccess,nintendoAccountCandidate,bootstrapSummary,resourceSummary});
+  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport,psCookieQuery,checkPsCookieAccess,psRequestContext,nintendoAccountCandidate,bootstrapSummary,resourceSummary});
 })(globalThis);

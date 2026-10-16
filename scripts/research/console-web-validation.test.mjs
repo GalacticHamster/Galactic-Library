@@ -288,3 +288,65 @@ test('Nintendo account changes remain explicit and hostile account diagnostics c
   const report=C.sanitizeReport({...ledger.report(),accountId:'private',readOnlyAccountCheck:{accountId:'private'},scopes:[{accountRelations:{candidatePresent:true,ownerMatchesAccount:1,'private-account':1}}]});
   assert.equal(report.accountIdentity.accountChanged,true);assert.equal(report.scopes[0].accountRelations.ownerMatchesAccount,1);assert.equal(report.readOnlyAccountCheck,undefined);assert(!JSON.stringify(report).includes('private'));
 });
+test('PlayStation account test uses the current website fetch context while the proven purchase control keeps native fetch',async()=>{
+  const posts=[],listeners=[];let nativeCalls=0,pageCalls=0;
+  const native=async(input,options={})=>{
+    nativeCalls++;
+    if(new URL(input).searchParams.get('operationName')==='getPurchasedGameList')return new Response(JSON.stringify(psBody(0,[],true)));
+    return options.headers?.['x-fixture-context']==='website'?
+      new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name'}}})):
+      new Response(JSON.stringify({errors:[{message:'Cannot query field "oracleUserProfileRetrieve" on type "Query". private-details',extensions:{}}]}),{status:400});
+  };
+  const context=vm.createContext({URL,URLSearchParams,AbortSignal,TextDecoder,Uint8Array,location:{origin:'https://library.playstation.com',pathname:'/'},fetch:native,addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
+  context.window=context;context.postMessage=value=>posts.push(value);context.testListeners=listeners;
+  vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
+  const observed=context.fetch;
+  context.fetch=(input,options={})=>{pageCalls++;return observed(input,{...options,headers:{...options.headers,'x-fixture-context':'website'}});};
+  await context.fetch(psProfileUrl(),{credentials:'include'});await new Promise(resolve=>setTimeout(resolve,10));
+  const old=await C.checkPsCookieAccess(psProfileUrl(),native,'getProfileOracle');assert.equal(old.httpStatus,400);assert.equal(old.errorCategory,'schema-contract');assert(!JSON.stringify(old).includes('private'));
+  vm.runInContext("for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'check-account'}});",context);
+  for(let n=0;n<30&&posts.at(-1)?.report.readOnlyAccountCheck?.state!=='complete';n++)await new Promise(resolve=>setTimeout(resolve,5));
+  const result=C.sanitizeReport(posts.at(-1).report);assert.equal(result.readOnlyAccountCheck.recognizedAccountProfile,true);assert.equal(result.readOnlyAccountCheck.fetchContext,'page-current');assert.equal(result.readOnlyAccountCheck.helperCopiedAuthorizationHeaders,false);assert.equal(result.readOnlyAccountCheck.extraAuthorizationHeaders,undefined);
+  assert.equal(result.accountRequestContext.method,'GET');assert.equal(result.accountRequestContext.headersObservable,true);
+  assert.equal(nativeCalls,3);assert.equal(pageCalls,2);assert(!JSON.stringify(result).includes('private'));assert(!JSON.stringify(result).includes('x-fixture-context'));
+  // Merely observing a later page wrapper must not change the purchase control.
+  const purchase='https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:'{"start":0,"size":24}',extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})});
+  await context.fetch(purchase);await new Promise(resolve=>setTimeout(resolve,10));const before=pageCalls;
+  vm.runInContext("for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'check'}});",context);
+  for(let n=0;n<30&&posts.at(-1)?.report.readOnlyCookieCheck?.state!=='complete';n++)await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(posts.at(-1).report.readOnlyCookieCheck.recognizedPurchasedPage,true);assert.equal(pageCalls,before);
+});
+
+test('PlayStation request-context diagnostics report names and fixed categories without reading credential values',()=>{
+  const url=new URL(psProfileUrl());
+  url.searchParams.set('query','query getProfileOracle { oracleUserProfileRetrieve { accountId onlineId } } # private-description');
+  url.searchParams.set('private-parameter','private-query-value');
+  const extensions=JSON.parse(url.searchParams.get('extensions'));
+  extensions.clientLibrary='private-client';extensions.private='private-value';url.searchParams.set('extensions',JSON.stringify(extensions));
+  const headers={'Content-Type':'application/json; charset=utf-8'};
+  for(const name of ['Authorization','X-Psn-Request-Scope','X-Psn-Custom-Context','apollographql-client-name'])Object.defineProperty(headers,name,{enumerable:true,get(){throw Error('Credential/context values must not be read');}});
+  Object.defineProperty(headers,'undefined',{get(){throw Error('Do not read an absent Content-Type key');}});
+  const context=plain(C.psRequestContext(url.href,{headers}));
+  assert.equal(context.contentType,'application/json');assert.equal(context.headersObservable,true);
+  assert.deepEqual(context.headerNames,['content-type','authorization','x-psn-request-scope','x-psn-custom-context','apollographql-client-name']);
+  assert.equal(context.otherQueryParameters,1);assert.equal(context.otherExtensionFields,1);
+  assert.deepEqual(context.extensionFields,['persistedQuery','clientLibrary']);
+  assert.deepEqual(context.knownQueryFields,['oracleUserProfileRetrieve','accountId','onlineId']);
+  const report=plain(C.sanitizeReport({format:1,provider:'playstation',accountRequestContext:context}));
+  assert.deepEqual(report.accountRequestContext,context);assert(!JSON.stringify(report).includes('private'));
+  assert.equal(C.psRequestContext(psProfileUrl(),{headers:{Authorization:'private'}}).contentType,'absent');
+});
+
+test('PlayStation request context supports Headers and pairs, bounds enumeration, and sanitizes hostile metadata',()=>{
+  for(const headers of [new Headers({'Content-Type':'text/plain','Authorization':'private'}),[['Authorization','private'],['Content-Type','text/plain']]]){
+    const result=C.psRequestContext(psProfileUrl(),{headers});assert.equal(result.contentType,'text/plain');assert(result.headerNames.includes('authorization'));assert(!JSON.stringify(result).includes('private'));
+  }
+  let reads=0;
+  const bounded=C.psRequestContext(psProfileUrl(),{headers:{*keys(){for(let n=0;n<1000;n++){reads++;yield 'x-psn-context-'+n;}},get(name){assert.equal(name,'content-type');return null;}}});
+  assert.equal(reads,100);assert.equal(bounded.headerNames.length,100);
+  const inaccessible={};Object.defineProperty(inaccessible,'headers',{get(){throw Error('private');}});
+  assert.equal(C.psRequestContext(psProfileUrl(),inaccessible).headersObservable,false);
+  const report=C.sanitizeReport({format:1,provider:'playstation',accountRequestContext:{endpoint:'https://private.example',method:'private',queryParameterNames:['query','private'],knownQueryFields:['accountId','private'],extensionFields:['clientLibrary','private'],headerNames:['authorization','x-psn-request-scope','x-psn-private/value','private'],contentType:'private',private:'private'}});
+  assert(!JSON.stringify(report).includes('private'));assert.equal(report.accountRequestContext.endpoint,'https://web.np.playstation.com/api/graphql/v1/op');
+  assert.equal(C.sanitizeReport({format:1,provider:'nintendo',accountRequestContext:bounded}).accountRequestContext,undefined);
+});

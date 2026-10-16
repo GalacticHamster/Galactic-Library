@@ -1,16 +1,18 @@
 # PlayStation and Nintendo web-library implementation gate
 
-Date: **2026-10-15**. Continues GL `996eb87`. The current release instruction is
-PlayStation first, then Nintendo; **Xbox is deferred until after 1.0**. Existing
-Xbox research/harness files are preserved without further investigation.
+Date: **2026-10-15**. Continues GL `996eb87`. Revised release scope: repair
+PlayStation's PS4/PS5 Purchased library first, then investigate only the current
+Xbox web library. Full historical Xbox ownership remains deferred after 1.0.
+Nintendo's 115-card production import has succeeded in the user's live account.
+Older findings below retain their original research context.
 
 ## Current support matrix
 
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
 | PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Independent purchase GET succeeds; website profile query succeeds but independent profile query returns HTTP 400 rejecting its field | Purchase-page access demonstrated. Independent account recheck remains blocked by a different accepted GraphQL field contract; exact missing request context is unknown. **Production importer deferred.** |
-| Nintendo — Switch Virtual Game Cards | 115 rows / card IDs / software IDs, terminal page. In 0.1.7 the signed-in obfuscatedId matches ownerNaId and userNaId on all 115 rows; no account change | Account-scoped website observation feeds an isolated importer through existing validated additive atomic saves. No independent API request or copied credential is needed. Live production import still requires user-side validation. |
-| Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
+| Nintendo — Switch Virtual Game Cards | 115 rows / card IDs / software IDs, terminal page. In 0.1.7 the signed-in obfuscatedId matches ownerNaId and userNaId on all 115 rows; no account change | **Working:** user confirms production import of 115 cards. Account-scoped website observation feeds existing validated additive atomic saves; no independent API request or copied credential. Agent testing remains synthetic/disposable. |
+| Xbox — Web Library | User reports approximately 37 web-visible games; approximately 245 in the mobile app is a separate scope | Current web-library source/join and access semantics still require validation. Full console history, Collections v7 and mobile/device authorization are deferred. No production Xbox importer yet. |
 
 Nintendo's source/account observation gate is now satisfied. The implementation
 uses the website-owned request and requires complete pagination; it does not
@@ -307,13 +309,52 @@ PlayStation projection has no registered provider, page script or import action.
 The live helper established **115 raw cards / 115 stable card IDs / 115 software
 IDs**, terminal traversal and account equality. It imported **zero** purchases.
 Installed production tests import 115 synthetic cards successfully in both
-browsers, including actual background persistence. A real production import has
-not been performed by the agent and remains a user-side acceptance check:
-reload GL, reload Nintendo's portal, choose/confirm the profile and click
-**Import loaded cards**. Check 115 observed/imported cards, 112 owned and 3
-unconfirmed, inspect known cards, and repeat to confirm no extra records. Hidden,
-legacy and non-card purchases are outside this scope. Do not lend a game solely
-for testing. The research helper can be removed.
+browsers, including actual background persistence. The user subsequently
+confirmed a successful real production import of **115 Virtual Game Cards**.
+The predicted 112 owned / 3 unconfirmed distribution above describes the source
+projection; it is not an independently inspected live saved-library result.
+Hidden, legacy and non-card purchases remain outside scope.
+
+Nintendo final 1.0 audit issues (preserved; no Nintendo redesign in this task):
+
+1. Slow initial import.
+2. Inadequate progress feedback.
+3. Inconsistent **Import loaded cards** wording.
+4. Missing quick-update workflow.
+5. Provider UI and behavior parity.
+
+## PlayStation follow-up: schema mismatch persists through current fetch
+
+The user's helper **0.1.8** capture contains one successful website
+`getProfileOracle` response with account/online ID presence, followed by the
+explicit helper test returning HTTP 400, category `schema-contract`. Both use
+the same endpoint/path and operation name. Calling the website's current fetch
+function did not repair the independent account lookup. A synthetic delegating
+wrapper test demonstrates a possible request-context difference, not the live
+root cause. This result does not establish an authorization restriction.
+
+The helper reconstructs a minimal URL from the observed persisted-query hash,
+empty variables and fixed JSON protocol headers; it drops other query/extension
+fields and does not copy website headers. The supplied 0.1.8 export contains no
+request-context comparison, so missing query/extension/header context cannot yet
+be distinguished. The helper does not blindly rename GraphQL fields or retry
+with guessed credentials. The previously successful purchase-request control is
+unchanged.
+
+Helper **0.1.9** adds automatic, bounded request-context diagnostics for the
+first observed account query: recognized parameter/extension names, known query
+field presence, standard/PSN/Apollo/Sony header names and a fixed Content-Type
+category. Unknown names are counted. No header values except classification of
+Content-Type, query documents, hashes, account IDs, variable values or tokens
+are exported; authorization values are never read. Header inspection is capped
+at 100 names and diagnostics are reprojected in the isolated world. No persistent
+storage, production provider behavior or permissions change.
+
+Next live check: reload the helper and PlayStation Library, verify the helper
+shows **0.1.9**, click **Test account lookup**, then **Copy summary**. The new
+`accountRequestContext` section supplies the metadata automatically; no manual
+DevTools/header copying is required. Production PlayStation import remains
+blocked pending reliable account binding; no live purchases were imported.
 
 Reproduction: `node --test tests/console-library.test.mjs`, `node tests/run.js`,
 `node tests/nintendo-native.mjs` (add `--firefox`), and packaged Providers UI via
@@ -340,6 +381,14 @@ the reported newest-first request. No provider request, stored ownership,
 matching rule or account guard is changed by this correction.
 
 ## Validation
+
+Helper 0.1.9: **30 focused synthetic tests**, installed-helper checks for both
+providers in **Chrome and Firefox**, **1,214 GL unit tests** including matching
+parity, repository/link checks and both production packaging checks pass. Native
+tests verify the new request-context section reaches the visible/exported
+summary. These checks use an artifact-free checkout and disposable synthetic
+pages. Production package hashes are unchanged from `da7fefa`; no importer,
+matching, ownership or persistent storage behavior changed.
 
 Nintendo implementation: **1,210 GL tests** passed, including shared matching
 parity, contents regressions and release integrity. **12 packaged Providers UI

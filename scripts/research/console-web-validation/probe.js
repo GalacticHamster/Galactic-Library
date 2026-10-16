@@ -5,11 +5,11 @@
   const provider=C.providerForLocation(location);if(!provider)return;
   const ledger=C.createLedger(provider,{readNintendoAccount:()=>C.nintendoAccountCandidate(globalThis.document)}),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true,psQuery=null,psAccountQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  let active=true,psQuery=null,psAccountQuery=null,accountRequestContext=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
   function captureQuery(input,options){
     if(provider!=='playstation'||!active)return;
     if(!psQuery){psQuery=C.psCookieQuery(input,options);if(psQuery)cookieCheck={state:'ready'};}
-    if(!psAccountQuery){psAccountQuery=C.psCookieQuery(input,options,'getProfileOracle');if(psAccountQuery)accountCheck={state:'ready'};}
+    if(!psAccountQuery){psAccountQuery=C.psCookieQuery(input,options,'getProfileOracle');if(psAccountQuery){accountRequestContext=C.psRequestContext(input,options);accountCheck={state:'ready'};}}
   }
   async function inspect(response,info){
     if(!active||!info)return;
@@ -26,7 +26,8 @@
   function wrappedFetch(...args){
     fetchCalls++;
     const result=Reflect.apply(originalFetch,this,args);
-    // Request headers, cookies and token fields are deliberately never inspected.
+    // Only profile-request header names and a fixed Content-Type category are
+    // inspected for diagnostics. Cookie/authorization values are never read.
     const info=C.requestInfo(provider,args[0],args[1]);
     captureQuery(args[0],args[1]);
     if(info)void result.then(response=>inspect(response,info),()=>{if(active)ledger.observe(info,0,null);});
@@ -52,12 +53,17 @@
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
       typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check','check-account'].includes(event.data.action))return;
     if(event.data.action==='stop')stop();
-    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck,readOnlyAccountCheck:accountCheck}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
+    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck,readOnlyAccountCheck:accountCheck,accountRequestContext}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
     if(event.data.action==='check'&&active&&provider==='playstation'&&psQuery&&cookieCheck.state==='ready'){
       cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
     }
     if(event.data.action==='check-account'&&active&&provider==='playstation'&&psAccountQuery&&accountCheck.state==='ready'){
-      accountCheck={state:'running'};reply();accountCheck=await C.checkPsCookieAccess(psAccountQuery,originalFetch,'getProfileOracle');if(active)reply();return;
+      // Unlike the purchase control, exercise the website's current fetch path.
+      // Its wrapper may supply request context absent from native fetch captured
+      // at document start. Do not extract/copy headers, credentials or token caches.
+      accountCheck={state:'running',fetchContext:'page-current'};reply();
+      accountCheck={...await C.checkPsCookieAccess(psAccountQuery,(...args)=>Reflect.apply(globalThis.fetch,globalThis,args),'getProfileOracle'),fetchContext:'page-current'};
+      if(active)reply();return;
     }
     reply();
   });

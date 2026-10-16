@@ -88,6 +88,11 @@ try{
       assert.equal(check.report.accountIdentity.accountIdPresent,true);assert.equal(check.report.scopes.length,1);
       const account=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check-account]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check-account]").disabled};');
       assert.equal(account.report.readOnlyAccountCheck.recognizedAccountProfile,true);assert.equal(account.calls,5);assert.equal(account.disabled,true);assert(!JSON.stringify(account.report).includes('private'));
+      assert.equal(account.report.helperVersion,'0.1.9');
+      assert.equal(account.report.accountRequestContext.method,'GET');
+      assert.equal(account.report.accountRequestContext.contentType,'application/json');
+      assert.deepEqual(account.report.accountRequestContext.headerNames,['content-type']);
+      assert.equal(account.report.readOnlyAccountCheck.fetchContext,'page-current');
     }
     const stopped=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=stop]").click();await new Promise(r=>setTimeout(r,20));return {report:JSON.parse(s.querySelector("textarea").value),text:s.querySelector("[role=status]").textContent,visible:document.querySelector("#gl-console-validation").getBoundingClientRect().width>0};');
     assert.equal(stopped.report.active,false);assert(stopped.visible);assert.match(stopped.text,/stopped/);
