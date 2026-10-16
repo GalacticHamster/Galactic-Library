@@ -237,3 +237,54 @@ test('A delegating page fetch wrapper reports a replaced hook without proving ob
   vm.runInContext(`for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});`,context);
   assert.equal(posts[0].report.observerState.fetchHookInstalled,false);assert.equal(posts[0].report.observerState.fetchCalls,1);assert.equal(posts[0].report.scopes[0].rows,1);
 });
+
+const psProfileUrl=(variables={})=>'https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getProfileOracle',variables:JSON.stringify(variables),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'b'.repeat(64)}})});
+test('PlayStation account lookup uses only the website-observed public hash, empty variables and fixed browser-session headers',async()=>{
+  const safe=C.psCookieQuery(psProfileUrl(),{},'getProfileOracle');assert(safe);
+  assert.equal(C.psCookieQuery(psProfileUrl({accountId:'private'}),{},'getProfileOracle'),null);
+  assert.equal(C.psCookieQuery(psProfileUrl(),{},'getPurchasedGameList'),null);
+  assert.equal(C.psCookieQuery(psProfileUrl(),{},'queryOracleUserProfileFullSubscription'),null);
+  let calls=0;
+  const result=await C.checkPsCookieAccess(safe,async(url,options)=>{
+    calls++;assert.equal(url,safe);assert.equal(options.credentials,'include');assert.deepEqual(plain(options.headers),{Accept:'application/json','Content-Type':'application/json'});
+    return new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name',other:'private'}}}));
+  },'getProfileOracle');
+  assert.equal(calls,1);assert.equal(result.recognizedAccountProfile,true);assert.equal(result.accountIdPresent,true);assert.equal(result.onlineIdPresent,true);assert.equal(result.reason,'recognized-account-profile');
+  const report=C.sanitizeReport({format:1,provider:'playstation',readOnlyAccountCheck:{...result,accountId:'private-account',response:'private'},accountIdentity:{source:'private',accountId:'private',accountIdPresent:true}});
+  assert.equal(report.readOnlyAccountCheck.recognizedAccountProfile,true);assert.equal(report.accountIdentity.source,'getProfileOracle');assert(!JSON.stringify(report).includes('private'));
+});
+test('PlayStation account observations never become games and expose only presence and account-change flags',()=>{
+  const request=C.requestInfo('playstation',psProfileUrl()),ledger=C.createLedger('playstation');assert.equal(request.operation,'getProfileOracle');
+  ledger.observe(request,200,{data:{oracleUserProfileRetrieve:{accountId:'private-account-a',onlineId:'private-name'}}});
+  ledger.observe(request,200,{data:{oracleUserProfileRetrieve:{accountId:'private-account-a'}}});
+  let report=C.sanitizeReport(ledger.report());assert.equal(report.accountIdentity.responsesObserved,2);assert.equal(report.accountIdentity.accountIdPresent,true);assert.equal(report.accountIdentity.accountChanged,false);assert.equal(report.scopes.length,0);assert.equal(report.malformedPages,0);
+  ledger.observe(request,200,{data:{oracleUserProfileRetrieve:{accountId:'private-account-b'}}});
+  report=C.sanitizeReport(ledger.report());assert.equal(report.accountIdentity.accountChanged,true);assert(!JSON.stringify(report).includes('private'));
+});
+test('PlayStation account check rejects errors, missing/string-unsafe identifiers and oversized responses without exporting response data',async()=>{
+  const safe=psProfileUrl();
+  for(const [body,status]of [[{errors:[{message:'private',extensions:{code:'UNAUTHENTICATED'}}]},401],[{data:{}},200],[{data:{oracleUserProfileRetrieve:{accountId:9007199254740993}}},200],[{errors:[{message:'private'}],data:{oracleUserProfileRetrieve:{accountId:'private-account'}}},200]]){
+    const r=await C.checkPsCookieAccess(safe,async()=>new Response(JSON.stringify(body),{status}),'getProfileOracle');
+    assert.notEqual(r.recognizedAccountProfile,true);assert(!JSON.stringify(r).includes('private'));
+  }
+  const r=await C.checkPsCookieAccess(safe,async()=>new Response('x'.repeat(2097153)),'getProfileOracle');assert.equal(r.reason,'response-bound');
+});
+test('Nintendo account comparison reads only obfuscatedId and reports equality counts without assuming identifier namespaces',()=>{
+  const document={getElementById:name=>name==='state'?{getAttribute:()=>JSON.stringify({user:{obfuscatedId:'private-account',screenNameLoginId:'private-login',idToken:'private-token'}})}:null};
+  assert.equal(C.nintendoAccountCandidate(document),'private-account');
+  const ledger=C.createLedger('nintendo',{readNintendoAccount:()=>C.nintendoAccountCandidate(document)});
+  const rows=[{id:'private-card1',ownerNaId:'private-account',userNaId:'private-account'},{id:'private-card2',ownerNaId:'private-account',userNaId:'private-borrower'},{id:'private-card3',ownerNaId:'private-owner',userNaId:'private-account'},{id:'private-card4',ownerNaId:'private-other',userNaId:'private-other'},{}];
+  ledger.observe(nRequest(),200,nBody(0,rows,5));ledger.observe(nRequest(),200,nBody(0,rows,5));
+  const report=plain(C.sanitizeReport({...ledger.report(),bootstrap:C.bootstrapSummary(document)}));
+  assert.deepEqual(report.scopes[0].accountRelations,{candidatePresent:true,ownerMatchesAccount:2,userMatchesAccount:2,neitherMatchesAccount:1,ownerOrUserAbsent:1});
+  assert.deepEqual(report.bootstrap.accountIdentityFieldPaths,['state.user.obfuscatedId']);assert.equal(report.accountIdentity.candidatePresent,true);assert.equal(report.accountIsolationValidated,false);assert(!JSON.stringify(report).includes('private'));
+  assert.equal(C.nintendoAccountCandidate({getElementById:()=>({getAttribute:()=>'bad-json'})}),null);
+  assert.equal(C.nintendoAccountCandidate({getElementById:()=>({getAttribute:()=>'x'.repeat(2097153)})}),null);
+  const noCandidate=C.createLedger('nintendo');noCandidate.observe(nRequest(),200,nBody(0,rows,5));assert.equal(noCandidate.report().scopes[0].accountRelations.candidatePresent,false);assert.equal(noCandidate.report().scopes[0].accountRelations.neitherMatchesAccount,0,'Absent candidate is not a namespace mismatch.');
+});
+test('Nintendo account changes remain explicit and hostile account diagnostics cannot export values',()=>{
+  let actor='private-a';const ledger=C.createLedger('nintendo',{readNintendoAccount:()=>actor});
+  ledger.observe(nRequest(),200,nBody(0,[{ownerNaId:actor,userNaId:actor}],1));actor='private-b';ledger.observe(nRequest(),200,nBody(0,[{ownerNaId:actor,userNaId:actor}],1));
+  const report=C.sanitizeReport({...ledger.report(),accountId:'private',readOnlyAccountCheck:{accountId:'private'},scopes:[{accountRelations:{candidatePresent:true,ownerMatchesAccount:1,'private-account':1}}]});
+  assert.equal(report.accountIdentity.accountChanged,true);assert.equal(report.scopes[0].accountRelations.ownerMatchesAccount,1);assert.equal(report.readOnlyAccountCheck,undefined);assert(!JSON.stringify(report).includes('private'));
+});

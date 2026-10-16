@@ -23,13 +23,23 @@ providers remain gated on actual signed-in results. Xbox is outside this task.
    **Copy summary**. To check full observed pagination, visit every Purchased
    page rather than only the first and last pages; the one-page test does not
    fill gaps in the observation ledger.
+   Helper **0.1.7** also recognizes the website's `getProfileOracle` query. Click
+   **Test account lookup** once it becomes available, then copy the summary. This
+   makes one separate, read-only browser-session request and reports only whether
+   the expected account fields exist. It does not export their values or use an
+   old hardcoded query hash. If the button remains unavailable, report that.
 3. Repeat on [Nintendo Virtual Game Cards](https://accounts.nintendo.com/portal/vgcs/).
    Browse/scroll its card list before updating the summary. The current
    user-reported comparison target is **115 visible cards**, not automatically
-   115 products or permanent purchases. Helper 0.1.6 also checks initial page
+   115 products or permanent purchases. Helper 0.1.7 also checks initial page
    data: its `bootstrap` section reports declared Nintendo GraphQL endpoints,
    aggregate card-array counts, and account-identity field names without values.
    Reload the helper and the website when upgrading the helper.
+   The `accountRelations` section compares `state.user.obfuscatedId` with each
+   observed card's owner/user IDs entirely inside the page. It exports only match
+   counts, candidate presence, and a change flag. A mismatch is evidence that the
+   identifiers may use different namespaces, not proof of borrowing or account
+   failure. No Nintendo test request or credential decoding is added.
    The panel and exported `helperVersion` identify the loaded version. If the
    recognized arrays remain empty, `observerState` distinguishes replaced hooks
    from installed hooks; `resources` summarizes browser-observed Nintendo hosts
@@ -51,9 +61,9 @@ title list or screenshot of account details is required.
 
 The MAIN-world observer starts at document start. It forwards original fetch/XHR
 calls unchanged and observes only candidate read-only GraphQL requests. It makes
-**no requests itself**. The separate PlayStation test button explicitly makes
+**no requests itself**. Each separate PlayStation test button explicitly makes
 one read-only request, using an observed public persisted-query hash and safe
-paging variables at the fixed PlayStation endpoint. It never copies headers,
+paging variables (or empty account-query variables) at the fixed PlayStation endpoint. It never copies headers,
 retries, falls back to other authentication, or imports the response. The observer
 ignores mutation documents, authorization headers and
 cookies. Nintendo credential-variable **presence** is reported; its value is
@@ -71,9 +81,11 @@ bare error arrays.
 
 Current candidate contracts:
 
-- PlayStation `getPurchasedGameList` at
+- PlayStation `getPurchasedGameList` and `getProfileOracle` at
   `https://web.np.playstation.com/api/graphql/v1/op`, GET/POST metadata, public
   paging/filter variables, `data.purchasedTitlesRetrieve.games` and `pageInfo`.
+  Profile observation separately checks `data.oracleUserProfileRetrieve.accountId`
+  and `onlineId` presence. Profile responses never become games or pagination.
 - Nintendo `getVgcsVgcs` (current website) and `getVgcs` (inspected client) at a Nintendo HTTPS subdomain's GraphQL
   path, including the exact portal-declared endpoint
   `https://wb.lp1.savanna.srv.nintendo.net/graphql`, with
@@ -85,7 +97,7 @@ Current candidate contracts:
   separately as auxiliary queries and never supply card rows or pagination totals.
   The helper recognizes either `vgcViews` or `vgcViewsV2` as one list; it rejects
   responses containing both instead of combining independent lists. The current
-  website's response shape still requires authenticated validation. Bounded
+  website's `vgcViewsV2` response shape has been validated by the 115-card result. Bounded
   `responseShape` diagnostics expose only fixed paths, field types and key counts
   if the response differs, so raw response contents are unnecessary.
 
@@ -102,7 +114,10 @@ filters remain separate scopes and must not be added together as distinct games.
 `terminal-range-observed` means only contiguous observed rows reached that scope's
 terminal page/total. It is not an account-completeness or authorization verdict.
 
-No account binding or ownership rule has been validated. Reload before switching
+Account checks are diagnostic evidence, not production account authorization.
+The Nintendo candidate has not yet been shown to share the card-ID namespace;
+the PlayStation account test has not yet been exercised on the signed-in site.
+Reload before switching
 accounts. A page can interfere with MAIN-world instrumentation, and aggregate
 reports are diagnostic evidence, not authority to import or classify purchases.
 
@@ -111,6 +126,8 @@ reports are diagnostic evidence, not authority to import or classify purchases.
 - Observation validates the page-to-extension handoff, **not independent
   extension-issued authenticated requests**. Only a successful explicit PlayStation
   test demonstrates one independent cookie-only page fetch in that browser session.
+  Its separate account test establishes account-query access only when successful;
+  it does not exercise production save-time or account-switch guards.
   Zero observations can mean caching, a captured original fetch, an unsupported
   Request/batched GraphQL shape, a worker-owned request, changed operation/host,
   or failed injection. It does not mean an empty library or an authentication denial.

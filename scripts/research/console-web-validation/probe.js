@@ -3,9 +3,14 @@
   'use strict';
   const C=globalThis.GLConsoleValidationCore;if(!C)return;
   const provider=C.providerForLocation(location);if(!provider)return;
-  const ledger=C.createLedger(provider),originalFetch=globalThis.fetch;
+  const ledger=C.createLedger(provider,{readNintendoAccount:()=>C.nintendoAccountCandidate(globalThis.document)}),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true,psQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  let active=true,psQuery=null,psAccountQuery=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  function captureQuery(input,options){
+    if(provider!=='playstation'||!active)return;
+    if(!psQuery){psQuery=C.psCookieQuery(input,options);if(psQuery)cookieCheck={state:'ready'};}
+    if(!psAccountQuery){psAccountQuery=C.psCookieQuery(input,options,'getProfileOracle');if(psAccountQuery)accountCheck={state:'ready'};}
+  }
   async function inspect(response,info){
     if(!active||!info)return;
     try{
@@ -23,7 +28,7 @@
     const result=Reflect.apply(originalFetch,this,args);
     // Request headers, cookies and token fields are deliberately never inspected.
     const info=C.requestInfo(provider,args[0],args[1]);
-    if(provider==='playstation'&&!psQuery){psQuery=C.psCookieQuery(args[0],args[1]);if(psQuery)cookieCheck={state:'ready'};}
+    captureQuery(args[0],args[1]);
     if(info)void result.then(response=>inspect(response,info),()=>{if(active)ledger.observe(info,0,null);});
     return result;
   }
@@ -33,6 +38,7 @@
   function wrappedSend(body){
     xhrCalls++;
     const input=xhrInfo.get(this),info=input?C.requestInfo(provider,input.url,{method:input.method,body}):null;
+    if(input)captureQuery(input.url,{method:input.method,body});
     if(info)this.addEventListener('loadend',()=>{
       if(!active)return;
       if(this.status!==200){ledger.observe(info,this.status,null,'xhr');return;}
@@ -44,11 +50,14 @@
   function stop(){active=false;if(globalThis.fetch===wrappedFetch)globalThis.fetch=originalFetch;if(xhr?.open===wrappedOpen)xhr.open=originalOpen;if(xhr?.send===wrappedSend)xhr.send=originalSend;}
   addEventListener('message',async event=>{
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
-      typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check'].includes(event.data.action))return;
+      typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check','check-account'].includes(event.data.action))return;
     if(event.data.action==='stop')stop();
-    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
+    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck,readOnlyAccountCheck:accountCheck}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
     if(event.data.action==='check'&&active&&provider==='playstation'&&psQuery&&cookieCheck.state==='ready'){
       cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
+    }
+    if(event.data.action==='check-account'&&active&&provider==='playstation'&&psAccountQuery&&accountCheck.state==='ready'){
+      accountCheck={state:'running'};reply();accountCheck=await C.checkPsCookieAccess(psAccountQuery,originalFetch,'getProfileOracle');if(active)reply();return;
     }
     reply();
   });

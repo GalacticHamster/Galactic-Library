@@ -232,9 +232,40 @@ registration, import UI, neutral records, additive atomic saves and backup tests
 be implemented in GL. If access is substantially blocked, document the actual
 failure and move to the other provider. No legacy-console recovery is in scope.
 
+## Account identity checks: helper 0.1.7
+
+The user supplied only other PlayStation operation names. These include
+`getProfileOracle`, alongside subscription, cart, device and download operations.
+The inspected [public client implementation](https://github.com/FriendsOfGalaxy/galaxy-integration-psn/blob/master/src/psn_client.py)
+uses that operation with empty variables and reads
+`data.oracleUserProfileRetrieve.accountId` / `onlineId`. This is a response-path
+lead, not signed-in confirmation. The helper now observes those fields' presence
+and offers one explicit **Test account lookup** using the current website's
+observed public hash, fixed JSON headers and browser-managed cookies. No client
+identity, old public hash, authentication headers or identifiers are copied.
+
+The user also supplied Nintendo `state.user` field names, including `obfuscatedId`.
+The helper now compares that noncredential candidate against card `ownerNaId` and
+`userNaId` locally. Exports contain only per-scope match/missing counts, candidate
+presence and an account-change flag. Reobserving the same page replaces its counts.
+No assumption is made that these identifiers share a namespace. No token is decoded
+and no Nintendo request is added. A mismatch will require a different verified
+account binding; it will not be treated as evidence of borrowing.
+
+Signed-in results of these new checks remain pending. Synthetic tests include
+matching IDs, different namespaces, owned/lent/borrowed-shaped relationships,
+missing fields, account changes, GraphQL/auth errors, oversized responses and
+hostile report redaction. Neither successful field presence nor a match count
+alone establishes production account-switch or save-time isolation.
+
 ## Validation
 
-Passed: **22 focused synthetic tests**, installed-helper checks for both providers
+Helper 0.1.7: **27 focused synthetic tests** and installed-helper checks for both
+providers in **Chrome and Firefox** pass, including both explicit PlayStation
+requests and Nintendo's redacted account-to-card equality counts. These tests
+use disposable synthetic pages, not personal accounts.
+
+Previously passed at 0.1.6: **22 focused synthetic tests**, installed-helper checks for both providers
 in **Chrome and Firefox**, **1,193 GL unit tests** including shared matching,
 repository layout/links, and both production packaging checks. Runtime packages
 remain identical to baseline (181 files each). Production importer validation
