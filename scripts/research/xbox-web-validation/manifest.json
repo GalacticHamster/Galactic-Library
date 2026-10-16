@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GL Xbox Web Library Validation (Read Only)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minimum_chrome_version": "111",
   "description": "Read-only aggregate inspection of Xbox's existing library cache. No imports, requests or credential collection.",
   "browser_specific_settings": {"gecko": {"id": "gl-xbox-web-validation@galactichamster.com", "strict_min_version": "128.0", "data_collection_permissions": {"required": ["none"]}}},

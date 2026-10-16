@@ -9,15 +9,21 @@ function fixture(){
   const actor='private-local-id',data=new Map(),queries={};
   const add=(name,value,scoped=true)=>{
     const key=scoped?['user',actor,name]:[name];data.set(JSON.stringify(key),{status:'success',fetchStatus:'idle',value});
-    const q={getOptions:()=>({queryKey:key})};queries[name]=scoped?{getActiveUserQuery:()=>q}:q;
+    const q={getOptions:()=>({queryKey:key})};
+    if(scoped){
+      // The website's active proxy is a different, immediately collectible query.
+      const proxyKey=['user','active',name];if(name!=='owned')data.set(JSON.stringify(proxyKey),{status:'success',fetchStatus:'idle',value});
+      queries[name]={getUserQuery:localId=>({getOptions:()=>({queryKey:['user',localId,name]})}),getActiveUserQuery:()=>({getOptions:()=>({queryKey:proxyKey})})};
+    }else queries[name]=q;
   };
   const rows=Array.from({length:37},(_,i)=>({productId:'X'+String(i).padStart(11,'0'),providerId:'grts-catalog-provider',basicProductInfo:{title:'Private title '+i}}));
   add('activeUser',actor,false);add('profile',{xuid:'1234567890123456'});add('owned',rows.map(({productId})=>({productId})));add('assembled',rows);
+  add('catalogs',[{id:'owned',kind:'owned',totalCount:37,previewEntries:rows.slice(0,4)}]);
   add('access',new Map(rows.map((r,i)=>[r.productId,{userAccessTypes:new Set(i<3?[1,2]:[1])}])));
-  const env={queryClient:{getQueryState:key=>data.get(JSON.stringify(key)),getQueryData:key=>data.get(JSON.stringify(key))?.value},systems:{authentication:{queries:{activeUserId:queries.activeUser,userInfo:queries.profile}},library:{queries:{resolveCatalogItems:queries.owned,assembledItems:queries.assembled}},contentAccess:{queries:{allProductAccess:queries.access}}}};
+  const env={queryClient:{getQueryState:key=>data.get(JSON.stringify(key)),getQueryData:key=>data.get(JSON.stringify(key))?.value},systems:{authentication:{queries:{activeUserId:queries.activeUser,userInfo:queries.profile}},library:{queries:{resolveCatalogItems:queries.owned,assembledItems:queries.assembled,resolveCatalogs:queries.catalogs}},contentAccess:{queries:{allProductAccess:queries.access}}}};
   const window={location:{origin:'https://play.xbox.com',href:'https://play.xbox.com/library'},__SW_MANAGER__:{env}};
   const get=name=>data.get(JSON.stringify(name==='activeUser'?[name]:['user',actor,name]));
-  return {window,env,get,rows};
+  return {window,env,get,rows,data,queries,actor};
 }
 test('Xbox website Owned cache joins 37 identities/titles/access entries without requests or identifying exports',()=>{
   const f=fixture(),result=C.read(f.window);assert.equal(result.state,'ready');assert.equal(result.ownedRows,37);assert.equal(result.distinctProducts,37);assert.equal(result.joinedTitles,37);assert.equal(result.joinedAccess,37);assert.equal(result.flags.personalOwnedFlag,37);assert.equal(result.flags.gamePassUltimate,3);assert.equal(result.accountScopesMatch,true);assert.equal(result.accountIdentityPresent,true);assert.equal(result.requestsMade,0);assert.equal(result.libraryComplete,false);assert.equal(result.ownershipVerified,false);
@@ -26,7 +32,7 @@ test('Xbox website Owned cache joins 37 identities/titles/access entries without
 test('Xbox cache missing, pending, fetching, mismatched-account and unsupported data remain explicit',()=>{
   assert.equal(C.read({location:{origin:'https://play.xbox.com'}}).state,'unavailable');
   for(const name of ['owned','assembled','access']){const f=fixture();f.get(name).value=undefined;assert.equal(C.read(f.window).state,'waiting');}
-  const f=fixture();f.get('owned').fetchStatus='fetching';assert.equal(C.read(f.window).state,'incomplete');f.get('owned').fetchStatus='idle';f.get('activeUser').value='private-other';assert.equal(C.read(f.window).accountScopesMatch,false);
+  const f=fixture();f.get('owned').fetchStatus='fetching';assert.equal(C.read(f.window).state,'incomplete');f.get('owned').fetchStatus='idle';f.get('activeUser').value='private-other';assert.equal(C.read(f.window).state,'waiting');assert.equal(C.read(f.window).accountIdentityPresent,false);
   const g=fixture();g.get('owned').value.push({productId:'private-invalid'});assert.equal(C.read(g.window).unsupportedIdentities,1);assert.equal(C.read(g.window).state,'incomplete');
 });
 test('Xbox title hydration, stable identity duplication and third-party records are not silently accepted',()=>{
@@ -51,4 +57,36 @@ test('Xbox helper has no network/storage permissions and MAIN messages reject fo
   vm.runInContext(await readFile(new URL('probe.js',root),'utf8'),ctx);
   const event={source:f.window,origin:f.window.location.origin,data:{channel:'gl-xbox-validation-request',nonce:'a'.repeat(32)}};
   listeners[0]({...event,origin:'https://evil.example'});listeners[0]({...event,data:{...event.data,nonce:'private'}});assert.equal(posts.length,0);listeners[0](event);assert.equal(posts.length,1);assert.equal(posts[0].report.state,'ready');assert.equal(posts[0].nonce,'a'.repeat(32));
+});
+
+
+test('Xbox reads actual-account backing queries even when active aliases exist or Owned alias was collected',()=>{
+  const f=fixture();
+  assert.equal(f.data.has(JSON.stringify(['user','active','owned'])),false);
+  assert.equal(f.data.has(JSON.stringify(['user','active','assembled'])),true);
+  // None of these disposable aliases is an account identifier or required source.
+  for(const name of ['profile','owned','assembled','access','catalogs'])f.queries[name].getActiveUserQuery=()=>{throw Error('Do not inspect an active alias');};
+  const r=C.read(f.window);assert.equal(r.state,'ready');assert.equal(r.accountScopesMatch,true);
+  for(const name of ['profile','owned','assembled','access','catalogs']){assert.equal(r.queries[name].keyScope,'account');assert.equal(r.queries[name].accountKeyMatches,true);}
+  assert.equal(r.ownedCatalogTotal,37);assert.equal(r.ownedCatalogPreviewRows,4);
+});
+
+test('Xbox catalog overview never substitutes preview entries for an uncached Owned list',()=>{
+  const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));
+  const r=C.read(f.window);assert.equal(r.state,'waiting');assert.equal(r.waitReason,'owned-view-not-cached');assert.equal(r.accountScopesMatch,true);
+  assert.equal(r.queries.owned.state,'absent');assert.equal(r.assembledRows,37);assert.equal(r.accessProducts,37);assert.equal(r.ownedCatalogTotal,37);assert.equal(r.ownedCatalogPreviewRows,4);assert.equal(r.ownedRows,undefined);assert.equal(r.distinctProducts,undefined);
+  f.data.delete(JSON.stringify(['user',f.actor,'catalogs']));assert.equal(C.read(f.window).ownedCatalogTotal,undefined);
+  const g=fixture();g.data.delete(JSON.stringify(['user',g.actor,'catalogs']));assert.equal(C.read(g.window).state,'ready');
+});
+
+test('Xbox rejects a wrong-account backing key or active alias and detects switches during inspection',()=>{
+  for(const actor of ['private-other','active']){
+    const f=fixture(),key=['user',actor,'owned'];f.data.set(JSON.stringify(key),f.get('owned'));
+    f.queries.owned.getUserQuery=()=>({getOptions:()=>({queryKey:key})});
+    const r=C.read(f.window);assert.equal(r.state,'incomplete');assert.equal(r.waitReason,'account-scope-mismatch');assert.equal(r.accountScopesMatch,false);assert.equal(r.queries.owned.accountKeyMatches,false);assert.equal(r.ownedRows,undefined);
+  }
+  const f=fixture(),read=f.env.queryClient.getQueryData;let reads=0;
+  f.env.queryClient.getQueryData=key=>key[0]==='activeUser'&&++reads===2?'private-other':read(key);
+  const r=C.read(f.window);assert.equal(r.state,'incomplete');assert.equal(r.accountStable,false);assert.equal(r.waitReason,'account-changed');
+  for(const value of [undefined,'','active']){const g=fixture();g.get('activeUser').value=value;const r=C.read(g.window);assert.equal(r.state,'waiting');assert.equal(r.waitReason,'active-account-unavailable');assert.equal(r.accountStable,false);}
 });
