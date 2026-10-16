@@ -20,9 +20,9 @@ for(const size of sizes){
       ['quick-cold',{}],['quick-warm',{}],['quick-repeated',{}],['quick-restart',{}],['incremental-change',{items:[extra]}],
       ['full-unchanged',{mode:'full',items:[...items,extra]}],
       ['full-change',{mode:'full',items:[...items.map((record,index)=>index?record:{...record,title:'Synthetic Changed Game',ownership:'revoked'}),extra,{...extra,providerItemId:'second-new',title:'Synthetic Second Addition'}]}],
-      ['incomplete',{scanDiagnostics:{failedRequestCount:1}}],['failed',{fail:true}]
+      ['incomplete',{scanDiagnostics:{failedRequestCount:1}}],['incomplete-repeated',{scanDiagnostics:{failedRequestCount:1}}],['incomplete-restart',{scanDiagnostics:{failedRequestCount:1}}],['failed',{fail:true}],['failed-repeated',{fail:true}]
     ]){
-      if(workflow==='quick-restart')harness=performanceWriter(null,{...writerOptions,stored:harness.stored});
+      if(workflow.endsWith('restart'))harness=performanceWriter(null,{...writerOptions,stored:harness.stored});
       rows.push({size,repeat,workflow,...await measuredScan(harness,options)});
     }
   }

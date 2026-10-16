@@ -1,10 +1,11 @@
 import {strictDatabaseSerialization} from './validation-certificate.js';
 import {validateProviderStates} from './provider-state.js';
 import {equalDatabaseData} from './data-equality.js';
+import {PROVIDERS} from './constants.js';
 
-// Successful empty incremental checks, never item observations or ownership.
+// Status-only scans, never item observations or ownership.
 export const PROVIDER_CHECKS_KEY='galacticLibraryProviderChecks';
-const providers=['steam','epic'];
+const providers=PROVIDERS;
 const fields=['lastSync','quickSyncAt','lastError','source','syncMode','syncHealth'];
 export async function providerCheckDigest(database){
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(strictDatabaseSerialization(database)));
@@ -18,27 +19,36 @@ export function validProviderChecks(value,digest){
   return value.checks;
 }
 export function providerCheckPatch(provider,state){
-  if(!providers.includes(provider))throw Error('Unsupported empty provider check.');
+  if(!providers.includes(provider))throw Error('Unsupported provider check.');
   const patch=Object.fromEntries(fields.filter(key=>Object.hasOwn(state,key)).map(key=>[key,state[key]]));
   const validated=validateProviderStates({[provider]:patch})[provider];
-  if(validated.syncMode!=='incremental'||!validated.lastSync
-    ||validated.lastError!==null||validated.syncHealth?.status!=='succeeded'||validated.syncHealth.mode!=='incremental'
-    ||!validated.syncHealth.attemptRef||validated.syncHealth.failedRequestCount||validated.syncHealth.coverageLimit
-    ||!validated.syncHealth.finishedAt||Object.values(validated.syncHealth.differences??{}).some(Boolean))throw Error('Invalid empty provider check.');
+  const health=validated.syncHealth,success=health?.status==='succeeded';
+  if(!health||!['succeeded','partial','failed','cancelled'].includes(health.status)||!health.attemptRef||!health.finishedAt
+    ||Object.entries(health.differences??{}).some(([key,value])=>!['observed','unchanged'].includes(key)&&value!==0)
+    ||success&&(validated.syncMode!=='incremental'||!validated.lastSync||validated.lastError!==null||health.mode!=='incremental'||health.failedRequestCount||health.coverageLimit)
+    ||!success&&Object.keys(patch).some(key=>key!=='syncHealth'))throw Error('Invalid provider status check.');
   return validated;
+}
+export function providerCheckBaseline(provider,entry){
+  const raw=entry?.baseline??(entry?.patch?.syncHealth?.status==='succeeded'?entry.patch:null);
+  if(!raw)return null;
+  try{const patch=providerCheckPatch(provider,raw);return patch.syncHealth.status==='succeeded'&&equalDatabaseData(raw,patch)?patch:null;}catch{return null;}
 }
 export function applyProviderChecks(database,value,digest){
   let result=database;
   for(const [provider,entry]of Object.entries(validProviderChecks(value,digest))){
     try{
-      if(!entry||Object.keys(entry).some(key=>!['profileId','patch'].includes(key)))continue;
+      if(!entry||Object.keys(entry).some(key=>!['profileId','patch','baseline'].includes(key)))continue;
       const profile=database.providerProfiles[entry.profileId];
       if(profile?.provider!==provider||database.providers[provider]?.activeProfileId!==profile.profileId||!profile.state.connected||!profile.state.fullSyncAt)continue;
       const patch=providerCheckPatch(provider,entry.patch);
       if(!equalDatabaseData(patch,entry.patch))continue;
+      const baseline=providerCheckBaseline(provider,entry);
+      if(entry.baseline&&!baseline)continue;
+      const effective={...(baseline??{}),...patch};
       if(result===database)result={...database,providers:{...database.providers},providerProfiles:{...database.providerProfiles}};
-      result.providerProfiles[profile.profileId]={...profile,state:{...profile.state,...patch}};
-      result.providers[provider]={...database.providers[provider],...patch};
+      result.providerProfiles[profile.profileId]={...profile,state:{...profile.state,...effective}};
+      result.providers[provider]={...database.providers[provider],...effective};
     }catch{/* Invalid/stale receipts never certify a successful check. */}
   }
   return result;

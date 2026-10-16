@@ -535,8 +535,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       };
   if(request.scanDiagnostics!==undefined){
     const raw=request.scanDiagnostics;
-    if(!raw||typeof raw!=='object'||Array.isArray(raw)||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}
-    syncDetails.scanDiagnostics={failedRequestCount:raw.failedRequestCount??0,...(raw.retries!==undefined?{retries:raw.retries}:{}),coverageLimit:raw.arrayOnly===true?'array-only-index-without-total':''};
+    if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.incomplete!==undefined&&typeof raw.incomplete!=='boolean'||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}
+    syncDetails.scanDiagnostics={failedRequestCount:raw.failedRequestCount??0,incomplete:raw.incomplete===true,...(raw.retries!==undefined?{retries:raw.retries}:{}),coverageLimit:raw.arrayOnly===true?'array-only-index-without-total':''};
   }
   const timing=providerTiming(request),end=timing?.begin('provider_finish');
   const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};

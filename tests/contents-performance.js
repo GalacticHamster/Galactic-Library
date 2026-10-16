@@ -20,7 +20,7 @@ export const contentsPerformanceTests=[
    const first=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'fandango-at-home'},sender);assert(first.ok);assert.equal(first.performance.provider,'fandango-at-home');
    const readCount=memory.getCount;
    const second=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'fandango-at-home'},sender);assert(second.ok);assert.equal(second.profileId,first.profileId);assert.equal(second.profileLabel,'Personal');assert(second.performance.events.some(e=>e.stage==='snapshot_hit'));
-   assert.equal(memory.getCount,readCount);
+   assert.equal(memory.getCount,readCount+1,'Only the small shared scan-status key is read; the catalog snapshot remains a hit');
    await pageA.mergeProviderItems('fandango-at-home',[{providerItemId:'another',title:'Another Film',mediaType:'movie',ownership:'owned'}],{profileLabel:'Other'});
    const denied=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'fandango-at-home',beginScan:true,mode:'incremental',profileLabel:'Personal',profileId:first.profileId,rememberedProfile:true},sender);
    assert.equal(denied.ok,false);assert.match(denied.error,/Saved accounts changed/);

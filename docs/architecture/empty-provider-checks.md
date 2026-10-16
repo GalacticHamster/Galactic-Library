@@ -1,108 +1,108 @@
-# Empty provider quick checks
+# Shared status-only provider checks
 
-An empty incremental Steam/Epic check can update successful-check metadata
-without rewriting the catalog. This is deliberately not a general "zero new
-titles" optimization. Incoming records, even content-identical ones, have new
-observation evidence and continue through full validation and persistence.
+Provider scans can persist status separately when no authoritative catalog,
+access, observation, relationship or account-cursor data changes. This extends
+the original successful empty Steam/Epic receipt to the shared writer. It is
+not a rule that "zero new titles means nothing changed."
 
-## Persistence investigation and alternatives
+## Eligibility
 
-Preparation reads authoritative data, validates or proves exact equality with
-the immutable committed snapshot, and persists a tab/account/mode-bound lease.
-Existing-account incremental preparation already avoids a catalog write.
-Commit reads again and checks the lease against the current profile/selection.
+The worker still reads authoritative storage. Reuse requires exact equality
+with a detached validated immutable committed snapshot; cold/different data
+validates/migrates normally. A receipt requires that exact base to remain current,
+the same active immutable profile ID, connected state and an existing full
+baseline. New accounts, switching, baseline changes and unavailable proofs
+retain ordinary validated persistence.
 
-Ordinary incremental merges refresh incoming `observedAt`/`updatedAt`, preserve
-source/enrichment/manual evidence, reconcile history and canonical groups, and
-recalculate counts. Provider/profile state saves connected/counts, `lastSync`,
-`lastError`, source/mode, quick-check time and `syncHealth`. Final validation,
-whole-value persistence, frozen publication and session certification follow.
-An empty list previously still required that last validation/write/publication.
+Commits require a lease-only incremental start and supported scan-detail fields.
+Normalize incoming records using existing import rules and compare **every
+field**, including observation dates, access and provenance, to current records.
+All must be identical. Empty lists qualify; nonempty lists normally refresh
+observations and require a save even when title/addition counters are zero.
+Changed account sync cursors also require a save. Fallback reuses already
+normalized entries rather than normalizing twice.
 
-| Alternative | Benefit and integrity costs | Decision |
-| --- | --- | --- |
-| Skip saving and remove the existing lease | Kobo's existing identical-observation shortcut does this, but successful-check time/error/health remain old. A lease is not success evidence and is excluded from backup. | Insufficient; Kobo's special path is unchanged. |
-| Exact-base check overlay | Removes final validation/write/publication for empty checks. Requires reader projection, backup flattening, stale-base rejection and interruption recovery. One bounded private key; no catalog migration. | Implemented narrowly. |
-| Record-level / IndexedDB catalog | Could improve actual record updates, but needs transactional manifests, coherent readers, dependency validation, migration, backup and rollback. Firefox already stores whole values in private IndexedDB; backend selection alone does not remove whole-value work. | Deferred. |
+Kobo's existing sparse-observation policy retains the prior representation/date
+when metadata and access are meaningfully unchanged. This is now expressed in
+normalization, permitting the same exact shared comparison without a Kobo-only
+persistence branch. New metadata/access still saves; full scans still refresh
+observation dates. Missing/historical records cannot pass the current-record
+equality check.
 
-## Eligibility, fields and anchor
+Full successful scans retain snapshot validation, observations and absence/history
+reconciliation. Console imports still verify fingerprints, source contracts and
+complete supported scopes; their fresh snapshot evidence is a data change. No
+shortcut bypasses those acquisition guards. Failed/cancelled attempts can use
+status-only receipts when their established account/base remains valid, including
+after a full-start bookkeeping save. They never reconcile missing records.
 
-Only an existing active Steam/Epic profile with a full baseline, a lease-only
-incremental start, an actual empty array, no reported failed request or coverage
-limitation, and closed supported scan-detail fields can use the shortcut.
-Observed committed snapshots must be supported. New/switching accounts, full
-scans, incoming records, incomplete scans and unsupported details take the
-original path. There is no incoming item to change ownership or observation
-dates. An empty check does not refresh item-level matching `checkedAt` evidence.
+## Receipt and successful baseline
 
-`galacticLibraryProviderChecks` contains format 1, a whole-database SHA-256 digest
-and at most one receipt per supported provider. Each receipt names the immutable
-profile UUID and a closed validated patch: `lastSync`, optional `quickSyncAt`,
-`lastError: null`, optional source, incremental mode and successful `syncHealth`
-(attempt UUID, start/finish, retry diagnostics, zero item differences). Catalog
-records, ownership, counts and credentials cannot be patched. Source/mode here
-are scan bookkeeping, separate from source observations and identities.
+`galacticLibraryProviderChecks` remains format 1, anchored by SHA-256 of the
+strict canonical serialization of the **entire base database**, not a schema
+flag, nickname, timestamp or in-memory sequence. Bound entries to one per known
+provider, scoped to the active profile UUID. Cache digests only for exact
+worker-owned immutable bases; first/cold/new-base reads still hash.
 
-The anchor uses existing strict canonical serialization of the *entire* base,
-not a schema flag, nickname, timestamp or in-memory sequence. Mutation reads
-still acquire authoritative storage. Exact equality permits validation reuse;
-otherwise full validation/migration runs. Cache digests only for the exact
-worker-owned immutable base. A first receipt, cold activation or changed base
-can still pay serialization/hash cost. A digest grants no authorization.
+Successful incremental patches contain only validated `lastSync`, optional
+`quickSyncAt`, cleared `lastError`, optional source/mode and successful
+`syncHealth`. They cannot update `fullSyncAt`, records, counts or ownership.
+
+Partial, failed and cancelled patches contain **only terminal `syncHealth`**:
+attempt ID, times, mode, safe error category, retry/count/coverage information.
+They cannot advance successful timestamps, clear ownership or certify item
+observations. A coverage limitation or explicit incomplete flag also produces
+Partial, even when no HTTP request failed.
+
+If an incomplete attempt replaces a successful receipt on the same base, carry
+the validated successful patch as `baseline`; otherwise the raw database's older
+time would replace the latest successful check. Apply baseline first, then current
+health. Repeated failures retain that baseline; newer success replaces it. Both
+live in one small value. Closed validation permits no additions, removals,
+metadata or ownership changes in differences; checked/unchanged counts may be
+nonzero without claiming refreshed item observation dates.
 
 ## Ordering and recovery
 
-All commits use the existing mutation queue. Await the single receipt write
-before cleaning up the lease. These are **two independent small writes**, not
-an assumed transaction. Including preparation, an empty operation makes three
-small writes. Completion makes no database or session-certificate write; cold
-preparation can still publish/certify its validated base as before.
+Operations share the existing writer queue. Acknowledge the single receipt write,
+then independently clean up the lease. These **two writes are not assumed atomic**.
+Incremental preparation adds one small lease write. Status-only completion needs
+no final catalog validation/write, snapshot replacement or new certificate;
+cold preparation remains unchanged.
 
-| Interruption | Recovery |
+| Interruption | Result |
 | --- | --- |
-| Receipt not committed | No new success claimed; prior library/freshness remain. Pending lease can retry or be superseded. |
-| Receipt committed but acknowledgement lost | Caller may see failure; reload observes durable success. That attempt cannot replay, fail or cancel it. |
-| Receipt committed, cleanup interrupted | Durable success wins. Options does not show that matching attempt as running. New scan replaces the stale lease. Cleanup failure does not fail an acknowledged save. |
-| Stale/malformed receipt or different database | Exact digest and closed validation fail. Ignore it; never infer ownership or update observations. |
-| Ordinary mutation succeeds | Mutable reads flatten valid receipt state before the usual validated database save. Only after that commit, best-effort removal retires the old receipt. Failed cleanup leaves a mismatched digest that cannot overwrite newer state. |
-| Ordinary save fails | No new item success is minted; existing storage failure guarantees apply. |
-| Restore/clear interrupted | Remove receipt before replacement. Removal failure aborts replacement. A crash after removal but before replacement may lose check-only freshness, retaining the old catalog. It cannot invent observation/ownership success or revive a receipt on an identical old restore. |
+| Receipt not committed | Prior data/status remain. Lease can retry or be superseded; no completion claimed. |
+| Receipt committed, acknowledgement lost | Reload observes terminal status. Caller may see an error; that attempt cannot replay/fail/cancel. |
+| Lease cleanup interrupted | Receipt wins. Options does not show that attempt as Running; a new scan supersedes the stale lease. |
+| Old response after a newer attempt | Token/tab/profile guards reject it; no override of a newer result. |
+| Observed base change | Reject stale completion. Ignore malformed/digest-mismatched receipts. |
+| Ordinary data save | Flatten valid baseline/health, fully validate/save DB, then retire receipt. Failed retirement leaves a harmless mismatched digest. |
+| Restore/clear | Retire receipt first, including identical-old-backup restore. Retirement failure aborts replacement. A crash afterward may lose check-only freshness but retains the catalog; it cannot fabricate ownership or observation success. |
 
-Concurrent providers retain both receipts on one base; latest same-provider
-lease wins. Intervening catalog changes are re-read/revalidated, not overwritten
-with the scan-start snapshot. Account selection, baseline reset, profile removal,
-full import and restore keep their token invalidation and normal save paths.
-Ordinary account changes first fold valid old check metadata into the database.
-
-No lock or compare-and-swap against arbitrary independent storage writers is
-added. GL mutations must still use its writer. Exact comparison catches
-out-of-band changes preceding acquisition. Independent writes are never assumed
-atomic. Stale receipts left by interrupted cleanup are harmless because their
-base digest differs, and a later save/receipt can retire or replace them.
+Independent providers preserve each other's entries. Selection, rename, reset,
+removal and restore retain existing invalidation. No cross-writer lock or
+compare-and-swap against arbitrary independent storage writers is introduced.
 
 ## Readers, backup and compatibility
 
-`getDatabase` returns mutable data with valid patches flattened in. Options and
-provider-profile lookup project the same patches without changing frozen catalog
-data. Providers observes receipt/lease notifications; receipt changes invalidate
-pending backup confirmation. Export reads current state and uses existing
-format-1 validation. Restore writes flattened state into the ordinary database.
-No sidecar, schema migration or new backup format is needed.
+`getDatabase`, Options and provider-profile lookup flatten valid status into
+existing provider/profile fields. Providers observes receipt/lease changes;
+pending backup confirmations are invalidated. Export reads current state and
+uses existing format-1 validation. Restore persists flattened status/baseline.
+No backup or database schema migration.
 
-`getQueryDatabase` retains the original immutable catalog object. Companion
-status exposes connection/counts; matching uses records, effective ownership
-and original observation dates. Empty receipts change none of these inputs, so
-MATCH_ITEMS can reuse its identity/index projection. No companion protocol,
-authorization or purchase-sync changes are required. A receipt never certifies
-that new purchase observations were committed.
+Companion queries retain their immutable catalog, identity/index cache, ownership
+and per-item `checkedAt` evidence. Their status API exposes connection/counts,
+not receipts. No companion protocol, permissions or purchase-sync changes.
+HB/FAN account-cursor changes still require an ordinary save.
 
-The key uses protected Chrome local storage / Firefox extension-origin private
-IndexedDB. No permissions, manifest versions or validator rules change. Existing
-installations without receipts work as before. Older GL ignores the new key and
-sees older check-only freshness, without affecting ownership. Export a flattened
-backup before downgrading if retaining that freshness matters.
+Chrome uses protected local storage; Firefox uses extension-origin private
+IndexedDB. No record-level redesign or version bump. Earlier successful receipts
+remain valid. Older GL may ignore unknown providers, terminal patches or baseline
+fields and display older check-only freshness, without affecting ownership.
+Export a flattened backup before downgrade when that freshness matters.
 
-This does not optimize Kobo checks carrying observations, Epic's normal full
-import, cold validation, Options rendering or actual record saves. A first read
-of a changed base with a stale receipt can still pay digest cost. Broader record
-persistence remains a separate design task.
+Whole-library reads, comparison/copy, cold validation/hash, Options rendering
+and genuine observation saves remain costs. Splitting actual records requires
+transactional readers, migration and recovery and remains deferred.

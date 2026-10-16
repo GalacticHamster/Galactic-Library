@@ -49,7 +49,13 @@ try{
       w=make();
     }
     assert((await w.getDatabase()).providers.steam.syncHealth.status==='succeeded','Check receipt did not survive worker recreation');
+    const success=(await w.getCommittedLibraryView()).database.providers.steam;
+    const partial=await w.beginProviderScan('steam','Fixture','incremental',false,1);
+    await w.commitProviderScan('steam',[],{syncMode:'incremental',quickSyncAt:'2026-10-17',scanDiagnostics:{failedRequestCount:2}},null,partial.scanToken,1);
+    const incomplete=(await w.getCommittedLibraryView()).database.providers.steam;
+    assert(databaseWrites===writes&&incomplete.syncHealth.status==='partial'&&incomplete.lastSync===success.lastSync&&incomplete.quickSyncAt===success.quickSyncAt,'Incomplete receipt rewrote data or advanced success');
     checks.push('Empty Steam quick checks persist success across worker recreation without any database write or changed item observations');
+    checks.push('Incomplete empty checks retain Partial status and the prior success baseline without a catalog write');
   }
   await import('../src/providers/kindle-ownership.js');await import('../src/providers/kindle.js');
   for(const originType of ['Purchase','Comixology'])for(const [itemStatus,ownership]of [['Return complete','returned'],['Revoked','revoked'],['Expired','expired']]){
@@ -65,7 +71,7 @@ try{
     const result={items,snapshot,unresolvedApps:[],newAppCount:1,skippedCount:0,failures:[],knownPurchaseIds:['fixture-purchase'],purchasesRead:1,skippedKnown:0,diagnostics:{windowsRead:1,categoryCounts:{'personal-documents':0}}};
     if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>method==='readFandangoGrid'?items:result};
     const denied=()=>{throw new Error('Content-script storage access denied.');};
-    let imported=0; let mode='full';
+    let imported=0; let mode='full',rejectCommit=false;
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
@@ -75,6 +81,7 @@ try{
       if(request.type==='FANDANGO_IMPORT_STATE'&&request.action==='get'){const scan=await writer.beginProviderScan(provider,'fixture',mode,false,1);return {ok:true,state:{phase:'tv',fullRescan:scan.forceFull||mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[],scanContext:{profileLabel:'fixture',confirmed:true,mode,scanToken:scan.scanToken}}};}
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
       if(request.type==='COMMIT_PROVIDER_SCAN'){
+        if(rejectCommit)return {ok:false,error:'Synthetic save rejection'};
         const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics},request.snapshot,request.scanToken,1);
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state,changes:state.syncHealth?.differences};
       }
@@ -111,6 +118,28 @@ try{
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
       providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
+    }
+    if(provider==='steam'){
+      const before=JSON.stringify(values.galacticLibraryDatabase.providerItems),timingBefore=providerTimings.length;
+      globalThis.GalacticSteamStore.fetchOwnedSteamGames=async(report,known,options)=>{
+        assert(options?.diagnostics===true,'Detailed outcomes enabled outside the explicit profiling switch');
+        return {items:[],newAppCount:159,unresolvedApps:Array.from({length:159},()=>({appId:'PRIVATE_APP_ID',status:'PRIVATE_RAW_ERROR'})),failedRequestCount:2,unsupportedAppCount:0,failureSummary:'Steam title lookup returned HTTP 400.',diagnostics:{ownedListRead:true,ownedIdCount:1112,candidateCount:159,attemptedCount:159,titleRequests:2,failedRequests:2,unresolvedCount:159,malformedRows:0,outcomes:{http:159},httpStatuses:{400:1,429:1},unsupportedTypes:{},firstFailure:{stage:'titles',kind:'http',httpStatus:400},privateTitle:'PRIVATE_TITLE'}};
+      };
+      const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="incremental"]').click();
+      await wait(()=>providerTimings.length>timingBefore&&!shadow.querySelector('.status').dataset.busy);
+      const text=shadow.querySelector('.status').textContent,diagnostic=providerTimings.at(-1)?.steamDiagnostics;
+      assert(/incomplete; no readable games or DLC saved/iu.test(text)&&text.includes('HTTP 400')&&text.includes('159 App IDs still lack usable title metadata'),'Steam incomplete UI hides its actual result');
+      assert(diagnostic?.outcomes.http===159&&diagnostic.saveState==='committed'&&diagnostic.savedCount===0,'Steam aggregate outcomes or save boundary absent');
+      assert(!JSON.stringify(diagnostic).includes('PRIVATE')&&JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Steam diagnostics leaked raw data or altered saved records');
+      checks.push('Steam opt-in incomplete diagnostics reconcile 159 HTTP failures, zero saved IDs and a concrete safe error without leaking titles or IDs');
+      rejectCommit=true;
+      globalThis.GalacticSteamStore.fetchOwnedSteamGames=async()=>({items:[{providerItemId:'777',title:'Save rejection fixture',mediaType:'game',ownership:'owned'}],newAppCount:1,unresolvedApps:[],failedRequestCount:0,unsupportedAppCount:0,diagnostics:{ownedListRead:true,ownedIdCount:1,candidateCount:1,attemptedCount:1,titleRequests:1,failedRequests:0,unresolvedCount:0,malformedRows:0,outcomes:{games:1},httpStatuses:{200:1},unsupportedTypes:{}}});
+      const beforeRejected=providerTimings.length;shadow.querySelector('button[data-mode="incremental"]').click();
+      await wait(()=>providerTimings.length>beforeRejected&&!shadow.querySelector('.status').dataset.busy);
+      const rejected=providerTimings.at(-1).steamDiagnostics;
+      assert(rejected.saveState==='rejected'&&rejected.savedCount===0&&rejected.saveRejectedCount===1&&rejected.firstFailure.stage==='save','Save rejection was reported as a committed ID');
+      assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Rejected save changed the catalog');
+      checks.push('Steam diagnostics distinguish resolved metadata from save rejection and retain zero confirmed saved IDs');
     }
     globalThis.GalacticSync.setProfiling(false);
     if(provider==='gog'){const beforeFailure=JSON.stringify(values.galacticLibraryDatabase.providerItems);

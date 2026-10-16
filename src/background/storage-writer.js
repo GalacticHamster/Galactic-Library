@@ -43,7 +43,7 @@ import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/re
 import {libraryReminders} from '../lib/reminders.js';
 import {date} from '../lib/validation.js';
 import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES,providerScanDisplay} from '../lib/sync-health.js';
-import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerCheckPatch,applyProviderChecks} from '../lib/provider-scan-checks.js';
+import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerCheckPatch,providerCheckBaseline,applyProviderChecks} from '../lib/provider-scan-checks.js';
 
 /**
  * Instantiate once in the service worker. Mutations and ordinary storage
@@ -110,8 +110,30 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   async function getProviderDatabase(provider,options){
     const database=await getQueryDatabase(options);
-    return ['steam','epic'].includes(provider)?providerCheckView(database):database;
+    return providerCheckView(database);
   }
+  function canPersistProviderCheck(database,provider,profile,scan){
+    const base=checkBases.get(database);
+    if(base&&Object.isFrozen(base)&&base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
+    return cacheQuerySnapshots&&base&&base===querySnapshot&&scan.profileId===profile.profileId
+      &&scan.activeAtStartId===profile.profileId&&database.providers[provider]?.activeProfileId===profile.profileId
+      &&profile.state.connected===true&&Boolean(profile.state.fullSyncAt);
+  }
+  async function persistProviderCheck(database,provider,profile,scan,patch,storedScans){
+    patch=providerCheckPatch(provider,patch);
+    const base=checkBases.get(database),digest=await timedAsync('provider_check_digest',()=>checkDigest(base));
+    const previous=(await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY];
+    if(base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
+    const checks=validProviderChecks(previous,digest),old=checks[provider];
+    const baseline=patch.syncHealth.status!=='succeeded'&&old?.profileId===profile.profileId?providerCheckBaseline(provider,old):null;
+    const receipt={format:1,baseDigest:digest,checks:{...checks,[provider]:{profileId:profile.profileId,patch,...(baseline?{baseline}:{})}}};
+    await timedAsync('provider_check_write',()=>storageArea.set({[PROVIDER_CHECKS_KEY]:receipt}));
+    providerChecksPresent=true;
+    const scans={...storedScans};delete scans[provider];
+    try{await storageArea.set({[SCANS]:scans});}catch{/* Durable terminal receipt consumes the attempt even without lease cleanup. */}
+    return applyProviderChecks(database,receipt,digest);
+  }
+  const scanCompleted=(profile,scan)=>profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status!=='running';
   function freezeQuerySnapshot(value){
     if(value&&typeof value==='object'&&!Object.isFrozen(value)){
       for(const child of Object.values(value))freezeQuerySnapshot(child);
@@ -296,30 +318,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
     const checkedBase=checkBases.get(database);
     if(checkedBase&&Object.isFrozen(checkedBase)&&checkedBase!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
-    if(profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status==='succeeded')throw Error('This scan already completed. Start a fresh scan.');
-    let result,changes;
-    // Deliberately narrower than "zero added/updated": incoming records still
-    // need their observation dates committed, even when product fields agree.
-    if(cacheQuerySnapshots&&checkBases.get(database)===querySnapshot&&querySnapshot&&['steam','epic'].includes(provider)&&scan.readOnlyStart&&details.syncMode==='incremental'
-      &&Array.isArray(values)&&values.length===0&&!details.scanDiagnostics?.failedRequestCount&&!details.scanDiagnostics?.coverageLimit
-      &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics'].includes(key))){
-      const now=new Date().toISOString();
-      const patch=providerCheckPatch(provider,{...profile.state,...syncDetails,lastSync:now,lastError:null,
-        syncHealth:successfulSyncHealth(database,provider,[],false,details)});
-      // readDatabase established exact equality with this immutable base, or
-      // fully validated a cold read. The receipt is bound to its whole value.
-      const base=checkBases.get(database),digest=await timedAsync('provider_check_digest',()=>checkDigest(base));
-      const previous=(await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY];
-      if(base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
-      const receipt={format:1,baseDigest:digest,checks:{...validProviderChecks(previous,digest),[provider]:{profileId:profile.profileId,patch}}};
-      await timedAsync('provider_check_write',()=>storageArea.set({[PROVIDER_CHECKS_KEY]:receipt}));
-      providerChecksPresent=true;
-      // Receipt durability consumes the attempt. Cleanup is advisory: a crash
-      // here cannot replay it or display it as running after restart.
-      const scans={...stored[SCANS]};delete scans[provider];
-      try{await storageArea.set({[SCANS]:scans});}catch{/* Durable receipt wins over an unremoved lease. */}
-      result=applyProviderChecks(database,receipt,digest);
-    }
+    if(scanCompleted(profile,scan))throw Error('This scan already completed. Start a fresh scan.');
+    let result,changes,preparedIncoming;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint)||scan.sourceAccountFingerprint!==sourceAccountFingerprint||profile.sourceAccountFingerprint&&profile.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('The '+label+' account changed before saving. No items were imported. Start a fresh import.');
@@ -333,18 +333,21 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       // Reuse the additive importer; never archive omissions or revoke access.
       result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database);
     }
-    if(provider==='kobo'&&scan.readOnlyStart&&details.syncMode==='incremental'&&!details.scanDiagnostics?.failedRequestCount
-      &&profile.state.syncHealth?.status==='succeeded'){
-      const incoming=timed('entry_validation',()=>[...new Map(normalizedIncoming(database,provider,profile,values).map(item=>[item.id,item])).values()]);
-      changes=timed('provider_compare',()=>successfulSyncHealth(database,provider,incoming,false,details).differences);
-      if(changes.added===0&&changes.updated===0){
-        // No database mutation means no canonical rebuild, database set or sync
-        // notification. Completing the lease still rejects a repeated commit.
-        const scans={...stored[SCANS]};delete scans[provider];await storageArea.set({[SCANS]:scans});
-        result=database;
+    if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
+      &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics','syncState'].includes(key))
+      &&(!Object.hasOwn(syncDetails,'syncState')||equalDatabaseData(syncDetails.syncState,profile.state.syncState))){
+      preparedIncoming=timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
+      const incoming=[...new Map(preparedIncoming.map(item=>[item.id,item])).values()];
+      // Compare ALL normalized fields, including observation/access evidence.
+      // A count of zero additions/updates alone is not a write-set proof.
+      const unchanged=timed('provider_compare',()=>incoming.every(item=>equalDatabaseData(item,database.providerItems[item.id])));
+      if(unchanged){
+        const health=successfulSyncHealth(database,provider,incoming,false,details);changes=health.differences;
+        const patch=health.status==='succeeded'?{...profile.state,...syncDetails,lastSync:new Date().toISOString(),lastError:null,syncHealth:health}:{syncHealth:health};
+        result=await persistProviderCheck(database,provider,profile,scan,patch,stored[SCANS]);
       }
     }
-    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database):mergeIntoDatabase(provider,values,details,database));
+    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database):mergeIntoDatabase(provider,values,details,database,preparedIncoming));
     if(!includeResult)return result;
     const observedIds=new Set(values.map(value=>value.providerItemId));
     const observed=provider==='kobo'?Object.values(result.providerItems).filter(item=>item.provider===provider&&item.profileId===profile.profileId&&observedIds.has(item.providerItemId)):[];
@@ -460,24 +463,29 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function failProviderScan(provider,scanToken,tabId,failure={}){
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId)return false;
-    const database=await getDatabase();
+    const database=await readDatabase(true);
     const failureCode=SYNC_FAILURE_CODES.includes(failure.code)?failure.code:'other';
     const profile=database.providerProfiles[scan.profileId];if(!profile||database.providers[provider]?.activeProfileId!==scan.activeAtStartId)return false;
-    if(profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status==='succeeded')return false;
-    profile.state={...profile.state,syncHealth:validateSyncHealth({attemptRef:scan.attemptRef,status:'failed',mode:scan.mode,attemptedProfileLabel:scan.profileLabel,startedAt:scan.startedAt,finishedAt:new Date().toISOString(),failureCode,retryable:true,failedRequestCount:failure.failedRequestCount??1,failedPages:failure.failedPages??[]})};
+    if(scanCompleted(profile,scan))return false;
+    const health=validateSyncHealth({attemptRef:scan.attemptRef,status:'failed',mode:scan.mode,attemptedProfileLabel:scan.profileLabel,startedAt:scan.startedAt,finishedAt:new Date().toISOString(),failureCode,retryable:true,failedRequestCount:failure.failedRequestCount??1,failedPages:failure.failedPages??[]});
+    if(canPersistProviderCheck(database,provider,profile,scan)){await persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);return true;}
+    profile.state={...profile.state,syncHealth:health};
     if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);
     await persistDatabase(database,provider);return true;
   }
   async function cancelProviderScan(provider,attemptRef){
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];if(!scan||scan.attemptRef!==attemptRef)throw new Error('This scan changed or already finished. Refresh the dashboard.');
-    const database=await getDatabase(),profile=database.providerProfiles[scan.profileId];if(!profile)throw Error('Scan profile changed.');
-    if(profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status==='succeeded')throw Error('This scan already finished. Refresh the dashboard.');
-    profile.state.syncHealth={...profile.state.syncHealth,attemptRef:scan.attemptRef,startedAt:scan.startedAt,mode:scan.mode,attemptedProfileLabel:scan.profileLabel,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);return persistDatabase(database,provider);
+    const database=await readDatabase(true),profile=database.providerProfiles[scan.profileId];if(!profile)throw Error('Scan profile changed.');
+    if(scanCompleted(profile,scan))throw Error('This scan already finished. Refresh the dashboard.');
+    const health=validateSyncHealth({attemptRef:scan.attemptRef,startedAt:scan.startedAt,mode:scan.mode,attemptedProfileLabel:scan.profileLabel,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true});
+    if(canPersistProviderCheck(database,provider,profile,scan))return persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);
+    profile.state.syncHealth=health;if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);return persistDatabase(database,provider);
   }
   function successfulSyncHealth(database,provider,records,full,details){
     const diagnostics=details.scanDiagnostics??{};const profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&(p.profileId===details.profileId||p.nickname===(details.profileLabel??database.providers[provider]?.profileLabel??'')));const prior=details.scanAttempt??profile?.state.syncHealth;
     const failedRequestCount=diagnostics.failedRequestCount??0;
-    return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:failedRequestCount?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:failedRequestCount>0,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
+    const incomplete=failedRequestCount>0||diagnostics.incomplete===true||Boolean(diagnostics.coverageLimit);
+    return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
     const restored=validateDatabase(database),extra={galacticPurchaseSync:{}};
@@ -576,10 +584,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const groups=new Map();for(const h of Object.values(database.providerHistory))if(h.item.profileId===profileId){const list=groups.get(h.item.id)??[];list.push(h.item);groups.set(h.item.id,list);}
     return new Map([...groups].filter(([,items])=>items.length===1).map(([id,items])=>[id,items[0]]));
   }
-  function preserveEnrichment(incoming, previous) {
+  function preserveEnrichment(incoming, previous,stableSparse=false) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
-    if(incoming.provider==='kobo'&&previous&&!koboObservationChanged(previous,incoming))incoming.updatedAt=previous.updatedAt;
+    // Kobo sparse observations with no meaningful metadata/access change have
+    // historically retained their saved representation and observation date.
+    // Normalize that policy here; persistence can then compare exact records.
+    if(incoming.provider==='kobo'&&previous&&!koboObservationChanged(previous,incoming)){
+      if(stableSparse)return previous;
+      incoming.updatedAt=previous.updatedAt;
+    }
     if(incoming.provider==='fanatical'){
       const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>({...entry,observedAt:incoming.observedAt}));
       if(origins.length||previous?.metadata.purchaseOrigins?.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(previous?.metadata.purchaseOrigins??[],origins);
@@ -686,20 +700,20 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return values.map(value=>{
       const item=normalizeProviderItem({...value,provider,profileId:profile.profileId,recordRef:undefined,observedAt:now},now,{allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source=PROVIDER_SOURCES[provider];
-      return preserveEnrichment(item,database.providerItems[item.id]??historicalById.get(item.id));
+      return preserveEnrichment(item,database.providerItems[item.id]??historicalById.get(item.id),true);
     });
   }
   async function mergeProviderItems(provider,values,syncDetails={}){
     return mergeIntoDatabase(provider,values,syncDetails);
   }
-  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null) {
+  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null,preparedIncoming=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
     const now = new Date().toISOString();
-    const incoming = timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
+    const incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     reconcileMediaChanges(database,incoming);

@@ -36,6 +36,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 - [Artifacts, audits and fixture policy](development/artifacts-and-audits.md)
 - [Audit tooling and private-input reproduction](development/audit-tooling.md)
 - [PlayStation/Nintendo signed-in web validation](development/console-web-validation.md)
+- [Provider performance and Steam outcome diagnostics](development/steam-outcome-diagnostics.md)
 - [Selected historical engineering investigations](audits/README.md)
 
 Generated results belong in ignored `audit-artifacts/`, not this documentation tree.

@@ -50,12 +50,17 @@ try{
     if(JSON.stringify(stored.galacticLibraryDatabase)!==JSON.stringify(baseline))throw Error('Empty checks rewrote private database');
     if(!stored.galacticLibraryProviderChecks)throw Error('Check receipt not saved privately');
     const view=await S.getCommittedLibraryView();if(view.database.providers.steam.quickSyncAt!=='2026-10-16T00:00:00.000Z')throw Error('Check missing from Providers');
+    const partial=await client.beginProviderScan('steam','Empty check fixture','incremental',false,1);
+    await client.commitProviderScan('steam',[],{syncMode:'incremental',quickSyncAt:'2026-10-17',scanDiagnostics:{failedRequestCount:2}},null,partial.scanToken,1);
+    const incomplete=(await S.getCommittedLibraryView()).database.providers.steam;
+    if(incomplete.syncHealth.status!=='partial'||incomplete.lastSync!==view.database.providers.steam.lastSync||incomplete.quickSyncAt!==view.database.providers.steam.quickSyncAt)throw Error('Incomplete receipt advanced the successful baseline');
+    if(JSON.stringify((await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase)!==JSON.stringify(baseline))throw Error('Incomplete check rewrote private catalog');
     const backup=S.parseBackup(S.createBackup(await S.getDatabase()));if(backup.providers.steam.lastSync!==view.database.providers.steam.lastSync)throw Error('Backup omitted check time');
     await S.restoreDatabase(backup);if((await S.getDatabase()).providers.steam.lastSync!==backup.providers.steam.lastSync)throw Error('Restore lost check time');
     if(JSON.stringify(await chrome.storage.local.get(null)).includes('galacticLibraryProviderChecks'))throw Error('Private receipt leaked to public storage');
     return true;
   `);
-  assert(emptyCheck);console.log('PASS installed Firefox GL: empty quick checks use private receipts, preserve catalog, appear in Providers and flatten through backup/restore');
+  assert(emptyCheck);console.log('PASS installed Firefox GL: empty successful/incomplete checks use private receipts, preserve successful baseline/catalog and flatten through backup/restore');
   if(process.argv.includes('--companions')){
     const fanRoot=resolve(projectRoot,'../Fanatical'),hbRoot=resolve(projectRoot,'../HB'),fan=await install(fanRoot,'FAN'),hbStage=join(temporary,'HB');await mkdir(hbStage);
     execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(hbRoot,'scripts/package-release.ps1'),'-Target','Firefox','-OutputDirectory',hbStage],{windowsHide:true,stdio:'pipe'});

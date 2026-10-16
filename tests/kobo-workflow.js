@@ -20,7 +20,7 @@ export const koboWorkflowTests=[
      writes.length=0;
      const scan=await writer.beginProviderScan('kobo','Personal','incremental',false,1,id,true);
      const result=await writer.commitProviderScan('kobo',items.slice(0,24),{syncMode:'incremental'},null,scan.scanToken,1,true);
-     assert.deepEqual(result.database,original);assert.equal(result.scanResult.changes.updated,0);assert.equal(result.scanResult.changes.added,0);assert.equal(result.scanResult.ownership.review,24);
+     assert.deepEqual(result.database.providerItems,original.providerItems);assert.equal(result.database.providers.kobo.syncHealth.status,'succeeded');assert(result.database.providers.kobo.lastSync>=original.providers.kobo.lastSync);assert.equal(result.scanResult.changes.updated,0);assert.equal(result.scanResult.changes.added,0);assert.equal(result.scanResult.ownership.review,24);
      assert(writes.every(write=>!('galacticLibraryDatabase' in write)));assert.equal(await writer.getQueryDatabase(),snapshot);
      await assert.rejects(writer.commitProviderScan('kobo',items.slice(0,24),{syncMode:'incremental'},null,scan.scanToken,1),/superseded/);
    }

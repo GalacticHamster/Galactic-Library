@@ -10,6 +10,8 @@ import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {withWorker,snapshotFixture} from './storage.js';
 import {PROVIDER_CHECKS_KEY,providerCheckDigest,applyProviderChecks} from '../src/lib/provider-scan-checks.js';
 import {handleExternalApiRequestAsync} from '../src/lib/external-api.js';
+import {steamOutcomeTests} from './steam-outcomes.js';
+import {providerStatusReceiptTests} from './provider-status-receipts.js';
 
 function steamFixture(responses){
   let queries=0;
@@ -18,6 +20,8 @@ function steamFixture(responses){
   return {S:c.GalacticSteamStore,queries:()=>queries};
 }
 export const providerPipelinePerformanceTests=[
+ ...steamOutcomeTests,
+ ...providerStatusReceiptTests,
  ['empty checks: an observed base change during receipt acquisition rejects the stale commit',async()=>{
    let armed=false,h;const db=syntheticProviderLibrary(40),item=Object.values(db.providerItems).find(item=>item.provider==='steam');
    h=performanceWriter(db,{beforeGet:defaults=>{if(armed&&Object.hasOwn(defaults,PROVIDER_CHECKS_KEY)){armed=false;h.stored.galacticLibraryDatabase.providerItems[item.id].ownership='revoked';h.writer.invalidateQuerySnapshot();}}});
@@ -72,7 +76,7 @@ export const providerPipelinePerformanceTests=[
  ['empty checks: stale/malformed overlays cannot claim freshness or modify ownership or counts',async()=>{
    const db=syntheticProviderLibrary(40),h=performanceWriter(db);await measuredScan(h);
    const receipt=structuredClone(h.stored[PROVIDER_CHECKS_KEY]),digest=await providerCheckDigest(db);
-   const invalid=[{...receipt,baseDigest:'0'.repeat(64)}, {...receipt,format:2}, {...receipt,checks:{...receipt.checks,kindle:receipt.checks.steam}},
+   const invalid=[{...receipt,baseDigest:'0'.repeat(64)}, {...receipt,format:2}, {...receipt,checks:{...receipt.checks,untrusted:receipt.checks.steam}},
      {...receipt,checks:{steam:{...receipt.checks.steam,profileId:db.providers.epic.activeProfileId}}},
      {...receipt,checks:{steam:{...receipt.checks.steam,patch:{...receipt.checks.steam.patch,itemCount:123}}}}];
    for(const overlay of invalid)assert.deepEqual(applyProviderChecks(db,overlay,digest),db);
@@ -89,7 +93,7 @@ export const providerPipelinePerformanceTests=[
    for(const provider of ['steam','epic'])assert.equal(h.stored.galacticLibraryDatabase.providers[provider].lastSync,view.providers[provider].lastSync);
    assert.equal((await h.writer.getCommittedLibraryView()).database.ownershipPolicy.providers.kobo,true);
  }],
- ['empty checks: first imports, account switching, incomplete scans and records with refreshed evidence take the validated save path',async()=>{
+ ['empty checks: first imports, account switching and records with refreshed evidence take the validated save path',async()=>{
    const db=syntheticProviderLibrary(40),profile=db.providers.steam.activeProfileId;
    const item=Object.values(db.providerItems).find(item=>item.profileId===profile);
    for(const change of [{},{title:'Changed title'},{ownership:'returned'},{ownership:'revoked'},{ownership:'expired'},{ownership:'subscription'},{ownership:'borrowed'},{ownership:'unknown'},{metadata:{...item.metadata,parentProviderItemId:'900'}}]){
@@ -100,7 +104,9 @@ export const providerPipelinePerformanceTests=[
    for(const diagnostics of [{failedRequestCount:1},{coverageLimit:'array-only-index-without-total'}]){
      const h=performanceWriter(db),scan=await h.writer.beginProviderScan('steam','Personal','incremental',false,1);
      await h.writer.commitProviderScan('steam',[],{syncMode:'incremental',scanDiagnostics:diagnostics},null,scan.scanToken,1);
-     assert.equal(h.counts.databaseWrites,1);assert(!h.stored[PROVIDER_CHECKS_KEY]);
+     assert.equal(h.counts.databaseWrites,0);assert(h.stored[PROVIDER_CHECKS_KEY]);
+     const state=(await h.writer.getCommittedLibraryView()).database.providers.steam;
+     assert.equal(state.syncHealth.status,'partial');assert.equal(state.lastSync,db.providers.steam.lastSync);assert.equal(state.quickSyncAt,db.providers.steam.quickSyncAt);
      assert.deepEqual(h.stored.galacticLibraryDatabase.providerItems,db.providerItems);
    }
    const h=performanceWriter(db),scan=await h.writer.beginProviderScan('steam','Other','incremental',true,1);
@@ -125,9 +131,9 @@ export const providerPipelinePerformanceTests=[
  }],
  ['empty checks: failed retirement after a real commit cannot resurrect old successful health',async()=>{
    let armed=false;const h=performanceWriter(syntheticProviderLibrary(40),{beforeRemove:()=>{if(armed)throw Error('Interrupted receipt cleanup');}});
-   await measuredScan(h);armed=true;await measuredScan(h,{fail:true});
-   assert(h.stored[PROVIDER_CHECKS_KEY]);assert.equal(h.stored.galacticLibraryDatabase.providers.steam.syncHealth.status,'failed');
-   const restart=performanceWriter(null,{stored:h.stored});assert.equal((await restart.writer.getCommittedLibraryView()).database.providers.steam.syncHealth.status,'failed');
+   await measuredScan(h);armed=true;await measuredScan(h,{items:[{providerItemId:'real-change',title:'Real change',mediaType:'game',ownership:'owned'}],scanDiagnostics:{failedRequestCount:1}});
+   assert(h.stored[PROVIDER_CHECKS_KEY]);assert.equal(h.stored.galacticLibraryDatabase.providers.steam.syncHealth.status,'partial');
+   const restart=performanceWriter(null,{stored:h.stored});assert.equal((await restart.writer.getCommittedLibraryView()).database.providers.steam.syncHealth.status,'partial');
  }],
  ['provider pipeline: repeated empty quick scans read twice, write no database and retain data',async()=>{
    for(const size of [40,200]){
@@ -203,7 +209,7 @@ export const providerPipelinePerformanceTests=[
  ['Steam retries: missing and malformed batch results never count an unresolved ID twice',async()=>{
    const f=steamFixture([{response:{store_items:[{appid:1,type:'invalid'}]}}]);
    const result=await f.S.fetchOwnedSteamGames(()=>{},[]);
-   assert.equal(result.unresolvedApps.length,3);assert.equal(new Set(result.unresolvedApps.map(item=>item.appId)).size,3);assert.equal(result.failedRequestCount,1);assert.equal(result.items.length,0);
+   assert.equal(result.unresolvedApps.length,3);assert.equal(new Set(result.unresolvedApps.map(item=>item.appId)).size,3);assert.equal(result.failedRequestCount,0);assert.equal(result.items.length,0);
  }],
  ['provider diagnostics: Steam start/finish profiles remain bounded and redact all private values',async()=>withWorker(async({dispatch,pageA})=>{
    await pageA.mergeProviderItems('steam',[{providerItemId:'1',title:'PRIVATE SYNTHETIC TITLE',ownership:'owned',mediaType:'game'}],{profileLabel:'Personal',fullSyncAt:'2026-01-01'});

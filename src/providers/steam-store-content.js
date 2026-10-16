@@ -32,22 +32,27 @@
         status.textContent = retryingTitles
           ? `Steam is checking titles one at a time: ${completed}/${total} apps checked; ${games} games found so far.`
           : `Reading Steam titles: ${completed}/${total} candidate App IDs checked from ${ownedApps} owned apps; ${games} games found.`;
-      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
+      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [],{diagnostics:Boolean(timing)});
       fetchEnd?.();
       const { items, unresolvedApps } = result;
       if(timing)Object.assign(timing,{providerCandidates:result.newAppCount,providerCaptured:items.length,providerUnresolved:unresolvedApps.length,providerUnsupported:result.unsupportedAppCount??0,providerFailedRequests:result.failedRequestCount??0});
+      if(timing&&result.diagnostics)timing.steamDiagnostics={...result.diagnostics,saveState:'pending'};
       status.textContent = items.length ? 'Saving Steam games and DLC locally...' : 'No new Steam apps; recording the completed check...';
       finishEnd=timing?.begin('save_message');
-      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items, snapshot: result.snapshot,diagnosticLookupId:timing?.id,scanDiagnostics:{failedRequestCount:result.failedRequestCount??0} });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'steam', mode: fullRescan ? 'full' : 'incremental', items, snapshot: result.snapshot,diagnosticLookupId:timing?.id,scanDiagnostics:{failedRequestCount:result.failedRequestCount??0,incomplete:unresolvedApps.length>0} });
       finishEnd?.();P?.merge(timing,response?.performance);
-      if (!response?.ok) throw new Error(response?.error ?? 'Steam import did not complete.');
+      if (!response?.ok){if(timing?.steamDiagnostics){Object.assign(timing.steamDiagnostics,{saveState:response?.ok===false?'rejected':'unconfirmed',...(response?.ok===false?{savedCount:0,saveRejectedCount:items.length}:{})});timing.steamDiagnostics.firstFailure??={stage:'save',kind:'other'};}throw new Error(response?.error ?? 'Steam import did not complete.');}
+      if(timing?.steamDiagnostics)Object.assign(timing.steamDiagnostics,{saveState:'committed',savedCount:items.length,saveRejectedCount:0});
       completed=true;
       uiEnd=timing?.begin('page_ui');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       const c=response.changes;
       const changed=!state.hasFullBaseline?`Imported ${response.gameCount} games and ${response.addOnCount??0} DLC.`:c?`${c.gamesAdded} new games, ${c.gamesUpdated} updated; ${c.addOnsAdded} new DLC, ${c.addOnsUpdated} updated.`:'Library saved.';
-      status.textContent = `${fullRescan?'Full rescan':'Quick update'} ${result.failedRequestCount?'incomplete; readable records saved':'complete'}. ${changed} ${response.gameCount} games and ${response.addOnCount??0} DLC currently recorded. ${result.newAppCount} candidate App IDs checked (including retries).${unresolvedApps.length?` ${unresolvedApps.length} unresolved App IDs will be retried on a later update.`:''}${result.unsupportedAppCount?` ${result.unsupportedAppCount} App IDs returned other catalog types; no game ownership was added for them.`:''}${unlinkedAddOnCount?` ${unlinkedAddOnCount} DLC have no saved parent game.`:''}`;
+      const incomplete=result.failedRequestCount||unresolvedApps.length;
+      status.textContent = `${fullRescan?'Full rescan':'Quick update'} ${incomplete?items.length?'incomplete; readable records saved':'incomplete; no readable games or DLC saved':'complete'}. ${changed} ${response.gameCount} games and ${response.addOnCount??0} DLC currently recorded. ${result.newAppCount} candidate App IDs checked (including retries).${unresolvedApps.length?` The owned App-ID list was read; ${unresolvedApps.length} App IDs still lack usable title metadata and will be retried. ${result.failureSummary??''}`:''}${result.unsupportedAppCount?` ${result.unsupportedAppCount} App IDs returned other catalog types; no game ownership was added for them.`:''}${unlinkedAddOnCount?` ${unlinkedAddOnCount} DLC have no saved parent game.`:''}`;
     } catch (error) {
+      if(timing&&error.steamDiagnostics)timing.steamDiagnostics=error.steamDiagnostics;
+      if(timing?.steamDiagnostics?.saveState==='pending'){timing.steamDiagnostics.saveState='unconfirmed';timing.steamDiagnostics.firstFailure??={stage:'save',kind:'other'};}
       await globalThis.GalacticSync.failed('steam',error);
       status.textContent = `Steam import failed: ${error.message}`;
     } finally {

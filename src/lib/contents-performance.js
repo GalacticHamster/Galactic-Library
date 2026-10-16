@@ -15,6 +15,22 @@
   for(const stage of ['provider_profile','provider_start','provider_fetch','provider_compare','provider_finish','provider_total','provider_profile_wait','provider_hint_ready','provider_hint_read','provider_hint_message','provider_profile_message','provider_hint_display','provider_verified_display'])stages.add(stage);
   const cleanClient=value=>({...Object.fromEntries(['beforeSendMs','localStorageMs','preparationMs','previousFlightMs','postResponseMs','pageToRenderedMs'].filter(key=>Number.isFinite(value?.[key])&&value[key]>=0&&value[key]<=300000).map(key=>[key,value[key]])),...(['rendered','superseded','incomplete'].includes(value?.renderOutcome)?{renderOutcome:value.renderOutcome}:{})});
   const cleanWork=value=>Object.fromEntries(['snapshot','index','execution'].filter(key=>value?.[key]).map(key=>[key,Object.fromEntries(['cpuMs','waitMs','maxWaitMs','yields'].filter(field=>Number.isFinite(value[key][field])&&value[key][field]>=0).map(field=>[field,value[key][field]]))]));
+  function cleanSteam(value){
+    if(!value||typeof value!=='object')return null;
+    const bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=10000000;
+    const fields=['ownedIdCount','candidateCount','attemptedCount','titleRequests','failedRequests','unresolvedCount','malformedRows','savedCount','saveRejectedCount'];
+    const result=Object.fromEntries(fields.filter(key=>bounded(value[key])).map(key=>[key,value[key]]));
+    const kinds=['games','dlc','unsupported','missing','http','authentication','malformed','classification','network','other'];
+    result.outcomes=Object.fromEntries(kinds.map(key=>[key,bounded(value.outcomes?.[key])?value.outcomes[key]:0]));
+    if(!bounded(result.attemptedCount)||Object.values(result.outcomes).reduce((sum,n)=>sum+n,0)!==result.attemptedCount)return null;
+    if(typeof value.ownedListRead==='boolean')result.ownedListRead=value.ownedListRead;
+    result.httpStatuses=Object.fromEntries(Object.entries(value.httpStatuses??{}).filter(([key,n])=>/^[1-5]\d{2}$/u.test(key)&&bounded(n)).slice(0,500));
+    result.unsupportedTypes=Object.fromEntries(Object.entries(value.unsupportedTypes??{}).filter(([key,n])=>(key==='other'||/^-?\d{1,6}$/u.test(key))&&bounded(n)).slice(0,32));
+    const first=value.firstFailure;
+    if(['owned-list','titles','save'].includes(first?.stage)&&kinds.includes(first.kind))result.firstFailure={stage:first.stage,kind:first.kind,...(Number.isInteger(first.httpStatus)&&first.httpStatus>=100&&first.httpStatus<=599?{httpStatus:first.httpStatus}:{})};
+    if(['pending','committed','rejected','unconfirmed'].includes(value.saveState))result.saveState=value.saveState;
+    return result;
+  }
   const now = () => performance.timeOrigin + performance.now();
   const validId = id => /^lookup-[a-f0-9]{12}-\d{3,6}$/u.test(id ?? '');
   function trace(id, kind = 'network', clock = now, startAt = null) {
@@ -42,6 +58,7 @@
       ...(value.work?{work:cleanWork(value.work)}:{}),
       ...Object.fromEntries(['recordsRead','recordsWritten','recordsNormalized','providerCandidates','providerCaptured','providerUnresolved','providerUnsupported','providerFailedRequests'].filter(key=>Number.isSafeInteger(value[key])&&value[key]>=0&&value[key]<=10000000).map(key=>[key,value[key]])),
       ...(value.validationWork?{validationWork:Object.fromEntries(['executingMs','waitMs','yields'].filter(key=>Number.isFinite(value.validationWork[key])&&value.validationWork[key]>=0).map(key=>[key,value.validationWork[key]]))}:{}),
+      ...(value.provider==='steam'&&cleanSteam(value.steamDiagnostics)?{steamDiagnostics:cleanSteam(value.steamDiagnostics)}:{}),
       ...(['profile','hint','account','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
       ...(['found','missing','ambiguous','invalid'].includes(value.profileHintStatus)?{profileHintStatus:value.profileHintStatus}:{}),
       ...(['steam','gog','epic','humble','fanatical','kindle','kobo','audible','amazon-games','amazon-video','fandango-at-home'].includes(value.provider)?{provider:value.provider}:{}),

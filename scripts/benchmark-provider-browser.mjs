@@ -28,9 +28,9 @@ try{
  let rows;
  if(matrix){
   rows=[];
-  const scenarios=['quick-warm','quick-repeated','quick-repeated-2','quick-restart-no-proof','incremental-change','full-unchanged','full-change','incomplete','failed'];
+  const scenarios=['quick-warm','quick-repeated','quick-repeated-2','quick-restart-no-proof','incremental-change','full-unchanged','full-change','incomplete','incomplete-repeated','incomplete-restart-no-proof','failed','failed-repeated'];
   for(const workflow of scenarios){
-   if(workflow==='quick-restart-no-proof'){
+   if(workflow.endsWith('restart-no-proof')){
     await driver.send('ServiceWorker.enable',{},sessionId);await driver.send('ServiceWorker.stopAllWorkers',{},sessionId);
     await evaluate(`await chrome.storage.session.remove('galacticLibraryValidationCertificate');return true;`);
    }
@@ -43,12 +43,12 @@ try{
     const journal=async operation=>{const report=await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}),events=report.activity.events;
      const event=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
      const spans=events.filter(e=>e.startEpochMs>=event.startEpochMs&&e.startEpochMs<event.startEpochMs+event.durationMs);
-     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+(full&&operation==='beginProviderScan'?1:0)};};
+     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+(full&&operation==='beginProviderScan'?1:0)};};
     const at=performance.now(),scan=await client.beginProviderScan('steam','Personal',mode,false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
     const finishStart=performance.now();let result;
-    if(workflow==='failed')await client.failProviderScan('steam',scan.scanToken,1,{code:'network'});
-    else result=await client.commitProviderScan('steam',items,{syncMode:mode,...(full?{fullSyncAt:'2026-10-16'}:{quickSyncAt:'2026-10-16'}),...(workflow==='incomplete'?{scanDiagnostics:{failedRequestCount:1}}:{})},full?P.completeProviderSnapshot('steam',items,[P.completedScope('library',items.length,items.length,'reported-count')]):null,scan.scanToken,1);
-    const finished=performance.now(),post=await journal(workflow==='failed'?'failProviderScan':'commitProviderScan');
+    if(workflow.startsWith('failed'))await client.failProviderScan('steam',scan.scanToken,1,{code:'network'});
+    else result=await client.commitProviderScan('steam',items,{syncMode:mode,...(full?{fullSyncAt:'2026-10-16'}:{quickSyncAt:'2026-10-16'}),...(workflow.startsWith('incomplete')?{scanDiagnostics:{failedRequestCount:1}}:{})},full?P.completeProviderSnapshot('steam',items,[P.completedScope('library',items.length,items.length,'reported-count')]):null,scan.scanToken,1);
+    const finished=performance.now(),post=await journal(workflow.startsWith('failed')?'failProviderScan':'commitProviderScan');
     const bytes=value=>new TextEncoder().encode(JSON.stringify(value)).length;
     return {workflow,preMessageMs:prepared-at,postMessageMs:finished-finishStart,workerPre:pre,workerPost:post,databaseBytes:pre.databaseWrites*bytes(scan.database)+post.databaseWrites*bytes(result??scan.database)};
    `);

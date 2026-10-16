@@ -269,3 +269,11 @@ Account-list refreshes preserve the existing connection form and staged choices.
 Providers also contains Advanced companion communication checks. These only test
 communication; they do not import or synchronize. Settings retains developer pairing
 and links back to the appropriate provider card.
+
+An incomplete quick check can retain your library unchanged while recording its
+current problem. Advanced update details shows that latest attempt separately
+from the last successful quick check/full baseline. It does not imply ownership
+was reverified. Steam's candidate App IDs include retries and unsupported types,
+not just new purchases; an owned-ID list can load successfully while title lookup
+remains incomplete. Retry later if the title service fails. Optional diagnostic
+steps are in [Steam outcome diagnostics](../development/steam-outcome-diagnostics.md).

@@ -83,16 +83,20 @@ than reading it again. The final database still passes full validation and an
 atomic save. Freshness, ownership changes, manual corrections, history and
 add-on links remain intact.
 
-An empty successful Steam/Epic incremental check now saves a small exact-base
-receipt instead of a whole database. The [receipt contract](../architecture/empty-provider-checks.md)
-defines eligibility, reader/backup flattening, interruption handling and rollback.
-Checks returning records still save observation freshness; full scans, actual
-changes and incomplete checks retain their existing validated writes. No catalog
-schema migration, record-level persistence or checkpoint change is introduced.
+The shared writer saves status receipts when exact normalized records and
+account state are unchanged, for successful, incomplete, failed and cancelled
+attempts. The [receipt contract](../architecture/empty-provider-checks.md) covers
+retained successful baselines, reader/backup flattening and recovery. Incoming
+observation/access changes, account cursors and successful full scans retain
+validated saves. No schema migration or record-level persistence is introduced.
+See [Steam outcome diagnostics](steam-outcome-diagnostics.md) to distinguish
+recurring candidates without personal data logging or additional requests.
 
 For a comparable baseline use `--writer-root=PATH` with the Node benchmark. Its
 matrix includes first/warm/repeated/restarted checks, actual changes, full scans,
 partial failure and failure. The restarted harness has no reusable proof.
+The matrix also repeats incomplete/failed operations and explicitly restarts
+before another incomplete operation, retaining its prior successful baseline.
 `benchmark-provider-browser.mjs --matrix --size=10000` exercises the same paths
 in an actual packaged Chrome worker, stopping only its disposable worker and
 removing the session certificate for the explicit restart case. Worker IDs
@@ -113,4 +117,5 @@ Unresolved IDs are counted once even when a malformed batch fails after missing
 IDs were collected. Request failures stay visibly incomplete. Steam/Epic added
 and updated game/add-on counts reuse reconciliation; observation timestamps
 alone do not make a product updated. Older backups without these optional
-summary counts remain valid; validation certificates have a new algorithm tag.
+summary counts remain valid. This status-only extension changes neither the
+database validator nor its certificate version.
