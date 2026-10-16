@@ -1,6 +1,7 @@
 import {manualReconciliationTests} from './manual-reconciliation.js';
 import {consoleLibraryTests} from './console-library.js';
 import {nintendoImportTests} from './nintendo-import.js';
+import {playstationImportTests} from './playstation-import.js';
 import {naturalTitleSortTests} from './natural-title-sort.js';
 import {purchaseRepairTests} from './purchase-repair.js';
 import {purchaseReconciliationTests} from './purchase-reconciliation.js';
@@ -124,6 +125,7 @@ const tests = [
   ...providerProfileTests,
   ...consoleLibraryTests,
   ...nintendoImportTests,
+  ...playstationImportTests,
   ...koboWorkflowTests,
   ...operationFeedbackTests,
   ...libraryLoadingTests,

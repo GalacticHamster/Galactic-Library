@@ -12,6 +12,7 @@ export const consoleLibraryTests=[
    const a=C.parsePlayStationPage(ps()).items[0];assert.equal(a.ownership,'owned');assert.equal(a.acquiredAt,null);assert.equal(a.metadata.conceptId,'123');
    const original=ps().data.purchasedTitlesRetrieve.games[0],b=C.parsePlayStationPage(ps(0,true,[{...original,platform:'PS5'}])).items[0],c=C.parsePlayStationPage(ps(0,true,[{...original,productId:'different-edition'}])).items[0];
    assert.notEqual(a.providerItemId,b.providerItemId);assert.notEqual(a.providerItemId,c.providerItemId);
+   assert.equal(C.parsePlayStationPage(ps(0,true,[{...original,edition:'Deluxe Edition'}])).items[0].metadata.edition,'Deluxe Edition');
    assert.throws(()=>C.parsePlayStationPage(ps(0,true,[{...original,productId:null}])));
    assert.throws(()=>C.parsePlayStationPage(ps(0,true,[{...original,platform:'PS3'}])));
    assert(!JSON.stringify(a).includes('account-a'));

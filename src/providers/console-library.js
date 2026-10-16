@@ -42,6 +42,7 @@
       const productId=identifier(row.productId,'PlayStation product ID'),titleId=identifier(row.titleId,'PlayStation title ID');
       if(!['PS4','PS5'].includes(row.platform))fail('PlayStation returned a platform outside this PS4/PS5 import.');
       const access=playStationAccess(row),metadata={source:'playstation-web-purchased-library',productId,titleId,accessBasis:access.basis};
+      if(row.edition!=null){if(typeof row.edition!=='string'||row.edition.length>500)fail('PlayStation returned an unreadable edition label.');if(row.edition.trim())metadata.edition=row.edition.trim();}
       if(row.conceptId!==undefined&&row.conceptId!==null)metadata.conceptId=identifier(row.conceptId,'PlayStation concept ID');
       for(const field of ['membership','subscriptionService'])if(membership(row[field]))metadata[field]=row[field];
       for(const field of ['isActive','isTrial'])if(typeof row[field]==='boolean')metadata[field]=row[field];

@@ -10,13 +10,14 @@ Older findings below retain their original research context.
 
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
-| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Independent purchase GET succeeds; website profile query succeeds but independent profile query returns HTTP 400 rejecting its field | Purchase-page access demonstrated. Independent account recheck remains blocked by a different accepted GraphQL field contract; exact missing request context is unknown. **Production importer deferred.** |
+| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Independent purchase GET succeeds. Helper 0.1.10 account recheck succeeds with the website's two Apollo client headers | **Awaiting live production validation.** Account lookup is repaired; account-bound additive importer and Full rescan / Quick update pass disposable packaged Chrome/Firefox tests. No live production import has been exercised by the agent. |
 | Nintendo — Switch Virtual Game Cards | 115 rows / card IDs / software IDs, terminal page. In 0.1.7 the signed-in obfuscatedId matches ownerNaId and userNaId on all 115 rows; no account change | **Working:** user confirms production import of 115 cards. Account-scoped website observation feeds existing validated additive atomic saves; no independent API request or copied credential. Agent testing remains synthetic/disposable. |
 | Xbox — Web Library | User reports approximately 37 web-visible games; approximately 245 in the mobile app is a separate scope | Current web-library source/join and access semantics still require validation. Full console history, Collections v7 and mobile/device authorization are deferred. No production Xbox importer yet. |
 
 Nintendo's source/account observation gate is now satisfied. The implementation
 uses the website-owned request and requires complete pagination; it does not
-replay authentication. PlayStation is not registered as a production provider.
+replay authentication. PlayStation now has a production provider using the
+independently validated browser-session request path described below.
 
 ## Evidence available before the signed-in check
 
@@ -430,7 +431,66 @@ Chrome/Firefox checks verify automatic enabling without **Update summary**;
 **33 focused tests** pass. This UI correction does not change the successful
 account request.
 
-## Validation
+## PlayStation production implementation
+
+**Navigation:** Providers → PlayStation — PS4/PS5 Purchased Library. Reload GL
+and the signed-in Purchased page, confirm the saved account nickname and select
+**Full rescan**. **Quick update** is available afterward. The standalone helper
+can be removed; neither test button is needed for production imports.
+
+[Page capture and acquisition](../../../src/providers/playstation-capture.js)
+retain only successful website-observed public query hashes, permitted purchase
+variables and the two Apollo metadata headers in page memory. The existing
+[neutral projection](../../../src/providers/console-library.js) validates pages
+and keeps composite product/title/platform identifiers and supplied editions.
+Account IDs and client metadata never leave MAIN world. No passwords, copied
+Authorization, token storage, backend or additional API host permission is used.
+Only the PlayStation Library site is added to content-script matches.
+
+An independent account request precedes acquisition, follows pagination and
+occurs immediately before save; an opaque provider-prefixed SHA-256 binds the
+existing GL profile/scan lease. Website requests during acquisition invalidate
+the prepared result. Head-page rechecking detects changes to the start of the
+listing; duplicate/stalled/malformed pages and missing terminal evidence fail
+before import. This is bounded HTTP source validation, not a claim of a server
+transactional snapshot. There is a two-minute scan bound and 20-second request
+bound, no retries, a 500-page/50,000-item ceiling and 2 MiB response limit.
+
+The [isolated panel](../../../src/providers/playstation-content.js) uses existing
+account confirmation, source fingerprint, tab-bound lease, writer validation
+and atomic additive merge. Full and quick checks both traverse the complete
+supported listing; quick is an additive update mode rather than a claim of a
+separate incremental API. Missing entries remain saved, preserving original
+records, manual access corrections and backups. Completion is shown only after
+commit, with titles/products/new/access-change/unconfirmed counts and page
+progress. It does not infer transaction dates or separate component purchases.
+
+Active Purchased entries with `membership: NONE` and no contrary subscription
+or trial evidence are Owned. Subscription memberships stay subscription;
+trial/inactive/unknown states stay unconfirmed. Product/title/platform IDs and
+edition metadata are retained without changing shared matching rules. Bundles
+are not expanded into invented component products. This is not a complete DLC,
+hidden/inactive, PS3/PSP/Vita or lifetime-order importer. Empty results without a
+reported zero total do not currently certify an import.
+
+Live acceptance remains user-side: compare the committed completion summary
+with the current Purchased list; inspect PS4/PS5 titles, then repeat with
+**Quick update** and verify no extra records. The historical 60 rows / 59 product
+IDs are source evidence, **not a claimed current production import count**.
+Dedicated [source/writer tests](../../../tests/playstation-import.js) and
+[installed package tests](../../../tests/playstation-native.mjs) use synthetic
+60-row / 59-product data, three pages, 58 owned / one subscription / one unknown,
+additive omissions, repeat imports, account switching and backup round trips.
+
+## Validation results
+
+PlayStation production: **1,219 GL tests**, including matching parity; **472/472
+contents tests**; **12 packaged Providers UI checks per browser**; installed full
+PlayStation and Nintendo runtime tests in **Chrome and Firefox**; repository/link
+validation and both **186-file** packaging checks pass. Validation used an
+artifact-free checkout and disposable/synthetic data. Newly supported PS
+account-bound behavior has dedicated tests rather than being treated as a
+legacy provider with unrestricted import messages. No HB/FAN files were changed.
 
 Helper 0.1.10: **32 focused synthetic tests**, installed-helper checks for both
 providers in **Chrome and Firefox**, **1,214 GL unit tests** including matching

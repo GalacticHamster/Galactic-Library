@@ -8,6 +8,6 @@ export const GOOGLE_BOOKS_API_KEY_STORAGE_KEY = 'googleBooksApiKey';
 export const GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY = 'googleBooksEnrichmentJob';
 export const SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY = 'galacticLibraryShowEnrichmentActions';
 
-export const PROVIDERS = Object.freeze(['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'fanatical', 'humble', 'nintendo']);
+export const PROVIDERS = Object.freeze(['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'fanatical', 'humble', 'nintendo', 'playstation']);
 export const MEDIA_TYPES = Object.freeze(['game', 'game-addon', 'software', 'audiobook', 'book', 'movie', 'tv']);
 export const OWNERSHIP_STATES = Object.freeze(['owned', 'claimed', 'subscription', 'borrowed', 'rental', 'unknown', 'returned', 'revoked', 'expired']);

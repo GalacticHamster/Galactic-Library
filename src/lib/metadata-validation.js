@@ -4,13 +4,14 @@ import {validatePurchaseOrigins} from './purchase-origins.js';
 import {validateManifest} from './kindle-manifest.js';
 import {validateKindleCategoryPaths} from './kindle-categories.js';
 
-export const PROVIDER_SOURCES = Object.freeze({steam:'steam-store-browse-items',gog:'gog-account-library',epic:'epic-store-library','amazon-games':'amazon-games-collection',audible:'audible-library-page',kindle:'amazon-kindle-content-library','amazon-video':'amazon-prime-video-purchases-library','fandango-at-home':'fandango-at-home-library',kobo:'kobo-my-books-library',fanatical:'fanatical-order-history',humble:'humble-purchase-library',nintendo:'nintendo-virtual-game-cards'});
+export const PROVIDER_SOURCES = Object.freeze({steam:'steam-store-browse-items',gog:'gog-account-library',epic:'epic-store-library','amazon-games':'amazon-games-collection',audible:'audible-library-page',kindle:'amazon-kindle-content-library','amazon-video':'amazon-prime-video-purchases-library','fandango-at-home':'fandango-at-home-library',kobo:'kobo-my-books-library',fanatical:'fanatical-order-history',humble:'humble-purchase-library',nintendo:'nintendo-virtual-game-cards',playstation:'playstation-web-purchased-library'});
 const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com'],'amazon-games':['gaming.amazon.com','luna.amazon.com'],audible:['audible.com'],kindle:['amazon.com'],'amazon-video':['amazon.com'],'fandango-at-home':['athome.fandango.com'],kobo:['kobo.com'],fanatical:['fanatical.com'],humble:['humblebundle.com']};
 const FIELDS = {
   steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery'],
   audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
   fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
+  playstation:['productId','titleId','conceptId','accessBasis','membership','subscriptionService','isActive','isTrial'],
   nintendo:['cardId','applicationId','accessBasis','productKind','lendingExpiresAt','isHidden','isLending','isPartialLending','hasApplication','hasAddOnContents','hasReleasedApplication','hasReleasedAddOnContents','hasReleasedUpgrade']
 };
 const COMMON = ['source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
@@ -75,6 +76,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
   for (const key of [...COMMON,...(FIELDS[provider]??[])]) {
     if (!Object.hasOwn(value,key)) continue;
     if(key==='purchaseOrigins')result[key]=validatePurchaseOrigins(value[key]);
+    else if(provider==='playstation'&&['isActive','isTrial'].includes(key)){if(typeof value[key]!=='boolean')throw Error('Invalid PlayStation access flag.');result[key]=value[key];}
     else if(provider==='nintendo'&&['isHidden','isLending','isPartialLending','hasApplication','hasAddOnContents','hasReleasedApplication','hasReleasedAddOnContents','hasReleasedUpgrade'].includes(key)){if(typeof value[key]!=='boolean')throw Error('Invalid Nintendo card flag.');result[key]=value[key];}
     else if (LISTS.has(key)) result[key]=strings(value[key],50,500,key);
     else if (['isbn','isbns'].includes(key)) result[key]=Array.isArray(value[key])?strings(value[key],50,32,key):text(value[key],32,key);

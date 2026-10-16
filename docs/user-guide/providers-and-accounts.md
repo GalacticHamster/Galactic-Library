@@ -67,6 +67,35 @@ Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
 
+## PlayStation PS4/PS5 Purchased Library
+
+Open **Providers → PlayStation — PS4/PS5 Purchased Library** and open its website.
+Sign in and let the Purchased library finish loading. In GL's floating panel,
+choose and confirm the account nickname, then select **Full rescan**. The panel
+reports pages and titles read, checks the account again, and saves atomically.
+After the first full import, **Quick update** checks the same supported listing
+for additions and access changes. Both retain earlier saved records; absence
+does not establish a refund or revoked access. User access corrections remain
+authoritative.
+
+The importer uses the website's current public query definitions and client
+settings with browser-managed cookies. It never copies login tokens, stores
+credentials or exports raw account IDs. An opaque hash binds the saved profile
+to the signed-in account; switching accounts requires a separate confirmed GL
+profile. Platform, product and title IDs remain distinct. Permanent access is
+inferred only for active non-subscription Purchased entries; subscription,
+trial, inactive and unrecognized licenses retain their separate access status.
+Activity dates are not purchase dates. Supplied edition labels are retained.
+
+Only the active PS4/PS5 web Purchased listing is supported, not PS3/PSP/Vita,
+hidden/inactive entries, complete lifetime orders or a complete DLC inventory.
+Filtered/changed pages, unreadable rows and incomplete pagination reject the
+import without replacing saved records. An empty listing without a reported
+zero total cannot currently certify an import. The production importer is
+awaiting live user acceptance; disposable Chrome/Firefox tests pass. Remove
+the separate research helper to avoid overlapping diagnostic panels. Firefox
+may require granting GL access to the PlayStation Library site.
+
 ## Nintendo Switch Virtual Game Cards
 
 Open **Providers → Nintendo — Switch Virtual Game Cards**, then open Nintendo's

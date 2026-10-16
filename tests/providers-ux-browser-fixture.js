@@ -1,5 +1,5 @@
 import {createStorageWriter} from '../src/background/storage-writer.js';
-import {DATABASE_STORAGE_KEY} from '../src/lib/constants.js';
+import {DATABASE_STORAGE_KEY,PROVIDERS} from '../src/lib/constants.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
 const snapshotFixture=(provider,items)=>completeProviderSnapshot(provider,items,['books','personal-documents'].map(id=>{const n=items.filter(i=>(i.metadata.libraryCategory??'books')===id).length;return {...completedScope(id,n,n,'reported-count'),duplicateCount:0};}));
 
@@ -34,7 +34,8 @@ try{
  await wait(()=>!document.querySelector('#empty-library').hidden,'Empty Library onboarding did not load.');
  assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Books & Contents|Settings','Wrong main navigation.');
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
- assert(document.querySelectorAll('.provider-card').length===12,'Supported provider choices missing.');
+ assert(document.querySelectorAll('.provider-card').length===PROVIDERS.length,'Supported provider choices missing.');
+ assert(document.querySelector('.provider-card[data-provider="playstation"]')&&document.querySelector('.provider-card[data-provider="nintendo"]'),'Console provider entry points missing.');
  const syncHost=document.querySelector('#purchase-sharing-humble [data-purchase-handoff]'),manual=syncHost.querySelector('[data-purchase-manual]');
  assert(document.querySelector('.provider-card[data-provider="humble"]').contains(syncHost)&&document.querySelectorAll('#purchase-sharing-humble').length===1,'Connection is separate or duplicated');
  assert(!document.querySelector('#settings-workspace #official-companion-status')&&document.querySelector('#providers-workspace #official-companion-status'),'Connection checks still scattered across Settings');
@@ -45,7 +46,7 @@ try{
  for(const selector of ['[data-sync-local]','[data-sync-remote]']){const field=syncHost.querySelector(selector);field.value='personal';field.dispatchEvent(new Event('change'));}
  syncHost.querySelector('[data-sync-connect]').click();await delay();assert(!syncCalls.some(r=>r.action==='syncConnect'),'Cancelled connection still sent consent');confirmSync=true;syncHost.querySelector('[data-sync-connect]').click();await wait(()=>syncHost.querySelector('[data-sync-status]').textContent==='Synced','Confirmed connection status missing');assert(syncCalls.filter(r=>r.action==='syncConnect').length===1,'Setup sent duplicate authorization');
  checks.push('Colocated sync UI requires exact account selections and confirmation before sending existing setup requests');
- assert(!operations.includes('beginProviderScan')&&opened.length===0,'Onboarding started an import.');checks.push('Empty Library routes to all 12 providers without acquisition');
+ assert(!operations.includes('beginProviderScan')&&opened.length===0,'Onboarding started an import.');checks.push(`Empty Library routes to all ${PROVIDERS.length} providers without acquisition`);
 
  let d=await writer.replaceProviderItems('kindle',[book],{profileLabel:'',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[book]));const a=d.providers.kindle.activeProfileId,ref=Object.values(d.providerItems)[0].recordRef;
  d=await writer.saveContentReview(Object.keys(d.providerItems)[0],{entries:[{series:'Synthetic',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}],statement:'Collects Synthetic #1',source:'manual-review',sourceUrl:'',verifiedAt:'2026-10-01'});

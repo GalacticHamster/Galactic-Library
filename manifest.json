@@ -27,6 +27,32 @@
   "options_page": "options.html",
   "content_scripts": [
     {
+      "matches": [
+        "https://library.playstation.com/*"
+      ],
+      "js": [
+        "src/providers/provider-snapshot.js",
+        "src/providers/console-library.js",
+        "src/providers/playstation-capture.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://library.playstation.com/*"
+      ],
+      "js": [
+        "shared/theme.js",
+        "src/providers/floating-panel.js",
+        "src/providers/playstation-content.js"
+      ],
+      "run_at": "document_idle",
+      "css": [
+        "shared/theme.css"
+      ]
+    },
+    {
       "matches": ["https://accounts.nintendo.com/portal/vgcs*"],
       "js": ["src/providers/provider-snapshot.js", "src/providers/console-library.js", "src/providers/nintendo-capture.js"],
       "world": "MAIN",
