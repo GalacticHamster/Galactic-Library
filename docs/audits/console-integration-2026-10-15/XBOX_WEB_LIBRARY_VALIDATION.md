@@ -240,3 +240,20 @@ clicks before the relevant data loads. Provider opening and account-update
 links now use [the full-library Owned grid](https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned) directly. This changes navigation only; source checks, import scope,
 account consent and saving behavior are unchanged. Packaged Providers UI checks
 assert the actual rendered link retains all three required query parameters.
+
+### Overlay persistence during website hydration
+
+The user then reported that the panel appeared briefly before the Owned view
+loaded and disappeared until reloading. The inspected first-party entry point
+hydrates `document.documentElement`; GL previously appended its host there only
+once. Replacing that root's children reproduced the lost panel in an installed
+disposable Chrome build before the fix.
+
+The Xbox panel now observes only direct document-root child changes and
+reattaches its original host when removed. It does not rebuild the form, rerun
+profile setup, start an import, poll the page or observe the game-grid subtree.
+Installed Chrome/Firefox tests rebuild the root, preserve the same minimized
+panel and entered account confirmation, and remove the panel during full/quick
+imports. The original panel, busy state and handlers survive without duplicates;
+the existing save, account, omission and backup checks still pass. Source
+selection, authorization, persistence and other providers are unchanged.

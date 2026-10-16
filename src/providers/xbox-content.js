@@ -5,7 +5,13 @@
   const host=document.createElement('div');host.id='galactic-library-xbox-importer';host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(410px,95vw)';
   const shadow=host.attachShadow({mode:'open'});
   shadow.innerHTML='<style>:host{font:14px system-ui}.panel{background:var(--gh-surface,#fff);color:var(--gh-text,#111);border:1px solid var(--gh-border,#888);border-radius:10px;padding:16px;box-shadow:0 4px 20px #0003}button{font:inherit;padding:7px 12px;margin:4px;background:var(--gh-accent,#7c3aed);color:var(--gh-on-accent,#fff);border:0;border-radius:6px}p{margin:9px 0}</style><section class="panel"><h3>Galactic Library · Xbox — Web Library</h3><p>Import the games in the Owned catalog of your current Xbox web library. This covers web-visible games, not your complete console or lifetime purchase history. Previously saved items are retained.</p><button type="button" data-mode="full">Full rescan</button><button type="button" data-mode="incremental">Quick update</button><p data-import-status role="status">Let Xbox Library finish loading. Both actions check the complete web-visible Owned catalog; Quick update adds changes without removing earlier items.</p></section>';
-  document.documentElement.append(host);globalThis.GalacticFloatingPanel?.attach?.(shadow,'xbox');
+  // Xbox hydrates this root and can replace its children during navigation.
+  // Restore the same node so account consent, minimized state and active work
+  // survive. Observe only direct root children, not the game's changing grid.
+  const pageRoot=document.documentElement;
+  const ensureMounted=()=>{if(host.parentNode!==pageRoot)pageRoot.append(host);};
+  new MutationObserver(ensureMounted).observe(pageRoot,{childList:true});
+  ensureMounted();globalThis.GalacticFloatingPanel?.attach?.(shadow,'xbox');
   const buttons=[...shadow.querySelectorAll('[data-mode]')],status=shadow.querySelector('[data-import-status]');
   function bridge(action){
     const nonce=[...crypto.getRandomValues(new Uint8Array(16))].map(n=>n.toString(16).padStart(2,'0')).join('');

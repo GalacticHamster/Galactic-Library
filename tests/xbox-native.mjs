@@ -10,7 +10,7 @@ import {setTimeout as pause} from 'node:timers/promises';
 import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,runtimeZip} from '../scripts/release.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
-const server=createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body><button id="load" onclick="loadPurchases()">Load synthetic purchases</button></body></html>');});
+const server=createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body><main>Synthetic Xbox Library</main></body></html>');});
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin='http://127.0.0.1:'+server.address().port;
 const manifest=JSON.parse(files.get('manifest.json'));for(const entry of manifest.content_scripts)entry.matches=entry.matches.map(pattern=>pattern==='https://play.xbox.com/library*'?'http://127.0.0.1/*':pattern);
 manifest.host_permissions.push('http://127.0.0.1/*');files.set('manifest.json',Buffer.from(JSON.stringify(manifest)));
@@ -44,14 +44,20 @@ try{
   }
   async function navigate(url){if(firefox)await driver.send('WebDriver:Navigate',{url});else{const t=await driver.send('Target.createTarget',{url});session=(await driver.send('Target.attachToTarget',{targetId:t.targetId,flatten:true})).sessionId;await driver.send('Runtime.enable',{},session);}}
   async function wait(script,message){for(let i=0;i<250;i++){const v=await evaluate(script);if(v)return v;await pause(100);}const state=await evaluate('return {url:location.href,ready:document.readyState,status:document.querySelector("#galactic-library-xbox-importer")?.shadowRoot?.querySelector("[data-import-status]")?.textContent};');throw Error(message+' '+JSON.stringify(state));}
-  await navigate(origin+'/library');await wait('return !!document.querySelector("#galactic-library-xbox-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Xbox panel missing');
+  await navigate(origin+'/library?tab=fullLibrary&view=grid&catalog=owned');await wait('return !!document.querySelector("#galactic-library-xbox-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Xbox panel missing');
   const root='document.querySelector("#galactic-library-xbox-importer").shadowRoot';
+  await evaluate(`window.originalXboxPanel=document.querySelector('#galactic-library-xbox-importer');const s=${root};s.querySelector('[data-profile-label]').value='Personal';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;s.querySelector('[data-galactic-floating-panel-control=minimize]').click();document.documentElement.replaceChildren(document.createElement('head'),document.createElement('body'));history.replaceState(null,'','/library?tab=fullLibrary&view=grid&catalog=owned');return true;`);
+  await pause(50);
+  const remounted=await evaluate(`const host=document.querySelector('#galactic-library-xbox-importer'),s=host?.shadowRoot;return {same:host===window.originalXboxPanel,count:document.querySelectorAll('#galactic-library-xbox-importer').length,nickname:s?.querySelector('[data-profile-label]').value,confirmed:s?.querySelector('[data-profile-confirm]').checked,minimized:s?.querySelector('.panel').hidden,restoreVisible:s?!s.querySelector('[data-galactic-floating-panel-control=restore]').hidden:false};`);
+  assert.equal(remounted.same,true,'Xbox hydration removed the panel without restoring its original instance');assert.equal(remounted.count,1);assert.equal(remounted.nickname,'Personal');assert.equal(remounted.confirmed,true);assert.equal(remounted.minimized,true);assert.equal(remounted.restoreVisible,true);
+  await evaluate(`const s=${root};s.querySelector('[data-galactic-floating-panel-control=restore]').click();return true;`);
   await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Personal';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;s.querySelector('[data-mode=full]').click();return true;`);
   await wait(`const s=${root};return !s.querySelector('[data-mode=full]').disabled&&/finish loading/.test(s.querySelector('[data-import-status]').textContent);`,'Unloaded purchases were not rejected');
   await evaluate('fixtureXbox.get("profile").status="success";return true;');
   for(const mode of ['full','incremental']){
-    await evaluate(`const s=${root};s.querySelector('[data-mode=${mode}]').click();return true;`);
+    assert.equal(await evaluate(`const s=${root};s.querySelector('[data-mode=${mode}]').click();window.originalXboxPanel.remove();return s.querySelector('[data-mode=full]').disabled;`),true,'A removed panel lost its in-progress disabled state');
     await wait(`const s=${root};return !s.querySelector('[data-mode=full]').disabled&&s.querySelector('[data-import-status]').textContent.includes('Saved 37 checked titles');`,'Complete import/quick update did not commit');
+    assert.equal(await evaluate(`return document.querySelector('#galactic-library-xbox-importer')===window.originalXboxPanel&&document.querySelectorAll('#galactic-library-xbox-importer').length===1;`),true);
   }
   await evaluate('fixtureXbox.get("catalogs").value[0].totalCount=38;return true;');await evaluate(`const s=${root};s.querySelector('[data-mode=full]').click();return true;`);
   await wait(`const s=${root};return !s.querySelector('[data-mode=full]').disabled&&/catalog total/.test(s.querySelector('[data-import-status]').textContent);`,'Mismatched catalog was not blocked');
@@ -63,7 +69,7 @@ try{
   const reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');await navigate(reportUrl);
   const result=JSON.parse(await wait('return document.documentElement?.dataset.result;','Committed database report unavailable'));
   assert.equal(result.error,undefined);assert.equal(result.records,37);assert.equal(result.refs,37);assert.equal(result.owned,37);assert.equal(result.unknown,0);assert.equal(result.subscriptions,0);assert.equal(result.history,0);assert.equal(result.binding,64);assert.equal(result.roundTrip,true);assert.equal(result.snapshot,36);assert.equal(result.source,'xbox-web-library');assert.equal(result.acquiredAt,null);assert.deepEqual(result.platform,['Windows','Xbox One','Xbox Series X|S']);assert.equal(result.metadata.edition,'Deluxe Edition');assert.deepEqual(result.metadata.accessTypes,[1]);
-  console.log('PASS '+(firefox?'Firefox':'Chrome')+' packaged Xbox: 40/264/37/14 source reconciliation, zero source requests, consent, 37 committed records, idempotent full/quick/additive reimport, incomplete and switched-account rejection, real worker save and backup round trip.');
+  console.log('PASS '+(firefox?'Firefox':'Chrome')+' packaged Xbox: hydration/filter remount preserves the same panel, account fields, minimized/busy state and listeners; 40/264/37/14 source, zero source requests, 37 committed records, full/quick/additive imports, failure/account guards and backup round trip.');
 
 }finally{
   if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;await new Promise(done=>server.close(done));
