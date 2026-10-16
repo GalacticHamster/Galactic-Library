@@ -33,6 +33,11 @@ job storage remains separate from ordinary library backups.
 
 Provider nicknames are manual declarations, not verified website account IDs.
 
+Successful empty Steam/Epic quick checks may keep check-only freshness in a
+small exact-base receipt. Authoritative/profile/Options reads and backups flatten
+it into existing profile state; ownership and item observations remain unchanged.
+See [Empty provider checks](empty-provider-checks.md) for ordering and recovery.
+
 ## Selection and updates
 
 `selectProviderProfile(profileId, expectedActiveId, confirmed)` activates an

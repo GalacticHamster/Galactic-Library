@@ -28,6 +28,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 - [Companion API](architecture/companion-api.md)
 - [Metadata validation](architecture/metadata-validation.md)
 - [Provider profiles and sync reliability](architecture/sync-reliability.md)
+- [Empty provider checks and persistence recovery](architecture/empty-provider-checks.md)
 
 ## Development
 

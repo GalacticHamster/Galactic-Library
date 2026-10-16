@@ -83,11 +83,28 @@ than reading it again. The final database still passes full validation and an
 atomic save. Freshness, ownership changes, manual corrections, history and
 add-on links remain intact.
 
-An unchanged Steam quick check still updates successful-scan metadata, requiring
-one full database write with the current storage format. Full scans also
-persist observation freshness. Eliminating those final whole-value writes
-requires a separately reviewed persistence design; this batch does not add a
-metadata overlay, split the database or change checkpoint architecture.
+An empty successful Steam/Epic incremental check now saves a small exact-base
+receipt instead of a whole database. The [receipt contract](../architecture/empty-provider-checks.md)
+defines eligibility, reader/backup flattening, interruption handling and rollback.
+Checks returning records still save observation freshness; full scans, actual
+changes and incomplete checks retain their existing validated writes. No catalog
+schema migration, record-level persistence or checkpoint change is introduced.
+
+For a comparable baseline use `--writer-root=PATH` with the Node benchmark. Its
+matrix includes first/warm/repeated/restarted checks, actual changes, full scans,
+partial failure and failure. The restarted harness has no reusable proof.
+`benchmark-provider-browser.mjs --matrix --size=10000` exercises the same paths
+in an actual packaged Chrome worker, stopping only its disposable worker and
+removing the session certificate for the explicit restart case. Worker IDs
+confirm a new generation. Use sizes 1000, 5000, 10000 and 20000 and `--root=PATH`
+for the browser baseline. Run browser measurements sequentially.
+
+Native matrix timings come from the worker journal; full-scan start includes
+one synchronous validation known from its writer path, not an extra journal
+span. Database byte estimates serialize the returned database outside timing;
+the Node adapter separately measures exact written JSON bytes and small metadata
+bytes. Neither estimate is physical storage traffic. Privileged client response
+transport remains distinct from the compact production provider response.
 
 Steam candidate App IDs are owned-list IDs absent from saved provider/account
 records, including unresolved/unsupported retries. They are not newly purchased

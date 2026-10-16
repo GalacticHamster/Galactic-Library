@@ -38,6 +38,24 @@ try{
     await area.set({'adapter-test':{safe:'before'}});try{await area.set({'adapter-test':{safe:'after'},invalid:()=>{}});}catch{}if((await area.get('adapter-test'))['adapter-test'].safe!=='before')throw Error('IndexedDB did not roll back a failed multi-key write');await area.remove('adapter-test');
     return ['valid Firefox reminder manifest, required alarms and opt-in notifications','reminder permission request uses only the installed optional notification permission','module event page and queued library writer','library/API keys stay outside public storage.local','private database survives a new connection','invalid restore is atomic','backup round-trip','failed multi-key private write rolls back'];
   `);checks.forEach(name=>console.log('PASS installed Firefox GL: '+name));
+  const emptyCheck=await evaluate(`
+    const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),client=S.createStorageClient(message=>chrome.runtime.sendMessage(message)),area=P.createPrivateStorage(indexedDB);
+    await S.mergeProviderItems('steam',[{providerItemId:'empty-native',title:'Disposable empty-check game',mediaType:'game',ownership:'owned'}],{profileLabel:'Empty check fixture',fullSyncAt:'2026-01-01'});
+    const baseline=(await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase;
+    for(let pass=0;pass<2;pass++){
+      const scan=await client.beginProviderScan('steam','Empty check fixture','incremental',false,1);
+      await client.commitProviderScan('steam',[],{syncMode:'incremental',quickSyncAt:'2026-10-16'},null,scan.scanToken,1);
+    }
+    const stored=await area.get({galacticLibraryDatabase:null,galacticLibraryProviderChecks:null});
+    if(JSON.stringify(stored.galacticLibraryDatabase)!==JSON.stringify(baseline))throw Error('Empty checks rewrote private database');
+    if(!stored.galacticLibraryProviderChecks)throw Error('Check receipt not saved privately');
+    const view=await S.getCommittedLibraryView();if(view.database.providers.steam.quickSyncAt!=='2026-10-16T00:00:00.000Z')throw Error('Check missing from Providers');
+    const backup=S.parseBackup(S.createBackup(await S.getDatabase()));if(backup.providers.steam.lastSync!==view.database.providers.steam.lastSync)throw Error('Backup omitted check time');
+    await S.restoreDatabase(backup);if((await S.getDatabase()).providers.steam.lastSync!==backup.providers.steam.lastSync)throw Error('Restore lost check time');
+    if(JSON.stringify(await chrome.storage.local.get(null)).includes('galacticLibraryProviderChecks'))throw Error('Private receipt leaked to public storage');
+    return true;
+  `);
+  assert(emptyCheck);console.log('PASS installed Firefox GL: empty quick checks use private receipts, preserve catalog, appear in Providers and flatten through backup/restore');
   if(process.argv.includes('--companions')){
     const fanRoot=resolve(projectRoot,'../Fanatical'),hbRoot=resolve(projectRoot,'../HB'),fan=await install(fanRoot,'FAN'),hbStage=join(temporary,'HB');await mkdir(hbStage);
     execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(hbRoot,'scripts/package-release.ps1'),'-Target','Firefox','-OutputDirectory',hbStage],{windowsHide:true,stdio:'pipe'});

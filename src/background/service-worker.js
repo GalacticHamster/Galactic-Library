@@ -440,7 +440,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? ((request.confirmed===true || request.rememberedProfile===true) && Number.isInteger(sender.tab?.id)
         ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true,request.sourceAccountFingerprint],timing)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
-      : (request.type==='GET_PROVIDER_PROFILE'||request.provider==='kobo'?storageWriter.getQueryDatabase({beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
+      : (request.type==='GET_PROVIDER_PROFILE'||request.provider==='kobo'?storageWriter.getProviderDatabase(request.provider,{beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
         const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
         const state = database.providerProfiles?.[activeId]?.state ?? {};

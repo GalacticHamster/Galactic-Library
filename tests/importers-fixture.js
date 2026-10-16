@@ -35,6 +35,22 @@ const fixtures=[
   ['fandango-at-home','fandango-at-home','GalacticFandangoAtHome','readFandangoGrid','/content/browse/mylibrary']
 ];
 try{
+  {
+    const saved={};let databaseWrites=0;
+    const area={get:async defaults=>structuredClone(Object.fromEntries(Object.entries(defaults).map(([key,value])=>[key,saved[key]??value]))),set:async updates=>{if(updates.galacticLibraryDatabase)databaseWrites++;Object.assign(saved,structuredClone(updates));},remove:async key=>{delete saved[key];}};
+    const make=()=>createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true});let w=make();
+    await w.mergeProviderItems('steam',[{providerItemId:'empty-check-fixture',title:'Disposable game',mediaType:'game',ownership:'owned'}],{profileLabel:'Fixture',fullSyncAt:'2026-01-01'});
+    const original=JSON.stringify(saved.galacticLibraryDatabase),writes=databaseWrites;
+    for(let repeat=0;repeat<2;repeat++){
+      const scan=await w.beginProviderScan('steam','Fixture','incremental',false,1);
+      await w.commitProviderScan('steam',[],{syncMode:'incremental',quickSyncAt:'2026-10-16'},null,scan.scanToken,1);
+      assert(databaseWrites===writes&&JSON.stringify(saved.galacticLibraryDatabase)===original,'Empty check rewrote the library');
+      assert((await w.getCommittedLibraryView()).database.providers.steam.quickSyncAt==='2026-10-16T00:00:00.000Z','Successful check missing from Providers view');
+      w=make();
+    }
+    assert((await w.getDatabase()).providers.steam.syncHealth.status==='succeeded','Check receipt did not survive worker recreation');
+    checks.push('Empty Steam quick checks persist success across worker recreation without any database write or changed item observations');
+  }
   await import('../src/providers/kindle-ownership.js');await import('../src/providers/kindle.js');
   for(const originType of ['Purchase','Comixology'])for(const [itemStatus,ownership]of [['Return complete','returned'],['Revoked','revoked'],['Expired','expired']]){
     const item=globalThis.GalacticKindle.kindleItemFromOwnershipItem({asin:'B012345678',title:'Kindle access fixture',originType,itemStatus});assert(item.ownership===ownership&&item.metadata.itemStatus===itemStatus&&item.metadata.ownershipBasis,'Kindle negative access status lost');

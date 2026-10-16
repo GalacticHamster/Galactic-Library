@@ -68,6 +68,7 @@
   "src/lib/provider-profiles.js",
   "src/lib/provider-snapshot.js",
   "src/lib/provider-state.js",
+  "src/lib/provider-scan-checks.js",
   "src/lib/purchase-origins.js",
   "src/lib/query-diagnostics.js",
   "src/lib/reading.js",

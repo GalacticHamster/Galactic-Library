@@ -7,6 +7,7 @@
   const categories = new Set(['pending','statement-found','no-statement','unavailable','temporary-failure','captcha','sign-in','paused','save-failure','prepared','reparsed','failed','checkpointed']);
   for(const stage of ['snapshot_hit','snapshot_wait','snapshot_read','snapshot_validation','snapshot_canonical','snapshot_compare','snapshot_freeze','snapshot_clone','snapshot_retry','snapshot_migration','matching_index_build','matching_index_wait','matching_index_hit','matching_canonical','options_snapshot','client_round_trip','response_transport'])stages.add(stage);
   for(const stage of ['read_committed_compare','read_committed_clone','storage_set_dispatch','storage_set_wait','storage_change_compare'])stages.add(stage);
+  for(const stage of ['provider_check_digest','provider_check_write'])stages.add(stage);
   stages.add('matching_yield_wait');
   stages.add('validation_yield_wait');
   for(const stage of ['options_contents','options_feedback_paint','options_projection','options_filter_controls'])stages.add(stage);

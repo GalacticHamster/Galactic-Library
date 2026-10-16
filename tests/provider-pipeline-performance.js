@@ -8,6 +8,8 @@ import {ownershipCorrectionTarget} from '../src/ui/quick-access.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {withWorker,snapshotFixture} from './storage.js';
+import {PROVIDER_CHECKS_KEY,providerCheckDigest,applyProviderChecks} from '../src/lib/provider-scan-checks.js';
+import {handleExternalApiRequestAsync} from '../src/lib/external-api.js';
 
 function steamFixture(responses){
   let queries=0;
@@ -16,15 +18,126 @@ function steamFixture(responses){
   return {S:c.GalacticSteamStore,queries:()=>queries};
 }
 export const providerPipelinePerformanceTests=[
- ['provider pipeline: repeated no-change quick scans read twice, save once and retain data',async()=>{
+ ['empty checks: an observed base change during receipt acquisition rejects the stale commit',async()=>{
+   let armed=false,h;const db=syntheticProviderLibrary(40),item=Object.values(db.providerItems).find(item=>item.provider==='steam');
+   h=performanceWriter(db,{beforeGet:defaults=>{if(armed&&Object.hasOwn(defaults,PROVIDER_CHECKS_KEY)){armed=false;h.stored.galacticLibraryDatabase.providerItems[item.id].ownership='revoked';h.writer.invalidateQuerySnapshot();}}});
+   const scan=await h.writer.beginProviderScan('steam','Personal','incremental',false,1);armed=true;
+   await assert.rejects(h.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1),/library changed/);
+   assert.equal(h.stored.galacticLibraryDatabase.providerItems[item.id].ownership,'revoked');assert(!h.stored[PROVIDER_CHECKS_KEY]);assert.equal(h.counts.databaseWrites,0);
+ }],
+ ['empty checks: durable receipt survives restart and backup/restore without rewriting item observations',async()=>{
+   const db=syntheticProviderLibrary(80),h=performanceWriter(db),original=structuredClone(db);
+   await measuredScan(h);assert.deepEqual(h.stored.galacticLibraryDatabase,original);assert(h.stored[PROVIDER_CHECKS_KEY]);
+   const beforeQuery=await h.writer.getQueryDatabase();
+   await measuredScan(h);assert.equal(await h.writer.getQueryDatabase(),beforeQuery,'Identity projection base is unchanged');
+   const restart=performanceWriter(null,{stored:h.stored}),view=(await restart.writer.getCommittedLibraryView()).database;
+   assert.equal(view.providers.steam.quickSyncAt,'2026-10-16T00:00:00.000Z');assert.equal(view.providers.steam.syncHealth.status,'succeeded');
+   assert.deepEqual(view.providerItems,original.providerItems);
+   assert.deepEqual(await handleExternalApiRequestAsync(view,{type:'GET_STATUS'}),await handleExternalApiRequestAsync(beforeQuery,{type:'GET_STATUS'}));
+   const backup=parseBackup(createBackup(await restart.writer.getDatabase()));
+   assert.equal(backup.providers.steam.lastSync,view.providers.steam.lastSync);
+   await restart.writer.restoreDatabase(backup);assert.equal(h.stored[PROVIDER_CHECKS_KEY],undefined);
+   assert.equal((await restart.writer.getDatabase()).providers.steam.lastSync,view.providers.steam.lastSync);
+   await restart.writer.restoreDatabase(original);assert.deepEqual((await restart.writer.getDatabase()).providerItems,original.providerItems);
+   assert.equal((await restart.writer.getDatabase()).providers.steam.quickSyncAt,undefined);
+ }],
+ ['empty checks: receipt failure preserves baseline; committed receipt consumes lease despite failed cleanup/restart',async()=>{
+   for(const failAfter of [false,true]){
+     let armed=false;
+     const db=syntheticProviderLibrary(40),h=performanceWriter(db,{
+       beforeSet:updates=>{if(armed&&(!failAfter&&updates[PROVIDER_CHECKS_KEY]||failAfter&&!updates[PROVIDER_CHECKS_KEY]&&updates.galacticLibraryProviderScans))throw Error('Interrupted storage');}
+     });
+     const scan=await h.writer.beginProviderScan('steam','Personal','incremental',false,1);armed=true;
+     const commit=()=>h.writer.commitProviderScan('steam',[],{syncMode:'incremental',quickSyncAt:'2026-10-16'},null,scan.scanToken,1);
+     if(!failAfter){await assert.rejects(commit(),/Interrupted/);assert(!h.stored[PROVIDER_CHECKS_KEY]);}
+     else {await commit();assert(h.stored.galacticLibraryProviderScans.steam);}
+     const restart=performanceWriter(null,{stored:h.stored});
+     assert.deepEqual(h.stored.galacticLibraryDatabase,db);
+     if(failAfter){
+       const view=(await restart.writer.getCommittedLibraryView()).database;
+       assert.equal(view.providers.steam.syncHealth.status,'succeeded');
+       await assert.rejects(restart.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1),/already completed/);
+       await assert.rejects(restart.writer.cancelProviderScan('steam',h.stored.galacticLibraryProviderScans.steam.attemptRef),/already finished/);
+       assert.equal(await restart.writer.failProviderScan('steam',scan.scanToken,1),false);
+     }else await restart.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1);
+   }
+ }],
+ ['empty checks: write-then-error acknowledgement recovery never replays a durable completion',async()=>{
+   let armed=false;const h=performanceWriter(syntheticProviderLibrary(40),{afterSet:updates=>{if(armed&&updates[PROVIDER_CHECKS_KEY])throw Error('Lost acknowledgement');}});
+   const scan=await h.writer.beginProviderScan('steam','Personal','incremental',false,1);armed=true;
+   await assert.rejects(h.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1),/acknowledgement/);
+   const restart=performanceWriter(null,{stored:h.stored});assert.equal((await restart.writer.getCommittedLibraryView()).database.providers.steam.syncHealth.status,'succeeded');
+   await assert.rejects(restart.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1),/already completed/);
+ }],
+ ['empty checks: stale/malformed overlays cannot claim freshness or modify ownership or counts',async()=>{
+   const db=syntheticProviderLibrary(40),h=performanceWriter(db);await measuredScan(h);
+   const receipt=structuredClone(h.stored[PROVIDER_CHECKS_KEY]),digest=await providerCheckDigest(db);
+   const invalid=[{...receipt,baseDigest:'0'.repeat(64)}, {...receipt,format:2}, {...receipt,checks:{...receipt.checks,kindle:receipt.checks.steam}},
+     {...receipt,checks:{steam:{...receipt.checks.steam,profileId:db.providers.epic.activeProfileId}}},
+     {...receipt,checks:{steam:{...receipt.checks.steam,patch:{...receipt.checks.steam.patch,itemCount:123}}}}];
+   for(const overlay of invalid)assert.deepEqual(applyProviderChecks(db,overlay,digest),db);
+   const item=Object.values(h.stored.galacticLibraryDatabase.providerItems)[0];item.ownership='returned';
+   const restart=performanceWriter(null,{stored:h.stored}),view=(await restart.writer.getCommittedLibraryView()).database;
+   assert.equal(view.providers.steam.quickSyncAt,undefined);assert.equal(view.providerItems[item.id].ownership,'returned');
+ }],
+ ['empty checks: concurrent providers retain both receipts; a real edit folds check metadata into the atomic database save',async()=>{
+   const h=performanceWriter(syntheticProviderLibrary(80));
+   await Promise.all([measuredScan(h),measuredScan(h,{provider:'epic'})]);
+   const view=(await h.writer.getCommittedLibraryView()).database;
+   for(const provider of ['steam','epic'])assert.equal(view.providers[provider].quickSyncAt,'2026-10-16T00:00:00.000Z');
+   await h.writer.saveOwnershipPolicy({providers:{kobo:true}});
+   for(const provider of ['steam','epic'])assert.equal(h.stored.galacticLibraryDatabase.providers[provider].lastSync,view.providers[provider].lastSync);
+   assert.equal((await h.writer.getCommittedLibraryView()).database.ownershipPolicy.providers.kobo,true);
+ }],
+ ['empty checks: first imports, account switching, incomplete scans and records with refreshed evidence take the validated save path',async()=>{
+   const db=syntheticProviderLibrary(40),profile=db.providers.steam.activeProfileId;
+   const item=Object.values(db.providerItems).find(item=>item.profileId===profile);
+   for(const change of [{},{title:'Changed title'},{ownership:'returned'},{ownership:'revoked'},{ownership:'expired'},{ownership:'subscription'},{ownership:'borrowed'},{ownership:'unknown'},{metadata:{...item.metadata,parentProviderItemId:'900'}}]){
+     const h=performanceWriter(db),result=await measuredScan(h,{items:[{...item,...change}]});
+     assert.equal(result.counts.databaseWrites,1);assert(result.phases.persist_validation>0);assert.equal(h.stored[PROVIDER_CHECKS_KEY],undefined);
+     assert.equal(h.stored.galacticLibraryDatabase.providerItems[item.id].ownership,change.ownership??item.ownership);
+   }
+   for(const diagnostics of [{failedRequestCount:1},{coverageLimit:'array-only-index-without-total'}]){
+     const h=performanceWriter(db),scan=await h.writer.beginProviderScan('steam','Personal','incremental',false,1);
+     await h.writer.commitProviderScan('steam',[],{syncMode:'incremental',scanDiagnostics:diagnostics},null,scan.scanToken,1);
+     assert.equal(h.counts.databaseWrites,1);assert(!h.stored[PROVIDER_CHECKS_KEY]);
+     assert.deepEqual(h.stored.galacticLibraryDatabase.providerItems,db.providerItems);
+   }
+   const h=performanceWriter(db),scan=await h.writer.beginProviderScan('steam','Other','incremental',true,1);
+   await h.writer.commitProviderScan('steam',[],{syncMode:'incremental'},null,scan.scanToken,1);
+   assert.equal(h.counts.databaseWrites,2);assert(!h.stored[PROVIDER_CHECKS_KEY]);assert.equal((await h.writer.getDatabase()).providers.steam.activeProfileId,scan.profileId);
+   const fresh=performanceWriter(syntheticProviderLibrary(1));delete fresh.stored.galacticLibraryDatabase.providerProfiles[profile];
+   const first=await fresh.writer.beginProviderScan('steam','New','full',true,1);
+   await fresh.writer.commitProviderScan('steam',[],{syncMode:'full'},snapshotFixture('steam',[]),first.scanToken,1);
+   assert.equal(fresh.counts.databaseWrites,2);assert(!fresh.stored[PROVIDER_CHECKS_KEY]);
+ }],
+ ['empty checks: replacement failures are conservative and never resurrect stale successful checks',async()=>{
+   for(const step of ['remove','database']){
+     let armed=false;const db=syntheticProviderLibrary(40),h=performanceWriter(db,{
+       beforeRemove:()=>{if(armed&&step==='remove')throw Error('Interrupted removal');},
+       beforeSet:updates=>{if(armed&&step==='database'&&updates.galacticLibraryDatabase)throw Error('Interrupted replacement');}
+     });
+     await measuredScan(h);armed=true;await assert.rejects(h.writer.restoreDatabase(db),/Interrupted/);
+     assert.deepEqual(h.stored.galacticLibraryDatabase,db);
+     const restart=performanceWriter(null,{stored:h.stored}),view=(await restart.writer.getCommittedLibraryView()).database;
+     assert.equal(Boolean(view.providers.steam.quickSyncAt),step==='remove');
+   }
+ }],
+ ['empty checks: failed retirement after a real commit cannot resurrect old successful health',async()=>{
+   let armed=false;const h=performanceWriter(syntheticProviderLibrary(40),{beforeRemove:()=>{if(armed)throw Error('Interrupted receipt cleanup');}});
+   await measuredScan(h);armed=true;await measuredScan(h,{fail:true});
+   assert(h.stored[PROVIDER_CHECKS_KEY]);assert.equal(h.stored.galacticLibraryDatabase.providers.steam.syncHealth.status,'failed');
+   const restart=performanceWriter(null,{stored:h.stored});assert.equal((await restart.writer.getCommittedLibraryView()).database.providers.steam.syncHealth.status,'failed');
+ }],
+ ['provider pipeline: repeated empty quick scans read twice, write no database and retain data',async()=>{
    for(const size of [40,200]){
      const db=syntheticProviderLibrary(size),h=performanceWriter(db),other=Object.values(db.providerItems).filter(item=>item.provider!=='steam');
      for(let pass=0;pass<2;pass++){
        const result=await measuredScan(h);
-       assert.equal(result.counts.databaseReads,2);assert.equal(result.counts.databaseWrites,1);
+       assert.equal(result.counts.databaseReads,2);assert.equal(result.counts.databaseWrites,0);
        assert.equal(result.phases.canonical_rebuild,undefined);
        if(pass)assert.equal(result.phases.read_validation,undefined,'Fresh equal committed revision reuses validation');
-       const after=h.stored.galacticLibraryDatabase;
+       const after=(await h.writer.getCommittedLibraryView()).database;
        assert.deepEqual(other,Object.values(after.providerItems).filter(item=>item.provider!=='steam'));
        assert.equal(after.providers.steam.quickSyncAt,'2026-10-16T00:00:00.000Z');
        assert.equal(after.providers.steam.syncHealth.differences.added,0);assert.equal(after.providers.steam.syncHealth.differences.updated,0);
@@ -99,6 +212,6 @@ export const providerPipelinePerformanceTests=[
    assert(start.ok,start.error);assert(start.performance.events.some(event=>event.stage==='provider_start'));
    const finish=await dispatch({type:'COMMIT_PROVIDER_SCAN',provider:'steam',mode:'incremental',items:[],scanToken:start.scanToken,diagnosticLookupId:'lookup-aaaaaaaaaaaa-101'},sender);
    assert(finish.ok,finish.error);assert.equal(finish.changes.gamesAdded,0);assert.equal(finish.changes.gamesUpdated,0);
-   assert(!JSON.stringify(finish.performance).includes('PRIVATE'));assert(finish.performance.validationWork.executingMs>=0);
- })]
+   assert(!JSON.stringify(finish.performance).includes('PRIVATE'));assert.equal(finish.performance.validationWork,undefined);
+ },{storageEvents:true,concurrentQueries:true})]
 ];

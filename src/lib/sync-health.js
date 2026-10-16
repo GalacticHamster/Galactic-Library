@@ -43,6 +43,7 @@ export function providerScanDisplay(database,scans={}){
   for(const [provider,scan]of Object.entries(scans)){
     if(!scan?.readOnlyStart||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||scan.profileId!==scan.activeAtStartId)continue;
     const profile=database.providerProfiles[scan.profileId];if(!profile||profile.provider!==provider)continue;
+    if(profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status==='succeeded')continue;
     let health;
     try{health=validateSyncHealth({attemptRef:scan.attemptRef,status:'running',mode:scan.mode,attemptedProfileLabel:profile.nickname,startedAt:scan.startedAt,retryable:false});}catch{continue;}
     if(result===database)result={...database,providers:{...database.providers},providerProfiles:{...database.providerProfiles}};

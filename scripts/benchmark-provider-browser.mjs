@@ -12,6 +12,7 @@ const root=resolve(process.argv.find(arg=>arg.startsWith('--root='))?.slice(7)??
 const size=Number(process.argv.find(arg=>arg.startsWith('--size='))?.slice(7)??10000);
 if(!Number.isSafeInteger(size)||size<100||size>20000)throw Error('Size must be 100..20000.');
 const output=await outputPath(process.argv.find(arg=>arg.startsWith('--output='))?.slice(9),'provider-browser.json');
+const matrix=process.argv.includes('--matrix');
 const temporary=await mkdtemp(join(tmpdir(),'gl-provider-benchmark-'));let child,exited;
 try{
  const stage=join(temporary,'extension'),release=await createRelease(root);
@@ -24,7 +25,36 @@ try{
  const db=syntheticProviderLibrary(size);
  await evaluate(`const S=await import('./src/lib/storage.js');await S.restoreDatabase(${JSON.stringify(db)});return true;`);
  console.log('Seeded disposable Chrome library:',size);
- const rows=await evaluate(`
+ let rows;
+ if(matrix){
+  rows=[];
+  const scenarios=['quick-warm','quick-repeated','quick-repeated-2','quick-restart-no-proof','incremental-change','full-unchanged','full-change','incomplete','failed'];
+  for(const workflow of scenarios){
+   if(workflow==='quick-restart-no-proof'){
+    await driver.send('ServiceWorker.enable',{},sessionId);await driver.send('ServiceWorker.stopAllWorkers',{},sessionId);
+    await evaluate(`await chrome.storage.session.remove('galacticLibraryValidationCertificate');return true;`);
+   }
+   const row=await evaluate(`
+    const S=await import('./src/lib/storage.js'),P=await import('./src/lib/provider-snapshot.js'),client=S.createStorageClient(message=>chrome.runtime.sendMessage(message));
+    const workflow=${JSON.stringify(workflow)},full=workflow.startsWith('full-'),mode=full?'full':'incremental';
+    const all=${JSON.stringify(Object.values(db.providerItems).filter(item=>item.profileId===db.providers.steam.activeProfileId))};
+    const extra={providerItemId:'synthetic-new',title:'Synthetic Added Game',mediaType:'game',ownership:'owned'};
+    const items=workflow==='incremental-change'?[extra]:workflow==='full-unchanged'?[...all,extra]:workflow==='full-change'?[...all.slice(0,-1).map((item,index)=>index?item:{...item,ownership:'revoked'}),extra]:[];
+    const journal=async operation=>{const report=await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}),events=report.activity.events;
+     const event=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
+     const spans=events.filter(e=>e.startEpochMs>=event.startEpochMs&&e.startEpochMs<event.startEpochMs+event.durationMs);
+     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+(full&&operation==='beginProviderScan'?1:0)};};
+    const at=performance.now(),scan=await client.beginProviderScan('steam','Personal',mode,false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
+    const finishStart=performance.now();let result;
+    if(workflow==='failed')await client.failProviderScan('steam',scan.scanToken,1,{code:'network'});
+    else result=await client.commitProviderScan('steam',items,{syncMode:mode,...(full?{fullSyncAt:'2026-10-16'}:{quickSyncAt:'2026-10-16'}),...(workflow==='incomplete'?{scanDiagnostics:{failedRequestCount:1}}:{})},full?P.completeProviderSnapshot('steam',items,[P.completedScope('library',items.length,items.length,'reported-count')]):null,scan.scanToken,1);
+    const finished=performance.now(),post=await journal(workflow==='failed'?'failProviderScan':'commitProviderScan');
+    const bytes=value=>new TextEncoder().encode(JSON.stringify(value)).length;
+    return {workflow,preMessageMs:prepared-at,postMessageMs:finished-finishStart,workerPre:pre,workerPost:post,databaseBytes:pre.databaseWrites*bytes(scan.database)+post.databaseWrites*bytes(result??scan.database)};
+   `);
+   rows.push(row);console.log(JSON.stringify(row));
+  }
+ }else rows=await evaluate(`
  const S=await import('./src/lib/storage.js'),client=S.createStorageClient(message=>chrome.runtime.sendMessage(message)),rows=[];
  const journal=async operation=>{const report=await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}),events=report.activity.events;
   const row=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
@@ -37,8 +67,8 @@ try{
  }
  return rows;
  `);
- await writeFile(output,JSON.stringify({format:1,size,sourceRoot:root,environment:'Packaged Chrome, disposable profile, actual worker and chrome.storage.local; storage-client calls return the database, unlike compact provider replies. Scan/network zero. First request after seeding is not a cold worker restart.',rows},null,2));
- for(const row of rows)console.log(JSON.stringify(row));
+ await writeFile(output,JSON.stringify({format:1,size,sourceRoot:root,environment:'Packaged Chrome, disposable profile, actual worker and chrome.storage.local; storage-client calls return the database, unlike compact provider replies. Scan/network zero. First request after seeding is not cold. Matrix restart stops only this disposable worker and removes its session validation proof. Database bytes estimate returned DB serialization at each write, outside timed work; metadata bytes not measured natively.',rows},null,2));
+ if(!matrix)for(const row of rows)console.log(JSON.stringify(row));
  console.log('Wrote',output);
 }finally{
  if(child&&child.exitCode===null){child.kill();await Promise.race([exited,new Promise(done=>setTimeout(done,3000))]);}
