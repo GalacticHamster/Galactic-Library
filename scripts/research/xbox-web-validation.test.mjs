@@ -31,7 +31,7 @@ test('Xbox website Owned cache joins 37 identities/titles/access entries without
 });
 test('Xbox cache missing, pending, fetching, mismatched-account and unsupported data remain explicit',()=>{
   assert.equal(C.read({location:{origin:'https://play.xbox.com'}}).state,'unavailable');
-  for(const name of ['owned','assembled','access']){const f=fixture();f.get(name).value=undefined;assert.equal(C.read(f.window).state,'waiting');}
+  for(const name of ['owned','assembled','access']){const f=fixture();f.get(name).value=undefined;if(name==='owned')f.get('catalogs').value=undefined;assert.equal(C.read(f.window).state,'waiting');}
   const f=fixture();f.get('owned').fetchStatus='fetching';assert.equal(C.read(f.window).state,'incomplete');f.get('owned').fetchStatus='idle';f.get('activeUser').value='private-other';assert.equal(C.read(f.window).state,'waiting');assert.equal(C.read(f.window).accountIdentityPresent,false);
   const g=fixture();g.get('owned').value.push({productId:'private-invalid'});assert.equal(C.read(g.window).unsupportedIdentities,1);assert.equal(C.read(g.window).state,'incomplete');
 });
@@ -72,9 +72,9 @@ test('Xbox reads actual-account backing queries even when active aliases exist o
 });
 
 test('Xbox catalog overview never substitutes preview entries for an uncached Owned list',()=>{
-  const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));
-  const r=C.read(f.window);assert.equal(r.state,'waiting');assert.equal(r.waitReason,'owned-view-not-cached');assert.equal(r.accountScopesMatch,true);
-  assert.equal(r.queries.owned.state,'absent');assert.equal(r.assembledRows,37);assert.equal(r.accessProducts,37);assert.equal(r.ownedCatalogTotal,37);assert.equal(r.ownedCatalogPreviewRows,4);assert.equal(r.ownedRows,undefined);assert.equal(r.distinctProducts,undefined);
+  const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));f.get('assembled').value=f.rows.slice(0,4);
+  const r=C.read(f.window);assert.equal(r.state,'incomplete');assert.equal(r.waitReason,'owned-selection-disagrees');assert.equal(r.accountScopesMatch,true);
+  assert.equal(r.queries.owned.state,'absent');assert.equal(r.assembledRows,4);assert.equal(r.accessProducts,37);assert.equal(r.ownedCatalogTotal,37);assert.equal(r.ownedCatalogPreviewRows,4);assert.equal(r.ownedRows,undefined);assert.equal(r.distinctProducts,undefined);
   f.data.delete(JSON.stringify(['user',f.actor,'catalogs']));assert.equal(C.read(f.window).ownedCatalogTotal,undefined);
   const g=fixture();g.data.delete(JSON.stringify(['user',g.actor,'catalogs']));assert.equal(C.read(g.window).state,'ready');
 });
@@ -89,4 +89,45 @@ test('Xbox rejects a wrong-account backing key or active alias and detects switc
   f.env.queryClient.getQueryData=key=>key[0]==='activeUser'&&++reads===2?'private-other':read(key);
   const r=C.read(f.window);assert.equal(r.state,'incomplete');assert.equal(r.accountStable,false);assert.equal(r.waitReason,'account-changed');
   for(const value of [undefined,'','active']){const g=fixture();g.get('activeUser').value=value;const r=C.read(g.window);assert.equal(r.state,'waiting');assert.equal(r.waitReason,'active-account-unavailable');assert.equal(r.accountStable,false);}
+});
+
+
+test('Xbox reconstructs the actual 40 assembled / 264 access / 37 Owned / 14 preview shape using personal ownership only',()=>{
+  const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));
+  const extra=[
+    {productId:'Y00000000001',providerId:'grts-catalog-provider',basicProductInfo:{title:'Bundle container',bundleChildren:['X00000000000']}},
+    {productId:'Y00000000002',providerId:'grts-catalog-provider',basicProductInfo:{title:'Subscription'}},
+    {productId:'Y00000000003',providerId:'steam',basicProductInfo:{title:'Other provider'}}
+  ];
+  f.rows.push(...extra);const access=f.get('access').value;
+  for(const [i,row]of extra.entries())access.set(row.productId,{userAccessTypes:new Set(i===1?[2]:[1])});
+  for(let i=0;access.size<264;i++)access.set('Z'+String(i).padStart(11,'0'),{userAccessTypes:new Set([1])});
+  f.get('catalogs').value[0].previewEntries=f.rows.slice(0,14);
+  const r=C.read(f.window);assert.equal(r.state,'ready');assert.equal(r.selectionSource,'reconciled-owned-catalog');assert.equal(r.selectionReconciled,true);assert.equal(r.reconstructedOwnedRows,37);assert.equal(r.assembledRows,40);assert.equal(r.accessProducts,264);assert.equal(r.ownedRows,37);assert.equal(r.joinedTitles,37);assert.equal(r.flags.personalOwnedFlag,37);assert.equal(r.ownedCatalogPreviewRows,14);assert.equal(r.requestsMade,0);assert.equal(r.queries.owned.state,'absent');assert.equal(r.libraryComplete,false);assert.equal(r.ownershipVerified,false);
+});
+
+test('Xbox reconstruction rejects differing totals and same-count wrong preview identities, duplicates and empty previews',()=>{
+  for(const mode of ['total','preview','duplicate-preview','empty-preview','duplicate-row']){
+    const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));const catalog=f.get('catalogs').value[0];
+    if(mode==='total')catalog.totalCount=36;
+    if(mode==='preview')catalog.previewEntries[0]={productId:'Y00000000000'};
+    if(mode==='duplicate-preview')catalog.previewEntries.push(catalog.previewEntries[0]);
+    if(mode==='empty-preview')catalog.previewEntries=[];
+    if(mode==='duplicate-row'){f.rows[1]=f.rows[0];catalog.totalCount=37;}
+    const r=C.read(f.window);assert.equal(r.state,'incomplete',mode);assert.equal(r.selectionReconciled,false);assert.equal(r.selectionSource,null);assert.equal(r.ownedRows,undefined);assert.equal(r.reconstructedOwnedRows,37);
+    assert.equal(r.waitReason,['total','duplicate-row'].includes(mode)?'owned-selection-disagrees':'owned-preview-disagrees');
+  }
+});
+
+test('Xbox cannot reconstruct purchases from aggregate ownership, subscriptions, disc, trial, history or unsettled queries',()=>{
+  for(const flags of [[2],[64],[8192],[16384],[999999],[]]){
+    const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));f.get('access').value.set(f.rows[0].productId,{userAccessTypes:new Set(flags),aggregateAccessTypes:new Set([1])});f.rows[0].isInstalled=true;f.rows[0].lastPlayedDate=new Date();
+    const r=C.read(f.window);assert.equal(r.state,'incomplete');assert.equal(r.reconstructedOwnedRows,36);assert.equal(r.selectionReconciled,false);
+  }
+  for(const name of ['activeUser','profile','assembled','access','catalogs']){
+    const f=fixture();f.data.delete(JSON.stringify(['user',f.actor,'owned']));f.get(name).fetchStatus='fetching';
+    const r=C.read(f.window);assert.notEqual(r.state,'ready',name);assert.equal(r.selectionReconciled,false);assert.equal(r.reconstructedOwnedRows,undefined);
+  }
+  const empty=fixture();empty.data.delete(JSON.stringify(['user',empty.actor,'owned']));empty.get('assembled').value=[];empty.get('catalogs').value=[{id:'owned',totalCount:0,previewEntries:[]}];
+  const r=C.read(empty.window);assert.equal(r.state,'ready');assert.equal(r.ownedRows,0);assert.equal(r.selectionReconciled,true);
 });

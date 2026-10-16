@@ -18,9 +18,14 @@ window.fixtureRequests=0;window.fetch=()=>{window.fixtureRequests++;throw Error(
 const data=new Map(),queries={},actor='synthetic-local';
 function add(name,value,scoped=true){const key=scoped?['user',actor,name]:[name];data.set(JSON.stringify(key),{status:'success',fetchStatus:'idle',value});const q={getOptions:()=>({queryKey:key})};queries[name]=scoped?{getUserQuery:localId=>({getOptions:()=>({queryKey:['user',localId,name]})}),getActiveUserQuery:()=>({getOptions:()=>({queryKey:['user','active',name]})})}:q;}
 const rows=Array.from({length:37},(_,i)=>({productId:'X'+String(i).padStart(11,'0'),providerId:'grts-catalog-provider',basicProductInfo:{title:'Synthetic private title '+i}}));
-add('activeUser',actor,false);add('profile',{xuid:'1234567890123456'});add('owned',rows.map(({productId})=>({productId})));add('assembled',rows);add('catalogs',[{id:'owned',totalCount:37,previewEntries:rows.slice(0,4)}]);add('access',new Map(rows.map(r=>[r.productId,{userAccessTypes:new Set([1])}])));
+add('activeUser',actor,false);add('profile',{xuid:'1234567890123456'});add('owned',rows.map(({productId})=>({productId})));add('assembled',rows);add('catalogs',[{id:'owned',totalCount:37,previewEntries:rows.slice(0,14)}]);add('access',new Map(rows.map(r=>[r.productId,{userAccessTypes:new Set([1])}])));
 window.__SW_MANAGER__={env:{queryClient:{getQueryState:key=>data.get(JSON.stringify(key)),getQueryData:key=>data.get(JSON.stringify(key))?.value},systems:{authentication:{queries:{activeUserId:queries.activeUser,userInfo:queries.profile}},library:{queries:{resolveCatalogItems:queries.owned,assembledItems:queries.assembled,resolveCatalogs:queries.catalogs}},contentAccess:{queries:{allProductAccess:queries.access}}}}};
-window.fixtureClear=()=>{data.get(JSON.stringify(['user',actor,'owned'])).value=undefined;};
+// Match the live website shape: overview only, 40 assembled, 264 access, 37 Owned.
+const access=data.get(JSON.stringify(['user',actor,'access'])).value;
+for(let i=0;i<3;i++){const id='Y'+String(i).padStart(11,'0');rows.push({productId:id,providerId:i===2?'steam':'grts-catalog-provider',basicProductInfo:{title:'Synthetic excluded '+i,...(i===0?{bundleChildren:['X00000000000']}:{})}});access.set(id,{userAccessTypes:new Set(i===1?[2]:[1])});}
+for(let i=0;access.size<264;i++)access.set('Z'+String(i).padStart(11,'0'),{userAccessTypes:new Set([1])});
+data.delete(JSON.stringify(['user',actor,'owned']));
+window.fixtureClear=()=>{data.delete(JSON.stringify(['user',actor,'catalogs']));};
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-xbox-helper-'));let child,driver,session,exited;
 try{
@@ -50,12 +55,12 @@ try{
     report=await evaluate('const s=document.querySelector("#gl-xbox-web-validation")?.shadowRoot;return s?.querySelector("textarea").value?JSON.parse(s.querySelector("textarea").value):null;');
     if(report)break;await pause(100);
   }
-  assert.equal(report.state,'ready');assert.equal(report.ownedRows,37);assert.equal(report.joinedTitles,37);assert.equal(report.joinedAccess,37);assert.equal(report.flags.personalOwnedFlag,37);assert.equal(report.accountScopesMatch,true);assert.equal(report.requestsMade,0);assert.equal(report.helperVersion,'0.1.1');assert.equal(report.queries.owned.keyScope,'account');assert.equal(report.ownedCatalogTotal,37);assert.equal(report.ownedCatalogPreviewRows,4);
+  assert.equal(report.state,'ready');assert.equal(report.ownedRows,37);assert.equal(report.joinedTitles,37);assert.equal(report.joinedAccess,37);assert.equal(report.flags.personalOwnedFlag,37);assert.equal(report.accountScopesMatch,true);assert.equal(report.requestsMade,0);assert.equal(report.helperVersion,'0.1.2');assert.equal(report.queries.owned.keyScope,'account');assert.equal(report.ownedCatalogTotal,37);assert.equal(report.ownedCatalogPreviewRows,14);assert.equal(report.assembledRows,40);assert.equal(report.accessProducts,264);assert.equal(report.selectionSource,'reconciled-owned-catalog');assert.equal(report.selectionReconciled,true);assert.equal(report.queries.owned.state,'absent');
   for(const secret of ['synthetic-local','Synthetic private title','1234567890123456','X00000000000'])assert(!JSON.stringify(report).includes(secret));
   await evaluate('window.fixtureClear();document.querySelector("#gl-xbox-web-validation").shadowRoot.querySelector("[data-action=report]").click();return true;');await pause(100);
   const waiting=await evaluate('const s=document.querySelector("#gl-xbox-web-validation").shadowRoot;return {report:JSON.parse(s.querySelector("textarea").value),text:s.querySelector("[role=status]").textContent,calls:window.fixtureRequests};');
-  assert.equal(waiting.report.state,'waiting');assert.equal(waiting.report.waitReason,'owned-view-not-cached');assert.equal(waiting.report.accountScopesMatch,true);assert.equal(waiting.report.assembledRows,37);assert.equal(waiting.report.accessProducts,37);assert.equal(waiting.report.ownedCatalogTotal,37);assert.equal(waiting.report.ownedRows,undefined);assert.match(waiting.text,/not cached/);assert.match(waiting.text,/Xbox reports 37 games/);assert.equal(waiting.calls,0);
-  console.log('PASS '+(firefox?'Firefox':'Chrome')+' installed Xbox read-only helper: existing website cache, 37 joined entries, redacted MAIN/isolated report, no network, missing-cache feedback.');
+  assert.equal(waiting.report.state,'waiting');assert.equal(waiting.report.waitReason,'owned-view-not-cached');assert.equal(waiting.report.accountScopesMatch,true);assert.equal(waiting.report.assembledRows,40);assert.equal(waiting.report.accessProducts,264);assert.equal(waiting.report.ownedCatalogTotal,undefined);assert.equal(waiting.report.ownedRows,undefined);assert.match(waiting.text,/not cached/);assert.equal(waiting.calls,0);
+  console.log('PASS '+(firefox?'Firefox':'Chrome')+' installed Xbox read-only helper: existing website cache, 40 assembled / 264 access / 37 Owned / 14 previews, redacted MAIN/isolated report, no network, missing-cache feedback.');
 }finally{
   if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}
   child?.kill();driver?.close?.();if(exited)await exited;
