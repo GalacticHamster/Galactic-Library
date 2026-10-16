@@ -1,4 +1,4 @@
-# Kindle contents performance instrumentation ? 2026-10-04
+# Kindle contents performance instrumentation — 2026-10-04
 
 > Historical engineering record. Versions, counts and implementation status describe that investigation, not the current release. Generated run ledgers are local under `audit-artifacts/`; see the [artifact policy](../development/artifacts-and-audits.md).
 
@@ -192,7 +192,7 @@ For a small comparison, collect roughly 10?20 completed lookups with the Kindle 
 
 Compare `fetch_headers`, `response_body`, `throttle`, `writer_queue`, residuals and the total. If a one-second throttle becomes several seconds while hidden, that is observed timer/scheduling expansion, not a newly added throttle. No browser power-management workaround was implemented.
 
-## Ranked next optimization opportunities ? not implemented
+## Ranked next optimization opportunities — not implemented
 
 1. **Reduce repeated whole-database validation/canonical reconstruction for a contents checkpoint**, while preserving current guards, atomicity, identity semantics and shared writer ordering. This is the strongest measured local opportunity.
 2. **Reduce unconditional whole-database serialization/comparison and checkpoint clone/write cost.** Decide on a safe persistence strategy only after native `storage_write` measurements. No batching or cache was added.

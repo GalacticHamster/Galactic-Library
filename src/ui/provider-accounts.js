@@ -13,7 +13,7 @@ export const PROVIDER_SITES=[
  ['fanatical','Fanatical','https://www.fanatical.com/en/orders'],
  ['humble','Humble Bundle','https://www.humblebundle.com/home/purchases'],
  ['xbox','Xbox — Web Library','https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned'],
- ['playstation','PlayStation ? PS4/PS5 Purchased Library','https://library.playstation.com/recently-purchased'],
+ ['playstation','PlayStation — PS4/PS5 Purchased Library','https://library.playstation.com/recently-purchased'],
  ['nintendo','Nintendo — Switch Virtual Game Cards','https://accounts.nintendo.com/portal/vgcs']
 ].map(([provider,name,url])=>({provider,name,url}));
 
