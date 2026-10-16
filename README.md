@@ -53,7 +53,7 @@ portal and keeps earlier cards absent from the current non-hidden view. It does
 not request or store Nintendo credentials. PlayStation supports the active PS4/PS5
 Purchased web library using the existing signed-in session. Its full and quick
 checks retain earlier saved records; older consoles and lifetime history are not
-included. The production importer awaits live user acceptance. Epic and
+included. Its initial production import has been live-validated. Epic and
 Nintendo support complete imports only. Other quick updates check each provider's incremental
 scope; they do not establish that missing records were removed. A successful
 Full rescan reconciles the selected account and retains earlier missing records

@@ -91,8 +91,8 @@ Only the active PS4/PS5 web Purchased listing is supported, not PS3/PSP/Vita,
 hidden/inactive entries, complete lifetime orders or a complete DLC inventory.
 Filtered/changed pages, unreadable rows and incomplete pagination reject the
 import without replacing saved records. An empty listing without a reported
-zero total cannot currently certify an import. The production importer is
-awaiting live user acceptance; disposable Chrome/Firefox tests pass. Remove
+zero total cannot currently certify an import. The initial production import
+has been live-validated; disposable Chrome/Firefox reimport tests pass. Remove
 the separate research helper to avoid overlapping diagnostic panels. Firefox
 may require granting GL access to the PlayStation Library site.
 

@@ -10,9 +10,9 @@ Older findings below retain their original research context.
 
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
-| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Independent purchase GET succeeds. Helper 0.1.10 account recheck succeeds with the website's two Apollo client headers | **Awaiting live production validation.** Account lookup is repaired; account-bound additive importer and Full rescan / Quick update pass disposable packaged Chrome/Firefox tests. No live production import has been exercised by the agent. |
+| PlayStation — PS4/PS5 web library | Independent purchase GET and account recheck succeed. User confirms production Full rescan: **60 titles / 59 products / 60 new / 0 access changes**, complete supported listing | **Working:** live initial import confirmed by the user. Full/quick/additive and isolation checks also pass disposable packaged Chrome/Firefox tests. Live quick-update acceptance is not yet reported. |
 | Nintendo — Switch Virtual Game Cards | 115 rows / card IDs / software IDs, terminal page. In 0.1.7 the signed-in obfuscatedId matches ownerNaId and userNaId on all 115 rows; no account change | **Working:** user confirms production import of 115 cards. Account-scoped website observation feeds existing validated additive atomic saves; no independent API request or copied credential. Agent testing remains synthetic/disposable. |
-| Xbox — Web Library | User reports approximately 37 web-visible games; approximately 245 in the mobile app is a separate scope | Current web-library source/join and access semantics still require validation. Full console history, Collections v7 and mobile/device authorization are deferred. No production Xbox importer yet. |
+| Xbox — Web Library | User reports approximately 37 web-visible games; approximately 245 in the mobile app is a separate scope | **Awaiting live source validation:** a [read-only website-cache helper](XBOX_WEB_LIBRARY_VALIDATION.md) is available; no production Xbox importer yet. Full console history, Collections v7 and mobile/device authorization remain deferred. |
 
 Nintendo's source/account observation gate is now satisfied. The implementation
 uses the website-owned request and requires complete pagination; it does not
@@ -473,10 +473,12 @@ are not expanded into invented component products. This is not a complete DLC,
 hidden/inactive, PS3/PSP/Vita or lifetime-order importer. Empty results without a
 reported zero total do not currently certify an import.
 
-Live acceptance remains user-side: compare the committed completion summary
-with the current Purchased list; inspect PS4/PS5 titles, then repeat with
-**Quick update** and verify no extra records. The historical 60 rows / 59 product
-IDs are source evidence, **not a claimed current production import count**.
+The user confirmed a successful real Full rescan: **Saved 60 checked titles ·
+59 products · 60 new · 0 access changes**, complete supported listing. This
+establishes live initial-import acceptance. Inspecting known PS4/PS5 titles and
+an unchanged **Quick update** remain useful follow-up checks; only disposable
+tests have exercised repeat/quick imports so far. The agent has not modified
+the live library.
 Dedicated [source/writer tests](../../../tests/playstation-import.js) and
 [installed package tests](../../../tests/playstation-native.mjs) use synthetic
 60-row / 59-product data, three pages, 58 owned / one subscription / one unknown,
