@@ -16,25 +16,38 @@
   const status = shadow.querySelector('.status');
 
   button.addEventListener('click', async () => {
+    const timing=globalThis.GalacticSync.trace?.('epic'),P=globalThis.GalacticContentsPerformance;let completed=false,uiEnd,fetchEnd,finishEnd;
+    const startEnd=timing?.begin('request_dispatch');
     button.disabled = true;
     status.dataset.busy = 'true';
     try {
-      const scan = await globalThis.GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'epic'});
+      const scan = await globalThis.GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'epic',diagnosticLookupId:timing?.id});
+      startEnd?.();P?.merge(timing,scan?.performance);
       if(!scan?.ok)throw new Error(scan?.error??'Could not start scan.');
+      fetchEnd=timing?.begin('provider_fetch');
       const { items, skippedCount, snapshot } = await globalThis.GalacticEpic.fetchEpicGames(({ pagesRead, games }) => {
         status.textContent = `Reading Epic library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${games} games found.`;
       });
+      fetchEnd?.();
+      if(timing)Object.assign(timing,{providerCaptured:items.length,providerUnsupported:skippedCount});
       status.textContent = 'Saving Epic games and add-ons locally...';
-      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot });
+      finishEnd=timing?.begin('save_message');
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot,diagnosticLookupId:timing?.id });
+      finishEnd?.();P?.merge(timing,response?.performance);
       if (!response?.ok) throw new Error(response?.error ?? 'Epic import did not complete.');
+      completed=true;
+      uiEnd=timing?.begin('page_ui');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
-      status.textContent = `Saved ${response.gameCount} Epic game${response.gameCount === 1 ? '' : 's'} locally.${response.addOnCount ? ` Saved ${response.addOnCount} Epic add-on${response.addOnCount === 1 ? '' : 's'}; ${response.linkedAddOnCount} linked to a game${unlinkedAddOnCount ? ` and ${unlinkedAddOnCount} shown as unlinked` : ''}.` : ''}${skippedCount ? ` ${skippedCount} non-game account item${skippedCount === 1 ? ' was' : 's were'} excluded.` : ''}`;
+      const c=response.changes;
+      status.textContent = `Sync complete. ${!scan.hasFullBaseline?`Imported ${response.gameCount} games and ${response.addOnCount??0} add-ons.`:c?`${c.gamesAdded} new games, ${c.gamesUpdated} updated; ${c.addOnsAdded} new add-ons, ${c.addOnsUpdated} updated.`:'Library saved.'} ${response.gameCount} games and ${response.addOnCount??0} add-ons currently recorded.${unlinkedAddOnCount?` ${unlinkedAddOnCount} add-ons have no saved parent game.`:''}${skippedCount?` ${skippedCount} non-game account items excluded.`:''}`;
     } catch (error) {
       await globalThis.GalacticSync.failed('epic',error);
       status.textContent = `Epic import failed: ${error.message}`;
     } finally {
+      startEnd?.();fetchEnd?.();finishEnd?.();uiEnd??=timing?.begin('page_ui');
       button.disabled = false;
       delete status.dataset.busy;
+      if(timing){await new Promise(resolve=>requestAnimationFrame(resolve));uiEnd?.();globalThis.GalacticSync.send({type:'GL_PROVIDER_UI_TIMING',provider:'epic',timing:P.clean(timing.finish(completed?'prepared':'failed'))}).catch(()=>{});}
     }
   });
   globalThis.GalacticFloatingPanel?.attach(shadow, 'epic');

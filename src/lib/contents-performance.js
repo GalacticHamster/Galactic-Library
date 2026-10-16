@@ -39,6 +39,8 @@
       ...(/^[a-f0-9]{12}$/u.test(value.worker??'')?{worker:value.worker}:{}),
       ...(Number.isFinite(value.workerStartedEpochMs)?{workerStartedEpochMs:value.workerStartedEpochMs}:{}),
       ...(value.work?{work:cleanWork(value.work)}:{}),
+      ...Object.fromEntries(['recordsRead','recordsWritten','recordsNormalized','providerCandidates','providerCaptured','providerUnresolved','providerUnsupported','providerFailedRequests'].filter(key=>Number.isSafeInteger(value[key])&&value[key]>=0&&value[key]<=10000000).map(key=>[key,value[key]])),
+      ...(value.validationWork?{validationWork:Object.fromEntries(['executingMs','waitMs','yields'].filter(key=>Number.isFinite(value.validationWork[key])&&value.validationWork[key]>=0).map(key=>[key,value.validationWork[key]]))}:{}),
       ...(['profile','hint','account','start','finish','scan'].includes(value.providerPhase)?{providerPhase:value.providerPhase}:{}),
       ...(['found','missing','ambiguous','invalid'].includes(value.profileHintStatus)?{profileHintStatus:value.profileHintStatus}:{}),
       ...(['steam','gog','epic','humble','fanatical','kindle','kobo','audible','amazon-games','amazon-video','fandango-at-home'].includes(value.provider)?{provider:value.provider}:{}),
@@ -86,6 +88,8 @@
   function merge(target, value) {
     const record=clean(value);if(!target||!record||target.id!==record.id)return;
     for(const event of record.events)if(target.events.length<512)target.events.push({...event,startMs:Math.max(0,record.startEpochMs-target.start+event.startMs)});
+    for(const key of ['recordsRead','recordsWritten','recordsNormalized'])if(record[key]!==undefined)target[key]=(target[key]??0)+record[key];
+    if(record.validationWork){target.validationWork??={executingMs:0,waitMs:0,yields:0};for(const key of ['executingMs','waitMs','yields'])target.validationWork[key]+=(record.validationWork[key]??0);}
   }
   global.GalacticContentsPerformance=Object.freeze({LIMIT,now,validId,trace,clean,sum,breakdown,stats,aggregate,collector,merge});
 }(globalThis));

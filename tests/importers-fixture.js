@@ -1,4 +1,5 @@
 import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
+import '../src/lib/contents-performance.js';
 import '../src/lib/kindle-contents-scan.js';
 import '../src/providers/floating-panel.js';
 import { createStorageWriter } from '../src/background/storage-writer.js';
@@ -12,7 +13,7 @@ import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
 // Real content-script controls, with signed-in fetches replaced by fixtures.
 // Content scripts have no direct storage access; the worker owns this hidden area.
 function providerRecord(database,provider,nativeId){const records=Object.values(database.providerItems).filter(r=>r.provider===provider&&r.providerItemId===nativeId);assert(records.length===1,'Expected one account-scoped fixture record for '+provider+':'+nativeId);return records[0];}
-const checks=[]; const values={}; const writer=createStorageWriter({get:async defaults=>Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])])),set:async updates=>Object.assign(values,structuredClone(updates))},Promise.resolve(),{cacheRefreshPreflight:true});
+const checks=[],providerTimings=[]; const values={}; const writer=createStorageWriter({get:async defaults=>Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])])),set:async updates=>Object.assign(values,structuredClone(updates))},Promise.resolve(),{cacheRefreshPreflight:true});
 const shadows=[]; const attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
@@ -59,18 +60,22 @@ try{
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
       if(request.type==='COMMIT_PROVIDER_SCAN'){
         const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics},request.snapshot,request.scanToken,1);
-        imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state};
+        imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state,changes:state.syncHealth?.differences};
       }
+      if(request.type==='GL_PROVIDER_UI_TIMING'){providerTimings.push(request.timing);return {ok:true};}
       return {ok:false,error:'Unexpected importer request.'};
     }}};
-    for(mode of provider==='epic'?['full']:['full','incremental']){
+    let providerPass=0;
+    for(mode of provider==='epic'?['full','full']:['full','incremental']){
       const before=imported;
+      const timingBefore=providerTimings.length;
       if(provider==='fandango-at-home'){
         // Final View All stage of the actual resumable workflow, in both modes.
         globalThis[globalName][method]=async()=>[];
         await import(`../src/providers/${file}-content.js?mode=${mode}`);
       }else{
         if(mode==='full')await import(`../src/providers/${file}-content.js`);
+        if(['steam','epic'].includes(provider))globalThis.GalacticSync.setProfiling(true);
         const shadow=shadows.at(-1);
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('button');
         assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
@@ -78,9 +83,20 @@ try{
       const shadow=shadows.at(-1);
       await wait(()=>!shadow.querySelector('.status').dataset.busy&&(imported>before||/failed:/iu.test(shadow.querySelector('.status').textContent)));
       assert(!/failed:/iu.test(shadow.querySelector('.status').textContent),shadow.querySelector('.status').textContent);
+      if(['steam','epic'].includes(provider)){
+        const text=shadow.querySelector('.status').textContent;
+        assert(!/undefined|new apps/iu.test(text),provider+' reported misleading counts');
+        if(providerPass)assert(/0 new games, 0 updated/iu.test(text),text);
+        await wait(()=>providerTimings.length>timingBefore&&providerTimings.at(-1)?.provider===provider&&providerTimings.at(-1)?.events.some(event=>event.stage==='page_ui'));
+        const timing=providerTimings.at(-1);assert(timing?.events.some(event=>event.stage==='provider_fetch'),provider+' scan timing absent');
+        assert(timing.providerCaptured===items.length,provider+' captured-item count absent');
+        assert(timing.events.some(event=>event.stage==='save_message'),provider+' save timing absent');
+      }
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
+      providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
     }
+    globalThis.GalacticSync.setProfiling(false);
     if(provider==='gog'){const beforeFailure=JSON.stringify(values.galacticLibraryDatabase.providerItems);
       globalThis.GalacticGog.fetchGogGames=async()=>{throw new Error('Network failure on page 7: PRIVATE_TOKEN');};const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="full"]').click();
       await wait(()=>values.galacticLibraryDatabase.providers.gog.syncHealth.status==='failed');assert(values.galacticLibraryDatabase.providers.gog.syncHealth.failedPages[0]===7&&!JSON.stringify(values).includes('PRIVATE_TOKEN'),'Failure report lost its page or leaked raw errors.');const retained=providerRecord(values.galacticLibraryDatabase,'gog','fixture-123');assert(retained.id!=='gog:fixture-123'&&retained.profileId,'Named-account record lost profile scope.');assert(retained.title===items[0].title&&JSON.stringify(values.galacticLibraryDatabase.providerItems)===beforeFailure,'Failed scan destroyed prior records.');checks.push('actual GOG failure reports safe dashboard diagnostics and preserves the prior snapshot');

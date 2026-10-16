@@ -65,7 +65,7 @@
     const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
 
     const itemsById = new Map();
-    const unresolvedApps = [];
+    const unresolvedById = new Map(),unsupportedIds=new Set();let failedRequestCount=0;
     for (let offset = 0; offset < appIdsToResolve.length; offset += STORE_ITEMS_BATCH_SIZE) {
       const batch = appIdsToResolve.slice(offset, offset + STORE_ITEMS_BATCH_SIZE);
       reportProgress({ completed: offset, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
@@ -73,26 +73,29 @@
         const items = await fetchStoreItems(batch);
         if (!Array.isArray(items?.response?.store_items)) throw new Error('Steam returned a malformed title-service response.');
         const returnedIds = new Set((items?.response?.store_items ?? []).map((item) => String(item?.appid ?? '')).filter(Boolean));
-        for (const appId of batch) if (!returnedIds.has(appId)) unresolvedApps.push({ appId, status: 'not returned by Steam' });
+        for (const appId of batch) if (!returnedIds.has(appId)) unresolvedById.set(appId,{ appId, status: 'not returned by Steam' });
         const parsed = libraryItemsFromStoreItems(items, new Set(batch));
         const parsedIds = new Set(parsed.map((item) => item.providerItemId));
         for (const item of items.response.store_items) {
           const id = String(item?.appid ?? '');
           if (!/^\d+$/u.test(id) || !Number.isInteger(Number(item.type))) throw new Error('Steam returned a malformed catalog entry.');
-          if (batch.includes(id) && [0, 4].includes(Number(item.type)) && !parsedIds.has(id)) unresolvedApps.push({ appId: id, status: 'unreadable title' });
+          if (batch.includes(id) && [0, 4].includes(Number(item.type)) && !parsedIds.has(id)) unresolvedById.set(id,{ appId: id, status: 'unreadable title' });
         }
         for (const item of parsed) itemsById.set(item.providerItemId, item);
+        for(const item of items.response.store_items)if(batch.includes(String(item.appid))&&![0,4].includes(Number(item.type)))unsupportedIds.add(String(item.appid));
       } catch (error) {
         if (!incremental) throw new Error(`${error.message} The full Steam snapshot was not replaced.`);
-        unresolvedApps.push(...batch.map((appId) => ({ appId, status: error.message })));
+        failedRequestCount++;
+        for(const appId of batch)unresolvedById.set(appId,{appId,status:error.message});
       }
       reportProgress({ completed: offset + batch.length, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       if (offset + STORE_ITEMS_BATCH_SIZE < appIdsToResolve.length) await wait(BETWEEN_BATCHES_MS);
     }
     if (!incremental && ![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Steam returned owned apps but no game titles. Please try again later.');
+    const unresolvedApps=[...unresolvedById.values()];
     if (!incremental && unresolvedApps.length) throw new Error(`Steam could not resolve ${unresolvedApps.length} owned apps. A complete full replacement is unavailable; previous records were kept. Quick update can still add readable new apps.`);
     const items = [...itemsById.values()];
-    return { items, unresolvedApps, ownedAppIds: appIds, newAppCount: appIdsToResolve.length, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('steam', items, [global.GalacticProviderSnapshot.completedScope('library', appIds.length, appIds.length, 'index-complete', Math.max(1, Math.ceil(appIds.length / STORE_ITEMS_BATCH_SIZE)))]) };
+    return { items, unresolvedApps, failedRequestCount,unsupportedAppCount:unsupportedIds.size,ownedAppIds: appIds, newAppCount: appIdsToResolve.length, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('steam', items, [global.GalacticProviderSnapshot.completedScope('library', appIds.length, appIds.length, 'index-complete', Math.max(1, Math.ceil(appIds.length / STORE_ITEMS_BATCH_SIZE)))]) };
   }
 
   global.GalacticSteamStore = { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems, fetchOwnedSteamGames };

@@ -2,25 +2,27 @@
 (function attachFloatingPanelControls(global) {
   'use strict';
   const sessions=new Map();
+  let profiling=false,profileSequence=100;
+  let profilePrefix;
   async function send(request) {
     const provider=request.provider??(request.type==='FANDANGO_IMPORT_STATE'?'fandango-at-home':null);
     const session=sessions.get(provider);
     if(request.type==='GET_PROVIDER_SYNC_STATE'){
       if(!session)throw new Error('Reload this page to start a profile scan.');
-      const timing=provider==='kobo'?global.GalacticContentsPerformance?.trace(request.diagnosticLookupId,'provider'):null;
+      const timing=global.GalacticContentsPerformance?.validId(request.diagnosticLookupId)?global.GalacticContentsPerformance.trace(request.diagnosticLookupId,'provider'):null;
       const waitEnd=timing?.begin('provider_profile_wait');
       await session.ready;
       waitEnd?.();
       const context=session.resume??session.read();session.resume=null;
       if(!context.rememberedProfile&&(!context.confirmed||!context.profileLabel))throw new Error('Enter a profile label and confirm the signed-in account.');
-      const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true});
+      const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true,...(timing?{diagnosticSentEpochMs:global.GalacticContentsPerformance.now()}: {})});
       if(result.ok)session.context={...context,confirmed:true,scanToken:result.scanToken,profileId:result.profileId};
       if(timing){global.GalacticContentsPerformance.merge(timing,result.performance);result.performance=global.GalacticContentsPerformance.clean(timing.finish(result.ok?'prepared':'failed'));}
       return result;
     }
     if(request.type==='IMPORT_PROVIDER_ITEMS'){
       if(!session?.context?.scanToken)throw new Error('Start a fresh confirmed profile scan.');
-      return chrome.runtime.sendMessage({...request,type:'COMMIT_PROVIDER_SCAN',scanToken:session.context.scanToken});
+      return chrome.runtime.sendMessage({...request,type:'COMMIT_PROVIDER_SCAN',scanToken:session.context.scanToken,...(request.diagnosticLookupId?{diagnosticSentEpochMs:global.GalacticContentsPerformance?.now()}: {})});
     }
     if(request.type==='FANDANGO_IMPORT_STATE'&&session){
       if(request.action==='set'){
@@ -44,7 +46,13 @@
     const page=/\bpage\s+([1-9]\d{0,4})\b/iu.exec(message);
     try{await chrome.runtime.sendMessage({type:'REPORT_PROVIDER_SCAN_FAILURE',provider,scanToken:context.scanToken,failure:{code,failedRequestCount:1,failedPages:page?[Number(page[1])]:[]}});}catch{}
   }
-  global.GalacticSync={send,failed};
+  // Development opt-in in the extension's isolated console. No persistent
+  // setting or per-item logging; ordinary provider scans keep this disabled.
+  global.GalacticSync={send,failed,setProfiling(value){profiling=value===true;},trace(provider){
+    if(profiling)profilePrefix??=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
+    const timing=profiling?global.GalacticContentsPerformance?.trace(`lookup-${profilePrefix}-${profileSequence++}`,'provider'):null;
+    if(timing){timing.provider=provider;timing.providerPhase='scan';}return timing;
+  }};
   function attach(shadow,provider) {
     const panel = shadow?.querySelector?.('.panel');
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;

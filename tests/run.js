@@ -1,4 +1,5 @@
 import {xboxImportTests} from './xbox-import.js';
+import {providerPipelinePerformanceTests} from './provider-pipeline-performance.js';
 import {consoleCompanionTests} from './console-companion.js';
 import {manualReconciliationTests} from './manual-reconciliation.js';
 import {consoleLibraryTests} from './console-library.js';
@@ -147,6 +148,7 @@ const tests = [
   ...parentScopedComponentCases,
   ...ownershipPolicyTests,
   ...commonMatchingPolicyTests,
+  ...providerPipelinePerformanceTests,
   ...consoleCompanionTests,
   ...companionTitleOwnershipTests,
   ['sorts numbered media titles in reading order', () => {

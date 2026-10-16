@@ -61,7 +61,7 @@ const companionTimings=contentsPerformance.collector();
 const providerTimings=contentsPerformance.collector();
 let providerDiagnosticSequence=100;
 function providerTiming(request){
-  if(request.provider!=='kobo'&&request.type!=='GET_PROVIDER_PROFILE')return null;
+  if(request.provider!=='kobo'&&request.type!=='GET_PROVIDER_PROFILE'&&!contentsPerformance.validId(request.diagnosticLookupId))return null;
   const sent=request.diagnosticSentEpochMs,entered=contentsPerformance.now(),hasSenderTime=Number.isFinite(sent)&&sent<=entered&&entered-sent<=60000;
   const timing=contentsPerformance.trace(contentsPerformance.validId(request.diagnosticLookupId)?request.diagnosticLookupId:`lookup-${companionDiagnosticPrefix}-${providerDiagnosticSequence++}`,'provider',undefined,hasSenderTime?sent:null);
   timing.providerPhase=request.type==='GET_PROVIDER_PROFILE_HINT'?'hint':request.type==='GET_PROVIDER_PROFILE'?'profile':request.beginScan?'start':'finish';
@@ -421,7 +421,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if(request?.type==='GL_PROVIDER_UI_TIMING'){
-    if(request.provider==='kobo'&&isProviderImportPage('kobo',sender.url)&&contentsPerformance.clean(request.timing)?.kind==='provider')providerTimings.add(request.timing);
+    if(isKnownProvider(request.provider)&&isProviderImportPage(request.provider,sender.url)&&contentsPerformance.clean(request.timing)?.kind==='provider')providerTimings.add(request.timing);
     sendResponse({ok:true});return undefined;
   }
   if(request?.type==='GET_PROVIDER_PROFILE_HINT'){
@@ -554,7 +554,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       tvCount: database.providers[request.provider].tvCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
-      ...(['playstation','xbox'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
+      ...(['steam','epic','playstation','xbox'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
       syncedAt: database.providers[request.provider].lastSync
     });})
     .catch((error) => reply({ ok: false, error: error.message }));
