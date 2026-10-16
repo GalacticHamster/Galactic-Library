@@ -1,12 +1,12 @@
 import {createConnection,createServer} from 'node:net';
 import {setTimeout as pause} from 'node:timers/promises';
 
-function commands(write){
+function commands(write,timeoutMs=20000){
   let next=0;const pending=new Map();
-  return {send(method,params={},sessionId){return new Promise((resolve,reject)=>{const id=++next,timeout=setTimeout(()=>{pending.delete(id);reject(new Error(`Browser command timed out: ${method}`));},20000);pending.set(id,{resolve,reject,timeout});write({id,method,params,...(sessionId?{sessionId}:{})});});},receive(id,error,result){const request=pending.get(id);if(!request)return;pending.delete(id);clearTimeout(request.timeout);error?request.reject(new Error(error.message??String(error))):request.resolve(result);},fail(error){for(const request of pending.values()){clearTimeout(request.timeout);request.reject(error);}pending.clear();}};
+  return {send(method,params={},sessionId){return new Promise((resolve,reject)=>{const id=++next,timeout=setTimeout(()=>{pending.delete(id);reject(new Error(`Browser command timed out: ${method}`));},timeoutMs);pending.set(id,{resolve,reject,timeout});write({id,method,params,...(sessionId?{sessionId}:{})});});},receive(id,error,result){const request=pending.get(id);if(!request)return;pending.delete(id);clearTimeout(request.timeout);error?request.reject(new Error(error.message??String(error))):request.resolve(result);},fail(error){for(const request of pending.values()){clearTimeout(request.timeout);request.reject(error);}pending.clear();}};
 }
-export function chromePipe(child){
-  const protocol=commands(value=>child.stdio[3].write(JSON.stringify(value)+'\0'));let input=Buffer.alloc(0);
+export function chromePipe(child,{timeoutMs=20000}={}){
+  const protocol=commands(value=>child.stdio[3].write(JSON.stringify(value)+'\0'),timeoutMs);let input=Buffer.alloc(0);
   child.stdio[4].on('data',chunk=>{input=Buffer.concat([input,chunk]);let end;while((end=input.indexOf(0))>=0){const value=JSON.parse(input.subarray(0,end));input=input.subarray(end+1);if(value.id)protocol.receive(value.id,value.error,value.result);}if(input.length>8*1024*1024)protocol.fail(new Error('Excessive browser response.'));});
   child.on('error',error=>protocol.fail(error));child.on('exit',()=>protocol.fail(new Error('Chrome exited.')));return protocol;
 }
