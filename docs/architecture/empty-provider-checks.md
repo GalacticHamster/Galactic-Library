@@ -8,8 +8,9 @@ not a rule that "zero new titles means nothing changed."
 ## Eligibility
 
 The worker still reads authoritative storage. Reuse requires exact equality
-with a detached validated immutable committed snapshot; cold/different data
-validates/migrates normally. A receipt requires that exact base to remain current,
+with a detached validated immutable committed snapshot. Cold reads may establish
+that snapshot using the [protected exact-value certificate](query-validation-certificate.md);
+unavailable/mismatched proof validates/migrates normally. A receipt requires that exact base to remain current,
 the same active immutable profile ID, connected state and an existing full
 baseline. New accounts, switching, baseline changes and unavailable proofs
 retain ordinary validated persistence.
@@ -42,7 +43,8 @@ after a full-start bookkeeping save. They never reconcile missing records.
 strict canonical serialization of the **entire base database**, not a schema
 flag, nickname, timestamp or in-memory sequence. Bound entries to one per known
 provider, scoped to the active profile UUID. Cache digests only for exact
-worker-owned immutable bases; first/cold/new-base reads still hash.
+worker-owned immutable bases. A cold certificate hit reuses its verified digest;
+otherwise first/new-base receipts still hash.
 
 Successful incremental patches contain only validated `lastSync`, optional
 `quickSyncAt`, cleared `lastError`, optional source/mode and successful
@@ -67,8 +69,8 @@ nonzero without claiming refreshed item observation dates.
 Operations share the existing writer queue. Acknowledge the single receipt write,
 then independently clean up the lease. These **two writes are not assumed atomic**.
 Incremental preparation adds one small lease write. Status-only completion needs
-no final catalog validation/write, snapshot replacement or new certificate;
-cold preparation remains unchanged.
+no final catalog validation/write, snapshot replacement or new certificate.
+Cold preparation can verify existing proof; it never skips authoritative reads.
 
 | Interruption | Result |
 | --- | --- |
@@ -103,6 +105,7 @@ remain valid. Older GL may ignore unknown providers, terminal patches or baselin
 fields and display older check-only freshness, without affecting ownership.
 Export a flattened backup before downgrade when that freshness matters.
 
-Whole-library reads, comparison/copy, cold validation/hash, Options rendering
+Whole-library reads, comparison/copy, cold certificate serialization/hash or
+fallback validation, Options rendering
 and genuine observation saves remain costs. Splitting actual records requires
 transactional readers, migration and recovery and remains deferred.

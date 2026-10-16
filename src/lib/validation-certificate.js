@@ -50,18 +50,25 @@ export function createValidationCertificates(area){
   let generation=0,tail=Promise.resolve();const pending=new Set();
   const queue=work=>{tail=tail.then(work).catch(()=>{});return tail;};
   const available=()=>typeof area?.get==='function'&&typeof area?.set==='function'&&typeof area?.remove==='function';
+  async function verifyDigest(database,{beginSpan=()=>{}}={}){
+    const span=async(stage,work)=>{const end=beginSpan(stage);try{return await work();}finally{end?.();}};
+    const miss=stage=>{beginSpan(stage)?.();return null;};
+    try{
+      if(!available())return miss('certificate_unavailable');
+      if(database?.schemaVersion!==DATABASE_SCHEMA_VERSION)return miss('certificate_invalid');
+      const stored=await span('certificate_read',()=>area.get(VALIDATION_CERTIFICATE_KEY));
+      const certificate=stored?.[VALIDATION_CERTIFICATE_KEY];
+      if(!certificate)return miss('certificate_missing');
+      if(!valid(certificate))return miss('certificate_invalid');
+      const end=beginSpan('certificate_serialize');let serialized;
+      try{serialized=strictDatabaseSerialization(database);}finally{end?.();}
+      const hash=await span('certificate_hash',()=>digest(serialized));
+      return certificate.digest===hash?hash:miss('certificate_mismatch');
+    }catch{return miss('certificate_error');}
+  }
   return {
-    async verify(database,{beginSpan=()=>{}}={}){
-      const span=async(stage,work)=>{const end=beginSpan(stage);try{return await work();}finally{end?.();}};
-      try{
-        if(!available()||database?.schemaVersion!==DATABASE_SCHEMA_VERSION)return false;
-        const stored=await span('certificate_read',()=>area.get(VALIDATION_CERTIFICATE_KEY));
-        const certificate=stored?.[VALIDATION_CERTIFICATE_KEY];if(!valid(certificate))return false;
-        const end=beginSpan('certificate_serialize');let serialized;
-        try{serialized=strictDatabaseSerialization(database);}finally{end?.();}
-        return certificate.digest===await span('certificate_hash',()=>digest(serialized));
-      }catch{return false;}
-    },
+    verifyDigest,
+    async verify(database,options){return Boolean(await verifyDigest(database,options));},
     issue(database){
       if(!available()||!isCommittedSnapshot(database))return Promise.resolve();
       const current=++generation;let serialized;

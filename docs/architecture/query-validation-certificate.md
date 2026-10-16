@@ -1,11 +1,11 @@
-# Committed query validation certificate
+# Committed database validation certificate
 
 The worker may skip repeated full validation on a cold read only when the exact
 authoritative value has a matching protected session receipt. This is a
 cross-generation validation proof, not a cache of the library or matching output.
 
 `galacticLibraryValidationCertificate` is a single bounded `storage.session` key.
-Its closed descriptor contains format 1, schema version 12, serialization version
+Its closed descriptor contains format 1, the current database schema version, serialization version
 2, `SHA-256`, a 64-character digest, and `VALIDATION_ALGORITHM_VERSION`. The latter
 must change whenever database validation, normalization, source interpretation or
 canonical identity rules change. Imports, backups, provider payloads and public
@@ -13,13 +13,22 @@ API messages cannot supply this receipt. The session area is protected before
 library access is admitted. Extension reload/update and browser restart lose the
 receipt and safely restore full validation.
 
+There is no time-based expiry. A worker stop preserves session storage; browser
+session loss or extension reload/update removes this optimization. The descriptor
+is not signed or authenticated by its hash alone: provenance comes from protected
+extension-only storage and internal issuance. Chrome restricts local/session
+access to trusted contexts before admitting operations; Firefox uses privileged
+session storage and extension-origin private IndexedDB. Arbitrary provider pages
+cannot mint certificates. A privileged extension-code compromise is outside this
+boundary, as it could already modify the library directly.
+
 Only a worker-owned registered immutable committed snapshot can mint a receipt:
 
 - A cold read completes full current validation and an exact raw/normalized
   comparison. If migration is necessary, it commits through the existing writer
   and the read retries before publication/certification.
 - A successful authoritative database write publishes a detached, frozen
-  snapshot only after existing validation and native commit. An existing query
+  snapshot only after existing validation and native commit. That registered
   snapshot then permits certification. If no snapshot was needed, the receipt
   is discarded rather than making another full-library copy just for this cache.
 - Clear removes the receipt. No certificate is issued for an absent database.
@@ -52,6 +61,34 @@ self-authenticating claim: only the protected internal issuance boundary grants
 provenance. Compromise of privileged extension code is outside this trust model,
 just as that code could previously write arbitrary valid library observations.
 
+## Provider preparation and mutable reads
+
+Shared `readDatabase(true)` uses the same exact-value verifier when its freshly
+read database does not match an in-memory validated snapshot. It accepts only
+the current closed certificate descriptor plus SHA-256 of the entire strictly
+serialized authoritative value. Missing, older-validator, malformed, unavailable
+or mismatched proof falls back to ordinary semantic validation and migration.
+Legacy schema data cannot pass the current descriptor/schema check. An observed
+snapshot epoch change during verification or fallback validation retries the
+authoritative read before publication. No revision number or timestamp grants
+trust. Ordinary `readDatabase()` callers retain their full validation path.
+
+On a hit, publish a detached, frozen registered snapshot and return the separate
+mutable storage result to the queued operation. Seed the immutable snapshot's
+receipt-digest cache with the already verified hash. Do not reserialize/hash or
+reissue the same certificate. This also avoids hashing the base again when
+flattening or writing a status-only provider receipt. Snapshot-copy failure
+cannot authorize status-only persistence without its immutable proof.
+
+The proof establishes only the validity of the previously committed database,
+not the incoming scan. Tab/token/profile/account guards, authoritative commit
+reads, observation comparisons, console acquisition checks and final full
+validation before data-changing commits remain required. New accounts, switching,
+full-scan reconciliation and actual data/access changes retain their normal
+save behavior. Partial/failed/cancelled status receipts preserve the last
+successful baseline under the existing [status receipt contract](empty-provider-checks.md).
+No independent-writer transaction or new persistence system is introduced.
+
 Certificate hashing/writes never gate acknowledgements on session persistence.
 Serialization captures the immutable value synchronously, hashing is asynchronous,
 and writes are ordered. Superseded pending issues cannot overwrite later clear or
@@ -78,6 +115,14 @@ or `certificate_miss`, `certificate_issue`, and `matching_canonical_reuse` stage
 `snapshot_validation` still appears on fallback; `matching_canonical` remains for
 untrusted reconstruction. Certificate issue measures synchronous capture only;
 it does not claim to measure the subsequent fire-and-forget session write.
+
+Provider traces additionally expose `read_certificate` and, on interruption,
+`read_certificate_retry`. Closed miss reasons are `certificate_missing`,
+`certificate_invalid`, `certificate_mismatch`, `certificate_unavailable` and
+`certificate_error`. Serialization and hash spans are nested within verification;
+do not add them twice. The bounded worker journal includes these stages, read/
+comparison/copy stages and snapshot setup so packaged offline measurements need
+no provider requests. Digests, certificates and library values are never exported.
 
 Compare warm requests with a request after at least 60 seconds without GL/HB
 activity. Verify the worker ID actually changed; elapsed idle time alone is not

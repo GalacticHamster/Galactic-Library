@@ -61,6 +61,25 @@ try{
     return true;
   `);
   assert(emptyCheck);console.log('PASS installed Firefox GL: empty successful/incomplete checks use private receipts, preserve successful baseline/catalog and flatten through backup/restore');
+  assert(await evaluate(`
+    const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),W=await import('./src/background/storage-writer.js'),C=await import('./src/lib/validation-certificate.js'),Q=await import('./src/lib/query-diagnostics.js');
+    // Marionette imports modules into its sandbox while IDB returns page-realm
+    // objects. Recreate this known JSON fixture in the module's realm, matching
+    // production's single realm; never relax the strict serializer for testing.
+    const privateArea=P.createPrivateStorage(indexedDB),area={get:async defaults=>JSON.parse(JSON.stringify(await privateArea.get(defaults))),set:updates=>privateArea.set(updates),remove:keys=>privateArea.remove(keys)};
+    const database=(await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase;
+    await S.getCommittedLibraryView();
+    const proof=C.createValidationCertificates(chrome.storage.session);let valid=false,reasons=[];
+    for(let n=0;n<200&&!valid;n++){reasons=[];valid=await proof.verify(database,{beginSpan:stage=>{reasons.push(stage);return ()=>{};}});if(!valid)await new Promise(done=>setTimeout(done,10));}
+    if(!valid)throw Error('Native Firefox session proof unavailable: '+reasons.join(', '));
+    const journal=Q.createQueryDiagnostics(),cold=W.createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:chrome.storage.session,diagnostics:journal});
+    const scan=await cold.beginProviderScan('steam','Empty check fixture','incremental',false,1);
+    if(!journal.report().events.some(row=>row.stage==='certificate_hit')||journal.report().events.some(row=>row.stage==='validation'))throw Error('New Firefox writer did not accept exact session proof');
+    await cold.commitProviderScan('steam',[],{syncMode:'incremental',scanDiagnostics:{incomplete:true}},null,scan.scanToken,1);
+    if(JSON.stringify((await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase)!==JSON.stringify(database))throw Error('Cold receipt rewrote private database');
+    const view=await cold.getDatabase();if(view.providers.steam.syncHealth.status!=='partial'||view.providers.steam.lastSync!==database.providers.steam.lastSync)throw Error('Cold receipt lost successful baseline');
+    return true;
+  `));console.log('PASS installed Firefox GL: a new writer verifies session proof against private IndexedDB and completes an unchanged incomplete scan without validation or database writes');
   if(process.argv.includes('--companions')){
     const fanRoot=resolve(projectRoot,'../Fanatical'),hbRoot=resolve(projectRoot,'../HB'),fan=await install(fanRoot,'FAN'),hbStage=join(temporary,'HB');await mkdir(hbStage);
     execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(hbRoot,'scripts/package-release.ps1'),'-Target','Firefox','-OutputDirectory',hbStage],{windowsHide:true,stdio:'pipe'});

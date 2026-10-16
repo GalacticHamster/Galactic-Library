@@ -13,6 +13,7 @@ const size=Number(process.argv.find(arg=>arg.startsWith('--size='))?.slice(7)??1
 if(!Number.isSafeInteger(size)||size<100||size>20000)throw Error('Size must be 100..20000.');
 const output=await outputPath(process.argv.find(arg=>arg.startsWith('--output='))?.slice(9),'provider-browser.json');
 const matrix=process.argv.includes('--matrix');
+const coldMatrix=process.argv.includes('--cold-matrix');
 const temporary=await mkdtemp(join(tmpdir(),'gl-provider-benchmark-'));let child,exited;
 try{
  const stage=join(temporary,'extension'),release=await createRelease(root);
@@ -26,7 +27,47 @@ try{
  await evaluate(`const S=await import('./src/lib/storage.js');await S.restoreDatabase(${JSON.stringify(db)});return true;`);
  console.log('Seeded disposable Chrome library:',size);
  let rows;
- if(matrix){
+ if(coldMatrix){
+  rows=[];
+  for(const workflow of ['warm-unchanged','cold-valid','cold-no-proof','cold-mismatch','cold-change','cold-incomplete']){
+   const previous=await evaluate(`
+    const S=await import('./src/lib/storage.js');await S.restoreDatabase(${JSON.stringify(db)});await S.getCommittedLibraryView();
+    for(let n=0;n<500;n++){if((await chrome.storage.session.get('galacticLibraryValidationCertificate')).galacticLibraryValidationCertificate)break;await new Promise(done=>setTimeout(done,10));}
+    if(!(await chrome.storage.session.get('galacticLibraryValidationCertificate')).galacticLibraryValidationCertificate)throw Error('Seed did not issue a session certificate');
+    if(${JSON.stringify(workflow)}==='cold-no-proof')await chrome.storage.session.remove('galacticLibraryValidationCertificate');
+    if(${JSON.stringify(workflow)}==='cold-mismatch'){const key='galacticLibraryValidationCertificate',certificate=(await chrome.storage.session.get(key))[key];await chrome.storage.session.set({[key]:{...certificate,digest:'0'.repeat(64)}});}
+    return (await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'})).activity.worker;
+   `);
+   if(workflow.startsWith('cold-')){
+    await driver.send('ServiceWorker.enable',{},sessionId);await driver.send('ServiceWorker.stopAllWorkers',{},sessionId);
+    for(let n=0;n<100;n++){
+     const targets=await driver.send('Target.getTargets');
+     if(!targets.targetInfos.some(info=>info.type==='service_worker'&&info.url.startsWith('chrome-extension://'+installed.id+'/')))break;
+     if(n===99)throw Error('Disposable worker did not stop');await new Promise(done=>setTimeout(done,20));
+    }
+   }
+   const row=await evaluate(`
+    const S=await import('./src/lib/storage.js'),client=S.createStorageClient(message=>chrome.runtime.sendMessage(message));
+    const journal=async operation=>{const report=await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}),events=report.activity.events;
+     const event=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
+     const spans=events.filter(e=>e.operation===operation&&e.startEpochMs>=event.startEpochMs&&e.startEpochMs<event.startEpochMs+event.durationMs);
+     const ms=stage=>spans.filter(e=>e.stage===stage).reduce((sum,e)=>sum+e.durationMs,0),has=stage=>spans.some(e=>e.stage===stage);
+     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataReads:spans.filter(e=>e.stage==='storage_get'&&e.key!=='database'||e.stage==='certificate_read').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length,
+      storageReadMs:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').reduce((sum,e)=>sum+e.durationMs,0),certificateMs:ms('read_certificate'),certificateReadMs:ms('certificate_read'),serializationMs:ms('certificate_serialize'),hashMs:ms('certificate_hash'),receiptDigestMs:ms('provider_check_digest'),snapshotCloneMs:ms('snapshot_clone'),snapshotFreezeMs:ms('snapshot_freeze'),validationMs:ms('validation'),migrationCompareMs:ms('migration_compare'),committedCompareMs:ms('read_committed_compare'),committedCloneMs:ms('read_committed_clone'),certificateHit:has('certificate_hit'),certificateMiss:has('certificate_miss'),fallbackReasons:['certificate_missing','certificate_mismatch','certificate_invalid','certificate_error','certificate_unavailable'].filter(has)};
+    };
+    const at=performance.now(),scan=await client.beginProviderScan('steam','Personal','incremental',false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
+    const items=${JSON.stringify(workflow)}==='cold-change'?[{providerItemId:'cold-new',title:'Cold added game',mediaType:'game',ownership:'owned'}]:[];
+    const finishStart=performance.now();await client.commitProviderScan('steam',items,{syncMode:'incremental',quickSyncAt:'2026-10-16',...(${JSON.stringify(workflow)}==='cold-incomplete'?{scanDiagnostics:{failedRequestCount:1}}:{})},null,scan.scanToken,1);
+    const finished=performance.now(),post=await journal('commitProviderScan');
+    return {workflow:${JSON.stringify(workflow)},preMessageMs:prepared-at,postMessageMs:finished-finishStart,captureMs:0,preparationTransportMs:prepared-at-pre.workerMs,commitTransportMs:finished-finishStart-post.workerMs,workerPre:pre,workerPost:post};
+   `);
+   row.previousWorkerId=previous;row.workerRestarted=row.workerPre.workerId!==previous;
+   assert.equal(row.workerRestarted,workflow.startsWith('cold-'),'Worker generation: '+workflow);
+   if(workflow==='cold-change')assert.equal(row.workerPost.databaseWrites,1);
+   else assert.equal(row.workerPost.databaseWrites,0);
+   rows.push(row);console.log(JSON.stringify(row));
+  }
+ }else if(matrix){
   rows=[];
   const scenarios=['quick-warm','quick-repeated','quick-repeated-2','quick-restart-no-proof','incremental-change','full-unchanged','full-change','incomplete','incomplete-repeated','incomplete-restart-no-proof','failed','failed-repeated'];
   for(const workflow of scenarios){
@@ -67,8 +108,8 @@ try{
  }
  return rows;
  `);
- await writeFile(output,JSON.stringify({format:1,size,sourceRoot:root,environment:'Packaged Chrome, disposable profile, actual worker and chrome.storage.local; storage-client calls return the database, unlike compact provider replies. Scan/network zero. First request after seeding is not cold. Matrix restart stops only this disposable worker and removes its session validation proof. Database bytes estimate returned DB serialization at each write, outside timed work; metadata bytes not measured natively.',rows},null,2));
- if(!matrix)for(const row of rows)console.log(JSON.stringify(row));
+ await writeFile(output,JSON.stringify({format:1,size,sourceRoot:root,environment:'Packaged Chrome, disposable profile, actual worker and chrome.storage.local; storage-client calls return the database, unlike compact provider replies. Scan/network zero. Cold matrix seeds a validated certificate then actually stops the worker; generation changes are asserted. Missing/mismatched proof is set separately. Ordinary matrix restart removes proof. Nested stage times overlap; metadata counts exclude background certificate issuance outside an operation. Database bytes, where present, estimate returned DB serialization outside timed work; metadata bytes not measured natively.',rows},null,2));
+ if(!matrix&&!coldMatrix)for(const row of rows)console.log(JSON.stringify(row));
  console.log('Wrote',output);
 }finally{
  if(child&&child.exitCode===null){child.kill();await Promise.race([exited,new Promise(done=>setTimeout(done,3000))]);}

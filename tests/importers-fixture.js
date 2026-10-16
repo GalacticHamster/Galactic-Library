@@ -9,6 +9,9 @@ import '../src/providers/fanatical.js';
 import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
+import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src/lib/models.js';
+import {newProviderProfile} from '../src/lib/provider-profiles.js';
+import {VALIDATION_CERTIFICATE_KEY} from '../src/lib/validation-certificate.js';
 
 // Real content-script controls, with signed-in fetches replaced by fixtures.
 // Content scripts have no direct storage access; the worker owns this hidden area.
@@ -21,6 +24,37 @@ const assert=(value,message)=>{if(!value)throw new Error(message);};
 // The page-lifetime pacing gate can wait for a previous run's last start and
 // then a second request. Allow that legitimate interval; assert rate below.
 const wait=async predicate=>{for(let n=0;n<500;n++){if(predicate())return;await pause();}throw new Error('Importer did not finish.');};
+{
+  const database=createEmptyDatabase(),profile=newProviderProfile('steam','Cold fixture');
+  profile.state={connected:true,fullSyncAt:'2026-01-01',lastSync:'2026-01-01'};
+  database.providerProfiles[profile.profileId]=profile;database.providers.steam={...profile.state,activeProfileId:profile.profileId};
+  const item=normalizeProviderItem({provider:'steam',profileId:profile.profileId,providerItemId:'cold-fixture',title:'Cold fixture game',mediaType:'game',ownership:'unknown'},'2026-01-01');
+  database.providerItems[item.id]=item;
+  const state={galacticLibraryDatabase:validateDatabase(database)},session={};
+  const area={get:async defaults=>structuredClone(Object.fromEntries(Object.entries(defaults).map(([key,value])=>[key,state[key]??value]))),set:async updates=>Object.assign(state,structuredClone(updates)),remove:async keys=>{for(const key of [keys].flat())delete state[key];}};
+  const proofArea={get:async key=>({[key]:structuredClone(session[key])}),set:async updates=>Object.assign(session,structuredClone(updates)),remove:async key=>{delete session[key];}};
+  const first=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:proofArea});await first.getQueryDatabase();
+  await wait(()=>Boolean(session[VALIDATION_CERTIFICATE_KEY]));
+  for(const missing of [false,true]){
+    if(missing)delete session[VALIDATION_CERTIFICATE_KEY];
+    const cold=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:proofArea}),stages=[];
+    const timing={begin:stage=>{stages.push(stage);return ()=>{};}};
+    const scan=await cold.execute('beginProviderScan',['steam','Cold fixture','incremental',false,1],timing);
+    assert(stages.includes(missing?'read_validation':'certificate_hit'),'Cold proof path was not selected');
+    if(!missing)assert(!stages.includes('read_validation'),'Valid proof repeated semantic validation');
+    const before=JSON.stringify(state.galacticLibraryDatabase);
+    await cold.execute('commitProviderScan',['steam',[],{syncMode:'incremental',scanDiagnostics:{incomplete:true}},null,scan.scanToken,1],timing);
+    assert(JSON.stringify(state.galacticLibraryDatabase)===before,'Incomplete cold check changed the catalog');
+    const view=await cold.getDatabase();assert(view.providers.steam.syncHealth.status==='partial'&&view.providers.steam.lastSync==='2026-01-01T00:00:00.000Z','Incomplete cold check changed successful baseline');
+  }
+  checks.push('cold provider generations reuse exact session proof; absent proof validates and incomplete receipts preserve catalog and successful baseline');
+  const fresh=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:proofArea}),stages=[];
+  const timing={begin:stage=>{stages.push(stage);return ()=>{};}};
+  const scan=await fresh.execute('beginProviderScan',['steam','Cold fixture','incremental',false,1],timing);
+  await fresh.execute('commitProviderScan',['steam',[{...item,ownership:'returned'}],{syncMode:'incremental'},null,scan.scanToken,1],timing);
+  assert(stages.includes('persist_validation')&&state.galacticLibraryDatabase.providerItems[item.id].ownership==='returned','Certificate skipped data-changing save validation');
+  checks.push('cold proof never certifies new access evidence; returned records still pass final save validation');
+}
 const fixtures=[
   ['steam','steam-store','GalacticSteamStore','fetchOwnedSteamGames','/account'],
   ['gog','gog','GalacticGog','fetchGogGames','/account'],

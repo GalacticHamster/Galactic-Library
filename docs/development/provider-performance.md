@@ -77,7 +77,9 @@ the library, and cancellation still invalidates the exact attempt.
 
 Mutable scan reads always read authoritative storage. Validation reuse requires
 exact equality with a detached, immutable, validated committed snapshot; a
-different value must validate. That proof does not depend on a worker surviving.
+different value must validate or match the protected current-code session
+certificate over its entire authoritative value. See the
+[certificate trust model](../architecture/query-validation-certificate.md).
 Commit passes the checked database into private reconciliation helpers rather
 than reading it again. The final database still passes full validation and an
 atomic save. Freshness, ownership changes, manual corrections, history and
@@ -102,6 +104,35 @@ in an actual packaged Chrome worker, stopping only its disposable worker and
 removing the session certificate for the explicit restart case. Worker IDs
 confirm a new generation. Use sizes 1000, 5000, 10000 and 20000 and `--root=PATH`
 for the browser baseline. Run browser measurements sequentially.
+
+Use `--cold-matrix --size=10000` for explicit warm/valid-certificate/no-certificate/
+digest-mismatch/data-change/incomplete cases. Every cold case seeds a validated
+synthetic library and certificate, then stops the disposable worker and waits
+for its service-worker target to disappear. Different worker IDs are asserted.
+Only the missing and mismatch cases remove or alter proof. All cases retain
+real packaged code, native storage and the production writer/message path.
+No provider requests are made. Each case resets its disposable library outside
+the timed operation so prior mutations do not contaminate the next proof case.
+
+Rows separate worker preparation/completion from privileged-client transport,
+which includes the full database reply and worker wakeup. Capture is explicitly
+zero. Read counts, small metadata mutations, validation passes, certificate
+read/serialization/hash, snapshot setup and closed fallback reasons are included.
+These nested durations must not be summed as independent stages. Metadata counts
+cover operations only, excluding background certificate issuance and benchmark
+setup. Older comparison roots lack some new substage instrumentation; zero for
+those absent spans is not proof of zero cost. The total worker/validation/native
+storage measurements remain comparable. Generated reports stay ignored.
+
+For live acceptance, reload the updated extension, enable existing page-local
+profiling, perform a quick update to establish current proof, then leave all GL
+activity idle for at least 60 seconds. Run another quick update and promptly
+export. Check that the worker ID changed and preparation shows `certificate_hit`,
+serialization/hash and no `read_validation`; unchanged incomplete completion
+should still have no full DB write/final validation. Compare a prompt warm
+repeat separately. Reload/update and browser restart may lose proof, so the first
+run can legitimately validate; do not advertise it as an eligible hit. Actual
+records recovered by a scan still require validated saves.
 
 Native matrix timings come from the worker journal; full-scan start includes
 one synchronous validation known from its writer path, not an extra journal

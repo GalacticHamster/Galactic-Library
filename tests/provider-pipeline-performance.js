@@ -12,6 +12,7 @@ import {PROVIDER_CHECKS_KEY,providerCheckDigest,applyProviderChecks} from '../sr
 import {handleExternalApiRequestAsync} from '../src/lib/external-api.js';
 import {steamOutcomeTests} from './steam-outcomes.js';
 import {providerStatusReceiptTests} from './provider-status-receipts.js';
+import {providerColdReadTests} from './provider-cold-reads.js';
 
 function steamFixture(responses){
   let queries=0;
@@ -20,6 +21,7 @@ function steamFixture(responses){
   return {S:c.GalacticSteamStore,queries:()=>queries};
 }
 export const providerPipelinePerformanceTests=[
+ ...providerColdReadTests,
  ...steamOutcomeTests,
  ...providerStatusReceiptTests,
  ['empty checks: an observed base change during receipt acquisition rejects the stale commit',async()=>{

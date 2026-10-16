@@ -28,14 +28,14 @@ export function syntheticProviderLibrary(size){
   return validateDatabase(db);
 }
 
-export function performanceWriter(database,{cache=true,stored:existing=null,beforeGet=()=>{},beforeSet=()=>{},afterSet=()=>{},beforeRemove=()=>{},writerFactory=createStorageWriter}={}){
+export function performanceWriter(database,{cache=true,stored:existing=null,beforeGet=()=>{},beforeSet=()=>{},afterSet=()=>{},beforeRemove=()=>{},writerFactory=createStorageWriter,certificateArea=null}={}){
   const stored=existing??{galacticLibraryDatabase:structuredClone(database)},counts={databaseReads:0,databaseWrites:0,bytesWritten:0,metadataWrites:0,metadataBytes:0},journal=createQueryDiagnostics({limit:192});
   const area={
     async get(defaults){await beforeGet(defaults);if(Object.hasOwn(defaults,'galacticLibraryDatabase'))counts.databaseReads++;return structuredClone(Object.fromEntries(Object.entries(defaults).map(([key,value])=>[key,Object.hasOwn(stored,key)?stored[key]:value])));},
     async set(updates){await beforeSet(updates);if(updates.galacticLibraryDatabase){counts.databaseWrites++;counts.bytesWritten+=Buffer.byteLength(JSON.stringify(updates.galacticLibraryDatabase));}else{counts.metadataWrites++;counts.metadataBytes+=Buffer.byteLength(JSON.stringify(updates));}Object.assign(stored,structuredClone(updates));await afterSet(updates);},
     async remove(keys){await beforeRemove(keys);counts.metadataWrites++;for(const key of [keys].flat())delete stored[key];}
   };
-  const writer=writerFactory(area,Promise.resolve(),{cacheQuerySnapshots:cache,diagnostics:journal});
+  const writer=writerFactory(area,Promise.resolve(),{cacheQuerySnapshots:cache,diagnostics:journal,certificateArea});
   return {writer,stored,counts,journal};
 }
 

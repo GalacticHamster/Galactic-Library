@@ -48,8 +48,9 @@ import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerChec
 /**
  * Instantiate once in the service worker. Mutations and ordinary storage
  * operations share one queue. Integration queries use detached committed read
- * snapshots. Refresh and Kobo checks can reuse their validation only after a fresh, exact
- * whole-value storage comparison, and receives a detached mutable copy.
+ * snapshots. Provider/refresh reads can reuse validation only after a fresh,
+ * exact whole-value snapshot comparison or protected session proof. They return
+ * a separate mutable value; incoming data and saves still require validation.
  */
 export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null} = {}) {
   const PROFILE_HINTS='galacticLibraryProviderProfileHints';
@@ -151,23 +152,25 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     querySnapshot=null;querySnapshotEpoch++;
     snapshotEvent('invalidated',source,previousSnapshot);
   }
-  function publishQuerySnapshot(database){
+  function publishQuerySnapshot(database,verifiedDigest=null){
     const previousSnapshot=committedSnapshotSequence(querySnapshot);
     querySnapshotEpoch++;
     // Only these trusted writer paths supply fully validated committed values.
     // Detach before sharing: caller-owned mutable results must not affect queries.
     querySnapshot=null;
     try{if(cacheQuerySnapshots&&querySnapshotsUsed){
-      const endClone=activeTiming?.begin('snapshot_clone');let detached;
-      try{detached=structuredClone(database);}finally{endClone?.();}
-      const endFreeze=activeTiming?.begin('snapshot_freeze');
-      try{querySnapshot=registerCommittedSnapshot(freezeQuerySnapshot(detached));}finally{endFreeze?.();}
+      const detached=timed('snapshot_clone',()=>structuredClone(database));
+      querySnapshot=timed('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(detached)));
     }}
     catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
     snapshotEvent(querySnapshot?'published':'unavailable','writer',previousSnapshot);
     // Every authoritative DB set funnels through here after full validation.
     // No additional snapshot copy is made solely to obtain a certificate.
-    if(querySnapshot)certificates.issue(querySnapshot);else certificates.clear();
+    if(querySnapshot&&verifiedDigest){
+      // The certificate verified this exact detached storage value. Reuse its
+      // hash for receipts; neither reserialize nor reissue the same proof.
+      checkDigests.set(querySnapshot,Promise.resolve(verifiedDigest));
+    }else if(querySnapshot)certificates.issue(querySnapshot);else certificates.clear();
   }
   storageArea={
     async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
@@ -258,12 +261,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   // is reused for a write. Only the worker with change observation enables this.
   let refreshProjection=null,refreshProjectionEpoch=0;
   const invalidateRefreshPreflight=()=>{refreshProjection=null;refreshProjectionEpoch++;};
-  const timed = (stage, work) => { const end=activeTiming?.begin(stage);try{return work();}finally{end?.();} };
+  const readStages=new Set(['storage_read','read_committed_compare','read_committed_clone','read_certificate','read_certificate_retry','certificate_hit','certificate_miss','migration_compare','snapshot_clone','snapshot_freeze','provider_check_digest']);
+  const timed = (stage, work) => { const end=activeTiming?.begin(stage),journalEnd=readStages.has(stage)?activity(stage,{operation:activeOperation}):null;try{return work();}finally{end?.();journalEnd?.();} };
   const timedAsync = (stage, work) => {
-    if(!activeTiming)return work();
-    const end=activeTiming.begin(stage);
+    if(!activeTiming&&!readStages.has(stage))return work();
+    const end=activeTiming?.begin(stage),journalEnd=readStages.has(stage)?activity(stage,{operation:activeOperation}):null;
     if(stage==='storage_write'||stage==='migration_write'){try{activeTiming.onWrite?.();}catch{/* Diagnostics must never prevent a write. */}}
-    return (async()=>{try{return await work();}finally{end();}})();
+    return (async()=>{try{return await work();}finally{end?.();journalEnd?.();}})();
   };
   async function validateForWriter(value){
     const timing=activeTiming;let endStage,endActivityStage;const endActivity=activity('validation',{operation:activeOperation});
@@ -511,6 +515,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     // A successful refresh commit should publish a proof for its next batch,
     // even if no Options/companion query has requested a snapshot yet.
     if(reuseCommittedValidation&&cacheQuerySnapshots)querySnapshotsUsed=true;
+    const epoch=querySnapshotEpoch;
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if(activeTiming)activeTiming.recordsRead=(activeTiming.recordsRead??0)+Object.keys(stored[DATABASE_STORAGE_KEY]?.providerItems??{}).length;
     if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
@@ -522,7 +527,22 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       &&timed('read_committed_compare',()=>equalDatabaseData(stored[DATABASE_STORAGE_KEY],committed))){
       return checkedProviderView(timed('read_committed_clone',()=>structuredClone(committed)),committed);
     }
+    if(reuseCommittedValidation&&cacheQuerySnapshots){
+      // Authoritative cold mutation reads may reuse only exact current-code
+      // validation proof. This never validates incoming records or a save.
+      const verifiedDigest=await timedAsync('read_certificate',()=>certificates.verifyDigest(stored[DATABASE_STORAGE_KEY],{beginSpan:stage=>{
+        const end=activeTiming?.begin(stage),endActivity=activity(stage,{operation:activeOperation});
+        return ()=>{end?.();endActivity();};
+      }}));
+      if(epoch!==querySnapshotEpoch){timed('read_certificate_retry',()=>{});return readDatabase(true);}
+      timed(verifiedDigest?'certificate_hit':'certificate_miss',()=>{});
+      if(verifiedDigest){
+        publishQuerySnapshot(stored[DATABASE_STORAGE_KEY],verifiedDigest);
+        return checkedProviderView(stored[DATABASE_STORAGE_KEY],querySnapshot??stored[DATABASE_STORAGE_KEY]);
+      }
+    }
     const database = await timedAsync('read_validation',()=>validateForWriter(stored[DATABASE_STORAGE_KEY]));
+    if(reuseCommittedValidation&&cacheQuerySnapshots&&epoch!==querySnapshotEpoch){timed('read_certificate_retry',()=>{});return readDatabase(true);}
     if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
