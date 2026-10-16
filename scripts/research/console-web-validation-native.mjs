@@ -30,7 +30,10 @@ files.set('fixture.js',Buffer.from(`
     window.fixtureNetworkCalls++;
     const ps=location.pathname==='/ps',u=new URL(input),v=ps?JSON.parse(u.searchParams.get('variables')):JSON.parse(options.body).variables,offset=v.start??v.offset;
     if(ps&&options?.headers?.['Content-Type']!=='application/json')return Promise.resolve(new Response(JSON.stringify([{message:'This operation has been blocked as a potential Cross-Site Request Forgery (CSRF).',extensions:{}}]),{status:400}));
-    if(ps&&u.searchParams.get('operationName')==='getProfileOracle')return Promise.resolve(new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name'}}}),{status:200}));
+    if(ps&&u.searchParams.get('operationName')==='getProfileOracle'){
+      if(options?.headers?.['apollographql-client-name']!=='FixtureLibrary'||options?.headers?.['apollographql-client-version']!=='1.2.3')return Promise.resolve(new Response(JSON.stringify({errors:[{message:'Cannot query field "oracleUserProfileRetrieve" on type "Query".'}]}),{status:400}));
+      return Promise.resolve(new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name'}}}),{status:200}));
+    }
     const rows=offset===0?[{id:'private-one',productId:'private-p1',applicationId:'private-s1',name:'Private title',isLending:false},{id:'private-two',productId:'private-p2',applicationId:'private-s2'}]:[{id:'private-three',productId:'private-p3',applicationId:'private-s3'}];
     const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViewsV2:{views:rows.map(row=>({...row,ownerNaId:'private-account',userNaId:'private-account'})),offsetInfo:{offset,total:3}}}}}};
     return Promise.resolve(new Response(JSON.stringify(body),{status:200}));
@@ -38,7 +41,7 @@ files.set('fixture.js',Buffer.from(`
   window.fixtureFetch=offset=>location.pathname==='/ps'?fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getPurchasedGameList',variables:JSON.stringify({start:offset,size:2}),extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'a'.repeat(64)}})}),{headers:{'Content-Type':'application/json'}}):
     fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName:'getVgcsVgcs',query:'query getVgcsVgcs { account { vgc { vgcViewsV2 { views { id } } } } }',variables:{offset,limit:2,idToken:'private-token'}})});
   if(location.pathname!=='/ps')window.fixtureAux=async()=>{for(const operationName of ['getVgcTotalsVgcs','getDevicesVgcs','getAllDevicesVgcs'])await fetch('https://wb.lp1.savanna.srv.nintendo.net/graphql',{method:'POST',body:JSON.stringify({operationName,variables:{}})});};
-  else window.fixtureAux=()=>fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getProfileOracle',variables:'{}',extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'b'.repeat(64)}})}),{headers:{'Content-Type':'application/json'}});
+  else window.fixtureAux=()=>fetch('https://web.np.playstation.com/api/graphql/v1/op?'+new URLSearchParams({operationName:'getProfileOracle',variables:'{}',extensions:JSON.stringify({persistedQuery:{version:1,sha256Hash:'b'.repeat(64)}})}),{headers:{'Content-Type':'application/json','apollographql-client-name':'FixtureLibrary','apollographql-client-version':'1.2.3'}});
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-console-helper-'));let child,driver,session,exited;
 try{
@@ -88,11 +91,13 @@ try{
       assert.equal(check.report.accountIdentity.accountIdPresent,true);assert.equal(check.report.scopes.length,1);
       const account=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check-account]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check-account]").disabled};');
       assert.equal(account.report.readOnlyAccountCheck.recognizedAccountProfile,true);assert.equal(account.calls,5);assert.equal(account.disabled,true);assert(!JSON.stringify(account.report).includes('private'));
-      assert.equal(account.report.helperVersion,'0.1.9');
+      assert.equal(account.report.helperVersion,'0.1.10');
       assert.equal(account.report.accountRequestContext.method,'GET');
       assert.equal(account.report.accountRequestContext.contentType,'application/json');
-      assert.deepEqual(account.report.accountRequestContext.headerNames,['content-type']);
-      assert.equal(account.report.readOnlyAccountCheck.fetchContext,'page-current');
+      assert.deepEqual(account.report.accountRequestContext.headerNames,['content-type','apollographql-client-name','apollographql-client-version']);
+      assert.equal(account.report.readOnlyAccountCheck.fetchContext,'native-observed-client');
+      assert.equal(account.report.readOnlyAccountCheck.observedClientMetadataApplied,true);
+      assert(!JSON.stringify(account.report).includes('FixtureLibrary'));assert(!JSON.stringify(account.report).includes('1.2.3'));
     }
     const stopped=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=stop]").click();await new Promise(r=>setTimeout(r,20));return {report:JSON.parse(s.querySelector("textarea").value),text:s.querySelector("[role=status]").textContent,visible:document.querySelector("#gl-console-validation").getBoundingClientRect().width>0};');
     assert.equal(stopped.report.active,false);assert(stopped.visible);assert.match(stopped.text,/stopped/);

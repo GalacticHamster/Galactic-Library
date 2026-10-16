@@ -12,6 +12,29 @@
   const psHeaders=['accept','content-type','authorization','x-psn-store-locale','x-psn-request-scope','x-psn-platform','x-psn-account-id','x-apollo-operation-name','apollo-require-preflight','apollographql-client-name','apollographql-client-version'];
   const psContextHeader=name=>psHeaders.includes(name)||typeof name==='string'&&/^x-(?:psn|apollo|sony)-[a-z][a-z0-9-]{0,47}$/u.test(name);
   const psParameters=['operationName','variables','extensions','query','locale','features','operationType'];
+  const psClientHeaders=['apollographql-client-name','apollographql-client-version'];
+  function validPsClientMetadata(value){
+    try{
+      if(!value||typeof value!=='object'||Array.isArray(value)||Reflect.ownKeys(value).length!==2)return false;
+      const descriptors=Object.getOwnPropertyDescriptors(value);
+      return psClientHeaders.every(key=>typeof descriptors[key]?.value==='string'&&/^[A-Za-z0-9][A-Za-z0-9 ._/@:+-]{0,127}$/u.test(descriptors[key].value));
+    }catch{return false;}
+  }
+  function psClientMetadata(input,options={}){
+    // Only these two website client-metadata values may be reused, in page
+    // memory, for the explicit account check. Never enumerate/copy other values.
+    if(!psCookieQuery(input,options,'getProfileOracle'))return null;
+    try{
+      const h=options.headers??(typeof input==='object'?input.headers:null);if(!h)return null;
+      const read=name=>{
+        if(Array.isArray(h)){const pairs=h.slice(0,100).filter(p=>Array.isArray(p)&&typeof p[0]==='string'&&p[0].toLowerCase()===name);return pairs.length===1?pairs[0][1]:null;}
+        if(typeof h.get==='function')return h.get(name);
+        const keys=Object.keys(h).filter(k=>k.toLowerCase()===name);return keys.length===1?h[keys[0]]:null;
+      };
+      const metadata=Object.fromEntries(psClientHeaders.map(key=>[key,read(key)]));
+      return validPsClientMetadata(metadata)?Object.freeze(metadata):null;
+    }catch{return null;}
+  }
   function psRequestContext(input,options={}){
     // Field presence only. Never construct/copy a Headers object or read an
     // authorization value, client ID, query/variable value into diagnostics.
@@ -115,13 +138,16 @@
       return url.href;
     }catch{return null;}
   }
-  async function checkPsCookieAccess(url,fetchImpl=fetch,operation='getPurchasedGameList'){
+  async function checkPsCookieAccess(url,fetchImpl=fetch,operation='getPurchasedGameList',clientMetadata=null){
     const safe=psCookieQuery(url,{},operation);if(!safe)return {state:'unavailable',reason:'no-observed-safe-query'};
+    if(clientMetadata!==null&&(operation!=='getProfileOracle'||!validPsClientMetadata(clientMetadata)))return {state:'unavailable',reason:'invalid-client-context'};
     try{
       // JSON content type satisfies Apollo's CSRF/preflight requirement for GET.
       // These fixed protocol headers contain no Sony client/authentication data.
-      const response=await fetchImpl(safe,{credentials:'include',redirect:'error',headers:{Accept:'application/json','Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});
-      const result={state:'complete',httpStatus:response.status,pagesRequested:1,extraAuthorizationHeaders:false,requestFormat:'json-content-type'};
+      const headers={Accept:'application/json','Content-Type':'application/json'};
+      if(clientMetadata)for(const key of psClientHeaders)headers[key]=clientMetadata[key];
+      const response=await fetchImpl(safe,{credentials:'include',redirect:'error',headers,signal:AbortSignal.timeout(20000)});
+      const result={state:'complete',httpStatus:response.status,pagesRequested:1,extraAuthorizationHeaders:false,requestFormat:'json-content-type',...(clientMetadata?{observedClientMetadataApplied:true}:{})};
       const rejected=response.status!==200,failure={...result,reason:rejected?'request-rejected':'unrecognized-response',recognizedPurchasedPage:false};
       const reader=response.body?.getReader();if(!reader)return {...failure,...(rejected?psErrorSummary(null,response.status):{})};
       const chunks=[];let size=0;try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2097152){void reader.cancel();return {...result,reason:'response-bound',recognizedPurchasedPage:false};}chunks.push(value);}}finally{reader.releaseLock();}
@@ -265,7 +291,7 @@
         scope.accountRelations.candidatePresent&&=page.accountRelations.candidatePresent;
         for(const key of ['ownerMatchesAccount','userMatchesAccount','neitherMatchesAccount','ownerOrUserAbsent'])scope.accountRelations[key]+=page.accountRelations[key];
       }
-      return {format:1,helperVersion:'0.1.9',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
+      return {format:1,helperVersion:'0.1.10',provider,readOnly:true,requestsObserved:requests,failedRequests:failures,unrecognizedOperations:unknownOperations,auxiliaryRequests:auxiliary,malformedPages:malformed,boundReached:bounded,
         accountIdentity:provider==='playstation'?{source:'getProfileOracle',responsesObserved:accountResponses,accountIdPresent,onlineIdPresent,accountChanged}:{source:'state.user.obfuscatedId',candidatePresent:priorAccount!==null,accountChanged},
         requestContracts:observations,scopes:[...scopes].map(([scope,s])=>{
           const pages=s.pages.sort((a,b)=>a.offset-b.offset);let end=0,contiguous=true;
@@ -291,7 +317,7 @@
     const safeShape=row=>({type:['object','array','string','number','boolean','null','undefined'].includes(row.type)?row.type:'unknown',...(integer(row.keyCount)?{keyCount:row.keyCount}:{}),fields:Object.fromEntries(Object.entries(row.fields??{}).filter(([key,type])=>bootstrapFields.includes(key)&&['object','array','string','number','boolean','null','undefined'].includes(type)))});
     const result={format:1,provider:input.provider,readOnly:true,...numbers(input),boundReached:input.boundReached===true,
       active:input.active===true,accountIsolationValidated:false,ownershipSemanticsValidated:false,accountLibraryComplete:false};
-    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5','0.1.6','0.1.7','0.1.8','0.1.9'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
+    if(['0.1.1','0.1.2','0.1.3','0.1.4','0.1.5','0.1.6','0.1.7','0.1.8','0.1.9','0.1.10'].includes(input.helperVersion))result.helperVersion=input.helperVersion;
     result.requestContracts=(Array.isArray(input.requestContracts)?input.requestContracts:[]).slice(0,20).flatMap(r=>{
       // Validate endpoints independently of request bodies on the receiving side.
       let url;try{url=new URL(r.endpoint);}catch{return [];}
@@ -310,7 +336,7 @@
     if(input.provider==='playstation'&&input.accountRequestContext){const r=input.accountRequestContext;result.accountRequestContext={endpoint:'https://web.np.playstation.com/api/graphql/v1/op',method:['GET','POST'].includes(r.method)?r.method:'unrecognized',queryParameterNames:(Array.isArray(r.queryParameterNames)?r.queryParameterNames:[]).filter(k=>psParameters.includes(k)).slice(0,psParameters.length),otherQueryParameters:integer(r.otherQueryParameters)?r.otherQueryParameters:0,queryDocumentPresent:r.queryDocumentPresent===true,knownQueryFields:(Array.isArray(r.knownQueryFields)?r.knownQueryFields:[]).filter(k=>['oracleUserProfileRetrieve','userProfilesRetrieve','accountId','onlineId'].includes(k)).slice(0,4),extensionFields:(Array.isArray(r.extensionFields)?r.extensionFields:[]).filter(k=>['persistedQuery','clientLibrary','clientLibraryVersion'].includes(k)).slice(0,3),otherExtensionFields:integer(r.otherExtensionFields)?r.otherExtensionFields:0,headersObservable:r.headersObservable===true,headerNames:(Array.isArray(r.headerNames)?r.headerNames:[]).filter(psContextHeader).slice(0,100),otherHeaders:integer(r.otherHeaders)?r.otherHeaders:0,contentType:['absent','application/json','text/plain','other'].includes(r.contentType)?r.contentType:'other'};}
     if(input.observerState){const r=input.observerState;result.observerState={fetchHookInstalled:r.fetchHookInstalled===true,xhrOpenHookInstalled:r.xhrOpenHookInstalled===true,xhrSendHookInstalled:r.xhrSendHookInstalled===true,fetchCalls:integer(r.fetchCalls)?r.fetchCalls:0,xhrCalls:integer(r.xhrCalls)?r.xhrCalls:0};}
     if(input.readOnlyCookieCheck){const r=input.readOnlyCookieCheck;result.readOnlyCookieCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-purchase-page','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedPurchasedPage:r.recognizedPurchasedPage===true,extraAuthorizationHeaders:false,...numbers(r),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
-    if(input.provider==='playstation'&&input.readOnlyAccountCheck){const r=input.readOnlyAccountCheck;result.readOnlyAccountCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-account-profile','transport-or-response-failure'].includes(r.reason)?r.reason:null,recognizedAccountProfile:r.recognizedAccountProfile===true,accountIdPresent:r.accountIdPresent===true,onlineIdPresent:r.onlineIdPresent===true,...(r.fetchContext==='page-current'?{fetchContext:'page-current',helperCopiedAuthorizationHeaders:false}:{extraAuthorizationHeaders:false}),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
+    if(input.provider==='playstation'&&input.readOnlyAccountCheck){const r=input.readOnlyAccountCheck;result.readOnlyAccountCheck={state:['ready','running','complete','unavailable'].includes(r.state)?r.state:'unavailable',reason:['no-observed-safe-query','request-rejected','unrecognized-response','response-bound','recognized-account-profile','transport-or-response-failure','invalid-client-context','observed-client-context-unavailable'].includes(r.reason)?r.reason:null,recognizedAccountProfile:r.recognizedAccountProfile===true,accountIdPresent:r.accountIdPresent===true,onlineIdPresent:r.onlineIdPresent===true,...(['page-current','native-observed-client'].includes(r.fetchContext)?{fetchContext:r.fetchContext,helperCopiedAuthorizationHeaders:false}:{extraAuthorizationHeaders:false}),...(r.observedClientMetadataApplied===true?{observedClientMetadataApplied:true}:{}),...(integer(r.httpStatus)&&r.httpStatus<=599?{httpStatus:r.httpStatus}:{}),...(r.pagesRequested===1?{pagesRequested:1}:{}),...(r.requestFormat==='json-content-type'?{requestFormat:r.requestFormat}:{}),...(psErrorCategories.includes(r.errorCategory)?{errorCategory:r.errorCategory}:{}),...(Array.isArray(r.errorCodes)?{errorCodes:r.errorCodes.slice(0,20).filter(code=>psErrorCodes.includes(code))}:{})};}
     if(input.bootstrap&&input.provider==='nintendo'){
       const b=input.bootstrap;result.bootstrap={blocks:(Array.isArray(b.blocks)?b.blocks:[]).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,parsed:row.parsed===true,...safeShape(row)})),boundReached:b.boundReached===true,
         structure:(Array.isArray(b.structure)?b.structure:[]).slice(0,40).filter(row=>['data','state','meta'].includes(row.block)).map(row=>({block:row.block,...safeShape(row)})),
@@ -321,5 +347,5 @@
     if(input.resources&&input.provider==='nintendo')result.resources={boundReached:input.resources.boundReached===true,groups:(Array.isArray(input.resources.groups)?input.resources.groups:[]).slice(0,30).filter(row=>typeof row.host==='string'&&nintendoHost(row.host)&&['fetch','xmlhttprequest','script','iframe','other'].includes(row.kind)&&integer(row.count)&&integer(row.graphqlPaths)).map(row=>({host:row.host,kind:row.kind,count:row.count,graphqlPaths:row.graphqlPaths}))};
     return result;
   }
-  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport,psCookieQuery,checkPsCookieAccess,psRequestContext,nintendoAccountCandidate,bootstrapSummary,resourceSummary});
+  root.GLConsoleValidationCore=Object.freeze({providerForLocation,requestInfo,createLedger,sanitizeReport,psCookieQuery,checkPsCookieAccess,psRequestContext,psClientMetadata,nintendoAccountCandidate,bootstrapSummary,resourceSummary});
 })(globalThis);

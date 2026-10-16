@@ -5,13 +5,14 @@
   const provider=C.providerForLocation(location);if(!provider)return;
   const ledger=C.createLedger(provider,{readNintendoAccount:()=>C.nintendoAccountCandidate(globalThis.document)}),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true,psQuery=null,psAccountQuery=null,accountRequestContext=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  let active=true,psQuery=null,psAccountQuery=null,psAccountClientMetadata=null,accountRequestContext=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
   function captureQuery(input,options){
     if(provider!=='playstation'||!active)return;
     if(!psQuery){psQuery=C.psCookieQuery(input,options);if(psQuery)cookieCheck={state:'ready'};}
-    if(!psAccountQuery){psAccountQuery=C.psCookieQuery(input,options,'getProfileOracle');if(psAccountQuery){accountRequestContext=C.psRequestContext(input,options);accountCheck={state:'ready'};}}
+    if(!psAccountQuery||!psAccountClientMetadata){const query=C.psCookieQuery(input,options,'getProfileOracle');if(query){accountRequestContext=C.psRequestContext(input,options);return {query,clientMetadata:C.psClientMetadata(input,options)};}}
+    return null;
   }
-  async function inspect(response,info){
+  async function inspect(response,info,accountCandidate){
     if(!active||!info)return;
     try{
       if(response.status!==200){ledger.observe(info,response.status,null);return;}
@@ -20,17 +21,26 @@
       try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2*1024*1024){void reader.cancel();ledger.observe(info,response.status,null);return;}chunks.push(value);}}
       finally{reader.releaseLock();}
       const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-      const body=JSON.parse(new TextDecoder().decode(bytes));if(active)ledger.observe(info,response.status,body);
+      const body=JSON.parse(new TextDecoder().decode(bytes));if(active){
+        ledger.observe(info,response.status,body);
+        // Only a successful, recognized website profile can supply the client
+        // context. Failed/malformed requests cannot seed the explicit check.
+        const accountId=body?.data?.oracleUserProfileRetrieve?.accountId;
+        if(accountCandidate&&!body?.errors?.length&&typeof accountId==='string'&&accountId.length>0&&accountId.length<=200){
+          psAccountQuery=accountCandidate.query;psAccountClientMetadata=accountCandidate.clientMetadata;
+          accountCheck=psAccountClientMetadata?{state:'ready'}:{state:'unavailable',reason:'observed-client-context-unavailable'};
+        }
+      }
     }catch{if(active)ledger.observe(info,response.status,null);/* Never log private errors. */}
   }
   function wrappedFetch(...args){
     fetchCalls++;
     const result=Reflect.apply(originalFetch,this,args);
-    // Only profile-request header names and a fixed Content-Type category are
-    // inspected for diagnostics. Cookie/authorization values are never read.
+    // Profile header names/Content-Type are diagnostic. Only two Apollo client
+    // values may be retained in page memory; cookie/auth values are never read.
     const info=C.requestInfo(provider,args[0],args[1]);
-    captureQuery(args[0],args[1]);
-    if(info)void result.then(response=>inspect(response,info),()=>{if(active)ledger.observe(info,0,null);});
+    const accountCandidate=captureQuery(args[0],args[1]);
+    if(info)void result.then(response=>inspect(response,info,accountCandidate),()=>{if(active)ledger.observe(info,0,null);});
     return result;
   }
   function wrappedOpen(method,url,...rest){
@@ -48,7 +58,7 @@
     return Reflect.apply(originalSend,this,[body]);
   }
   globalThis.fetch=wrappedFetch;if(xhr){xhr.open=wrappedOpen;xhr.send=wrappedSend;}
-  function stop(){active=false;if(globalThis.fetch===wrappedFetch)globalThis.fetch=originalFetch;if(xhr?.open===wrappedOpen)xhr.open=originalOpen;if(xhr?.send===wrappedSend)xhr.send=originalSend;}
+  function stop(){active=false;psAccountClientMetadata=null;if(globalThis.fetch===wrappedFetch)globalThis.fetch=originalFetch;if(xhr?.open===wrappedOpen)xhr.open=originalOpen;if(xhr?.send===wrappedSend)xhr.send=originalSend;}
   addEventListener('message',async event=>{
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
       typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check','check-account'].includes(event.data.action))return;
@@ -58,11 +68,10 @@
       cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
     }
     if(event.data.action==='check-account'&&active&&provider==='playstation'&&psAccountQuery&&accountCheck.state==='ready'){
-      // Unlike the purchase control, exercise the website's current fetch path.
-      // Its wrapper may supply request context absent from native fetch captured
-      // at document start. Do not extract/copy headers, credentials or token caches.
-      accountCheck={state:'running',fetchContext:'page-current'};reply();
-      accountCheck={...await C.checkPsCookieAccess(psAccountQuery,(...args)=>Reflect.apply(globalThis.fetch,globalThis,args),'getProfileOracle'),fetchContext:'page-current'};
+      // Controlled check: same public query/cookie session and native fetch as
+      // the purchase control, plus only the two successful website client headers.
+      accountCheck={state:'running',fetchContext:'native-observed-client'};reply();
+      accountCheck={...await C.checkPsCookieAccess(psAccountQuery,originalFetch,'getProfileOracle',psAccountClientMetadata),fetchContext:'native-observed-client'};
       if(active)reply();return;
     }
     reply();

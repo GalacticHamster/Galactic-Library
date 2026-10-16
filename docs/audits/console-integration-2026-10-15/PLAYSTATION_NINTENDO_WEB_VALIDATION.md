@@ -350,11 +350,10 @@ are exported; authorization values are never read. Header inspection is capped
 at 100 names and diagnostics are reprojected in the isolated world. No persistent
 storage, production provider behavior or permissions change.
 
-Next live check: reload the helper and PlayStation Library, verify the helper
-shows **0.1.9**, click **Test account lookup**, then **Copy summary**. The new
-`accountRequestContext` section supplies the metadata automatically; no manual
-DevTools/header copying is required. Production PlayStation import remains
-blocked pending reliable account binding; no live purchases were imported.
+The user supplied the 0.1.9 summary; its new `accountRequestContext` section
+provides the metadata automatically. Findings and the next control follow below.
+Production PlayStation import remains blocked pending reliable account binding;
+no live purchases were imported.
 
 Reproduction: `node --test tests/console-library.test.mjs`, `node tests/run.js`,
 `node tests/nintendo-native.mjs` (add `--firefox`), and packaged Providers UI via
@@ -380,7 +379,55 @@ Focused tests include the exact redacted newest-first variable shape and matchin
 the reported newest-first request. No provider request, stored ownership,
 matching rule or account guard is changed by this correction.
 
+## PlayStation client-header control: helper 0.1.10
+
+The user's **0.1.9** export narrows the observed request differences. The
+successful website profile request is a GET at the same endpoint with only
+`operationName`, empty `variables` and `extensions.persistedQuery`; no query
+document, additional extension fields or other URL parameters were observed.
+Its four headers are Accept, JSON Content-Type, `apollographql-client-name`
+and `apollographql-client-version`. No Authorization or other request headers
+were observed. The helper supplied only Accept and JSON Content-Type and still
+received the schema error through current-page fetch.
+
+Those two omitted client headers are now the concrete controlled difference to
+test, **not an established live root cause**. [Apollo documents these headers as
+client name/version metadata](https://www.apollographql.com/docs/graphos/routing/observability/client-awareness).
+That documentation does not prove how Sony routes this operation. No alternate
+GraphQL field, hash, endpoint or client identity has been guessed.
+
+Helper **0.1.10** retains only those two website-observed metadata values in
+page memory, validates their lengths/characters, and uses them only after the
+corresponding website profile response succeeds with a recognized account ID.
+Clicking **Test account lookup** makes one native-fetch request with the same
+observed public hash, empty variables, fixed JSON headers and browser cookies,
+adding just those two client headers. It does not depend on a later page fetch
+wrapper, copy Authorization/cookies, request new permissions, retry or change
+the previously successful purchase control. Stop/reload clears the retained
+client context. Metadata values never reach the isolated UI, summaries, storage
+or fixtures; the result exports only `observedClientMetadataApplied: true` and
+`fetchContext: native-observed-client`. Missing/invalid metadata prevents the
+test with an explicit explanation rather than sending guessed values. Explicit
+native checks appear in their result sections, separately from website request
+observations in the ledger.
+
+Next live check: reload helper **0.1.10** and PlayStation Library, click
+**Test account lookup**, then **Copy summary**. A success would establish that
+the pair of client headers repairs this request in this session; a failure
+leaves the account-lookup blocker unresolved. No production PlayStation importer
+has been enabled and no live purchases have been changed.
+
 ## Validation
+
+Helper 0.1.10: **32 focused synthetic tests**, installed-helper checks for both
+providers in **Chrome and Firefox**, **1,214 GL unit tests** including matching
+parity, repository/link checks and both production packaging checks pass in an
+artifact-free checkout. Synthetic account responses require the two observed
+client-header names and prove the control reuses them without exporting values;
+this is not live Sony schema-routing evidence. Failed/malformed website profiles,
+missing or invalid metadata, extra credential fields and repeated test clicks
+cannot initiate an unauthorized extra check. Production runtime/package hashes
+are unchanged.
 
 Helper 0.1.9: **30 focused synthetic tests**, installed-helper checks for both
 providers in **Chrome and Firefox**, **1,214 GL unit tests** including matching
