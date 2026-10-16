@@ -1,4 +1,5 @@
 import {xboxImportTests} from './xbox-import.js';
+import {consoleCompanionTests} from './console-companion.js';
 import {manualReconciliationTests} from './manual-reconciliation.js';
 import {consoleLibraryTests} from './console-library.js';
 import {nintendoImportTests} from './nintendo-import.js';
@@ -146,6 +147,7 @@ const tests = [
   ...parentScopedComponentCases,
   ...ownershipPolicyTests,
   ...commonMatchingPolicyTests,
+  ...consoleCompanionTests,
   ...companionTitleOwnershipTests,
   ['sorts numbered media titles in reading order', () => {
     assert.deepEqual(

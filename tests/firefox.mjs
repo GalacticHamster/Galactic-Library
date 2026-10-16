@@ -8,6 +8,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,projectRoot} from '../scripts/release.mjs';
+import {seedConsoleCompanionLibrary,checkConsoleCompanionResults} from './fixtures/console-companion-native.mjs';
 
 const candidates=[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe'];
 if(process.platform==='win32'){try{const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}catch{}}
@@ -50,7 +51,7 @@ try{
     await evaluate(`document.querySelector('#check-companion-connections').click();for(let n=0;n<200;n++){if([...document.querySelector('#official-companion-status').children].every(row=>row.textContent.includes('Connected (API 1)')))return true;await new Promise(done=>setTimeout(done,20));}throw Error('GL named companion statuses did not verify');`);console.log('PASS Firefox settings: GL verifies both named official companions through normal controls');
     await evaluate(`const S=await import('./src/lib/storage.js');await S.saveAllowedExternalClientIds([]);return true;`);
     await navigate(hb.id,hb.manifest.options_page);
-    assert(await evaluate(`document.querySelector('#test-galactic-library-link').click();for(let n=0;n<200;n++){const text=document.querySelector('#galactic-library-link-status').textContent;if(text.startsWith('Connected to Galactic Library'))return true;await new Promise(done=>setTimeout(done,20));}throw Error('HB automatic settings connection check failed');`));console.log('PASS Firefox settings: HB verifies automatic GL connection through the normal UI');
+    assert(await evaluate(`for(let n=0;n<200&&!document.querySelector('#galactic-library-link-status').textContent.includes('Automatic Galactic Library pairing ready.');n++)await new Promise(done=>setTimeout(done,20));document.querySelector('#test-galactic-library-link').click();for(let n=0;n<200;n++){const text=document.querySelector('#galactic-library-link-status').textContent;if(text.startsWith('Connected to Galactic Library'))return true;await new Promise(done=>setTimeout(done,20));}throw Error('HB automatic settings connection check failed: '+document.querySelector('#galactic-library-link-status').textContent);`));console.log('PASS Firefox settings: HB verifies automatic GL connection through the normal UI');
     const hbChecks=await evaluate((await readFile(join(hbRoot,'tests/runtime-checks.js'),'utf8'))+';return await installedRuntimeChecks();');hbChecks.checks.forEach(name=>console.log('PASS installed Firefox HB: '+name));
     await evaluate(`const H=HumbleComicLibrary;if(H.resolveGalacticId('',chrome.runtime)!==${JSON.stringify(installed.id)})throw Error('Wrong automatic HB target');document.querySelector('#share-gl-profile').value='central-synthetic';document.querySelector('#confirm-reminder-sharing').checked=true;document.querySelector('#share-entitlements').click();for(let n=0;n<200;n++){const text=document.querySelector('#entitlement-share-status').textContent;if(text.startsWith('Shared 1 entitlements'))return true;if(!document.querySelector('#share-entitlements').disabled)throw Error(text);await new Promise(done=>setTimeout(done,20));}throw Error('Reminder sharing did not complete');`);console.log('PASS Firefox pairing: installed HB options shares private entitlement reminders using its stable add-on ID');
     await navigate(fan.id,fan.manifest.options_page);
@@ -127,6 +128,14 @@ try{
       return true;
     `);
     console.log('PASS Firefox ownership preference: disabling choices restores uncertain and borrowed matches to Possible');
+    await navigate(installed.id,installed.manifest.options_page);
+    await evaluate('await ('+seedConsoleCompanionLibrary.toString()+')();return true;');
+    await navigate(fan.id,fan.manifest.options_page);
+    assert(await evaluate('return await ('+checkConsoleCompanionResults.toString()+')(message=>chrome.runtime.sendMessage('+JSON.stringify(installed.id)+',message),FanaticalLibrary);'));
+    await navigate(hb.id,hb.manifest.options_page);
+    assert(await evaluate('return await ('+checkConsoleCompanionResults.toString()+')(message=>chrome.runtime.sendMessage('+JSON.stringify(installed.id)+',message));'));
+    console.log('PASS Firefox consoles: actual GL worker to HB/FAN, FAN validation/classification, uncertain/temporary/returned access, wishlist-only and provider exclusions');
+    await navigate(fan.id,fan.manifest.options_page);
     const fanReview=await evaluate(`return await chrome.runtime.sendMessage({type:'FANATICAL_OPEN_GALACTIC_REVIEW',url:'https://evil.test'});`);assert.equal(fanReview.ok,true);console.log('PASS Firefox review: FAN delegates central review to GL without a private URL');
     await navigate(hb.id,hb.manifest.options_page);assert.equal((await evaluate(`return await chrome.runtime.sendMessage({type:'HCL_OPEN_GALACTIC_REVIEW',url:'https://evil.test'});`)).ok,true);console.log('PASS Firefox review: HB delegates central review to GL without a private URL');
     await navigate(installed.id,installed.manifest.options_page);const received=await evaluate(`const S=await import('./src/lib/storage.js'),database=await S.getDatabase();return {feed:database.companionFeeds[${JSON.stringify(hb.id)}],publicState:await chrome.storage.local.get(null)};`);assert.equal(received.feed.entries.length,1);assert.equal(received.feed.entries[0].activationStatus,'unknown');assert.doesNotMatch(JSON.stringify(received),/PRIVATE SYNTHETIC/);
