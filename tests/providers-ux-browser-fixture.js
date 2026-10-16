@@ -35,7 +35,7 @@ try{
  assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Books & Contents|Settings','Wrong main navigation.');
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
  assert(document.querySelectorAll('.provider-card').length===PROVIDERS.length,'Supported provider choices missing.');
- assert(document.querySelector('.provider-card[data-provider="playstation"]')&&document.querySelector('.provider-card[data-provider="nintendo"]'),'Console provider entry points missing.');
+ assert(document.querySelector('.provider-card[data-provider="xbox"]')&&document.querySelector('.provider-card[data-provider="playstation"]')&&document.querySelector('.provider-card[data-provider="nintendo"]'),'Console provider entry points missing.');
  const syncHost=document.querySelector('#purchase-sharing-humble [data-purchase-handoff]'),manual=syncHost.querySelector('[data-purchase-manual]');
  assert(document.querySelector('.provider-card[data-provider="humble"]').contains(syncHost)&&document.querySelectorAll('#purchase-sharing-humble').length===1,'Connection is separate or duplicated');
  assert(!document.querySelector('#settings-workspace #official-companion-status')&&document.querySelector('#providers-workspace #official-companion-status'),'Connection checks still scattered across Settings');

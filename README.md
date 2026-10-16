@@ -47,17 +47,22 @@ on later visits; a different store login requires deliberate account switching.
 Every saved account remains in the combined Library.
 
 Supported providers are Steam, GOG, Epic Games, Amazon Games, Audible, Kindle,
-Amazon Video, Fandango at Home, Kobo, Humble Bundle, Fanatical, PlayStation and Nintendo
+Amazon Video, Fandango at Home, Kobo, Humble Bundle, Fanatical, Xbox Web Library, PlayStation and Nintendo
 Switch Virtual Game Cards. Nintendo uses **Import loaded cards** on its signed-in
 portal and keeps earlier cards absent from the current non-hidden view. It does
 not request or store Nintendo credentials. PlayStation supports the active PS4/PS5
 Purchased web library using the existing signed-in session. Its full and quick
 checks retain earlier saved records; older consoles and lifetime history are not
-included. Its initial production import has been live-validated. Epic and
+included. Its initial production import has been live-validated. Xbox imports the current
+web-visible Owned catalog from the signed-in page, not the complete console or
+lifetime purchase history; earlier records and manual access corrections remain
+intact. Its source selection is live-validated; the production import awaits
+live acceptance. Epic and
 Nintendo support complete imports only. Other quick updates check each provider's incremental
 scope; they do not establish that missing records were removed. A successful
-Full rescan reconciles the selected account and retains earlier missing records
-as history. Failed or incomplete scans preserve the previous validated library.
+Full rescan reconciles the selected supported view. Other providers may move
+missing records to earlier-import history; these console views retain earlier
+saved records. Failed or incomplete scans preserve the previous validated library.
 See [Providers and saved accounts](docs/user-guide/providers-and-accounts.md).
 
 For HB/FAN, **Connect and sync** can populate an empty library from saved

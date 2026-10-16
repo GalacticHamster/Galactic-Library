@@ -96,6 +96,43 @@ has been live-validated; disposable Chrome/Firefox reimport tests pass. Remove
 the separate research helper to avoid overlapping diagnostic panels. Firefox
 may require granting GL access to the PlayStation Library site.
 
+## Xbox Web Library
+
+Open **Providers → Xbox — Web Library**, open its website and sign in. Reload
+Xbox Library after loading the updated GL extension and let the games finish
+loading. In GL's floating panel, choose/confirm the account nickname and select
+**Full rescan**. After the first import, **Quick update** checks the same complete
+web-visible Owned catalog for additions and changes. Neither action removes
+previously saved products that disappear from this limited view.
+
+GL reads the account-scoped data already loaded by the website. It reconstructs
+the same Owned selection, checks the reported total and preview product IDs,
+then checks the account and source again before the atomic save. It makes no
+additional Xbox requests, reads no authentication token, and stores no raw Xbox
+account ID. An opaque account hash prevents a different login from silently
+reusing the saved profile. Switching store accounts requires explicit selection
+and confirmation of a different GL account.
+
+Only first-party products with the signed-in account's personal Owned flag are
+included. Subscription, trial, disc, aggregate/family access and played/installed
+history alone cannot establish ownership. Current product IDs, supplied titles,
+edition/platform metadata and access flags are retained; purchase dates, prices
+and transactions are not invented. Coarse product-kind flags do not manufacture
+separately named add-ons or bundle children. Existing manual access corrections
+remain authoritative and survive reimport and backup/restore.
+
+This is the current **web-visible Owned catalog**, not the complete lifetime
+Xbox purchase history, all console/mobile games, a complete DLC inventory, or
+other subscription catalogs. The 37-product source has been live-validated;
+production full/quick imports have passed disposable Chrome/Firefox tests but
+still await a live import. Reload the website before updating it. If the site
+is still loading, its data is invalidated, account changes, or counts/preview IDs
+disagree, GL rejects the import and retains saved items. A zero list requires an
+explicit zero catalog total; GL does not interpret an absent catalog as empty.
+
+The read-only research helper is no longer needed and can be disabled. Firefox
+may require granting GL access to play.xbox.com and reloading the Library page.
+
 ## Nintendo Switch Virtual Game Cards
 
 Open **Providers → Nintendo — Switch Virtual Game Cards**, then open Nintendo's

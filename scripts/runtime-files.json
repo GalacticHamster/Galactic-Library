@@ -1,5 +1,8 @@
 [
   "manifest.json",
+  "src/providers/xbox-library.js",
+  "src/providers/xbox-capture.js",
+  "src/providers/xbox-content.js",
   "src/providers/console-library.js",
   "src/providers/playstation-capture.js",
   "src/providers/playstation-content.js",

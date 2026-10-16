@@ -126,6 +126,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
       || (provider === 'fandango-at-home' && page.origin === 'https://athome.fandango.com')
       || (provider === 'kobo' && page.origin === 'https://www.kobo.com' && page.pathname.includes('/library'))
+      || (provider === 'xbox' && page.origin === 'https://play.xbox.com' && /^\/library(?:\/|$)/u.test(page.pathname))
       || (provider === 'playstation' && page.origin === 'https://library.playstation.com')
       || (provider === 'nintendo' && page.origin === 'https://accounts.nintendo.com' && /^\/portal\/vgcs(?:\/|$)/u.test(page.pathname))
       || (provider === 'fanatical' && page.origin === 'https://www.fanatical.com' && /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?orders\/?$/iu.test(page.pathname))
@@ -483,15 +484,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
-  if(['nintendo','playstation'].includes(request.provider)&&request.type!=='COMMIT_PROVIDER_SCAN'){
+  if(['nintendo','playstation','xbox'].includes(request.provider)&&request.type!=='COMMIT_PROVIDER_SCAN'){
     sendResponse({ok:false,error:'Console imports require a confirmed account-bound scan.'});return undefined;
   }
-  const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home', 'playstation'].includes(request.provider);
+  const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home', 'playstation', 'xbox'].includes(request.provider);
   if (!Array.isArray(request.items) || request.items.length > 50000) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
   }
-  const source = request.provider === 'playstation' ? 'playstation-web-purchased-library' : request.provider === 'nintendo' ? 'nintendo-virtual-game-cards' : request.provider === 'steam'
+  const source = request.provider === 'xbox' ? 'xbox-web-library' : request.provider === 'playstation' ? 'playstation-web-purchased-library' : request.provider === 'nintendo' ? 'nintendo-virtual-game-cards' : request.provider === 'steam'
     ? 'steam-store-browse-items'
     : request.provider === 'gog'
       ? 'gog-account-library'
@@ -553,7 +554,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       tvCount: database.providers[request.provider].tvCount ?? 0,
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
-      ...(request.provider==='playstation'?{changes:database.providers.playstation.syncHealth?.differences}:{}),
+      ...(['playstation','xbox'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
       syncedAt: database.providers[request.provider].lastSync
     });})
     .catch((error) => reply({ ok: false, error: error.message }));

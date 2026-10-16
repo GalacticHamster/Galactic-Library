@@ -26,6 +26,8 @@
   },
   "options_page": "options.html",
   "content_scripts": [
+    {"matches": ["https://play.xbox.com/library*"],"js": ["src/providers/provider-snapshot.js","src/providers/xbox-library.js","src/providers/xbox-capture.js"],"world": "MAIN","run_at": "document_start"},
+    {"matches": ["https://play.xbox.com/library*"],"js": ["shared/theme.js","src/providers/floating-panel.js","src/providers/xbox-content.js"],"run_at": "document_idle","css": ["shared/theme.css"]},
     {
       "matches": [
         "https://library.playstation.com/*"

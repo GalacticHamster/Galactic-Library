@@ -222,8 +222,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await readDatabase(provider==='kobo'),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
-    if(['nintendo','playstation'].includes(provider)){
-      const label=provider==='nintendo'?'Nintendo':'PlayStation';
+    if(['nintendo','playstation','xbox'].includes(provider)){
+      const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(provider==='nintendo'&&mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
       const bound=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.sourceAccountFingerprint===sourceAccountFingerprint);
       if(bound&&bound.profileId!==existing?.profileId)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');
@@ -241,7 +241,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
-    if(['nintendo','playstation'].includes(provider))scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
+    if(['nintendo','playstation','xbox'].includes(provider))scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
     // An existing-account quick check needs a tab-bound lease, not a rewrite of
     // every saved book merely to announce that scanning has started.
     if(provider==='kobo'&&mode==='incremental'&&!forceFull&&active===profile.profileId){
@@ -260,13 +260,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname};
     let result,changes;
-    if(['nintendo','playstation'].includes(provider)){
-      const label=provider==='nintendo'?'Nintendo':'PlayStation';
+    if(['nintendo','playstation','xbox'].includes(provider)){
+      const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint)||scan.sourceAccountFingerprint!==sourceAccountFingerprint||profile.sourceAccountFingerprint&&profile.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('The '+label+' account changed before saving. No items were imported. Start a fresh import.');
       if(provider==='nintendo'&&details.syncMode!=='full')throw Error('Nintendo requires a complete loaded card list.');
       validateProviderSnapshot(provider,values,snapshot);
       const scope=snapshot.scopes[0];
-      if(snapshot.scopes.length!==1||scope.id!==(provider==='nintendo'?'non-hidden-virtual-cards':'ps4-ps5-purchased')||(provider==='nintendo'?scope.expectedCount!==values.length:scope.expectedCount!==null||scope.end!=='pagination-end')||scope.readCount!==values.length||new Set(values.map(v=>v.providerItemId)).size!==values.length)throw Error(label+' library coverage is incomplete. Previously saved items were kept.');
+      if(snapshot.scopes.length!==1||scope.id!==(provider==='nintendo'?'non-hidden-virtual-cards':provider==='xbox'?'owned-web-library':'ps4-ps5-purchased')||(provider==='playstation'?scope.expectedCount!==null||scope.end!=='pagination-end':scope.expectedCount!==values.length||provider==='xbox'&&scope.end!=='reported-count')||scope.readCount!==values.length||new Set(values.map(v=>v.providerItemId)).size!==values.length)throw Error(label+' library coverage is incomplete. Previously saved items were kept.');
+      if(provider==='xbox'&&values.some(v=>v.provider!=='xbox'||!/^[A-Z0-9]{12}$/u.test(v.providerItemId)||v.metadata?.productId!==v.providerItemId||v.metadata?.source!=='xbox-web-library'||v.metadata?.accessBasis!=='personal-owned-web-catalog'||v.ownership!=='owned'||!Array.isArray(v.metadata?.accessTypes)||!v.metadata.accessTypes.includes(1)))throw Error('Xbox items do not match the validated web-owned source. Previously saved items were kept.');
       profile.sourceAccountFingerprint=sourceAccountFingerprint;
       // A complete non-hidden view is still not a complete purchase history.
       // Reuse the additive importer; never archive omissions or revoke access.
@@ -424,7 +425,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
-    if(['nintendo','playstation'].includes(provider))throw Error('Console imports require a confirmed account-bound scan.');
+    if(['nintendo','playstation','xbox'].includes(provider))throw Error('Console imports require a confirmed account-bound scan.');
     const database=await getDatabase();
     if(database.providers[provider]?.profileLabel)throw new Error('Reload the provider page and start a confirmed profile scan.');
     return details.syncMode==='incremental'?mergeProviderItems(provider,values,details):replaceProviderItems(provider,values,details,snapshot);

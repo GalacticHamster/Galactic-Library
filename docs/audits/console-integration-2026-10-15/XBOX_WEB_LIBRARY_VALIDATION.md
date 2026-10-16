@@ -97,7 +97,7 @@ keys and an account switch during inspection. They assert zero helper network
 requests and no identifying summary values. Synthetic counts do not establish
 that reconstruction selects the same 37 products on the live account.
 
-Current status: **Awaiting live source validation; no production Xbox provider**.
+Current status: **Source selection live-validated; production importer awaiting live acceptance**.
 The user only needs to copy the updated helper's summary. No DevTools inspection, token
 capture, account registration or Microsoft authorization experiment is required.
 
@@ -159,3 +159,71 @@ isolated-world bridge and missing-catalog feedback with zero helper requests.
 title joins and personal access flags. No production Xbox provider or import has
 been enabled, and no personal GL data has changed. Completing this gate needs
 no DevTools, different website view, tokens or new authorization experiment.
+
+## Live 0.1.2 reconciliation and production integration
+
+The user confirmed **ready**, matching/stable account, **37 distinct products,
+37 joined titles, 37 personal Owned flags, zero duplicates/unsupported IDs or
+missing titles**, and agreement with the 37-item catalog and its 14 preview IDs.
+The 40 assembled and 264 access counts remained distinct. DOM product-link
+counts were zero; reconciliation uses the account-bound website catalog, not
+visible DOM anchors or a claim to independent screen scraping. The helper's
+`libraryComplete: false` and `ownershipVerified: false` are conservative fixed
+research fields, not contradictory evidence about the now-successful join.
+They never establish complete lifetime ownership or transaction verification.
+
+The [production projection](../../../src/providers/xbox-library.js) uses the
+same validated first-party/personal-Owned/non-container rule. It requires the
+website's exact account-specific queries to succeed and be idle/not invalidated,
+checks catalog total and all preview IDs, validates stable product IDs and
+bounded titles/access/platform sets, and preserves supplied metadata. No
+resolved-detail query or independent Xbox request is required. Catalog counts
+are not fixed at 37. Empty imports require an explicit zero descriptor.
+
+The [MAIN bridge](../../../src/providers/xbox-capture.js) hashes the stable Xbox
+ID with a provider prefix for the existing GL account binding. Raw account IDs,
+profile PII and the complete access map do not leave MAIN. Preparation is checked
+again after hashing, expires after two minutes, and is re-read/compared before
+saving. The digest includes projected products, access/platform/edition metadata,
+preview identities and query update markers. Loading, failures, invalidation,
+account changes and changed preparations reject before import. Unrecognized
+website exceptions produce a generic message without exporting their contents.
+
+The [panel](../../../src/providers/xbox-content.js) supplies Full rescan and
+Quick update, immediate stage feedback, account consent and truthful committed
+counts. The existing writer requires the matching Library origin/path, tab,
+scan lease, account hash, supported complete snapshot and per-product personal
+Owned evidence. Both modes use additive atomic merging, retain omitted records,
+and preserve user corrections. No matching, synchronization protocol, contents,
+HB/FAN data or schema version changed. Only play.xbox.com/library content-script
+scope was added; there are no additional Xbox API hosts or permissions.
+
+Product IDs remain independent. The account-scoped personal Owned flag supports
+source-derived Owned, not proof of price, purchase date or transaction. Other
+access flags and supported platform codes are preserved. The source's coarse
+Durable/App/Game/Bundle kinds remain metadata rather than guessed DLC parent or
+bundle-child records. Expiry/revocation is not inferred from disappearance.
+This reads current page cache; users reload Xbox Library before an update.
+Stale successful cache without an observable account/invalidation change cannot
+be independently reauthenticated without an additional website request, which
+this integration deliberately does not make.
+
+Validation uses the shared synthetic 40/264/37/14 fixture, never a personal
+account or backup. Focused console tests cover source mismatches, flags, account
+isolation, leases, preserved corrections, omissions, zero totals and backup
+round-trips. Installed Chrome/Firefox packages commit 37 products through the
+real worker, repeat full/quick imports, retain the omitted 37th product after a
+36-product scan, reject incomplete/switched sources, and restore backups. Their
+page fixture records zero source requests. Existing PlayStation/Nintendo native
+checks and packaged Providers navigation also remain passing.
+
+Completed checks: **1,225 full GL unit/matching tests, 472 contents tests,
+32 focused console tests, 12 packaged Providers UI checks per browser**, installed
+Xbox/PlayStation/Nintendo import tests in both Chrome and Firefox, repository
+links/layout, and both 189-file release packages. All used disposable data and
+an artifact-free checkout; ignored output was not required as test input.
+
+**Remaining acceptance:** reload GL and Xbox Library, disable the research helper,
+confirm a target nickname in the production GL panel and click Full rescan. The
+expected current selection is 37 products; report the actual committed summary.
+No agent has imported the user's library or claimed this live save succeeded.

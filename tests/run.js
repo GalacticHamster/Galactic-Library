@@ -1,3 +1,4 @@
+import {xboxImportTests} from './xbox-import.js';
 import {manualReconciliationTests} from './manual-reconciliation.js';
 import {consoleLibraryTests} from './console-library.js';
 import {nintendoImportTests} from './nintendo-import.js';
@@ -126,6 +127,7 @@ const tests = [
   ...consoleLibraryTests,
   ...nintendoImportTests,
   ...playstationImportTests,
+  ...xboxImportTests,
   ...koboWorkflowTests,
   ...operationFeedbackTests,
   ...libraryLoadingTests,
