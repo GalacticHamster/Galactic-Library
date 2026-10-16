@@ -98,9 +98,10 @@ may require granting GL access to the PlayStation Library site.
 
 ## Xbox Web Library
 
-Open **Providers → Xbox — Web Library**, open its website and sign in. Reload
-Xbox Library after loading the updated GL extension and let the games finish
-loading. In GL's floating panel, choose/confirm the account nickname and select
+Open **Providers → Xbox — Web Library**, open its website and sign in. The link
+opens the [Owned catalog](https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned)
+directly. Reload Xbox Library after loading the updated GL extension and let
+the games finish loading. In GL's floating panel, choose/confirm the account nickname and select
 **Full rescan**. After the first import, **Quick update** checks the same complete
 web-visible Owned catalog for additions and changes. Neither action removes
 previously saved products that disappear from this limited view.
@@ -123,9 +124,10 @@ remain authoritative and survive reimport and backup/restore.
 
 This is the current **web-visible Owned catalog**, not the complete lifetime
 Xbox purchase history, all console/mobile games, a complete DLC inventory, or
-other subscription catalogs. The 37-product source has been live-validated;
-production full/quick imports have passed disposable Chrome/Firefox tests but
-still await a live import. Reload the website before updating it. If the site
+other subscription catalogs. The initial production import has been
+live-validated: 37 checked titles, 37 products and 37 new records. Full/quick
+reimports pass disposable Chrome/Firefox tests; live quick-update acceptance
+has not yet been reported. Reload the website before updating it. If the site
 is still loading, its data is invalidated, account changes, or counts/preview IDs
 disagree, GL rejects the import and retains saved items. A zero list requires an
 explicit zero catalog total; GL does not interpret an absent catalog as empty.

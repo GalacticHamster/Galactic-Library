@@ -12,7 +12,7 @@ export const PROVIDER_SITES=[
  ['kobo','Kobo','https://www.kobo.com/us/en/library/books'],
  ['fanatical','Fanatical','https://www.fanatical.com/en/orders'],
  ['humble','Humble Bundle','https://www.humblebundle.com/home/purchases'],
- ['xbox','Xbox — Web Library','https://play.xbox.com/library'],
+ ['xbox','Xbox — Web Library','https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned'],
  ['playstation','PlayStation ? PS4/PS5 Purchased Library','https://library.playstation.com/recently-purchased'],
  ['nintendo','Nintendo — Switch Virtual Game Cards','https://accounts.nintendo.com/portal/vgcs']
 ].map(([provider,name,url])=>({provider,name,url}));

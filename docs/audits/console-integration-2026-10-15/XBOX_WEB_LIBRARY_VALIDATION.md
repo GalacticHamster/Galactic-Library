@@ -37,9 +37,8 @@ The website joins Content Access and catalog data before presenting its library.
 Raw CAS row counts alone cannot establish the 37 visible products. Existing
 history data can affect ordering/assembly but is not used as purchase evidence.
 Reading the final website cache would avoid the earlier page-fetch probe's
-blind spot for service-worker-owned requests. Cache availability is now
-**live-validated**, while the reconstructed selection and importer remain
-unvalidated on the live account. The
+blind spot for service-worker-owned requests. Cache availability, reconstructed
+selection and the initial production save are now **live-validated**. The
 public asset could not be re-fetched through the browser tool during this turn;
 the helper detects missing or changed runtime interfaces rather than assuming
 the inspected build still applies.
@@ -97,9 +96,10 @@ keys and an account switch during inspection. They assert zero helper network
 requests and no identifying summary values. Synthetic counts do not establish
 that reconstruction selects the same 37 products on the live account.
 
-Current status: **Source selection live-validated; production importer awaiting live acceptance**.
-The user only needs to copy the updated helper's summary. No DevTools inspection, token
-capture, account registration or Microsoft authorization experiment is required.
+Current status: **Working; initial production import live-confirmed by the user**.
+The research helper can now be disabled; production imports do not depend on it.
+No DevTools inspection, token capture, account registration or Microsoft
+authorization experiment is required.
 
 ## Live 0.1.0 report and diagnostic correction
 
@@ -155,7 +155,7 @@ duplicates, aggregate-only ownership and unsettled source queries. Installed
 Chrome and Firefox checks exercise reconstruction through the actual MAIN to
 isolated-world bridge and missing-catalog feedback with zero helper requests.
 
-**Still awaiting:** a live 0.1.2 summary confirming the 37 reconstructed products,
+**Historical gate (now satisfied):** a live 0.1.2 summary confirming the 37 reconstructed products,
 title joins and personal access flags. No production Xbox provider or import has
 been enabled, and no personal GL data has changed. Completing this gate needs
 no DevTools, different website view, tokens or new authorization experiment.
@@ -223,7 +223,20 @@ Xbox/PlayStation/Nintendo import tests in both Chrome and Firefox, repository
 links/layout, and both 189-file release packages. All used disposable data and
 an artifact-free checkout; ignored output was not required as test input.
 
-**Remaining acceptance:** reload GL and Xbox Library, disable the research helper,
-confirm a target nickname in the production GL panel and click Full rescan. The
-expected current selection is 37 products; report the actual committed summary.
-No agent has imported the user's library or claimed this live save succeeded.
+## Live production acceptance and direct Owned link
+
+The user completed the production Full rescan and confirmed:
+
+> Saved 37 checked titles · 37 products · 37 new · 0 access changes.
+> Complete web-visible Owned catalog; earlier saved items retained.
+
+This confirms the real GL save, not just research-helper selection. Xbox is
+**Working** for the limited web-visible Owned catalog. Full/quick repeat imports,
+account switching and retention remain disposable-test results; live quick
+updates have not yet been reported. No agent modified the personal library.
+
+The user also identified that the generic Library landing page needs several
+clicks before the relevant data loads. Provider opening and account-update
+links now use [the full-library Owned grid](https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned) directly. This changes navigation only; source checks, import scope,
+account consent and saving behavior are unchanged. Packaged Providers UI checks
+assert the actual rendered link retains all three required query parameters.

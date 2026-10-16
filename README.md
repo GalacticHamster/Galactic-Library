@@ -56,8 +56,7 @@ checks retain earlier saved records; older consoles and lifetime history are not
 included. Its initial production import has been live-validated. Xbox imports the current
 web-visible Owned catalog from the signed-in page, not the complete console or
 lifetime purchase history; earlier records and manual access corrections remain
-intact. Its source selection is live-validated; the production import awaits
-live acceptance. Epic and
+intact. Its initial production import is live-validated for 37 products. Epic and
 Nintendo support complete imports only. Other quick updates check each provider's incremental
 scope; they do not establish that missing records were removed. A successful
 Full rescan reconciles the selected supported view. Other providers may move
