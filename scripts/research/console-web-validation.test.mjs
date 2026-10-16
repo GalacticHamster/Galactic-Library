@@ -400,3 +400,20 @@ test('Only recognized successful website profiles with usable client metadata en
     assert(!JSON.stringify(C.sanitizeReport(posts.at(-1).report)).includes('private'));
   }
 });
+
+test('A profile response arriving after the panel handshake pushes readiness without another summary request',async()=>{
+  const posts=[],listeners=[];let complete,calls=0;
+  const context=vm.createContext({URL,URLSearchParams,AbortSignal,TextDecoder,Uint8Array,location:{origin:'https://library.playstation.com',pathname:'/'},fetch:()=>{calls++;return new Promise(resolve=>{complete=resolve;});},addEventListener:(name,fn)=>listeners.push(fn),setTimeout:()=>0});
+  context.window=context;context.postMessage=value=>posts.push(value);context.testListeners=listeners;
+  vm.runInContext(core,context);vm.runInContext(await readFile(new URL('probe.js',dir),'utf8'),context);
+  vm.runInContext("for(const fn of testListeners)fn({source:window,origin:location.origin,data:{channel:'gl-console-validation-request',nonce:'a'.repeat(32),action:'report'}});",context);
+  assert.equal(posts.length,1);assert.equal(posts[0].report.readOnlyAccountCheck.state,'unavailable');
+  const loading=context.fetch(psProfileUrl(),{headers:{'apollographql-client-name':'FixtureLibrary','apollographql-client-version':'1.2.3'}});
+  assert.equal(posts.at(-1).report.readOnlyAccountCheck.reason,'website-profile-response-pending');
+  complete(new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account'}}})));
+  await loading;
+  for(let n=0;n<30&&posts.at(-1).report.readOnlyAccountCheck.state!=='ready';n++)await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(posts.at(-1).report.readOnlyAccountCheck.state,'ready');assert.equal(posts.at(-1).nonce,'a'.repeat(32));
+  assert.equal(calls,1,'Readiness notifications must not make network requests.');
+  assert(!JSON.stringify(C.sanitizeReport(posts.at(-1).report)).includes('private'));
+});

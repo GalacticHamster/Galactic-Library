@@ -32,7 +32,9 @@ files.set('fixture.js',Buffer.from(`
     if(ps&&options?.headers?.['Content-Type']!=='application/json')return Promise.resolve(new Response(JSON.stringify([{message:'This operation has been blocked as a potential Cross-Site Request Forgery (CSRF).',extensions:{}}]),{status:400}));
     if(ps&&u.searchParams.get('operationName')==='getProfileOracle'){
       if(options?.headers?.['apollographql-client-name']!=='FixtureLibrary'||options?.headers?.['apollographql-client-version']!=='1.2.3')return Promise.resolve(new Response(JSON.stringify({errors:[{message:'Cannot query field "oracleUserProfileRetrieve" on type "Query".'}]}),{status:400}));
-      return Promise.resolve(new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name'}}}),{status:200}));
+      const response=new Response(JSON.stringify({data:{oracleUserProfileRetrieve:{accountId:'private-account',onlineId:'private-name'}}}),{status:200});
+      if(window.fixtureHoldProfile)return new Promise(resolve=>{window.fixtureReleaseProfile=()=>{window.fixtureHoldProfile=false;resolve(response);};});
+      return Promise.resolve(response);
     }
     const rows=offset===0?[{id:'private-one',productId:'private-p1',applicationId:'private-s1',name:'Private title',isLending:false},{id:'private-two',productId:'private-p2',applicationId:'private-s2'}]:[{id:'private-three',productId:'private-p3',applicationId:'private-s3'}];
     const body=ps?{data:{purchasedTitlesRetrieve:{games:rows,pageInfo:{offset,size:rows.length,isLast:offset===2}}}}:{data:{account:{vgc:{vgcViewsV2:{views:rows.map(row=>({...row,ownerNaId:'private-account',userNaId:'private-account'})),offsetInfo:{offset,total:3}}}}}};
@@ -69,7 +71,15 @@ try{
     if(firefox)await driver.send('WebDriver:Navigate',{url:origin+route});
     else {const target=await driver.send('Target.createTarget',{url:origin+route});session=(await driver.send('Target.attachToTarget',{targetId:target.targetId,flatten:true})).sessionId;await driver.send('Runtime.enable',{},session);}
     let ready=false;for(let i=0;i<60;i++){if(await evaluate('return !!document.querySelector("#gl-console-validation")?.shadowRoot?.querySelector("textarea");')){ready=true;break;}await pause(100);}assert(ready,'Installed helper did not render.');
-    await evaluate('document.querySelector("#fixture").click();return true;');
+    await evaluate('if(location.pathname==="/ps")window.fixtureHoldProfile=true;document.querySelector("#fixture").click();return true;');
+    if(route==='/ps'){
+      for(let n=0;n<30&&!await evaluate('return typeof window.fixtureReleaseProfile==="function";');n++)await pause(20);
+      const waiting=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;return {disabled:s.querySelector("[data-action=check-account]").disabled,text:s.querySelector("[role=status]").textContent};');
+      assert.equal(waiting.disabled,true);assert.match(waiting.text,/Waiting for PlayStation/);
+      await evaluate('window.fixtureReleaseProfile();return true;');
+      let enabled=false;for(let n=0;n<30;n++){enabled=await evaluate('return !document.querySelector("#gl-console-validation").shadowRoot.querySelector("[data-action=check-account]").disabled;');if(enabled)break;await pause(20);}
+      assert(enabled,'Delayed account response must enable the button without Update summary.');
+    }
     let report;
     for(let i=0;i<60;i++){
       report=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=report]").click();await new Promise(r=>setTimeout(r,20));return JSON.parse(s.querySelector("textarea").value||"null");');
@@ -91,7 +101,7 @@ try{
       assert.equal(check.report.accountIdentity.accountIdPresent,true);assert.equal(check.report.scopes.length,1);
       const account=await evaluate('const s=document.querySelector("#gl-console-validation").shadowRoot;s.querySelector("[data-action=check-account]").click();await new Promise(r=>setTimeout(r,40));return {report:JSON.parse(s.querySelector("textarea").value),calls:window.fixtureNetworkCalls,disabled:s.querySelector("[data-action=check-account]").disabled};');
       assert.equal(account.report.readOnlyAccountCheck.recognizedAccountProfile,true);assert.equal(account.calls,5);assert.equal(account.disabled,true);assert(!JSON.stringify(account.report).includes('private'));
-      assert.equal(account.report.helperVersion,'0.1.10');
+      assert.equal(account.report.helperVersion,'0.1.11');
       assert.equal(account.report.accountRequestContext.method,'GET');
       assert.equal(account.report.accountRequestContext.contentType,'application/json');
       assert.deepEqual(account.report.accountRequestContext.headerNames,['content-type','apollographql-client-name','apollographql-client-version']);

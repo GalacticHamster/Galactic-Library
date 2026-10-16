@@ -5,15 +5,20 @@
   const provider=C.providerForLocation(location);if(!provider)return;
   const ledger=C.createLedger(provider,{readNintendoAccount:()=>C.nintendoAccountCandidate(globalThis.document)}),originalFetch=globalThis.fetch;
   const xhr=globalThis.XMLHttpRequest?.prototype,originalOpen=xhr?.open,originalSend=xhr?.send,xhrInfo=new WeakMap();
-  let active=true,psQuery=null,psAccountQuery=null,psAccountClientMetadata=null,accountRequestContext=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  let active=true,panelNonce=null,psQuery=null,psAccountQuery=null,psAccountClientMetadata=null,accountRequestContext=null,cookieCheck={state:'unavailable',reason:'no-observed-safe-query'},accountCheck={state:'unavailable',reason:'no-observed-safe-query'},fetchCalls=0,xhrCalls=0;
+  function reply(nonce=panelNonce){
+    if(nonce===null)return;
+    window.postMessage({channel:'gl-console-validation-report',nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck,readOnlyAccountCheck:accountCheck,accountRequestContext}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
+  }
   function captureQuery(input,options){
     if(provider!=='playstation'||!active)return;
-    if(!psQuery){psQuery=C.psCookieQuery(input,options);if(psQuery)cookieCheck={state:'ready'};}
-    if(!psAccountQuery||!psAccountClientMetadata){const query=C.psCookieQuery(input,options,'getProfileOracle');if(query){accountRequestContext=C.psRequestContext(input,options);return {query,clientMetadata:C.psClientMetadata(input,options)};}}
+    if(!psQuery){psQuery=C.psCookieQuery(input,options);if(psQuery){cookieCheck={state:'ready'};reply();}}
+    if(!psAccountQuery||!psAccountClientMetadata){const query=C.psCookieQuery(input,options,'getProfileOracle');if(query){accountRequestContext=C.psRequestContext(input,options);accountCheck={state:'unavailable',reason:'website-profile-response-pending'};reply();return {query,clientMetadata:C.psClientMetadata(input,options)};}}
     return null;
   }
   async function inspect(response,info,accountCandidate){
     if(!active||!info)return;
+    let accountBody=null;
     try{
       if(response.status!==200){ledger.observe(info,response.status,null);return;}
       const copy=response.clone(),reader=copy.body?.getReader();if(!reader){ledger.observe(info,response.status,null);return;}
@@ -25,13 +30,19 @@
         ledger.observe(info,response.status,body);
         // Only a successful, recognized website profile can supply the client
         // context. Failed/malformed requests cannot seed the explicit check.
-        const accountId=body?.data?.oracleUserProfileRetrieve?.accountId;
-        if(accountCandidate&&!body?.errors?.length&&typeof accountId==='string'&&accountId.length>0&&accountId.length<=200){
-          psAccountQuery=accountCandidate.query;psAccountClientMetadata=accountCandidate.clientMetadata;
-          accountCheck=psAccountClientMetadata?{state:'ready'}:{state:'unavailable',reason:'observed-client-context-unavailable'};
-        }
+        accountBody=body;
       }
     }catch{if(active)ledger.observe(info,response.status,null);/* Never log private errors. */}
+    finally{
+      if(active&&accountCandidate){
+        const accountId=accountBody?.data?.oracleUserProfileRetrieve?.accountId;
+        if(!accountBody?.errors?.length&&typeof accountId==='string'&&accountId.length>0&&accountId.length<=200){
+          psAccountQuery=accountCandidate.query;psAccountClientMetadata=accountCandidate.clientMetadata;
+          accountCheck=psAccountClientMetadata?{state:'ready'}:{state:'unavailable',reason:'observed-client-context-unavailable'};
+        }else accountCheck={state:'unavailable',reason:response.status===200?'website-profile-response-unrecognized':'website-profile-request-failed'};
+        reply();
+      }
+    }
   }
   function wrappedFetch(...args){
     fetchCalls++;
@@ -40,7 +51,7 @@
     // values may be retained in page memory; cookie/auth values are never read.
     const info=C.requestInfo(provider,args[0],args[1]);
     const accountCandidate=captureQuery(args[0],args[1]);
-    if(info)void result.then(response=>inspect(response,info,accountCandidate),()=>{if(active)ledger.observe(info,0,null);});
+    if(info)void result.then(response=>inspect(response,info,accountCandidate),()=>{if(active){ledger.observe(info,0,null);if(accountCandidate){accountCheck={state:'unavailable',reason:'website-profile-request-failed'};reply();}}});
     return result;
   }
   function wrappedOpen(method,url,...rest){
@@ -62,8 +73,8 @@
   addEventListener('message',async event=>{
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-console-validation-request'||
       typeof event.data.nonce!=='string'||!/^[a-f0-9]{32}$/.test(event.data.nonce)||!['report','stop','check','check-account'].includes(event.data.action))return;
+    panelNonce=event.data.nonce;
     if(event.data.action==='stop')stop();
-    const reply=()=>window.postMessage({channel:'gl-console-validation-report',nonce:event.data.nonce,report:{...ledger.report(),active,observerState:{fetchHookInstalled:globalThis.fetch===wrappedFetch,xhrOpenHookInstalled:globalThis.XMLHttpRequest?.prototype?.open===wrappedOpen&&!!xhr,xhrSendHookInstalled:globalThis.XMLHttpRequest?.prototype?.send===wrappedSend&&!!xhr,fetchCalls,xhrCalls},...(provider==='playstation'?{readOnlyCookieCheck:cookieCheck,readOnlyAccountCheck:accountCheck,accountRequestContext}:{bootstrap:C.bootstrapSummary(document),resources:C.resourceSummary(globalThis.performance)})}},location.origin);
     if(event.data.action==='check'&&active&&provider==='playstation'&&psQuery&&cookieCheck.state==='ready'){
       cookieCheck={state:'running'};reply();cookieCheck=await C.checkPsCookieAccess(psQuery,originalFetch);if(active)reply();return;
     }

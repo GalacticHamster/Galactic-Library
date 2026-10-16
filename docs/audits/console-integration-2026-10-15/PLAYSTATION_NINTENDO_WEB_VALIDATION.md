@@ -411,11 +411,24 @@ test with an explicit explanation rather than sending guessed values. Explicit
 native checks appear in their result sections, separately from website request
 observations in the ledger.
 
-Next live check: reload helper **0.1.10** and PlayStation Library, click
-**Test account lookup**, then **Copy summary**. A success would establish that
-the pair of client headers repairs this request in this session; a failure
-leaves the account-lookup blocker unresolved. No production PlayStation importer
-has been enabled and no live purchases have been changed.
+The user completed this control successfully: helper **0.1.10** returned
+**HTTP 200**, `recognized-account-profile`, account/online ID presence, native
+fetch and `observedClientMetadataApplied: true`, without copied Authorization.
+Reusing the pair of website Apollo headers repairs the account query in this
+session. This does not establish which individual header is necessary, nor
+production account-switch safety or full import acceptance. The earlier schema
+failure resulted from an incomplete request context, not evidence that the
+GraphQL field had become obsolete. No live purchases were changed.
+
+The same reproduction confirmed a helper readiness race: its initial report
+could precede asynchronous profile validation, but there was no subsequent panel
+notification. **Update summary** enabled the account button immediately. Helper
+**0.1.11** pushes readiness changes to the existing panel handshake and explains
+waiting, unreadable responses and missing client metadata. It adds no polling,
+network requests or storage writes. A delayed-response unit test and installed
+Chrome/Firefox checks verify automatic enabling without **Update summary**;
+**33 focused tests** pass. This UI correction does not change the successful
+account request.
 
 ## Validation
 
