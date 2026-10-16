@@ -271,9 +271,9 @@ providerProfileTests.push(
 );
 
 providerProfileTests.push(
- ['all eleven providers retain independent remembered full baselines and profile-local scan authority',async()=>{
+ ['legacy providers retain independent remembered full baselines and profile-local scan authority',async()=>{
    const {writer}=memory();
-   for(const provider of PROVIDERS){
+   for(const provider of PROVIDERS.filter(p=>p!=='nintendo')){
      const mediaType=provider==='kindle'?'book':provider==='fandango-at-home'?'movie':'game',items=[{providerItemId:'x',title:'Synthetic',mediaType}];
      let d=await writer.replaceProviderItems(provider,items,{profileLabel:'A',fullSyncAt:'2026-10-01'},snapshotFixture(provider,items)),a=d.providers[provider].activeProfileId;
      d=await writer.replaceProviderItems(provider,items,{profileLabel:'B',fullSyncAt:'2026-10-02'},snapshotFixture(provider,items));const b=d.providers[provider].activeProfileId;

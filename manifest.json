@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "111",
   "name": "Galactic Library",
   "version": "0.1.0",
   "description": "A private, browser-local index of digital media you own.",
@@ -26,6 +26,18 @@
   },
   "options_page": "options.html",
   "content_scripts": [
+    {
+      "matches": ["https://accounts.nintendo.com/portal/vgcs*"],
+      "js": ["src/providers/provider-snapshot.js", "src/providers/console-library.js", "src/providers/nintendo-capture.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://accounts.nintendo.com/portal/vgcs*"],
+      "js": ["shared/theme.js", "src/providers/floating-panel.js", "src/providers/nintendo-content.js"],
+      "run_at": "document_idle",
+      "css": ["shared/theme.css"]
+    },
     {
       "matches": [
         "https://store.steampowered.com/*"

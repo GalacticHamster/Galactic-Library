@@ -54,10 +54,10 @@ export const securityTests = [
     await withWorker(async({memory,pageA})=>{await assert.rejects(pageA.getDatabase(),/storage protection failed/u);assert.equal(memory.getCount,0);},{accessError:new Error('storage protection failed')});
     await assert.rejects(restrictStorageAccess({local:{},session:{}}),/cannot protect library storage/u);
   }],
-  ['all eleven providers keep full and quick import messages working with protected storage', () => withWorker(async({dispatch,pageA})=>{
+  ['legacy providers keep full and quick import messages working with protected storage; Nintendo requires account-bound commits', () => withWorker(async({dispatch,pageA})=>{
     const sites={steam:'https://store.steampowered.com/',gog:'https://www.gog.com/account',epic:'https://store.epicgames.com/', 'amazon-games':'https://gaming.amazon.com/my-collection',audible:'https://www.audible.com/library',kindle:'https://www.amazon.com/hz/mycd/', 'amazon-video':'https://www.amazon.com/gp/video/library', 'fandango-at-home':'https://athome.fandango.com/content/browse/mylibrary',kobo:'https://www.kobo.com/library',fanatical:'https://www.fanatical.com/en/orders',humble:'https://www.humblebundle.com/home/purchases'};
     const id='abcdefghijklmnopabcdefghijklmnop';
-    for(const provider of PROVIDERS){
+    for(const provider of PROVIDERS.filter(p=>p!=='nintendo')){
       const sender={id,url:sites[provider],tab:{id:1}};
       const item={providerItemId:'test-1',title:`Fixture ${provider}`,mediaType:provider==='kindle'?'book':provider==='fandango-at-home'?'movie':'game',ownership:'owned'};
       let response=await dispatch({type:'IMPORT_PROVIDER_ITEMS',provider,items:[item],snapshot:snapshotFixture(provider,[item])},sender);

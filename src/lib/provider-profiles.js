@@ -11,7 +11,7 @@ export function newProviderProfile(provider,nickname='',legacy=false){
 }
 export function validateProviderProfiles(value={}){
   object(value,'Provider profiles');if(Object.keys(value).length>10000)throw Error('Too many provider profiles.');
-  const legacy=new Set(),names=new Set();
+  const legacy=new Set(),names=new Set(),bindings=new Set();
   return Object.fromEntries(Object.entries(value).map(([id,p])=>{
     profileRef(id);object(p,'Provider profile');if(p.profileId!==id||!PROVIDERS.includes(p.provider))throw Error('Invalid profile owner.');
     const nickname=text(p.nickname,100,'Profile nickname'),keySpace=p.keySpace===''?'':profileRef(p.keySpace);
@@ -20,9 +20,11 @@ export function validateProviderProfiles(value={}){
     const name=`${p.provider}:${nickname}`;if(nickname&&names.has(name))throw Error('Duplicate provider profile nickname.');if(nickname)names.add(name);
     if(!['declared','unassigned'].includes(p.provenance))throw Error('Invalid profile provenance.');
     if(p.assumeUnconfirmedOwned!==undefined&&(p.provider!=='kobo'||typeof p.assumeUnconfirmedOwned!=='boolean'))throw Error('Invalid Kobo account ownership preference.');
+    if(p.sourceAccountFingerprint!==undefined&&(p.provider!=='nintendo'||typeof p.sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(p.sourceAccountFingerprint)))throw Error('Invalid Nintendo account binding.');
+    if(p.sourceAccountFingerprint){if(bindings.has(p.sourceAccountFingerprint))throw Error('Duplicate Nintendo account binding.');bindings.add(p.sourceAccountFingerprint);}
     const state=validateProviderStates({[p.provider]:p.state??{}})[p.provider];delete state.activeProfileId;state.profileLabel=nickname;
     const legacyArchive={};object(p.legacyArchive??{},'Legacy archive dates');if(Object.keys(p.legacyArchive??{}).length>500000)throw Error('Too many legacy archive dates.');for(const [ref,at]of Object.entries(p.legacyArchive??{}))legacyArchive[profileRef(ref)]=date(at);
-    return [id,{...(Object.keys(legacyArchive).length?{legacyArchive}:{}),...(p.assumeUnconfirmedOwned===true?{assumeUnconfirmedOwned:true}:{}),profileId:id,provider:p.provider,nickname,keySpace,state,lastSelectedAt:date(p.lastSelectedAt),provenance:p.provenance}];
+    return [id,{...(Object.keys(legacyArchive).length?{legacyArchive}:{}),...(p.assumeUnconfirmedOwned===true?{assumeUnconfirmedOwned:true}:{}),...(p.sourceAccountFingerprint?{sourceAccountFingerprint:p.sourceAccountFingerprint}:{}),profileId:id,provider:p.provider,nickname,keySpace,state,lastSelectedAt:date(p.lastSelectedAt),provenance:p.provenance}];
   }));
 }
 // Migration/unscoped legacy bootstrap reserves one legacy namespace; its IDs remain stable;

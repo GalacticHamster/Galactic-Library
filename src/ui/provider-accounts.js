@@ -11,7 +11,8 @@ export const PROVIDER_SITES=[
  ['fandango-at-home','Fandango at Home','https://athome.fandango.com/content/browse/mylibrary'],
  ['kobo','Kobo','https://www.kobo.com/us/en/library/books'],
  ['fanatical','Fanatical','https://www.fanatical.com/en/orders'],
- ['humble','Humble Bundle','https://www.humblebundle.com/home/purchases']
+ ['humble','Humble Bundle','https://www.humblebundle.com/home/purchases'],
+ ['nintendo','Nintendo — Switch Virtual Game Cards','https://accounts.nintendo.com/portal/vgcs']
 ].map(([provider,name,url])=>({provider,name,url}));
 
 export function providerAccounts(database){
@@ -22,6 +23,7 @@ export function updateEligibility(profile,state={},now=Date.now()){
  const fullReason=!profile.active?'Select this account for updates first.':!profile.nickname?'Name this saved account before updating it.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
  let quickReason=fullReason;
  if(!quickReason&&profile.provider==='epic')quickReason='Epic supports complete imports only. Use Full Rescan.';
+ if(!quickReason&&profile.provider==='nintendo')quickReason='Nintendo imports the complete loaded card list. Use Full Rescan.';
  if(!quickReason&&!state.fullSyncAt)quickReason='Run a first Full Rescan to establish this account’s import history.';
  if(!quickReason&&profile.provider==='amazon-games'){
    const age=now-Date.parse(state.quickSyncAt??state.fullSyncAt??'');

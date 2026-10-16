@@ -11,7 +11,7 @@ Choose **Add a library** from an empty Library or the toolbar popup. In Provider
 expand a provider and open its website. For a first store scan, sign in, enter a recognizable **Account
 nickname** on the Galactic Library panel, and confirm that it describes the
 signed-in account. Start **Full rescan** for the first import, or **Sync library**
-on Epic. Keep the provider tab open until the import finishes. Return to Library
+on Epic, or **Import loaded cards** on Nintendo. Keep the provider tab open until the import finishes. Return to Library
 to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
@@ -57,7 +57,8 @@ GL do not automatically start an import.
 Quick Update uses the selected account's saved import history and reads the
 provider's incremental scope. It is unavailable until a full import exists,
 while an update is running, or until an unnamed account is named. Epic supports
-complete imports only. Amazon Games needs a full scan after more than 70 days
+complete imports only. Nintendo likewise requires a complete loaded card list.
+Amazon Games needs a full scan after more than 70 days
 without an update. Fandango quick updates run from Recently Purchased View All
 grids; full scans check My Library. The provider panel remains authoritative
 about coverage and any additional restrictions.
@@ -65,6 +66,42 @@ about coverage and any additional restrictions.
 Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
+
+## Nintendo Switch Virtual Game Cards
+
+Open **Providers → Nintendo — Switch Virtual Game Cards**, then open Nintendo's
+Virtual Game Cards page and sign in normally. Reload that page after installing
+or reloading GL so it can observe the website's card-list request. Let the list
+finish loading; if Nintendo loads several pages, browse all pages before import.
+Enter/confirm a nickname on first use and choose **Import loaded cards**.
+
+GL imports only a complete, non-hidden card list observed on that page. It makes
+no Nintendo API requests, copies no authentication headers, and never stores a
+token or raw Nintendo account/device ID. An opaque hash binds the saved GL profile
+to the website account; a different account cannot silently reuse that profile.
+Rename a saved account in Providers rather than creating another profile for it.
+
+Each card keeps its software ID, source platform and available lending/released
+flags. A card whose owner matches the signed-in account and whose released base
+application is confirmed is Owned; a borrowed card does not become a purchase.
+A false released-base flag does not establish a DLC-only product or exclude an
+unreleased game. Such cards remain visible with unconfirmed access. Add-on flags
+on a combined card do not create separately named DLC products. Purchase dates
+and prices are not inferred from activation order.
+
+Repeat imports keep stable records. Cards missing from a later view remain saved;
+GL never infers a return or revocation from omission. An incomplete list, failed
+request or detected account change prevents saving. Profiles, bindings and user
+access corrections survive backup/restore.
+
+This scope is not lifetime Nintendo purchase history: hidden cards, older systems,
+and purchases not represented as Virtual Game Cards are outside it. Switch 2
+platform labels are preserved when provided, but the live validation sample was
+115 Switch cards. Lending/borrowing variations have synthetic tests, not live
+lending validation. Chrome 111+ or the supported Firefox release is required.
+In Firefox, allow GL access to the Nintendo site if the browser withholds site
+permissions, then reload the page. The temporary research helper may be removed;
+the production importer does not depend on it.
 
 ## Kobo metadata and ownership
 

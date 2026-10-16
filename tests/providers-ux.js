@@ -8,7 +8,7 @@ export const providersUxTests=[
    const {writer}=memory();let d=await writer.replaceProviderItems('kindle',[record],{profileLabel:'A',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[record]));
    d=await writer.replaceProviderItems('kindle',[record],{profileLabel:'B',fullSyncAt:'2026-10-02'},snapshotFixture('kindle',[record]));
    const sites=providerAccounts(d),kindle=sites.find(p=>p.provider==='kindle');
-   assert.equal(sites.length,11);assert.equal(kindle.accounts.length,2);assert.equal(kindle.accounts.find(a=>a.active).nickname,'B');assert.equal(kindle.accounts.reduce((n,p)=>n+p.recordCount,0),2);
+   assert.equal(sites.length,12);assert.equal(kindle.accounts.length,2);assert.equal(kindle.accounts.find(a=>a.active).nickname,'B');assert.equal(kindle.accounts.reduce((n,p)=>n+p.recordCount,0),2);
    assert.equal(kindle.accounts.find(a=>a.nickname==='A').baselineComplete,true);
    assert(PROVIDER_SITES.every(p=>p.url.startsWith('https://')));
  }],

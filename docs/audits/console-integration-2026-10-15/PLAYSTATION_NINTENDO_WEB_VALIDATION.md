@@ -8,13 +8,13 @@ Xbox research/harness files are preserved without further investigation.
 
 | Source | Live user evidence | GL implementation / authenticated test |
 | --- | --- | --- |
-| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Live independent 0.1.6 GET succeeds with 24 purchase rows and HTTP 200 | Browser-managed session access demonstrated after fixing JSON Content-Type. Account binding and product/title relationships remain to check. **No production importer yet.** |
-| Nintendo — Switch Virtual Game Cards | Live 0.1.5 helper reconciles 115 rows / 115 card IDs / 115 software IDs, one terminal page; all four queries HTTP 200 | Authenticated website source and extension observation demonstrated. Account isolation, access semantics and independent acquisition remain to validate. **No production importer yet.** |
+| PlayStation — PS4/PS5 web library | First capture: 60 rows / 59 product IDs, 3 terminal pages. Independent purchase GET succeeds; website profile query succeeds but independent profile query returns HTTP 400 rejecting its field | Purchase-page access demonstrated. Independent account recheck remains blocked by a different accepted GraphQL field contract; exact missing request context is unknown. **Production importer deferred.** |
+| Nintendo — Switch Virtual Game Cards | 115 rows / card IDs / software IDs, terminal page. In 0.1.7 the signed-in obfuscatedId matches ownerNaId and userNaId on all 115 rows; no account change | Account-scoped website observation feeds an isolated importer through existing validated additive atomic saves. No independent API request or copied credential is needed. Live production import still requires user-side validation. |
 | Xbox | Existing separate research | Deferred beyond 1.0 by user instruction; no work in this task. |
 
-Do not list either new source as an available provider until the signed-in gate
-passes and its production implementation is tested. The existing provider list
-and production extension package remain unchanged at this stage.
+Nintendo's source/account observation gate is now satisfied. The implementation
+uses the website-owned request and requires complete pagination; it does not
+replay authentication. PlayStation is not registered as a production provider.
 
 ## Evidence available before the signed-in check
 
@@ -252,13 +252,83 @@ No assumption is made that these identifiers share a namespace. No token is deco
 and no Nintendo request is added. A mismatch will require a different verified
 account binding; it will not be treated as evidence of borrowing.
 
-Signed-in results of these new checks remain pending. Synthetic tests include
+The user returned the 0.1.7 results: Nintendo has a candidate on every page,
+115 owner matches, 115 user matches, zero neither/missing matches, and no account
+change. PlayStation's website profile response contains both accountId and
+onlineId. The independent account check instead returns HTTP 400, with the user
+supplying only this schema error: `Cannot query field "oracleUserProfileRetrieve"
+on type "Query"`. The suggestion of other field names is not evidence of an
+equivalent account endpoint. This differs from the earlier CSRF rejection. The
+exact request-context difference is unestablished; do not guess headers, copy
+authorization or treat it as proof the session is logged out. Following the
+task's stopping rule, PlayStation remains gated rather than expanding research.
+
+Synthetic tests include
 matching IDs, different namespaces, owned/lent/borrowed-shaped relationships,
 missing fields, account changes, GraphQL/auth errors, oversized responses and
 hostile report redaction. Neither successful field presence nor a match count
 alone establishes production account-switch or save-time isolation.
 
+## Nintendo implementation and remaining acceptance check
+
+Production code observes the verified `getVgcsVgcs` website request at document
+start and parses only a bounded neutral card projection. It issues no Nintendo
+API calls and never retains a request body or credential. Imports require one
+contiguous, consistently scoped traversal reaching the reported total. Pending
+requests, changed accounts/scopes/totals, duplicate cards, failures, unsupported
+filters and stale observation versions reject the import.
+
+An opaque SHA-256 of provider plus signed-in account ID binds the existing GL
+profile and tab-bound scan lease. Save-time checks preserve that relationship;
+the same source account cannot silently create a second profile under a new
+nickname. The existing additive writer validates and saves the full result
+atomically, retaining omitted cards, stable record refs, user access corrections
+and existing metadata. Binding survives the ordinary backup validator without a
+schema-version change. No ownership or matching policy was broadened.
+
+The 115-card live source implies **112 Owned / 3 unconfirmed** under the implemented
+conservative projection, not 115 established permanent game purchases. The three
+false released-base flags cannot distinguish unreleased games from DLC-only
+cards. Reference clients can alias those flags to names such as hasApplication;
+that alias is not additional absence evidence. The 13 add-on-positive cards are
+retained once each, without fabricated separately named DLC products. Lent-out
+cards retain ownership when account-owner evidence supports it; borrowed cards
+are not purchases. Lending expiry, when supplied, is retained separately rather
+than becoming the owner's access-expiry date.
+
+Primary files: [source projection](../../../src/providers/console-library.js),
+[page capture](../../../src/providers/nintendo-capture.js),
+[import panel](../../../src/providers/nintendo-content.js),
+[existing writer](../../../src/background/storage-writer.js),
+[profile validation](../../../src/lib/provider-profiles.js), registry/metadata,
+provider UI, runtime manifest/allowlist and focused synthetic tests. A draft
+PlayStation projection has no registered provider, page script or import action.
+
+The live helper established **115 raw cards / 115 stable card IDs / 115 software
+IDs**, terminal traversal and account equality. It imported **zero** purchases.
+Installed production tests import 115 synthetic cards successfully in both
+browsers, including actual background persistence. A real production import has
+not been performed by the agent and remains a user-side acceptance check:
+reload GL, reload Nintendo's portal, choose/confirm the profile and click
+**Import loaded cards**. Check 115 observed/imported cards, 112 owned and 3
+unconfirmed, inspect known cards, and repeat to confirm no extra records. Hidden,
+legacy and non-card purchases are outside this scope. Do not lend a game solely
+for testing. The research helper can be removed.
+
+Reproduction: `node --test tests/console-library.test.mjs`, `node tests/run.js`,
+`node tests/nintendo-native.mjs` (add `--firefox`), and packaged Providers UI via
+`node tests/browser.js --release --ux` (add `--firefox`). All use disposable data;
+localhost origin changes and test permissions exist only in the native fixture.
+
 ## Validation
+
+Nintendo implementation: **1,210 GL tests** passed, including shared matching
+parity, contents regressions and release integrity. **12 packaged Providers UI
+checks per browser** passed. Installed full-runtime Chrome and Firefox tests
+exercise profile confirmation, complete 115-card capture, 112 owned / 3 unknown,
+repeat import, retained omission, account-switch rejection, atomic worker writes
+and backup round-trip. The standalone research helper's earlier results below
+remain separate from these production tests.
 
 Helper 0.1.7: **27 focused synthetic tests** and installed-helper checks for both
 providers in **Chrome and Firefox** pass, including both explicit PlayStation

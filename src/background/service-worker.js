@@ -22,6 +22,7 @@ import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
+import {PROVIDERS} from '../lib/constants.js';
 
 let workerLifecycle,purchaseSync;
 const queryDiagnostics=createQueryDiagnostics({onActivity:(stage,details)=>workerLifecycle?.observe(details.operation??stage)});
@@ -125,6 +126,7 @@ function isProviderImportPage(provider, url) {
       || (provider === 'amazon-video' && page.origin === 'https://www.amazon.com' && page.pathname.includes('/gp/video/'))
       || (provider === 'fandango-at-home' && page.origin === 'https://athome.fandango.com')
       || (provider === 'kobo' && page.origin === 'https://www.kobo.com' && page.pathname.includes('/library'))
+      || (provider === 'nintendo' && page.origin === 'https://accounts.nintendo.com' && /^\/portal\/vgcs(?:\/|$)/u.test(page.pathname))
       || (provider === 'fanatical' && page.origin === 'https://www.fanatical.com' && /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?orders\/?$/iu.test(page.pathname))
       || (provider === 'humble' && page.origin === 'https://www.humblebundle.com' && page.pathname.startsWith('/home/purchases'));
   } catch {
@@ -149,7 +151,7 @@ function isOwnExtensionPage(url) {
 }
 
 function isKnownProvider(provider) {
-  return ['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'fanatical', 'humble'].includes(provider);
+  return PROVIDERS.includes(provider);
 }
 
 function humbleSyncState(value) {
@@ -434,7 +436,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};
     const read = request.beginScan===true
       ? ((request.confirmed===true || request.rememberedProfile===true) && Number.isInteger(sender.tab?.id)
-        ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true],timing)
+        ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true,request.sourceAccountFingerprint],timing)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
       : (request.type==='GET_PROVIDER_PROFILE'||request.provider==='kobo'?storageWriter.getQueryDatabase({beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
     read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
@@ -480,12 +482,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Imports are accepted only from the matching signed-in provider site.' });
     return undefined;
   }
+  if(request.provider==='nintendo'&&request.type!=='COMMIT_PROVIDER_SCAN'){
+    sendResponse({ok:false,error:'Nintendo imports require a confirmed account-bound scan.'});return undefined;
+  }
   const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home'].includes(request.provider);
   if (!Array.isArray(request.items) || request.items.length > 50000) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
   }
-  const source = request.provider === 'steam'
+  const source = request.provider === 'nintendo' ? 'nintendo-virtual-game-cards' : request.provider === 'steam'
     ? 'steam-store-browse-items'
     : request.provider === 'gog'
       ? 'gog-account-library'
@@ -534,7 +539,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const timing=providerTiming(request),end=timing?.begin('provider_finish');
   const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};
   (request.type==='COMMIT_PROVIDER_SCAN'
-    ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,request.provider==='kobo'],timing)
+    ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,request.provider==='kobo',request.sourceAccountFingerprint],timing)
     : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))
     .then((result) => {const database=result.database??result;reply({
       ok: true,

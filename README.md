@@ -47,8 +47,12 @@ on later visits; a different store login requires deliberate account switching.
 Every saved account remains in the combined Library.
 
 Supported providers are Steam, GOG, Epic Games, Amazon Games, Audible, Kindle,
-Amazon Video, Fandango at Home, Kobo, Humble Bundle and Fanatical. Epic supports
-complete imports only. Other quick updates check each provider's incremental
+Amazon Video, Fandango at Home, Kobo, Humble Bundle, Fanatical and Nintendo
+Switch Virtual Game Cards. Nintendo uses **Import loaded cards** on its signed-in
+portal and keeps earlier cards absent from the current non-hidden view. It does
+not request or store Nintendo credentials. PlayStation remains gated on the
+account-lookup limitation documented in the console validation report. Epic and
+Nintendo support complete imports only. Other quick updates check each provider's incremental
 scope; they do not establish that missing records were removed. A successful
 Full rescan reconciles the selected account and retains earlier missing records
 as history. Failed or incomplete scans preserve the previous validated library.

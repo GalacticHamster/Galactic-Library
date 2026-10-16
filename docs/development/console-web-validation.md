@@ -2,7 +2,9 @@
 
 This is **Phase A**, a separate read-only browser helper. It is not a GL importer.
 It does not change GL, call its companion API, or save any purchases. Production
-providers remain gated on actual signed-in results. Xbox is outside this task.
+providers are separate from this helper. Nintendo's verified source/account result
+now supports the production loaded-card importer; PlayStation remains gated on
+its independent profile-query failure. Xbox is outside this task.
 
 ## Use your existing signed-in browser
 
@@ -115,8 +117,10 @@ filters remain separate scopes and must not be added together as distinct games.
 terminal page/total. It is not an account-completeness or authorization verdict.
 
 Account checks are diagnostic evidence, not production account authorization.
-The Nintendo candidate has not yet been shown to share the card-ID namespace;
-the PlayStation account test has not yet been exercised on the signed-in site.
+The returned Nintendo result matches the account candidate to owner/user on all
+115 cards. PlayStation's website profile response exposes the expected fields,
+but its separate test returns HTTP 400 rejecting `oracleUserProfileRetrieve`.
+Neither result alone tests production profile switching or atomic import guards.
 Reload before switching
 accounts. A page can interfere with MAIN-world instrumentation, and aggregate
 reports are diagnostic evidence, not authority to import or classify purchases.

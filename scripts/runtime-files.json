@@ -1,5 +1,8 @@
 [
   "manifest.json",
+  "src/providers/console-library.js",
+  "src/providers/nintendo-capture.js",
+  "src/providers/nintendo-content.js",
   "options.html",
   "popup.html",
   "src/background/import-state.js",

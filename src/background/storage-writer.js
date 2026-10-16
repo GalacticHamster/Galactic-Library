@@ -217,11 +217,18 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
-  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false) {
+  async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false,sourceAccountFingerprint=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
     const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await readDatabase(provider==='kobo'),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
+    if(provider==='nintendo'){
+      if(mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload Nintendo and import its complete loaded card list with a verified account.');
+      const bound=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.sourceAccountFingerprint===sourceAccountFingerprint);
+      if(bound&&bound.profileId!==existing?.profileId)throw Error('This Nintendo account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');
+      if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This GL account belongs to a different Nintendo account. Choose another profile and confirm switching.');
+      if(existing&&!existing.sourceAccountFingerprint&&Object.values(database.providerItems).some(i=>i.profileId===existing.profileId))throw Error('This saved account has no verified Nintendo identity. Use a new account profile.');
+    }
     if(requestedProfileId&&existing?.profileId!==requestedProfileId)throw Error('Scan profile changed. Start a fresh confirmed scan.');
     if(rememberedProfile===true&&(Object.values(database.providerProfiles).filter(p=>p.provider===provider).length!==1
       ||!requestedProfileId||existing?.profileId!==active||existing?.state.connected!==true||!existing?.state.lastSync))throw Error('Saved accounts changed. Select and confirm the signed-in account before scanning.');
@@ -233,6 +240,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
+    if(provider==='nintendo')scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
     // An existing-account quick check needs a tab-bound lease, not a rewrite of
     // every saved book merely to announce that scanning has started.
     if(provider==='kobo'&&mode==='incremental'&&!forceFull&&active===profile.profileId){
@@ -245,12 +253,23 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     await storageArea.set({[SCANS]:scans,[DATABASE_STORAGE_KEY]:validateDatabase(database)});
     return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
   }
-  async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false) {
+  async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false,sourceAccountFingerprint=null) {
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(provider==='kobo');
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId||!scan.profileId||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||!database.providerProfiles[scan.profileId])throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname};
     let result,changes;
+    if(provider==='nintendo'){
+      if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint)||scan.sourceAccountFingerprint!==sourceAccountFingerprint||profile.sourceAccountFingerprint&&profile.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('The Nintendo account changed before saving. No cards were imported. Start a fresh import.');
+      if(details.syncMode!=='full')throw Error('Nintendo requires a complete loaded card list.');
+      validateProviderSnapshot(provider,values,snapshot);
+      const scope=snapshot.scopes[0];
+      if(snapshot.scopes.length!==1||scope.id!=='non-hidden-virtual-cards'||scope.expectedCount!==values.length||scope.readCount!==values.length||new Set(values.map(v=>v.providerItemId)).size!==values.length)throw Error('Nintendo card coverage is incomplete. Previously saved items were kept.');
+      profile.sourceAccountFingerprint=sourceAccountFingerprint;
+      // A complete non-hidden view is still not a complete purchase history.
+      // Reuse the additive importer; never archive omissions or revoke access.
+      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database);
+    }
     if(provider==='kobo'&&scan.readOnlyStart&&details.syncMode==='incremental'&&!details.scanDiagnostics?.failedRequestCount
       &&profile.state.syncHealth?.status==='succeeded'){
       const incoming=timed('entry_validation',()=>[...new Map(normalizedIncoming(database,provider,profile,values).map(item=>[item.id,item])).values()]);
@@ -403,6 +422,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
+    if(provider==='nintendo')throw Error('Nintendo imports require a confirmed account-bound scan.');
     const database=await getDatabase();
     if(database.providers[provider]?.profileLabel)throw new Error('Reload the provider page and start a confirmed profile scan.');
     return details.syncMode==='incremental'?mergeProviderItems(provider,values,details):replaceProviderItems(provider,values,details,snapshot);
