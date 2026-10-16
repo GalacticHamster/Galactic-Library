@@ -320,6 +320,25 @@ Reproduction: `node --test tests/console-library.test.mjs`, `node tests/run.js`,
 `node tests/browser.js --release --ux` (add `--firefox`). All use disposable data;
 localhost origin changes and test permissions exist only in the native fixture.
 
+## First production follow-up: false filter error
+
+The user reported a filter-reset error with no selected filters. Their redacted
+request uses the same operation and pagination, `sortBy: ACTIVATED_DATE`, but
+`order: DESC` instead of the earlier observed ASC. Both optional type/status
+filters are absent. The first importer mistakenly required ASC and reported every
+unsupported request setting as an active filter. No card import was committed
+through that rejected request.
+
+Capture now accepts ASC and DESC, binding all pages to the same ordering as well
+as account/locale/shop scope. A direction change mid-traversal remains incomplete.
+Empty optional filter objects are also accepted; nonempty unsupported selections
+remain blocked. Failures identify the specific check using fixed, value-free
+diagnostic codes rather than telling users to reset filters they did not select.
+Focused tests include the exact redacted newest-first variable shape and matching
+115-card results in either direction. Installed Chrome/Firefox fixtures now use
+the reported newest-first request. No provider request, stored ownership,
+matching rule or account guard is changed by this correction.
+
 ## Validation
 
 Nintendo implementation: **1,210 GL tests** passed, including shared matching

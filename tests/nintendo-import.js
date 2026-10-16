@@ -29,9 +29,9 @@ function captureHarness(){
   ctx.window=ctx;ctx.listeners=listeners;ctx.postMessage=value=>{posts.push(value);reply?.(value);};
   for(const path of ['src/providers/provider-snapshot.js','src/providers/console-library.js','src/providers/nintendo-capture.js'])vm.runInContext(readFileSync(new URL('../'+path,import.meta.url),'utf8'),ctx);
   const rows=(n=1)=>Array.from({length:n},(_,i)=>({id:'card-'+i,applicationId:'app-'+i,applicationName:'Synthetic Game '+i,apparentPlatform:'NX',ownerNaId:actor,userNaId:actor,hasReleasedApplication:true}));
-  function start(list=rows(),offset=0,total=list.length,changes={}){
+  function start(list=rows(),offset=0,total=list.length,changes={},query='query getVgcsVgcs { account { vgc { vgcViewsV2(isHidden: false) { views { id } } } } }'){
     const xhr=new XHR();xhr.open('POST','https://wb.lp1.savanna.srv.nintendo.net/graphql');
-    xhr.send(JSON.stringify({operationName:'getVgcsVgcs',query:'query getVgcsVgcs { account { vgc { vgcViewsV2(isHidden: false) { views { id } } } } }',variables:{offset,limit:300,shopId:3,order:'ASC',sortBy:'ACTIVATED_DATE',idToken:'private-token',...changes}}));
+    xhr.send(JSON.stringify({operationName:'getVgcsVgcs',query,variables:{offset,limit:300,shopId:3,order:'ASC',sortBy:'ACTIVATED_DATE',idToken:'private-token',...changes}}));
     return (status=200,body={data:{account:{vgc:{vgcViewsV2:{views:list,offsetInfo:{offset,total}}}}}})=>{xhr.status=status;xhr.responseType='json';xhr.response=body;xhr.done?.();};
   }
   function ask(action='prepare'){
@@ -40,6 +40,31 @@ function captureHarness(){
   return {rows,start,ask,setActor:value=>{actor=value;},posts,ctx};
 }
 export const nintendoImportTests=[
+ ['Nintendo newest-first default imports the same 115 identities as oldest-first without requiring filters',async()=>{
+   const results=[];
+   for(const order of ['ASC','DESC']){
+     const h=captureHarness();h.start(h.rows(115),0,115,{country:'US',language:'en',shopId:3,limit:300,offset:0,order,sortBy:'ACTIVATED_DATE',nasLanguage:'en-US'})();
+     const result=await h.ask();assert.equal(result.ok,true,result.error);assert.equal(result.snapshot.itemCount,115);results.push(result);
+   }
+   assert.equal(results[0].sourceAccountFingerprint,results[1].sourceAccountFingerprint);
+   assert.deepEqual(JSON.parse(JSON.stringify(results[0].items)),JSON.parse(JSON.stringify(results[1].items)));
+ }],
+ ['Nintendo sorting direction cannot change between pages of a complete traversal',async()=>{
+   const h=captureHarness();h.start(h.rows(),0,2,{order:'DESC'})();
+   h.start([{...h.rows()[0],id:'card-next',applicationId:'app-next'}],1,2,{order:'ASC'})();
+   const result=await h.ask();assert.equal(result.ok,false);assert(result.error.includes('scope between pages'),result.error);
+ }],
+ ['Nintendo empty GraphQL type/status defaults are not active filters',async()=>{
+   for(const changes of [{},{vgcViewType:null,vgcViewStatus:null},{vgcViewType:{},vgcViewStatus:{}},{vgcViewType:{},vgcViewStatus:null},{vgcViewType:null,vgcViewStatus:{}}]){
+     const h=captureHarness();h.start(h.rows(115),0,115,changes)();const result=await h.ask();assert.equal(result.ok,true,result.error);assert.equal(result.items.length,115);assert.equal(result.snapshot.itemCount,115);
+   }
+ }],
+ ['Nintendo unsupported selections and request contracts report their actual failing check without exporting values',async()=>{
+   for(const [changes,code]of [[{vgcViewType:{filter:'private-value'}},'NINTENDO_CARD_TYPE'],[{vgcViewStatus:{filter:'private-value'}},'NINTENDO_CARD_STATUS'],[{vgcViewType:[]},'NINTENDO_CARD_TYPE'],[{limit:0},'NINTENDO_PAGING'],[{sortBy:'private-value'},'NINTENDO_SCOPE_SETTINGS'],[{order:'private-value'},'NINTENDO_SCOPE_SETTINGS'],[{isHidden:true},'NINTENDO_HIDDEN_SCOPE']]){
+     const h=captureHarness();h.start()();assert.equal((await h.ask()).ok,true);h.start(h.rows(),0,1,changes)();const result=await h.ask();assert.equal(result.ok,false);assert(result.error.includes(code),result.error);assert(!result.error.includes('private-value'));assert(!result.error.includes('Reset Nintendo list filters'));
+   }
+   const h=captureHarness();h.start(h.rows(),0,1,{},'query getVgcsVgcs { changedField }')();assert((await h.ask()).error.includes('NINTENDO_QUERY_SHAPE'));
+ }],
  ['Nintendo additive atomic imports preserve 137 records, stable IDs, omitted cards and backup bindings',async()=>{
    const {writer}=memory(),items=Array.from({length:137},(_,i)=>item('card-'+i));
    let d=await commit(writer,await begin(writer),items),refs=Object.values(d.providerItems).map(i=>i.recordRef).sort(),profile=d.providerProfiles[d.providers.nintendo.activeProfileId];

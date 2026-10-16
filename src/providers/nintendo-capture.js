@@ -6,6 +6,9 @@
   if(location.origin!=='https://accounts.nintendo.com'||!/^\/portal\/vgcs(?:\/|$)/u.test(location.pathname)||!globalThis.GalacticConsoleLibrary)return;
   const endpoint='https://wb.lp1.savanna.srv.nintendo.net/graphql',pages=new Map();
   let account=null,problem='',epoch=0,pending=0,generation=0,scope=null;
+  // Optional GraphQL input objects may be omitted, null, or empty. An empty
+  // object does not select a card type/status; nonempty inputs need validation.
+  const emptySelection=value=>value==null||typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===0;
   function currentAccount(){
     const raw=document.getElementById('state')?.getAttribute('data-json');
     if(typeof raw!=='string'||raw.length>2097152)throw Error('Nintendo account information is unavailable. Sign in and reload this page.');
@@ -19,16 +22,21 @@
       if(url.href!==endpoint||String(options.method??input?.method??'GET').toUpperCase()!=='POST'||typeof options.body!=='string'||options.body.length>262144)return null;
       const body=JSON.parse(options.body),v=body.variables;
       if(body.operationName!=='getVgcsVgcs')return null;
-      if(typeof body.query!=='string'||/\bmutation\b/iu.test(body.query)||!/\bvgcViewsV2\b/u.test(body.query)||!/\bisHidden\s*:\s*false\b/u.test(body.query))return {unsupported:true};
-      if(!Number.isSafeInteger(v?.offset)||v.offset<0||!Number.isSafeInteger(v.limit)||v.limit<1||v.limit>300||!Number.isSafeInteger(v.shopId)||v.shopId<1||v.shopId>1000||v.sortBy!=='ACTIVATED_DATE'||v.order!=='ASC'
-        ||v.vgcViewType!=null||v.vgcViewStatus!=null||v.isHidden===true||['country','language','nasLanguage'].some(k=>v[k]!=null&&(typeof v[k]!=='string'||v[k].length>30)))return {unsupported:true};
-      return {offset:v.offset,limit:v.limit,scope:JSON.stringify([v.shopId,v.country??null,v.language??null,v.nasLanguage??null])};
+      if(typeof body.query!=='string'||/\bmutation\b/iu.test(body.query)||!/\bvgcViewsV2\b/u.test(body.query)||!/\bisHidden\s*:\s*false\b/u.test(body.query))return {unsupported:'GL could not recognize Nintendo’s card-list query. No cards were imported. (NINTENDO_QUERY_SHAPE)'};
+      if(!Number.isSafeInteger(v?.offset)||v.offset<0||!Number.isSafeInteger(v.limit)||v.limit<1||v.limit>300)return {unsupported:'Nintendo’s card-list paging settings are not supported. No cards were imported. (NINTENDO_PAGING)'};
+      if(!Number.isSafeInteger(v.shopId)||v.shopId<1||v.shopId>1000||v.sortBy!=='ACTIVATED_DATE'||!['ASC','DESC'].includes(v.order)||['country','language','nasLanguage'].some(k=>v[k]!=null&&(typeof v[k]!=='string'||v[k].length>30)))return {unsupported:'Nintendo sent library settings GL does not yet recognize. No cards were imported. (NINTENDO_SCOPE_SETTINGS)'};
+      if(!emptySelection(v.vgcViewType))return {unsupported:'Nintendo sent card-type settings GL does not yet recognize. These may be website defaults rather than a filter you selected. No cards were imported. (NINTENDO_CARD_TYPE)'};
+      if(!emptySelection(v.vgcViewStatus))return {unsupported:'Nintendo sent card-status settings GL does not yet recognize. These may be website defaults rather than a filter you selected. No cards were imported. (NINTENDO_CARD_STATUS)'};
+      if(v.isHidden===true)return {unsupported:'Switch to Nintendo’s non-hidden card list before importing. No cards were imported. (NINTENDO_HIDDEN_SCOPE)'};
+      // Sorting changes presentation, not membership. Still bind every page in
+      // a traversal to its direction so a mid-list sort cannot mix two scans.
+      return {offset:v.offset,limit:v.limit,scope:JSON.stringify([v.shopId,v.country??null,v.language??null,v.nasLanguage??null,v.sortBy,v.order])};
     }catch{return null;}
   }
   function begin(info){
     if(!info)return null;
     epoch++;pending++;
-    if(info.unsupported){pages.clear();problem='Reset Nintendo list filters and reload the Virtual Game Cards page before importing.';return {...info,generation};}
+    if(info.unsupported){pages.clear();problem=info.unsupported;return {...info,generation};}
     // A new first page starts a new observation set. Never union scans or filters.
     if(info.offset===0){generation++;pages.clear();problem='';scope=info.scope;}
     else if(info.scope!==scope){pages.clear();problem='Nintendo changed the library scope between pages. Reload before importing.';}
