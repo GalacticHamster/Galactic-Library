@@ -1,5 +1,345 @@
 # Unchanged full-scan completion: architecture decision
 
+## Stage 2 — completion and automatic recovery (October 17, 2026)
+
+Baseline: `d68ab4a`. **Stage 2 enables unchanged completion on Chrome and Firefox;
+the corrected performance and release gates pass.**
+The controlled cold-matching diagnosis below supersedes the initial stopped
+measurements. Live Epic acceptance and public release remain separate. The Stage 1 and investigation sections below
+describe earlier states. No real library, authenticated provider data, backup,
+HB/FAN repository, version or public release was changed during development.
+
+### Eligibility and exact semantics
+
+The existing `replaceIntoDatabase` / `mergeIntoDatabase` paths still validate
+source completeness/account binding, normalize returned records, preserve
+enrichment/origins, reconcile history, calculate counts/health, and derive
+canonical groups. Before the ordinary full validation/save, an eligible established
+lease can compare that prepared result with its authoritative effective input.
+[observation-completion.js](../../src/lib/observation-completion.js) permits only
+record observation/update clocks, existing origin observation clocks, and the
+closed successful state patch. Everything else must agree, including every
+canonical group, record reference, review, history entry, source field, origin
+order/membership, acquisition date, identity and ownership value. This reuses the
+actual importer, not a simplified second normalizer. Zero UI updates alone prove
+nothing. Canonical reconciliation is retained to catch order-dependent grouping
+differences; skipping it is not part of this change.
+
+Complete uniform scopes use compressed profile observations when supported.
+Subset scopes enumerate only returned records. Fanatical always uses explicit
+records/origins and can retain independently observed origins across scans. Kobo
+full retains updatedAt; its unchanged sparse quick path still preserves both
+record clocks and can use the existing status-only receipt. Xbox/PlayStation quick
+subsets can use explicit observations without advancing retained rows.
+
+**Console full scans deliberately retain the validated fallback.** Their existing
+additive importer produces incremental-mode health even for a full listing. The
+closed success contract does not reinterpret that as full-mode health. Nintendo's
+only mode therefore remains a full save. No completeness or acquisition rule was
+changed to force eligibility. Changed metadata/access/identifiers, additions,
+removals, reappearances, history/canonical changes, account changes, unsupported
+state changes and packet bounds all retain the current validated full-save path.
+Incomplete/failed/cancelled results never become successful observation receipts.
+
+Raw catalogs remain exactly validated: a warm exact snapshot or a verified cold
+session certificate can be reused; absent/mismatched proof requires ordinary
+validation first. No new certificate certifies an effective view. The payload
+limits remain 1 MiB, 14 providers, 5,000 explicit records, 10,000 origins and three
+superseded status-attempt references. Overflow materializes through the full save.
+Fanatical's existing health may count an origin-date refresh as an update; that
+bounded health count is preserved after the full substantive-delta proof.
+
+### Single-value commit and recoverable materialization
+
+[observation-transactions.js](../../src/lib/observation-transactions.js) adds a
+closed format-2 envelope under `galacticLibraryObservations`:
+
+- Active: epoch UUID, exact raw base digest, consolidated format-1 payload or null,
+  and at most one terminal completion identity per provider (14 maximum).
+- Saving: the prior complete active envelope, intended after-digest/epoch,
+  reset intent, optional terminal scan identity, and before/after values for the
+  operation's affected metadata keys. It never duplicates the full database.
+
+`galacticLibraryObservationHead` is now a small registration marker, not a
+separately updated revision pointer. Initial admission writes a complete empty
+envelope before registering it. Interrupted registration is repaired before a
+later acknowledgement. A valid complete envelope is independently readable;
+missing data behind an existing registration is corruption, not an empty library.
+Existing Stage 1 injected pairs remain readable; no historical binary downgrade
+protocol was added.
+
+Successful unchanged completion rechecks the raw catalog and observation token,
+writes **one complete consolidated envelope value**, awaits native settlement,
+publishes the effective revision, then attempts lease retirement. That native
+settlement is the commit point. A lost settlement reply is checked by rereading
+the exact attempted value. No success is acknowledged for a rejected/unconfirmed
+write. Durable attempt/token/tab/profile/mode/account identity and a digest of the
+request make a retry idempotent even after lease cleanup. Reusing a completed
+token with different results is rejected. Request comparison excludes only the
+server-generated full/quick sync timestamps, which must retain their original
+committed values on retry. Independent providers pin their own observation
+attempt, so one receipt need not invalidate another provider's admitted scan.
+
+Before a real full save, the writer durably records the saving envelope. It then
+writes the fully validated database and its metadata, followed by an active empty
+envelope on the new base. Recovery hashes the authoritative raw database:
+
+| Authoritative database | Recovery action |
+| --- | --- |
+| Matches intended after-digest | Replay the after-metadata; retire the already folded packet. |
+| Matches before-digest only | Restore before-metadata and the complete prior packet. |
+| Matches neither | Preserve evidence and report genuine corruption. |
+
+Restore/clear use the same journal with reset intent. Clear's after-base is absence.
+If an explicit restore replaces an identical raw value, recovery can finish its
+metadata/reset intent without another catalog write. Pending journals keep all
+affected scan/job/preferences metadata; no cross-key atomicity is presumed.
+Concurrent local queries retain the prior complete view while a save is in flight,
+including restore/clear; they cannot prematurely roll back that writer's journal.
+A rollback with an unchanged raw catalog retains its matching index. Recovery
+also retains committed terminal identities for changed-scan fallbacks, so lost
+full-save replies can be retried safely.
+
+When a proved observation-only delta must fall back because the packet is at its
+bound, the validated new raw snapshot can reuse the prior identity revision.
+Raw digest/certificate association remains separate and uses the new raw value.
+Late-bound response records use current dates/access. The revision is a lightweight
+opaque token, not an accumulating catalog chain. Cached candidate indexes contain
+record IDs and history references, so compaction need not retain old complete
+records or raw databases. A cold worker still builds its index once. The bounded-status-lineage
+regression exercises real receipt growth followed by a full compaction and checks
+that this does not cause a second matching-index build.
+
+The commit boundary follows the native API, not an invented disk flush guarantee:
+[Chrome storage](https://developer.chrome.com/docs/extensions/reference/api/storage)
+is asynchronous and signals completion through its Promise; GL's Firefox adapter
+settles on the IndexedDB transaction's complete event. Firefox documents relaxed
+[IndexedDB durability](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction#firefox_durability_guarantees).
+These tests establish worker/background restart recovery, not durability against
+OS/power loss. Invalid receipts, unknown versions and unreadable storage block
+rather than silently discarding committed observations. Genuine corruption still
+requires explicit recovery; routine interrupted valid operations do not.
+
+### Initial stopped measurements against Stage 1 (historical)
+
+`scripts/benchmark-observation-completion.mjs` uses unmodified production packages,
+14,004 synthetic records and 2,800 returned records. Each version/browser ran five
+warm unchanged full completions, 20 samples for Exact/Possible/Partial/batch/
+aggregation matching and three real background restarts. The harness uses full
+storage-client replies; real provider replies are compact. Provider network work
+is zero; the diagnostic interval between calls is not acquisition time. These
+lean fixtures are not predictions for the developer's larger real metadata.
+
+Milliseconds, **median (range)**:
+
+| Measurement | Chrome Stage 1 | Chrome Stage 2 | Firefox Stage 1 | Firefox Stage 2 |
+| --- | ---: | ---: | ---: | ---: |
+| Preparation | 487 (475–512) | 523 (516–562) | 768 (718–805) | 1,004 (967–1,221) |
+| Completion | 2,454 (2,415–2,558) | 818 (763–941) | 1,345 (1,335–1,518) | 1,243 (1,183–1,285) |
+| Both messages | 2,932 (2,928–3,064) | 1,334 (1,288–1,464) | 2,141 (2,063–2,299) | 2,239 (2,210–2,404) |
+| First 40-item match after completion | 516 (479–585) | 5 (4–7) | 219 (170–250) | 17 (13–20) |
+| Standalone materialized backup validation | 724 (704–791) | 853 (798–910) | 470 (468–479) | 614 (578–688) |
+
+Every eligible completion changed from **one full write + one full validation**
+to **zero full writes + zero full validations + one bounded receipt commit**.
+Across the ten native measured completions, ten full writes/validations were
+avoided. Chrome's median receipt settlement was about 1 ms; equality proof
+55 ms, consolidation 16 ms, materialization 8 ms and publication 21 ms. Firefox's
+corresponding medians were 0/30/3/4/8 ms (zero is timer resolution). Nested spans overlap. Authoritative
+whole-value reads and mutable clones remain; full canonical reconciliation remains
+part of the oracle proof. Backup reads still validate/materialize a full database:
+Chrome getDatabase median was 1,062 ms versus 738 ms, Firefox 1,318 versus 925 ms.
+No backup-speed improvement is claimed.
+
+Warm post-scan 40-item median/p95 was Chrome **2.6/3.1 ms** versus **2.9/3.8 ms**,
+Firefox **10/15 ms** versus **7/8 ms**. Exact and Possible remain around 0.6–1 ms;
+Partial medians were Chrome 13.4 versus 11.1 ms and Firefox 7 versus 8 ms. Cold
+40-item medians were **940 versus 716 ms Chrome** (ranges 939–1,198 / 700–743)
+and **2,014 versus 1,435 ms Firefox** (2,013–2,103 / 1,429–1,547).
+Firefox reload loses session proof and must validate its raw base; Chrome worker
+stops retain proof. Tests show no observation-induced matching-index rebuild and
+current evidence timestamps. **checkedAt is retained.**
+
+Those cold increases triggered the original matching acceptance stop.
+Earlier pilot medians were closer, but did not override those
+measurements. Other timings also vary, including preparation and backup work.
+The additional cold interval has not been attributed reliably to execution,
+storage, receipt reconstruction or competing work. A fresh-writer probe in a
+background extension page instead encounters heavily throttled page timers, so
+its wall times cannot substitute for worker measurements. No cache/lifecycle
+redesign was attempted to conceal this gap. Work stopped without a commit;
+the following controlled diagnosis addresses that blocker.
+
+### Cold-matching diagnosis and narrow correction — October 17, 2026
+
+The original 26 staged files, unstaged diff and benchmark artifacts were preserved
+under ignored `audit-artifacts/observation-stage2/cold-diagnosis-before/`. Stage 1
+remained a clean detached `d68ab4a` checkout. No real data or authenticated session
+was used. New diagnostic code transforms only disposable packages; it is absent
+from shipped runtime files. The default browser harness still behaves normally.
+
+**Measured cause:** the earlier wall-time comparison did not isolate matching
+from automatic Options startup and rendering. `onInstalled` opens Options;
+Firefox's AddonManager reload triggers that path again. The old harness left those
+pages running. The journal shows concurrent Options snapshot work and the matcher
+waiting on that snapshot. Cooperative index timers then spend most of their wall
+time suspended. In the Options-running diagnostic, Firefox Stage 1/Stage 2 index
+CPU medians were 145/159 ms but waits were 916/970 ms. Suppressing only automatic
+Options opening in the test package reduced those waits to about 50 ms in the
+first control. The slowdown therefore also affects unchanged Stage 1. No evidence
+supports attributing it to changed identity rules, repeated catalog reads, GC,
+service-worker suspension or a new certificate requirement.
+
+The old 224/579 ms differences cannot be retrospectively apportioned exactly:
+those exports lacked phase traces and scheduling varied. Controlled repeats do
+not reproduce a persistent penalty of that size. There is a small real receipt
+reconstruction cost, and one avoidable duplicate validation was demonstrated.
+`validateActiveEnvelope` already validates its exact packet against the raw digest;
+`readObservations` previously validated it again (roughly 5 ms Chrome in the first
+trace). The production correction reuses that validated result and digest.
+Legacy pairs still validate normally. Invalid format-2 payloads still reject on
+warm and cold reads, as the new regression verifies. No proof or recovery check,
+source timestamp, matching rule, ownership decision or worker scheduling changed.
+
+Reproduction (run sequentially, without other test processes):
+
+```text
+node scripts/diagnose-observation-cold.mjs --quiet-options --label=accepted
+node scripts/diagnose-observation-cold.mjs --quiet-options --label=accepted --firefox
+node scripts/benchmark-observation-completion.mjs --quiet-options --baseline --root=../gl-observation-stage1-baseline
+node scripts/benchmark-observation-completion.mjs --quiet-options
+```
+
+Repeat the last two commands with `--firefox`. Omit `--quiet-options` on the
+diagnostic to reproduce overlapping Options work. `--stage2-root`, `--baseline-root`
+and `--case=A|B|C|D` allow independent comparisons. The final matrix primes the raw
+query certificate uniformly before stopping backgrounds; ordinary getDatabase
+alone does not guarantee query-certificate issuance. Chrome stops its actual
+worker; Firefox reloads its actual extension background and loses session proof.
+Each generation is checked. All four cases have exactly equal effective item
+values and the same 40-item workload, verified with order-independent deep equality.
+
+Five cold generations per case, milliseconds **median (range)**; with five samples
+the empirical p95 is the maximum and is not a stable tail estimate:
+
+| Case | Chrome | Firefox |
+| --- | ---: | ---: |
+| A: clean Stage 1 | 678 (671–693) | 1,011 (976–1,099) |
+| B: Stage 2, no receipt/registration | 684 (677–690) | 991 (932–1,168) |
+| C: Stage 2, active receipt | 717 (707–723) | 1,016 (961–1,513) |
+| D: Stage 2, folded receipt/empty envelope | 720 (705–855) | 976 (946–1,114) |
+
+Representative phase medians from that matrix (nested spans **must not be added**):
+
+| Phase | Chrome A / C | Firefox A / C |
+| --- | ---: | ---: |
+| Dependency execution to listener setup | 2.8 / 3.0 | 6 / 7 |
+| Caller wall outside handler (startup/transport/response residual) | 48 / 47 | 7 / 7 |
+| Native raw read, including API deserialization/clone | 274 / 277 | 100 / 106 |
+| Certificate verify | 174 / 179 | 1 / 1 (missing after reload) |
+| Whole-library semantic validation | 0 / 0 | 391 / 436 |
+| Strict raw serialization (nested in certificate verify/issue) | 136 / 141 | 185 / 175 |
+| Raw freeze/publication | 18 / 18 | 18 / 22 |
+| Observation read/validation/materialization, total | 1 / 23 | 1 / 13 |
+| Index executing work / suspended waits | 119+37 / 121+43 | 195+82 / 197+81 |
+
+Candidate/matching execution is only a few milliseconds. Browser module loading
+and parsing before the first dependency cannot be separated from the residual;
+Firefox reload time is recorded separately and is not added to a later request.
+Native engine I/O and API deserialization cannot be split with these APIs.
+Full raw JSON is about 11.02 MB; C's envelope is 2,132 bytes plus a 30-byte head;
+D's empty envelope is 498 bytes. These are post-timing JSON sizes, not disk bytes.
+The matrix shows exactly one raw database read and one identity-index build per
+cold generation. Chrome reuses its session proof with zero semantic validations;
+Firefox performs one required semantic validation. C constructs one effective
+view and validates its packet once; B/D construct none. There is no second full
+raw serialization for observation validation. Recovery checks and small envelope
+reads do not clone the catalog. Ordinary matching uses the cached effective view.
+The supplemental startup-counter smoke confirms one recovery envelope/head read
+and one query envelope/head read, generally 0–3 ms each, plus ordinary reminder/
+job metadata reads. Awaiting the already issued digest took 0–0.1 ms Chrome and
+0–6 ms Firefox in that smoke. No query writes a full catalog or receipt. These
+supplemental timings ran during gate validation and are counters, not another
+performance acceptance sample.
+
+An independent check without detailed probe hooks uses production matching and
+storage code, with **only automatic Options opening suppressed in the test
+package**. Five completion runs, 20 warm samples/case, three cold generations:
+
+| Measurement | Chrome Stage 1 / Stage 2 | Firefox Stage 1 / Stage 2 |
+| --- | ---: | ---: |
+| Cold 40-item match, median (range) | 710 (701–726) / 717 (706–745) | 710 (700–767) / 756 (709–809) |
+| Warm 40-item median / p95 | 3.6 / 4.2 → 2.7 / 3.2 | 8 / 17 → 7 / 9 |
+| Unchanged completion, median (range) | 2,179 (2,103–2,233) / 732 (723–833) | 1,357 (1,338–1,448) / 929 (898–965) |
+| First match after completion, median | 151 / 4.4 | 236 / 11 |
+| Effective database read, median | 699 / 717 | 949 / 948 |
+| Standalone backup validation, median | 651 / 651 | 463 / 456 |
+
+Exact/Possible medians remain about 1 ms; Partial stays about 8 ms Firefox.
+The 46 ms Firefox cold difference in this small check overlaps its baseline range;
+the larger controlled matrix differs by 5 ms. No material repeatable cold/warm
+regression remains. These controls do **not** claim faster production scheduling
+or predict speed while Options is busy; no production UI was suppressed and no
+work was deferred to another request. The earlier 940/2,014 ms results remain
+archived. The performance gate passes on repeatability and phase attribution,
+not by deleting unfavorable samples or comparing the controlled 756 ms directly
+with an uncontrolled 1,435 ms baseline.
+
+All ten measured eligible completions again have zero full database writes,
+zero full semantic validations and one bounded receipt commit. Existing tests
+also prove zero additional identity-index builds across observation revisions
+and bounded full compaction, with current checkedAt evidence. The existing
+receipt bounds, validated changed-scan fallback and native acknowledgement/
+recovery protocol remain unchanged. OS power-loss guarantees and real-library
+Epic performance remain outside these measurements.
+
+### Parity, native faults and live acceptance
+
+The extended oracle probe compares all effective fields in **156 cases across
+14 providers/26 modes**: unchanged, changed, empty, incomplete, failed, cancelled.
+It identifies 23 receipt cases / 23 avoided full saves in that matrix. Both writers
+retain the existing two PlayStation empty-list rejections without explicit zero
+totals. Additional focused tests cover Fanatical origin subsets, independent
+providers, request mismatch, changed-save lost replies, stale enrichment/identity
+guards inherited from Stage 1, first import after clear, and concurrent readers.
+
+`scripts/test-observation-native.mjs` instruments only an extracted disposable
+package, never production sources. Chrome actually stops its worker; Firefox
+destroys/reloads its installed extension background. Eleven boundaries per browser
+cover before/issued/settled receipt writes, lost replies, stale leases, missing
+certificates, consolidation-before-write, materialization before/after catalog
+commit, restore and clear. Outcomes are exact prior or committed states, not
+manually reconstructed libraries. Chrome additionally rejects a real storage.local
+quota write after omitting unlimitedStorage only in the disposable test manifest.
+Both browsers also test injected quota rejection at the adapter boundary. Firefox
+physical disk/quota exhaustion and OS power loss are not claimed.
+
+Correctness gates passed from the isolated checkout without private inputs: 1,523 unit
+tests (including 45 completion/recovery regressions), 472 contents tests, 105
+packaged importer and 68 UI checks per browser, 12 installed Firefox storage/
+recovery/backup checks, 12 native Chrome interruption/quota scenarios and 11
+Firefox background interruption scenarios, both 193-file package validators,
+and the 88-case original plus 156-case extended parity probes. The repository
+layout check retains only the 15 pre-existing absolute links in the historical
+ecosystem audit. No new layout warning was introduced.
+
+**Developer-run live Epic verification (now ready):**
+
+1. Reload the updated GL extension and open Epic through Providers. Keep the
+   existing saved account selected. Do not import a new backup or rescan elsewhere.
+2. In the Epic overlay, expand **Performance diagnostics**, select **Profile the
+   next Epic sync**, then click **Sync Epic library** (the complete listing scan).
+3. Export promptly from **GL → Settings → Performance diagnostics → Export timing
+   summary**. Re-arm the checkbox and repeat unchanged once; export again before
+   restarting GL. No Kindle acquisition tracing or Amazon page is involved.
+4. Compare provider start/fetch/save/UI phases and the observation equality/
+   consolidation/commit/publication spans. Eligible completion should have no
+   persist_validation/storage_write stage. If it falls back, preserve that trace;
+   do not infer eligibility from the displayed zero counts.
+
+The live target remains the measured ~22.5 s completion / ~32 s total baseline.
+The earlier 5–10 s estimate is not verified until those live traces arrive.
+
 ## Stage 1 implementation — October 17, 2026
 
 Baseline: `8a12a86`. **Reader infrastructure is implemented; observation-only

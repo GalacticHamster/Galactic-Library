@@ -10,8 +10,11 @@ import {newProviderProfile} from '../lib/provider-profiles.js';
 import {preserveKoboObservation,koboObservationChanged} from '../lib/kobo-observations.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
-import {registerCommittedSnapshot,committedSnapshotSequence,registerEffectiveSnapshot,isCommittedSnapshot,committedCatalogSnapshot} from '../lib/committed-snapshot.js';
-import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY,validateObservationOverlay,materializeObservations,observationToken,observationStatusChecks} from '../lib/observation-overlays.js';
+import {registerCommittedSnapshot,committedSnapshotSequence,registerEffectiveSnapshot,isCommittedSnapshot,committedCatalogSnapshot,reuseCommittedIdentity} from '../lib/committed-snapshot.js';
+import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY,validateObservationOverlay,materializeObservations,observationToken,observationStatusChecks,consolidateObservations} from '../lib/observation-overlays.js';
+import {OBSERVATION_REGISTRATION,isObservationTransaction,activeObservationEnvelope,validateActiveEnvelope,validateObservationJournal,providerObservationToken,retainedCompletions,observationCorruption} from '../lib/observation-transactions.js';
+import {validateProviderStates} from '../lib/provider-state.js';
+import {observationCompletionEntry} from '../lib/observation-completion.js';
 import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences, mergeUiPreferences } from '../lib/ui-preferences.js';
@@ -53,7 +56,7 @@ import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerChec
  * exact whole-value snapshot comparison or protected session proof. They return
  * a separate mutable value; incoming data and saves still require validation.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null,observationCompletions=false} = {}) {
   const PROFILE_HINTS='galacticLibraryProviderProfileHints';
   const profileHints=database=>Object.fromEntries(['kobo'].map(provider=>{
     const profiles=Object.values(database.providerProfiles).filter(p=>p.provider===provider),profile=database.providerProfiles[database.providers[provider]?.activeProfileId];
@@ -96,9 +99,62 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   let retiringObservation=null;
   const effectivePackets=new WeakMap();
   const observationVersions=new Map();
-  function invalidateObservationSnapshot(){observationEpoch++;observationCache=null;invalidateRefreshPreflight();}
+  const effectiveTokens=new WeakMap();
+  let activeEnvelope=null,recoveryChecked=false,recoveryPending=null;
+  let pendingScanCompletion=null;
+  let pendingAdmission=null;
+  let pendingIdentityCatalog=null;
+  function invalidateObservationSnapshot(){observationEpoch++;observationCache=null;recoveryChecked=false;invalidateRefreshPreflight();}
+  async function recoverObservations(){
+    if(recoveryChecked||retiringObservation)return;
+    if(recoveryPending)return recoveryPending;
+    recoveryPending=(async()=>{
+      const saved=await committedArea.get({[OBSERVATION_KEY]:null,[OBSERVATION_HEAD_KEY]:null}),value=saved[OBSERVATION_KEY];
+      if(saved[OBSERVATION_HEAD_KEY]&&![1,2].includes(saved[OBSERVATION_HEAD_KEY].format))observationCorruption();
+      if(saved[OBSERVATION_HEAD_KEY]?.format===2&&!equalDatabaseData(saved[OBSERVATION_HEAD_KEY],OBSERVATION_REGISTRATION))observationCorruption();
+      if(saved[OBSERVATION_HEAD_KEY]?.format===2&&!isObservationTransaction(value))observationCorruption();
+      if(isObservationTransaction(value)&&value.kind==='saving'){
+        validateObservationJournal(value);
+        const raw=(await committedArea.get({[DATABASE_STORAGE_KEY]:null}))[DATABASE_STORAGE_KEY],digest=raw?await providerCheckDigest(raw):null;
+        const forward=digest===value.afterDigest,backward=digest===value.before.baseDigest;
+        if(!forward&&!backward)observationCorruption();
+        // A committed catalog is the decision point. Replay or undo only its
+        // journaled metadata; a crash can occur between any two native keys.
+        if(forward){
+          if(Object.keys(value.updates).length)await committedArea.set(value.updates);
+          if(value.removals.length)await committedArea.remove(value.removals);
+        }else{
+          validateActiveEnvelope(value.before,raw,digest);
+          const updates=Object.fromEntries(Object.entries(value.previous).filter(([,v])=>v.present).map(([k,v])=>[k,v.value])),remove=Object.entries(value.previous).filter(([,v])=>!v.present).map(([k])=>k);
+          if(Object.keys(updates).length)await committedArea.set(updates);if(remove.length)await committedArea.remove(remove);
+        }
+        const completed=value.completion?[...value.before.completions.filter(c=>c.provider!==value.completion.provider),value.completion]:value.before.completions;
+        const next=forward?activeObservationEnvelope(digest,null,value.afterEpoch,!value.reset&&raw?retainedCompletions(completed,raw):[]):value.before;
+        await committedArea.set({[OBSERVATION_KEY]:next});activeEnvelope=next;observationVersions.clear();invalidateObservationSnapshot();invalidateQuerySnapshot(raw,'observation-recovery');
+        diagnostics?.event('observation_recovered',{reason:forward?'catalog-committed':'catalog-not-committed'});
+      }
+      recoveryChecked=true;
+    })();
+    try{await recoveryPending;}finally{recoveryPending=null;}
+  }
+  async function ensureObservationRegistration(base,packet){
+    if(activeEnvelope){
+      if(!equalDatabaseData((await committedArea.get({[OBSERVATION_HEAD_KEY]:null}))[OBSERVATION_HEAD_KEY],OBSERVATION_REGISTRATION))await committedArea.set({[OBSERVATION_HEAD_KEY]:OBSERVATION_REGISTRATION});
+      return;
+    }
+    const value=activeObservationEnvelope(await checkDigest(base),packet??null);
+    // The complete empty/legacy value precedes registration. Losing either
+    // reply is harmless: the next reader can recognize this same complete value.
+    await committedArea.set({[OBSERVATION_KEY]:value});
+    await committedArea.set({[OBSERVATION_HEAD_KEY]:OBSERVATION_REGISTRATION});
+    activeEnvelope=value;invalidateObservationSnapshot();
+  }
   async function requireNoObservations(){
+    await recoverObservations();
     const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});
+    if(isObservationTransaction(stored[OBSERVATION_KEY])){
+      validateActiveEnvelope(stored[OBSERVATION_KEY],createEmptyDatabase(),null);return;
+    }
     if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY])throw Error('Saved observations require their original library. Restore a complete backup before repairing or replacing this library.');
   }
   async function readObservations(base,force=false){
@@ -107,25 +163,32 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!force&&observationPending?.base===base&&observationPending.epoch===observationEpoch)return observationPending.promise;
     const epoch=observationEpoch;
     const promise=(async()=>{
-      const stored=await storageArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null}),head=stored[OBSERVATION_HEAD_KEY],packet=stored[OBSERVATION_KEY];
+      const stored=await storageArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});let head=stored[OBSERVATION_HEAD_KEY],packet=stored[OBSERVATION_KEY],envelope=null;
+      if(isObservationTransaction(packet)){
+        if(packet.kind!=='active')observationCorruption();
+        const digest=packet.baseDigest===null?null:await checkDigest(base);
+        envelope=validateActiveEnvelope(packet,base,digest);activeEnvelope=envelope;packet=envelope.packet;head=packet?{format:1,baseDigest:packet.baseDigest,generation:packet.generation,revision:packet.revision,status:'active'}:null;
+      }else if(head?.format===2)observationCorruption();
       if(epoch!==observationEpoch)return readObservations(base,force);
-      if(observationCache?.base===base&&observationCache.epoch===epoch&&equalDatabaseData(head,observationCache.head)&&equalDatabaseData(packet,observationCache.packet))return observationCache;
-      const digest=head||packet?await checkDigest(base):null;
-      const validated=validateObservationOverlay(base,digest,head,packet),token=validated?observationToken(head):'none';
+      if(observationCache?.base===base&&observationCache.epoch===epoch&&equalDatabaseData(envelope,observationCache.envelope)&&equalDatabaseData(head,observationCache.head)&&equalDatabaseData(packet,observationCache.packet))return observationCache;
+      // The format-2 envelope already validated this exact payload against the
+      // raw digest above. Legacy pairs still require their own validation.
+      const digest=envelope?envelope.baseDigest:head||packet?await checkDigest(base):null;
+      const validated=envelope?packet:validateObservationOverlay(base,digest,head,packet),token=envelope?`${envelope.epoch}:${validated?observationToken(head):'none'}`:validated?observationToken(head):'none';
       if(epoch!==observationEpoch)return readObservations(base,force);
       if(validated){const prior=observationVersions.get(digest);if(prior&&(prior.generation!==packet.generation||prior.revision>packet.revision||prior.revision===packet.revision&&!equalDatabaseData(prior.packet,packet)))throw Error('Saved observations changed unexpectedly. Restore a complete backup or retry.');observationVersions.clear();observationVersions.set(digest,{generation:packet.generation,revision:packet.revision,packet:freezeQuerySnapshot(packet)});}
       else if(!head&&!packet&&observationVersions.size){
         const current=await checkDigest(base);if(observationVersions.has(current))throw Error('Saved observation information is missing. Your library was kept. Restore a complete backup or retry.');
       }
-      const value={base,epoch,head,packet:validated,token,view:null};
-      if(isCommittedSnapshot(base)){value.view=validated?registerEffectiveSnapshot(freezeQuerySnapshot(materializeObservations(base,validated)),base):base;effectivePackets.set(value.view,validated);observationCache=value;}
+      const value={base,epoch,head,packet:validated,envelope,token,view:null};
+      if(isCommittedSnapshot(base)){value.view=validated?registerEffectiveSnapshot(freezeQuerySnapshot(materializeObservations(base,validated)),base):base;effectivePackets.set(value.view,validated);effectiveTokens.set(value.view,value);observationCache=value;}
       return value;
     })();
     observationPending={base,epoch,promise};try{return await promise;}finally{if(observationPending?.promise===promise)observationPending=null;}
   }
   async function checkedProviderView(database,base){
     const observations=await readObservations(base,true);
-    if(activeOperation)activeObservationRead={base,token:observations.token};
+    if(activeOperation)activeObservationRead={...observations,base};
     const effective=observations.packet?materializeObservations(database,structuredClone(observations.packet)):database;
     effectivePackets.set(effective,observations.packet);
     const view=await providerCheckView(effective,base);effectivePackets.set(view,observations.packet);checkBases.set(view,base);return view;
@@ -173,6 +236,48 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return applyProviderChecks(database,receipt,digest);
   }
   const scanCompleted=(profile,scan)=>profile.state.syncHealth?.attemptRef===scan.attemptRef&&profile.state.syncHealth.status!=='running';
+  async function tryObservationCompletion(database,provider,context){
+    const {scan,base,observations,before,returnedIds}=context,profile=database.providerProfiles[scan.profileId];
+    // Match persistDatabase's existing state normalization without validating
+    // unrelated records again. Incoming rows and canonical reconciliation have
+    // already used the ordinary importer below.
+    profile.state=validateProviderStates({[provider]:profile.state})[provider];
+    database.providers[provider]={...profile.state,activeProfileId:profile.profileId,profileLabel:profile.nickname};
+    const checks=(await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY],old=checks?.checks?.[provider],digest=await checkDigest(base);
+    let packet;
+    const end=()=>{endTiming?.();endJournal();},endTiming=activeTiming?.begin('observation_equality'),endJournal=activity('observation_equality');
+    try{
+      const entry=observationCompletionEntry(before,database,provider,scan,returnedIds);
+      if(!entry)return null;
+      entry.supersededStatusAttempts=[...new Set([old?.patch?.syncHealth?.attemptRef,old?.baseline?.syncHealth?.attemptRef].filter(Boolean))];
+      // Exact public result equality includes canonical IDs, reviews, history,
+      // counts, origin order, access and every field outside the closed delta.
+      const view=timed('observation_materialization',()=>materializeObservations(before,{entries:[entry]}));if(!equalDatabaseData(view,database))return null;
+      pendingIdentityCatalog=base;
+      packet=timed('observation_consolidation',()=>consolidateObservations(base,digest,observations.packet,entry));
+    }catch(error){
+      // Only unsupported representation/limits use the validated full save.
+      // Native reads and commits occur outside this eligibility catch below.
+      if(!/Saved observation information|Invalid (?:saved snapshot|provider|sync)|Snapshot|bounded/iu.test(error.message))throw error;
+      diagnostics?.event('observation_fallback',{reason:'unsupported-delta-or-bound'});return null;
+    }finally{end?.();}
+    if(base!==querySnapshot)throw Error('The library changed while completing this scan. Start a fresh scan.');
+    const current=await readObservations(base,true);if(current.token!==observations.token)throw Error('Observations changed while completing this scan. Start a fresh scan.');
+    const completion=pendingScanCompletion;
+    const envelope=activeObservationEnvelope(await checkDigest(base),packet,current.envelope.epoch,[...current.envelope.completions.filter(c=>c.provider!==provider),completion]);
+    validateActiveEnvelope(envelope,base,envelope.baseDigest);
+    await timedAsync('observation_commit',async()=>{
+      try{await committedArea.set({[OBSERVATION_KEY]:envelope});}
+      catch(error){const saved=(await committedArea.get({[OBSERVATION_KEY]:null}))[OBSERVATION_KEY];if(!equalDatabaseData(saved,envelope))throw error;}
+    });
+    activeEnvelope=envelope;invalidateObservationSnapshot();
+    // Native settlement is the commit point. Publish before best-effort lease
+    // cleanup; the committed attempt makes stale leases and lost replies safe.
+    await timedAsync('observation_publication',()=>readObservations(base,true));
+    const scans={...context.storedScans};delete scans[provider];
+    try{await storageArea.set({[SCANS]:scans});}catch{/* Terminal attempt is durable. */}
+    return database;
+  }
   function freezeQuerySnapshot(value){
     if(value&&typeof value==='object'&&!Object.isFrozen(value)){
       for(const child of Object.values(value))freezeQuerySnapshot(child);
@@ -201,6 +306,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     try{if(cacheQuerySnapshots&&querySnapshotsUsed){
       const detached=timed('snapshot_clone',()=>structuredClone(database));
       querySnapshot=timed('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(detached)));
+      if(pendingIdentityCatalog)reuseCommittedIdentity(querySnapshot,pendingIdentityCatalog);
     }}
     catch{/* A query optimization must never turn an acknowledged commit into a failed write. */}
     snapshotEvent(querySnapshot?'published':'unavailable','writer',previousSnapshot);
@@ -212,12 +318,46 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       checkDigests.set(querySnapshot,Promise.resolve(verifiedDigest));
     }else if(querySnapshot)certificates.issue(querySnapshot);else certificates.clear();
   }
+  async function beginObservationSave(updates,removals=[],database=null){
+    const stored=await committedArea.get({[OBSERVATION_KEY]:null}),before=stored[OBSERVATION_KEY];
+    if(!isObservationTransaction(before))return null;
+    if(before.kind!=='active')observationCorruption();
+    let prior;
+    if(activeObservationRead&&activeOperation!=='restoreDatabase'&&activeOperation!=='clearDatabase'){
+      const current=await readObservations(activeObservationRead.base,true);
+      if(current.token!==activeObservationRead.token)throw Error('Observations changed while saving. Start a fresh operation.');
+      prior=current;
+    }
+    if(!prior?.view){
+      const view=await getQueryDatabase();prior={...effectiveTokens.get(view),base:committedCatalogSnapshot(view),view};
+    }
+    const afterEpoch=crypto.randomUUID();
+    if(pendingAdmission&&updates[SCANS]?.[pendingAdmission.provider]?.attemptRef===pendingAdmission.attemptRef){
+      const provider=pendingAdmission.provider;updates[SCANS]={...updates[SCANS],[provider]:{...updates[SCANS][provider],observationToken:`${afterEpoch}:none`,observationProviderToken:`${afterEpoch}:none`}};
+    }
+    const extra=Object.fromEntries(Object.entries(updates).filter(([k])=>k!==DATABASE_STORAGE_KEY)),keys=[...Object.keys(extra),...removals.filter(k=>k!==DATABASE_STORAGE_KEY)],old=await committedArea.get(keys);
+    const journal={format:2,kind:'saving',before,afterDigest:database?await providerCheckDigest(database):null,afterEpoch,reset:activeOperation==='restoreDatabase'||activeOperation==='clearDatabase',completion:pendingScanCompletion,updates:extra,removals:removals.filter(k=>k!==DATABASE_STORAGE_KEY),previous:Object.fromEntries(keys.map(k=>[k,Object.hasOwn(old,k)?{present:true,value:old[k]}:{present:false}]))};
+    validateObservationJournal(journal);
+    retiringObservation=prior;
+    try{await committedArea.set({[OBSERVATION_KEY]:journal});}
+    catch(error){retiringObservation=null;invalidateObservationSnapshot();throw error;}
+    invalidateObservationSnapshot();return journal;
+  }
+  async function finishObservationSave(journal,database){
+    const replacing=activeOperation==='restoreDatabase'||activeOperation==='clearDatabase';
+    const completed=journal.completion?[...journal.before.completions.filter(c=>c.provider!==journal.completion.provider),journal.completion]:journal.before.completions;
+    const next=activeObservationEnvelope(journal.afterDigest,null,journal.afterEpoch,replacing?[]:database?retainedCompletions(completed,database):[]);
+    await committedArea.set({[OBSERVATION_KEY]:next});activeEnvelope=next;observationVersions.clear();invalidateObservationSnapshot();return next;
+  }
   storageArea={
     async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
     async set(updates){
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))updates={...updates,[PROFILE_HINTS]:profileHints(updates[DATABASE_STORAGE_KEY])};
       let retirement=false;
+      let journal;
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY)){
+        journal=await beginObservationSave(updates,[],updates[DATABASE_STORAGE_KEY]);
+        if(!journal){
         const replacing=activeOperation==='restoreDatabase'||activeOperation==='clearDatabase';
         let head;
         if(replacing){const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY])head={format:1,baseDigest:'0'.repeat(64),generation:crypto.randomUUID(),revision:1,status:'retiring'};}
@@ -229,6 +369,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
           catch(error){retiringObservation=null;invalidateObservationSnapshot();throw error;}
           invalidateObservationSnapshot();retirement=true;
         }
+        }
       }
       const endActivity=activity('storage_set',{key:storageKey(updates),operation:activeOperation});
       try{
@@ -238,6 +379,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const waitEnd=activeTiming?.begin('storage_set_wait');
       try{await pending;}finally{waitEnd?.();}
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY)){
+        if(journal)await finishObservationSave(journal,updates[DATABASE_STORAGE_KEY]);
         if(retirement){await committedArea.remove([OBSERVATION_HEAD_KEY,OBSERVATION_KEY]);observationVersions.clear();invalidateObservationSnapshot();}
         publishQuerySnapshot(updates[DATABASE_STORAGE_KEY]);
         // Valid receipts were folded before the database commit. Retire them
@@ -245,19 +387,21 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         // never a lost catalog save or a false ownership acknowledgement.
         if(providerChecksPresent)try{await storageArea.remove([PROVIDER_CHECKS_KEY]);providerChecksPresent=false;}catch{}
       }
-      }finally{if(retirement)retiringObservation=null;endActivity();}
+      }finally{if(retirement||journal){retiringObservation=null;recoveryChecked=false;}endActivity();}
     },
     async remove(keys){
       if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))keys=[...(Array.isArray(keys)?keys:[keys]),PROFILE_HINTS];
       const removesDatabase=(Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY);
-      if(removesDatabase){const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY]){await committedArea.set({[OBSERVATION_HEAD_KEY]:{format:1,baseDigest:'0'.repeat(64),generation:crypto.randomUUID(),revision:1,status:'retiring'}});invalidateObservationSnapshot();}}
+      const journal=removesDatabase?await beginObservationSave({},keys):null;
+      if(removesDatabase&&!journal){const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY]){await committedArea.set({[OBSERVATION_HEAD_KEY]:{format:1,baseDigest:'0'.repeat(64),generation:crypto.randomUUID(),revision:1,status:'retiring'}});invalidateObservationSnapshot();}}
       const end=activity('storage_remove',{key:storageKey(typeof keys==='string'?[keys]:keys),operation:activeOperation});try{
       await committedArea.remove(keys);
-      if(removesDatabase){await committedArea.remove([OBSERVATION_HEAD_KEY,OBSERVATION_KEY]);observationVersions.clear();invalidateObservationSnapshot();publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
-      }finally{end();}
+      if(removesDatabase){if(journal)await finishObservationSave(journal,null);else await committedArea.remove([OBSERVATION_HEAD_KEY,OBSERVATION_KEY]);observationVersions.clear();invalidateObservationSnapshot();publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
+      }finally{if(journal){retiringObservation=null;recoveryChecked=false;}end();}
     }
   };
   async function getQueryDatabase(options={}){
+    if(retiringObservation?.view)return retiringObservation.view;
     for(;;){const epoch=observationEpoch,base=await getRawQueryDatabase(options),catalogEpoch=querySnapshotEpoch,observations=await readObservations(base);
       if(epoch!==observationEpoch||catalogEpoch!==querySnapshotEpoch)continue;
       return observations.view??base;
@@ -266,7 +410,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function getRawQueryDatabase({beginSpan=()=>{},onValidationSlice=()=>{},onValidationWait=()=>{}}={}){
     const span=async(stage,work)=>{const end=beginSpan(stage),endActivity=activity(stage);try{return await work();}finally{end?.();endActivity();}};
     const sync=(stage,work)=>{const end=beginSpan(stage);try{return work();}finally{end?.();}};
-    querySnapshotsUsed=true;await ready;
+    querySnapshotsUsed=true;await ready;await recoverObservations();
     if(cacheQuerySnapshots&&querySnapshot)return sync('snapshot_hit',()=>querySnapshot);
     if(querySnapshotPending)return span('snapshot_wait',()=>querySnapshotPending);
     const loading=(async()=>{
@@ -319,8 +463,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const end=beginSpan('options_snapshot');
     let database,preferences,scans;
     try{[database,preferences,scans]=await Promise.all([getQueryDatabase({beginSpan}),ready.then(()=>getUiPreferences()),ready.then(()=>storageArea.get({[SCANS]:{}}))]);
-      const packet=effectivePackets.get(database),token=packet?observationToken({...packet,status:'active'}):'none';
-      scans={[SCANS]:Object.fromEntries(Object.entries(scans[SCANS]??{}).filter(([,scan])=>(scan.observationToken??'none')===token))};
+      const packet=effectivePackets.get(database),info=effectiveTokens.get(database),token=info?.token??(packet?observationToken({...packet,status:'active'}):'none');
+      scans={[SCANS]:Object.fromEntries(Object.entries(scans[SCANS]??{}).filter(([provider,scan])=>scan.observationProviderToken?scan.observationProviderToken===providerObservationToken(info?.envelope,packet,provider):(scan.observationToken??'none')===token))};
       database=await providerCheckView(database);}
     finally{end?.();endActivity();}
     return {database:providerScanDisplay(database,scans[SCANS]),preferences,...(timing?{performance:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}:{})};
@@ -329,7 +473,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   // is reused for a write. Only the worker with change observation enables this.
   let refreshProjection=null,refreshProjectionEpoch=0;
   const invalidateRefreshPreflight=()=>{refreshProjection=null;refreshProjectionEpoch++;};
-  const readStages=new Set(['storage_read','read_committed_compare','read_committed_clone','read_certificate','read_certificate_retry','certificate_hit','certificate_miss','migration_compare','snapshot_clone','snapshot_freeze','provider_check_digest']);
+  const readStages=new Set(['storage_read','read_committed_compare','read_committed_clone','read_certificate','read_certificate_retry','certificate_hit','certificate_miss','migration_compare','snapshot_clone','snapshot_freeze','provider_check_digest','observation_consolidation','observation_commit','observation_publication','observation_materialization','entry_validation','canonical_rebuild']);
   const timed = (stage, work) => { const end=activeTiming?.begin(stage),journalEnd=readStages.has(stage)?activity(stage,{operation:activeOperation}):null;try{return work();}finally{end?.();journalEnd?.();} };
   const timedAsync = (stage, work) => {
     if(!activeTiming&&!readStages.has(stage))return work();
@@ -375,8 +519,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
+    if(observationCompletions&&cacheQuerySnapshots&&profile.state.connected&&profile.state.fullSyncAt&&checkBases.get(database)===querySnapshot){
+      await ensureObservationRegistration(querySnapshot,effectivePackets.get(database));
+      const current=await readObservations(querySnapshot,true);activeObservationRead=current;
+    }
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
     scans[provider].observationToken=activeObservationRead?.token??'none';
+    if(activeObservationRead?.envelope)scans[provider].observationProviderToken=providerObservationToken(activeObservationRead.envelope,activeObservationRead.packet,provider);
     if(['nintendo','playstation','xbox'].includes(provider))scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
     // Announcing a scan does not reobserve any records. An unchanged established
     // account can project Running from a durable lease in either acquisition mode.
@@ -392,13 +541,21 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     profile.state.syncHealth=validateSyncHealth({attemptRef:scans[provider].attemptRef,status:'running',mode:scans[provider].mode,attemptedProfileLabel:profileLabel,startedAt:scans[provider].startedAt,finishedAt:null,retryable:false});
     if(activeAtStartId===profile.profileId)profileState(database,profile,profile.state);
+    pendingAdmission={provider,attemptRef:scans[provider].attemptRef};
     await storageArea.set({[SCANS]:scans,[DATABASE_STORAGE_KEY]:timed('persist_validation',()=>validateDatabase(database))});
     return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
   }
   async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false,sourceAccountFingerprint=null) {
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(true);
+    if(!Array.isArray(values)||values.length>50000)throw Error('Import needs a bounded item list.');
+    const requestDigest=()=>{const {quickSyncAt,fullSyncAt,...details}=syncDetails;return providerCheckDigest(JSON.parse(JSON.stringify({provider,values,snapshot:snapshot??null,details})));};
+    const done=activeEnvelope?.completions.find(c=>c.provider===provider&&c.scanToken===scanToken&&c.tabId===tabId&&c.mode===syncDetails.syncMode&&c.sourceAccountFingerprint===(sourceAccountFingerprint??null));
+    if(done&&database.providers[provider]?.activeProfileId===done.profileId&&database.providerProfiles[done.profileId]?.state.syncHealth?.attemptRef===done.attemptRef){
+      if(done.requestDigest!==await requestDigest())throw Error('This scan already completed with different results. Start a fresh scan.');
+      return includeResult?{database,scanResult:providerScanResult(database,provider,done.profileId,values)}:database;
+    }
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId||!scan.profileId||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||!database.providerProfiles[scan.profileId])throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
-    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
+    if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname,
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
@@ -412,7 +569,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       beforeFullSave();
     }
     if(scanCompleted(profile,scan))throw Error('This scan already completed. Start a fresh scan.');
+    pendingScanCompletion=activeObservationRead?.envelope?{provider,profileId:profile.profileId,attemptRef:scan.attemptRef,scanToken:scan.scanToken,tabId:scan.tabId,mode:scan.mode,sourceAccountFingerprint:scan.sourceAccountFingerprint??null,requestDigest:await requestDigest()}:null;
     let result,changes,preparedIncoming;
+    const completion=observationCompletions&&scan.readOnlyStart&&canPersistProviderCheck(database,provider,profile,scan)&&activeObservationRead?.envelope?{scan,base:checkedBase,observations:activeObservationRead,storedScans:stored[SCANS],returnedIds:new Set(values.map(v=>v.providerItemId)),before:{...database,providerItems:{...database.providerItems},providerHistory:{...database.providerHistory},providers:structuredClone(database.providers),providerProfiles:structuredClone(database.providerProfiles)}}:null;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint)||scan.sourceAccountFingerprint!==sourceAccountFingerprint||profile.sourceAccountFingerprint&&profile.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('The '+label+' account changed before saving. No items were imported. Start a fresh import.');
@@ -424,7 +583,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       profile.sourceAccountFingerprint=sourceAccountFingerprint;
       // A complete non-hidden view is still not a complete purchase history.
       // Reuse the additive importer; never archive omissions or revoke access.
-      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave);
+      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave,completion);
     }
     if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
       &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics','syncState'].includes(key))
@@ -440,20 +599,23 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         result=await persistProviderCheck(database,provider,profile,scan,patch,stored[SCANS]);
       }
     }
-    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database,beforeFullSave):mergeIntoDatabase(provider,values,details,database,preparedIncoming));
+    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database,beforeFullSave,completion):mergeIntoDatabase(provider,values,details,database,preparedIncoming,beforeFullSave,completion));
     if(!includeResult)return result;
+    return {database:result,scanResult:providerScanResult(result,provider,profile.profileId,values,changes)};
+  }
+  function providerScanResult(database,provider,profileId,values,changes){
     const observedIds=new Set(values.map(value=>value.providerItemId));
-    const observed=provider==='kobo'?Object.values(result.providerItems).filter(item=>item.provider===provider&&item.profileId===profile.profileId&&observedIds.has(item.providerItemId)):[];
+    const observed=provider==='kobo'?Object.values(database.providerItems).filter(item=>item.provider===provider&&item.profileId===profileId&&observedIds.has(item.providerItemId)):[];
     const ownership={unconfirmed:0,covered:0,review:0,subscriptions:0};
     for(const item of observed){
       if(item.ownership==='subscription')ownership.subscriptions++;
       if(item.ownership!=='unknown')continue;
       ownership.unconfirmed++;
-      const effective=effectiveOwnershipRecord(item,result);
+      const effective=effectiveOwnershipRecord(item,database);
       if(effective.ownership==='owned'&&effective.ownershipOverride)ownership.covered++;
       else if(effective.ownership==='unknown')ownership.review++;
     }
-    return {database:result,scanResult:{changes:changes??result.providers[provider].syncHealth?.differences,ownership,checkedAt:new Date().toISOString()}};
+    return {changes:changes??database.providers[provider].syncHealth?.differences,ownership,checkedAt:new Date().toISOString()};
   }
   async function kindleProfileTransition(database,oldId,newId){
     if(oldId===newId)return {};
@@ -557,7 +719,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId)return false;
     const database=await readDatabase(true);
-    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))return false;
+    if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))return false;
     const failureCode=SYNC_FAILURE_CODES.includes(failure.code)?failure.code:'other';
     const profile=database.providerProfiles[scan.profileId];if(!profile||database.providers[provider]?.activeProfileId!==scan.activeAtStartId)return false;
     if(scanCompleted(profile,scan))return false;
@@ -570,7 +732,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function cancelProviderScan(provider,attemptRef){
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];if(!scan||scan.attemptRef!==attemptRef)throw new Error('This scan changed or already finished. Refresh the dashboard.');
     const database=await readDatabase(true),profile=database.providerProfiles[scan.profileId];if(!profile)throw Error('Scan profile changed.');
-    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Refresh the dashboard.');
+    if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Refresh the dashboard.');
     if(scanCompleted(profile,scan))throw Error('This scan already finished. Refresh the dashboard.');
     const health=validateSyncHealth({attemptRef:scan.attemptRef,startedAt:scan.startedAt,mode:scan.mode,attemptedProfileLabel:scan.profileLabel,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true});
     if(canPersistProviderCheck(database,provider,profile,scan))return persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);
@@ -583,14 +745,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
-    const restored=validateDatabase(database),extra={galacticPurchaseSync:{}};
+    const restored=validateDatabase(database),extra={galacticPurchaseSync:{},[PROVIDER_CHECKS_KEY]:null};
     if(preferences!==undefined){
       if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
       extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),...preferences});
     }
     // Explicit replacement must not revive a receipt when restoring an exactly
     // identical old value. Failure here aborts replacement, before its DB set.
-    if((await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY])await storageArea.remove([PROVIDER_CHECKS_KEY]);
     for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
@@ -603,6 +764,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return readDatabase();
   }
   async function readDatabase(reuseCommittedValidation=false) {
+    await recoverObservations();
     // A successful refresh commit should publish a proof for its next batch,
     // even if no Options/companion query has requested a snapshot yet.
     if(reuseCommittedValidation&&cacheQuerySnapshots)querySnapshotsUsed=true;
@@ -747,7 +909,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
-  async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null) {
+  async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
@@ -781,7 +943,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const syncHealth=successfulSyncHealth(database,provider,records,true,syncDetails);
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...retained, ...Object.fromEntries(unique) };
-    database.canonicalItems = rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations);
+    database.canonicalItems = timed('canonical_rebuild',()=>rebuildCanonicalItems(database.providerItems, database.manualMatchDecisions, database.canonicalItems, database.editionSeparations));
     database.providers[provider] = {
       ...profile.state,
       connected: true,
@@ -802,6 +964,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
+    if(completion){const observed=await tryObservationCompletion(database,provider,completion);if(observed)return observed;}
     return persistDatabase(database,provider,jobs,beforeSave);
   }
 
@@ -821,7 +984,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function mergeProviderItems(provider,values,syncDetails={}){
     return mergeIntoDatabase(provider,values,syncDetails);
   }
-  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null,preparedIncoming=null,beforeSave=null) {
+  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null,preparedIncoming=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = authoritativeDatabase??await getDatabase();
@@ -866,12 +1029,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
+    if(completion){const observed=await tryObservationCompletion(database,provider,completion);if(observed)return observed;}
     return persistDatabase(database,provider,jobs,beforeSave);
   }
 
   async function clearDatabase() {
-    await storageArea.remove([PROVIDER_CHECKS_KEY]);
-    await storageArea.remove(['galacticPurchaseSync',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
+    await storageArea.remove([PROVIDER_CHECKS_KEY,'galacticPurchaseSync',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -1635,7 +1798,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(operation!=='checkKindleContentsRefreshItem')invalidateRefreshPreflight();
     const end=activity('operation',{operation});activeOperation=operation;
     activeObservationRead=null;
-    try{return await operations[operation](...values);}finally{activeObservationRead=null;activeOperation=null;end();}
+    pendingScanCompletion=null;
+    pendingAdmission=null;
+    pendingIdentityCatalog=null;
+    try{await recoverObservations();return await operations[operation](...values);}finally{activeObservationRead=null;pendingScanCompletion=null;pendingAdmission=null;pendingIdentityCatalog=null;activeOperation=null;end();}
   }
 
   function execute(operation, args = [], timing = null) {

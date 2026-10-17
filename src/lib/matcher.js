@@ -3,7 +3,7 @@ import { identityConflicts as recordConflicts, identityEvidence, relationshipRea
 import { contentCoverage, proposeContents } from './contents.js';
 import { canonicalItemsSteps } from './models.js';
 import {finishWork,finishWorkAsync} from './cooperative-work.js';
-import {isCommittedSnapshot,committedCatalogSnapshot} from './committed-snapshot.js';
+import {isCommittedSnapshot,committedCatalogSnapshot,committedIdentityKey} from './committed-snapshot.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
@@ -53,25 +53,26 @@ export function matchItems(items, requestedItems, context = {}) {
 }
 export async function matchItemsAsync(items,requestedItems,context={},options={}){
   let projection;
-  const catalog=committedCatalogSnapshot(context);
+  const catalog=committedCatalogSnapshot(context),key=committedIdentityKey(context);
   if(options.cacheCommittedProjection&&items===context.providerItems&&catalog){
     options.onStage?.('matching_index');
-    let entry=committedIndexes.get(catalog);
+    let entry=committedIndexes.get(key);
     const end=options.beginSpan?.(entry?.value?'matching_index_hit':entry?'matching_index_wait':'matching_index_build');
     try{
       if(!entry){
-        entry={};committedIndexes.set(catalog,entry);
-        entry.pending=finishWorkAsync(identityIndexSteps(catalog.providerItems,catalog,options),{...options,onStage:()=>{}})
-          .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(catalog);throw error;});
+        entry={};committedIndexes.set(key,entry);
+        entry.pending=finishWorkAsync(identityIndexSteps(catalog.providerItems,catalog,{...options,indexReferencesOnly:true}),{...options,onStage:()=>{}})
+          .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(key);throw error;});
       }
       projection=entry.value??await entry.pending;
     }finally{end?.();}
   }
   return finishWorkAsync(matchItemsSteps(items,requestedItems,context,{...options,projection}),options);
 }
-function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpan}={}) {
+function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpan,indexReferencesOnly=false}={}) {
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
-  const add=(index,key,item)=>{const group=index.get(key)??[];group.push(item);index.set(key,group);};
+  const references=new Map();
+  const add=(index,key,item)=>{const group=index.get(key)??[];if(indexReferencesOnly&&!references.has(item.id))references.set(item.id,{id:item.id});group.push(indexReferencesOnly?references.get(item.id):item);index.set(key,group);};
   const byCandidateTitle = new Map();const byPresentation = new Map();
   for(const item of all){
     yield;
@@ -105,7 +106,7 @@ function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpa
   }
   const history=Object.values(context.providerHistory??{}).filter(entry=>entry.reason==='missing-from-complete-scan'
     &&(entry.item.profileId?Boolean(context.providerProfiles?.[entry.item.profileId]):entry.profileLabel===(context.providers?.[entry.item.provider]?.profileLabel??''))&&!items[entry.item.id]);
-  return {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history};
+  return {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history:indexReferencesOnly?history.map(entry=>entry.item.recordRef):history,historyRefs:indexReferencesOnly};
 }
 function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
   yield 'matching_index';
@@ -129,7 +130,8 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
   }
   const database={...context,providerItems:items};
   let materializedCoverage=!options.projection;
-  const {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative,history}=projection;
+  const {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative}=projection;
+  const history=projection.historyRefs?projection.history.map(ref=>context.providerHistory?.[ref]).filter(Boolean):projection.history;
   const historicalResults=history.length?yield* matchItemsSteps(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
   yield 'matching_execution';
   const results=[];

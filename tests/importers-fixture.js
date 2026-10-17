@@ -99,6 +99,15 @@ try{
  }
  checks.push('All 14 provider injected observation views preserve raw records, populate Options and flatten through backup/restore');
 }
+{
+ const {PROVIDERS}=await import('../src/lib/constants.js'),F=await import('./provider-sync-fixture.js'),O=await import('./observation-completion-fixture.js');
+ for(const provider of PROVIDERS){
+  const h=O.completionWriter(await O.completionBaseline(provider)),scan=await O.admitCompletion(h,provider);await O.finishCompletion(h,provider,scan,[F.providerSyncValue(provider)]);
+  assert(h.counts.databaseWrites===(F.consoleProvider(provider)?1:0),'Wrong validated fallback/observation path for '+provider);
+  if(!F.consoleProvider(provider))assert(h.counts.receiptWrites===1&&!h.stages.includes('persist_validation'),'Unchanged '+provider+' completion rewrote or revalidated the library');
+ }
+ checks.push('All 14 provider completion paths preserve source semantics; proven ordinary unchanged full scans commit one receipt without full writes or validation');
+}
 
   {
     const saved={};let databaseWrites=0;
@@ -163,7 +172,8 @@ try{
         await import(`../src/providers/${file}-content.js?mode=${mode}`);
       }else{
         if(mode==='full')await import(`../src/providers/${file}-content.js`);
-        if(['steam','epic'].includes(provider))globalThis.GalacticSync.setProfiling(true);
+        if(provider==='steam')globalThis.GalacticSync.setProfiling(true);
+        if(provider==='epic'){globalThis.GalacticSync.setProfiling(false);const profile=shadows.at(-1).querySelector('[data-profile-next]');profile.checked=true;profile.dispatchEvent(new Event('change'));}
         const shadow=shadows.at(-1);
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('button');
         assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
@@ -179,6 +189,7 @@ try{
         const timing=providerTimings.at(-1);assert(timing?.events.some(event=>event.stage==='provider_fetch'),provider+' scan timing absent');
         assert(timing.providerCaptured===items.length,provider+' captured-item count absent');
         assert(timing.events.some(event=>event.stage==='save_message'),provider+' save timing absent');
+        if(provider==='epic')assert(!shadow.querySelector('[data-profile-next]').checked&&shadow.querySelector('[data-profile-timing-status]').textContent.includes('Timing captured'),'Epic one-shot profiling was not consumed and delivered');
       }
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
       providerPass++;

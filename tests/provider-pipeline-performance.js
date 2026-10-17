@@ -122,15 +122,15 @@ export const providerPipelinePerformanceTests=[
    assert.equal(fresh.counts.databaseWrites,2);assert(!fresh.stored[PROVIDER_CHECKS_KEY]);
  }],
  ['empty checks: replacement failures are conservative and never resurrect stale successful checks',async()=>{
-   for(const step of ['remove','database']){
+   for(const step of ['before','after']){
      let armed=false;const db=syntheticProviderLibrary(40),h=performanceWriter(db,{
-       beforeRemove:()=>{if(armed&&step==='remove')throw Error('Interrupted removal');},
-       beforeSet:updates=>{if(armed&&step==='database'&&updates.galacticLibraryDatabase)throw Error('Interrupted replacement');}
+       beforeSet:updates=>{if(armed&&step==='before'&&updates.galacticLibraryDatabase)throw Error('Interrupted replacement');},
+       afterSet:updates=>{if(armed&&step==='after'&&updates.galacticLibraryDatabase)throw Error('Interrupted acknowledgement');}
      });
      await measuredScan(h);armed=true;await assert.rejects(h.writer.restoreDatabase(db),/Interrupted/);
      assert.deepEqual(h.stored.galacticLibraryDatabase,db);
      const restart=performanceWriter(null,{stored:h.stored}),view=(await restart.writer.getCommittedLibraryView()).database;
-     assert.equal(Boolean(view.providers.steam.quickSyncAt),step==='remove');
+     assert.equal(Boolean(view.providers.steam.quickSyncAt),step==='before');
    }
  }],
  ['empty checks: failed retirement after a real commit cannot resurrect old successful health',async()=>{

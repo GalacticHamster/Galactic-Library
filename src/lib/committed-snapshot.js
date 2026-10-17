@@ -3,6 +3,7 @@
 const committed = new WeakSet();
 const sequences=new WeakMap();let sequence=0;
 const effectiveCatalogs=new WeakMap();
+const identityRevisions=new WeakMap();
 // Effective views have validated observation metadata, not raw certificate
 // provenance. Never register them in the raw committed WeakSet.
 export function registerEffectiveSnapshot(view,catalog){
@@ -10,6 +11,17 @@ export function registerEffectiveSnapshot(view,catalog){
   effectiveCatalogs.set(view,catalog);return view;
 }
 export const committedCatalogSnapshot=view=>committed.has(view)?view:effectiveCatalogs.get(view)??null;
+// A fully validated compaction can replace the raw base while preserving the
+// proved identity inputs. Certificates/digests still use the new raw snapshot.
+export function reuseCommittedIdentity(snapshot,previous){
+  if(!isCommittedSnapshot(snapshot)||!isCommittedSnapshot(previous))throw Error('Identity reuse requires validated committed snapshots.');
+  identityRevisions.set(snapshot,committedIdentityKey(previous));
+}
+export function committedIdentityKey(view){
+  const raw=committedCatalogSnapshot(view);if(!raw)return null;
+  if(!identityRevisions.has(raw))identityRevisions.set(raw,Object.freeze({}));
+  return identityRevisions.get(raw);
+}
 export function registerCommittedSnapshot(database) {
   if (!Object.isFrozen(database)) throw Error('A committed snapshot must be immutable.');
   committed.add(database);

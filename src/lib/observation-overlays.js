@@ -3,7 +3,7 @@ import {VALIDATION_ALGORITHM_VERSION} from './validation-certificate.js';
 import {validateProviderStates} from './provider-state.js';
 import {equalDatabaseData} from './data-equality.js';
 
-// Stage 1 reader contract only. No scan completion writes these values yet.
+// Closed observation payload, committed inside Stage 2's single-value envelope.
 export const OBSERVATION_KEY='galacticLibraryObservations';
 export const OBSERVATION_HEAD_KEY='galacticLibraryObservationHead';
 export const OBSERVATION_LIMITS=Object.freeze({bytes:1048576,records:5000,origins:10000,providers:14});
@@ -46,7 +46,7 @@ export function validateObservationOverlay(base,digest,head,packet){
   const health=state.syncHealth;
   if(state.lastError!==null||state.syncMode!==mode||!state.lastSync||!health||health.status!=='succeeded'||health.mode!==mode||health.attemptRef!==entry.attemptRef||!health.startedAt||!health.finishedAt||health.failureCode||health.failedRequestCount||health.failedPages?.length||health.coverageLimit||health.retryable)fail();
   if(!state[mode==='full'?'fullSyncAt':'quickSyncAt'])fail();
-  if(Object.entries(health.differences??{}).some(([k,v])=>!['observed','unchanged'].includes(k)&&v!==0))fail();
+  if(Object.entries(health.differences??{}).some(([k,v])=>!['observed','unchanged',...(provider==='fanatical'?['updated']:[])].includes(k)&&v!==0))fail();
   if(mode==='full'&&!state.snapshotValidation||consoles.has(provider)&&!state.snapshotValidation)fail();
   if(!consoles.has(provider)&&mode==='full'&&scope!=='complete')fail();
   const members=Object.values(base.providerItems).filter(i=>i.profileId===profileId);
@@ -66,7 +66,7 @@ export function validateObservationOverlay(base,digest,head,packet){
    if(scope==='complete'&&(refs.size!==members.length||members.some(i=>!refs.has(i.recordRef))))fail();
   }else fail();
   const count=observations.kind==='all'?members.length:observations.items.length;
-  if(state.snapshotValidation?.itemCount>count||health.differences?.observed>count)fail();
+  if((mode==='full'||consoles.has(provider))&&state.snapshotValidation?.itemCount>count||health.differences?.observed>count||(health.differences?.updated??0)>count)fail();
  }
  if(recordCount>OBSERVATION_LIMITS.records||originCount>OBSERVATION_LIMITS.origins)fail();return packet;
 }
@@ -86,8 +86,8 @@ export function materializeObservations(base,packet){
  }return result;
 }
 
-// Pure bounded consolidation for future producers and injected fixtures. No
-// operation/API persists this packet in Stage 1. Overflow requires a full save.
+// Pure bounded consolidation shared by the writer and injected fixtures.
+// Overflow requires the existing validated full save.
 export function consolidateObservations(base,digest,previous,entry){
  if(previous&&!validateObservationOverlay(base,digest,observationHead(previous),previous))fail();
  const incoming={format:1,baseDigest:digest,generation:previous?.generation??crypto.randomUUID(),revision:(previous?.revision??0)+1,validationVersion:VALIDATION_ALGORITHM_VERSION,entries:[entry]};

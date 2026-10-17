@@ -328,3 +328,39 @@ backup/certificate checks, both 190-file validators and the 88-case offline prob
 Layout checking retains only the 15 previously known historical absolute links.
 Full completion receipt design remains open; overall synchronization parity is
 not claimed. No HB/FAN, version, ownership, acquisition or schema changes.
+
+## Shared observation completion and recovery — Stage 2 (2026-10-17)
+
+GL-PERF-05 has a shared completion implementation with correctness and controlled
+cold-matching gates passing. Live Epic acceptance remains pending. It preserves the existing importer/reconciliation as
+the oracle and commits one bounded observation envelope only for an exact supported
+delta. Changed/unsupported cases retain validated saves; console full scans retain
+their existing additive health semantics and full-save fallback. Supported recent
+subsets, Fanatical origins and Kobo clocks are not promoted to whole-profile
+observations without proof. A journal recovers materialization/restore/clear by
+the before/after raw digest rather than requiring routine manual restore.
+
+The extended oracle comparison covers 156 cases across 14 providers/26 modes,
+including 23 receipt cases / avoided full writes. Native Chrome worker stops and
+Firefox background reloads cover interrupted receipt/full saves and stale leases;
+Chrome also verifies actual quota rejection in a disposable constrained package.
+Controlled synthetic 14,004-record median completion changed from 2.18 to 0.73 s
+Chrome and 1.36 to 0.93 s Firefox. Cold 40-item matching was 710/717 ms Chrome and
+710/756 ms Firefox, with overlapping ranges; a separate five-generation A/B/C/D
+matrix confirms no persistent large regression. These comparisons suppress only
+automatic Options opening in disposable packages. The initial stopped results
+remain documented: Options snapshot/render work and cooperative waits made the
+wall comparison variable; an actual redundant packet-validation pass was removed.
+These are not real-library timings. Matching indexes
+remain stable across observations; checkedAt stays in the API. No HB/FAN changes,
+ownership/matching changes, schema/version bump or public release was made.
+
+The final gate passed 1,523 unit tests, 472 contents tests, 105 importer/68 UI
+checks per browser, 12 Firefox native storage checks, 12 Chrome/11 Firefox native
+fault scenarios, both package validators and both parity probes. Only the same
+15 historical documentation-link warnings remain. No power-loss claim is made.
+
+The Epic panel offers one-shot profiling without a console. Run two unchanged
+syncs and export their timing summaries promptly through GL Settings before
+marking the live ~22.5 s completion / ~32 s total acceptance complete. See the
+[current contract and measurement limits](../architecture/unchanged-full-scan-completion.md).

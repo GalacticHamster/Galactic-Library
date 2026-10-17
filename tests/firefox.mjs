@@ -81,18 +81,17 @@ try{
     return true;
   `));console.log('PASS installed Firefox GL: a new writer verifies session proof against private IndexedDB and completes an unchanged incomplete scan without validation or database writes');
   assert(await evaluate(`
-    const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),W=await import('./src/background/storage-writer.js'),Q=await import('./src/lib/query-diagnostics.js'),snap=await import('./src/lib/provider-snapshot.js');
-    const privateArea=P.createPrivateStorage(indexedDB);let writes=0;
-    const area={get:async defaults=>JSON.parse(JSON.stringify(await privateArea.get(defaults))),set:updates=>{if(updates.galacticLibraryDatabase)writes++;return privateArea.set(updates);},remove:keys=>privateArea.remove(keys)};
-    const before=(await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase,journal=Q.createQueryDiagnostics();
-    const w=W.createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:chrome.storage.session,diagnostics:journal});
+    const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),snap=await import('./src/lib/provider-snapshot.js'),w=S.createStorageClient(m=>chrome.runtime.sendMessage(m));
+    const area=P.createPrivateStorage(indexedDB),before=(await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase;
     const scan=await w.beginProviderScan('steam','Empty check fixture','full',false,1);
-    if(writes||journal.report().events.some(e=>e.stage==='validation'))throw Error('Eligible full admission validated or rewrote Firefox catalog');
+    const pre=(await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'})).activity.events,last=pre.filter(e=>e.stage==='operation'&&e.operation==='beginProviderScan').at(-1);
+    if(pre.some(e=>e.id>last.id&&e.operation==='beginProviderScan'&&(e.stage==='validation'||e.stage==='storage_set'&&e.key==='database')))throw Error('Eligible full admission validated or rewrote Firefox catalog');
     if(JSON.stringify((await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase)!==JSON.stringify(before))throw Error('Full admission changed records');
     if((await w.getCommittedLibraryView()).database.providers.steam.syncHealth.status!=='running')throw Error('Full lease is invisible');
-    const items=Object.values(before.providerItems).filter(i=>i.profileId===before.providers.steam.activeProfileId);
+    const items=Object.values(before.providerItems).filter(i=>i.profileId===before.providers.steam.activeProfileId).map((item,n)=>n?item:{...item,title:'Disposable changed game'});
     await w.commitProviderScan('steam',items,{syncMode:'full',fullSyncAt:new Date().toISOString()},snap.completeProviderSnapshot('steam',items,[snap.completedScope('library',items.length,items.length,'reported-count')]),scan.scanToken,1);
-    if(writes!==1||!journal.report().events.some(e=>e.stage==='validation'))throw Error('Full completion skipped required validated save');
+    const post=(await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'})).activity.events,commit=post.filter(e=>e.stage==='operation'&&e.operation==='commitProviderScan').at(-1),events=post.filter(e=>e.id>commit.id&&e.operation==='commitProviderScan');
+    if(events.filter(e=>e.stage==='storage_set'&&e.key==='database').length!==1||!events.some(e=>e.stage==='validation'))throw Error('Changed full completion skipped required validated save');
     const saved=await w.getDatabase();if(saved.providers.steam.syncHealth.status!=='succeeded')throw Error('Full completion status lost');
     return true;
   `));console.log('PASS installed Firefox GL: full admission keeps private catalog intact, projects Running from its lease, and completion validates and saves once');
@@ -102,7 +101,7 @@ try{
     const profile=db.providerProfiles[db.providers.steam.activeProfileId],at='2026-10-18T00:00:00.000Z',attemptRef=crypto.randomUUID();
     const entry={provider:'steam',profileId:profile.profileId,attemptRef,mode:'incremental',scope:'complete',sourceAccountFingerprint:null,supersededStatusAttempts:[],state:V.validateProviderStates({steam:{lastSync:at,quickSyncAt:at,lastError:null,syncMode:'incremental',syncHealth:H.validateSyncHealth({attemptRef,status:'succeeded',mode:'incremental',startedAt:at,finishedAt:at,retryable:false})}}).steam,observations:{kind:'all',observedAt:at,updatedAt:'advance'}};
     const digest=await D.providerCheckDigest(db),packet=O.consolidateObservations(db,digest,null,entry);await area.set({[O.OBSERVATION_KEY]:packet,[O.OBSERVATION_HEAD_KEY]:O.observationHead(packet)});
-    const w=W.createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:chrome.storage.session}),stages=[],query=async()=>A.handleExternalApiRequestAsync(await w.getQueryDatabase(),{type:'MATCH_ITEMS',apiVersion:1,items:[{title:'Disposable empty-check game',mediaType:'game'}]},{cacheImmutableRecords:true,cacheCommittedProjection:true,beginSpan:stage=>{stages.push(stage);return ()=>{};}});
+    const w=W.createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:chrome.storage.session}),stages=[],query=async()=>A.handleExternalApiRequestAsync(await w.getQueryDatabase(),{type:'MATCH_ITEMS',apiVersion:1,items:[{title:Object.values(db.providerItems).find(i=>i.provider==='steam').title,mediaType:'game'}]},{cacheImmutableRecords:true,cacheCommittedProjection:true,beginSpan:stage=>{stages.push(stage);return ()=>{};}});
     const first=await query();if(first.results[0].matches[0].evidence.checkedAt!==at||!stages.includes('matching_index_build'))throw Error('Private cold observation read failed');
     const nextAt='2026-10-19T00:00:00.000Z',nextAttempt=crypto.randomUUID(),next=O.consolidateObservations(db,digest,packet,{...entry,attemptRef:nextAttempt,state:{...entry.state,syncHealth:{...entry.state.syncHealth,attemptRef:nextAttempt}},observations:{kind:'all',observedAt:nextAt,updatedAt:'advance'}});
     await area.set({[O.OBSERVATION_KEY]:next,[O.OBSERVATION_HEAD_KEY]:O.observationHead(next)});w.invalidateObservationSnapshot();stages.length=0;

@@ -1,5 +1,30 @@
 # Provider synchronization parity: shared scan starts and completion gate
 
+## Observation completion update — October 17, 2026
+
+Stage 2 enables bounded observations after the existing importer proves an
+exact closed observation/success-state delta. Proven ordinary unchanged full
+scans and supported quick subsets use zero full writes/validations and one
+receipt commit. Changed/unsupported scans retain the validated save. Console full
+scans retain it because their current additive health mode is incremental; their
+existing semantics were not changed. Empty/incomplete/failed/cancelled checks keep
+their established status behavior. Fanatical origins and Kobo clocks are scoped,
+not indiscriminately refreshed.
+
+The extended 156-case full-save oracle probe covers all 14 providers/26 modes,
+with 23 receipt cases and exact effective results. It retains the two existing
+PlayStation empty-list rejections without explicit zero totals. The original
+88-case baseline probe also remains useful; its writer has optimization disabled
+to keep the original persistence oracle. See the
+[completion/recovery contract](unchanged-full-scan-completion.md) for the enabled
+classes, native restart/quota tests, benchmark distributions, fallback exceptions
+and live Epic profiling instructions. Its correctness and controlled cold-matching
+gates pass. The original performance stop is explained by overlapping Options
+work/scheduling variance and a small duplicate packet-validation pass, now removed;
+the initial measurements remain historical evidence. No overall provider acquisition parity or
+real-library performance result is implied. The sections below describe the
+earlier lease-only baseline where they say completion always saves the database.
+
 **Baseline: `b75ab51`; shared lease-only starts implemented October 17, 2026.**
 Eligible repeated full scans now announce Running through the existing durable
 scan lease, without a catalog write or redundant semantic validation. Completion

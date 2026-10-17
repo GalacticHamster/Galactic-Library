@@ -1,5 +1,6 @@
 import {xboxImportTests} from './xbox-import.js';
 import {observationOverlayTests} from './observation-overlays.js';
+import {observationCompletionTests} from './observation-completion.js';
 import {providerPipelinePerformanceTests} from './provider-pipeline-performance.js';
 import {consoleCompanionTests} from './console-companion.js';
 import {manualReconciliationTests} from './manual-reconciliation.js';
@@ -142,6 +143,7 @@ const tests = [
   ...checkpointResponsivenessTests,
   ...committedProjectionTests,
   ...observationOverlayTests,
+  ...observationCompletionTests,
   ...validationCertificateTests,
   ...refreshWritePacingTests,
   ...kindleRefreshCases,
