@@ -87,6 +87,18 @@ try{
  }
  checks.push('All 14 provider full starts use durable leases, render Running in the existing dashboard, and complete through one validated save');
 }
+{
+ const {PROVIDERS}=await import('../src/lib/constants.js'),F=await import('./provider-sync-fixture.js'),O=await import('./observation-fixture.js'),C=await import('../src/lib/observation-overlays.js'),S=await import('../src/lib/storage.js');
+ for(const provider of PROVIDERS){
+  const db=F.providerSyncLibrary(provider),saved={galacticLibraryDatabase:structuredClone(db)},w=createStorageWriter({get:async defaults=>structuredClone(Object.fromEntries(Object.entries(defaults).map(([k,v])=>[k,saved[k]??v]))),set:async values=>Object.assign(saved,structuredClone(values)),remove:async keys=>{for(const key of [keys].flat())delete saved[key];}},Promise.resolve(),{cacheQuerySnapshots:true});
+  const raw=await w.getQueryDatabase(),packet=await O.observationPacket(db,provider,{whole:provider!=='fanatical'});O.injectObservations(saved,w,packet);
+  const view=(await w.getCommittedLibraryView()).database,backup=S.parseBackup(S.createBackup(await w.getDatabase()));
+  assert(Object.values(view.providerItems)[0].observedAt===O.observationDate&&Object.values(raw.providerItems)[0].observedAt===F.oldObservation,'Observation read changed raw '+provider+' evidence');
+  assert(Object.values(backup.providerItems)[0].observedAt===O.observationDate,'Backup lost effective '+provider+' evidence');
+  await w.restoreDatabase(backup);assert(!saved[C.OBSERVATION_KEY]&&!saved[C.OBSERVATION_HEAD_KEY],'Restore retained injected observations for '+provider);
+ }
+ checks.push('All 14 provider injected observation views preserve raw records, populate Options and flatten through backup/restore');
+}
 
   {
     const saved={};let databaseWrites=0;

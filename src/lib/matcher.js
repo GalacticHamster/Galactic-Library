@@ -3,7 +3,7 @@ import { identityConflicts as recordConflicts, identityEvidence, relationshipRea
 import { contentCoverage, proposeContents } from './contents.js';
 import { canonicalItemsSteps } from './models.js';
 import {finishWork,finishWorkAsync} from './cooperative-work.js';
-import {isCommittedSnapshot} from './committed-snapshot.js';
+import {isCommittedSnapshot,committedCatalogSnapshot} from './committed-snapshot.js';
 import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
@@ -53,15 +53,16 @@ export function matchItems(items, requestedItems, context = {}) {
 }
 export async function matchItemsAsync(items,requestedItems,context={},options={}){
   let projection;
-  if(options.cacheCommittedProjection&&items===context.providerItems&&isCommittedSnapshot(context)){
+  const catalog=committedCatalogSnapshot(context);
+  if(options.cacheCommittedProjection&&items===context.providerItems&&catalog){
     options.onStage?.('matching_index');
-    let entry=committedIndexes.get(context);
+    let entry=committedIndexes.get(catalog);
     const end=options.beginSpan?.(entry?.value?'matching_index_hit':entry?'matching_index_wait':'matching_index_build');
     try{
       if(!entry){
-        entry={};committedIndexes.set(context,entry);
-        entry.pending=finishWorkAsync(identityIndexSteps(items,context,options),{...options,onStage:()=>{}})
-          .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(context);throw error;});
+        entry={};committedIndexes.set(catalog,entry);
+        entry.pending=finishWorkAsync(identityIndexSteps(catalog.providerItems,catalog,options),{...options,onStage:()=>{}})
+          .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(catalog);throw error;});
       }
       projection=entry.value??await entry.pending;
     }finally{end?.();}

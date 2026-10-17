@@ -46,6 +46,7 @@ import {bookReviewCounts,receiptReviewCounts} from './review-status.js';
 import {applyReviewedEnrichments,dismissEnrichmentReviews,undoEnrichmentSelections} from '../lib/storage.js';
 import { addAllowedExternalClientId, clearGoogleBooksEnrichmentJob, createBackup, clearDatabase, getDatabase, getAllowedExternalClientIds, getGoogleBooksApiKey, getGoogleBooksEnrichmentJob, getShowEnrichmentActions, parseBackup, parseBackupPreferences, removeManualMatchDecision, restoreDatabase, saveAllowedExternalClientIds, saveGoogleBooksApiKey, saveGoogleBooksEnrichmentJob, saveGoogleBooksGenreHints, saveManualMatchDecision,savePreferredDisplayTitle, saveShowEnrichmentActions, startGoogleBooksEnrichmentJob } from '../lib/storage.js';
 import { DATABASE_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY } from '../lib/constants.js';
+import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY} from '../lib/observation-overlays.js';
 import { findDuplicateCandidates } from '../lib/duplicate-review.js';
 import { isExtensionId } from '../lib/external-api.js';
 import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.js';
@@ -1056,7 +1057,7 @@ const contentsScanProgress=createContentsScanProgress({runtime:chrome.runtime,co
 let contentsDiagnosticId=null,contentsDiagnosticExpires=0;
 const recentContentsDiagnosticId=()=>{const id=Date.now()<contentsDiagnosticExpires?contentsDiagnosticId:null;contentsDiagnosticId=null;return id;};
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes[DATABASE_STORAGE_KEY]) {backupRestore.changed();contentsScanProgress.changed();}
+  if (areaName === 'local' && [DATABASE_STORAGE_KEY,OBSERVATION_KEY,OBSERVATION_HEAD_KEY].some(key=>Object.hasOwn(changes,key))) {backupRestore.changed();contentsScanProgress.changed();}
   else if(areaName==='local'&&(changes.galacticLibraryProviderScans||changes.galacticLibraryProviderChecks)&&workspace.workspace==='providers')contentsScanProgress.changed();
   if(areaName==='local'&&changes.galacticLibraryProviderChecks)backupRestore.changed();
   if (areaName === 'local' && changes[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]) {
@@ -1071,7 +1072,7 @@ chrome.runtime.onMessage?.addListener((message,sender)=>{
   if(sender.id===chrome.runtime.id&&message?.type==='GL_CONTENTS_TIMING_START'&&globalThis.GalacticContentsPerformance.validId(message.diagnosticLookupId)){contentsDiagnosticId=message.diagnosticLookupId;contentsDiagnosticExpires=Date.now()+60000;}
   if(sender.id===chrome.runtime.id&&message?.type==='GL_KINDLE_CONTENTS_PROGRESS')contentsScanProgress.accept(message.runs??[]);
   if(sender.id===chrome.runtime.id&&message?.type===PRIVATE_STORAGE_CHANGED&&Array.isArray(message.keys)){
-    if(message.keys.includes(DATABASE_STORAGE_KEY)){backupRestore.changed();contentsScanProgress.changed();}
+    if([DATABASE_STORAGE_KEY,OBSERVATION_KEY,OBSERVATION_HEAD_KEY].some(key=>message.keys.includes(key))){backupRestore.changed();contentsScanProgress.changed();}
     else if(message.keys.some(key=>['galacticLibraryProviderScans','galacticLibraryProviderChecks'].includes(key))&&workspace.workspace==='providers')contentsScanProgress.changed();
     if(message.keys.includes('galacticLibraryProviderChecks'))backupRestore.changed();
     if(message.keys.includes(SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY)){showEnrichmentActions.checked=workspace.workspace==='books';if(database)render();}

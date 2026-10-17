@@ -1,5 +1,195 @@
 # Unchanged full-scan completion: architecture decision
 
+## Stage 1 implementation — October 17, 2026
+
+Baseline: `8a12a86`. **Reader infrastructure is implemented; observation-only
+completion writes are disabled.** Full and quick scans retain their existing
+persistence paths. Only synthetic tests inject observation packets. Nothing in
+this work reads or changes an installed personal library or a frozen backup.
+
+The architecture investigation below is historical. This section supersedes its
+reader/index unknowns and older-binary rollback requirements. GL has no public
+deployed versions: arbitrary old-binary compatibility and flatten-and-downgrade
+tooling are outside scope. Complete backups and explicit restore/clear remain
+supported. Enabling a completion producer requires separate Stage 2 approval.
+
+### Closed observation contract
+
+[observation-overlays.js](../../src/lib/observation-overlays.js) owns the format,
+validation, pure consolidation and materialization. Two private keys are used:
+
+- `galacticLibraryObservationHead`: format 1, exact raw SHA-256 `baseDigest`,
+  UUID `generation`, positive integer `revision`, `active`/`retiring` status.
+- `galacticLibraryObservations`: format 1, the same binding/generation/revision,
+  current database validation version, and consolidated provider entries.
+
+Each entry contains provider, immutable profile ID, scan-attempt UUID, full or
+incremental mode, complete/subset scope, exact saved account fingerprint (required
+for consoles), successful normalized state/health, an explicit list of up to three
+superseded status-attempt UUIDs, and one of:
+
+- Complete-profile `all`: observation time and an explicit advance/preserve
+  updatedAt policy. Fanatical and sparse Kobo quick scans cannot use this form.
+- `records`: exact existing record references, observedAt/updatedAt, and explicit
+  existing Fanatical occurrence references with their observation dates.
+
+The contract cannot add records/origins, change ownership, content, counts,
+account identity, import cursors, reviews or source evidence. State fields other
+than observation/success metadata must equal the saved profile state. Full scans
+require saved completeness evidence. Console scopes retain their additive
+meaning: unreturned records are not reobserved. Ordinary full scans require
+complete membership. Complete explicit scopes must enumerate every member.
+Fanatical origin membership and purchase dates remain intact. Kobo full scans
+preserve updatedAt; sparse unchanged quick scans preserve both record clocks,
+including a preceding full observation consolidated on the same base.
+
+Limits: **1 MiB encoded packet, 14 provider entries (one active account per
+provider), 5,000 explicit record deltas, 10,000 origin deltas**. Complete-profile
+compression does not consume explicit-record slots. Consolidation replaces prior
+provider success metadata and retains the latest per-record/origin observations;
+it does not append attempts indefinitely. Overflow throws; a future producer must
+materialize and use the existing validated full save. The pure consolidator is
+not a storage operation or companion API.
+
+Unknown fields/versions, mismatched head/payload, invalid states/dates, wrong
+profiles/fingerprints, malformed scopes and missing members reject the entire
+view. A well-formed packet bound to a different raw digest is stale and cannot
+attach to replacement records. Observed revisions cannot roll backward or mutate
+under the same generation/revision during a worker lifetime. Status-only format-1
+receipts remain status-only; explicit attempt lineage prevents an older status
+receipt/baseline from overwriting a newer observation without ordering clocks.
+
+### Effective reads, trust and recovery
+
+[storage-writer.js](../../src/background/storage-writer.js) is the authoritative
+integration point. Writer reads, scan reconciliation/absence history, ownership
+and enrichment mutations, pending-result observation guards, provider views,
+Options/Details/source inspection, companion queries and backup reads all consume
+the same materializer. Source-specific evidence clocks and acquisition dates are
+not advanced. Options observes both metadata keys through Chrome changes and
+Firefox private-storage notifications, using its existing refresh/draft guards.
+
+Raw committed snapshots stay immutable and independently registered. An effective
+view has a separate weak association with its raw catalog; it cannot mint a raw
+validation certificate. Exact digests already computed for session certificates
+are reused for the raw binding. The effective view is materialized/frozen once
+per observation revision and shared by read-only requests; mutable operations
+receive detached data. Overlay invalidation does not invalidate the raw catalog.
+Scan leases and final persistence checks pin both raw and observation revisions;
+stale completions, failures and cancellations cannot overwrite newer observations.
+
+A real database save folds effective observations into the ordinary validated
+database first. Before replacing the database it writes a retiring marker; only
+after the database save succeeds does it remove the packet/head. This deliberately
+does **not** assume cross-key storage atomicity. Concurrent local queries can use
+the prior complete committed effective view while that save is running. A failed
+barrier/save/cleanup leaves detectable evidence; a new reader fails closed rather
+than reporting a successful observation or using an ambiguous base. Explicit
+restore/clear can repair that state. Automatic interrupted-transaction recovery
+and real process-kill/power-loss testing remain Stage 2 gates.
+
+Backups contain the complete effective database in the existing backup format,
+not a database plus sidecar. Restoring even an identical old backup and clearing
+the library retire observation metadata and leases. Active metadata without its
+original database, or an implicit identity migration with active metadata, blocks
+instead of silently dropping observations. Legacy databases with no registration
+remain readable. Loss of both metadata keys across a cold restart is inherently
+indistinguishable from a never-registered legacy database; Stage 2 must establish
+registration before acknowledging its first observation. The current reader never
+treats an unreadable key or a missing member of a registered pair as absence.
+
+### Matching and actual companion dependencies
+
+The existing index already stores stable catalog record IDs and resolves current
+ownership for candidates. [matcher.js](../../src/lib/matcher.js) now keys that
+index by the raw catalog associated with either a raw or effective view. Candidate
+response records bind lazily to the current effective providerItems. No identity,
+classification, ownership or matching-threshold rule changed. Warm requests do
+not clone a whole database or rebuild the index after observation-only changes.
+
+**`evidence.checkedAt` is retained.** In GL it is public-match formatting derived
+from record observedAt, not identity/ownership/index evidence. Local HB
+`ownership.js` and FAN `src/shared.js` display it and show a missing/>30-day
+freshness advisory in central reminders; that advisory explicitly does not revoke
+permanent purchases. Their request/cache keys use outgoing listing fields, not
+returned checkedAt. Separate entitlement clocks are unrelated. Existing page
+response caches refresh on the next normal request; no new push protocol is added.
+Purchase-sync comparisons already ignore record observation/update dates. HB/FAN
+were inspected read-only and were not modified.
+
+### Matching measurements
+
+Reproduce with `scripts/benchmark-observation-matching.mjs` (Node real writer/API)
+and `scripts/benchmark-observation-browser.mjs` (packaged Chrome/native storage and
+actual worker stops). Use `--root=BASELINE_CHECKOUT --baseline` for `8a12a86` and
+the default root for Stage 1. Synthetic libraries contain 1,004, 14,004 and 20,004
+records, multiple providers/accounts/access states, real-title Possible controls,
+reviewed Partial controls and cross-provider ownership aggregation. Distinct
+synthetic background titles avoid an artificial common-word candidate explosion.
+These are not live HB/FAN page timings or real-library performance predictions.
+
+Packaged Chrome at 14,004 records, milliseconds **median / p95**:
+
+| Request | Baseline warm | Stage 1 warm | Stage 1 after revision |
+| --- | ---: | ---: | ---: |
+| Single Exact | 0.6 / 1.1 | 0.6 / 0.7 | 19.1 / 21.6, first view preparation included |
+| Possible (Astro City) | 0.6 / 0.7 | 0.8 / 1.1 | 1.0 / 1.2 |
+| Partial/reviewed contents | 11.0 / 11.7 | 10.5 / 11.9 | 10.4 / 13.3 |
+| 40-item batch | 2.9 / 3.9 | 2.8 / 3.3 | 3.2 / 4.8 |
+| Cross-provider aggregation | 0.4 / 0.6 | 0.5 / 0.6 | 0.8 / 1.0 |
+| Cold worker, 40-item batch | 670.5 / 675.2 | — | 690.6 / 699.4 |
+
+20 warm samples, 12 revisions and five actual stopped/restarted worker generations
+per size/version. The first post-revision request includes native metadata read,
+validation and one effective-view construction; subsequent requests reuse it.
+At 1,004/20,004 records that first request is 2.5/26.7 ms median; warm batches
+are 2.1/2.8 ms versus baseline 2.0/2.7 ms. 20k cold medians are 963.9 ms versus
+961.7 ms. Node at 14k shows warm batch 3.20 vs 3.12 ms and Exact 0.098 vs
+0.096 ms. Node's separate revision preparation is 25.96 ms median / 37.64 ms
+p95, and fresh-writer batch medians are 642.75 vs 669.28 ms. Node distributions
+are not native worker restart measurements.
+
+All semantic controls agree, timestamps advance correctly, and instrumented Node
+and regression checks show **one initial index build and zero additional builds
+across observation revisions** at every size. Revision materialization has a
+measurable bounded cost; it is not free. It replaces a reader view once, not an
+identity index. Normal matching remains effectively unchanged; removing the
+supplementary timestamp would not remove the shared effective-state requirement.
+There is no demonstrated meaningful matching penalty requiring API removal.
+Raw distributions, including outliers, remain under ignored audit-artifacts.
+
+### Validation and next gate
+
+Focused regression coverage includes all 14 providers, explicit/subset scopes,
+Fanatical origin consolidation, Kobo full→quick clocks, console account binding,
+history/missingSince, pending enrichment guards, status lineage, exact/absent/bad
+certificates, stale bases, malformed/missing metadata, read/revision races,
+interrupted and lost-ack saves, concurrent queries, restore/clear and immutable
+index reuse. Packaged importer checks cover all 14 effective views; native Firefox
+exercises private IndexedDB, current matching evidence, index hits, effective
+backup round-trips and explicit interrupted-save recovery.
+
+Final gates ran from an isolated checkout without private inputs: **1,478 unit
+tests (including 53 observation regressions), 472 contents tests, 104 packaged
+importer checks per browser, 68 packaged UI checks per browser, 12 native Firefox
+checks, and 88 provider parity probes across 14 providers/26 exposed modes**.
+Both package validators pass with 191 runtime files. Existing shared matching
+parity tests pass; HB/FAN remain unchanged. The storage-protection test now
+expects both an empty catalog read and the detached-observation check after
+authorization; zero reads before authorization and on protection failure remain
+asserted. The layout checker reports only 15 pre-existing absolute links in the
+unchanged historical ecosystem audit, not new-file or package problems.
+
+Stage 2 still needs the exact unchanged-result producer proof using existing
+normalization/acquisition/completeness/account rules, bounded producer writes on
+the single writer queue, durable admission/acknowledgement/recovery protocol,
+native termination/write-failure gates, and live opt-in timings. No completion
+optimization or scan semantic change is enabled by Stage 1.
+
+---
+
+## Historical architecture investigation (before Stage 1)
+
 Investigation date: October 17, 2026. Baseline: `6a9e9b8`.
 **Architecture and disposable experiments only; no runtime implementation approved.**
 

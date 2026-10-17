@@ -21,6 +21,7 @@ import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-orig
 import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
+import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY} from '../lib/observation-overlays.js';
 import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
 import {PROVIDERS} from '../lib/constants.js';
 
@@ -32,6 +33,7 @@ const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
   if(keys.includes('galacticLibraryDatabase')){storageWriter.invalidateQuerySnapshot(undefined,'private-observer');observePurchaseSync().catch(()=>{});}
+  if(keys.includes(OBSERVATION_KEY)||keys.includes(OBSERVATION_HEAD_KEY))storageWriter.invalidateObservationSnapshot();
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
@@ -102,6 +104,7 @@ registerReminderEvents();
 chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==='local'&&(Object.hasOwn(changes,OBSERVATION_KEY)||Object.hasOwn(changes,OBSERVATION_HEAD_KEY)))storageWriter.invalidateObservationSnapshot();
   if(area==='local')for(const key of Object.keys(changes).slice(0,16))queryDiagnostics.event('storage_change',{key:diagnosticStorageKey(key),source:'observer'});
   if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();
   if(area==='local'&&changes.galacticLibraryDatabase){storageWriter.invalidateQuerySnapshot(changes.galacticLibraryDatabase.newValue);observePurchaseSync(changes.galacticLibraryDatabase.newValue).catch(()=>{});}

@@ -10,7 +10,8 @@ import {newProviderProfile} from '../lib/provider-profiles.js';
 import {preserveKoboObservation,koboObservationChanged} from '../lib/kobo-observations.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
-import {registerCommittedSnapshot,committedSnapshotSequence} from '../lib/committed-snapshot.js';
+import {registerCommittedSnapshot,committedSnapshotSequence,registerEffectiveSnapshot,isCommittedSnapshot,committedCatalogSnapshot} from '../lib/committed-snapshot.js';
+import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY,validateObservationOverlay,materializeObservations,observationToken,observationStatusChecks} from '../lib/observation-overlays.js';
 import {diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import '../lib/contents-performance.js';
 import { UI_PREFERENCES_KEY, defaultUiPreferences, validateUiPreferences, mergeUiPreferences } from '../lib/ui-preferences.js';
@@ -90,20 +91,56 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   let providerChecksPresent=false;
   const checkDigests=new WeakMap();
   const checkBases=new WeakMap();
+  let observationEpoch=0,observationCache=null,observationPending=null;
+  let activeObservationRead=null;
+  let retiringObservation=null;
+  const effectivePackets=new WeakMap();
+  const observationVersions=new Map();
+  function invalidateObservationSnapshot(){observationEpoch++;observationCache=null;invalidateRefreshPreflight();}
+  async function requireNoObservations(){
+    const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});
+    if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY])throw Error('Saved observations require their original library. Restore a complete backup before repairing or replacing this library.');
+  }
+  async function readObservations(base,force=false){
+    if(!force&&retiringObservation?.base===base)return retiringObservation;
+    if(!force&&observationCache?.base===base&&observationCache.epoch===observationEpoch)return observationCache;
+    if(!force&&observationPending?.base===base&&observationPending.epoch===observationEpoch)return observationPending.promise;
+    const epoch=observationEpoch;
+    const promise=(async()=>{
+      const stored=await storageArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null}),head=stored[OBSERVATION_HEAD_KEY],packet=stored[OBSERVATION_KEY];
+      if(epoch!==observationEpoch)return readObservations(base,force);
+      if(observationCache?.base===base&&observationCache.epoch===epoch&&equalDatabaseData(head,observationCache.head)&&equalDatabaseData(packet,observationCache.packet))return observationCache;
+      const digest=head||packet?await checkDigest(base):null;
+      const validated=validateObservationOverlay(base,digest,head,packet),token=validated?observationToken(head):'none';
+      if(epoch!==observationEpoch)return readObservations(base,force);
+      if(validated){const prior=observationVersions.get(digest);if(prior&&(prior.generation!==packet.generation||prior.revision>packet.revision||prior.revision===packet.revision&&!equalDatabaseData(prior.packet,packet)))throw Error('Saved observations changed unexpectedly. Restore a complete backup or retry.');observationVersions.clear();observationVersions.set(digest,{generation:packet.generation,revision:packet.revision,packet:freezeQuerySnapshot(packet)});}
+      else if(!head&&!packet&&observationVersions.size){
+        const current=await checkDigest(base);if(observationVersions.has(current))throw Error('Saved observation information is missing. Your library was kept. Restore a complete backup or retry.');
+      }
+      const value={base,epoch,head,packet:validated,token,view:null};
+      if(isCommittedSnapshot(base)){value.view=validated?registerEffectiveSnapshot(freezeQuerySnapshot(materializeObservations(base,validated)),base):base;effectivePackets.set(value.view,validated);observationCache=value;}
+      return value;
+    })();
+    observationPending={base,epoch,promise};try{return await promise;}finally{if(observationPending?.promise===promise)observationPending=null;}
+  }
   async function checkedProviderView(database,base){
-    const view=await providerCheckView(database,base);checkBases.set(view,base);return view;
+    const observations=await readObservations(base,true);
+    if(activeOperation)activeObservationRead={base,token:observations.token};
+    const effective=observations.packet?materializeObservations(database,structuredClone(observations.packet)):database;
+    effectivePackets.set(effective,observations.packet);
+    const view=await providerCheckView(effective,base);effectivePackets.set(view,observations.packet);checkBases.set(view,base);return view;
   }
   function checkDigest(database){
     // Only immutable worker-owned bases may cache a digest. Mutable caller
     // copies never mint a reusable proof.
     if(database===querySnapshot&&Object.isFrozen(database)){
-      if(!checkDigests.has(database))checkDigests.set(database,providerCheckDigest(database));
+      if(!checkDigests.has(database))checkDigests.set(database,certificates.committedDigest(database)??providerCheckDigest(database));
       return checkDigests.get(database);
     }
     return providerCheckDigest(database);
   }
-  async function providerCheckView(database,base=database){
-    const checks=(await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY];
+  async function providerCheckView(database,base=committedCatalogSnapshot(database)??database){
+    const checks=observationStatusChecks((await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY],effectivePackets.get(database));
     if(!checks)return database;
     providerChecksPresent=true;
     const digest=await timedAsync('provider_check_digest',()=>checkDigest(base));
@@ -123,11 +160,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function persistProviderCheck(database,provider,profile,scan,patch,storedScans){
     patch=providerCheckPatch(provider,patch);
     const base=checkBases.get(database),digest=await timedAsync('provider_check_digest',()=>checkDigest(base));
-    const previous=(await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY];
+    const previous=observationStatusChecks((await storageArea.get({[PROVIDER_CHECKS_KEY]:null}))[PROVIDER_CHECKS_KEY],effectivePackets.get(database));
     if(base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
     const checks=validProviderChecks(previous,digest),old=checks[provider];
     const baseline=patch.syncHealth.status!=='succeeded'&&old?.profileId===profile.profileId?providerCheckBaseline(provider,old):null;
     const receipt={format:1,baseDigest:digest,checks:{...checks,[provider]:{profileId:profile.profileId,patch,...(baseline?{baseline}:{})}}};
+    if(activeObservationRead&&(await readObservations(activeObservationRead.base,true)).token!==activeObservationRead.token)throw Error('Observations changed while completing this check. Start a fresh scan.');
     await timedAsync('provider_check_write',()=>storageArea.set({[PROVIDER_CHECKS_KEY]:receipt}));
     providerChecksPresent=true;
     const scans={...storedScans};delete scans[provider];
@@ -150,11 +188,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     catch{/* A malformed change must invalidate, never retain, the snapshot. */}
     finally{end();}
     querySnapshot=null;querySnapshotEpoch++;
+    observationEpoch++;observationCache=null;
     snapshotEvent('invalidated',source,previousSnapshot);
   }
   function publishQuerySnapshot(database,verifiedDigest=null){
     const previousSnapshot=committedSnapshotSequence(querySnapshot);
     querySnapshotEpoch++;
+    observationEpoch++;observationCache=null;
     // Only these trusted writer paths supply fully validated committed values.
     // Detach before sharing: caller-owned mutable results must not affect queries.
     querySnapshot=null;
@@ -176,6 +216,20 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     async get(defaults){const end=activity('storage_get',{key:storageKey(defaults),operation:activeOperation});try{return await committedArea.get(defaults);}finally{end();}},
     async set(updates){
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY))updates={...updates,[PROFILE_HINTS]:profileHints(updates[DATABASE_STORAGE_KEY])};
+      let retirement=false;
+      if(Object.hasOwn(updates,DATABASE_STORAGE_KEY)){
+        const replacing=activeOperation==='restoreDatabase'||activeOperation==='clearDatabase';
+        let head;
+        if(replacing){const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY])head={format:1,baseDigest:'0'.repeat(64),generation:crypto.randomUUID(),revision:1,status:'retiring'};}
+        else if(activeObservationRead){const current=await readObservations(activeObservationRead.base,true);if(current.token!==activeObservationRead.token)throw Error('Observations changed while saving. Start a fresh operation.');if(current.packet){head={...current.head,status:'retiring'};retiringObservation=current;}}
+        if(head){
+          // No cross-key atomicity assumption: readers fail closed during this
+          // short barrier. A failed/interrupted save retains the original packet.
+          try{await committedArea.set({[OBSERVATION_HEAD_KEY]:head});}
+          catch(error){retiringObservation=null;invalidateObservationSnapshot();throw error;}
+          invalidateObservationSnapshot();retirement=true;
+        }
+      }
       const endActivity=activity('storage_set',{key:storageKey(updates),operation:activeOperation});
       try{
       let pending;
@@ -184,23 +238,32 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const waitEnd=activeTiming?.begin('storage_set_wait');
       try{await pending;}finally{waitEnd?.();}
       if(Object.hasOwn(updates,DATABASE_STORAGE_KEY)){
+        if(retirement){await committedArea.remove([OBSERVATION_HEAD_KEY,OBSERVATION_KEY]);observationVersions.clear();invalidateObservationSnapshot();}
         publishQuerySnapshot(updates[DATABASE_STORAGE_KEY]);
         // Valid receipts were folded before the database commit. Retire them
         // only after that commit; failed cleanup leaves digest-rejected state,
         // never a lost catalog save or a false ownership acknowledgement.
         if(providerChecksPresent)try{await storageArea.remove([PROVIDER_CHECKS_KEY]);providerChecksPresent=false;}catch{}
       }
-      }finally{endActivity();}
+      }finally{if(retirement)retiringObservation=null;endActivity();}
     },
     async remove(keys){
       if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY))keys=[...(Array.isArray(keys)?keys:[keys]),PROFILE_HINTS];
+      const removesDatabase=(Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY);
+      if(removesDatabase){const stored=await committedArea.get({[OBSERVATION_HEAD_KEY]:null,[OBSERVATION_KEY]:null});if(stored[OBSERVATION_HEAD_KEY]||stored[OBSERVATION_KEY]){await committedArea.set({[OBSERVATION_HEAD_KEY]:{format:1,baseDigest:'0'.repeat(64),generation:crypto.randomUUID(),revision:1,status:'retiring'}});invalidateObservationSnapshot();}}
       const end=activity('storage_remove',{key:storageKey(typeof keys==='string'?[keys]:keys),operation:activeOperation});try{
       await committedArea.remove(keys);
-      if((Array.isArray(keys)?keys:[keys]).includes(DATABASE_STORAGE_KEY)){publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
+      if(removesDatabase){await committedArea.remove([OBSERVATION_HEAD_KEY,OBSERVATION_KEY]);observationVersions.clear();invalidateObservationSnapshot();publishQuerySnapshot(createEmptyDatabase());certificates.clear();}
       }finally{end();}
     }
   };
-  async function getQueryDatabase({beginSpan=()=>{},onValidationSlice=()=>{},onValidationWait=()=>{}}={}){
+  async function getQueryDatabase(options={}){
+    for(;;){const epoch=observationEpoch,base=await getRawQueryDatabase(options),catalogEpoch=querySnapshotEpoch,observations=await readObservations(base);
+      if(epoch!==observationEpoch||catalogEpoch!==querySnapshotEpoch)continue;
+      return observations.view??base;
+    }
+  }
+  async function getRawQueryDatabase({beginSpan=()=>{},onValidationSlice=()=>{},onValidationWait=()=>{}}={}){
     const span=async(stage,work)=>{const end=beginSpan(stage),endActivity=activity(stage);try{return await work();}finally{end?.();endActivity();}};
     const sync=(stage,work)=>{const end=beginSpan(stage);try{return work();}finally{end?.();}};
     querySnapshotsUsed=true;await ready;
@@ -215,7 +278,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         // result over a newer committed revision, including clear/restore.
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         const raw=stored[DATABASE_STORAGE_KEY];
-        const certified=raw&&await span('snapshot_certificate',()=>certificates.verify(raw,{beginSpan}));
+        if(!raw)await requireNoObservations();
+        const certified=raw&&await span('snapshot_certificate',()=>certificates.verifyDigest(raw,{beginSpan}));
         sync(certified?'certificate_hit':'certificate_miss',()=>{});
         if(epoch!==querySnapshotEpoch){sync('snapshot_retry',()=>{});continue;}
         let endValidationStage;
@@ -232,6 +296,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
           await span('snapshot_migration',()=>execute('getDatabase'));continue;
         }
         sync('snapshot_freeze',()=>registerCommittedSnapshot(freezeQuerySnapshot(database)));
+        if(certified)checkDigests.set(database,Promise.resolve(certified));
         if(cacheQuerySnapshots)querySnapshot=database;
         snapshotEvent('published','cold-read');
         if(raw&&!certified)sync('certificate_issue',()=>certificates.issue(database));
@@ -253,7 +318,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const beginSpan=stage=>timing?.begin(stage);
     const end=beginSpan('options_snapshot');
     let database,preferences,scans;
-    try{[database,preferences,scans]=await Promise.all([getQueryDatabase({beginSpan}),ready.then(()=>getUiPreferences()),ready.then(()=>storageArea.get({[SCANS]:{}}))]);database=await providerCheckView(database);}
+    try{[database,preferences,scans]=await Promise.all([getQueryDatabase({beginSpan}),ready.then(()=>getUiPreferences()),ready.then(()=>storageArea.get({[SCANS]:{}}))]);
+      const packet=effectivePackets.get(database),token=packet?observationToken({...packet,status:'active'}):'none';
+      scans={[SCANS]:Object.fromEntries(Object.entries(scans[SCANS]??{}).filter(([,scan])=>(scan.observationToken??'none')===token))};
+      database=await providerCheckView(database);}
     finally{end?.();endActivity();}
     return {database:providerScanDisplay(database,scans[SCANS]),preferences,...(timing?{performance:globalThis.GalacticContentsPerformance.clean(timing.finish('reparsed'))}:{})};
   }
@@ -308,6 +376,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
+    scans[provider].observationToken=activeObservationRead?.token??'none';
     if(['nintendo','playstation','xbox'].includes(provider))scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
     // Announcing a scan does not reobserve any records. An unchanged established
     // account can project Running from a durable lease in either acquisition mode.
@@ -329,6 +398,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false,sourceAccountFingerprint=null) {
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(true);
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId||!scan.profileId||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||!database.providerProfiles[scan.profileId])throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
+    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname,
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
@@ -487,6 +557,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId)return false;
     const database=await readDatabase(true);
+    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))return false;
     const failureCode=SYNC_FAILURE_CODES.includes(failure.code)?failure.code:'other';
     const profile=database.providerProfiles[scan.profileId];if(!profile||database.providers[provider]?.activeProfileId!==scan.activeAtStartId)return false;
     if(scanCompleted(profile,scan))return false;
@@ -499,6 +570,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function cancelProviderScan(provider,attemptRef){
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider];if(!scan||scan.attemptRef!==attemptRef)throw new Error('This scan changed or already finished. Refresh the dashboard.');
     const database=await readDatabase(true),profile=database.providerProfiles[scan.profileId];if(!profile)throw Error('Scan profile changed.');
+    if((scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Refresh the dashboard.');
     if(scanCompleted(profile,scan))throw Error('This scan already finished. Refresh the dashboard.');
     const health=validateSyncHealth({attemptRef:scan.attemptRef,startedAt:scan.startedAt,mode:scan.mode,attemptedProfileLabel:scan.profileLabel,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true});
     if(canPersistProviderCheck(database,provider,profile,scan))return persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);
@@ -537,7 +609,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const epoch=querySnapshotEpoch;
     const stored = await timedAsync('storage_read',()=>storageArea.get({ [DATABASE_STORAGE_KEY]: null }));
     if(activeTiming)activeTiming.recordsRead=(activeTiming.recordsRead??0)+Object.keys(stored[DATABASE_STORAGE_KEY]?.providerItems??{}).length;
-    if (!stored[DATABASE_STORAGE_KEY]) return createEmptyDatabase();
+    if (!stored[DATABASE_STORAGE_KEY]){await requireNoObservations();return createEmptyDatabase();}
     // Mutation proof: the freshly read authoritative value is exactly the
     // already validated immutable committed revision. Never use the eligibility
     // projection, an uncommitted working copy, or epoch identity alone as proof.
@@ -563,6 +635,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = await timedAsync('read_validation',()=>validateForWriter(stored[DATABASE_STORAGE_KEY]));
     if(reuseCommittedValidation&&cacheQuerySnapshots&&epoch!==querySnapshotEpoch){timed('read_certificate_retry',()=>{});return readDatabase(true);}
     if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
+      // An identity repair cannot silently detach authoritative observations
+      // from their exact original base. Explicit restore/clear remains available.
+      await requireNoObservations();
       const jobState = await storageArea.get({[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]: null});
       const job = jobState[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY];
       const migrated = {[DATABASE_STORAGE_KEY]: database};
@@ -582,7 +657,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       await timedAsync('migration_write',()=>storageArea.set(migrated));
     }
     if(reuseCommittedValidation&&cacheQuerySnapshots)publishQuerySnapshot(database);
-    return checkedProviderView(database,reuseCommittedValidation?querySnapshot??database:database);
+    const base=querySnapshot&&equalDatabaseData(stored[DATABASE_STORAGE_KEY],querySnapshot)?querySnapshot:database;
+    return checkedProviderView(database,base);
   }
 
   async function persistDatabase(database,invalidate=null,extra={},beforeSave=null) {
@@ -1558,7 +1634,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function runOperation(operation,values){
     if(operation!=='checkKindleContentsRefreshItem')invalidateRefreshPreflight();
     const end=activity('operation',{operation});activeOperation=operation;
-    try{return await operations[operation](...values);}finally{activeOperation=null;end();}
+    activeObservationRead=null;
+    try{return await operations[operation](...values);}finally{activeObservationRead=null;activeOperation=null;end();}
   }
 
   function execute(operation, args = [], timing = null) {
@@ -1591,7 +1668,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   return Object.freeze({
     execute,
     invalidateRefreshPreflight,
-    getQueryDatabase,getProviderDatabase,getQueryAllowedExternalClientIds,invalidateQuerySnapshot,getProviderProfileHint,rememberProviderProfileHints,
+    getQueryDatabase,getProviderDatabase,getQueryAllowedExternalClientIds,invalidateQuerySnapshot,invalidateObservationSnapshot,getProviderProfileHint,rememberProviderProfileHints,
     ...Object.fromEntries(STORAGE_OPERATIONS.map((name) => [name, (...args) => execute(name, args)]))
   });
 }

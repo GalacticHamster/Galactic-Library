@@ -47,6 +47,7 @@ function valid(value){
 // Only worker-owned registered committed snapshots can mint a receipt. Session
 // writes are ordered but never awaited by database saves or query responses.
 export function createValidationCertificates(area){
+  const issuedDigests=new WeakMap();
   let generation=0,tail=Promise.resolve();const pending=new Set();
   const queue=work=>{tail=tail.then(work).catch(()=>{});return tail;};
   const available=()=>typeof area?.get==='function'&&typeof area?.set==='function'&&typeof area?.remove==='function';
@@ -67,6 +68,7 @@ export function createValidationCertificates(area){
     }catch{return miss('certificate_error');}
   }
   return {
+    committedDigest:database=>isCommittedSnapshot(database)?issuedDigests.get(database):null,
     verifyDigest,
     async verify(database,options){return Boolean(await verifyDigest(database,options));},
     issue(database){
@@ -74,7 +76,8 @@ export function createValidationCertificates(area){
       const current=++generation;let serialized;
       // Capture synchronously while the exact committed value is immutable.
       try{serialized=strictDatabaseSerialization(database);}catch{return Promise.resolve();}
-      const task=digest(serialized).then(hash=>queue(async()=>{
+      const hashing=digest(serialized);issuedDigests.set(database,hashing);
+      const task=hashing.then(hash=>queue(async()=>{
         if(current!==generation)return;
         await area.set({[VALIDATION_CERTIFICATE_KEY]:{format:1,schemaVersion:DATABASE_SCHEMA_VERSION,validationVersion:VALIDATION_ALGORITHM_VERSION,serializationVersion:2,algorithm:'SHA-256',digest:hash}});
       })).catch(()=>{});

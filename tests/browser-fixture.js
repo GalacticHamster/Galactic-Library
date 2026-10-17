@@ -26,12 +26,13 @@ const card=title=>{const node=[...document.querySelectorAll('#library-items > li
 const showWorkspace=value=>document.querySelector('[data-workspace="'+value+'"]').click();
 const open=async node=>{assert(node,'Missing details');node.open=true;await pause();return node;};
 const contentsRuntimeListeners=[],contentsStorageListeners=[],contentsUiTimings=[];
-const values={};let openedOptions;let failOwnershipSave=false;
+const values={};let openedOptions;let failOwnershipSave=false,committedViewReads=0;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
 globalThis.chrome={runtime:{onMessage:{addListener:listener=>contentsRuntimeListeners.push(listener)},getManifest:()=>({optional_permissions:['notifications']}),id:'abcdefghijklmnopabcdefghijklmnop',sendMessage:async message=>{
   if(message.type==='GL_CONTENTS_UI_TIMING'){contentsUiTimings.push(message.timing);return {ok:true};}
   if(message.type==='SEARCH_GOOGLE_BOOKS')return {ok:true,candidates:[{volumeId:'review-manga-one',title:'Review manga Vol. 1',authors:['Writer'],publisher:'Publisher',isbn:['9780140328721'],language:'en'}]};
   if(message.type!=='LIBRARY_STORAGE_OPERATION')return {ok:false,error:'Remote services disabled in UI fixture.'};
+  if(message.operation==='getCommittedLibraryView')committedViewReads++;
   if(message.operation==='saveOwnershipPolicy'&&failOwnershipSave)return {ok:false,error:'Synthetic preference storage failure'};
   try{return {ok:true,result:await writer[message.operation](...message.args)};}catch(error){return {ok:false,error:error.message};}
 }},tabs:{create:async value=>{openedOptions=value.url;}},permissions:{request:async request=>{assert(JSON.stringify(request.permissions)===JSON.stringify(['notifications']),'Reminder UI requested a non-optional Firefox permission.');return true;}},storage:{onChanged:{addListener:listener=>contentsStorageListeners.push(listener)}}};
@@ -414,5 +415,16 @@ try{
   checks.push(...await checkParentScopedComponents());
   checks.push(`bounded numbered precision: ${checkNumberedPrecision()} source-shape controls`);
   checks.push(`Kindle source/history refresh: ${await checkKindleRefresh()} transactional queue and safety controls`);
+  {
+    const F=await import('./provider-sync-fixture.js'),O=await import('./observation-fixture.js'),K=await import('../src/lib/observation-overlays.js');
+    const db=F.providerSyncLibrary('steam');await writer.restoreDatabase(db);O.injectObservations(values,writer,await O.observationPacket(db,'steam',{whole:true}));
+    const initial=committedViewReads;
+    for(const listener of contentsStorageListeners)listener({[K.OBSERVATION_KEY]:{newValue:values[K.OBSERVATION_KEY]}},'local');
+    await wait(()=>committedViewReads>initial,'Chrome observation change did not refresh Options');const before=committedViewReads;
+    for(const listener of contentsRuntimeListeners)listener({type:'GL_PRIVATE_STORAGE_CHANGED',keys:[K.OBSERVATION_HEAD_KEY]},{id:chrome.runtime.id});
+    await wait(()=>committedViewReads>before,'Firefox private observation change did not refresh Options');
+    assert(Object.values((await writer.getCommittedLibraryView()).database.providerItems)[0].observedAt===O.observationDate,'Options lost effective observation evidence');
+    checks.push('Chrome and Firefox observation notifications refresh Options through the shared effective reader');
+  }
   await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack||error.message})});}

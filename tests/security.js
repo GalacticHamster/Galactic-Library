@@ -49,7 +49,9 @@ export const securityTests = [
     await withWorker(async({memory,pageA,accessLevels})=>{
       const read=pageA.getDatabase(); await new Promise(resolve=>setTimeout(resolve,0));
       assert.equal(memory.getCount,0); assert.deepEqual(accessLevels,[['local','TRUSTED_CONTEXTS'],['session','TRUSTED_CONTEXTS']]);
-      release(); await read; assert.equal(memory.getCount,1);
+      // Empty-library reads also check that no authoritative observations have
+      // been detached from their raw database. Both reads remain gated.
+      release(); await read; assert.equal(memory.getCount,2);
     },{accessGate});
     await withWorker(async({memory,pageA})=>{await assert.rejects(pageA.getDatabase(),/storage protection failed/u);assert.equal(memory.getCount,0);},{accessError:new Error('storage protection failed')});
     await assert.rejects(restrictStorageAccess({local:{},session:{}}),/cannot protect library storage/u);
