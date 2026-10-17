@@ -7,6 +7,12 @@ still performs its validated full save. This implements the first bounded
 improvement, not overall synchronization parity. Moving record and purchase-origin
 observations out of completion writes remains a separate freshness-model design.
 
+The [unchanged full-scan completion investigation](unchanged-full-scan-completion.md)
+compares versioned observation overlays with provider segments and a hybrid using
+disposable native experiments. It recommends a reader-first, bounded overlay design
+for a subsequent approved task; current full completion remains unchanged, and
+overall synchronization parity is not marked complete.
+
 ## Implemented admission contract
 
 `beginProviderScan` shares lease admission between full and incremental modes.
