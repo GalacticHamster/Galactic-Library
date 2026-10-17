@@ -1,0 +1,108 @@
+{
+  "format": 1,
+  "bundle": "Batman Day Comics Bundle (DC Comics Books)",
+  "description": "Git-tracked non-sensitive baseline metadata and performance benchmarks for the Batman Bundle regression suite.",
+  "workloadMetrics": {
+    "itemCount": 31,
+    "contentsCount": 2,
+    "mediaType": "book",
+    "responseResults": 31,
+    "responseMatchesTotal": 17,
+    "responsePossibleTotal": 13,
+    "responsePartialTotal": 0,
+    "breakdown": {
+      "exactMatchOnly": 11,
+      "bothMatchAndPossible": 6,
+      "possibleOnly": 7,
+      "partial": 0,
+      "unmatchedNew": 7,
+      "total": 31
+    }
+  },
+  "fixtureHashes": {
+    "workload": {
+      "filename": "batman-bundle-workload.json",
+      "sha256": "7bbf99375a1d0d8c13f3df2af8c29a87b8f7b3ab4be7aa9c01b4462a2eaf2591"
+    },
+    "pageHtml": {
+      "filename": "batman-bundle-page.html",
+      "sha256": "f42290c7a76367fad917c5958dd75c094aeb75c4828b94899e77c504154e740b"
+    },
+    "library": {
+      "filename": "private-library.json",
+      "sha256": "e9f49118778ca63d62c6a02ae4258984434db10f78bf62a3625768f96843c845"
+    },
+    "certificateDigest": "2c59d3505cbb99b0076db4aa6bde6917435dd4a14afca9ee1ff712fc45c774ff"
+  },
+  "approvedBaselines": {
+    "testA": {
+      "name": "Isolated GL Replay (CDP Direct)",
+      "description": "Measures GL MV3 service worker matching performance directly via CDP from an authorized caller extension.",
+      "cold": {
+        "runs": 5,
+        "totalMs": { "median": 9985.8, "min": 9828.7, "max": 10135.6, "p95": 10135.6 },
+        "snapshotReadMs": { "median": 2461.6 },
+        "snapshotCertMs": { "median": 2500.8 },
+        "matchingIndexBuildMs": { "median": 2356.8 },
+        "matchingExecutionMs": { "median": 2477.2 }
+      },
+      "warm": {
+        "runs": 10,
+        "totalMs": { "median": 2344.1, "min": 2128.4, "max": 2538.9, "p95": 2538.9 },
+        "matchingExecutionMs": { "median": 2341.2 }
+      }
+    },
+    "testB": {
+      "name": "Humble Bundle + Galactic Library Browser Integration Replay",
+      "description": "Reproduces matching, messaging, and rendering in an offline browser extension context. Note: Test B does not reproduce the live Humble website's approximately two seconds of network asset fetching, tracking scripts, and hydration/preparation overhead.",
+      "cold": {
+        "runs": 5,
+        "pageToRenderedMs": { "median": 9389.7, "min": 9354.1, "max": 9696.9, "p95": 9696.9 },
+        "preparationMs": { "median": 10.5 },
+        "glRoundTripMs": { "median": 9263.0 },
+        "postResponseMs": { "median": 95.9 },
+        "glTotalMs": { "median": 9254.7, "min": 9222.1, "max": 9566.5, "p95": 9566.5 },
+        "snapshotReadMs": { "median": 2367.3 },
+        "snapshotCertMs": { "median": 2301.8 },
+        "matchingIndexBuildMs": { "median": 2314.0 },
+        "matchingExecutionMs": { "median": 2103.1 }
+      },
+      "warm": {
+        "runs": 10,
+        "pageToRenderedMs": { "median": 2033.0, "min": 1985.0, "max": 2408.0, "p95": 2408.0 },
+        "preparationMs": { "median": 10.4 },
+        "glRoundTripMs": { "median": 1914.3 },
+        "postResponseMs": { "median": 92.5 },
+        "glTotalMs": { "median": 1910.7, "min": 1858.7, "max": 2284.5, "p95": 2284.5 },
+        "matchingExecutionMs": { "median": 1906.9 }
+      }
+    }
+  },
+  "historicalLiveReference": {
+    "description": "Captured from live humblebundle.com website on October 17, 2026. Preserved as historical context, not as strict performance thresholds.",
+    "hbTimingWindow": {
+      "coldPageToRenderedMs": 11790.0,
+      "warmPageToRenderedMs": 4310.0,
+      "coldPreparationMs": 692.1,
+      "warmPreparationMs": 692.1,
+      "notes": "Includes live network latency, external CDN assets, Google Tag Manager/analytics scripts, and client-side React hydration."
+    },
+    "glServer": {
+      "coldTotalMs": 9858.1,
+      "warmTotalMs": 1954.4,
+      "coldMatchingExecutionMs": 2537.3,
+      "warmMatchingExecutionMs": 1952.0,
+      "coldSnapshotReadMs": 2404.5,
+      "coldSnapshotCertMs": 2420.6,
+      "coldMatchingIndexBuildMs": 2382.1
+    }
+  },
+  "regressionPolicy": {
+    "parityTarget": 100.0,
+    "maxAllowableRegressionPct": 20.0,
+    "requireExactPayloadMatch": true,
+    "requireExactResultMatch": true,
+    "requireColdWorkerRestart": true,
+    "requireWarmWorkerReuse": true
+  }
+}
