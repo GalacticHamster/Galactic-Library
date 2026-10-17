@@ -15,6 +15,12 @@ the same active immutable profile ID, connected state and an existing full
 baseline. New accounts, switching, baseline changes and unavailable proofs
 retain ordinary validated persistence.
 
+Eligible full starts also use this durable lease and Running projection, as
+described in [provider-sync-parity.md](provider-sync-parity.md). They pin the raw
+committed base for a subsequent validated full save. This changes admission only:
+successful full completion cannot use an incremental status-only receipt. A cold
+proof miss still validates the authoritative read before deciding eligibility.
+
 Commits require a lease-only incremental start and supported scan-detail fields.
 Normalize incoming records using existing import rules and compare **every
 field**, including observation dates, access and provenance, to current records.
@@ -35,7 +41,8 @@ reconciliation. Console imports still verify fingerprints, source contracts and
 complete supported scopes; their fresh snapshot evidence is a data change. No
 shortcut bypasses those acquisition guards. Failed/cancelled attempts can use
 status-only receipts when their established account/base remains valid, including
-after a full-start bookkeeping save. They never reconcile missing records.
+after a lease-only full start or an ineligible bookkeeping save. They never
+reconcile missing records.
 
 ## Receipt and successful baseline
 

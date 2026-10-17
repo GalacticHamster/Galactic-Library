@@ -71,6 +71,23 @@ const fixtures=[
   ['fandango-at-home','fandango-at-home','GalacticFandangoAtHome','readFandangoGrid','/content/browse/mylibrary']
 ];
 try{
+// The same shared start path runs in both packaged browsers for all providers.
+{
+ const {PROVIDERS}=await import('../src/lib/constants.js');
+ const F=await import('./provider-sync-fixture.js'),{createSyncHealthView}=await import('../src/ui/sync-health.js');
+ for(const provider of PROVIDERS){
+  const db=F.providerSyncLibrary(provider),saved={galacticLibraryDatabase:structuredClone(db)};let writes=0;
+  const w=createStorageWriter({get:async defaults=>structuredClone(Object.fromEntries(Object.entries(defaults).map(([k,v])=>[k,saved[k]??v]))),set:async updates=>{if(updates.galacticLibraryDatabase)writes++;Object.assign(saved,structuredClone(updates));},remove:async keys=>{for(const k of [keys].flat())delete saved[k];}},Promise.resolve(),{cacheQuerySnapshots:true});
+  await w.getQueryDatabase();const scan=await w.beginProviderScan(provider,'Personal','full',false,1,null,false,F.consoleProvider(provider)?F.fingerprint:null);
+  assert(writes===0&&saved.galacticLibraryProviderScans[provider].fullStartDigest,'Full admission rewrote '+provider);
+  const view=(await w.getCommittedLibraryView()).database,card=createSyncHealthView(view,{cancel:()=>{},refresh:()=>{}});card.open=true;card.dispatchEvent(new Event('toggle'));
+  assert(card.textContent.includes('Last attempt: running, full'),'Running full scan is invisible for '+provider);
+  const items=[F.providerSyncValue(provider)];await w.commitProviderScan(provider,items,{syncMode:'full',fullSyncAt:new Date().toISOString()},F.providerSyncSnapshot(provider,items),scan.scanToken,1,false,F.consoleProvider(provider)?F.fingerprint:null);
+  assert(writes===1&&(await w.getCommittedLibraryView()).database.providers[provider].syncHealth.status==='succeeded','Full completion was bypassed for '+provider);
+ }
+ checks.push('All 14 provider full starts use durable leases, render Running in the existing dashboard, and complete through one validated save');
+}
+
   {
     const saved={};let databaseWrites=0;
     const area={get:async defaults=>structuredClone(Object.fromEntries(Object.entries(defaults).map(([key,value])=>[key,saved[key]??value]))),set:async updates=>{if(updates.galacticLibraryDatabase)databaseWrites++;Object.assign(saved,structuredClone(updates));},remove:async key=>{delete saved[key];}};

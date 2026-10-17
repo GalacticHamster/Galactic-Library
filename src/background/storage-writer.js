@@ -277,11 +277,17 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   const NOTIFICATIONS='galacticLibraryReminderNotifications';
   const SCANS='galacticLibraryProviderScans';
+  function canStartProviderLease(database,provider,profile,scan,forceFull,bindingUnchanged){
+    return !forceFull&&bindingUnchanged&&profile.provider===provider
+      &&scan.activeAtStartId===profile.profileId
+      &&(scan.mode==='incremental'||canPersistProviderCheck(database,provider,profile,scan));
+  }
   async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false,sourceAccountFingerprint=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
     const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
     const database=await readDatabase(true),active=database.providers[provider]?.activeProfileId;
     const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
+    let bindingUnchanged=true;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(provider==='nintendo'&&mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
@@ -289,6 +295,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(bound&&bound.profileId!==existing?.profileId)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');
       if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This GL account belongs to a different '+label+' account. Choose another profile and confirm switching.');
       if(existing&&!existing.sourceAccountFingerprint&&Object.values(database.providerItems).some(i=>i.profileId===existing.profileId))throw Error('This saved account has no verified '+label+' identity. Use a new account profile.');
+      bindingUnchanged=existing?.sourceAccountFingerprint===sourceAccountFingerprint;
     }
     if(requestedProfileId&&existing?.profileId!==requestedProfileId)throw Error('Scan profile changed. Start a fresh confirmed scan.');
     if(rememberedProfile===true&&(Object.values(database.providerProfiles).filter(p=>p.provider===provider).length!==1
@@ -302,10 +309,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
     scans[provider]={scanToken,attemptRef:crypto.randomUUID(),profileId:profile.profileId,activeAtStartId,profileLabel,mode:forceFull?'full':mode,tabId,startedAt:new Date().toISOString()};
     if(['nintendo','playstation','xbox'].includes(provider))scans[provider].sourceAccountFingerprint=sourceAccountFingerprint;
-    // An existing-account quick check needs a tab-bound lease, not a rewrite of
-    // every saved book merely to announce that scanning has started.
-    if(mode==='incremental'&&!forceFull&&active===profile.profileId){
+    // Announcing a scan does not reobserve any records. An unchanged established
+    // account can project Running from a durable lease in either acquisition mode.
+    if(canStartProviderLease(database,provider,profile,scans[provider],forceFull,bindingUnchanged)){
       scans[provider].readOnlyStart=true;
+      if(mode==='full'){
+        const base=checkBases.get(database);
+        scans[provider].fullStartDigest=await timedAsync('provider_check_digest',()=>checkDigest(base));
+        if(base!==querySnapshot)throw Error('The library changed while starting this scan. Start a fresh scan.');
+      }
       await storageArea.set({[SCANS]:scans});
       return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
     }
@@ -322,6 +334,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
     const checkedBase=checkBases.get(database);
     if(checkedBase&&Object.isFrozen(checkedBase)&&checkedBase!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
+    let beforeFullSave=null;
+    if(scan.readOnlyStart&&scan.mode==='full'){
+      if(!/^[a-f0-9]{64}$/u.test(scan.fullStartDigest??'')||!checkedBase
+        ||scan.fullStartDigest!==await timedAsync('provider_check_digest',()=>checkDigest(checkedBase)))throw Error('The library changed during this full scan. Start a fresh scan.');
+      beforeFullSave=()=>{if(checkedBase!==querySnapshot)throw Error('The library changed during this full scan. Start a fresh scan.');};
+      beforeFullSave();
+    }
     if(scanCompleted(profile,scan))throw Error('This scan already completed. Start a fresh scan.');
     let result,changes,preparedIncoming;
     if(['nintendo','playstation','xbox'].includes(provider)){
@@ -335,7 +354,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       profile.sourceAccountFingerprint=sourceAccountFingerprint;
       // A complete non-hidden view is still not a complete purchase history.
       // Reuse the additive importer; never archive omissions or revoke access.
-      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database);
+      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave);
     }
     if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
       &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics','syncState'].includes(key))
@@ -351,7 +370,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         result=await persistProviderCheck(database,provider,profile,scan,patch,stored[SCANS]);
       }
     }
-    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database):mergeIntoDatabase(provider,values,details,database,preparedIncoming));
+    result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database,beforeFullSave):mergeIntoDatabase(provider,values,details,database,preparedIncoming));
     if(!includeResult)return result;
     const observedIds=new Set(values.map(value=>value.providerItemId));
     const observed=provider==='kobo'?Object.values(result.providerItems).filter(item=>item.provider===provider&&item.profileId===profile.profileId&&observedIds.has(item.providerItemId)):[];
@@ -652,7 +671,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
-  async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null) {
+  async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
@@ -707,7 +726,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
-    return persistDatabase(database,provider,jobs);
+    return persistDatabase(database,provider,jobs,beforeSave);
   }
 
   // Incremental syncs must never make an entitlement disappear merely because
@@ -726,7 +745,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function mergeProviderItems(provider,values,syncDetails={}){
     return mergeIntoDatabase(provider,values,syncDetails);
   }
-  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null,preparedIncoming=null) {
+  async function mergeIntoDatabase(provider, values, syncDetails = {}, authoritativeDatabase=null,preparedIncoming=null,beforeSave=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     const database = authoritativeDatabase??await getDatabase();
@@ -771,7 +790,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const jobs=provider==='kindle'?await kindleProfileTransition(database,priorActiveId,profile.profileId):{};
     if(priorActiveId!==profile.profileId)profile.lastSelectedAt=now;
     profileState(database,profile,database.providers[provider]);
-    return persistDatabase(database,provider,jobs);
+    return persistDatabase(database,provider,jobs,beforeSave);
   }
 
   async function clearDatabase() {

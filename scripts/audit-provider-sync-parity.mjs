@@ -1,38 +1,14 @@
-// Offline baseline probe. All libraries/accounts/items are disposable synthetic
+// Offline provider persistence probe. All libraries/accounts/items are disposable synthetic
 // data; this never contacts providers or reads browser storage/private exports.
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {outputPath} from './audit-artifacts.mjs';
 import {PROVIDERS} from '../src/lib/constants.js';
-import {PROVIDER_SOURCES} from '../src/lib/metadata-validation.js';
-import {createEmptyDatabase,validateDatabase,normalizeProviderItem} from '../src/lib/models.js';
-import {newProviderProfile} from '../src/lib/provider-profiles.js';
-import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
+import {providerSyncModes as modes,consoleProvider,fingerprint,oldObservation as old,providerSyncValue as raw,providerSyncSnapshot as snapshot,providerSyncLibrary as library} from '../tests/provider-sync-fixture.js';
 import {performanceWriter} from '../tests/provider-performance-fixture.js';
 import {PROVIDER_CHECKS_KEY} from '../src/lib/provider-scan-checks.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
-import {snapshotFixture} from '../tests/storage.js';
 
-const modes=p=>p==='epic'||p==='nintendo'?['full']:['full','incremental'];
-const consoleProvider=p=>['nintendo','playstation','xbox'].includes(p);
-const fingerprint='a'.repeat(64),old='2020-01-01T00:00:00.000Z';
-function raw(provider){
- const mediaType=['kindle','kobo','humble','fanatical'].includes(provider)?'book':provider==='audible'?'audiobook':['amazon-video','fandango-at-home'].includes(provider)?'movie':'game';
- return {provider,providerItemId:provider==='xbox'?'9N0000000001':'synthetic-1',title:'Synthetic parity record',mediaType,ownership:'owned',metadata:{source:PROVIDER_SOURCES[provider],
-  ...(provider==='xbox'?{productId:'9N0000000001',accessBasis:'personal-owned-web-catalog',accessTypes:[1]}:{})}};
-}
-function snapshot(provider,items){
- if(!consoleProvider(provider))return snapshotFixture(provider,items);
- return completeProviderSnapshot(provider,items,[completedScope(provider==='nintendo'?'non-hidden-virtual-cards':provider==='playstation'?'ps4-ps5-purchased':'owned-web-library',items.length,provider==='playstation'?null:items.length,provider==='playstation'?'pagination-end':'reported-count')]);
-}
-function library(provider,values=[raw(provider)]){
- const database=createEmptyDatabase(),profile=newProviderProfile(provider,'Personal');
- if(consoleProvider(provider))profile.sourceAccountFingerprint=fingerprint;
- profile.state={connected:true,lastSync:old,fullSyncAt:old,syncMode:'full',recordCount:values.length,...(provider==='humble'?{syncState:{knownPurchaseIds:[]}}:provider==='fanatical'?{syncState:{knownOrderFingerprints:[]}}:{})};
- database.providerProfiles[profile.profileId]=profile;database.providers[provider]={...profile.state,activeProfileId:profile.profileId};
- for(const value of values){const item=normalizeProviderItem({...value,profileId:profile.profileId},old,{profileKeySpace:profile.keySpace});database.providerItems[item.id]=item;}
- return validateDatabase(database);
-}
 async function probe(provider,mode,scenario){
  const base=library(provider),h=performanceWriter(base);await h.writer.getQueryDatabase();
  const before={...h.counts},lastEvent=h.journal.report().events.at(-1)?.id??0,events=[];const clock=()=>performance.now();
@@ -67,7 +43,7 @@ for(const provider of PROVIDERS){
 assert.equal(new Set(rows.map(r=>r.provider)).size,PROVIDERS.length);
 assert.equal(rows.filter(r=>r.scenario==='reobserved-identical').length,26);
 for(const row of rows){
- if(row.mode==='full'&&row.scenario==='reobserved-identical')assert.equal(row.counts.databaseWrites,2);
+ if(row.mode==='full'&&row.scenario==='reobserved-identical')assert.equal(row.counts.databaseWrites,1);
  if(row.scenario==='empty-check')assert.equal(row.counts.databaseWrites,0);
 }
 // Demonstrate why refreshing a provider's entire saved profile is unsafe for
@@ -88,7 +64,7 @@ const observed={...fanRaw,metadata:{...fanRaw.metadata,purchaseOrigins:[origins[
 await fan.writer.commitProviderScan('fanatical',[observed],{syncMode:'full',fullSyncAt:new Date().toISOString()},snapshot('fanatical',[observed]),fanScan.scanToken,1);
 const fanAfter=Object.values((await fan.writer.getDatabase()).providerItems)[0].metadata.purchaseOrigins;
 assert.equal(fanAfter.filter(o=>o.observedAt===old).length,1);assert.equal(fanAfter.filter(o=>o.observedAt!==old).length,1);
-const result={format:1,baseline:'b75ab51',implementation:false,environment:'Node synthetic storage adapter; source acquisition is zero; no native observer or physical disk timing',rows,counterexamples:{consoleUnobservedRecordDatePreserved:true,fanaticalUnobservedOriginDatePreserved:true}};
-const path=await outputPath(process.argv[2]??'audit-artifacts/provider-performance/provider-parity-baseline.json');
+const result={format:2,baseline:'b75ab51',implementation:'lease-only-full-starts',environment:'Node synthetic storage adapter; source acquisition is zero; no native observer or physical disk timing',rows,counterexamples:{consoleUnobservedRecordDatePreserved:true,fanaticalUnobservedOriginDatePreserved:true}};
+const path=await outputPath(process.argv[2]??'audit-artifacts/provider-performance/provider-parity-full-starts.json');
 await writeFile(path,JSON.stringify(result,null,2)+'\n');
 console.log(JSON.stringify({providers:PROVIDERS.length,exposedModes:26,probes:rows.length,counterexamples:result.counterexamples,output:path}));

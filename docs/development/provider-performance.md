@@ -166,18 +166,19 @@ alone do not make a product updated. Older backups without these optional
 summary counts remain valid. This status-only extension changes neither the
 database validator nor its certificate version.
 
-## Cross-provider baseline and pending observation design
+## Shared full starts and pending completion design
 
 See [the provider parity matrix](../architecture/provider-sync-parity.md) for
 all 14 providers, all 26 store modes, companion/manual purchase imports, current
 persistence counts, timestamp consumers and the proposed 22-scenario gate.
-This is an audit, not an implemented optimization or an after-performance claim.
+Eligible full starts now use durable leases; completion observation receipts
+remain deferred. The matrix includes historical and implemented persistence counts.
 
 Run `node scripts/audit-provider-sync-parity.mjs` from a disposable checkout to
-reproduce 88 baseline writer probes and the Xbox retained-record / Fanatical
+reproduce 88 current writer probes and the Xbox retained-record / Fanatical
 retained-origin counterexamples. It makes no network requests, uses no private
 backup or browser profile and writes aggregate synthetic output under ignored
-`audit-artifacts/provider-performance/provider-parity-baseline.json`. An optional
+`audit-artifacts/provider-performance/provider-parity-full-starts.json`. An optional
 first argument selects another output inside audit-artifacts.
 
 The probe uses warm query seeding outside measurements, source acquisition of
@@ -188,8 +189,21 @@ is counted in that DB write; only separate small writes count as metadata writes
 Native observer invalidations are not emulated. Do not use its tiny-library
 durations as 1k/5k/10k/14k/20k production benchmarks.
 
-The requested implementation stopped before modifying runtime behavior because
-moving authoritative record/origin freshness into receipts requires a shared
-materialization, query-evidence, backup and recovery contract. Before/after
-large-library benchmarks and the full post-fix scenario matrix remain pending
-that design, rather than being represented as successful parity.
+Use `node scripts/benchmark-provider-browser.mjs --full-starts --size=14000`
+for warm and genuinely restarted-worker admission/completion samples. `--root=...`
+selects a comparison checkout; `--output=...` selects ignored output. Repeat at
+1k/5k/10k/14k/20k. Setup/restore and certificate establishment are outside timings.
+This mode uses complete Epic snapshots through shared storage, makes no provider
+requests, and asserts one completion DB save. The existing `--cold-matrix` retains
+incremental missing/mismatched proof controls. Native metrics include reads,
+writes, validation, separate lease mutations, publications and observer changes.
+Historical synchronous full-start validation is derived only when that start
+actually writes; it is explicitly marked in output. Cold snapshot initialization
+may publish before admission and is distinct from publishing Running. Worker times
+exclude client reply transport; nested spans must not be added together.
+
+The current matrix records before/after samples against `e1597be`. All eligible
+starts eliminate the redundant catalog write/validation; successful full completion
+still writes observations. Moving that remaining work into receipts requires a
+shared materialization, query-evidence, backup and recovery contract. Overall
+synchronization parity is not claimed.

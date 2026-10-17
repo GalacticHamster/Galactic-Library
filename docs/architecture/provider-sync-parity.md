@@ -1,10 +1,48 @@
-# Provider synchronization parity: baseline audit and freshness gate
+# Provider synchronization parity: shared scan starts and completion gate
 
-**Audit baseline: `b75ab51`, October 16, 2026. No runtime changes implemented.**
-This is the completed pre-implementation inventory, not a claim of optimized
-parity. The requested stop condition applies: faithfully moving record and
-purchase-origin observations out of catalog writes changes the authoritative
-freshness model and its consumers. The existing status-only receipt cannot do it.
+**Baseline: `b75ab51`; shared lease-only starts implemented October 17, 2026.**
+Eligible repeated full scans now announce Running through the existing durable
+scan lease, without a catalog write or redundant semantic validation. Completion
+still performs its validated full save. This implements the first bounded
+improvement, not overall synchronization parity. Moving record and purchase-origin
+observations out of completion writes remains a separate freshness-model design.
+
+## Implemented admission contract
+
+`beginProviderScan` shares lease admission between full and incremental modes.
+For full mode it requires the same active immutable profile, connected state,
+successful full baseline, unchanged account binding, and an exact validated
+committed database. Console fingerprints remain mandatory. The lease is durably
+written before acquisition is admitted. Existing status consumers project Running
+from that lease; the catalog is not published merely to announce the attempt.
+
+First imports, account switches, disconnected/no-baseline profiles, changed console
+bindings and writers without immutable query-snapshot support retain the existing
+validated start save. Missing/mismatched cold certificates require ordinary read
+validation to establish the exact committed base; that required validation is not
+skipped or counted as redundant. A valid cold certificate can reuse its proof.
+
+Full leases pin the SHA-256 digest of the complete raw committed database in
+existing scan metadata. Completion rereads authoritative storage and checks the
+base, profile, token, sender tab, mode and console fingerprint. The pinned base is
+checked again immediately before the validated save, including mutations observed
+during cooperative validation. A catalog change, even in another provider, rejects
+this full result and requires a fresh scan; it cannot overwrite newer data. Small
+status receipts from an independent provider do not change that raw catalog and
+remain compatible. This conservative restriction avoids a new reconciliation model.
+
+Replacement completion still validates source boundaries, reobserves returned
+records/origins and reconciles absence/history. Console completion remains additive
+and retains older unobserved records. Both use one validated save and publish the
+result. No observation, ownership, import, backup or schema semantics changed.
+
+Failure/cancellation use existing terminal receipts without advancing successful
+dates or record evidence. Interrupted leases remain Running/long-running, survive
+worker restart, and can be cancelled, resumed by a valid token, or replaced by a
+new attempt. No expiration/keepalive policy was added. Restore/clear retire old
+leases, including restoration of an identical backup. A failed admission write
+does not authorize acquisition; a lost reply after a durable write remains
+recoverable through the same cancel/replacement controls.
 
 ## Common paths and account guarantees
 
@@ -40,7 +78,7 @@ its adjacent `*-content.js` provides the listed entry point.
 | --- | --- | --- | --- |
 | [Steam](../../src/providers/steam-store.js), Q/F | Q reads owned IDs, resolves candidates absent from this account's saved IDs; F resolves all owned IDs. Valid games/DLC and index-complete proof; unresolved IDs prohibit replacement. | Successful F is replacement; missing saved rows enter provider history, not refund inference. | Usually empty candidates -> status receipt. Unavailable/unsupported IDs remain retryable. A returned existing record refreshes observation and writes. |
 | [GOG](../../src/providers/gog.js), Q/F | Newest-first purchase pages; Q stops at known page. F completes visible and hidden sections with pagination/count checks. | Only F absence is reconciled into history. | Empty -> receipt; Q does not recheck every known title. |
-| [Epic](../../src/providers/epic.js), Sync Epic library | Complete cursor traversal, finite-page/repeated-cursor/catalog guards, supported catalog items. No Q exposed. | F replacement archives omitted supported records. | Always full-start/full-save; repeated same products still refresh observations. |
+| [Epic](../../src/providers/epic.js), Sync Epic library | Complete cursor traversal, finite-page/repeated-cursor/catalog guards, supported catalog items. No Q exposed. | F replacement archives omitted supported records. | Eligible full start uses a lease; completion still refreshes observations. |
 | [Amazon Games](../../src/providers/amazon-games.js), Q/F | Q scans past-three-month claim window; F enumerates exposed calendar years and completed scroll scopes. Only Amazon-delivered games retained. | Only successful F replacement establishes absence within this supported claim scope. | Often returns existing recent claims, so observation changes write. Empty writer checks qualify, but no-readable-claim acquisition can throw; do not promise an empty successful UI scan. |
 | [Audible](../../src/providers/audible.js), Q/F | Date-added pages; Q stops on known page; F requires terminal pagination/available count evidence. | F absence -> history; subscription/unknown access remains source-dependent. | Empty -> receipt; Q is not a complete access recheck. |
 | [Kindle](../../src/providers/kindle.js), Q/F | Separate books/personal-documents sections, counts, pagination and explained duplicates. Q returns new IDs and bounded refreshed access evidence where implemented. Contents discovery is a separate acquisition, not library sync. | Valid F absence -> history; disappearance never means refund. Explicit source access/returns and user overrides remain distinct. | Empty -> receipt; returned existing access evidence/observations can require a save. |
@@ -49,7 +87,7 @@ its adjacent `*-content.js` provides the listed entry point.
 | [Kobo](../../src/providers/kobo.js), Q/F | Q reads newest My Books pages to known boundary but refreshes every observed card; F adds exposed archives/audiobook sections. Pagination/count validation remains. | F omission -> history; sparse metadata cannot erase richer evidence. | Existing unchanged sparse cards retain their previous representation and dates -> receipt even with nonempty Q input. F advances observedAt while retaining unchanged updatedAt. |
 | [Humble](../../src/providers/humble.js), Q/F | Purchase index plus unknown/explicit refresh purchase details; F validates complete purchase traversal. Redemption values redacted. | F absence -> history; Q never removes omitted orders/products. | Empty with identical known-purchase cursor -> receipt. Cursor movement or returned records requires save. |
 | [Fanatical](../../src/providers/fanatical-content.js), Q/F | Signed-in page projects validated completed-order history; Q skips known fingerprints. F requires completed coverage; array-only index is explicitly limited. | F replacement/history remains; native purchase occurrences merge with retained origins. | Empty with same fingerprints -> receipt. New cursor, origin evidence or observation changes writes. |
-| [Nintendo](../../src/providers/nintendo-capture.js), Import loaded cards | Complete loaded **non-hidden Virtual Game Cards** list, counts, account/owner/user and supported scopes; import is full-mode but **additive**. | Omitted/hidden/other-platform records retained; this is not full purchase history. | No Q exposed. F still writes twice. Reobservation must cover only returned cards, not all saved account records. |
+| [Nintendo](../../src/providers/nintendo-capture.js), Import loaded cards | Complete loaded **non-hidden Virtual Game Cards** list, counts, account/owner/user and supported scopes; import is full-mode but **additive**. | Omitted/hidden/other-platform records retained; this is not full purchase history. | No Q exposed. Eligible F writes once at completion. Reobservation covers only returned cards, not all saved account records. |
 | [PlayStation](../../src/providers/playstation-capture.js), Q/F | Both traverse supported active PS4/PS5 Purchased listing; account verification and terminal pagination. Both commits are **additive**. | Earlier saved items retained; older consoles, inactive/other listings are not proved absent. | Q starts lease-only, but writes returned observations and snapshot evidence. Complete listing is not complete lifetime ownership. |
 | [Xbox](../../src/providers/xbox-capture.js), Q/F | Complete account-scoped web-visible Owned catalog from validated site cache; both actions are **additive**. | Retain prior records outside web-visible supported catalog. No inference of revocation from omission. | Q starts lease-only, but writes returned observations and supported-snapshot evidence. Console/full purchase history remains out of scope. |
 
@@ -85,7 +123,7 @@ are not an extra supported optimization route. Backup restore, book enrichment,
 Kindle contents acquisition/reparse and ownership correction are distinct data
 operations, not zero-change provider syncs.
 
-## Baseline persistence matrix
+## Historical baseline persistence matrix
 
 Measured by [the offline probe](../../scripts/audit-provider-sync-parity.mjs):
 14 providers, all **26 exposed store modes**, 88 isolated writer probes plus
@@ -174,7 +212,7 @@ record/origin observations. Current format-1 receipts intentionally forbid them.
 Quietly retaining old dates, updating every retained record, or only overlaying
 Options would each change observable behavior.
 
-## Shared invariants and bounded proposal (not implemented)
+## Shared invariants and remaining completion proposal
 
 The user's stop condition is: **"Preserving per-record observation semantics
 requires a substantial data-model change."** This audit reaches that gate.
@@ -188,8 +226,8 @@ version does not remove the logical model/compatibility change.
    complete, recent-window/incremental and non-store companion imports. Keep
    current endpoint/snapshot/account validators. Do not add Epic to an
    incremental allowlist or downgrade complete replacement semantics.
-2. **Shared lease-only start.** For an existing unchanged active account and
-   baseline, full and incremental starts can use the existing lease/running
+2. **Shared lease-only start (implemented).** For an existing unchanged active account and
+   baseline, full and incremental starts use the existing lease/running
    projection. First import, binding changes and account changes remain saves.
    This removes the unnecessary announcement write in every full-mode provider.
 3. **Design one observation extension to the existing receipt.** An exact base,
@@ -214,16 +252,15 @@ version does not remove the logical model/compatibility change.
    A failed/cancelled/partial attempt must retain prior successful observation
    scope without adding a new successful one. No permanent retry suppression.
 
-The safe next implementation is a reviewed observation-receipt contract plus
-its complete reader/recovery tests, followed by the shared start/completion
-change. This audit does **not** implement only the easy start or an Epic-only
-special case and call the larger task complete.
+The shared start improvement is now implemented independently. The remaining
+completion optimization still requires a reviewed observation-receipt contract
+and complete reader/recovery tests; it is not part of this implementation.
 
 ## Proposed cross-provider regression gate
 
-The 88 baseline probes above do not constitute the requested post-fix regression
-matrix. That implementation phase is blocked at the model gate. Every provider
-and its 26 exposed modes must exercise applicable rows below after that design.
+The larger completion-design gate below remains a future requirement. Current
+start regressions are documented separately below; they do not claim an
+observation-receipt implementation.
 
 | Scenario | Required application / exception |
 | --- | --- |
@@ -257,28 +294,89 @@ exceptions separately from redundant validations. Include native Chrome worker
 replacement and Firefox private-storage recovery, as well as the synthetic
 matrix. Existing Steam v3 and UI one-shot profiling remain regression controls.
 
-## Benchmark and live acceptance plan
+## Current provider parity matrix
 
-No after-optimization benchmark exists: runtime implementation stopped before
-changing the freshness model. The live Epic exports already establish the
-double-write cost; do not substitute tiny synthetic probe durations for it.
+The offline probe now checks 88 cases and both retained-observation counterexamples
+with the implementation. The 80 focused admission regressions exercise all 14
+providers and all 26 modes, with lifecycle, stale-base and certificate controls.
+Counts exclude initial seeding and required proof-miss read validation.
 
-Once implemented, benchmark every applicable capability/provider mode at
-1k/5k/10k/~14k/20k records, warm, cold valid/missing/mismatched proof, changed,
-and incomplete/failed. Separate worker preparation/completion from native client
-transport; synthetic acquisition is zero, not live latency. Include real
-packaged Chrome/Firefox storage, separate executing slices/yield waits and
-write/publication wrappers, and first-run/setup costs outside the scan boundary.
-The acceptance target is zero redundant validation/DB writes for an eligible
-same-data scan, not identical network time or an unconditional speed promise.
+| Provider | F start writes/validations | F completion writes/validations | Q empty | Q overlap |
+| --- | --- | --- | --- | --- |
+| Steam | 0/0 | 1/1 | 0/0 | 1/1 |
+| GOG | 0/0 | 1/1 | 0/0 | 1/1 |
+| Epic | 0/0 | 1/1 | N/A | N/A |
+| Amazon Games | 0/0 | 1/1 | 0/0, conditional acquisition | 1/1 |
+| Audible | 0/0 | 1/1 | 0/0 | 1/1 |
+| Kindle | 0/0 | 1/1 | 0/0 | 1/1 |
+| Amazon Video | 0/0 | 1/1 | 0/0 | 1/1 |
+| Fandango | 0/0 | 1/1 | 0/0 | 1/1 |
+| Kobo | 0/0 | 1/1 | 0/0 | 0/0 |
+| Humble | 0/0 | 1/1 | 0/0, identical cursor | 1/1 |
+| Fanatical | 0/0 | 1/1 | 0/0, identical cursor | 1/1 |
+| Nintendo | 0/0 | 1/1, additive | N/A | N/A |
+| PlayStation | 0/0 | 1/1, additive | N/A, complete-list contract | 1/1 |
+| Xbox | 0/0 | 1/1, additive | N/A, complete-list contract | 1/1 |
 
-Minimal later live acceptance: use Steam's one-shot UI and Settings export as
-the existing control; run Epic twice and export after each; repeat a nonempty
-Kobo Q and an additive console import. Inspect ordinary journal write counts
-without DevTools. Add UI profiling to other panels only if the journal cannot
-answer a remaining interval, not as a prerequisite to diagnose proven DB writes.
-Real-library before/after timestamps and backups must be inspected read-only;
-development and failure injection use disposable copies exclusively.
+Each eligible full start makes one authoritative DB read and one separate small
+lease write. Completion makes one authoritative DB read and one validated DB
+write. Total full writes/validations fall from **2/2 to 1/1**. Quick paths retain
+the historical matrix semantics. Epic/Nintendo have no incremental UI; console
+empty checks cannot substitute for complete source contracts.
+
+## Packaged before/after measurements
+
+Packaged Chrome, disposable mixed-provider synthetic libraries, baseline
+`e1597be` versus this implementation. Each row is one warm and one genuinely
+restarted-worker sample with valid session proof, not a statistical benchmark.
+No provider requests or real libraries were used. Times are worker milliseconds;
+acquisition is zero and client message transport is reported separately by the tool.
+
+| Records | Warm start before / after | Cold start before / after | Warm completion before / after | Cold completion before / after |
+| --- | --- | --- | --- | --- |
+| 1,000 | 139 / 33 | 194 / 59 | 183 / 163 | 152 / 170 |
+| 5,000 | 715 / 172 | 873 / 160 | 931 / 879 | 858 / 852 |
+| 10,000 | 1,446 / 326 | 1,538 / 335 | 1,801 / 1,721 | 1,990 / 1,763 |
+| 14,000 | 1,953 / 462 | 2,089 / 481 | 2,516 / 2,458 | 2,539 / 2,527 |
+| 20,000 | 3,037 / 640 | 3,103 / 643 | 3,887 / 3,829 | 3,600 / 3,529 |
+
+In all ten before/after pairs: admission DB reads remain 1; writes and redundant
+validations go 1 to 0; separate lease writes go 0 to 1. Completion remains one
+read/write/validation. Warm admission publications/observer invalidations go 1/1
+to 0/0. Cold admission publications are 2-3 before and 1-2 after because snapshot
+setup and startup attribution overlap; observer invalidations go 1 to 0. Cold
+snapshot construction is required and is not a Running announcement publication.
+The old synchronous start validation is counted from its demonstrated DB-write
+path because it had no journal span. Nested journal spans are not additive and
+storage-write wrappers are not physical disk timings.
+
+These lean synthetic records do not predict the runtime of a personal library
+with larger source evidence. The result proves removal of the redundant start
+work, not an end-to-end Epic speed guarantee. The completion save remains the
+principal limitation and is deliberately unchanged.
+
+## Implemented start regression gate
+
+`tests/provider-full-starts.js` covers 26 mode admissions, per-provider first/
+no-baseline/disconnected starts, failure/cancellation/restart, changed/missing/
+reappearing records and console retention. Shared negatives cover account switches,
+unbound/mismatched console fingerprints, wrong tabs/modes/tokens, concurrent
+attempts, acquisition/final-validation catalog changes, restore/clear, failed or
+lost lease acknowledgments, independent receipts and cold valid/missing/mismatched
+proof. Existing quick-check and session-certificate regressions remain controls.
+Packaged importer checks render Running through the real sync dashboard for all
+14 providers; native Firefox additionally checks private-storage full admission
+and completion. Generated probe/benchmark outputs stay in ignored audit-artifacts.
+
+Validation from a disposable checkout without private inputs passed **1,425 GL
+tests**, **472 contents tests**, **103 packaged importer checks per browser**,
+**67 packaged UI checks per browser**, all **11 installed Firefox checks**
+(private storage, recovery, atomic backup/restore, receipts and cold proof),
+and both **190-file package validators**. The 166 focused provider-pipeline tests
+include 80 new full-start cases. The 88-case offline probe and both observation
+counterexamples also pass from that checkout. Repository layout checking retains
+only the 15 known absolute links in the unchanged historical ecosystem audit.
+HB/FAN, versions, real libraries and backups remain untouched.
 
 ## Validation of this audit baseline
 

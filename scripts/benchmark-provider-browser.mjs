@@ -14,6 +14,7 @@ if(!Number.isSafeInteger(size)||size<100||size>20000)throw Error('Size must be 1
 const output=await outputPath(process.argv.find(arg=>arg.startsWith('--output='))?.slice(9),'provider-browser.json');
 const matrix=process.argv.includes('--matrix');
 const coldMatrix=process.argv.includes('--cold-matrix');
+const fullStarts=process.argv.includes('--full-starts');
 const temporary=await mkdtemp(join(tmpdir(),'gl-provider-benchmark-'));let child,exited;
 try{
  const stage=join(temporary,'extension'),release=await createRelease(root);
@@ -27,9 +28,9 @@ try{
  await evaluate(`const S=await import('./src/lib/storage.js');await S.restoreDatabase(${JSON.stringify(db)});return true;`);
  console.log('Seeded disposable Chrome library:',size);
  let rows;
- if(coldMatrix){
+ if(coldMatrix||fullStarts){
   rows=[];
-  for(const workflow of ['warm-unchanged','cold-valid','cold-no-proof','cold-mismatch','cold-change','cold-incomplete']){
+  for(const workflow of fullStarts?['warm-unchanged','cold-valid']:['warm-unchanged','cold-valid','cold-no-proof','cold-mismatch','cold-change','cold-incomplete']){
    const previous=await evaluate(`
     const S=await import('./src/lib/storage.js');await S.restoreDatabase(${JSON.stringify(db)});await S.getCommittedLibraryView();
     for(let n=0;n<500;n++){if((await chrome.storage.session.get('galacticLibraryValidationCertificate')).galacticLibraryValidationCertificate)break;await new Promise(done=>setTimeout(done,10));}
@@ -52,18 +53,20 @@ try{
      const event=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
      const spans=events.filter(e=>e.operation===operation&&e.startEpochMs>=event.startEpochMs&&e.startEpochMs<event.startEpochMs+event.durationMs);
      const ms=stage=>spans.filter(e=>e.stage===stage).reduce((sum,e)=>sum+e.durationMs,0),has=stage=>spans.some(e=>e.stage===stage);
-     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataReads:spans.filter(e=>e.stage==='storage_get'&&e.key!=='database'||e.stage==='certificate_read').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length,
+     const synchronousStart=${fullStarts}&&operation==='beginProviderScan'&&spans.some(e=>e.stage==='storage_set'&&e.key==='database');
+     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataReads:spans.filter(e=>e.stage==='storage_get'&&e.key!=='database'||e.stage==='certificate_read').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+Number(synchronousStart),startSynchronousValidationDerivedFromWrite:synchronousStart,snapshotPublications:spans.filter(e=>e.stage==='snapshot_change'&&e.reason==='published').length,snapshotInvalidations:spans.filter(e=>e.stage==='snapshot_change'&&e.reason==='invalidated').length,
       storageReadMs:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').reduce((sum,e)=>sum+e.durationMs,0),certificateMs:ms('read_certificate'),certificateReadMs:ms('certificate_read'),serializationMs:ms('certificate_serialize'),hashMs:ms('certificate_hash'),receiptDigestMs:ms('provider_check_digest'),snapshotCloneMs:ms('snapshot_clone'),snapshotFreezeMs:ms('snapshot_freeze'),validationMs:ms('validation'),migrationCompareMs:ms('migration_compare'),committedCompareMs:ms('read_committed_compare'),committedCloneMs:ms('read_committed_clone'),certificateHit:has('certificate_hit'),certificateMiss:has('certificate_miss'),fallbackReasons:['certificate_missing','certificate_mismatch','certificate_invalid','certificate_error','certificate_unavailable'].filter(has)};
     };
-    const at=performance.now(),scan=await client.beginProviderScan('steam','Personal','incremental',false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
-    const items=${JSON.stringify(workflow)}==='cold-change'?[{providerItemId:'cold-new',title:'Cold added game',mediaType:'game',ownership:'owned'}]:[];
-    const finishStart=performance.now();await client.commitProviderScan('steam',items,{syncMode:'incremental',quickSyncAt:'2026-10-16',...(${JSON.stringify(workflow)}==='cold-incomplete'?{scanDiagnostics:{failedRequestCount:1}}:{})},null,scan.scanToken,1);
+    const full=${fullStarts},provider=full?'epic':'steam',mode=full?'full':'incremental',P=await import('./src/lib/provider-snapshot.js');
+    const at=performance.now(),scan=await client.beginProviderScan(provider,'Personal',mode,false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
+    const items=full?${JSON.stringify(Object.values(db.providerItems).filter(item=>item.profileId===db.providers.epic.activeProfileId))}:${JSON.stringify(workflow)}==='cold-change'?[{providerItemId:'cold-new',title:'Cold added game',mediaType:'game',ownership:'owned'}]:[];
+    const finishStart=performance.now();await client.commitProviderScan(provider,items,{syncMode:mode,...(full?{fullSyncAt:'2026-10-16'}:{quickSyncAt:'2026-10-16'}),...(${JSON.stringify(workflow)}==='cold-incomplete'?{scanDiagnostics:{failedRequestCount:1}}:{})},full?P.completeProviderSnapshot(provider,items,[P.completedScope('library',items.length,items.length,'reported-count')]):null,scan.scanToken,1);
     const finished=performance.now(),post=await journal('commitProviderScan');
     return {workflow:${JSON.stringify(workflow)},preMessageMs:prepared-at,postMessageMs:finished-finishStart,captureMs:0,preparationTransportMs:prepared-at-pre.workerMs,commitTransportMs:finished-finishStart-post.workerMs,workerPre:pre,workerPost:post};
    `);
    row.previousWorkerId=previous;row.workerRestarted=row.workerPre.workerId!==previous;
    assert.equal(row.workerRestarted,workflow.startsWith('cold-'),'Worker generation: '+workflow);
-   if(workflow==='cold-change')assert.equal(row.workerPost.databaseWrites,1);
+   if(fullStarts||workflow==='cold-change')assert.equal(row.workerPost.databaseWrites,1);
    else assert.equal(row.workerPost.databaseWrites,0);
    rows.push(row);console.log(JSON.stringify(row));
   }
@@ -84,7 +87,7 @@ try{
     const journal=async operation=>{const report=await chrome.runtime.sendMessage({type:'GET_KINDLE_CONTENTS_UI_TIMINGS'}),events=report.activity.events;
      const event=events.filter(row=>row.stage==='operation'&&row.operation===operation).at(-1);
      const spans=events.filter(e=>e.startEpochMs>=event.startEpochMs&&e.startEpochMs<event.startEpochMs+event.durationMs);
-     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+(full&&operation==='beginProviderScan'?1:0)};};
+     return {workerId:report.activity.worker,workerMs:event.durationMs,databaseReads:spans.filter(e=>e.stage==='storage_get'&&e.key==='database').length,databaseWrites:spans.filter(e=>e.stage==='storage_set'&&e.key==='database').length,metadataWrites:spans.filter(e=>e.stage==='storage_set'&&e.key!=='database'||e.stage==='storage_remove'&&e.key!=='database').length,validationPasses:spans.filter(e=>e.stage==='validation').length+(full&&operation==='beginProviderScan'&&spans.some(e=>e.stage==='storage_set'&&e.key==='database')?1:0)};};
     const at=performance.now(),scan=await client.beginProviderScan('steam','Personal',mode,false,1),prepared=performance.now(),pre=await journal('beginProviderScan');
     const finishStart=performance.now();let result;
     if(workflow.startsWith('failed'))await client.failProviderScan('steam',scan.scanToken,1,{code:'network'});

@@ -33,7 +33,7 @@
 | **GL-PERF-03** | GL | Steam outcomes and shared unchanged-scan persistence | P1 | Performance follow-up | **Implemented; live diagnosis pending** | Isolate malformed Steam rows, reject missing application types, export opt-in aggregate outcomes, and persist eligible unchanged partial/failed checks without rewriting the catalog. Historical 159-ID causes require a new detailed trace. |
 | **GL-PERF-04** | GL | Cold provider preparation | P1 | Cold-start follow-up | **Resolved; live verified** | Export 9 verifies new-worker certificate reuse, zero validations/DB writes and a 10.025 s captured GL interval versus 28.690 s. Authoritative reads and real-save checks remain. |
 | **GL-STEAM-01** | GL | Unresolved Steam metadata | P1 | Steam metadata follow-up | **Placeholder diagnostics complete; wider metadata recovery deferred** | Export 10 and six explicitly shared public checks establish unavailable app placeholders in the sample. Version 3 separates correlated failures from rows with no identifiable requested ID; retains unknown result codes. Steam now offers one-scan profiling and the existing Settings export through UI. Samples remain a separate opt-in/export. No fallback, ownership inference or retry suppression added. |
-| **GL-PERF-05** | GL | Cross-provider complete-snapshot persistence | P1 | Shared parity follow-up | **Audit complete; stopped at requested freshness-model gate** | All 14 providers / 26 store modes inventoried; 88 baseline probes confirm full-start/full-save double writes and different record/origin observation scopes. No runtime optimization implemented. [Parity matrix and bounded proposal](../architecture/provider-sync-parity.md). |
+| **GL-PERF-05** | GL | Cross-provider complete-snapshot persistence | P1 | Shared parity follow-up | **Shared lease-only starts implemented; completion design remains open** | All 14 providers / 26 modes checked. Eligible full scans now use zero catalog writes at admission and one validated completion save. Record/origin freshness redesign remains deferred. [Parity matrix and measurements](../architecture/provider-sync-parity.md). |
 
 ---
 
@@ -301,3 +301,30 @@ tests and both 190-file package validators. The probe also runs independently
 without private artifacts. This does not claim the deferred 22-scenario
 post-implementation matrix or 1k/5k/10k/14k/20k before/after benchmarks passed.
 The layout checker retains only known historical absolute-link findings.
+
+## Shared lease-only full starts (2026-10-17)
+
+GL-PERF-05's first bounded improvement is implemented in shared storage, across
+all 14 providers and 26 exposed modes. Existing active/bound profiles with a valid
+baseline and exact committed proof announce Running through a durable lease.
+Eligible full admission now makes zero catalog writes/validations, followed by
+the existing one validated completion save (previously two total). First imports,
+switches and binding changes retain validated starts. A full lease pins its raw
+catalog base; intervening catalog edits reject the result rather than overwrite
+newer data. Independent status receipts remain compatible. Record/origin dates,
+absence/history, additive consoles and successful quick receipts are unchanged.
+
+Packaged Chrome synthetic measurements at 1k/5k/10k/14k/20k verify the removed
+start write in warm and truly restarted workers. At 14k, worker admission changed
+from 1,953 to 462 ms warm and 2,089 to 481 ms cold; completion stayed near 2.5 s.
+These are single samples with lean fixtures, not live Epic performance promises.
+The [current parity contract](../architecture/provider-sync-parity.md) documents
+all persistence counts, measurements, eligibility exceptions and completion limits.
+
+The gate passed from a disposable checkout without private inputs: 1,425 unit
+tests (including 80 new admission regressions), 472 contents tests, 103 importer
+and 67 UI checks per packaged browser, 11 installed Firefox storage/recovery/
+backup/certificate checks, both 190-file validators and the 88-case offline probe.
+Layout checking retains only the 15 previously known historical absolute links.
+Full completion receipt design remains open; overall synchronization parity is
+not claimed. No HB/FAN, version, ownership, acquisition or schema changes.

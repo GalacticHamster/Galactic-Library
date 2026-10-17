@@ -13,6 +13,7 @@ import {handleExternalApiRequestAsync} from '../src/lib/external-api.js';
 import {steamOutcomeTests} from './steam-outcomes.js';
 import {providerStatusReceiptTests} from './provider-status-receipts.js';
 import {providerColdReadTests} from './provider-cold-reads.js';
+import {providerFullStartTests} from './provider-full-starts.js';
 
 function steamFixture(responses){
   let queries=0;
@@ -21,6 +22,7 @@ function steamFixture(responses){
   return {S:c.GalacticSteamStore,queries:()=>queries};
 }
 export const providerPipelinePerformanceTests=[
+ ...providerFullStartTests,
  ...providerColdReadTests,
  ...steamOutcomeTests,
  ...providerStatusReceiptTests,

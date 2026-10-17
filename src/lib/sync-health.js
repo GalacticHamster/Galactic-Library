@@ -36,7 +36,7 @@ export function snapshotDifferences(previous,incoming,full,detailed=false){
     gamesAdded:added.filter(item=>item.mediaType==='game').length,gamesUpdated:updated.filter(item=>item.mediaType==='game').length,
     addOnsAdded:added.filter(item=>item.mediaType==='game-addon').length,addOnsUpdated:updated.filter(item=>item.mediaType==='game-addon').length};
 }
-// A quick scan's persisted lease can show progress without changing the
+// An admitted scan's persisted lease can show progress without changing the
 // committed library. This projection is for trusted Options display only.
 export function providerScanDisplay(database,scans={}){
   let result=database;

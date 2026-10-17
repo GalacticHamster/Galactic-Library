@@ -80,6 +80,22 @@ try{
     const view=await cold.getDatabase();if(view.providers.steam.syncHealth.status!=='partial'||view.providers.steam.lastSync!==database.providers.steam.lastSync)throw Error('Cold receipt lost successful baseline');
     return true;
   `));console.log('PASS installed Firefox GL: a new writer verifies session proof against private IndexedDB and completes an unchanged incomplete scan without validation or database writes');
+  assert(await evaluate(`
+    const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),W=await import('./src/background/storage-writer.js'),Q=await import('./src/lib/query-diagnostics.js'),snap=await import('./src/lib/provider-snapshot.js');
+    const privateArea=P.createPrivateStorage(indexedDB);let writes=0;
+    const area={get:async defaults=>JSON.parse(JSON.stringify(await privateArea.get(defaults))),set:updates=>{if(updates.galacticLibraryDatabase)writes++;return privateArea.set(updates);},remove:keys=>privateArea.remove(keys)};
+    const before=(await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase,journal=Q.createQueryDiagnostics();
+    const w=W.createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,certificateArea:chrome.storage.session,diagnostics:journal});
+    const scan=await w.beginProviderScan('steam','Empty check fixture','full',false,1);
+    if(writes||journal.report().events.some(e=>e.stage==='validation'))throw Error('Eligible full admission validated or rewrote Firefox catalog');
+    if(JSON.stringify((await area.get({galacticLibraryDatabase:null})).galacticLibraryDatabase)!==JSON.stringify(before))throw Error('Full admission changed records');
+    if((await w.getCommittedLibraryView()).database.providers.steam.syncHealth.status!=='running')throw Error('Full lease is invisible');
+    const items=Object.values(before.providerItems).filter(i=>i.profileId===before.providers.steam.activeProfileId);
+    await w.commitProviderScan('steam',items,{syncMode:'full',fullSyncAt:new Date().toISOString()},snap.completeProviderSnapshot('steam',items,[snap.completedScope('library',items.length,items.length,'reported-count')]),scan.scanToken,1);
+    if(writes!==1||!journal.report().events.some(e=>e.stage==='validation'))throw Error('Full completion skipped required validated save');
+    const saved=await w.getDatabase();if(saved.providers.steam.syncHealth.status!=='succeeded')throw Error('Full completion status lost');
+    return true;
+  `));console.log('PASS installed Firefox GL: full admission keeps private catalog intact, projects Running from its lease, and completion validates and saves once');
   if(process.argv.includes('--companions')){
     const fanRoot=resolve(projectRoot,'../Fanatical'),hbRoot=resolve(projectRoot,'../HB'),fan=await install(fanRoot,'FAN'),hbStage=join(temporary,'HB');await mkdir(hbStage);
     execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(hbRoot,'scripts/package-release.ps1'),'-Target','Firefox','-OutputDirectory',hbStage],{windowsHide:true,stdio:'pipe'});

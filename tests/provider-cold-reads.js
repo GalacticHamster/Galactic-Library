@@ -118,7 +118,7 @@ export const providerColdReadTests=[
   const s=await setup(),h=s.writer(),profile=s.database.providers.steam.activeProfileId;
   const records=Object.values(s.database.providerItems).filter(item=>item.profileId===profile),removed=records.at(-1);
   const result=await measuredScan(h,{mode:'full',items:records.slice(0,-1)});
-  assert(stages(h).includes('certificate_hit'));assert.equal(result.counts.databaseWrites,2);assert.equal(result.counts.validationPasses,2);
+  assert(stages(h).includes('certificate_hit'));assert.equal(result.counts.databaseWrites,1);assert.equal(result.counts.validationPasses,1);
   assert(!h.stored.galacticLibraryDatabase.providerItems[removed.id]);assert(h.stored.galacticLibraryDatabase.providerHistory[removed.recordRef]);
   assert.deepEqual(Object.values(h.stored.galacticLibraryDatabase.providerItems).filter(item=>item.profileId!==profile),Object.values(s.database.providerItems).filter(item=>item.profileId!==profile));
  }],
