@@ -3,10 +3,11 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import '../src/lib/contents-performance.js';
 
-function fixture(ids,requests,{owned={ok:true,status:200,body:{rgOwnedApps:ids}}}={}){
+function fixture(ids,requests,{owned={ok:true,status:200,body:{rgOwnedApps:ids}},onTitleRequest=()=>{}}={}){
   let calls=0;
   const context=vm.createContext({setTimeout:callback=>callback(),fetch:async url=>{
-    const r=String(url).startsWith('/dynamicstore')?owned:requests[calls++];
+    const ownedRequest=String(url).startsWith('/dynamicstore');if(!ownedRequest)onTitleRequest(url);
+    const r=ownedRequest?owned:requests[calls++];
     if(r?.networkError)throw Error('PRIVATE URL / token');
     return {ok:r?.ok??true,status:r?.status??200,json:async()=>{if(r?.jsonError)throw Error('PRIVATE invalid response');return r?.body;}};
   }});
@@ -22,22 +23,98 @@ const reconcile=result=>{
   assert.equal(d.attemptedCount-result.items.length-d.outcomes.unsupported,result.unresolvedApps.length);
 };
 export const steamOutcomeTests=[
+ ['Steam metadata: an injected parser fault is local to one ID and never becomes an HTTP failure',async()=>{
+   const broken={appid:2,type:0};Object.defineProperty(broken,'name',{get(){throw Error('PRIVATE PARSER DETAIL');}});
+   const f=fixture([1,2,3],[response([{appid:1,type:0,name:'One'},broken,{appid:3,type:4,name:'Three'}])]);f.S.setDiagnosticSampling(true);
+   const r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);
+   assert.equal(r.items.length,2);assert.equal(r.failedRequestCount,0);assert.equal(r.diagnostics.outcomes.classification,1);assert.equal(r.diagnostics.httpStatuses['200'],1);
+   assert.equal(f.S.getDiagnosticSample().groups.classification[0].returnedEntry,true);assert(!JSON.stringify(r.diagnostics).includes('PRIVATE'));
+ }],
+ ['Steam metadata: deeply malformed names never serialize raw objects or poison valid neighbors and totals',async()=>{
+   let name={};for(let i=0;i<12000;i++)name={child:name};
+   const r=await run([1,2],[{appid:1,name:'Valid game',type:0},{appid:2,name,type:0}]);reconcile(r);
+   assert.equal(r.items.length,1);assert.equal(r.unresolvedApps.length,1);assert.equal(r.failedRequestCount,0);assert.equal(r.diagnostics.outcomes.invalidTitle,1);
+ }],
+ ['Steam metadata: absent, absent-name, empty-name, malformed-name and invalid-type outcomes stay disjoint',async()=>{
+   const r=await run([1,2,3,4,5,6,7,8],[{appid:2,type:0},{appid:3,type:4,name:' \n '},{appid:4,type:0,name:42},{appid:5,type:null,name:'Valid name'},{appid:6,type:6,name:'Unsupported'},{appid:7,type:0,name:'Game'},{appid:8,type:4,name:'DLC'}]);
+   reconcile(r);assert.equal(r.diagnostics.outcomeVersion,2);
+   assert.deepEqual({...r.metadataOutcomes},{games:1,dlc:1,unsupported:1,absent:1,missingTitle:2,invalidTitle:1,invalidType:1,conflictingDuplicate:0,http:0,authentication:0,malformed:0,classification:0,network:0,other:0});
+   assert.equal(r.diagnostics.requests[0].requestedCount,8);assert.equal(r.diagnostics.requests[0].returnedRowCount,7);assert.equal(r.diagnostics.requests[0].absentCount,1);
+ }],
+ ['Steam metadata: normalized numeric/string App IDs resolve and already-saved equivalents are not retried',async()=>{
+   const f=fixture(['0001',' 2 ',2],[response([{appid:1,name:'One',type:0},{appid:'0002',name:'Two',type:4,related_items:{parent_appid:'0001'}}])]);
+   const r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);assert.deepEqual(Array.from(r.items,item=>item.providerItemId),['1','2']);
+   assert.equal(r.items[1].metadata.parentProviderItemId,'1');assert.deepEqual(Array.from(f.S.newOwnedAppIds(['1',2,'0002'],['0001','2'])),[]);
+ }],
+ ['Steam metadata: invalid or lossy App IDs cannot establish ownership or launch title requests',async()=>{
+   for(const id of [0,-1,true,null,{},'1e3','1.5',4294967296,'9007199254740993']){
+     const f=fixture([id],[]);await assert.rejects(f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true}),/malformed owned-App-ID list/);assert.equal(f.calls(),0);
+   }
+   const r=await run([1],[{appid:4294967296,name:'Unrequested',type:0},{appid:0,name:'Not an app',type:0}]);reconcile(r);assert.equal(r.items.length,0);assert.equal(r.diagnostics.malformedRows,2);assert.equal(r.diagnostics.outcomes.absent,1);
+ }],
+ ['Steam metadata: empty HTTP 200 rows are absent metadata, not failed requests or revoked ownership',async()=>{
+   const r=await run([1,2],[]);reconcile(r);assert.equal(r.failedRequestCount,0);assert.equal(r.diagnostics.httpStatuses['200'],1);assert.equal(r.diagnostics.outcomes.absent,2);assert.equal(r.diagnostics.requests[0].returnedRowCount,0);
+ }],
+ ['Steam metadata: partial 200 responses preserve valid siblings and expose extra, malformed and duplicate row counts',async()=>{
+   const r=await run([1,2,3],[{appid:1,name:'Game',type:0},{appid:'01',name:' Game ',type:'0'},{appid:2,name:'',type:4},{appid:99,name:'Extra',type:0},{name:'Invalid row'}]);
+   reconcile(r);assert.equal(r.items.length,1);assert.equal(r.diagnostics.outcomes.missingTitle,1);assert.equal(r.diagnostics.outcomes.absent,1);
+   assert.deepEqual({...r.diagnostics.requests[0]},{requestedCount:3,httpStatus:200,returnedRowCount:5,unexpectedRowCount:1,malformedRowCount:1,duplicateRowCount:1,matchedIdCount:2,absentCount:1});
+ }],
+ ['Steam metadata: conflicting duplicates are unresolved regardless of row order or type representation',async()=>{
+   for(const rows of [[{appid:1,type:0,name:'One'},{appid:'01',type:4,name:'One'}],[{appid:'01',type:4,name:'One'},{appid:1,type:0,name:'One'}]]){
+    const r=await run([1],rows);reconcile(r);assert.equal(r.items.length,0);assert.equal(r.diagnostics.outcomes.conflictingDuplicate,1);
+   }
+ }],
+ ['Steam metadata: repeated scans retry unresolved/unsupported IDs but not captured games or DLC',async()=>{
+   const f=fixture([1,2,3,4],[response([{appid:1,type:0,name:'Game'},{appid:2,type:4,name:'DLC'},{appid:3,type:6}]),response([{appid:3,type:6},{appid:4,type:0,name:'Now available'}])]);
+   const first=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true}),next=await f.S.fetchOwnedSteamGames(()=>{},first.items.map(i=>i.providerItemId),{diagnostics:true});
+   reconcile(first);reconcile(next);assert.equal(next.newAppCount,2);assert.equal(next.items[0].providerItemId,'4');assert.equal(next.unsupportedAppCount,1);assert.equal(next.unresolvedApps.length,0);
+ }],
+ ['Steam samples: disabled by default, explicit collection is bounded and never part of ordinary diagnostics',async()=>{
+   const ids=Array.from({length:55},(_,i)=>i+1),f=fixture(ids,[response([]),response([])]);
+   await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});assert.equal(f.S.getDiagnosticSample(),null);
+   const notice=f.S.setDiagnosticSampling(true);assert.match(notice.notice,/may reveal/);
+   const r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true}),sample=f.S.getDiagnosticSample();
+   assert.equal(sample.groups.absent.length,20);assert.deepEqual(Array.from(sample.groups.absent,row=>row.appId),ids.slice(0,20).map(String));
+   assert(!JSON.stringify(r.diagnostics).includes('appId'));assert(sample.groups.absent.every(row=>row.returnedEntry===false));
+   f.S.setDiagnosticSampling(false);assert.equal(f.S.getDiagnosticSample(),null);
+ }],
+ ['Steam samples: deterministic across owned-list ordering and capture only closed identity/outcome fields',async()=>{
+   const ids=[7,3,1,6,2,5,4],rows=[{appid:1,type:0,name:'PRIVATE TITLE',account:'PRIVATE ACCOUNT'},{appid:2,type:4},{appid:3,type:0,name:{secret:'PRIVATE TOKEN'}},{appid:4,type:null,name:'PRIVATE TITLE'},{appid:5,type:6,name:'PRIVATE TITLE'},{appid:6,type:0,name:'One'},{appid:6,type:4,name:'One'}];
+   let previous;
+   for(const order of [ids,[...ids].reverse()]){const f=fixture(order,[response(rows)]);f.S.setDiagnosticSampling(true);await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});const sample=JSON.parse(JSON.stringify(f.S.getDiagnosticSample()));
+     assert(!JSON.stringify(sample).includes('PRIVATE'));assert(!sample.groups.games&&!sample.groups.dlc);
+     assert.equal(sample.groups.invalidType[0].hasUsableName,true);assert.equal(sample.groups.invalidTitle[0].hasUsableName,false);
+     assert.equal(sample.groups.unsupported[0].returnedType,6);if(previous)assert.deepEqual(sample,previous);previous=sample;
+   }
+ }],
+ ['Steam samples: disabling collection during a request prevents late publication',async()=>{
+   let f;f=fixture([1],[response([])],{onTitleRequest:()=>f.S.setDiagnosticSampling(false)});f.S.setDiagnosticSampling(true);
+   await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});assert.equal(f.S.getDiagnosticSample(),null);
+ }],
+ ['Steam diagnostics: request summaries and samples cannot leak IDs, names, raw errors or new arbitrary fields',async()=>{
+   const r=await run([123456789],[{appid:123456789,type:0}]),P=globalThis.GalacticContentsPerformance,t=P.trace('lookup-aaaaaaaaaaaa-102','provider');
+   t.provider='steam';t.steamDiagnostics={...r.diagnostics,samples:[{appId:'123456789'}],requests:[{...r.diagnostics.requests[0],appId:'123456789',name:'PRIVATE TITLE',headers:'PRIVATE TOKEN'}]};
+   const clean=P.clean(t.finish('prepared'));assert.equal(clean.steamDiagnostics.outcomes.missingTitle,1);assert.equal(clean.steamDiagnostics.requests[0].matchedIdCount,1);
+   assert(!JSON.stringify(clean).includes('123456789')&&!JSON.stringify(clean).includes('PRIVATE'));
+   t.steamDiagnostics.outcomes.absent=5;assert.equal(P.clean(t).steamDiagnostics,undefined);
+ }],
  ['Steam outcomes: a malformed neighbor no longer discards valid games and DLC',async()=>{
    const r=await run([1,2,3,4],[{appid:1,name:'PRIVATE GAME',type:0},{appid:2,name:'PRIVATE DLC',type:4,related_items:{parent_appid:1}},{appid:3,name:'Broken',type:null},{appid:'invalid',type:0}]);
    reconcile(r);assert.equal(r.items.length,2);assert.equal(r.items[1].metadata.parentProviderItemId,'1');
-   assert.equal(r.diagnostics.outcomes.classification,1);assert.equal(r.diagnostics.outcomes.missing,1);assert.equal(r.diagnostics.malformedRows,1);assert.equal(r.failedRequestCount,0);
+   assert.equal(r.diagnostics.outcomes.invalidType,1);assert.equal(r.diagnostics.outcomes.absent,1);assert.equal(r.diagnostics.malformedRows,1);assert.equal(r.failedRequestCount,0);
  }],
  ['Steam outcomes: null, missing, empty and noninteger app types never become owned games',async()=>{
    const r=await run([1,2,3,4,5],[null,undefined,'',0.5,{}].map((type,i)=>({appid:i+1,name:'Uncertain',type})));
-   reconcile(r);assert.equal(r.items.length,0);assert.equal(r.diagnostics.outcomes.classification,5);
+   reconcile(r);assert.equal(r.items.length,0);assert.equal(r.diagnostics.outcomes.invalidType,5);
  }],
  ['Steam outcomes: requested titles and identifiers remain bounded to the owned selection',async()=>{
    const r=await run([1,2,3],[{appid:1,name:{secret:'not a title'},type:0},{appid:2,name:'',type:4},{appid:77,name:'Unrequested',type:0}]);
-   reconcile(r);assert.equal(r.items.length,0);assert.equal(r.diagnostics.outcomes.missing,3);
+   reconcile(r);assert.equal(r.items.length,0);for(const kind of ['absent','missingTitle','invalidTitle'])assert.equal(r.diagnostics.outcomes[kind],1);
  }],
  ['Steam outcomes: repeated identical rows deduplicate; conflicting rows remain unresolved',async()=>{
    const a={appid:1,name:'Game',type:0},r=await run([1,1,2],[a,a,{appid:2,name:'One',type:0},{appid:2,name:'Two',type:0}]);
-   reconcile(r);assert.equal(r.newAppCount,2);assert.equal(r.items.length,1);assert.equal(r.diagnostics.outcomes.classification,1);
+   reconcile(r);assert.equal(r.newAppCount,2);assert.equal(r.items.length,1);assert.equal(r.diagnostics.outcomes.conflictingDuplicate,1);
  }],
  ['Steam outcomes: explicit unsupported types are separate from temporary failures and remain retryable candidates',async()=>{
    const f=fixture([1,2],[response([{appid:1,name:'Game',type:0},{appid:2,type:6}]),response([{appid:2,type:6}])]);

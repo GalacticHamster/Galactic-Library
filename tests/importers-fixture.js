@@ -6,6 +6,7 @@ import { createStorageWriter } from '../src/background/storage-writer.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
 import '../src/providers/metadata.js';
 import '../src/providers/fanatical.js';
+import '../src/providers/steam-store.js';
 import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
@@ -17,6 +18,7 @@ import {VALIDATION_CERTIFICATE_KEY} from '../src/lib/validation-certificate.js';
 // Content scripts have no direct storage access; the worker owns this hidden area.
 function providerRecord(database,provider,nativeId){const records=Object.values(database.providerItems).filter(r=>r.provider===provider&&r.providerItemId===nativeId);assert(records.length===1,'Expected one account-scoped fixture record for '+provider+':'+nativeId);return records[0];}
 const checks=[],providerTimings=[]; const values={}; const writer=createStorageWriter({get:async defaults=>Object.fromEntries(Object.keys(defaults).map(key=>[key,structuredClone(values[key]??defaults[key])])),set:async updates=>Object.assign(values,structuredClone(updates))},Promise.resolve(),{cacheRefreshPreflight:true});
+const realSteamFetch=globalThis.GalacticSteamStore.fetchOwnedSteamGames;
 const shadows=[]; const attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
@@ -162,7 +164,7 @@ try{
       const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="incremental"]').click();
       await wait(()=>providerTimings.length>timingBefore&&!shadow.querySelector('.status').dataset.busy);
       const text=shadow.querySelector('.status').textContent,diagnostic=providerTimings.at(-1)?.steamDiagnostics;
-      assert(/incomplete; no readable games or DLC saved/iu.test(text)&&text.includes('HTTP 400')&&text.includes('159 App IDs still lack usable title metadata'),'Steam incomplete UI hides its actual result');
+      assert(/incomplete; no readable games or DLC saved/iu.test(text)&&text.includes('HTTP 400')&&text.includes('159 unresolved App IDs will be retried'),'Steam incomplete UI hides its actual result');
       assert(diagnostic?.outcomes.http===159&&diagnostic.saveState==='committed'&&diagnostic.savedCount===0,'Steam aggregate outcomes or save boundary absent');
       assert(!JSON.stringify(diagnostic).includes('PRIVATE')&&JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Steam diagnostics leaked raw data or altered saved records');
       checks.push('Steam opt-in incomplete diagnostics reconcile 159 HTTP failures, zero saved IDs and a concrete safe error without leaking titles or IDs');
@@ -174,6 +176,29 @@ try{
       assert(rejected.saveState==='rejected'&&rejected.savedCount===0&&rejected.saveRejectedCount===1&&rejected.firstFailure.stage==='save','Save rejection was reported as a committed ID');
       assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Rejected save changed the catalog');
       checks.push('Steam diagnostics distinguish resolved metadata from save rejection and retain zero confirmed saved IDs');
+      rejectCommit=false;
+      const savedFetch=globalThis.fetch;
+      globalThis.fetch=async url=>({ok:true,status:200,json:async()=>String(url).startsWith('/dynamicstore')?{rgOwnedApps:[101,102,103,104,105,106]}:{response:{store_items:[{appid:101,type:0},{appid:102,type:0,name:{}},{appid:103,name:'PRIVATE TITLE'},{appid:104,type:6,name:'PRIVATE TITLE'},{appid:106,type:0,name:'One'},{appid:106,type:4,name:'One'}]}}});
+      globalThis.GalacticSteamStore.fetchOwnedSteamGames=realSteamFetch;
+      try{
+        const checkbox=shadow.querySelector('[data-sample-ids]'),download=shadow.querySelector('[data-export-sample]');
+        assert(!checkbox.checked&&download.disabled&&globalThis.GalacticSteamStore.getDiagnosticSample()===null,'Samples are not off by default');
+        checkbox.closest('details').open=true;assert(shadow.textContent.includes('may reveal part of your Steam library'),'Sampling privacy explanation missing');
+        checkbox.click();const sampleTiming=providerTimings.length;shadow.querySelector('button[data-mode="incremental"]').click();
+        await wait(()=>providerTimings.length>sampleTiming&&!shadow.querySelector('.status').dataset.busy);
+        const resultText=shadow.querySelector('.status').textContent,aggregate=providerTimings.at(-1).steamDiagnostics;
+        for(const label of ['Owned App-ID list read','IDs omitted by Steam: 1','Returned entries without titles: 1','Entries with invalid title data: 1','Entries without a valid application type: 1','IDs with conflicting returned entries: 1','App IDs with unsupported types: 1'])assert(resultText.includes(label),'Missing outcome text: '+label);
+        assert(aggregate?.outcomes.absent===1&&aggregate.outcomes.missingTitle===1&&aggregate.requests[0].matchedIdCount===5,'Detailed aggregate split/request counts absent');
+        assert(!JSON.stringify(aggregate).includes('PRIVATE')&&!aggregate.samples,'Ordinary timing included private samples');
+        assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Unresolved metadata changed saved ownership');
+        let exported;const create=URL.createObjectURL,revoke=URL.revokeObjectURL,click=HTMLAnchorElement.prototype.click,importsBeforeDownload=imported;
+        try{URL.createObjectURL=blob=>{exported=blob;return 'blob:synthetic-sample';};URL.revokeObjectURL=()=>{};HTMLAnchorElement.prototype.click=function(){assert(this.download==='GL-steam-app-id-sample.json','Wrong sample filename');};download.click();
+          const sample=JSON.parse(await exported.text());assert(sample.groups.absent[0].appId==='105'&&!JSON.stringify(sample).includes('PRIVATE'),'Explicit sample exported unwanted fields');
+          assert(imported===importsBeforeDownload,'Sample export started a new scan');
+        }finally{URL.createObjectURL=create;URL.revokeObjectURL=revoke;HTMLAnchorElement.prototype.click=click;}
+        checkbox.click();assert(download.disabled&&globalThis.GalacticSteamStore.getDiagnosticSample()===null,'Disabling samples did not clear them');
+        checks.push('Steam panel separates omitted/missing-title/invalid-type outcomes, exports only explicitly opted-in App IDs, clears samples and preserves ownership');
+      }finally{globalThis.fetch=savedFetch;}
     }
     globalThis.GalacticSync.setProfiling(false);
     if(provider==='gog'){const beforeFailure=JSON.stringify(values.galacticLibraryDatabase.providerItems);
