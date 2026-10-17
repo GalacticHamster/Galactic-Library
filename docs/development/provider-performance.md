@@ -165,3 +165,31 @@ and updated game/add-on counts reuse reconciliation; observation timestamps
 alone do not make a product updated. Older backups without these optional
 summary counts remain valid. This status-only extension changes neither the
 database validator nor its certificate version.
+
+## Cross-provider baseline and pending observation design
+
+See [the provider parity matrix](../architecture/provider-sync-parity.md) for
+all 14 providers, all 26 store modes, companion/manual purchase imports, current
+persistence counts, timestamp consumers and the proposed 22-scenario gate.
+This is an audit, not an implemented optimization or an after-performance claim.
+
+Run `node scripts/audit-provider-sync-parity.mjs` from a disposable checkout to
+reproduce 88 baseline writer probes and the Xbox retained-record / Fanatical
+retained-origin counterexamples. It makes no network requests, uses no private
+backup or browser profile and writes aggregate synthetic output under ignored
+`audit-artifacts/provider-performance/provider-parity-baseline.json`. An optional
+first argument selects another output inside audit-artifacts.
+
+The probe uses warm query seeding outside measurements, source acquisition of
+zero, real writer normalization/validation, synthetic complete-source boundaries
+and the structured-clone storage adapter. It is not a live provider scan or
+proof of native storage/scheduling time. Metadata co-written with a DB commit
+is counted in that DB write; only separate small writes count as metadata writes.
+Native observer invalidations are not emulated. Do not use its tiny-library
+durations as 1k/5k/10k/14k/20k production benchmarks.
+
+The requested implementation stopped before modifying runtime behavior because
+moving authoritative record/origin freshness into receipts requires a shared
+materialization, query-evidence, backup and recovery contract. Before/after
+large-library benchmarks and the full post-fix scenario matrix remain pending
+that design, rather than being represented as successful parity.

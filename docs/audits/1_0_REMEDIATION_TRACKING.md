@@ -33,6 +33,7 @@
 | **GL-PERF-03** | GL | Steam outcomes and shared unchanged-scan persistence | P1 | Performance follow-up | **Implemented; live diagnosis pending** | Isolate malformed Steam rows, reject missing application types, export opt-in aggregate outcomes, and persist eligible unchanged partial/failed checks without rewriting the catalog. Historical 159-ID causes require a new detailed trace. |
 | **GL-PERF-04** | GL | Cold provider preparation | P1 | Cold-start follow-up | **Resolved; live verified** | Export 9 verifies new-worker certificate reuse, zero validations/DB writes and a 10.025 s captured GL interval versus 28.690 s. Authoritative reads and real-save checks remain. |
 | **GL-STEAM-01** | GL | Unresolved Steam metadata | P1 | Steam metadata follow-up | **Placeholder diagnostics complete; wider metadata recovery deferred** | Export 10 and six explicitly shared public checks establish unavailable app placeholders in the sample. Version 3 separates correlated failures from rows with no identifiable requested ID; retains unknown result codes. Steam now offers one-scan profiling and the existing Settings export through UI. Samples remain a separate opt-in/export. No fallback, ownership inference or retry suppression added. |
+| **GL-PERF-05** | GL | Cross-provider complete-snapshot persistence | P1 | Shared parity follow-up | **Audit complete; stopped at requested freshness-model gate** | All 14 providers / 26 store modes inventoried; 88 baseline probes confirm full-start/full-save double writes and different record/origin observation scopes. No runtime optimization implemented. [Parity matrix and bounded proposal](../architecture/provider-sync-parity.md). |
 
 ---
 
@@ -270,3 +271,33 @@ avoid semantic validation and full catalog writes where eligible. Browser
 fixtures use synthetic provider responses, not a personal signed-in library;
 live version-3 classification remains the next acceptance run. Layout checking
 retains only known absolute links in the unchanged historical ecosystem audit.
+
+## Cross-provider persistence audit gate (2026-10-16)
+
+GL-PERF-05 remains open for implementation. The pre-implementation audit covers
+all 14 store providers and 26 exposed store modes, plus Humble/Fanatical saved
+purchase sync/manual import. An offline synthetic probe reproduces 88 baseline
+writer cases and two real semantic constraints: additive console scans retain
+unobserved records with older dates, and Fanatical retains unobserved purchase
+origins even when their product is reobserved. A provider-wide timestamp would
+falsely refresh those observations. Existing receipt overlays do not update
+companion query `checkedAt`, record evidence, review guards or record images in
+backups/history; merely extending the successful status predicate is unsafe.
+
+The task's explicit freshness-model stop condition was reached before runtime
+implementation. The tracked matrix proposes shared lease-only full starts,
+then a versioned observation extension to the existing receipts with one
+materialization/recovery contract for all readers. No new backend or schema
+migration is assumed, and no Epic-only shortcut was applied. Current full scans
+still perform two DB writes; most nonempty quick reobservations still perform
+one. Empty eligible checks and Kobo's unchanged sparse quick updates retain
+their existing zero-write paths. Unchanged purchase imports skip writes but
+their ordinary writer read can still validate; this is separately documented.
+
+Baseline verification from a disposable checkout without private inputs passed
+1,345 GL tests, 472 contents tests, 102 packaged importer checks and 67 packaged
+UI checks per browser, installed Firefox storage/recovery/backup/cold-proof
+tests and both 190-file package validators. The probe also runs independently
+without private artifacts. This does not claim the deferred 22-scenario
+post-implementation matrix or 1k/5k/10k/14k/20k before/after benchmarks passed.
+The layout checker retains only known historical absolute-link findings.

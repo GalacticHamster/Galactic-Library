@@ -109,3 +109,10 @@ Whole-library reads, comparison/copy, cold certificate serialization/hash or
 fallback validation, Options rendering
 and genuine observation saves remain costs. Splitting actual records requires
 transactional readers, migration and recovery and remains deferred.
+
+The [cross-provider baseline audit](provider-sync-parity.md) inventories all 14
+providers and 26 exposed store modes. It demonstrates why successful complete
+snapshots and nonempty quick reobservations cannot simply use these status-only
+receipts: record and individual purchase-origin observation dates are observable
+data. No full-observation receipt extension has been implemented; that audit
+stopped at the requested freshness-model design gate.

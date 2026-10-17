@@ -29,6 +29,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 - [Metadata validation](architecture/metadata-validation.md)
 - [Provider profiles and sync reliability](architecture/sync-reliability.md)
 - [Empty provider checks and persistence recovery](architecture/empty-provider-checks.md)
+- [Cross-provider sync parity baseline and pending freshness design](architecture/provider-sync-parity.md)
 - [Committed database validation certificates](architecture/query-validation-certificate.md)
 
 ## Development
