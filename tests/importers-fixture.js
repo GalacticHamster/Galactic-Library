@@ -108,7 +108,7 @@ try{
     if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>method==='readFandangoGrid'?items:result};
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full',rejectCommit=false;
-    globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{sendMessage:async request=>{
+    globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
       if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
@@ -178,7 +178,7 @@ try{
       checks.push('Steam diagnostics distinguish resolved metadata from save rejection and retain zero confirmed saved IDs');
       rejectCommit=false;
       const savedFetch=globalThis.fetch;
-      globalThis.fetch=async url=>({ok:true,status:200,json:async()=>String(url).startsWith('/dynamicstore')?{rgOwnedApps:[101,102,103,104,105,106]}:{response:{store_items:[{appid:101,type:0},{appid:102,type:0,name:{}},{appid:103,name:'PRIVATE TITLE'},{appid:104,type:6,name:'PRIVATE TITLE'},{appid:106,type:0,name:'One'},{appid:106,type:4,name:'One'}]}}});
+      globalThis.fetch=async url=>({ok:true,status:200,json:async()=>String(url).startsWith('/dynamicstore')?{rgOwnedApps:[101,102,103,104,105,106,107]}:{response:{store_items:[{appid:101,type:0},{appid:102,type:0,name:{}},{appid:103,name:'PRIVATE TITLE'},{appid:104,type:6,name:'PRIVATE TITLE'},{appid:106,type:0,name:'One'},{appid:106,type:4,name:'One'},{item_type:0,id:107,appid:0,success:15,visible:false,name:''}]}}});
       globalThis.GalacticSteamStore.fetchOwnedSteamGames=realSteamFetch;
       try{
         const checkbox=shadow.querySelector('[data-sample-ids]'),download=shadow.querySelector('[data-export-sample]');
@@ -187,8 +187,8 @@ try{
         checkbox.click();const sampleTiming=providerTimings.length;shadow.querySelector('button[data-mode="incremental"]').click();
         await wait(()=>providerTimings.length>sampleTiming&&!shadow.querySelector('.status').dataset.busy);
         const resultText=shadow.querySelector('.status').textContent,aggregate=providerTimings.at(-1).steamDiagnostics;
-        for(const label of ['Owned App-ID list read','IDs omitted by Steam: 1','Returned entries without titles: 1','Entries with invalid title data: 1','Entries without a valid application type: 1','IDs with conflicting returned entries: 1','App IDs with unsupported types: 1'])assert(resultText.includes(label),'Missing outcome text: '+label);
-        assert(aggregate?.outcomes.absent===1&&aggregate.outcomes.missingTitle===1&&aggregate.requests[0].matchedIdCount===5,'Detailed aggregate split/request counts absent');
+        for(const label of ['Owned App-ID list read','Steam catalog entries reported unavailable: 1','Requested IDs with no identifiable response row: 1','Returned entries without titles: 1','Entries with invalid title data: 1','Entries without a valid application type: 1','IDs with conflicting returned entries: 1','App IDs with unsupported types: 1'])assert(resultText.includes(label),'Missing outcome text: '+label);
+        assert(aggregate?.outcomes.absent===1&&aggregate.outcomes.missingTitle===1&&aggregate.outcomes.unavailable===1&&aggregate.requests[0].matchedIdCount===5&&aggregate.requests[0].placeholderRowCount===1,'Detailed aggregate split/request counts absent');
         assert(!JSON.stringify(aggregate).includes('PRIVATE')&&!aggregate.samples,'Ordinary timing included private samples');
         assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Unresolved metadata changed saved ownership');
         let exported;const create=URL.createObjectURL,revoke=URL.revokeObjectURL,click=HTMLAnchorElement.prototype.click,importsBeforeDownload=imported;
@@ -199,6 +199,52 @@ try{
         checkbox.click();assert(download.disabled&&globalThis.GalacticSteamStore.getDiagnosticSample()===null,'Disabling samples did not clear them');
         checks.push('Steam panel separates omitted/missing-title/invalid-type outcomes, exports only explicitly opted-in App IDs, clears samples and preserves ownership');
       }finally{globalThis.fetch=savedFetch;}
+      // Exercise the actual page-local control, not the developer console switch.
+      globalThis.GalacticSync.setProfiling(false);
+      const profile=shadow.querySelector('[data-profile-next]'),profileStatus=shadow.querySelector('[data-profile-timing-status]'),quick=shadow.querySelector('[data-mode="incremental"]');
+      assert(!profile.checked&&!profile.disabled&&profileStatus.textContent==='Detailed timing is off.','Profiling must start off');
+      assert(shadow.querySelector('[data-open-timing]').href.endsWith('/options.html#settings'),'Timing export does not point to existing Settings');
+      const messages=chrome.runtime.sendMessage;let detailed=[],failStart=false,abort=false,resetWorker=false;
+      chrome.runtime.sendMessage=async request=>{
+        if(failStart&&request.type==='GET_PROVIDER_SYNC_STATE')return {ok:false,error:'Synthetic start refusal'};
+        return messages(request);
+      };
+      globalThis.GalacticSteamStore.fetchOwnedSteamGames=async(report,known,options)=>{
+        detailed.push(options.diagnostics);
+        assert(profile.disabled&&(!profile.checked||!options.diagnostics),'Running profiling can be rearmed');
+        if(resetWorker)providerTimings.length=0; // Collector loss must not arm or consume anything.
+        if(abort)throw Error('Synthetic cancellation');
+        return {items:[],newAppCount:0,unresolvedApps:[],failedRequestCount:0,metadataOutcomes:{},...(options.diagnostics?{diagnostics:{outcomeVersion:3,ownedListRead:true,ownedIdCount:1,candidateCount:0,attemptedCount:0,outcomes:{},requests:[],httpStatuses:{},unsupportedTypes:{}}}:{})};
+      };
+      const runQuick=async()=>{quick.click();await wait(()=>!profile.disabled&&!shadow.querySelector('.status').dataset.busy);};
+      try{
+        profile.click();assert(profile.checked&&profileStatus.textContent.includes('Armed'),'UI did not arm');
+        globalThis.GalacticSync.trace('epic');assert(profile.checked,'Unrelated provider consumed profiling');
+        shadow.querySelector('[data-mode="full"]').click();await wait(()=>!profile.disabled&&!shadow.querySelector('.status').dataset.busy);
+        assert(profile.checked&&detailed.at(-1)===false&&profileStatus.textContent.includes('Armed'),'Full rescan consumed the Quick Update request');
+        profile.click();await runQuick();assert(detailed.at(-1)===false&&profileStatus.textContent==='Detailed timing is off.','Cancelling arm profiled an ordinary scan');
+        const beforeProfile=providerTimings.length;profile.click();await runQuick();
+        assert(detailed.at(-1)===true&&!profile.checked&&profileStatus.textContent.includes('Timing captured'),'One-shot UI did not capture/disarm');
+        assert(providerTimings.length>beforeProfile&&providerTimings.at(-1).steamDiagnostics?.outcomeVersion===3,'Detailed scan was not delivered to the existing collector');
+        await runQuick();assert(detailed.at(-1)===false,'One-shot profiling leaked into a later scan');
+        checks.push('Steam UI arms only this tab’s next Quick Update, cancels on request, automatically disarms and leaves ordinary/unrelated scans unprofiled');
+        const {bindPerformanceDiagnostics}=await import('../src/ui/performance-diagnostics.js');let exportClick,exported;
+        bindPerformanceDiagnostics({button:{disabled:false,addEventListener:(event,handler)=>{exportClick=handler;}},status:{textContent:''},worker:{textContent:''},runtime:{sendMessage:async()=>({ok:true,providers:providerTimings,records:[],companions:[]})},download:summary=>{exported=summary;}});
+        await exportClick();assert(exported.providers.some(t=>t.steamDiagnostics?.outcomeVersion===3),'Existing Settings export dropped the UI-profiled outcome report');
+        checks.push('Existing Settings timing export retains the one-shot Steam report without enabling App-ID sampling');
+        failStart=true;profile.click();await runQuick();assert(!profile.checked&&profileStatus.textContent.includes('Timing captured'),'Failed start left profiling armed');failStart=false;
+        abort=true;profile.click();await runQuick();assert(!profile.checked&&profileStatus.textContent.includes('Timing captured'),'Cancelled scan left profiling armed');abort=false;
+        resetWorker=true;profile.click();await runQuick();resetWorker=false;
+        assert(!profile.checked&&providerTimings.length===1&&providerTimings[0].events.some(e=>e.stage==='provider_fetch'),'Worker collector replacement lost page completion or rearmed profiling');
+        checks.push('Failed starts, cancelled scans and worker collector loss consume the one-shot request and retain diagnostic completion where delivery succeeds');
+        const later=chrome.runtime.sendMessage;chrome.runtime.sendMessage=async request=>request.type==='GL_PROVIDER_UI_TIMING'?Promise.reject(Error('Synthetic delivery loss')):later(request);
+        profile.click();await runQuick();assert(!profile.checked&&profileStatus.textContent.includes('could not be delivered'),'Lost acknowledgement implied capture or rearmed profiling');chrome.runtime.sendMessage=later;
+        profile.click();document.querySelector('#galactic-library-steam-store-importer').remove();
+        await import('../src/providers/steam-store-content.js?profile-reload');
+        const reloaded=shadows.at(-1);assert(!reloaded.querySelector('[data-profile-next]').checked&&reloaded.querySelector('[data-profile-timing-status]').textContent==='Detailed timing is off.','Reload retained a stale arm');
+        assert(!globalThis.GalacticSync.trace('steam'),'Stale completion reenabled the global profiler');
+        checks.push('Reload clears an unused arm; lost delivery is explicit and stale completion cannot rearm page or global profiling');
+      }finally{chrome.runtime.sendMessage=messages;globalThis.GalacticSteamStore.fetchOwnedSteamGames=realSteamFetch;}
     }
     globalThis.GalacticSync.setProfiling(false);
     if(provider==='gog'){const beforeFailure=JSON.stringify(values.galacticLibraryDatabase.providerItems);

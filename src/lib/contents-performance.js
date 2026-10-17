@@ -21,14 +21,18 @@
     const bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=10000000;
     const fields=['ownedIdCount','candidateCount','attemptedCount','titleRequests','failedRequests','unresolvedCount','malformedRows','savedCount','saveRejectedCount','requestSamplesDropped'];
     const result=Object.fromEntries(fields.filter(key=>bounded(value[key])).map(key=>[key,value[key]]));
-    const kinds=['games','dlc','unsupported','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','missing','http','authentication','malformed','classification','network','other'];
+    const kinds=['games','dlc','unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','missing','http','authentication','malformed','classification','network','other'];
     result.outcomes=Object.fromEntries(kinds.map(key=>[key,bounded(value.outcomes?.[key])?value.outcomes[key]:0]));
     if(!bounded(result.attemptedCount)||Object.values(result.outcomes).reduce((sum,n)=>sum+n,0)!==result.attemptedCount)return null;
     if(typeof value.ownedListRead==='boolean')result.ownedListRead=value.ownedListRead;
-    if(value.outcomeVersion===2)result.outcomeVersion=2;
-    if(Array.isArray(value.requests))result.requests=value.requests.slice(0,32).map(row=>Object.fromEntries(['requestedCount','returnedRowCount','matchedIdCount','absentCount','unexpectedRowCount','malformedRowCount','duplicateRowCount','httpStatus'].filter(key=>key==='httpStatus'?Number.isInteger(row?.[key])&&row[key]>=100&&row[key]<=599:bounded(row?.[key])).map(key=>[key,row[key]])));
+    if([2,3].includes(value.outcomeVersion))result.outcomeVersion=value.outcomeVersion;
+    if(Array.isArray(value.requests))result.requests=value.requests.slice(0,32).map(row=>Object.fromEntries(['requestedCount','returnedRowCount','matchedIdCount','matchedRowCount','placeholderRowCount','unavailableCount','conflictingIdCount','absentCount','unexpectedRowCount','malformedRowCount','duplicateRowCount','httpStatus'].filter(key=>key==='httpStatus'?Number.isInteger(row?.[key])&&row[key]>=100&&row[key]<=599:bounded(row?.[key])).map(key=>[key,row[key]])));
     result.httpStatuses=Object.fromEntries(Object.entries(value.httpStatuses??{}).filter(([key,n])=>/^[1-5]\d{2}$/u.test(key)&&bounded(n)).slice(0,500));
     result.unsupportedTypes=Object.fromEntries(Object.entries(value.unsupportedTypes??{}).filter(([key,n])=>(key==='other'||/^-?\d{1,6}$/u.test(key))&&bounded(n)).slice(0,32));
+    if(value.outcomeVersion===3){
+      result.placeholderResultCodes=Object.fromEntries(Object.entries(value.placeholderResultCodes??{}).filter(([key,n])=>(key==='other'||/^\d{1,6}$/u.test(key))&&bounded(n)).slice(0,32));
+      result.placeholderVisibility=Object.fromEntries(['true','false','unspecified'].filter(key=>bounded(value.placeholderVisibility?.[key])).map(key=>[key,value.placeholderVisibility[key]]));
+    }
     const first=value.firstFailure;
     if(['owned-list','titles','save'].includes(first?.stage)&&kinds.includes(first.kind))result.firstFailure={stage:first.stage,kind:first.kind,...(Number.isInteger(first.httpStatus)&&first.httpStatus>=100&&first.httpStatus<=599?{httpStatus:first.httpStatus}:{})};
     if(['pending','committed','rejected','unconfirmed'].includes(value.saveState))result.saveState=value.saveState;

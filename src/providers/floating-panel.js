@@ -46,11 +46,11 @@
     const page=/\bpage\s+([1-9]\d{0,4})\b/iu.exec(message);
     try{await chrome.runtime.sendMessage({type:'REPORT_PROVIDER_SCAN_FAILURE',provider,scanToken:context.scanToken,failure:{code,failedRequestCount:1,failedPages:page?[Number(page[1])]:[]}});}catch{}
   }
-  // Development opt-in in the extension's isolated console. No persistent
-  // setting or per-item logging; ordinary provider scans keep this disabled.
-  global.GalacticSync={send,failed,setProfiling(value){profiling=value===true;},trace(provider){
-    if(profiling)profilePrefix??=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
-    const timing=profiling?global.GalacticContentsPerformance?.trace(`lookup-${profilePrefix}-${profileSequence++}`,'provider'):null;
+  // A page-local UI may request one trace without enabling later scans. The
+  // explicit console switch remains available for development only.
+  global.GalacticSync={send,failed,setProfiling(value){profiling=value===true;},trace(provider,{once=false}={}){
+    if(profiling||once)profilePrefix??=crypto.randomUUID().replace(/-/gu,'').slice(0,12);
+    const timing=profiling||once?global.GalacticContentsPerformance?.trace(`lookup-${profilePrefix}-${profileSequence++}`,'provider'):null;
     if(timing){timing.provider=provider;timing.providerPhase='scan';}return timing;
   }};
   function attach(shadow,provider) {

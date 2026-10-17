@@ -19,10 +19,17 @@ unsupported types; they are not necessarily new purchases or missing games.
    `input_json`, explicit `ids:[{appid:Number(id)}]`, English/US/realm 1 context,
    and `data_request.include_basic_info:true`. Keep 100 IDs per batch and the
    existing 500 ms inter-batch delay. No new requests, permissions or login.
-4. Match `response.store_items[].appid` to requested canonical IDs. Count extra
-   and malformed rows separately. Identical interpreted duplicates deduplicate;
-   conflicting title/type/parent evidence remains unresolved. Do not guess that
-   an alternative field such as a package ID identifies the requested app.
+4. Match `response.store_items[].appid` to requested canonical IDs. For diagnostics
+   only, a row without a valid `appid` may be correlated by `id` when `item_type`
+   explicitly equals application type 0, `id` is a requested canonical App ID,
+   and `success` is an integer greater than 1. Visibility alone is insufficient.
+   This never supplies an importable `appid`, name or application type. Count
+   extra and malformed rows separately. Identical interpreted duplicates
+   deduplicate; conflicting title/type/parent evidence remains unresolved.
+   A valid matched row plus a placeholder for the same ID, or placeholders with
+   differing result/visibility evidence, become `conflictingDuplicate` in either
+   row order. A valid but different `appid` is never reassigned using `id`.
+   Package/bundle IDs and missing namespaces cannot establish app correlation.
 5. Require explicit type 0 (game) or 4 (DLC) and a usable string name. DLC parent
    IDs are optional relationships, not a saving prerequisite. Ownership evidence
    comes from membership in the owned-ID selection, not a public metadata lookup.
@@ -48,15 +55,16 @@ show omitted IDs, nameless rows, malformed/extra rows and duplicates independent
 
 ## Exact diagnostic meanings
 
-Version 2 acquisition outcomes partition attempted candidate IDs. Priority is
-conflicting duplicates, invalid type, unsupported type, title checks, then valid
+Version 3 acquisition outcomes partition attempted candidate IDs. Priority is
+conflicting duplicates, correlated unavailability, invalid type, unsupported type, title checks, then valid
 game/DLC. Thus an unsupported type without a name remains unsupported; a row
 with both invalid type and invalid name is `invalidType`. Secondary name-presence
 information can appear in an explicitly exported sample.
 
 | Outcome | Meaning |
 | --- | --- |
-| `absent` | No response row has this requested canonical ID in `appid`. Malformed/extra rows are not silently assigned to it. |
+| `unavailable` | Explicit app failure placeholder safely correlates to the requested ID; no conflicting valid entry or ambiguous duplicate. Metadata is unavailable, not proof of revoked ownership. |
+| `absent` | No identifiable response row: neither a matching canonical `appid` nor a safely correlated app failure. Unidentifiable/malformed rows are not assigned speculatively. Version 2 meant only no matching `appid`, and could include placeholders. |
 | `missingTitle` | Supported type, but name is absent, null, empty or whitespace-only. |
 | `invalidTitle` | Supported type, but name is a non-null non-string value. |
 | `invalidType` | No parseable integer type, including null/empty/fractional/object values. Never implicitly a game. |
@@ -70,8 +78,8 @@ information can appear in an explicitly exported sample.
 | `classification` | A matching row could not be interpreted/converted, including an isolated parser fault. Not an HTTP failure. |
 | `other` | Unexpected acquisition exception; no exposed raw error or invented status. |
 
-The sanitizer accepts legacy `missing` from old trace shapes; new acquisition
-never emits it. Owned-list failure is separate: `ownedListRead:false`, zero title
+The sanitizer accepts legacy `missing` and version-2 reports without changing
+their historical meanings; new acquisition never emits `missing`. Owned-list failure is separate: `ownedListRead:false`, zero title
 attempts and `firstFailure.stage:'owned-list'`, without classifying unattempted IDs.
 Games + DLC = captured records. Other outcomes except unsupported sum to unique
 unresolved IDs. All outcomes sum to attempted IDs, which may be fewer than
@@ -79,8 +87,24 @@ candidates after an aborted full scan. Unsupported types alone are not failures.
 
 Request-level statistics stay separate: title/failed-request counts, actual HTTP
 frequencies and at most 32 `requests` summaries. Each summary has requested,
-returned-row, matched-ID, absent, malformed-row, unexpected-row and duplicate-row
-counts when a valid response exists. No response counts are invented on HTTP or
+returned-row, matched-ID/row, placeholder-row, unavailable-ID, conflicting-ID,
+absent-ID, malformed-row, unexpected-row and duplicate-row counts when a valid
+response exists. `matchedIdCount` counts unique matching `appid` identities,
+including rows later rejected for unusable metadata or conflicts. It is not
+a count of imported games. `placeholderRowCount` includes identical/conflicting
+duplicates; `unavailableCount` counts only unambiguous per-ID unavailability.
+`conflictingIdCount` is separate from excess-row `duplicateRowCount`. These
+overlapping request measures are not another additive outcome partition.
+Returned rows partition into matched rows + correlated placeholder rows +
+unexpected rows + malformed rows. Placeholder rows do not inflate malformed
+row counts, malformed-response outcomes, or failed requests.
+
+`placeholderResultCodes` retains at most 32 numeric/other count buckets;
+`placeholderVisibility` counts true, false and unspecified over correlated
+placeholder rows (including duplicates/conflicts). Unknown numeric codes remain
+unknown: in particular, result 15 is not translated into a specific error,
+login failure, revocation, or permanent unavailability.
+No response counts are invented on HTTP or
 network failure. `requestSamplesDropped` counts omitted summaries; aggregate
 outcomes still cover all attempted batches. Empty HTTP 200 arrays mean absent;
 unreadable HTTP 200 bodies mean malformed.
@@ -92,16 +116,28 @@ acquisition partition. A status receipt certifies status, not item observations.
 
 ## Aggregate export
 
-1. Reload updated GL and the signed-in Steam Store page with its GL panel.
-2. Select GL's content-script/isolated console in developer tools and run
-   `GalacticSync.setProfiling(true)`.
-3. Run Quick update, then promptly export from GL Settings → Performance
-   diagnostics before worker restart. Check `steamDiagnostics.outcomeVersion:2`,
-   outcomes and request summaries.
-4. Disable with `GalacticSync.setProfiling(false)` or reload the page.
+1. Open the signed-in Steam Store page with its GL panel.
+2. Expand **Steam diagnostics** and check **Profile the next Quick Update**.
+   The status says it is armed for this tab.
+3. Run **Quick update**. The control automatically unchecks at startup; wait
+   for **Timing captured** even if the scan is incomplete or fails.
+4. Follow **Export timing in GL Settings > Performance diagnostics**, then
+   click **Export timing summary** promptly before worker restart. Check
+   `steamDiagnostics.outcomeVersion:3`, outcomes and request summaries.
 
-Detailed profiling stays page-local and off by default. Existing 50-trace FIFO
-and worker-reset behavior remain. No IDs, titles, accounts, URLs, credentials,
+No console command or extension reload is required. Failed starts/cancellation
+consume the request; arm again for another scan. Full rescan does not consume
+it, other tabs/providers cannot consume it, and page reload discards an unused
+request. Controls are disabled while a scan completes. No profiling request is
+persisted or delivered asynchronously to the page, so stale messages cannot
+rearm it. The existing developer console switch remains separate. See
+[provider profiling](provider-performance.md) for lifecycle/delivery limits.
+
+Detailed profiling stays page-local and off by default. Each worker timing
+collector retains the latest 50 records FIFO and resets on worker restart.
+Each trace has at most 512 events. The independent journal retains the latest
+192 events, counts evictions, and resets on restart. Only the tiny session
+lifecycle breadcrumb survives; detailed reports are not persisted. No IDs, titles, accounts, URLs, credentials,
 raw bodies or arbitrary errors enter ordinary exports. The bounded worker journal
 is independent of detailed profiling.
 
@@ -122,8 +158,10 @@ timing exports, backups or GL storage. To opt in:
 
 Keep the lowest 20 numeric IDs per unresolved/unsupported category, sorted
 consistently across source ordering. Do not retain supported-game/DLC samples.
-Fields are only App ID, outcome, returned-entry presence, supplied integer type
-if valid, and usable-name presence where observed. Request failures do not pretend
+Sample format 2 declares outcome version 3. Fields are only App ID, outcome,
+returned-entry presence, supplied integer type if valid, and usable-name presence
+where observed; unavailable samples also retain numeric `resultCode` and boolean
+`visible` when supplied. Missing visibility is omitted, not invented. Request failures do not pretend
 to establish whether an entry was returned. No titles, account identifiers,
 headers, cookies, tokens or raw responses. Full-scan failures sample attempted
 IDs only. Nothing is automatically logged to the ordinary console.
@@ -134,13 +172,18 @@ Export 8 established 159 candidates: 143 missing usable metadata and 16 other
 types, two HTTP 200 title responses, no captured games/DLC or save rejections.
 Its old missing category cannot be retrospectively split. Export 9 confirms cold
 certificate reuse but has no detailed provider outcomes. A new version-2 export
-is required. Actual identities require a separately and explicitly shared sample;
-none have been guessed or submitted to outside services during development.
+was required. The explicitly shared export 10 subsequently established 143
+unmatched `appid` results with 143 unidentifiable rows, plus 16 unsupported types.
+Six shared unresolved IDs checked directly against official public Steam
+returned app placeholders (`appid:0`, empty name, result 15); none recovered via
+public app-details. Two retain Community pages. The remaining 137 failure shapes
+were not retained in the export, so their exact code/visibility remains unproven.
+Version 3 now measures this without exporting private IDs.
 
 | Candidate fallback | Evidence and decision |
 | --- | --- |
 | Current owned-ID response | Supported owned field contains IDs. No retained evidence establishes another reliable title/type map. Do not invent one. |
-| Same-origin public store details/page | Existing Store permission, but response/type contract, delisted coverage and browser CORS require validation. Potentially one request per missing ID; no rate or coverage guarantee established. First compare a small shared sample directly with official Steam, then propose a bounded optional fallback. No automatic fallback added. |
+| Same-origin public store details/page | Six unresolved samples returned no metadata. A named legacy expansion returned its parent game's different ID, and software appeared as type game. Identity/type conflicts make blind fallback unsafe; browser CORS, rates and wider coverage remain unvalidated. No automatic fallback added. |
 | `IStoreService/GetAppList` | Valve documents API-key authentication, type filters and pagination. Not a keyless drop-in or account ownership proof. Do not add authentication/partner-host permissions or crawl the whole catalog. |
 | Legacy `ISteamApps/GetAppList` | Valve marks it deprecated because of scale. Public names alone do not establish type/ownership. Do not adopt as automatic fallback. |
 | `IPlayerService/GetOwnedGames` | Requires API key and Steam ID; optional names/icons depend on visibility. Not the existing browser-session contract. No new account/key workflow. |
@@ -148,8 +191,9 @@ none have been guessed or submitted to outside services during development.
 Official references: [IStoreService](https://partner.steamgames.com/doc/webapi/IStoreService#GetAppList),
 [ISteamApps](https://partner.steamgames.com/doc/webapi/ISteamApps#GetAppList),
 [IPlayerService](https://partner.steamgames.com/doc/webapi/IPlayerService#GetOwnedGames).
-Only public documentation was consulted; no private IDs or authenticated provider
-requests were used. Public comparison of actual unresolved IDs awaits the sample.
+The export-10 follow-up used only the explicitly shared small sample against
+official public Steam sources, without credentials or third-party lookups.
+This implementation batch makes no additional live provider requests.
 
 Unresolved/missing metadata remains retryable, never revoked ownership. Saved
 IDs stop recurring; unsupported types remain candidates because metadata/support
@@ -157,7 +201,7 @@ can change. Future throttling would require account/ID/endpoint-context scope,
 bounded expiry, version invalidation, Full rescan bypass and successful-ID removal.
 That design is deferred: no blacklist or suppression of future acquisitions.
 
-The panel separates owned-list retrieval, imported game/DLC changes, omitted IDs,
+The panel separates owned-list retrieval, imported game/DLC changes, unavailable catalog metadata, IDs with no identifiable response row,
 missing/invalid titles, invalid/conflicting types, unsupported types and request
 failures. Unresolved entries keep the result incomplete. Valid neighbors still
 save incrementally. Eligible unchanged incomplete checks preserve shared receipts,

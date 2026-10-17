@@ -32,7 +32,7 @@
 | **GL-PERF-02** | GL | Steam/Epic reconciliation summaries | P2 | Performance | **Resolved** | Report actual game/add-on additions/updates; distinguish retry candidates and uniquely counted unresolved IDs; retain incomplete-scan warnings. |
 | **GL-PERF-03** | GL | Steam outcomes and shared unchanged-scan persistence | P1 | Performance follow-up | **Implemented; live diagnosis pending** | Isolate malformed Steam rows, reject missing application types, export opt-in aggregate outcomes, and persist eligible unchanged partial/failed checks without rewriting the catalog. Historical 159-ID causes require a new detailed trace. |
 | **GL-PERF-04** | GL | Cold provider preparation | P1 | Cold-start follow-up | **Resolved; live verified** | Export 9 verifies new-worker certificate reuse, zero validations/DB writes and a 10.025 s captured GL interval versus 28.690 s. Authoritative reads and real-save checks remain. |
-| **GL-STEAM-01** | GL | Unresolved Steam metadata | P1 | Steam metadata follow-up | **Instrumented; live classification pending** | Split omitted IDs from missing/invalid titles and types; reconcile per-request counts; correct inconsistent decimal App-ID normalization. Optional private samples require a separate opt-in/export. No fallback or retry suppression added. |
+| **GL-STEAM-01** | GL | Unresolved Steam metadata | P1 | Steam metadata follow-up | **Placeholder diagnostics complete; wider metadata recovery deferred** | Export 10 and six explicitly shared public checks establish unavailable app placeholders in the sample. Version 3 separates correlated failures from rows with no identifiable requested ID; retains unknown result codes. Steam now offers one-scan profiling and the existing Settings export through UI. Samples remain a separate opt-in/export. No fallback, ownership inference or retry suppression added. |
 
 ---
 
@@ -227,3 +227,46 @@ Another offline edge case exposed raw malformed-name serialization in duplicate 
 Validation from a disposable checkout without private inputs: **1,330 GL tests**, **472 contents tests**, **98 packaged importer checks per browser**, **67 standard packaged UI checks per browser**, installed Firefox recovery/private-storage/backup/cold-proof checks, and both 190-file package validators passed. The 71 focused pipeline cases include 28 Steam outcome/sample cases and retained shared receipt/cold-proof safeguards. Sample download, privacy explanation, default-off state, disabling/clearing, no accidental scan from export, and unchanged ownership are exercised in both packaged browsers. Missing metadata still produces an eligible status-only partial result without full persistence. Layout checking retains only the known historical absolute-link findings.
 
 Stop at the remaining evidence boundary: reload GL and Steam, enable the existing isolated-console profiling, run Quick update and promptly export timing. The new outcome version and numeric request summaries establish omitted versus returned-but-unusable metadata. If the user chooses to share representative IDs, separately enable the panel's sample control and explicitly download the sample after that update. No specific identity, permanent classification, retry throttle or metadata fallback is inferred before this evidence arrives.
+
+## Steam placeholder diagnostics and UI profiling follow-up (2026-10-16)
+
+The preceding console-based instructions are superseded by the UI workflow in
+[Steam diagnostics](../development/steam-outcome-diagnostics.md). Export 10
+completed in 9.928 seconds with 159 candidates, 143 unmatched app IDs and 143
+unidentifiable rows, 16 unsupported types and zero request failures. Six
+explicitly shared unresolved IDs returned app failure placeholders in public
+checks. This does not prove every remaining row's failure code or visibility.
+
+Outcome version 3 correlates only requested canonical IDs in explicit app
+failure rows without a valid appid. It separates unavailable metadata from no
+identifiable response row, leaves conflicting duplicates unresolved and never
+imports placeholders. Request counts distinguish matching rows, placeholder
+rows, malformed/extra rows, conflicts and omissions; only per-ID outcomes form
+an additive attempted-ID partition. Result-code buckets (32 maximum) retain
+unknown codes without translating result 15. Visibility is counted separately.
+Opt-in sample format 2 adds only result code/visibility for unavailable entries;
+ordinary timing exports still contain no App IDs or titles.
+
+Steam diagnostics now exposes **Profile the next Quick Update**, with armed,
+running and captured/delivery-failure feedback and a link to Settings export.
+It requests one trace from the existing shared profiler, not a persisted toggle
+or a cross-context command. Only that tab's Quick Update consumes it; failures
+and cancellation disarm it, Full rescan leaves it armed, and page reload clears
+it. Other tabs/providers and stale messages cannot enable it. Collector loss
+on worker restart remains visible as a retention limitation, not a keepalive.
+Settings help describes the control. No metadata fallback, retry suppression,
+new permissions, versions, ownership rules or storage changes are introduced.
+
+Validation from a disposable checkout without private audit inputs: **1,345 GL
+tests**, **472 contents tests**, **102 packaged importer checks per browser**,
+**67 standard packaged UI checks per browser**, installed Firefox private
+storage/recovery/backup checks, and both 190-file package validators passed.
+The 43 focused Steam/profiling cases include the synthetic 159-ID accounting,
+namespace/conflict/unknown-code negatives, bounded redaction and independent
+page contexts. Packaged UI exercises arming/cancellation, one-shot capture,
+existing export, Full rescan exclusion, failures, collector replacement,
+lost delivery and reload. Cold-proof and status-only incomplete receipts still
+avoid semantic validation and full catalog writes where eligible. Browser
+fixtures use synthetic provider responses, not a personal signed-in library;
+live version-3 classification remains the next acceptance run. Layout checking
+retains only known absolute links in the unchanged historical ecosystem audit.

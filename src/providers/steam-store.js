@@ -6,7 +6,7 @@
 
   const STORE_ITEMS_BATCH_SIZE = 100;
   const BETWEEN_BATCHES_MS = 500;
-  const OUTCOMES=['games','dlc','unsupported','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','http','authentication','malformed','classification','network','other'];
+  const OUTCOMES=['games','dlc','unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','http','authentication','malformed','classification','network','other'];
   const SAMPLE_LIMIT=20;
   let sampling=false,sampleGeneration=0,lastSample=null;
   const appId=value=>{
@@ -20,6 +20,7 @@
   function sampleOutcome(sample,id,outcome,item,returnedEntry){
     if(!sample||['games','dlc'].includes(outcome))return;
     const type=appType(item?.type),row={appId:id,outcome,...(typeof returnedEntry==='boolean'?{returnedEntry}:{}),...(returnedEntry&&item?{hasUsableName:Boolean(titleText(item.name)),...(type!==null?{returnedType:type}:{})}:{})};
+    if(outcome==='unavailable')Object.assign(row,{resultCode:item.success,...(typeof item.visible==='boolean'?{visible:item.visible}:{})});
     const rows=sample.groups[outcome]??=[];const existing=rows.findIndex(row=>row.appId===id);if(existing>=0)rows.splice(existing,1);
     rows.push(row);rows.sort((a,b)=>Number(a.appId)-Number(b.appId));if(rows.length>SAMPLE_LIMIT)rows.pop();
   }
@@ -61,7 +62,7 @@
   const failure=(kind,status)=>Object.assign(new Error(kind==='http'||kind==='authentication'?'Steam title service returned '+(status?'HTTP '+status:'an HTTP error')+'.':kind==='malformed'?'Steam returned a malformed title-service response.':'Steam title-service request failed.'),{steamFailure:kind,...(Number.isInteger(status)&&status>=100&&status<=599?{httpStatus:status}:{})});
   function failureLabel(value){
     if(['http','authentication'].includes(value.kind)&&value.httpStatus)return 'Steam title lookup returned HTTP '+value.httpStatus+'.';
-    return {malformed:'Steam returned an unreadable title response.',classification:'Some Steam catalog entries could not be interpreted.',absent:'Steam omitted some requested App IDs from its title response.',missingTitle:'Some returned Steam entries have no title.',invalidTitle:'Some returned Steam entries have invalid title data.',invalidType:'Some returned Steam entries have no valid application type.',conflictingDuplicate:'Steam returned conflicting entries for some App IDs.',network:'Steam title lookup could not connect.'}[value.kind]??'Some Steam titles could not be resolved.';
+    return {malformed:'Steam returned an unreadable title response.',classification:'Some Steam catalog entries could not be interpreted.',unavailable:'Steam reported some catalog entries unavailable; this does not change ownership.',absent:'Some requested App IDs had no identifiable row in the title response.',missingTitle:'Some returned Steam entries have no title.',invalidTitle:'Some returned Steam entries have invalid title data.',invalidType:'Some returned Steam entries have no valid application type.',conflictingDuplicate:'Steam returned conflicting entries for some App IDs.',network:'Steam title lookup could not connect.'}[value.kind]??'Some Steam titles could not be resolved.';
   }
 
   function wait(milliseconds) {
@@ -86,7 +87,7 @@
   async function fetchOwnedSteamGames(reportProgress = () => {}, knownAppIds = null,{diagnostics=false}={}) {
     const generation=++sampleGeneration,sample=sampling?{groups:{}}:null;lastSample=null;
     try{return await acquireOwnedSteamGames(reportProgress,knownAppIds,{diagnostics},sample);}
-    finally{if(sample&&sampling&&generation===sampleGeneration)lastSample={format:1,provider:'steam',sampleLimitPerOutcome:SAMPLE_LIMIT,notice:'These App IDs may reveal part of your Steam library. No titles, accounts or credentials are included.',groups:Object.fromEntries(OUTCOMES.filter(kind=>sample.groups[kind]?.length).map(kind=>[kind,sample.groups[kind]]))};}
+    finally{if(sample&&sampling&&generation===sampleGeneration)lastSample={format:2,outcomeVersion:3,provider:'steam',sampleLimitPerOutcome:SAMPLE_LIMIT,notice:'These App IDs may reveal part of your Steam library. No titles, accounts or credentials are included.',groups:Object.fromEntries(OUTCOMES.filter(kind=>sample.groups[kind]?.length).map(kind=>[kind,sample.groups[kind]]))};}
   }
   async function acquireOwnedSteamGames(reportProgress,knownAppIds,{diagnostics},sample){
     let account,ownedStatus;
@@ -98,7 +99,7 @@
       if(!Array.isArray(account?.rgOwnedApps)||account.rgOwnedApps.some(id=>!appId(id)))throw failure('malformed',ownedStatus);
     }catch(error){
       error.message=error.steamFailure==='malformed'?'Steam returned a malformed owned-App-ID list. No library changes were saved.':error.httpStatus?'Steam owned-App-ID list returned HTTP '+error.httpStatus+'. No library changes were saved.':'Steam owned-App-ID list could not be read. No library changes were saved.';
-      if(diagnostics)error.steamDiagnostics={ownedListRead:false,ownedIdCount:0,candidateCount:0,attemptedCount:0,titleRequests:0,failedRequests:0,unresolvedCount:0,malformedRows:0,outcomes:{},httpStatuses:{},unsupportedTypes:{},firstFailure:{stage:'owned-list',kind:error.steamFailure??'other',...(error.httpStatus?{httpStatus:error.httpStatus}:{})}};
+      if(diagnostics)error.steamDiagnostics={outcomeVersion:3,ownedListRead:false,ownedIdCount:0,candidateCount:0,attemptedCount:0,titleRequests:0,failedRequests:0,unresolvedCount:0,malformedRows:0,outcomes:{},httpStatuses:{},unsupportedTypes:{},firstFailure:{stage:'owned-list',kind:error.steamFailure??'other',...(error.httpStatus?{httpStatus:error.httpStatus}:{})}};
       throw error;
     }
     const appIds = ownedAppIdsFromDynamicStore(account);
@@ -107,12 +108,13 @@
     const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
 
     const itemsById = new Map();
-    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),types={},httpStatuses={},requests=[];let failedRequestCount=0,titleRequests=0,malformedRows=0,firstFailure=null;
+    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),types={},httpStatuses={},requests=[],placeholderResultCodes={},placeholderVisibility={};let failedRequestCount=0,titleRequests=0,malformedRows=0,firstFailure=null;
+    const countCode=(counts,code)=>{let key=Number.isSafeInteger(code)&&Math.abs(code)<=100000?String(code):'other';if(!Object.hasOwn(counts,key)&&Object.keys(counts).length>=31)key='other';counts[key]=(counts[key]??0)+1;};
     const observeFailure=value=>{firstFailure??={stage:'titles',kind:value.kind,...(value.httpStatus?{httpStatus:value.httpStatus}:{})};};
     const outcome=(id,kind,item,returnedEntry)=>{outcomes.set(id,kind);sampleOutcome(sample,id,kind,item,returnedEntry);};
     const unresolved=(id,kind,status,item,returnedEntry)=>{outcome(id,kind,item,returnedEntry);unresolvedById.set(id,{appId:id,status:failureLabel({kind,httpStatus:status})});observeFailure({kind,httpStatus:status});};
-    const aggregate=()=>({outcomeVersion:2,ownedListRead:true,ownedIdCount:appIds.length,candidateCount:appIdsToResolve.length,attemptedCount:outcomes.size,titleRequests,failedRequests:failedRequestCount,unresolvedCount:unresolvedById.size,malformedRows,
-      outcomes:Object.fromEntries(OUTCOMES.map(kind=>[kind,[...outcomes.values()].filter(value=>value===kind).length])),httpStatuses,unsupportedTypes:types,requests,requestSamplesDropped:Math.max(0,titleRequests-requests.length),...(firstFailure?{firstFailure}:{})});
+    const aggregate=()=>({outcomeVersion:3,ownedListRead:true,ownedIdCount:appIds.length,candidateCount:appIdsToResolve.length,attemptedCount:outcomes.size,titleRequests,failedRequests:failedRequestCount,unresolvedCount:unresolvedById.size,malformedRows,
+      outcomes:Object.fromEntries(OUTCOMES.map(kind=>[kind,[...outcomes.values()].filter(value=>value===kind).length])),httpStatuses,unsupportedTypes:types,placeholderResultCodes,placeholderVisibility,requests,requestSamplesDropped:Math.max(0,titleRequests-requests.length),...(firstFailure?{firstFailure}:{})});
     for (let offset = 0; offset < appIdsToResolve.length; offset += STORE_ITEMS_BATCH_SIZE) {
       const batch = appIdsToResolve.slice(offset, offset + STORE_ITEMS_BATCH_SIZE);
       reportProgress({ completed: offset, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
@@ -121,21 +123,38 @@
         titleRequests++;
         const {body,status}=await fetchStoreItems(batch);
         if(Number.isInteger(status)&&status>=100&&status<=599)requestCounts.httpStatus=status;
-        requestCounts.returnedRowCount=body.response.store_items.length;requestCounts.unexpectedRowCount=0;requestCounts.malformedRowCount=0;requestCounts.duplicateRowCount=0;
+        requestCounts.returnedRowCount=body.response.store_items.length;requestCounts.unexpectedRowCount=0;requestCounts.malformedRowCount=0;requestCounts.duplicateRowCount=0;requestCounts.matchedRowCount=0;requestCounts.placeholderRowCount=0;requestCounts.unavailableCount=0;requestCounts.conflictingIdCount=0;
         if(diagnostics&&Number.isInteger(status)&&status>=100&&status<=599)httpStatuses[status]=(httpStatuses[status]??0)+1;
-        const requested=new Set(batch),byId=new Map();
+        const requested=new Set(batch),byId=new Map(),placeholders=new Map();
         for(const item of body.response.store_items){
-          const id=appId(item?.appid);if(!id){malformedRows++;requestCounts.malformedRowCount++;continue;}
+          let id=appId(item?.appid);
+          // Only an explicit application failure can use `id` for diagnostics.
+          // Never use it as an importable appid, or guess what an error code means.
+          if(!id&&appType(item?.item_type)===0&&Number.isSafeInteger(item?.success)&&item.success>1&&appId(item?.id)){
+            id=appId(item.id);if(!requested.has(id)){requestCounts.unexpectedRowCount++;continue;}
+            const group=placeholders.get(id)??[];if(group.length||byId.has(id))requestCounts.duplicateRowCount++;group.push(item);placeholders.set(id,group);
+            requestCounts.placeholderRowCount++;
+            if(diagnostics){countCode(placeholderResultCodes,item.success);const flag=typeof item.visible==='boolean'?String(item.visible):'unspecified';placeholderVisibility[flag]=(placeholderVisibility[flag]??0)+1;}
+            continue;
+          }
+          if(!id){malformedRows++;requestCounts.malformedRowCount++;continue;}
           if(!requested.has(id)){requestCounts.unexpectedRowCount++;continue;}
-          const group=byId.get(id)??[];if(group.length)requestCounts.duplicateRowCount++;group.push(item);byId.set(id,group);
+          const group=byId.get(id)??[];if(group.length||placeholders.has(id))requestCounts.duplicateRowCount++;group.push(item);byId.set(id,group);requestCounts.matchedRowCount++;
         }
-        requestCounts.matchedIdCount=byId.size;requestCounts.absentCount=batch.length-byId.size;
+        requestCounts.matchedIdCount=byId.size;requestCounts.absentCount=batch.length-new Set([...byId.keys(),...placeholders.keys()]).size;
         for(const id of batch){
-          const group=byId.get(id);if(!group){unresolved(id,'absent',undefined,null,false);continue;}
+          const group=byId.get(id),placeholderGroup=placeholders.get(id);
+          if(placeholderGroup){
+            const item=placeholderGroup[0],signature=row=>JSON.stringify([row.success,typeof row.visible==='boolean'?row.visible:null]);
+            if(group||placeholderGroup.some(row=>signature(row)!==signature(item))){requestCounts.conflictingIdCount++;unresolved(id,'conflictingDuplicate',undefined,null,true);}
+            else{requestCounts.unavailableCount++;unresolved(id,'unavailable',undefined,item,true);}
+            continue;
+          }
+          if(!group){unresolved(id,'absent',undefined,null,false);continue;}
           try{
           const item=group[0],type=appType(item.type);
           const signature=entry=>JSON.stringify([appType(entry?.type),entry?.name==null?['missing']:typeof entry.name==='string'?['text',titleText(entry.name)]:['invalid',typeof entry.name],appId(entry?.related_items?.parent_appid)]);
-          if(group.some(entry=>signature(entry)!==signature(item))){unresolved(id,'conflictingDuplicate',undefined,item,true);continue;}
+          if(group.some(entry=>signature(entry)!==signature(item))){requestCounts.conflictingIdCount++;unresolved(id,'conflictingDuplicate',undefined,item,true);continue;}
           if(type===null){unresolved(id,'invalidType',undefined,item,true);continue;}
           if(![0,4].includes(type)){
             unsupportedIds.add(id);outcome(id,'unsupported',item,true);

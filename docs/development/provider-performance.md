@@ -12,15 +12,29 @@ worker activity journal and provider traces. No Amazon page or Kindle tracing
 is required. The journal remains always bounded; detailed Steam/Epic page traces
 are disabled by default.
 
-For a developer reproduction:
+For a Steam reproduction using only the UI:
 
-1. Open the signed-in Steam or Epic page with the GL panel.
-2. Open browser developer tools. Select GL's **content-script/isolated-world**
-   console context, rather than the website's top-level JavaScript context.
-3. Run `GalacticSync.setProfiling(true)`.
-4. Run Quick update twice (or Sync Epic library twice), waiting for each result.
-5. Export the timing summary from GL Settings before the worker restarts.
-6. Run `GalacticSync.setProfiling(false)`, or reload the provider page.
+1. Open the signed-in Steam Store page with the GL panel.
+2. Expand **Steam diagnostics** and check **Profile the next Quick Update**.
+3. Click **Quick update**, then wait for the completion and **Timing captured**.
+4. Follow **Export timing in GL Settings > Performance diagnostics**, then click
+   **Export timing summary** promptly, before the worker restarts.
+5. To measure a second update, arm the control again before that update.
+
+The one-scan request belongs to this Steam tab, not Settings or other tabs.
+Unchecking cancels it; Full rescan does not consume it. A Quick Update that
+needs its initial full baseline still consumes it. Once started, success,
+failure and cancellation all leave it disarmed. Reloading/closing the page
+clears an unused request. Worker restart cannot rearm it: no persisted request
+or message changes the checkbox. Worker buffers can disappear during a scan;
+the page submits its completed trace and merged spans to whichever worker
+accepts delivery. Lost delivery is reported, without silently retrying or
+claiming capture. There is no worker keepalive or permanent profiling setting.
+
+The existing `GalacticSync.setProfiling` interface remains for development,
+including Epic. It is separate from the one-scan request and is not needed
+for routine Steam testing. The UI does not disable an explicitly enabled
+developer session.
 
 The opt-in is page-local, writes no setting, makes no additional provider
 requests, and logs no individual records. Traces contain durations, bounded
@@ -124,10 +138,11 @@ setup. Older comparison roots lack some new substage instrumentation; zero for
 those absent spans is not proof of zero cost. The total worker/validation/native
 storage measurements remain comparable. Generated reports stay ignored.
 
-For live acceptance, reload the updated extension, enable existing page-local
-profiling, perform a quick update to establish current proof, then leave all GL
-activity idle for at least 60 seconds. Run another quick update and promptly
-export. Check that the worker ID changed and preparation shows `certificate_hit`,
+For live acceptance after loading the updated extension, check **Profile the
+next Quick Update** in Steam diagnostics and run Quick update to establish
+current proof, then leave all GL activity idle for at least 60 seconds. Arm
+the checkbox again, run another Quick update and promptly export through
+Settings. Check that the worker ID changed and preparation shows `certificate_hit`,
 serialization/hash and no `read_validation`; unchanged incomplete completion
 should still have no full DB write/final validation. Compare a prompt warm
 repeat separately. Reload/update and browser restart may lose proof, so the first

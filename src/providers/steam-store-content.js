@@ -11,7 +11,7 @@
       .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; }
       p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Steam's owned App-ID list and checks titles for App IDs not yet saved in GL. These may be retries rather than new purchases. <strong>Full rescan</strong> rebuilds the Steam snapshot.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p><details><summary>Steam diagnostics</summary><p><label><input type="checkbox" data-sample-ids> Sample unresolved App IDs on the next update</label></p><p>App IDs may reveal part of your Steam library. Samples stay in this page, exclude titles and accounts, and are never included in timing exports.</p><button type="button" data-export-sample disabled>Export sampled App IDs</button></details></div>`;
+    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Steam's owned App-ID list and checks titles for App IDs not yet saved in GL. These may be retries rather than new purchases. <strong>Full rescan</strong> rebuilds the Steam snapshot.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p><details><summary>Steam diagnostics</summary><p><label><input type="checkbox" data-profile-next> Profile the next Quick Update</label></p><p data-profile-timing-status role="status">Detailed timing is off.</p><p><a data-open-timing target="_blank" rel="noopener">Export timing in GL Settings > Performance diagnostics</a>. Export promptly: worker timings are held in memory and lost when the worker restarts. Reloading this page clears an unused profiling request.</p><p><label><input type="checkbox" data-sample-ids> Sample unresolved App IDs on the next update</label></p><p>App IDs may reveal part of your Steam library. Samples stay in this page, exclude titles and accounts, and are never included in timing exports.</p><button type="button" data-export-sample disabled>Export sampled App IDs</button></details></div>`;
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
   const sampleCheckbox=shadow.querySelector('[data-sample-ids]'),sampleButton=shadow.querySelector('[data-export-sample]');
@@ -23,8 +23,16 @@
     link.href=url;link.download='GL-steam-app-id-sample.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
 
+  const profileNext=shadow.querySelector('[data-profile-next]'),profileStatus=shadow.querySelector('[data-profile-timing-status]');
+  shadow.querySelector('[data-open-timing]').href=chrome.runtime.getURL('options.html')+'#settings';
+  profileNext.addEventListener('change',()=>{profileStatus.textContent=profileNext.checked?'Armed for the next Quick Update in this Steam tab.':'Detailed timing is off.';});
+  let scanning=false;
   async function sync(mode) {
-    const timing=globalThis.GalacticSync.trace?.('steam'),P=globalThis.GalacticContentsPerformance;let completed=false,uiEnd,fetchEnd,finishEnd;
+    if(scanning)return;scanning=true;
+    const profileThisScan=mode==='incremental'&&profileNext.checked;
+    if(profileThisScan){profileNext.checked=false;profileStatus.textContent='Profiling this Quick Update…';}
+    profileNext.disabled=true;
+    const timing=globalThis.GalacticSync.trace?.('steam',{once:profileThisScan}),P=globalThis.GalacticContentsPerformance;let completed=false,uiEnd,fetchEnd,finishEnd;
     const startEnd=timing?.begin('request_dispatch');
     buttons.forEach((button) => { button.disabled = true; });
     sampleCheckbox.disabled=true;sampleButton.disabled=true;
@@ -60,7 +68,8 @@
       const changed=!state.hasFullBaseline?`Imported ${response.gameCount} games and ${response.addOnCount??0} DLC.`:c?`${c.gamesAdded} new games, ${c.gamesUpdated} updated; ${c.addOnsAdded} new DLC, ${c.addOnsUpdated} updated.`:'Library saved.';
       const incomplete=result.failedRequestCount||unresolvedApps.length;
       const outcomes=result.metadataOutcomes??{},details=[];
-      for(const [kind,label]of [['absent','IDs omitted by Steam'],['missingTitle','Returned entries without titles'],['invalidTitle','Entries with invalid title data'],['invalidType','Entries without a valid application type'],['conflictingDuplicate','IDs with conflicting returned entries'],['classification','Entries GL could not interpret']])if(outcomes[kind])details.push(`${label}: ${outcomes[kind]}.`);
+      for(const [kind,label]of [['unavailable','Steam catalog entries reported unavailable'],['absent','Requested IDs with no identifiable response row'],['missingTitle','Returned entries without titles'],['invalidTitle','Entries with invalid title data'],['invalidType','Entries without a valid application type'],['conflictingDuplicate','IDs with conflicting returned entries'],['classification','Entries GL could not interpret']])if(outcomes[kind])details.push(`${label}: ${outcomes[kind]}.`);
+      if(outcomes.unavailable)details.push('Unavailable catalog metadata does not change ownership.');
       if(result.failedRequestCount)details.push(`Title requests failed: ${result.failedRequestCount}. ${result.failureSummary??''}`);
       if(unresolvedApps.length)details.push(`${unresolvedApps.length} unresolved App IDs will be retried; earlier saved items retained.`);
       if(result.unsupportedAppCount)details.push(`App IDs with unsupported types: ${result.unsupportedAppCount}; no game ownership added for them.`);
@@ -72,10 +81,12 @@
       status.textContent = `Steam import failed: ${error.message}`;
     } finally {
       startEnd?.();fetchEnd?.();finishEnd?.();uiEnd??=timing?.begin('page_ui');
-      buttons.forEach((button) => { button.disabled = false; });
       sampleCheckbox.disabled=false;refreshSampleButton();
       delete status.dataset.busy;
-      if(timing){await new Promise(resolve=>requestAnimationFrame(resolve));uiEnd?.();globalThis.GalacticSync.send({type:'GL_PROVIDER_UI_TIMING',provider:'steam',timing:P.clean(timing.finish(completed?'prepared':'failed'))}).catch(()=>{});}
+      if(timing){await new Promise(resolve=>requestAnimationFrame(resolve));uiEnd?.();try{const reply=await globalThis.GalacticSync.send({type:'GL_PROVIDER_UI_TIMING',provider:'steam',timing:P.clean(timing.finish(completed?'prepared':'failed'))});if(profileThisScan)profileStatus.textContent=reply?.ok?'Timing captured. Export promptly from GL Settings > Performance diagnostics.':'Timing could not be delivered. Arm profiling and try again.';}catch{if(profileThisScan)profileStatus.textContent='Timing could not be delivered. Arm profiling and try again.';}}
+      if(profileThisScan&&!timing)profileStatus.textContent='Timing tools are unavailable. Reload this page before profiling again.';
+      profileNext.disabled=false;scanning=false;
+      buttons.forEach((button) => { button.disabled = false; });
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
