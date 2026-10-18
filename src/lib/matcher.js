@@ -61,7 +61,7 @@ export async function matchItemsAsync(items,requestedItems,context={},options={}
     try{
       if(!entry){
         entry={};committedIndexes.set(key,entry);
-        entry.pending=finishWorkAsync(identityIndexSteps(catalog.providerItems,catalog,{...options,indexReferencesOnly:true}),{...options,onStage:()=>{}})
+        entry.pending=finishWorkAsync(identityIndexSteps(catalog.providerItems,catalog,{...options,indexReferencesOnly:true}),{...options,budgetMs:options.budgetMs??16,onStage:()=>{}})
           .then(value=>{entry.value=value;return value;},error=>{committedIndexes.delete(key);throw error;});
       }
       projection=entry.value??await entry.pending;
