@@ -58,6 +58,74 @@ export const validationCertificateTests=[
   assert.equal(strictDatabaseSerialization({a:1,b:2}),strictDatabaseSerialization({b:2,a:1}));
   assert.equal(strictDatabaseSerialization({x:[null,true,1,'text']}),'{"x":[null,true,1,"text"]}');
  }],
+ ['randomized property-based differential tests verify identical serialization parity, non-mutation and rejection',()=>{
+  function refSerialize(val){
+   const chk=e=>{
+    if(e===null||typeof e==='boolean'||typeof e==='string')return;
+    if(typeof e==='number'&&Number.isFinite(e))return;
+    if(!e||typeof e!=='object')throw Error('Unsupported database value.');
+    const p=Object.getPrototypeOf(e);
+    if(p!==(Array.isArray(e)?Array.prototype:Object.prototype)&&!(p===null&&!Array.isArray(e)))throw Error('Unsupported database object.');
+    if(Object.hasOwn(e,'toJSON'))throw Error('Unsupported database transformation.');
+   };
+   chk(val);
+   return JSON.stringify(val,(_k,e)=>{
+    chk(e);if(e===null||typeof e!=='object')return e;
+    const arr=Array.isArray(e),desc=Object.getOwnPropertyDescriptors(e),ks=Reflect.ownKeys(desc);
+    if(arr&&(ks.length!==e.length+1||Object.keys(e).some((k,i)=>k!==String(i))))throw Error('Unsupported database array.');
+    for(const k of ks){
+     if(arr&&k==='length')continue;
+     const d=desc[k];
+     if(typeof k!=='string'||!d.enumerable||!Object.hasOwn(d,'value')||k==='toJSON')throw Error('Unsupported database property.');
+     chk(d.value);
+    }
+    return arr?e:Object.fromEntries(ks.sort().map(k=>[k,desc[k].value]));
+   });
+  }
+  function prng(seed=0x2468ace0){
+   let s=seed>>>0;
+   return()=>{s=(s+0x6D2B79F5)>>>0;let t=Math.imul(s^(s>>>15),1|s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};
+  }
+  const rnd=prng(),randInt=(min,max)=>Math.floor(rnd()*(max-min+1))+min,pick=arr=>arr[randInt(0,arr.length-1)];
+  const unicodes=['Batman™ & Robin®','Noël','バットマン','Бэтмен','🦇🦸🦹','line1\nline2\rline3\tline4','quotes "here" and \\backslash\\','zero\u0000byte','',' '];
+  const keys=['0','1','2','10','42','100','01','-1','1.5','title','author','year','metadata','蝙蝠侠','é','🌟','','spaced key','slash/key'];
+  function genPrim(){const t=randInt(0,5);if(t===0)return null;if(t===1)return rnd()>0.5;if(t===2)return rnd()>0.5?0:-0;if(t===3)return randInt(-10000,10000);if(t===4)return(rnd()-0.5)*1e5;return pick(unicodes);}
+  function genTree(depth=0,sharedPool=[]){
+   if(depth>5||(depth>1&&rnd()<0.4)){if(sharedPool.length>0&&rnd()<0.35)return pick(sharedPool);return genPrim();}
+   if(rnd()<0.35){const len=randInt(0,4),arr=[];for(let i=0;i<len;i++)arr.push(genTree(depth+1,sharedPool));if(rnd()<0.3)sharedPool.push(arr);return arr;}
+   const obj=rnd()<0.25?Object.create(null):{},num=randInt(0,5);
+   const klist=[...new Set(Array.from({length:num},()=>pick(keys)))].sort(()=>rnd()-0.5);
+   for(const k of klist)obj[k]=genTree(depth+1,sharedPool);
+   if(rnd()<0.3)sharedPool.push(obj);return obj;
+  }
+  function clone(val){
+   if(val===null||typeof val!=='object')return val;
+   if(Array.isArray(val))return val.map(clone);
+   const res=Object.getPrototypeOf(val)===null?Object.create(null):{};
+   for(const k of Reflect.ownKeys(val))res[k]=clone(val[k]);
+   return res;
+  }
+  for(let i=0;i<200;i++){
+   const tree=genTree(0,[]),before=clone(tree);
+   const expected=refSerialize(tree),actual=strictDatabaseSerialization(tree);
+   assert.equal(actual,expected);assert.deepEqual(tree,before);
+  }
+  const bad=[
+   ()=>undefined,()=>NaN,()=>Infinity,()=>-Infinity,()=>10n,()=>Symbol('s'),()=>()=>{},()=>new Date(),()=>/x/i,()=>new Set([1]),()=>new Map([['a',1]]),
+   ()=>({toJSON(){return 1;}}),()=>({toJSON:1}),()=>{const a=[1,2];delete a[0];return a;},()=>{const a=[1];a.x='y';return a;},
+   ()=>{const a=[1];Object.defineProperty(a,'0',{enumerable:false});return a;},()=>{const o={a:1};Object.defineProperty(o,'h',{value:1,enumerable:false});return o;},
+   ()=>{const o={};Object.defineProperty(o,'g',{get:()=>1,enumerable:true});return o;},()=>{const o={};Object.defineProperty(o,'s',{set:()=>{},enumerable:true});return o;},
+   ()=>{const o={a:1};o[Symbol('s')]=2;return o;},()=>{const o={};o.self=o;return o;}
+  ];
+  for(let i=0;i<100;i++){
+   const tree=genTree(0,[]),corrupt=pick(bad)();
+   if(Array.isArray(tree))tree.push(corrupt);else if(tree&&typeof tree==='object')tree['corrupt'+i]=corrupt;
+   let refThrew=false,actThrew=false;
+   try{refSerialize(tree);}catch{refThrew=true;}
+   try{strictDatabaseSerialization(tree);}catch{actThrew=true;}
+   assert.equal(actThrew,refThrew);assert.ok(actThrew);
+  }
+ }],
  ['field changes and corrupt records cannot reuse a formerly valid receipt',async()=>{
   const s=setup();await certify(s);s.db.values[DATABASE_STORAGE_KEY].providerItems['kindle:B000000001'].ownership='unknown';
   const changed=await query(s.writer());assert.ok(changed.stages.includes('snapshot_validation'));assert.equal(handleExternalApiRequest(changed.database,request).results[0].owned,false);

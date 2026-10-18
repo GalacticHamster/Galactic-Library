@@ -16,21 +16,61 @@ export function strictDatabaseSerialization(value){
     if(prototype!==(Array.isArray(entry)?Array.prototype:Object.prototype)&&!(prototype===null&&!Array.isArray(entry)))throw Error('Unsupported database object.');
     if(Object.hasOwn(entry,'toJSON'))throw Error('Unsupported database transformation.');
   };
-  check(value);
-  return JSON.stringify(value,(_key,entry)=>{
-    check(entry);if(entry===null||typeof entry!=='object')return entry;
-    const array=Array.isArray(entry);
-    const descriptors=Object.getOwnPropertyDescriptors(entry),keys=Reflect.ownKeys(descriptors);
-    if(array&&(keys.length!==entry.length+1||Object.keys(entry).some((key,index)=>key!==String(index))))throw Error('Unsupported database array.');
-    for(const key of keys){
-      if(array&&key==='length')continue;
-      const descriptor=descriptors[key];
-      if(typeof key!=='string'||!descriptor.enumerable||!Object.hasOwn(descriptor,'value')||key==='toJSON')throw Error('Unsupported database property.');
-      check(descriptor.value);
+  const isIntegerIndex=k=>String(Number(k)>>>0)===k&&k!=='4294967295';
+  const isCanonicalKeyOrder=keys=>{
+    let inStringPhase=false,prevStringKey='';
+    for(let i=0;i<keys.length;i++){
+      const k=keys[i];
+      if(!isIntegerIndex(k)){
+        if(!inStringPhase){inStringPhase=true;prevStringKey=k;}
+        else{if(prevStringKey>k)return false;prevStringKey=k;}
+      }else if(inStringPhase)return false;
     }
-    // Native storage need not retain the validator's object insertion order.
-    return array?entry:Object.fromEntries(keys.sort().map(key=>[key,descriptors[key].value]));
-  });
+    return true;
+  };
+  const canonicalize=(entry,stack=new Set())=>{
+    check(entry);if(entry===null||typeof entry!=='object')return entry;
+    if(stack.has(entry))throw TypeError('Converting circular structure to JSON');
+    stack.add(entry);
+    try{
+      const isArr=Array.isArray(entry),ownKeys=Reflect.ownKeys(entry);
+      if(isArr){
+        if(ownKeys.length!==entry.length+1||Object.keys(entry).some((key,index)=>key!==String(index)))throw Error('Unsupported database array.');
+        for(let i=0;i<entry.length;i++){
+          const k=String(i),desc=Object.getOwnPropertyDescriptor(entry,k);
+          if(!desc||!desc.enumerable||!Object.hasOwn(desc,'value')||k==='toJSON')throw Error('Unsupported database property.');
+        }
+        let copy=null;
+        for(let i=0;i<entry.length;i++){
+          const val=entry[i],canon=canonicalize(val,stack);
+          if(canon!==val&&!copy)copy=entry.slice(0,i);
+          if(copy)copy.push(canon);
+        }
+        return copy||entry;
+      }
+      if(Object.keys(entry).length!==ownKeys.length)throw Error('Unsupported database property.');
+      for(let i=0;i<ownKeys.length;i++){
+        const k=ownKeys[i];
+        if(typeof k!=='string'||k==='toJSON')throw Error('Unsupported database property.');
+        const desc=Object.getOwnPropertyDescriptor(entry,k);
+        if(!desc||!desc.enumerable||!Object.hasOwn(desc,'value'))throw Error('Unsupported database property.');
+      }
+      if(isCanonicalKeyOrder(ownKeys)){
+        let copy=null;
+        for(let i=0;i<ownKeys.length;i++){
+          const k=ownKeys[i],val=entry[k],canon=canonicalize(val,stack);
+          if(canon!==val&&!copy){copy={};for(let j=0;j<i;j++)copy[ownKeys[j]]=entry[ownKeys[j]];}
+          if(copy)copy[k]=canon;
+        }
+        return copy||entry;
+      }
+      ownKeys.sort();
+      const sorted={};
+      for(let i=0;i<ownKeys.length;i++){const k=ownKeys[i];sorted[k]=canonicalize(entry[k],stack);}
+      return sorted;
+    }finally{stack.delete(entry);}
+  };
+  return JSON.stringify(canonicalize(value));
 }
 const digest=async serialized=>{
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(serialized));
