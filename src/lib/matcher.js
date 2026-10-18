@@ -110,7 +110,7 @@ function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpa
 }
 function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
   yield 'matching_index';
-  const sourceItems=items;
+
   let projection=options.projection;
   if(!projection){
     items=Object.fromEntries(Object.entries(items).map(([id,item])=>[id,effectiveOwnershipRecord(item,context)]));
@@ -129,7 +129,7 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
     projection={...projection,...Object.fromEntries(['byTitle','byBase','byIdentifier','byAlias','byCandidateTitle','byPresentation'].map(key=>[key,view(projection[key])]))};
   }
   const database={...context,providerItems:items};
-  let materializedCoverage=!options.projection;
+
   const {byTitle,byBase,byIdentifier,byAlias,byCandidateTitle,byPresentation,barriers,editionByRecord,graph,negative}=projection;
   const history=projection.historyRefs?projection.history.map(ref=>context.providerHistory?.[ref]).filter(Boolean):projection.history;
   const historicalResults=history.length?yield* matchItemsSteps(Object.fromEntries(history.map(entry=>[entry.item.id,{...entry.item,ownership:'unknown'}])),requestedItems,{manualMatchDecisions:context.manualMatchDecisions}):[];
@@ -220,10 +220,10 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
     }
     let coverage=null;const partialMatches=new Map();
     if(requested?.length){
-      // Coverage enumerates the entire library repeatedly. Materialize the
-      // fresh per-request ownership view once instead of repeatedly enumerating
-      // the lazy Proxy; never share this time-dependent view across requests.
-      if(!materializedCoverage){database.providerItems=Object.fromEntries(Object.keys(sourceItems).map(id=>[id,items[id]]));materializedCoverage=true;}
+      // Content coverage evaluates database.contentReviews and lazily resolves
+      // only referenced parent items via the per-request ownership view.
+
+
       // API v1 has no trusted parent scope. Never forward caller parent fields.
       const result=contentCoverage(database,requested,{excludeProviders:[...exclude],mediaType:query.mediaType});
       const exposed=entries=>entries.map(entry=>({...entry,evidence:entry.evidence.map(({item,review})=>({...publicMatch(item,'contains','Reviewed collected contents.'),verifiedAt:review.verifiedAt}))}));

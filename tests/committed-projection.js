@@ -125,6 +125,42 @@ export const committedProjectionTests=[
     assert.equal(results[0].owned,true);assert.equal(results[1].owned,false);assert.equal(results[2].owned,false);assert.equal(results[3].owned,false);
   }
  }],
+ ['content coverage preserves identical semantics for overlapping collections, partial ownership, unknown ownership and manual confirmations',async()=>{
+  const db=createEmptyDatabase();
+  const entry=(number,run='2020')=>({series:'Batman Adventures',run,unitType:'issue',number,language:'en',completeness:'full'});
+  const colA=normalizeProviderItem({provider:'kindle',providerItemId:'B000000001',title:'Batman Adventures Vol 1',mediaType:'book',ownership:'owned',metadata:{authors:['Writer A']}});
+  const colB=normalizeProviderItem({provider:'kindle',providerItemId:'B000000002',title:'Batman Adventures Vol 2',mediaType:'book',ownership:'owned',metadata:{authors:['Writer B']}});
+  const colC=normalizeProviderItem({provider:'kindle',providerItemId:'B000000003',title:'Batman Adventures Vol 3',mediaType:'book',ownership:'unknown',metadata:{authors:['Writer C']}});
+  const colD=normalizeProviderItem({provider:'kindle',providerItemId:'B000000004',title:'Batman Adventures Vol 4',mediaType:'book',ownership:'unknown',metadata:{authors:['Writer D']}});
+  for(const item of [colA,colB,colC,colD])db.providerItems[item.id]=item;
+  db.contentReviews[colA.id]={entries:[entry('1'),entry('2'),entry('3')],statement:'Collects #1-3',verifiedAt:'2026-10-01'};
+  db.contentReviews[colB.id]={entries:[entry('3'),entry('4'),entry('5')],statement:'Collects #3-5',verifiedAt:'2026-10-01'};
+  db.contentReviews[colC.id]={entries:[entry('7'),entry('8')],statement:'Collects #7-8',verifiedAt:'2026-10-01'};
+  db.contentReviews[colD.id]={entries:[entry('9'),entry('10')],statement:'Collects #9-10',verifiedAt:'2026-10-01'};
+  db.ownershipReviews[colD.recordRef]={reviewRef:crypto.randomUUID(),source:'user-correction',ownership:'owned',confirmedAt:'2026-10-01'};
+  const snapshot=registerCommittedSnapshot(freeze(validateDatabase(db)));
+  const request={type:'MATCH_ITEMS',apiVersion:1,items:[
+    {title:'Batman Omnibus 1',mediaType:'book',contents:[entry('1'),entry('2'),entry('3'),entry('4')],contentsComplete:true},
+    {title:'Batman Omnibus 2',mediaType:'book',contents:[entry('1'),entry('2'),entry('3'),entry('4'),entry('5'),entry('6')],contentsComplete:true},
+    {title:'Batman Omnibus 3',mediaType:'book',contents:[entry('7'),entry('8')],contentsComplete:true},
+    {title:'Batman Omnibus 4',mediaType:'book',contents:[entry('9'),entry('10')],contentsComplete:true}
+  ]};
+  const syncResult=handleExternalApiRequest(snapshot,request);
+  const asyncResult=await handleExternalApiRequestAsync(snapshot,request,opts);
+  assert.deepEqual(asyncResult,syncResult);
+  const [res1,res2,res3,res4]=asyncResult.results;
+  assert.equal(res1.owned,true);assert.equal(res1.coverage.owned,4);assert.equal(res1.coverage.complete,true);assert.equal(res1.coverage.missing.length,0);
+  const res1Ids=new Set(res1.partialMatches.map(m=>m.itemRef));assert.ok(res1Ids.has(colA.recordRef));assert.ok(res1Ids.has(colB.recordRef));
+  assert.equal(res2.owned,false);assert.equal(res2.coverage.owned,5);assert.equal(res2.coverage.complete,false);assert.equal(res2.coverage.missing.length,1);assert.equal(res2.coverage.missing[0].number,'6');
+  assert.equal(res3.owned,false);assert.equal(res3.coverage.owned,0);assert.equal(res3.coverage.missing.length,2);assert.equal(res3.partialMatches.length,0);
+  assert.equal(res4.owned,true);assert.equal(res4.coverage.owned,2);assert.equal(res4.coverage.complete,true);assert.equal(res4.coverage.missing.length,0);assert.equal(res4.partialMatches[0].itemRef,colD.recordRef);
+  const overrideDb=structuredClone(db);overrideDb.ownershipPolicy.providers.kindle=true;
+  const overrideSnapshot=registerCommittedSnapshot(freeze(validateDatabase(overrideDb)));
+  const overrideSync=handleExternalApiRequest(overrideSnapshot,request);
+  const overrideAsync=await handleExternalApiRequestAsync(overrideSnapshot,request,opts);
+  assert.deepEqual(overrideAsync,overrideSync);
+  assert.equal(overrideAsync.results[2].owned,true);assert.equal(overrideAsync.results[2].coverage.complete,true);
+ }],
  ['Options committed view bypasses a held checkpoint, stays detached, preserves eligibility projection and cannot publish uncommitted changes',()=>withWorker(async({memory,pageA,dispatch,dispatchExternal})=>{
   chrome.runtime.sendMessage=async()=>({ok:true});memory.values.galacticLibraryDatabase=fixture();await pageA.saveAllowedExternalClientIds([hb,fan]);
   const before=await pageA.getCommittedLibraryView();
