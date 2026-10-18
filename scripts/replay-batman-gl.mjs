@@ -295,10 +295,13 @@ export async function runGlReplay({ coldRuns = 5, warmRuns = 10 } = {}) {
         workerId: perf?.worker,
         roundTripMs: outcome.roundTripMs,
         totalMs: perf?.totalMs ?? 0,
-        matchingExecutionMs: extractStageDuration(events, 'matching_execution')
+        matchingExecutionMs: extractStageDuration(events, 'matching_execution'),
+        executionCpuMs: perf?.work?.execution?.cpuMs ?? 0,
+        executionWaitMs: perf?.work?.execution?.waitMs ?? 0,
+        executionYields: perf?.work?.execution?.yields ?? 0
       };
       warmResults.push(entry);
-      console.log(`   [Warm ${i}/${warmRuns}] Total: ${entry.totalMs.toFixed(1)}ms | Worker: ${entry.workerId} | Match: ${entry.matchingExecutionMs.toFixed(1)}ms`);
+      console.log(`   [Warm ${i}/${warmRuns}] Total: ${entry.totalMs.toFixed(1)}ms | Match: ${entry.matchingExecutionMs.toFixed(1)}ms | CPU: ${entry.executionCpuMs.toFixed(1)}ms | Yields: ${entry.executionYields}`);
     }
 
     // Compute metrics
@@ -310,6 +313,9 @@ export async function runGlReplay({ coldRuns = 5, warmRuns = 10 } = {}) {
 
     const warmTotalStats = computeStats(warmResults.map(r => r.totalMs));
     const warmExecStats = computeStats(warmResults.map(r => r.matchingExecutionMs));
+    const warmCpuStats = computeStats(warmResults.map(r => r.executionCpuMs));
+    const warmWaitStats = computeStats(warmResults.map(r => r.executionWaitMs));
+    const warmYieldStats = computeStats(warmResults.map(r => r.executionYields));
 
     const report = {
       format: 1,
@@ -334,7 +340,10 @@ export async function runGlReplay({ coldRuns = 5, warmRuns = 10 } = {}) {
         warm: {
           runs: warmRuns,
           totalMs: warmTotalStats,
-          matchingExecutionMs: warmExecStats
+          matchingExecutionMs: warmExecStats,
+          executionCpuMs: warmCpuStats,
+          executionWaitMs: warmWaitStats,
+          executionYields: warmYieldStats
         }
       },
       runs: {
@@ -351,13 +360,15 @@ export async function runGlReplay({ coldRuns = 5, warmRuns = 10 } = {}) {
     console.log('                          GL REPLAY SUMMARY (BATMAN WORKLOAD)                          ');
     console.log('========================================================================================');
     console.log(` Output Parity:      100.0% (${parityMatches}/${expectedResults.length} identical results)`);
-    console.log(` Cold Total:         ${coldTotalStats.median.toFixed(1)}ms median (${coldTotalStats.min.toFixed(1)} - ${coldTotalStats.max.toFixed(1)}ms, p95: ${coldTotalStats.p95.toFixed(1)}ms)`);
-    console.log(`   - snapshot_read:    ${coldReadStats.median.toFixed(1)}ms`);
-    console.log(`   - cert_verify:      ${coldCertStats.median.toFixed(1)}ms`);
-    console.log(`   - index_build:      ${coldIndexStats.median.toFixed(1)}ms`);
-    console.log(`   - matching_exec:    ${coldExecStats.median.toFixed(1)}ms`);
+    if (coldRuns > 0) {
+      console.log(` Cold Total:         ${coldTotalStats.median.toFixed(1)}ms median (${coldTotalStats.min.toFixed(1)} - ${coldTotalStats.max.toFixed(1)}ms, p95: ${coldTotalStats.p95.toFixed(1)}ms)`);
+      console.log(`   - snapshot_read:    ${coldReadStats.median.toFixed(1)}ms`);
+      console.log(`   - cert_verify:      ${coldCertStats.median.toFixed(1)}ms`);
+      console.log(`   - index_build:      ${coldIndexStats.median.toFixed(1)}ms`);
+      console.log(`   - matching_exec:    ${coldExecStats.median.toFixed(1)}ms`);
+    }
     console.log(` Warm Total:         ${warmTotalStats.median.toFixed(1)}ms median (${warmTotalStats.min.toFixed(1)} - ${warmTotalStats.max.toFixed(1)}ms, p95: ${warmTotalStats.p95.toFixed(1)}ms)`);
-    console.log(`   - matching_exec:    ${warmExecStats.median.toFixed(1)}ms`);
+    console.log(`   - matching_exec:    ${warmExecStats.median.toFixed(1)}ms (CPU: ${warmCpuStats.median.toFixed(1)}ms, yields: ${warmYieldStats.median.toFixed(0)}, wait: ${warmWaitStats.median.toFixed(1)}ms)`);
     console.log('========================================================================================\n');
 
     return report;
@@ -371,7 +382,10 @@ export async function runGlReplay({ coldRuns = 5, warmRuns = 10 } = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
-  runGlReplay().catch(err => {
+  const warmOnly = process.argv.includes('--warm-only');
+  const coldRuns = warmOnly ? 0 : 5;
+  const warmRuns = 10;
+  runGlReplay({ coldRuns, warmRuns }).catch(err => {
     console.error('GL Replay Harness failed:', err);
     process.exit(1);
   });

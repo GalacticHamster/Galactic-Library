@@ -149,7 +149,7 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
     // homonym. Use title fallback when the imported copy lacks that identifier,
     // rather than making sparse title candidates override a validated hit.
     const anchors=[...new Set(identified.length?identified:presented)].filter(item=>!exclude.has(item.provider));
-    const compatible=anchors.filter(item=>!identityConflicts(query,item).length);
+    const compatible=anchors.filter(item=>!identityConflicts(query,item,{leftEvidence:evidence}).length);
     // Repeat purchase rows often have distinct canonical IDs because enrichment
     // needs stronger edition evidence. Only real contradictions or review
     // barriers make an otherwise identical companion title ambiguous.
@@ -177,7 +177,7 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
       }
       for(const id of editionByRecord.get(item.id)?.providerItemIds??[]){
         const other=items[id];
-        if(!other||exclude.has(other.provider)||exact.has(id)||identityConflicts(query,other).length)continue;
+        if(!other||exclude.has(other.provider)||exact.has(id)||identityConflicts(query,other,{leftEvidence:evidence}).length)continue;
         if(!reviewed.has(id)&&!identified.includes(other)&&!policy.fullTitleMatches(query.title,other.title,query.mediaType))continue;
         exact.set(id,publicMatch(other,'same-edition',reviewed.has(id)?'Reviewed same-edition relationship.':'Matching compatible full title or validated identifier.'));
       }
@@ -189,11 +189,11 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
       if(reason)candidate(item,reason);
     }
     for(const item of byAlias.get(`${query.mediaType}:${query.normalizedTitle}`)??[]){
-      if(!identityConflicts(query,item,{edition:false}).some(field=>['authors','run','unit','unitType'].includes(field)))candidate(item,'User-supplied alternate title; edition ownership still needs identifier or relationship evidence.');
+      if(!identityConflicts(query,item,{edition:false,leftEvidence:evidence}).some(field=>['authors','run','unit','unitType'].includes(field)))candidate(item,'User-supplied alternate title; edition ownership still needs identifier or relationship evidence.');
     }
     const discovered = new Set(candidateTitleKeys(query.title, query.mediaType).flatMap(key => byCandidateTitle.get(query.mediaType + ':' + key) ?? []));
     for (const item of discovered) {
-      if (exact.has(item.id) || possible.has(item.id) || identityConflicts(query, item, { edition: false }).some(field => ['media type', 'authors', 'run', 'unit', 'unitType'].includes(field))) continue;
+      if (exclude.has(item.provider) || exact.has(item.id) || possible.has(item.id) || identityConflicts(query, item, { edition: false, leftEvidence: evidence }).some(field => ['media type', 'authors', 'run', 'unit', 'unitType'].includes(field))) continue;
       // A numbered issue in this exact complete series is a related item, not
       // proof that the unnumbered offer contains it or has a complete manifest.
       const numbered=titleIdentity(item.title,item.mediaType);
@@ -202,7 +202,7 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
       const reason = seriesItem ? 'Numbered series item related to this title; collection membership and completeness are unconfirmed.'
         : possibleTitleRelation(query.title, item.title, query.mediaType);
       if (reason) {
-        const differences = identityConflicts(query, item);
+        const differences = identityConflicts(query, item, { leftEvidence: evidence });
         candidate(item, reason + (differences.length ? ' Differences: ' + differences.join(', ') + '.' : ''));
       }
     }

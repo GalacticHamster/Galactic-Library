@@ -70,8 +70,8 @@ export function identityEvidence(item) {
 }
 
 const overlap = (left, right) => left.some((value) => right.includes(value));
-export function identityConflicts(left, right, { edition = true, companion = false } = {}) {
-  const a = identityEvidence(left); const b = identityEvidence(right); const conflicts = [];
+export function identityConflicts(left, right, { edition = true, companion = false, leftEvidence = null, rightEvidence = null } = {}) {
+  const a = leftEvidence ?? identityEvidence(left); const b = rightEvidence ?? identityEvidence(right); const conflicts = [];
   if (left.mediaType !== right.mediaType) conflicts.push('media type');
   const authors = policy.authorRelation(a.authors, b.authors);
   if (authors === 'different') conflicts.push('authors');
