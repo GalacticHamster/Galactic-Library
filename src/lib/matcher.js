@@ -72,20 +72,21 @@ export async function matchItemsAsync(items,requestedItems,context={},options={}
 function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpan,indexReferencesOnly=false}={}) {
   const all=Object.values(items);const byTitle=new Map();const byBase=new Map();const byIdentifier=new Map();const byAlias=new Map();
   const references=new Map();
-  const add=(index,key,item)=>{const group=index.get(key)??[];if(indexReferencesOnly&&!references.has(item.id))references.set(item.id,{id:item.id});group.push(indexReferencesOnly?references.get(item.id):item);index.set(key,group);};
+  const add=(index,key,item)=>{const group=index.get(key);if(group)group.push(item);else index.set(key,[item]);};
   const byCandidateTitle = new Map();const byPresentation = new Map();
   for(const item of all){
     yield;
+    let entryItem=item;if(indexReferencesOnly){entryItem=references.get(item.id);if(!entryItem){entryItem={id:item.id};references.set(item.id,entryItem);}}
     const source=item,useCache=cacheImmutableRecords&&Object.isFrozen(source);
     let keys=useCache?immutableRecordKeys.get(source):null;
     if(!keys){keys={presentation:ownershipTitleKeys(item),candidate:candidateTitleKeys(item.title,item.mediaType),identity:identityEvidence(item)};if(useCache)immutableRecordKeys.set(source,keys);}
-    for (const key of keys.presentation) add(byPresentation, item.mediaType + ':' + key, item);
-    for (const key of keys.candidate) add(byCandidateTitle, item.mediaType + ':' + key, item);
-    const identity=keys.identity;add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,item);add(byBase,`${item.mediaType}:${identity.candidateKey}`,item);
-    for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,item);
-    for(const isbn of identity.isbn)add(byIdentifier,`${item.mediaType}:isbn:${isbn}`,item);
-    if(identity.asin)add(byIdentifier,`${item.mediaType}:asin:${identity.asin}`,item);
-    for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,item);
+    for (const key of keys.presentation) add(byPresentation, item.mediaType + ':' + key, entryItem);
+    for (const key of keys.candidate) add(byCandidateTitle, item.mediaType + ':' + key, entryItem);
+    const identity=keys.identity;add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,entryItem);add(byBase,`${item.mediaType}:${identity.candidateKey}`,entryItem);
+    for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,entryItem);
+    for(const isbn of identity.isbn)add(byIdentifier,`${item.mediaType}:isbn:${isbn}`,entryItem);
+    if(identity.asin)add(byIdentifier,`${item.mediaType}:asin:${identity.asin}`,entryItem);
+    for(const work of identity.workIds)add(byBase,`${item.mediaType}:work:${work}`,entryItem);
   }
   const barriers=editionBarriers(context.manualMatchDecisions,context.editionSeparations);
   const trusted=items===context.providerItems&&isCommittedSnapshot(context)&&Boolean(context.canonicalItems);
