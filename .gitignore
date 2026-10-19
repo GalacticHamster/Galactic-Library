@@ -1,11 +1,20 @@
 *.zip
 coverage/
-galactic-library-backup-v*.json
 comixology-ownership-review.md
 
 dist/
+
+# Runtime and testing logs
+*.log
+
+# Personal library exports and external backups
+*library-export*.json
+*detection-report*.json
+galactic-library-backup*.json
+*-backup*.json
 
 # Local audit/replay output and private publication-cleanup inventories.
 /audit-artifacts/
 /node_modules/
 /start.txt
+

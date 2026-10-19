@@ -45,7 +45,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 ### Issue GL-TXT-01: PlayStation Provider Title Contains Stray Question Mark (`?`)
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** Provider Account Selection & Provider Views
-- **File Reference:** [src/ui/provider-accounts.js:16](file:///d:/projects/GalacticLibrary/src/ui/provider-accounts.js#L16)
+- **File Reference:** [src/ui/provider-accounts.js:16](../../src/ui/provider-accounts.js#L16)
 - **Current Behavior:** Displays `PlayStation ? PS4/PS5 Purchased Library`.
 - **Expected Behavior:** Displays `PlayStation — PS4/PS5 Purchased Library` (using em-dash `—` U+2014) matching Xbox `Xbox — Web Library` and Nintendo formatting.
 - **Supporting Evidence:**
@@ -69,7 +69,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 ### Issue GL-TXT-02: `formatters.js` Omits `'playstation'` Provider Label
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** UI Formatting Utilities
-- **File Reference:** [src/ui/formatters.js:2-15](file:///d:/projects/GalacticLibrary/src/ui/formatters.js#L2-L15)
+- **File Reference:** [src/ui/formatters.js:2-15](../../src/ui/formatters.js#L2-L15)
 - **Current Behavior:** `providerLabel('playstation')` falls back to returning the raw provider key `'playstation'`.
 - **Expected Behavior:** `providerLabel('playstation')` should return `'PlayStation'` or `'PlayStation — PS4/PS5'`.
 - **Supporting Evidence:**
@@ -104,7 +104,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 ### Issue GL-INT-01: `sync-health.js` Missing Console Provider Store URLs
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** Sync Health & Diagnostics View
-- **File Reference:** [src/ui/sync-health.js:5-17](file:///d:/projects/GalacticLibrary/src/ui/sync-health.js#L5-L17)
+- **File Reference:** [src/ui/sync-health.js:5-17](../../src/ui/sync-health.js#L5-L17)
 - **Current Behavior:** The "Open provider to sync or retry" action link sets `href="undefined"` when clicked on Nintendo, PlayStation, or Xbox entries.
 - **Expected Behavior:** Links navigate to the legitimate provider library web pages:
   - Nintendo: `https://ec.nintendo.com/my/`
@@ -139,7 +139,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 ### Issue GL-INT-02: Companion Response `SOURCES` Set Omits Console Providers
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** Cross-Extension Companion Messaging
-- **File Reference:** [src/companion/companion-response.js:5-20](file:///d:/projects/GalacticLibrary/src/companion/companion-response.js#L5-L20)
+- **File Reference:** [src/companion/companion-response.js:5-20](../../src/lib/companion-response.js#L5-L20)
 - **Current Behavior:** The `SOURCES` constant in `companion-response.js` lists only PC/media sources:
   ```javascript
   const SOURCES = new Set([
@@ -163,9 +163,9 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** Nintendo Web Importer & GL Provider Card
 - **File References:**
-  - [src/importers/nintendo/nintendo-capture.js:120-135](file:///d:/projects/GalacticLibrary/src/importers/nintendo/nintendo-capture.js#L120-L135)
-  - [src/importers/nintendo/nintendo-injected.js:45-65](file:///d:/projects/GalacticLibrary/src/importers/nintendo/nintendo-injected.js#L45-L65)
-  - [src/ui/providers-view.js:140-160](file:///d:/projects/GalacticLibrary/src/ui/providers-view.js#L140-L160)
+  - [src/importers/nintendo/nintendo-capture.js:120-135](../../src/providers/nintendo-capture.js#L120-L135)
+  - [src/importers/nintendo/nintendo-injected.js:45-65](../../src/providers/nintendo-content.js#L45-L65)
+  - [src/ui/providers-view.js:140-160](../../src/ui/providers-view.js#L140-L160)
 - **Current Behavior:**
   1. In the web overlay on `ec.nintendo.com`, the button is labeled `"Import loaded cards"`.
   2. While the user scrolls through 115 cards, the overlay provides **no progress indicator** (no card count, no loading spinner). If the user clicks "Import loaded cards" before all cards are loaded, it throws an error (`"Nintendo cards still loading (received X of Y). Please wait..."`).
@@ -189,7 +189,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 - **Repositories:** Galactic Library, Humble Bundle, Fanatical
 - **Affected Component:** Primary Action Buttons & Status Banners
 - **File References:**
-  - GL: [src/ui/providers-view.js:150-165](file:///d:/projects/GalacticLibrary/src/ui/providers-view.js#L150-L165)
+  - GL: [src/ui/providers-view.js:150-165](../../src/ui/providers-view.js#L150-L165)
   - HB: `popup.html`, `options.html`
   - FAN: `popup.html`, `options.html`
 - **Current Behavior:**
@@ -217,11 +217,11 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** GL Options & Sync Health UI
 - **File References:**
-  - [options.html:25](file:///d:/projects/GalacticLibrary/options.html#L25): `<summary>Advanced: companion communication checks</summary>`
-  - [src/ui/sync-health.js:7](file:///d:/projects/GalacticLibrary/src/ui/sync-health.js#L7): `"Advanced update details and coverage"`
-  - [src/ui/providers-view.js:114](file:///d:/projects/GalacticLibrary/src/ui/providers-view.js#L114): `"Full import saved."`
-  - [src/ui/providers-view.js:108](file:///d:/projects/GalacticLibrary/src/ui/providers-view.js#L108): `"Selected for updates:"`
-  - [src/ui/options.js:77](file:///d:/projects/GalacticLibrary/src/ui/options.js#L77): Dumps raw JSON `JSON.stringify(response, null, 2)` directly into a pre tag in the main options view.
+  - [options.html:25](../../options.html#L25): `<summary>Advanced: companion communication checks</summary>`
+  - [src/ui/sync-health.js:7](../../src/ui/sync-health.js#L7): `"Advanced update details and coverage"`
+  - [src/ui/providers-view.js:114](../../src/ui/providers-view.js#L114): `"Full import saved."`
+  - [src/ui/providers-view.js:108](../../src/ui/providers-view.js#L108): `"Selected for updates:"`
+  - [src/ui/options.js:77](../../src/ui/options.js#L77): Dumps raw JSON `JSON.stringify(response, null, 2)` directly into a pre tag in the main options view.
 - **Current Behavior:** Internal debugging terminology and raw JSON blobs are presented to end-users on standard configuration screens.
 - **Expected Behavior:**
   - `"Advanced: companion communication checks"` -> **"Companion Extensions Status"**
@@ -280,7 +280,7 @@ The ecosystem architecture (specifically the strict separation between Catalog I
 ### Issue GL-UI-03: Provider Card Narrow-Width Layout Clipping
 - **Repository:** Galactic Library (`GalacticLibrary`)
 - **Affected Component:** Options Page Provider Grid
-- **File Reference:** [src/ui/providers-view.js](file:///d:/projects/GalacticLibrary/src/ui/providers-view.js) / [ui.css](file:///d:/projects/GalacticLibrary/ui.css)
+- **File Reference:** [src/ui/providers-view.js](../../src/ui/providers-view.js) / [ui.css](../../src/ui/ui.css)
 - **Current Behavior:** In viewports narrower than 900px, provider cards with multiple buttons ("Quick Update", "Full Rescan", "Accounts", "Re-authenticate") cause text to wrap awkwardly or button bars to overflow their container.
 - **Expected Behavior:** Responsive CSS flex-wrap or grid auto-fit rules ensure button bars stack neatly without clipping timestamps or account labels.
 - **Severity:** **P2**
