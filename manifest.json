@@ -231,8 +231,7 @@
     },
     {
       "matches": [
-        "https://www.fanatical.com/orders*",
-        "https://www.fanatical.com/*/orders*"
+        "https://www.fanatical.com/*"
       ],
       "js": [
         "shared/theme.js",

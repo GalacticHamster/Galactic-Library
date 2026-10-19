@@ -277,3 +277,8 @@ was reverified. Steam's candidate App IDs include retries and unsupported types,
 not just new purchases; an owned-ID list can load successfully while title lookup
 remains incomplete. Retry later if the title service fails. Optional diagnostic
 steps are in [Steam outcome diagnostics](../development/steam-outcome-diagnostics.md).
+
+On Fanatical, the import panel appears only on Orders. Navigating to a bundle
+removes it and shows Fanatical Library's bundle summary when that companion is
+installed. Returning to Orders restores the import panel. An import already
+submitted for saving can finish; a detached panel cannot start another save.
