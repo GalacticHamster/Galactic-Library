@@ -148,3 +148,7 @@ use `npm run package:firefox`, extract the ZIP and load its manifest through
 See [release validation](docs/development/release-packaging.md),
 [matching policy](docs/architecture/matching-policy.md), and
 [companion API](docs/architecture/companion-api.md).
+
+## Support development
+
+Enjoying Galactic Hamster's free, open-source tools? If you'd like to support continued development, you can [buy us a coffee on Ko-fi](https://ko-fi.com/galactichamster). Donations are entirely optional.
