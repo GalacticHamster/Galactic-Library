@@ -136,5 +136,21 @@ export const nintendoImportTests=[
    const scan=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'nintendo',beginScan:true,confirmed:true,profileLabel:'Personal',mode:'full',sourceAccountFingerprint:fingerprint},sender);assert(scan.ok,scan.error);
    const result=await dispatch({type:'COMMIT_PROVIDER_SCAN',provider:'nintendo',items,snapshot:snapshot(items),scanToken:scan.scanToken,sourceAccountFingerprint:fingerprint,mode:'full'},sender);assert(result.ok,result.error);assert.equal(result.gameCount,1);
    const d=await pageA.getDatabase();assert.equal(record(d).metadata.cardId,'card-a');assert.equal(d.providerProfiles[d.providers.nintendo.activeProfileId].sourceAccountFingerprint,fingerprint);
- })]
+ })],
+  ['Nintendo capture emits live progress events with loaded count, total, and completion status',async()=>{
+    const h=captureHarness();
+    h.start(h.rows(50),0,100)();
+    const progressMsgs=h.posts.filter(p=>p.channel==='gl-nintendo-progress');
+    assert(progressMsgs.length>=1,'Progress event was not emitted on page finish');
+    const first=progressMsgs[progressMsgs.length-1];
+    assert.equal(first.loaded,50);
+    assert.equal(first.total,100);
+    assert.equal(first.complete,false);
+    const rows2=Array.from({length:50},(_,i)=>({id:'card-page2-'+i,applicationId:'app-page2-'+i,applicationName:'Page2 Game '+i,apparentPlatform:'NX',ownerNaId:'private-account',userNaId:'private-account',hasReleasedApplication:true}));
+    h.start(rows2,50,100)();
+    const second=h.posts.filter(p=>p.channel==='gl-nintendo-progress').pop();
+    assert.equal(second.loaded,100);
+    assert.equal(second.total,100);
+    assert.equal(second.complete,true);
+  }]
 ];

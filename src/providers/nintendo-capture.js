@@ -33,22 +33,36 @@
       return {offset:v.offset,limit:v.limit,scope:JSON.stringify([v.shopId,v.country??null,v.language??null,v.nasLanguage??null,v.sortBy,v.order])};
     }catch{return null;}
   }
+  function emitProgress(){
+    const ordered=[...pages.values()].sort((a,b)=>a.offset-b.offset);
+    let offset=0,contiguousItems=0,total=null,complete=false;
+    for(const page of ordered){
+      if(page.offset!==offset)break;
+      if(page.expectedCount!=null)total=page.expectedCount;
+      contiguousItems+=page.items.length;
+      offset=page.nextOffset;
+      if(page.complete)complete=true;
+    }
+    const isComplete=complete&&(total==null||contiguousItems===total);
+    window.postMessage({channel:'gl-nintendo-progress',loaded:contiguousItems,total,complete:isComplete,pending:pending>0,problem:problem||''},location.origin);
+  }
   function begin(info){
     if(!info)return null;
     epoch++;pending++;
-    if(info.unsupported){pages.clear();problem=info.unsupported;return {...info,generation};}
+    if(info.unsupported){pages.clear();problem=info.unsupported;emitProgress();return {...info,generation};}
     // A new first page starts a new observation set. Never union scans or filters.
     if(info.offset===0){generation++;pages.clear();problem='';scope=info.scope;}
     else if(info.scope!==scope){pages.clear();problem='Nintendo changed the library scope between pages. Reload before importing.';}
     let actor;try{actor=currentAccount();}catch(error){problem=error.message;}
     if(account&&actor!==account){pages.clear();problem='The signed-in Nintendo account changed. Reload the page before importing.';}
     account=actor??null;
+    emitProgress();
     return {...info,account,generation};
   }
   function finish(ticket,status,body){
     if(!ticket)return;pending--;epoch++;
     if(ticket.generation!==generation)return;
-    if(ticket.unsupported)return;
+    if(ticket.unsupported){emitProgress();return;}
     try{
       if(ticket.account!==account||currentAccount()!==ticket.account)throw Error('The signed-in Nintendo account changed. Reload the page before importing.');
       if(status!==200)throw Error('Nintendo could not load the card list. Reload the page; saved GL items are unchanged.');
@@ -56,6 +70,7 @@
       if(pages.size>=500&&!pages.has(parsed.offset)||[...pages.values()].filter(p=>p.offset!==parsed.offset).reduce((n,p)=>n+p.items.length,0)+parsed.items.length>50000)throw Error('The loaded card list exceeds the safe import limit.');
       pages.set(parsed.offset,parsed);
     }catch(error){problem=error.message;pages.clear();}
+    emitProgress();
   }
   const originalFetch=globalThis.fetch;
   globalThis.fetch=function(...args){
@@ -110,7 +125,9 @@
   }
   addEventListener('message',async event=>{
     const r=event.data;
-    if(event.source!==window||event.origin!==location.origin||r?.channel!=='gl-nintendo-request'||!['prepare','verify'].includes(r.action)||typeof r.nonce!=='string'||!/^[a-f0-9]{32}$/u.test(r.nonce))return;
+    if(event.source!==window||event.origin!==location.origin)return;
+    if(r?.channel==='gl-nintendo-status-request'){emitProgress();return;}
+    if(r?.channel!=='gl-nintendo-request'||!['prepare','verify'].includes(r.action)||typeof r.nonce!=='string'||!/^[a-f0-9]{32}$/u.test(r.nonce))return;
     try{const value=await snapshot();window.postMessage({channel:'gl-nintendo-response',nonce:r.nonce,ok:true,...(r.action==='verify'?{sourceAccountFingerprint:value.sourceAccountFingerprint,captureVersion:value.captureVersion}:value)},location.origin);}
     catch(error){window.postMessage({channel:'gl-nintendo-response',nonce:r.nonce,ok:false,error:error.message},location.origin);}
   });

@@ -4,10 +4,21 @@
   if(location.origin!=='https://accounts.nintendo.com'||!/^\/portal\/vgcs(?:\/|$)/u.test(location.pathname)||document.getElementById('galactic-library-nintendo-importer'))return;
   const host=document.createElement('div');host.id='galactic-library-nintendo-importer';host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(410px,95vw)';
   const shadow=host.attachShadow({mode:'open'});
-  shadow.innerHTML='<style>:host{font:14px system-ui}.panel{background:var(--gh-surface,#fff);color:var(--gh-text,#111);border:1px solid var(--gh-border,#888);border-radius:10px;padding:16px;box-shadow:0 4px 20px #0003}button{font:inherit;padding:7px 12px;background:var(--gh-accent,#7c3aed);color:var(--gh-on-accent,#fff);border:0;border-radius:6px}p{margin:9px 0}</style><section class="panel"><h3>Galactic Library · Nintendo</h3><p>Switch Virtual Game Cards. Import the non-hidden cards loaded by this page. Other Nintendo purchases and older consoles are not included.</p><button type="button" data-mode="full">Import loaded cards</button><p data-import-status role="status">Let Nintendo finish loading the card list before importing. Previously saved GL items will be retained.</p></section>';
+  shadow.innerHTML='<style>:host{font:14px system-ui}.panel{background:var(--gh-surface,#fff);color:var(--gh-text,#111);border:1px solid var(--gh-border,#888);border-radius:10px;padding:16px;box-shadow:0 4px 20px #0003}button{font:inherit;padding:7px 12px;background:var(--gh-accent,#7c3aed);color:var(--gh-on-accent,#fff);border:0;border-radius:6px}p{margin:9px 0}</style><section class="panel"><h3>Galactic Library · Nintendo</h3><p>Switch Virtual Game Cards. Import the non-hidden cards loaded by this page. Other Nintendo purchases and older consoles are not included.</p><button type="button" data-mode="full">Import Nintendo cards</button><p data-import-status role="status">Let Nintendo finish loading the card list before importing. Previously saved GL items will be retained.</p></section>';
   document.documentElement.append(host);
   globalThis.GalacticFloatingPanel?.attach?.(shadow,'nintendo');
   const button=shadow.querySelector('[data-mode]'),status=shadow.querySelector('[data-import-status]');
+  let importing=false;
+  window.addEventListener('message',event=>{
+    const r=event.data;
+    if(event.source!==window||event.origin!==location.origin||r?.channel!=='gl-nintendo-progress'||importing)return;
+    if(r.problem){status.textContent=r.problem;return;}
+    if(r.complete){status.textContent=`All ${r.loaded} cards loaded and ready to import. Previously saved GL items will be retained.`;}
+    else if(r.total!=null){status.textContent=`Loaded ${r.loaded} of ${r.total} cards. Scroll down to load more cards.`;}
+    else if(r.loaded>0){status.textContent=`Loaded ${r.loaded} cards. Scroll down to load more cards.`;}
+    else if(r.pending){status.textContent='Loading cards from Nintendo…';}
+  });
+  window.postMessage({channel:'gl-nintendo-status-request'},location.origin);
   function bridge(action){
     const nonce=[...crypto.getRandomValues(new Uint8Array(16))].map(n=>n.toString(16).padStart(2,'0')).join('');
     return new Promise((resolve,reject)=>{
@@ -23,7 +34,7 @@
     });
   }
   button.addEventListener('click',async()=>{
-    if(button.disabled)return;button.disabled=true;status.setAttribute('aria-busy','true');
+    if(button.disabled)return;button.disabled=true;status.setAttribute('aria-busy','true');importing=true;
     try{
       status.textContent='Checking the loaded cards and signed-in Nintendo account…';
       const captured=await bridge('prepare');
@@ -36,6 +47,6 @@
       const owned=captured.items.filter(i=>i.ownership==='owned').length,borrowed=captured.items.filter(i=>i.ownership==='borrowed').length,unknown=captured.items.length-owned-borrowed;
       status.textContent=`Imported ${captured.items.length} cards · ${owned} owned${borrowed?` · ${borrowed} borrowed`:''}${unknown?` · ${unknown} with unconfirmed access`:''}. Previously saved cards were retained. No purchase dates were inferred.`;
     }catch(error){status.textContent=error.message;await globalThis.GalacticSync?.failed?.('nintendo',error);}
-    finally{button.disabled=false;status.setAttribute('aria-busy','false');}
+    finally{button.disabled=false;status.setAttribute('aria-busy','false');importing=false;}
   });
 }());

@@ -8,8 +8,12 @@ export function createContentsScanProgress({runtime, reconcile, container, clock
   const tools=globalThis.GalacticContentsScan;
   const element=document.createElement('section');element.id='kindle-contents-progress';element.hidden=true;
   const status=document.createElement('p');status.setAttribute('role','status');
+  const details=document.createElement('details');details.className='technical-details';
+  const detailsSummary=document.createElement('summary');detailsSummary.textContent='Show scan details';
+  const detailsList=document.createElement('ul');
+  details.append(detailsSummary,detailsList);
   const refresh=document.createElement('button');refresh.type='button';refresh.textContent='Refresh library now';
-  const feedback=document.createElement('p');feedback.setAttribute('role','status');element.append(status,refresh,feedback);container.prepend(element);
+  const feedback=document.createElement('p');feedback.setAttribute('role','status');element.append(status,details,refresh,feedback);container.prepend(element);
   let runs=[],dirty=false,lastFull=clock(),refreshing=null,timer=null,changedDuringRefresh=false;
   const active=()=>runs.some(tools.active);
   function fullRefresh() {
@@ -24,7 +28,26 @@ export function createContentsScanProgress({runtime, reconcile, container, clock
   }
   function render() {
     element.hidden=!runs.length;
-    status.textContent=runs.map(run=>`Kindle contents ${run.phase}: ${run.checked}/${run.total} checked; ${run.total-run.checked} remaining; ${run.found} statements found; ${run.empty} contents not extracted; ${run.unavailable} pages unavailable; ${run.failures} retryable failures; ${run.reparsed} locally reparsed. ${run.buffered} results waiting to save.`).join(' ');
+    status.textContent=runs.map(run=>{
+      const phasePrefix=run.phase==='completed'?'Kindle contents check completed':run.phase==='paused'?'Kindle contents check paused':'Checking Kindle book contents';
+      let msg=`${phasePrefix}: ${run.checked} of ${run.total} books checked (${run.total-run.checked} remaining).`;
+      if(run.failures||run.unavailable)msg+=" Some books couldn't be checked; you can retry later.";
+      if(run.buffered)msg+=` ${run.buffered} result${run.buffered===1?'':'s'} waiting to save.`;
+      return msg;
+    }).join(' ');
+    detailsList.replaceChildren();
+    for(const run of runs){
+      for(const [label,val] of [
+        ['Statements found',run.found],
+        ['Contents not extracted',run.empty],
+        ['Pages unavailable',run.unavailable],
+        ['Retryable failures',run.failures],
+        ['Locally reparsed',run.reparsed],
+        ['Results waiting to save',run.buffered]
+      ]){
+        const item=document.createElement('li');item.textContent=`${label}: ${val}`;detailsList.append(item);
+      }
+    }
   }
   function accept(values) {
     const wasActive=active();

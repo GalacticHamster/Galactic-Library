@@ -31,5 +31,13 @@ try {
   if (addOnCount) parts.push(`${addOnCount} DLC add-on${addOnCount === 1 ? '' : 's'}`);
   summary.textContent = parts.length ? `${parts.join('; ')}.` : Object.keys(database.providerProfiles??{}).length?'No imported items to show. Check your saved accounts in Providers.':'No libraries imported yet.';
 } catch (error) {
-  summary.textContent = `Could not load library: ${error.message}`;
+  summary.textContent = "Couldn't open your saved library. Close and reopen this popup, or open your library below.";
+  const details = document.createElement('details');
+  details.className = 'technical-details';
+  const summaryEl = document.createElement('summary');
+  summaryEl.textContent = 'Show technical details';
+  const message = document.createElement('p');
+  message.textContent = String(error?.message ?? error);
+  details.append(summaryEl, message);
+  summary.after(details);
 } finally {summary.setAttribute('aria-busy','false');}

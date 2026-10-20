@@ -133,9 +133,9 @@ export function createEvidenceInspector(canonical, records, database, actions, {
       const savedChoice=titleChoices.find(record=>record.title===savedTitle);
       if(savedChoice)preferred.value=savedChoice.recordRef;
       preferred.disabled=!b;
-      if(!a||!b){conflicts.textContent='Choose a record to inspect identity conflicts.';return;}
+      if(!a||!b){conflicts.textContent='Choose an item to compare editions.';return;}
       const differences=identityConflicts(a,b);
-      conflicts.textContent=differences.length?`Known differences: ${differences.join(', ')}. These prevent a same-edition merge.`:'No known conflicting fields. Missing evidence still needs human review.';
+      conflicts.textContent=differences.length?`These details differ: ${differences.join(', ')}. The items can't be combined as the same edition.`:'No known conflicting fields. Missing evidence still needs human review.';
     };
     const picker=createRelationshipPicker(database,()=>left.value,compare);
     left.addEventListener('change',picker.update);

@@ -84,7 +84,7 @@
         if(accountTiming&&result.performance?.profileHintStatus)accountTiming.profileHintStatus=result.performance.profileHintStatus;
         if(!resolved&&!edited&&!input.value&&result?.hint){
           hintValue=result.hint.nickname;input.value=hintValue;
-          controls.querySelector('[data-profile-status]').textContent='Remembered account shown; verifying saved account before updating...';
+          controls.querySelector('[data-profile-status]').textContent='Checking which saved account this import will update...';
           accountTiming?.begin('provider_hint_display')();
         }
       }).catch(()=>{hintEnd?.();}).finally(()=>{hintFinished=true;reportAccountTiming();});
