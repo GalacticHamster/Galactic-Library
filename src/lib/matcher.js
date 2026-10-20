@@ -12,7 +12,8 @@ const policy = globalThis.LibraryMatchingPolicy;
 // Cache only title/identity derivations, never entitlement, expiry or decisions.
 const immutableRecordKeys=new WeakMap();
 const committedIndexes=new WeakMap();
-const identityConflicts = (left, right, options = {}) => recordConflicts(left, right, { ...options, companion: true });
+const identityConflicts = (left, right, options = {}) => policy.gameInstallmentConflict(left.title, right.title, left.mediaType)
+  ? ['game installment'] : recordConflicts(left, right, { ...options, companion: true });
 
 // Companion checks can establish a full storefront title without merging GL's
 // canonical editions or approving enrichment. Missing metadata is not a conflict.
@@ -156,6 +157,7 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
     const ambiguous=ambiguousMatches(compatible,barriers);
     const exact=new Map();const possible=new Map();
     const candidate=(item,reason,relationship='same-work')=>{
+      if(policy.gameInstallmentConflict(query.title,item.title,query.mediaType))return;
       if(compatible.length && compatible.every(anchor=>negative.has([anchor.id,item.id].sort().join('\u0000'))))return;
       if(!exclude.has(item.provider)&&!exact.has(item.id))possible.set(item.id,publicMatch(item,relationship,reason,0.8));
     };

@@ -59,6 +59,7 @@ function closeTitleSpelling(left, right) {
 // Candidate rules never prove ownership. Callers must still check media,
 // known authors, runs and numbered units before presenting these warnings.
 export function possibleTitleRelation(left, right, kind = 'book') {
+  if (globalThis.LibraryMatchingPolicy.gameInstallmentConflict(left, right, kind)) return '';
   const a = normalizeTitle(left); const b = normalizeTitle(right);
   if (!a || !b) return '';
   const numbered = globalThis.LibraryMatchingPolicy.numberedCollectionRelation(left, right, kind);

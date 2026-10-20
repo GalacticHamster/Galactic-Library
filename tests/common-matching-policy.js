@@ -48,7 +48,7 @@ commonMatchingPolicyTests.push(['HB, FAN and GL agree on shared policy behavior 
     const kind=row.media??'book',kinds=kind==='book'?['book','comic']:[kind];
     return kinds.flatMap(kind=>row.records.map(record=>({
       offered:policy.presentationTitle(row.offer.title,kind),stored:policy.ownershipTitleKeys(record.title,kind),
-      exact:policy.fullTitleMatches(row.offer.title,record.title,kind),revision:policy.revisionWordingConflict(row.offer.title,record.title,kind),
+      installmentConflict:policy.gameInstallmentConflict(row.offer.title,record.title,kind),exact:policy.fullTitleMatches(row.offer.title,record.title,kind),revision:policy.revisionWordingConflict(row.offer.title,record.title,kind),
       offeredParts:policy.revisionTitleParts(row.offer.title,kind),storedParts:policy.revisionTitleParts(record.title,kind),
       related:Boolean(policy.relatedPresentationReason(row.offer.title,record.title,kind)),
       collection:policy.numberedCollectionRelation(row.offer.title,record.title,kind)===null?null:Boolean(policy.numberedCollectionRelation(row.offer.title,record.title,kind))
@@ -106,4 +106,21 @@ commonMatchingPolicyTests.push(['software identity keeps release/tier difference
     assert.equal(matchItems(records,[{title:right,mediaType}])[0].owned,false,'Neither a related owned release nor an exact unknown record establishes ownership');
     assert.equal(JSON.stringify(records),before);
   }
+}]);
+
+commonMatchingPolicyTests.push(['game installment barrier rejects fallback and alias candidates without suppressing valid matches',()=>{
+  const wrong=normalizeProviderItem({provider:'steam',providerItemId:'wrong-sequel',title:'Cat Quest II',mediaType:'game',ownership:'owned'});
+  const valid=normalizeProviderItem({provider:'gog',providerItemId:'right-sequel',title:'Cat Quest III',mediaType:'game',ownership:'owned'});
+  const items={[wrong.id]:wrong,[valid.id]:valid};
+  const context={titleAliases:{[wrong.recordRef]:{titles:['Cat Quest III']}}};
+  const result=matchItems(items,[{title:'Cat Quest III',mediaType:'game'}],context)[0];
+  assert.equal(result.owned,true);
+  assert.deepEqual(result.matches.map(record=>record.title),['Cat Quest III']);
+  assert.equal(result.possibleMatches.length,0);
+  for(const [title,stored]of [['Cat Quest III','Cat Quest II'],['Cat Quest II','Cat Quest III'],['Portal','Portal 2']]){
+    const item={...wrong,title,normalizedTitle:title.toLowerCase()};
+    const response=matchItems({[item.id]:item},[{title:stored,mediaType:'game'}])[0];
+    assert.equal(response.owned,false);assert.equal(response.matches.length,0);assert.equal(response.possibleMatches.length,0);
+  }
+  assert.equal(globalThis.LibraryMatchingPolicy.gameInstallmentConflict('Final Fantasy VII','Final Fantasy VII Remake','game'),false);
 }]);
