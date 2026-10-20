@@ -21,14 +21,15 @@ function relationTitleParts(value, kind) {
     if (found && found.index > 0) { title = title.slice(0, found.index).trim(); hasEdition = true; }
   };
   stripEdition();
-  const qualifier = /^(.*?)\s*\(([^()]*)\)\s*$/u.exec(title);
-  if (qualifier?.[1]?.trim()) {
-    hasEdition ||= edition.test(' ' + qualifier[2]);
-    title = qualifier[1].trim(); stripEdition();
+  const catalog = globalThis.LibraryMatchingPolicy.trailingTitleQualifier(title);
+  const qualifier = catalog.qualifier;
+  if (qualifier && catalog.base) {
+    hasEdition ||= edition.test(' ' + qualifier);
+    title = catalog.base; stripEdition();
   }
   const subtitle = /^(.*?)\s*:\s+(.+)$/u.exec(title);
   return { primary: kind === 'book' ? presentationTitle(subtitle?.[1]?.trim() || title, kind) : normalizeTitle(subtitle?.[1]?.trim() || title), subtitle: Boolean(subtitle),
-    qualifier: Boolean(qualifier), hasEdition, hasVersion: false };
+    complete: presentationTitle(title, kind), qualifier: Boolean(qualifier), hasEdition, hasVersion: false };
 }
 
 const CANDIDATE_STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'to', 'in', 'for', 'with', 'by', 'vol', 'volume', 'edition', 'book', 'game', 'software']);
@@ -64,6 +65,8 @@ export function possibleTitleRelation(left, right, kind = 'book') {
   if (!a || !b) return '';
   const numbered = globalThis.LibraryMatchingPolicy.numberedCollectionRelation(left, right, kind);
   if (numbered !== null) return numbered;
+  const collection = globalThis.LibraryMatchingPolicy.collectionTitleRelation(left, right, kind);
+  if (collection) return collection;
   const presentation = globalThis.LibraryMatchingPolicy.relatedPresentationReason(left, right, kind);
   if (presentation) return presentation;
   if (a === b || presentationTitle(left, kind) === presentationTitle(right, kind)) return 'Related title presentation; identity needs review.';
@@ -72,10 +75,11 @@ export function possibleTitleRelation(left, right, kind = 'book') {
   if (access(a) === access(b)) return 'Related title, but preview/sample access does not establish the full product.';
   const numbers = value => (value.match(/\d+(?:\.\d+|\/\d+)?/gu) ?? []).join('|');
   const l = relationTitleParts(left, kind); const r = relationTitleParts(right, kind);
+  if (['book', 'audiobook'].includes(kind) && l.complete && l.complete === r.complete && (l.qualifier || r.qualifier || l.hasEdition || r.hasEdition)) return 'One title is a shortened or qualified presentation of the other.';
   if (l.primary && l.primary === r.primary) {
     if (kind === 'software' && (l.hasVersion || r.hasVersion) && l.primary.replace(/\s/gu, '').length >= 8) return 'Related software title with different version labels.';
     if (kind === 'book' || kind === 'audiobook') {
-      if (l.hasEdition || r.hasEdition) return 'Related main title with different edition or subtitle wording.';
+      if (!(l.subtitle && r.subtitle) && (l.hasEdition || r.hasEdition)) return 'Related main title with different edition or subtitle wording.';
       // A bare title may have a longer store presentation, even if short.
       // Independently subtitled works are not inferred from a shared prefix.
       if (!(l.subtitle && r.subtitle) && (l.subtitle || r.subtitle || l.qualifier || r.qualifier)

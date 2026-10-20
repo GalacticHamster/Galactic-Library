@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {coverageBook,coverageDatabase,issue,confirmed} from './inferred-coverage-fixture.js';
+import {libraryContentCoverage} from '../src/lib/inferred-coverage.js';
 import {scenarios,centralResults,book,database,sequel,original,deluxe} from './fixtures/matching/cross-provider-collections.mjs';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 export const crossProviderCollectionTests=[];
@@ -49,4 +51,35 @@ test('record-scoped identity preserves providers/accounts/access and public priv
 test('generic deluxe overlap remains unresolved rather than an assignment to Book One',()=>{
  const s=scenarios().find(s=>s.name==='deluxe-unknown');
  for(const n of [1,2,3]){const r=find(s.db,deluxe(n));assert.equal(r.owned,false);assert(r.possibleMatches.some(m=>m.title==='30 Days of Night'));}
+});
+
+
+test('different stories with edition wording still expose explicitly verified synthetic issue overlap',()=>{
+ const item=book('kindle','Synthetic Franchise: First Story');
+ const entry=number=>({series:'Synthetic Comic',run:'2020',language:'en',unitType:'issue',number:String(number),completeness:'full'});
+ const db=database([item]);db.contentReviews[item.id]={entries:[entry(1)]};
+ const before=JSON.stringify(db);
+ const result=find(db,'Synthetic Franchise: Second Story (New Edition)',{contents:[entry(1),entry(2)],contentsComplete:true});
+ assert.equal(result.owned,false);assert.equal(result.matches.length,0);assert.equal(result.possibleMatches.length,0);
+ assert.equal(result.coverage.owned,1);assert.equal(result.partialMatches.length,1);
+ assert.equal(result.partialMatches[0].title,item.title);assert.equal(result.partialMatches[0].relationship,'contains');
+ assert.equal(JSON.stringify(db),before);
+});
+
+
+test('collection story: unreviewed Complete contents remain inferred; only a confirmed review can establish Partial',()=>{
+ const title='Batman: The Complete Hush (Batman (1940-2011))';
+ const item=coverageBook('synthetic-complete','Collects Synthetic Comic (2020) #1-2',{title});
+ const db=coverageDatabase(item),entry=n=>issue(String(n),{series:'Synthetic Comic',run:'2020'});
+ const offer='Batman: Hush (New Edition) (Batman (1940-2011))';
+ const extra={contents:[entry(1),entry(3)],contentsComplete:true};
+ assert.equal(libraryContentCoverage(db,[entry(1)]).inferred,1);
+ const before=JSON.stringify(db),inferred=find(db,offer,extra);
+ assert.equal(inferred.owned,false);assert.equal(inferred.coverage.owned,0);assert.equal(inferred.partialMatches.length,0);
+ assert.deepEqual(inferred.possibleMatches.map(x=>x.title),[title]);assert.equal(JSON.stringify(db),before);
+ db.contentReviews[item.id]=confirmed([entry(1),entry(2)]);
+ const reviewed=find(db,offer,extra);assert.equal(reviewed.owned,false);assert.equal(reviewed.coverage.owned,1);assert.equal(reviewed.partialMatches.length,1);
+ for(const ownership of ['unknown','subscription','borrowed','returned']){
+  item.ownership=ownership;assert.equal(find(db,offer,extra).coverage.owned,0);
+ }
 });

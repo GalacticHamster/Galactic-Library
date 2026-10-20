@@ -10,6 +10,7 @@ export const commonMatchingPolicyTests=cases.filter(row=>!row.fanOnly).map(row=>
   const offered={...row.offer,mediaType:media,...(row.offer.isbn?{identifiers:{isbn:row.offer.isbn}}:{})};
   const result=matchItems(Object.fromEntries(items.map(item=>[item.id,item])),[offered])[0];
   assert.equal(result.owned?'owned':result.matches.length||result.possibleMatches.length?'possible':'new',row.expected);
+  if((row.label.startsWith('story identity:') || row.label.startsWith('collection story:')) && row.expected==='new') { assert.equal(result.matches.length,0); assert.equal(result.possibleMatches.length,0); assert.equal(result.partialMatches.length,0); }
 }]);
 commonMatchingPolicyTests.push(['inferred canonical groups cannot transfer a different title or preview to Owned',()=>{
   const left=normalizeProviderItem({provider:'humble',providerItemId:'left',title:'I Am Legend',mediaType:'book',ownership:'unknown',metadata:{authors:['Writer']}});
@@ -49,7 +50,7 @@ commonMatchingPolicyTests.push(['HB, FAN and GL agree on shared policy behavior 
     return kinds.flatMap(kind=>row.records.map(record=>({
       offered:policy.presentationTitle(row.offer.title,kind),stored:policy.ownershipTitleKeys(record.title,kind),
       installmentConflict:policy.gameInstallmentConflict(row.offer.title,record.title,kind),exact:policy.fullTitleMatches(row.offer.title,record.title,kind),revision:policy.revisionWordingConflict(row.offer.title,record.title,kind),
-      offeredParts:policy.revisionTitleParts(row.offer.title,kind),storedParts:policy.revisionTitleParts(record.title,kind),
+      collectionRelation:policy.collectionTitleRelation(row.offer.title,record.title,kind),offeredParts:policy.revisionTitleParts(row.offer.title,kind),storedParts:policy.revisionTitleParts(record.title,kind),
       related:Boolean(policy.relatedPresentationReason(row.offer.title,record.title,kind)),
       collection:policy.numberedCollectionRelation(row.offer.title,record.title,kind)===null?null:Boolean(policy.numberedCollectionRelation(row.offer.title,record.title,kind))
     })));
