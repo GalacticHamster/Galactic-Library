@@ -8,6 +8,7 @@ import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} f
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
 import {createLibraryResultSummary} from './library-result.js';
+import {mountLibraryRow,expandCompactLibraryRow} from './library-layout.js';
 import {createAccessCardControls,openQuickAccessEditor} from './quick-access.js';
 import {createPagination} from './pagination.js';
 import {createLibraryBrowseProjection,libraryBrowseResults,recordQualifies,recordSearchRank,searchKey} from './library-browse.js';
@@ -95,6 +96,7 @@ const genreFilter = document.querySelector('#genre-filter');
 const clearFilters = document.querySelector('#clear-filters');
 const summary = document.querySelector('#library-summary');
 const items = document.querySelector('#library-items');
+const libraryLayout=document.querySelector('#library-layout'),expandedLibraryRows=new Set();
 const selectedAccessRecords=new Map(),accessSelection=document.createElement('div'),accessResult=document.createElement('p');
 accessSelection.className='actions';accessSelection.setAttribute('aria-label','Selected access changes');accessSelection.hidden=true;accessResult.setAttribute('role','status');
 document.querySelector('#library-pagination').before(accessSelection,accessResult);
@@ -256,7 +258,7 @@ function returnFromContents(){
   contentsWorkspace.close();workspace.select(origin.workspace,{view:origin.view,history:false});
   if(origin.workspace==='library'){
     const ref=origin.ref,card=[...items.children].find(node=>JSON.parse(node.dataset.recordRefs||'[]').includes(ref));
-    if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});}
+    if(card){expandCompactLibraryRow(card);const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));card.tabIndex=-1;card.focus({preventScroll:true});}
     else document.querySelector('#workspace-status').textContent='The original book moved or is no longer in these results. Your browsing filters are retained.';
   }
   reviewOrigin=null;workspace.rememberView();pushRoute('#'+origin.workspace);globalThis.scrollTo?.(0,origin.scroll);
@@ -286,7 +288,7 @@ function openLibraryRecord(ref,{returnToOrigin=false,section=null}={}){
   }
   workspace.rememberView();
   const card=findCard();
-  if(card){const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));if(section){const target=card.querySelector(`[data-item-section="${section==='ownership'?'library':section}"]`);if(target){target.open=true;target.dispatchEvent(new Event('toggle'));if(section==='ownership'){const tools=target.querySelector('.ownership-review-tools');if(tools){tools.open=true;tools.dispatchEvent(new Event('toggle'));}}}}card.tabIndex=-1;card.focus({preventScroll:true});if(origin)globalThis.scrollTo(0,origin.scroll);else card.scrollIntoView({block:'center'});}
+  if(card){expandCompactLibraryRow(card);const details=card.querySelector('.item-details');details.open=true;details.dispatchEvent(new Event('toggle'));if(section){const target=card.querySelector(`[data-item-section="${section==='ownership'?'library':section}"]`);if(target){target.open=true;target.dispatchEvent(new Event('toggle'));if(section==='ownership'){const tools=target.querySelector('.ownership-review-tools');if(tools){tools.open=true;tools.dispatchEvent(new Event('toggle'));}}}}card.tabIndex=-1;card.focus({preventScroll:true});if(origin)globalThis.scrollTo(0,origin.scroll);else card.scrollIntoView({block:'center'});}
   pushRoute(bookHref('library',ref));
 }
 function visitBookRoute(route){if(route?.workspace==='contents')openContentsRecord(route.recordRef);else if(route)openLibraryRecord(route.recordRef);}
@@ -831,6 +833,7 @@ function render(timing = null) {
   endSegment?.();endSegment=timing?.begin('options_cards');
   updateAccessSelection();
   libraryPaging.update({total:result.total,page:libraryPage,size:workspace.pageSize});
+  libraryLayout.value=workspace.libraryLayout;
   items.replaceChildren(...result.rows.map((row) => {
     const canonicalItem=row.canonical;
     const node = document.createElement('li');
@@ -838,8 +841,9 @@ function render(timing = null) {
     node.dataset.recordRefs=JSON.stringify(records.map(record=>record.recordRef));
     const linkedAddOns = records.flatMap((record) => addOnsByParent.get(record.id) ?? []);
     node.className = 'library-item';
-    node.append(createLibraryResultSummary(row,database,{filtered:Object.entries(filters).some(([key,value])=>key!=='mediaType'&&value!==filterDefault(key)),information:filters.information,series:value=>{seriesFilter.value=value;search.value='';librarySort.value='series';viewChanged();}}));
-    node.append(createAccessCardControls(row.qualifying.map(value=>value.record),database,{selected:selectedAccessRecords,onSelect:(record,checked)=>{if(checked&&selectedAccessRecords.size>=500){accessResult.textContent='Change up to 500 account copies at once.';return;}checked?selectedAccessRecords.set(record.recordRef,{provider:record.provider,profileId:record.profileId}):selectedAccessRecords.delete(record.recordRef);updateAccessSelection();},change:editAccess}));
+    mountLibraryRow(node,row,database,{layout:workspace.libraryLayout,expanded:expandedLibraryRows.has(canonicalItem.id),onToggle:open=>{open?expandedLibraryRows.add(canonicalItem.id):expandedLibraryRows.delete(canonicalItem.id);}},content=>{
+    content.append(createLibraryResultSummary(row,database,{filtered:Object.entries(filters).some(([key,value])=>key!=='mediaType'&&value!==filterDefault(key)),information:filters.information,series:value=>{seriesFilter.value=value;search.value='';librarySort.value='series';viewChanged();}}));
+    content.append(createAccessCardControls(row.qualifying.map(value=>value.record),database,{selected:selectedAccessRecords,onSelect:(record,checked)=>{if(checked&&selectedAccessRecords.size>=500){accessResult.textContent='Change up to 500 account copies at once.';return;}checked?selectedAccessRecords.set(record.recordRef,{provider:record.provider,profileId:record.profileId}):selectedAccessRecords.delete(record.recordRef);updateAccessSelection();},change:editAccess}));
     const details=document.createElement("details");details.className="item-details";details.dataset.canonicalId=canonicalItem.id;
     details.append(textElement("summary","Details"));
     const body=document.createElement("div");body.className="item-details-body";details.append(body);let built=false;
@@ -871,7 +875,8 @@ function render(timing = null) {
     };
     details.addEventListener("toggle",()=>{if(!details.isConnected)return;context.open=details.open;if(details.open){selectedBrowseRef=context.anchor;build();}});
     if(context.open){details.open=true;build();}
-    node.append(details);
+    content.append(details);
+    });
     return node;
   }));
 
@@ -1030,6 +1035,7 @@ showEnrichmentActions.addEventListener('change', async () => {
   }
 });
 for(const field of [...Object.values(viewControls),librarySort])field.addEventListener('change',viewChanged);
+libraryLayout.addEventListener('change',()=>{if(!drafts.allowNavigation()){libraryLayout.value=workspace.libraryLayout;return;}workspace.setLibraryLayout(libraryLayout.value);});
 clearFilters.addEventListener('click', () => {
   search.value='';for(const [key,field]of Object.entries(viewControls)){field.value=filterDefault(key);delete field.dataset.pendingValue;}viewChanged();
 });

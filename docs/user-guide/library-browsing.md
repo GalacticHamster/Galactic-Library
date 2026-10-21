@@ -2,7 +2,9 @@
 
 Library is a catalog of your imported collection. Each result groups records for the same item or edition; several purchases and provider/account records can appear together. This grouping is for browsing only and does not merge saved records. Browse results never make new matching, ownership or contents decisions.
 
-Results show title, known edition/volume/issue, saved series links, creator when available, media, a read-only contents preview when available, and a compact provider summary such as **Kindle (2 accounts) · Kobo**. There is no repeated Owned badge. Borrowed, subscription, rented or unconfirmed access and active ownership preferences remain visible. Covers stay inside item Details; missing artwork leaves no empty result block. **Details** opens the existing item workflow for all associated accounts, including those outside your filters.
+In **Detailed** view, results show title, known edition/volume/issue, saved series links, creator when available, media, a read-only contents preview when available, and a compact provider summary such as **Kindle (2 accounts) · Kobo**. There is no repeated Owned badge. Borrowed, subscription, rented or unconfirmed access and active ownership preferences remain visible. Covers stay inside item Details; missing artwork leaves no empty result block. **Details** opens the existing item workflow for all associated accounts, including those outside your filters.
+
+**Compact** is the default when no view preference has been saved. Use **View > Compact** beside Sort for short, expandable rows showing the title, media type, providers and access status. Open a row to use the same purchase history, Details, selection and correction controls. Owned, subscription and unconfirmed access stay distinguishable. **View > Detailed** restores the existing cards. The view choice is remembered after reopening GL; it does not change your library or filters.
 
 ## Repeat purchases and purchase history
 

@@ -14,7 +14,7 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
     clearTimeout(saveTimer);
     // View navigation must not overwrite a newer page-size choice from another
     // page. Only the explicit selector saves the shared pageSize field.
-    const {pageSize,appearance,comicCoverageStarts,comicCoverageTransitions,comicCoverageMerges,...snapshot} = structuredClone(preferences);
+    const {pageSize,libraryLayout,appearance,comicCoverageStarts,comicCoverageTransitions,comicCoverageMerges,...snapshot} = structuredClone(preferences);
     saveTimer = setTimeout(() => save(snapshot).catch(() => { status.textContent = 'Could not remember this view. Your library is unchanged.'; }), 180);
   };
   function show() {
@@ -68,6 +68,13 @@ export function createWorkspaceNavigation({ readView, applyView, save, changed, 
     },
     select,
     get pageSize(){return preferences.pageSize;},
+    get libraryLayout(){return preferences.libraryLayout;},
+    setLibraryLayout(layout){
+      if(!['compact','detailed'].includes(layout))return false;
+      preferences.libraryLayout=layout;changed();
+      save({libraryLayout:layout}).catch(()=>{status.textContent='Could not remember the Library view. Your library is unchanged.';});
+      return true;
+    },
     setPageSize(size){
       if(!validPageSize(size))return false;
       rememberBrowseView(preferences,preferences.workspace,readView(preferences.workspace));

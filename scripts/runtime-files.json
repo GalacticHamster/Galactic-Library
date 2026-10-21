@@ -141,6 +141,7 @@
   "src/ui/library-icon.png",
   "src/ui/library-loading.js",
   "src/ui/library-result.js",
+  "src/ui/library-layout.js",
   "src/ui/local-metadata-tools.js",
   "src/ui/onboarding.js",
   "src/ui/operation-feedback.js",

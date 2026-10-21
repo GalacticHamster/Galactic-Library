@@ -16,7 +16,7 @@ export function workspaceTarget(value) {
 export const emptyLibraryView = () => ({ search: '', provider: 'all', mediaType: 'all', genre: 'all', ownership: 'all', dlc: 'all', account:'all', reading:'all', series:'all', information:'all', acquisitions:'all', sort:'title-asc', page: 0 });
 export const SHARED_BROWSE_FIELDS = ['search','provider','mediaType','genre','ownership','account','reading','series','sort','page','anchor'];
 export const emptyBrowseView = () => Object.fromEntries(SHARED_BROWSE_FIELDS.map(key=>[key,key==='anchor'?'':emptyLibraryView()[key]]));
-export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,comicCoverageStarts:{},comicCoverageTransitions:{},comicCoverageMerges:{},comicCoverageNames:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
+export const defaultUiPreferences = () => ({workspace:'library',appearance:'dark',pageSize:50,libraryLayout:'compact',comicCoverageStarts:{},comicCoverageTransitions:{},comicCoverageMerges:{},comicCoverageNames:{},browse:emptyBrowseView(),library:{information:'all',dlc:'all',acquisitions:'all'},contents:{status:'all'},books:emptyLibraryView()});
 export function validateComicCoverageTransitions(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>10000)throw Error('Invalid numbering transitions.');
   const output={};for(const [key,list]of Object.entries(value)){
@@ -46,8 +46,9 @@ function validateView(view,defaults){
   return output;
 }
 export function validateUiPreferences(value){
-  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['workspace','appearance','pageSize','libraryLayout','comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames','browse','library','contents','books'].includes(key)))throw Error('Invalid library display preferences.');
   const output=defaultUiPreferences();
+  if(value.libraryLayout!==undefined){if(!['compact','detailed'].includes(value.libraryLayout))throw Error('Invalid Library view.');output.libraryLayout=value.libraryLayout;}
   if(value.appearance!==undefined){if(!['dark','light','system'].includes(value.appearance))throw Error('Invalid appearance preference.');output.appearance=value.appearance;}
   if(value.pageSize!==undefined){if(!validPageSize(value.pageSize))throw Error('Invalid items per page.');output.pageSize=value.pageSize;}
   if(value.workspace!==undefined){if(!WORKSPACES.includes(value.workspace))throw Error('Unknown library workspace.');output.workspace=workspaceTarget(value.workspace);}

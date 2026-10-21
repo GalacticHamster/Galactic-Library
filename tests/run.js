@@ -1,3 +1,4 @@
+import {lookupDismissalTests} from './lookup-dismissal.js';
 import {fanaticalNavigationTests} from './fanatical-navigation.js';
 import {xboxImportTests} from './xbox-import.js';
 import {observationOverlayTests} from './observation-overlays.js';
@@ -144,6 +145,7 @@ const tests = [
   ...checkpointResponsivenessTests,
   ...committedProjectionTests,
   ...observationOverlayTests,
+  ...lookupDismissalTests,
   ...observationCompletionTests,
   ...validationCertificateTests,
   ...refreshWritePacingTests,

@@ -187,6 +187,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     observationPending={base,epoch,promise};try{return await promise;}finally{if(observationPending?.promise===promise)observationPending=null;}
   }
   async function checkedProviderView(database,base){
+    // Keep the validated observation base separate from the caller's editable
+    // database, including cold reads with an empty observation envelope.
+    if(database===base)database=structuredClone(database);
     const observations=await readObservations(base,true);
     if(activeOperation)activeObservationRead={...observations,base};
     const effective=observations.packet?materializeObservations(database,structuredClone(observations.packet)):database;

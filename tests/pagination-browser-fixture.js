@@ -55,6 +55,15 @@ if(window.parent!==window){
   assert(list('Library').children.length===50&&select('Library').value==='50','Default page size wrong');
   assert(!list('Contents').children.length&&!document.querySelector('#contents-collections').querySelector('textarea'),'Hidden Contents was eagerly populated');
   checks.push('Large startup keeps loading/empty distinct and hidden Contents preparation deferred');
+  const view=document.querySelector('#library-layout'),readsBeforeLayout=requests.filter(value=>value==='getCommittedLibraryView').length,compactStart=performance.now();
+  change(view,'compact');
+  assert(list('Library').children.length===50&&!list('Library').querySelector('.item-details'),'Large compact view eagerly built full cards or lost pagination');
+  const compactMs=performance.now()-compactStart,firstCompact=list('Library').querySelector('.library-compact-entry');firstCompact.open=true;firstCompact.dispatchEvent(new Event('toggle'));
+  assert(list('Library').querySelectorAll('.item-details').length===1,'Large compact expansion built unrelated cards');
+  change(view,'detailed');
+  assert(list('Library').querySelectorAll('.item-details').length===50&&requests.filter(value=>value==='getCommittedLibraryView').length===readsBeforeLayout,'Layout switch reread the library or changed Detailed cards');
+  measurements.push({layout:'compact',providerRecords:14000,visibleRows:50,renderMs:compactMs});
+  checks.push('14,000-record compact Library builds only its page, expands one existing card and switches layout without rereading storage');
   const initialReads=requests.filter(op=>op==='getCommittedLibraryView'||op==='getDatabase').length;
   for(const name of ['Library','Contents']){
     navigate(name.toLowerCase());
