@@ -36,7 +36,7 @@ export const namedPublicationTests=[
  ['scan status, workbench and source review use the same unchanged named-publication interpretation',()=>{
   for(const [index,c]of fixtures.cases.entries()){
    const book=namedBook(c,index),db=coverageDatabase(book),p=collectionContents(book,db),status=contentsParseState(book),rows=enrichmentWorkbenchRows(db,{includeMissing:false});
-   assert.equal(status.parseOutcome,p.outcome);assert.equal(status.parseInput,p.parseInput);assert.equal(rows.length,1);assert(rows[0].reason.startsWith(p.unparsed.length?'Partially parsed proposal':'Parsed proposal; not verified'));
+   assert.equal(status.parseOutcome,p.outcome);assert.equal(status.parseInput,p.parseInput);assert.equal(rows.length,1);assert(rows[0].contentsState==='suggestions'&&rows[0].reason.startsWith(p.entries.length+' suggested entries'));
   }
  }],
  ['literal publication aliases require publisher and family, protect unrelated runs and cannot bind edited drafts',()=>{

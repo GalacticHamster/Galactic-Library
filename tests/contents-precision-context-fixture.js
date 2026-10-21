@@ -15,7 +15,7 @@ export function verifySourcePaths(c,assert){
  assert(JSON.stringify(compact)===JSON.stringify(raw),'Whitespace-only text lost source context: '+c.title);
  assert(status.parseInput===raw.parseInput&&status.parseOutcome===raw.outcome,'Scan/status context differs: '+c.title);
  const rows=enrichmentWorkbenchRows({providerItems:{fixture:record},contentReviews:{},enrichmentReviews:{},enrichmentHistory:{},canonicalItems:{}},{includeMissing:false});
- assert(rows.length===1&&rows[0].reason.startsWith(raw.unparsed.length?'Partially parsed proposal':'Parsed proposal'),'Workbench misclassifies source: '+c.title);
+ assert(rows.length===1&&rows[0].contentsState==='suggestions'&&rows[0].reason.startsWith(raw.entries.length+' suggested entries'),'Workbench misclassifies source: '+c.title);
  assert(JSON.stringify(record)===before,'Parsing modified captured evidence');
  return {record,proposal:raw};
 }

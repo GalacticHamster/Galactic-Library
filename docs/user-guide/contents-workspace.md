@@ -2,8 +2,27 @@
 
 ## Review status and comparisons
 
+In **Books & Contents > Review book suggestions**, contents are separated into
+**Contents suggestions to check**, **Descriptions without an issue list**, and
+**Descriptions changed since review**. Information gaps are optional; they are
+not thousands of required confirmations. Existing reviewed decisions stay saved.
+
+Opening a contents review shows the captured description and source attribution
+immediately. For a description such as "Collecting the first six issues of the hit
+series," GL may offer a possible #1-6 draft when its existing series-context checks
+identify one series. This is not automatic coverage: **Preview**, check the series
+and range, **Add entries**, then **Save reviewed contents**. If the context is
+ambiguous, enter the correct series and numbers from a source you have checked.
+
+Useful suggestions appear as editable rows with **Save reviewed contents**.
+**Add more contents** retains bulk entry; **Edit statement or add individual
+entries** retains reparsing, individual entry and accepting the original
+suggestions. Captured descriptions remain read-only evidence, separate from
+statement drafts and saved reviews. Source details and technical evidence remain
+optional disclosures.
+
 **Contents to check** counts changed, incomplete or uncertain saved descriptions.
-It is separate from **Unreviewed or changed contents**, which also includes usable
+It is separate from **Contents descriptions and suggestions**, which also includes usable
 inferred descriptions, and **Latest retrieval failed**, which can retain earlier
 useful contents. These filters are navigable from Contents status; they do not
 resolve or discard evidence. A successful inferred description is not an urgent
@@ -32,7 +51,7 @@ Choose **Inspect contents** to review the exact account record. **Back to Librar
 
 ## Quickly enter contents
 
-Open **Inspect contents → Review included works → Quick add contents**. Enter a list such as `The Sandman #1-8`, choose **Preview**, then **Add entries**. Commas continue a series; semicolons or separate lines can introduce another series. Years, annuals, specials and `material from` are supported. The preview shows issue ranges, types and anything it could not interpret. Missing years are not guessed; correct the series version/year in the rows where needed.
+Open **Inspect contents > Review included works > Quick add contents** (under **Add more contents** when entries are already present). Enter a list such as `The Sandman #1-8`, choose **Preview**, then **Add entries**. Commas continue a series; semicolons or separate lines can introduce another series. Years, annuals, specials and `material from` are supported. The preview shows issue ranges, types and anything it could not interpret. Missing years are not guessed; correct the series version/year in the rows where needed.
 
 Adding appends editable rows without replacing existing corrections or duplicating identical entries. Full and partial entries remain distinct. Nothing changes coverage until **Save reviewed contents**. The entered text is retained with the human review; captured provider descriptions remain unchanged. The detailed **Add contents entry** control remains available for exceptions.
 
@@ -49,7 +68,7 @@ Adding appends editable rows without replacing existing corrections or duplicati
 | Not checked yet | No acquired contents source is recorded. Automated acquisition currently supports eligible Kindle books only; manual review is available for other books. |
 | Couldn't retrieve description | Acquisition did not produce usable source evidence. Retry/recovery belongs on the signed-in Kindle page. |
 
-The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Unreviewed or changed contents** retains the former Needs contents review filter: it finds unconfirmed statements and statements that differ from the saved review. **Contents to check** narrows attention to changed, incomplete or uncertain descriptions. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
+The **Latest retrieval failed** filter also finds records that retain an older useful statement or a human review after a failed attempt. Such a failure does not discard earlier evidence or change a saved review. **Contents descriptions and suggestions** retains the former Needs contents review filter: it finds unconfirmed statements and statements that differ from the saved review. **Contents to check** narrows attention to changed, incomplete or uncertain descriptions. A proven whole-parent statement does not count as different merely because the saved source selected one of its child spans.
 
 List counts refer to saved human-reviewed entries, not a guessed total number of issues in the book. Statuses use stored interpretation fields. Visible previews reuse human entries or interpret the selected captured statement and its proven parent manifest in a 200-record snapshot cache. This uses the same source context as coverage and inspection, without refreshing a provider or reparsing the entire library on list navigation. Where interpretation is unavailable, saved description text remains visible.
 

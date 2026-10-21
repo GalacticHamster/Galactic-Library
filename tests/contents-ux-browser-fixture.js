@@ -1,3 +1,4 @@
+import {checkContentsReviewUsability} from './contents-review-usability-browser-fixture.js';
 import {newPublicationFixture} from './new-publication-fixture.js';
 import {scopedCoverageFixture} from './scoped-coverage-fixture.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
@@ -61,6 +62,7 @@ globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{add
 async function reconcile(){const before=operations.filter(op=>op==='getCommittedLibraryView').length;for(const fn of listeners)fn({[DATABASE_STORAGE_KEY]:{newValue:state[DATABASE_STORAGE_KEY]}},'local');await wait(()=>operations.filter(op=>op==='getCommittedLibraryView').length>before&&document.querySelector('#library-load-status').hidden,'Library reconciliation did not settle');}
 const item=n=>({providerItemId:'B'+String(n).padStart(9,'0'),title:'Collection '+String(n).padStart(3,'0'),mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B'+String(n).padStart(9,'0')}});
 try{
+ await checkContentsReviewUsability(assert);checks.push('Contents review shows original evidence, separates decisions from gaps, offers confirmed relative drafts and persists corrections/rejection without source changes');
   {
     const f=newPublicationFixture(),previous=await writer.getDatabase();await writer.restoreDatabase(f.database);let db=await writer.getDatabase(),projection=comicCoverageForLibrary(db),row=projection.dispositions.find(r=>r.recordRef===f.first.recordRef),baseline=JSON.stringify(db.providerItems);
     const actions={save:request=>writer.saveCoverageResolutions(request)},openRun=()=>openCoverageResolution(row,db,projection,actions),prepared=dialog=>wait(()=>!dialog.querySelector('[aria-label="Publication run candidates"]').disabled,'Run preparation did not finish');
@@ -130,13 +132,13 @@ try{
     const fixture=await (await fetch('/tests/fixtures/kindle/discovery-mixed.json')).json();
     fixture.cases.forEach((c,i)=>checkDiscoveryCase(c,i,assert));checkDiscoverySafety(assert);
     const doom=discoveryBook(fixture.cases[12],12),editor=createContentsEditor(doom,null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(editor);
-    assert(editor.querySelectorAll('[data-contents-field="number"]').length===16&&editor.querySelector('[aria-label="Original contents statement"]').value.includes('series with tales from'),'Captured Doom Patrol evidence is invisible');
+    assert(editor.querySelectorAll('[data-contents-field="number"]').length===16&&editor.querySelector('[aria-label="Contents statement draft"]').value.includes('series with tales from'),'Captured Doom Patrol evidence is invisible');
     assert([...editor.querySelectorAll('[data-contents-field="completeness"]')].filter(n=>n.value==='excerpt').length===6,'Doom Patrol anthology hosts became full');editor.remove();
     const snow=createContentsEditor(discoveryBook(fixture.cases[5],5),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(snow);
     assert(snow.querySelectorAll('[data-contents-field="number"]').length===16&&[...snow.querySelectorAll('[data-contents-field="number"]')].filter(n=>n.value==='124').length===1,'Mixed story issue repeated or missing');assert(snow.textContent.includes('does not establish that its entire source issue is included')&&snow.textContent.includes('Stories from FABLES #124-129'),'Story completeness or supporting claim hidden');snow.remove();
-    const fables=createContentsEditor(discoveryBook(fixture.cases[1],1),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(fables);assert(fables.querySelectorAll('[data-contents-field="number"]').length===8&&fables.querySelector('[aria-label="Original contents statement"]').value.startsWith('Collects 11-18'),'Weak automatic selection still shown');button(fables,'Parse statement for review').click();assert(fables.querySelectorAll('[data-contents-field="number"]').length===8,'Reparsing the displayed source lost context');fables.remove();
+    const fables=createContentsEditor(discoveryBook(fixture.cases[1],1),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(fables);assert(fables.querySelectorAll('[data-contents-field="number"]').length===8&&fables.querySelector('[aria-label="Contents statement draft"]').value.startsWith('Collects 11-18'),'Weak automatic selection still shown');button(fables,'Parse statement for review').click();assert(fables.querySelectorAll('[data-contents-field="number"]').length===8,'Reparsing the displayed source lost context');fables.remove();
     const data=coverageDatabase(...fixture.cases.map((c,i)=>discoveryBook(c,i))),view=createComicCoverageView(data);document.body.append(view);const result=await view.ready,main=result.groups.find(g=>g.series==='Fables');assert(main.covered===27&&main.partial===16&&main.duplicates===0,'Recovered contents/partial evidence miscounted in coverage');assert(result.groups.find(g=>g.series==='My Greatest Adventure').partial===6,'Host partials missing from coverage');view.remove();
-    const absent=createContentsEditor(coverageBook('no-capture','',{title:'No captured description'}),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(absent);assert(!absent.querySelector('[aria-label="Original contents statement"]').value&&absent.textContent.includes('No contents statement is available'),'Missing source silently fabricated');absent.remove();
+    const absent=createContentsEditor(coverageBook('no-capture','',{title:'No captured description'}),null,{save:async()=>{},refresh(){}},{expanded:true});document.body.append(absent);assert(!absent.querySelector('[aria-label="Contents statement draft"]').value&&absent.textContent.includes('No usable contents description is saved'),'Missing source silently fabricated');absent.remove();
     checks.push('Captured descriptions, stronger automatic candidates and mixed host/story extents reach the contents editor without invented evidence or repeated issues');
   }
   {
@@ -386,7 +388,7 @@ try{
  button(rejectEditor,'Reject suggested contents').click();await wait(()=>coverageDb.contentReviews[coverageParent.id]?.status==='rejected','Reject did not persist');
  assert(coverageDb.contentReviews[coverageParent.id].entries.length===0,'Reject retained coverage');await delay();rejectEditor.remove();
  const undoEditor=createContentsEditor(coverageParent,coverageDb.contentReviews[coverageParent.id],coverageActions,{expanded:true});document.body.append(undoEditor);
- assert(undoEditor.textContent.includes('Suggestions rejected'),'Rejection missing from editor');button(undoEditor,'Undo contents review').click();await wait(()=>!coverageDb.contentReviews[coverageParent.id],'Undo did not restore suggestions');await delay();undoEditor.remove();
+ assert(undoEditor.textContent.includes('Contents rejected.'),'Rejection missing from editor');button(undoEditor,'Undo contents review').click();await wait(()=>!coverageDb.contentReviews[coverageParent.id],'Undo did not restore suggestions');await delay();undoEditor.remove();
  checks.push('Actual contents editor accepts all, rejects and restores inferred contents without acquisition');
  }
  const wrappers=await (await fetch('/tests/fixtures/kindle/numbered-wrappers.json')).json();

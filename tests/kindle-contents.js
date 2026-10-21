@@ -96,7 +96,7 @@ export const kindleContentsTests=[
   let db=await writer.getDatabase();const items=Object.values(db.providerItems);
   await writer.saveKindleComicContents([save(items[0],'Includes Wool, Shift and Dust'),save(items[1],'Collects Comic #1-3; bonus essays'),save(items[2],'Collects issues #1-4')]);
   db=await writer.getDatabase();assert.deepEqual(Object.values(db.providerItems).map(item=>kindleContentsState(item,db).parseOutcome),['full','partial','failed']);
-  const rows=enrichmentWorkbenchRows(db).filter(row=>row.category==='unparsed');assert.equal(rows.length,3);assert.ok(rows.some(row=>/Parsed proposal; not verified/.test(row.reason)));
+  const rows=enrichmentWorkbenchRows(db).filter(row=>row.category==='unparsed');assert.equal(rows.length,3);assert.ok(rows.some(row=>row.contentsState==='suggestions'));
   await writer.saveContentReview(items[0].id,{entries:[component],statement:'Includes Wool, Shift and Dust'});
   db=await writer.getDatabase();assert.equal(enrichmentWorkbenchRows(db).filter(row=>row.category==='unparsed').length,2);assert.equal(kindleContentsState(db.providerItems[items[0].id],db).reviewStatus,'verified');
   const review=structuredClone(db.contentReviews[items[0].id]);

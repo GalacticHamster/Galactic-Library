@@ -18,7 +18,7 @@ export function createContentsWorkspace(actions={}) {
   const controls=text('div','');controls.className='contents-filters';
   const search=text('input','');search.type='search';search.maxLength=500;search.placeholder='Find a book or collection';search.setAttribute('aria-label','Search contents collections');
   const status=text('select','');status.setAttribute('aria-label','Contents status');
-  for(const [value,label] of [['all','All imported books'],['attention','Contents to check'],['review','Unreviewed or changed contents'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
+  for(const [value,label] of [['all','All imported books'],['attention','Contents to check'],['review','Contents descriptions and suggestions'],['failure','Latest retrieval failed'],...Object.entries(CONTENTS_STATUSES)])status.append(Object.assign(text('option',label),{value}));
   const shared={search};
   const primary=text('div','');primary.className='library-filters';
   const more=text('details','');more.append(text('summary','More filters'));const extra=text('div','');extra.className='library-filters';more.append(extra);
@@ -46,7 +46,7 @@ export function createContentsWorkspace(actions={}) {
   const resolutionActions=()=>({...actions.resolutionActions,canLeave:actions.canLeave,...actions.coverageOptions?.(),resolved:async(next,projection)=>{database=next;coverageFor=next;coverageKey=coverageProjectionKey(next,actions.coverageOptions?.().merges??{});coverage=projection;coverageRows=new Map(projection.dispositions.map(r=>[r.id,r]));rows=project(database);if(selected)open(selected);else renderList();await actions.resolutionActions?.resolved?.(next,projection);}});
   function coverageStatus(record){
     const row=coverageRows.get(record.id);if(coverage&&row)return createCoverageDisposition(row,database,coverage,resolutionActions());
-    const node=text('p',coverageError?'Coverage could not be checked: '+coverageError:coverage?'No parsed comic observations.':'Checking comic coverage…');node.className='contents-coverage-disposition';if(coverageError)node.append(button('Recheck coverage',()=>{coverageFor=null;requestCoverage();}));return node;
+    const node=text('p',coverageError?'Coverage could not be checked: '+coverageError:coverage?'No comic issue list has been identified. See the description and contents entry options below.':'Checking comic coverage…');node.className='contents-coverage-disposition';if(coverageError)node.append(button('Recheck coverage',()=>{coverageFor=null;requestCoverage();}));return node;
   }
   function refreshCoverageDetail(){const slot=detail.querySelector('.contents-coverage-slot'),record=Object.values(database.providerItems).find(r=>r.recordRef===selected);if(slot&&record)slot.replaceChildren(coverageStatus(record));}
   function requestCoverage(){
@@ -108,7 +108,7 @@ export function createContentsWorkspace(actions={}) {
         overview.textContent=`${rows.length} imported book records · ${counts.reviewed??0} contents reviewed · ${rows.filter(r=>r.needsAttention).length} contents to check · ${rows.filter(r=>r.needsReview&&!r.needsAttention).length} unreviewed contents available · ${rows.filter(r=>r.failed).length} latest retrievals failed. Use Contents status to open each group.`;
         for(const option of status.options){const key=option.value;
           const count=key==='all'?rows.length:key==='attention'?rows.filter(row=>row.needsAttention).length:key==='review'?rows.filter(row=>row.needsReview).length:key==='failure'?rows.filter(row=>row.failed).length:counts[key]??0;
-          const label=key==='all'?'All imported books':key==='attention'?'Contents to check':key==='review'?'Unreviewed or changed contents':key==='failure'?'Latest retrieval failed':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
+          const label=key==='all'?'All imported books':key==='attention'?'Contents to check':key==='review'?'Contents descriptions and suggestions':key==='failure'?'Latest retrieval failed':CONTENTS_STATUSES[key];option.textContent=`${label} (${count})`;
         }
         const projection=browse(database);
         for(const [key,options]of [['provider',[...new Set([...projection.records.values()].map(v=>v.record.provider))].sort().map(id=>({value:id,label:providerName(id)}))],['account',projection.accountOptions],['series',projection.seriesOptions.map(value=>({value,label:value}))],['genre',projection.genreOptions.map(value=>({value,label:value}))]]){

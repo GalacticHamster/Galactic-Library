@@ -3,6 +3,7 @@ import {enrichmentStages} from './enrichment.js';
 import {editionEnrichmentConflicts} from './identity.js';
 import {contentsStatement,contentsReviewChanged,proposeContentsForReview} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
+import {contentsReviewSummary} from './contents-review-summary.js';
 
 export function candidateConflicts(records,source,candidate){
   if(source==='openLibrary')return [];
@@ -31,9 +32,9 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
     if (includeContents && statement && (!review || contentsReviewChanged(record,review))) {
       const saved=record.metadata.enrichment?.kindleProductComicContents;
       const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);
-      const status = proposal.outcome==='filtered' ? 'Filtered non-containment; original evidence retained' : proposal.outcome==='uncertain' ? 'Uncertain candidate; context needs review' : !proposal.entries.length ? 'Unresolved containment statement' : proposal.unparsed.length ? 'Partially parsed proposal' : 'Parsed proposal; not verified';
+      const presentation=contentsReviewSummary(record,proposal,review);
       if(proposal.outcome!=='filtered' || review || proposal.descriptionMayBeIncomplete)rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
-        reason:`${review ? 'Discovery differs from reviewed contents; saved verification is unchanged. ' : status+'. '}${proposal.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents text may be missing. ':''}${statement}`});
+        contentsState:presentation.kind,reason:`${presentation.summary} ${presentation.statement}`});
     }
     for(const [kind,entry]of Object.entries(record.metadata.enrichment??{})){
       if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],reason:`${kind}: ${entry.matchBasis||'source evidence'}; retrieved ${entry.retrievedAt||entry.checkedAt||'unknown'}`});

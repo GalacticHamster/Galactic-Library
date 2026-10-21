@@ -4,7 +4,7 @@ import {contentsStatement,contentsReviewChanged} from '../lib/contents.js';
 // A presentation projection of committed evidence. No parsing, fetching or writes.
 export const CONTENTS_STATUSES = {
   rejected:'Contents rejected', reviewed:'Contents reviewed', identified:'Inferred contents available',
-  partial:'Incomplete contents to check', uncertain:'Uncertain contents to check',
+  partial:'Contents description to check', uncertain:'Contents description needs interpretation',
   missing:'Contents not extracted', unattempted:'Not checked yet',
   failed:"Couldn't retrieve description"
 };

@@ -8,7 +8,7 @@ import {accountLabel} from './item-presentation.js';
 import {workbenchReviewCounts} from './review-status.js';
 
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
-const labels={all:'All suggestions and gaps',attention:'Suggestions needing a decision',missing:'Missing book information (optional)',candidates:'Suggestions to review',conflicts:'Conflicting suggestions or selected sources',failed:'Lookup failures / no results',unparsed:'Unreviewed or changed contents',undo:'Saved sources to undo'};
+const labels={all:'All suggestions and gaps',attention:'Suggestions needing a decision',missing:'Missing book information (optional)',candidates:'Suggestions to review',conflicts:'Conflicting suggestions or selected sources',failed:'Lookup failures / no results',unparsed:'Contents descriptions and suggestions','contents-suggestions':'Contents suggestions to check','contents-information':'Descriptions without an issue list','contents-changed':'Descriptions changed since review',undo:'Saved sources to undo'};
 
 export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={}){
   const element=document.createElement('details');if(!item)element.id='enrichment-workbench';element.className=item?'tool-card item-enrichment-review':'tool-card';
@@ -42,18 +42,18 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
       currentRecords=new Map(Object.values(database.providerItems).filter(record=>!recordRefs||recordRefs.includes(record.recordRef)).map(record=>[record.recordRef,record]));rows=enrichmentWorkbenchRows(database,{recordRefs,includeContents:!item,includeMissing:!item});
       const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);
       const counts=workbenchReviewCounts(rows);
-      totals.textContent=`${counts.attention} suggestions needing a decision · ${counts.lookups} lookup failures / no results · ${counts.contents} unreviewed or changed contents · ${counts.saved} saved source selections${counts.sourceConflicts?' · '+counts.sourceConflicts+' selected sources to check':''}. Missing information and unreviewed contents are not automatically ownership or coverage problems.`;
+      totals.textContent=`${counts.attention} suggestions needing a decision · ${counts.lookups} lookup failures / no results · ${rows.filter(r=>r.contentsState==='suggestions').length} contents suggestions to check / ${rows.filter(r=>r.contentsState==='information').length} descriptions without an issue list / ${rows.filter(r=>r.contentsState==='changed').length} descriptions changed since review · ${counts.saved} saved source selections${counts.sourceConflicts?' · '+counts.sourceConflicts+' selected sources to check':''}. Descriptions without an issue list are optional information gaps, not a queue you must complete. No contents are confirmed automatically.`;
       heading.textContent=`${item?'Review suggestions for this item':'Review book suggestions'} — ${counts.attention} suggestions needing a decision`;
-      heading.title=`${counts.lookups} lookup failures/no results; ${counts.contents} unreviewed or changed contents; ${counts.saved} saved source selections; ${counts.sourceConflicts} selected sources to check. These are separate from pending suggestions.`;dirty=false;
+      heading.title=`${counts.lookups} lookup failures/no results; ${rows.filter(r=>r.contentsState==='suggestions').length} contents suggestions to check / ${rows.filter(r=>r.contentsState==='information').length} descriptions without an issue list / ${rows.filter(r=>r.contentsState==='changed').length} descriptions changed since review; ${counts.saved} saved source selections; ${counts.sourceConflicts} selected sources to check. These are separate from pending suggestions.`;dirty=false;
     }
-    const filtered=rows.filter(row=>(category.value==='all'||category.value==='attention'&&row.review&&['candidates','conflicts'].includes(row.category)||row.category===category.value)&&row.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()));
+    const filtered=rows.filter(row=>(category.value==='all'||category.value==='attention'&&row.review&&['candidates','conflicts'].includes(row.category)||row.category===category.value||row.category==='unparsed'&&category.value==='contents-'+row.contentsState)&&row.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()));
     page=Math.min(Math.max(page,0),Math.max(0,Math.ceil(filtered.length/50)-1));previous.disabled=busy||page===0;next.disabled=busy||(page+1)*50>=filtered.length;
     for(const node of [apply,dismiss,undo])node.disabled=busy||!selected.size||selected.size>50;
     counter.textContent=item?filtered.length?`${filtered.length} saved suggestions and source selections. Check a candidate before accepting it. Dismiss removes a pending suggestion, not provider data.`:'No pending book suggestions for this item. Request a lookup above or use a file or publisher page.':`${filtered.length} entries; page ${page+1} of ${Math.max(1,Math.ceil(filtered.length/50))}; ${selected.size} selected (maximum 50). Nothing changes until you choose an action.`;
     if(item)paging.hidden=filtered.length<=50;
     list.replaceChildren();
     for(const row of filtered.slice(page*50,(page+1)*50)){
-      const node=document.createElement('li');node.dataset.reviewId=row.id;node.append(text('strong',row.title),text('small',labels[row.category]),text('p',row.reason));
+      const node=document.createElement('li');node.dataset.reviewId=row.id;node.append(text('strong',row.title),text('small',labels[row.contentsState?'contents-'+row.contentsState:row.category]),text('p',row.reason));
       if(item)node.append(text('p','Applies to: '+row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean).map(record=>accountLabel(record,database)).join('; ')));
       let selectable=row.category==='undo'||Boolean(row.review);let choice;
       if(row.review?.candidates.length){

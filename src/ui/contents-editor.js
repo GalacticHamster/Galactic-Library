@@ -1,3 +1,4 @@
+import {contentsReviewSummary} from '../lib/contents-review-summary.js';
 import {scopedContents} from '../lib/scoped-coverage.js';
 import {reviewedContents} from '../lib/contents.js';
 import {labeledControl,presentAction} from './form-presentation.js';
@@ -24,10 +25,10 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
   const evidence=record.metadata?.enrichment?.kindleProductComicContents;
   const interpretedEvidence=evidence?.manifest?manifestReviewProposal(evidence,record.title):null;
   const discovered=interpretedEvidence?.manifestEvidence||contentsStatement(record);
-  const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Original contents statement');
+  const statement=document.createElement('textarea');statement.value=review?.statement||discovered;statement.rows=3;statement.maxLength=10000;statement.setAttribute('aria-label','Contents statement draft');
   const source=document.createElement('input');source.type='url';source.value=sourcePage(review?.sourceUrl||record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);source.placeholder='Source page URL (optional)';source.setAttribute('aria-label','Contents source page');
   const sourceDetails=document.createElement('details');sourceDetails.className='contents-source-details';
-  sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),labeledControl('Description / contents statement',statement),labeledControl('Source page',source));
+  sourceDetails.append(element('summary','Where this information came from'),element('p','Captured suggestions are separate from your saved human review. Changing the text below changes only this draft until you save.'),labeledControl('Statement draft (does not replace the captured description)',statement),labeledControl('Source page',source));
   sourceDetails.append(element('p',`From: ${evidence?'Kindle / Amazon product description':discovered?'File or publisher metadata':'No captured statement'}; Captured: ${formatDate(evidence?.checkedAt)}. ${review?'Human review saved: '+(formatDate(review.verifiedAt))+'.':''}`));
   const advanced=document.createElement('details');advanced.className='contents-advanced';advanced.append(element('summary','Advanced contents evidence'));
   const interpretation=element('div','');advanced.append(interpretation);
@@ -37,6 +38,7 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
   const table=document.createElement('table');const head=document.createElement('thead');const heading=document.createElement('tr');
   for(const title of ['Series or collection','Series version / year','Type','Number / name','Language','Extent',''])heading.append(element('th',title));
   head.append(heading);table.append(head);const body=document.createElement('tbody');table.append(body);
+  let saveButton,entryPanel;const updateSave=()=>{if(saveButton)saveButton.disabled=!body.rows.length;if(entryPanel)entryPanel.hidden=!body.rows.length;};
   let nextRow=0;const addRow=(entry={})=>{
     const rowNumber=++nextRow,row=document.createElement('tr');
     for(const key of ['series','run','unitType','number','language','completeness']){
@@ -50,18 +52,26 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
       }else{input=document.createElement('input');input.value=entry[key]??'';input.maxLength=500;}
       input.dataset.contentsField=key;input.setAttribute('aria-label',({series:'Series or collection',run:'Series version or year',unitType:'Included work type',number:'Issue/volume number or work name',language:'Language',completeness:'Full work or excerpt'})[key]+' for entry '+rowNumber);cell.append(input);row.append(cell);
     }
-    const remove=element('button','Remove');remove.type='button';presentAction(remove);remove.addEventListener('click',()=>row.remove());const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);
+    const remove=element('button','Remove');remove.type='button';presentAction(remove);remove.addEventListener('click',()=>{row.remove();updateSave();});const cell=document.createElement('td');cell.append(remove);row.append(cell);body.append(row);updateSave();
   };
   const sourceProposal=interpretedEvidence??(discovered?manifestReviewProposal(evidence,record.title,discovered,{series:record.metadata?.series}):null);
   const initialProposal=!review&&sourceProposal?scopedContents(sourceProposal,record,annotations):sourceProposal;
   const currentEntries=review?scopedContents({entries:review.entries,unparsed:[],confidence:review.status==='rejected'?'rejected':'verified'},record,annotations).entries:initialProposal?.entries??[];
   for(const entry of currentEntries)addRow(entry);
-  if(review)status.textContent=review.status==='rejected'?'Suggestions rejected: excluded from coverage until you save corrected entries or undo the rejection.':`${review.entries.length} reviewed entries saved. Edit to correct them, or undo the review.`;
-  else if(initialProposal)status.textContent=`${initialProposal.entries.length} suggested entries · Not reviewed. ${initialProposal.unparsed.length?`Unresolved text: ${initialProposal.unparsed.join('; ')}`:'Check every entry before saving.'}${initialProposal.descriptionMayBeIncomplete?' Amazon description may have been incomplete; later contents may be missing.':''}`;
-  else status.textContent='No contents statement is available. You can enter contents from a source you have checked. Automated Kindle acquisition and recovery belong on the signed-in Kindle page.';
+  const presentation=contentsReviewSummary(record,initialProposal,review);
+  const visibleEvidence=element('section','');visibleEvidence.className='contents-review-evidence';
+  visibleEvidence.append(element('h3','Description to review'));
+  if(presentation.statement)visibleEvidence.append(element('blockquote',presentation.statement));
+  else visibleEvidence.append(element('p','No captured contents statement is available.'));
+  if(presentation.statement){
+    visibleEvidence.append(element('p',evidence?'From: Kindle / Amazon product description':'From: saved file or publisher metadata'));
+    const capturedUrl=sourcePage(evidence?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);
+    if(capturedUrl){const link=element('a','Open source page');link.href=capturedUrl;link.target='_blank';link.rel='noreferrer';visibleEvidence.append(link);}
+  }
+  visibleEvidence.append(element('p','Captured description (read-only). Draft entries and statement edits below do not change this source.'));
+  root.insertBefore(visibleEvidence,sourceDetails);
+  status.textContent=presentation.summary;root.insertBefore(status,sourceDetails);
   if(initialProposal)showInterpretation(initialProposal,discovered);
-  if(review&&initialProposal?.unparsed.length)root.append(element('p','Original captured description still has unresolved material: '+initialProposal.unparsed.join('; ')+'. Your reviewed entries remain separate.'));
-  if(review&&initialProposal?.descriptionMayBeIncomplete)root.append(element('p','The captured description may be incomplete. Your human review is retained; it is not proof that the description lists everything in the book.'));
   const button=(label,onClick)=>{const node=element('button',label);node.type='button';node.addEventListener('click',onClick);return presentAction(node);};
   const draftEntries=()=>[...body.rows].map(row=>Object.fromEntries([...row.querySelectorAll('[data-contents-field]')].map(input=>[input.dataset.contentsField,input.value])));
   let quickProposal=null;const quickStatements=[];
@@ -77,6 +87,7 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
       append.disabled=true;
     }catch(error){quickPreview.append(element('p',error.message));}
   });append.disabled=true;
+  if(!currentEntries.length&&presentation.relative?.text){quickInput.value=presentation.relative.text;quick.append(element('p','Possible interpretation, not confirmed: '+presentation.relative.text+'. Check the series and range before adding; nothing has been changed.'));}
   quickInput.addEventListener('input',()=>{quickProposal=null;append.disabled=true;quickPreview.replaceChildren(element('p','Input changed. Preview again before adding entries.'));});
   quick.append(element('h3','Quick add contents'),element('p','Enter series and issue ranges, then preview and add them to the draft. Nothing is saved until you choose Save reviewed contents.'),labeledControl('Contents to add',quickInput),button('Preview',()=>{
     append.disabled=true;quickProposal=null;quickPreview.replaceChildren();
@@ -112,7 +123,7 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
       if(claim.qualifiers.length)section.append(element('p',`Source qualifiers: ${claim.qualifiers.join('; ')}. Check the material and extent; these are not normal full-work ownership claims.`));
 
       section.append(button('Replace draft with this statement',()=>{
-        loadedClaim=claim;statement.value=claim.raw;source.value=sourcePage(evidence?.sourceUrl||record.metadata?.detailUrl);body.replaceChildren();quickStatements.length=0;
+        loadedClaim=claim;statement.value=claim.raw;source.value=sourcePage(evidence?.sourceUrl||record.metadata?.detailUrl);body.replaceChildren();quickStatements.length=0;updateSave();
         status.textContent='Draft replaced with this separate statement and entry rows cleared. Parse and check it before saving. Your saved reviewed contents remain unchanged. Other statements have not been combined.';
       }));claims.append(section);
     }
@@ -137,21 +148,23 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
     sourceDetails.append(element('p','Captured description changed since this review. Your reviewed entries remain unchanged.'),element('blockquote',discovered),
       button('Use newly discovered statement',()=>{statement.value=discovered;source.value=sourcePage(record.metadata?.enrichment?.kindleProductComicContents?.sourceUrl||record.metadata?.enrichment?.localMetadata?.sourceUrl||record.metadata?.detailUrl);status.textContent='New text loaded for review. Parse or edit it before saving; your saved review has not changed.';}));
   }
-  const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);
-  root.append(quick,button('Parse statement for review',()=>{
+  const tableScroll=element('div','');tableScroll.className='contents-table-scroll';tableScroll.tabIndex=0;tableScroll.setAttribute('role','region');tableScroll.setAttribute('aria-label','Included works editor: scroll horizontally for all fields');tableScroll.append(table);entryPanel=tableScroll;entryPanel.hidden=!body.rows.length;
+  if(currentEntries.length||review){const more=element('details','');more.className='contents-add-more';more.append(element('summary','Add more contents'),quick);root.append(more);}else root.append(quick);
+  const manual=element('details','');manual.className='contents-manual-controls';manual.append(element('summary','Edit statement or add individual entries'));
+  manual.append(button('Parse statement for review',()=>{
     const proposed=loadedClaim&&statement.value===loadedClaim.raw?loadedClaim.proposal:manifestReviewProposal(evidence,record.title,statement.value,{series:record.metadata?.series});body.replaceChildren();quickStatements.length=0;proposed.entries.forEach(addRow);
-    status.textContent=`${proposed.entries.length} suggested entries · Not reviewed. ${proposed.outcome==='filtered'?'This text did not identify included works. ':proposed.outcome==='uncertain'?'This description needs human review. ':''}${proposed.descriptionMayBeIncomplete?'Amazon description may have been incomplete; later contents may be missing. ':''}${proposed.unparsed.length?`Review unresolved text: ${proposed.unparsed.join('; ')}`:'Check every entry and extent before saving.'}`;
+    status.textContent=contentsReviewSummary(record, {...proposed,manifestEvidence:statement.value},null).summary;updateSave();
     showInterpretation(proposed);
-  }),button('Add contents entry',()=>addRow()),element('p','Scroll the entry table to see every field. Series version/year and language help distinguish editions.'),tableScroll);
-  root.append(button('Save reviewed contents',()=>persist(async()=>{
+  }),button('Add contents entry',()=>addRow()));root.append(manual,element('p','Scroll the entry table to see every field. Series version/year and language help distinguish editions.'),tableScroll);
+  saveButton=button('Save reviewed contents',()=>persist(async()=>{
       const entries=draftEntries(),reviewStatement=[statement.value,...quickStatements.map(text=>'Manually entered contents:\n'+text)].filter(Boolean).join('\n\n');
       if(reviewStatement.length>10000)throw Error('The review text is too long. Shorten the original statement or add fewer sections before saving.');
       await actions.save(record.id,{entries:validateContents(entries),statement:reviewStatement,sourceUrl:source.value,source:'manual-review'});
-  })));
-  if(!review&&initialProposal?.entries.length)root.append(button('Accept all suggestions',()=>persist(()=>actions.save(record.id,{entries:validateContents(initialProposal.entries),statement:initialProposal.manifestEvidence||discovered,sourceUrl:source.value,source:'manual-review'}))));
-  root.append(button('Reject suggested contents',()=>persist(()=>actions.save(record.id,{status:'rejected',entries:[],statement:discovered,sourceUrl:source.value,source:'manual-review'}))));
+  }));root.append(saveButton);updateSave();
+  if(!review&&initialProposal?.entries.length)manual.append(button('Accept all suggestions',()=>persist(()=>actions.save(record.id,{entries:validateContents(initialProposal.entries),statement:initialProposal.manifestEvidence||discovered,sourceUrl:source.value,source:'manual-review'}))));
+  (currentEntries.length||review?root:manual).append(button('Reject suggested contents',()=>persist(()=>actions.save(record.id,{status:'rejected',entries:[],statement:discovered,sourceUrl:source.value,source:'manual-review'}))));
   if(review)root.append(button('Undo contents review',()=>persist(()=>actions.remove(record.id))));
-  root.append(element('p','Accept all verifies the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave unverified to keep inferred coverage without saving.'),status);
+  root.append(element('p','Accept all confirms the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave unverified to keep inferred coverage without saving.'));
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
   if(expanded){root.open=true;populated=true;populate();if(Number.isInteger(focusEntry))queueMicrotask(()=>{const row=root.querySelector('tbody')?.children[focusEntry];row?.setAttribute('data-coverage-selected','true');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});});}

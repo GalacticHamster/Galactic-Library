@@ -161,6 +161,9 @@ summary { cursor:pointer; }
 .contents-table-scroll { max-width:100%; overflow-x:auto; margin:8px 0; border:1px solid var(--gh-border); border-radius:4px; }
 .contents-quick-add { margin:12px 0; padding:12px; border:1px solid var(--gh-border); border-radius:6px; background:var(--gh-surface); }
 .contents-quick-add h3 { margin-top:0; }
+.contents-review-evidence { padding:12px; margin:12px 0; background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:6px; }
+.contents-review-evidence h3 { margin-top:0; }
+.contents-review-evidence blockquote { margin:8px 0; padding-left:12px; border-left:3px solid var(--gh-accent); white-space:pre-wrap; overflow-wrap:anywhere; }
 .contents-quick-preview { overflow-wrap:anywhere; }
 .comic-merge-target[aria-pressed="true"] { outline:3px solid var(--gh-accent); outline-offset:2px; box-shadow:inset 0 0 0 2px var(--gh-accent); }
 .comic-merge-selection { font-weight:600; overflow-wrap:anywhere; }

@@ -27,6 +27,7 @@
   "src/lib/contents-quality.js",
   "src/lib/contextual-comic-contents.js",
   "src/lib/contents.js",
+  "src/lib/contents-review-summary.js",
   "src/lib/quick-contents.js",
   "src/lib/inferred-coverage.js",
   "src/lib/coverage-run-context.js",
