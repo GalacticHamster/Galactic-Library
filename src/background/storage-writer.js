@@ -1,3 +1,4 @@
+import {identicalCapture} from '../lib/source-history.js';
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
 import {comicCoverageNameKey} from '../lib/comic-series-names.js';
 import {comicCoverage} from '../lib/comic-coverage.js';
@@ -1270,7 +1271,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     database.ownershipReviews[ref]=validateOwnershipReview({ownership:'owned',source:'local-purchase-history',reviewRef:crypto.randomUUID(),note:`${evidence.sourceLabel}: ${evidence.title}`,evidenceDate:evidence.acquiredAt,confirmedAt:new Date().toISOString(),expiresAt:null});delete database.ownershipProposals[proposalId];return persistDatabase(database);
   }
   async function dismissPurchaseEvidence(proposalId){const database=await getDatabase();delete database.ownershipProposals[proposalId];return persistDatabase(database);}
-  function selectEnrichment(database,id,kind,value,now,preserveMissingCategories=false){
+  function selectEnrichment(database,id,kind,value,now,preserveMissingCategories=false,routineCapture=false){
     // Routine reacquisition of the same catalogue item is not an explicit
     // category deletion. Never transplant labels across different source IDs;
     // reviewed replacement/undo/restore use their existing explicit paths.
@@ -1284,6 +1285,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(sameVolume&&(value.categories===undefined||Array.isArray(value.categories)&&!value.categories.length))value={...value,categories:previous.categories};
     }
     const item=database.providerItems[id];const selectionRef=crypto.randomUUID();
+    const enrichment=validateEnrichment(kind,{...value,selectionRef,retrievedAt:value.retrievedAt??value.appliedAt??now,appliedAt:now,approved:value.approved===true,matchBasis:value.matchBasis??(kind==='googleBooks'?'validated-identifier-or-title-and-author':'source-evidence')});
+    if(routineCapture&&kind==='kindleProductComicContents'&&identicalCapture(previous,enrichment)){
+      // Refresh retrieval metadata without rotating the source choice or its
+      // undo predecessor. Never coalesce punctuation, source or parser changes.
+      const retained={...enrichment,selectionRef:previous.selectionRef};
+      if(previous.appliedAt)retained.appliedAt=previous.appliedAt;else delete retained.appliedAt;
+      database.providerItems[id]={...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,[kind]:retained}},updatedAt:now};
+      return;
+    }
     const observations=kind==='kindleProductComicContents'&&database.kindleContentsObservations?.[item.recordRef];
     if(observations){
       const undo=database.enrichmentHistory[observations.undoRef];
@@ -1293,7 +1303,6 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       observations.undoRef=selectionRef;
     }
     database.enrichmentHistory[selectionRef]={recordRef:item.recordRef,kind,selectionRef,previous:item.metadata?.enrichment?.[kind]??null,changedAt:now};
-    const enrichment=validateEnrichment(kind,{...value,selectionRef,retrievedAt:value.retrievedAt??value.appliedAt??now,appliedAt:now,approved:value.approved===true,matchBasis:value.matchBasis??(kind==='googleBooks'?'validated-identifier-or-title-and-author':'source-evidence')});
     database.providerItems[id]={...item,metadata:{...item.metadata,enrichment:{...item.metadata.enrichment,[kind]:enrichment}},updatedAt:now};
     for(const [ref,review]of Object.entries(database.enrichmentReviews))if(review.source===kind&&review.recordRefs.includes(item.recordRef))delete database.enrichmentReviews[ref];
   }
@@ -1459,7 +1468,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const untrustworthy=['temporary-failure','unavailable'].includes(availability);
       if(untrustworthy)history.latestAttempt=contentsObservation(item,{...result,...parse});else delete history.latestAttempt;
       endHistory?.();
-      if(!untrustworthy||!previous)timed('enrichment_update',()=>selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt));
+      if(!untrustworthy||!previous)timed('enrichment_update',()=>selectEnrichment(database,itemId,'kindleProductComicContents',{...result,...parse},updatedAt,false,true));
       endValidation=activeTiming?.begin('entry_validation');
     }
     endValidation?.();
@@ -1476,7 +1485,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if (!supportedKindleContentsBook(item) || !entry.recordRef || entry.recordRef !== item.recordRef || !saved?.statement) {endValidation?.();throw new Error('The saved Kindle statement is no longer current.');}
       endValidation?.();
       const parsed=timed('parsing',()=>contentsParseState(item));
-      timed('enrichment_update',()=>selectEnrichment(database,item.id,'kindleProductComicContents',{...saved,...parsed},now));
+      timed('enrichment_update',()=>selectEnrichment(database,item.id,'kindleProductComicContents',{...saved,...parsed},now,false,true));
     }
     return persistDatabase(database);
   }

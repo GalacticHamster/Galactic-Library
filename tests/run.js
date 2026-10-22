@@ -1,3 +1,4 @@
+import {sourceHistoryTests} from './source-history.js';
 import {contentsConfirmationTests} from './contents-confirmation.js';
 import {contentsReviewUsabilityTests} from './contents-review-usability.js';
 import {lookupDismissalTests} from './lookup-dismissal.js';
@@ -149,6 +150,7 @@ const tests = [
   ...observationOverlayTests,
   ...lookupDismissalTests,
   ...contentsReviewUsabilityTests,
+  ...sourceHistoryTests,
   ...contentsConfirmationTests,
   ...observationCompletionTests,
   ...validationCertificateTests,

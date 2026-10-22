@@ -28,6 +28,7 @@
   "src/lib/contextual-comic-contents.js",
   "src/lib/contents.js",
   "src/lib/contents-review-summary.js",
+  "src/lib/source-history.js",
   "src/lib/contents-confirmation.js",
   "src/lib/quick-contents.js",
   "src/lib/inferred-coverage.js",

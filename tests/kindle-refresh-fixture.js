@@ -212,5 +212,26 @@ add('Refresh relies on final canonical validation without an extra rebuild while
  equal(after.providerItems['humble:H1'],before.providerItems['humble:H1'],'Unrelated provider changed');equal(after.kindleContentsObservations[plan.candidates[0].recordRef].baseline.statement,'Collects Historical #1-2','Baseline changed');
 });
 
+add('Identical captures preserve the source choice, pinned evidence, reviews and undo across reload',async()=>{
+ const store=memory();await store.writer.restoreDatabase(database(book(1,old())));
+ let plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);
+ await store.writer.saveContentReview('kindle:B000000001',{statement:'Human correction',entries:[{series:'Historical',run:'',unitType:'issue',number:'9',language:'',completeness:'full'}]});
+ const before=await store.writer.getDatabase(),ref=before.providerItems['kindle:B000000001'].recordRef;
+ for(let n=0;n<12;n++){plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);}
+ const after=await createStorageWriter(store.area).getDatabase();
+ await store.writer.reparseKindleContents([{itemId:'kindle:B000000001',recordRef:ref}]);equal((await store.writer.getDatabase()).enrichmentHistory,after.enrichmentHistory,'Unchanged reparse rotated undo');
+ equal(after.enrichmentHistory,before.enrichmentHistory,'Identical capture rotated undo');equal(after.kindleContentsObservations[ref],before.kindleContentsObservations[ref],'Pinned history changed');equal(after.contentReviews,before.contentReviews,'Review changed');equal(after.ownershipPolicy,before.ownershipPolicy,'Ownership changed');
+ equal(parseBackup(createBackup(after)).enrichmentHistory,after.enrichmentHistory,'Backup changed undo');
+ await store.writer.undoEnrichmentSelections([after.kindleContentsObservations[ref].undoRef]);const undone=await store.writer.getDatabase();equal(undone.providerItems['kindle:B000000001'].metadata.enrichment.kindleProductComicContents.statement,old().statement,'Undo lost predecessor');equal(undone.contentReviews,after.contentReviews,'Undo changed reviewed contents');
+ await store.writer.saveContentReview('kindle:B000000001',{statement:'Rejected suggestion',entries:[],status:'rejected'});
+ plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);const rejected=await store.writer.getDatabase();
+ plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);const repeated=await store.writer.getDatabase();equal(repeated.contentReviews,rejected.contentReviews,'Identical capture cleared rejection');equal(repeated.enrichmentHistory,rejected.enrichmentHistory,'Rejected source rotated undo');
+});
+add('Cosmetic and material capture changes retain separate predecessor evidence',async()=>{
+ const store=memory();await store.writer.restoreDatabase(database(book(1,old())));
+ let plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0])]);const before=await store.writer.getDatabase(),ref=before.providerItems['kindle:B000000001'].recordRef;
+ plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0],'Collects Fresh #3-4!')]);let db=await store.writer.getDatabase();assert(db.kindleContentsObservations[ref].undoRef!==before.kindleContentsObservations[ref].undoRef,'Cosmetic source was merged');equal(db.enrichmentHistory[db.kindleContentsObservations[ref].undoRef].previous.statement,'Collects Fresh #3-4','Original punctuation lost');
+ plan=await begin(store.writer);await commit(store.writer,plan,[observation(plan.candidates[0],'Collects Fresh #3-5')]);db=await store.writer.getDatabase();equal(db.enrichmentHistory[db.kindleContentsObservations[ref].undoRef].previous.statement,'Collects Fresh #3-4!','Material predecessor lost');
+});
 export const kindleRefreshCases=cases;
 export async function checkKindleRefresh(){for(const [name,check]of cases){try{await check();}catch(error){throw Error(name+': '+error.message);}}return cases.length;}
