@@ -22,8 +22,9 @@ try{
  await writer.mergeProviderItems('humble',[{providerItemId:'old:product:archer2',title:emperor,mediaType:'book',ownership:'owned',metadata:{purchaseId:'old',sourceBundle:'Older bundle',entitlement:'direct-download'},acquiredAt:'2014-09-25T00:00:00Z'},{providerItemId:'new:product:archer2',title:warrior,mediaType:'book',ownership:'owned',metadata:{purchaseId:'new',sourceBundle:'Newer bundle',entitlement:'direct-download'},acquiredAt:'2026-09-18T00:00:00Z'}]);
  await import('../src/ui/options.js');
  await wait(()=>document.querySelector('#library-items > li'),'Library did not load');
+ const layout=document.querySelector('#library-layout');layout.value='detailed';layout.dispatchEvent(new Event('change',{bubbles:true}));assert(layout.value==='detailed'&&!document.querySelector('.library-compact-entry'),'Reconciliation fixture requires Detailed layout');
  const archerCard=title=>[...document.querySelectorAll('#library-items > li')].find(node=>node.querySelector('strong')?.textContent===title);
- const archerInspector=title=>{const node=archerCard(title);open(node.querySelector('.item-details'));open(node.querySelector('[data-item-section="advanced"]'));return open(node.querySelector('.evidence-inspector'));};
+ const archerInspector=title=>{const node=archerCard(title);open(node.querySelector('.item-details'));open(node.querySelector('[data-item-section="matching"]'));return open(node.querySelector('.evidence-inspector'));};
  let archer=archerInspector(emperor),archerSearch=archer.querySelector('[aria-label="Search comparison records"]'),archerRight=archer.querySelector('[aria-label="Compare with library record"]');
  assert(archerRight.options.length===1&&archerRight.disabled,'Picker rendered library before searching');
  archerSearch.value='Archer';archerSearch.dispatchEvent(new Event('input'));

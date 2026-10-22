@@ -434,6 +434,7 @@ try{
  db=await writer.replaceProviderItems('kindle',[item(1)],{profileLabel:'Family',fullSyncAt:'2026-10-02'},snapshot([item(1)]));
  const b=Object.values(db.providerItems).find(r=>r.profileId!==a),aRef=record(1).recordRef;
  await reconcile();await wait(()=>list().children.length===50,'Contents page not loaded');
+ const layout=document.querySelector('#library-layout');layout.value='detailed';layout.dispatchEvent(new Event('change',{bubbles:true}));assert(layout.value==='detailed'&&!document.querySelector('#library-items .library-compact-entry'),'Card parity requires Detailed Library cards');
  const firstCard=list().querySelector('[data-record-ref="'+aRef+'"]'),cardStyle=getComputedStyle(firstCard),libraryStyle=getComputedStyle(document.querySelector('#library-items > li'));
  assert(list().classList.contains('library-items')&&firstCard.classList.contains('library-item'),'Contents bypassed the shared Library card classes');
  for(const property of ['backgroundColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft'])assert(cardStyle[property]===libraryStyle[property],'Contents card differs from Library: '+property);

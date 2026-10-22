@@ -4,6 +4,7 @@ import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY} from '../src/lib/observation-overl
 import {providerCheckDigest} from '../src/lib/provider-scan-checks.js';
 import {mountLibraryRow,compactAccessStatus} from '../src/ui/library-layout.js';
 import {accessLabel} from '../src/ui/item-presentation.js';
+import {UI_PREFERENCES_KEY} from '../src/lib/ui-preferences.js';
 
 const checks=[],values=JSON.parse(sessionStorage.getItem('compact-fixture')||'{}'),listeners=[];
 const assert=(value,message)=>{if(!value)throw Error(message);checks.push(message);};
@@ -58,10 +59,14 @@ try{
  await wait(()=>document.querySelector('#library-load-status').hidden&&rows().length,'Library did not load');
  const layout=document.querySelector('#library-layout');
  if(sessionStorage.getItem('compact-fixture')){
-  assert(layout.value==='compact','Compact preference survives a real document reload');
-  assert(rows().length>0&&rows().length<=20&&rows().every(row=>row.querySelector('.library-compact-entry')),'Reload keeps the compact page bounded and honors existing record navigation');
+  const expected=sessionStorage.getItem('layout-reload-stage')||'compact';
+  assert(layout.value===expected,expected+' preference survives a real document reload');
+  assert(rows().length>0&&rows().length<=20&&rows().every(row=>expected==='compact'?row.querySelector('.library-compact-entry'):row.querySelector('.library-result-summary')&&!row.querySelector('.library-compact-entry')),'Reload keeps the selected layout bounded and honors existing record navigation');
   assert(!document.querySelector('#library-alerts').textContent.includes('lookup failures / no results'),'Dismissed failure indicator stays gone after reload');
-  await fetch('/test-result',{method:'POST',body:JSON.stringify({checks:[...JSON.parse(sessionStorage.getItem('compact-checks')), ...checks]})});
+  if(expected==='compact'){
+   change(layout,'detailed');await wait(()=>values[UI_PREFERENCES_KEY]?.libraryLayout==='detailed','Detailed preference did not persist');
+   sessionStorage.setItem('compact-fixture',JSON.stringify(values));sessionStorage.setItem('compact-checks',JSON.stringify([...JSON.parse(sessionStorage.getItem('compact-checks')),...checks]));sessionStorage.setItem('layout-reload-stage','detailed');location.reload();
+  }else await fetch('/test-result',{method:'POST',body:JSON.stringify({checks:[...JSON.parse(sessionStorage.getItem('compact-checks')), ...checks]})});
  }else{
   assert(layout.value==='compact'&&rows().every(row=>row.querySelector('.library-compact-entry')),'Fresh Library defaults to Compact');
   change(layout,'detailed');
@@ -114,7 +119,12 @@ try{
   change(layout,'detailed');change(layout,'compact');
   assert(document.querySelector('#library-page-status').textContent===page&&rows().length===20,'View changes retain pagination');
   assert(document.querySelector('#search').value==='Fixture'&&document.querySelector('#provider-filter').value==='kindle'&&document.querySelector('#library-sort').value==='title-desc','View changes retain search, provider and sorting');
-  await new Promise(r=>setTimeout(r,250));
+  for(const mode of ['detailed','compact']){
+   change(layout,mode);assert(rows().length===20&&rows().every(row=>row.querySelector('strong').textContent.startsWith('Fixture Book')),'Filtered second page remains correct in '+mode);
+   document.querySelector('#library-next').click();assert(rows().length===20&&rows().every(row=>row.querySelector('strong').textContent.startsWith('Fixture Book')),'Filtered third page remains bounded in '+mode);
+   document.querySelector('#library-previous').click();assert(document.querySelector('#library-page-status').textContent===page,'Returning preserves filtered page in '+mode);
+  }
+  await wait(()=>values[UI_PREFERENCES_KEY]?.libraryLayout==='compact'&&values[UI_PREFERENCES_KEY]?.browse?.search==='Fixture','Final layout and search preferences did not persist');
   sessionStorage.setItem('compact-fixture',JSON.stringify(values));sessionStorage.setItem('compact-checks',JSON.stringify(checks));location.reload();
  }
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}

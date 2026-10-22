@@ -42,7 +42,7 @@ try{
   const qualityEditor=createContentsEditor(qualityRecord,null,{save:async()=>{},refresh(){}});
   qualityEditor.open=true;qualityEditor.dispatchEvent(new Event('toggle'));button(qualityEditor,'Parse statement for review').click();
   assert(qualityEditor.querySelector('textarea').value==='Collects Comic #1-3 Read More','Parsing destroyed original Read More evidence.');
-  assert(qualityEditor.textContent.includes('description may have been incomplete')&&qualityEditor.textContent.includes('Not reviewed'),'Hydration warning or unverified status missing.');
+  assert(qualityEditor.querySelector('.contents-interpretation').textContent.includes('The captured description may be incomplete; later included material may be missing.')&&qualityEditor.textContent.includes('Not reviewed'),'Hydration warning or unverified status missing.');
   assert(qualityEditor.querySelectorAll('tbody tr').length===3,'Captured issue range did not produce review proposals.');
   const mixedQuality=proposeContentsForReview('Collects A #1-2 and material from B #3','Quality collection');
   assert(mixedQuality.entries.filter(e=>e.completeness==='full').length===2&&mixedQuality.entries.filter(e=>e.completeness==='excerpt').length===1,'Packaged mixed extent regression.');
@@ -95,6 +95,8 @@ try{
   const backup=createBackup(await writer.getDatabase());
   await import('../src/ui/options.js');
   await wait(()=>document.querySelectorAll('#library-items > li').length===6,'Library failed to render: '+document.querySelector('#backup-status').textContent);
+  const layout=document.querySelector('#library-layout');layout.value='detailed';layout.dispatchEvent(new Event('change',{bubbles:true}));
+  assert(layout.value==='detailed'&&!document.querySelector('#library-items .library-compact-entry'),'Detailed fixture did not select its required layout');
   checks.push('actual options page renders distinct editions and same-title homonyms');
   assert(document.querySelector('#settings-workspace').hidden&&document.querySelector('#books-workspace').hidden&&document.querySelector('#reading-workspace').hidden&&document.querySelector('#ownership-workspace').hidden,'Default library exposes a tool workspace');
   assert(!document.querySelector('#library-items .evidence-inspector')&&!document.querySelector('#library-items .local-metadata-tools'),'Collapsed cards eagerly expose item tools');checks.push('default view is library first and item controls are lazy behind Details');
@@ -194,7 +196,13 @@ try{
   await wait(()=>values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks?.approved,'Approved candidate did not persist.');
   await open(card('Review manga Vol. 1').querySelector('.enrichment-evidence'));
   await wait(()=>button(card('Review manga Vol. 1'),'Undo Google Books selection'),'Undo control did not render.');
-  assert(card('Review manga Vol. 1').textContent.includes('Publisher')&&card('Review manga Vol. 1').textContent.includes('user-selected-edition'),'Field provenance missing.');
+  const evidence=card('Review manga Vol. 1').querySelector('.enrichment-evidence');
+  const publisherRow=[...evidence.querySelectorAll('tr')].find(row=>row.firstElementChild.textContent==='Publisher');
+  assert(publisherRow?.children[2]?.textContent==='Publisher','Selected publisher source value missing from the comparison.');
+  assert(!evidence.querySelector('.source-selection-technical pre'),'Technical provenance rendered before disclosure');
+  await open(evidence.querySelector('.source-selection-technical'));
+  const provenance=JSON.parse(evidence.querySelector('.source-selection-technical pre').textContent);
+  assert(provenance.matchBasis==='user-selected-edition'&&provenance.approved===true,'Confirmed source provenance missing.');
   checks.push('authorless Google Books discovery requires edition approval and exposes source field evidence');
   button(card('Review manga Vol. 1'),'Undo Google Books selection').click();
   await wait(()=>!values.galacticLibraryDatabase.providerItems['humble:review-manga'].metadata.enrichment?.googleBooks,'Enrichment undo failed.');
@@ -386,7 +394,8 @@ try{
   emitProgress(scanState);
   for(let n=0;n<20;n++){emitProgress({...scanState,checked:n+1,found:n+1,buffered:Math.min(n+1,20)});contentsStorageListeners.forEach(listener=>listener({galacticLibraryDatabase:{}},'local'));}
   await pause();assert(document.querySelector('#library-items').firstElementChild===firstLibraryNode,'Scan progress rebuilt the Library UI.');
-  assert(document.querySelector('#kindle-contents-progress').textContent.includes('20/40 checked'),'Lightweight progress counts are missing.');
+  await wait(()=>document.querySelector('#kindle-contents-progress [role="status"]').textContent.includes('20 of 40 books checked (20 remaining)'),'Lightweight checked and remaining progress counts are missing.');
+  assert(document.querySelector('#kindle-contents-progress').textContent.includes('20 results waiting to save.'),'Buffered-result progress is missing.');
   await writer.mergeProviderItems('kindle',[{providerItemId:'reconciled-after-scan',title:'Reconciled after scan',mediaType:'book',ownership:'owned'}]);
   emitProgress({...scanState,phase:'completed',checked:20,found:20,durable:20,buffered:0});
   await wait(()=>document.querySelector('#library-items').firstElementChild!==firstLibraryNode,'Scan completion did not reconcile the Library.');
