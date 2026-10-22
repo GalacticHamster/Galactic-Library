@@ -309,3 +309,7 @@ button.danger { background:var(--gh-danger-fill); }
 .library-compact-access[data-access="subscription"],.library-compact-access[data-access="borrowed"] { color:var(--gh-info); }
 .library-compact-access[data-access="unknown"] { color:var(--gh-text-muted); border-style:dashed; }
 .library-compact-body { padding:10px 12px; border-top:1px solid var(--gh-border); }
+
+.contents-confirmation-dialog { width:min(50rem,92vw); max-height:85vh; overflow:auto; }
+.contents-confirmation-dialog li { margin:.75rem 0; }
+.contents-queue-issues { margin:.5rem 0; }

@@ -1,3 +1,4 @@
+import {contentsConfirmationTests} from './contents-confirmation.js';
 import {contentsReviewUsabilityTests} from './contents-review-usability.js';
 // Offline unit selection: contents/parser/manifest and their persistence controls.
 // No packaging, browser, companion, live acquisition or unrelated provider suites.
@@ -19,7 +20,7 @@ import {parentScopedComponentCases} from './parent-scoped-components-fixture.js'
 globalThis.fetch=()=>{throw Error('Live requests are forbidden in the offline contents unit suite.');};
 const tests=process.argv.includes('--focused')?[...numberedWrapperTests,...contentsPrecisionContextTests,...boundedManifestTests]:[...numberedWrapperTests,...contentsPrecisionContextTests,...boundedManifestTests,...kindleManifestTests,...kindleWholeManifestTests,...kindleContentsTests,...kindleContentsQualityTests,...contentsParserV4Tests,...numberedPrecisionCases,...independentEvidenceTests,...kindleSourceCaptureTests,...parentScopedComponentCases];
 let failed=0;
-tests.push(...inferredCoverageTests,...contentsReviewUsabilityTests);
+tests.push(...inferredCoverageTests,...contentsReviewUsabilityTests,...contentsConfirmationTests);
 tests.push(...collectionOverlapTests);
 tests.push(...comicCoverageTests);
 for(const [name,run]of tests){try{await run();console.log('PASS '+name);}catch(error){failed++;console.error('FAIL '+name+'\n'+error.stack);}}

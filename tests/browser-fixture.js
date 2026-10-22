@@ -60,7 +60,7 @@ try{
   const pagedDatabase={providerItems:{},canonicalItems:{},enrichmentReviews:{},enrichmentHistory:{},contentReviews:{}};
   for(let n=0;n<61;n++){const id=`humble:page-${n}`,ref=crypto.randomUUID();pagedDatabase.providerItems[id]={id,recordRef:ref,title:`Paged book ${n}`,mediaType:'book',metadata:{}};pagedDatabase.canonicalItems[id]={id,title:`Paged book ${n}`,mediaType:'book',providerItemIds:[id]};}
   let inspected;
-  const pagedWorkbench=createEnrichmentWorkbench({inspect:refs=>{inspected=refs;}});document.body.append(pagedWorkbench.element);pagedWorkbench.update(pagedDatabase);await open(pagedWorkbench.element);
+  const pagedWorkbench=createEnrichmentWorkbench({inspect:refs=>{inspected=refs;}});document.body.append(pagedWorkbench.element);pagedWorkbench.update(pagedDatabase);pagedWorkbench.showCategory('missing');await open(pagedWorkbench.element);
   assert(pagedWorkbench.element.querySelectorAll('li').length===50,'Workbench first page is not bounded.');button(pagedWorkbench.element,'Next page').click();assert(pagedWorkbench.element.querySelectorAll('li').length===11&&pagedWorkbench.element.textContent.includes('Paged book 60'),'Workbench truncates results past page one.');
   const pagedSearch=pagedWorkbench.element.querySelector('input[type="search"]');pagedSearch.value='Paged book 60';pagedSearch.dispatchEvent(new Event('input'));assert(pagedWorkbench.element.querySelectorAll('li').length===1,'Workbench search failed.');button(pagedWorkbench.element,'Review library item').click();assert(inspected[0]===pagedDatabase.providerItems['humble:page-60'].recordRef,'Workbench navigation used the wrong record.');pagedWorkbench.element.remove();
   checks.push('workbench pagination reaches all rows, title filtering resets its page and item navigation preserves record scope');
@@ -225,7 +225,7 @@ try{
   await wait(()=>card('Review manga Vol. 1').textContent.includes('Undo File or publisher metadata selection'),'Source evidence did not refresh after approval.');
   assert(values.galacticLibraryDatabase.providerItems[queuedRecord.id].ownership==='unknown'&&!values.galacticLibraryDatabase.contentReviews[queuedRecord.id],'Local import overclaimed ownership or contents.');
   queueFilter.value='unparsed';queueFilter.dispatchEvent(new Event('change'));assert(workbench.textContent.includes('Collects Review manga Vol. One'),'Unparsed statement absent from queue.');
-  button(workbench,'Review library item').click();await pause();assert(document.querySelector('#contents-book-review .contents-editor').open,'Workbench navigation did not open Contents.');showWorkspace('books');
+  button(workbench,'Review details').click();await pause();assert(document.querySelector('#contents-book-review .contents-editor').open,'Workbench navigation did not open Contents.');showWorkspace('books');
   checks.push('actual ComicInfo file input queues source evidence and workbench approval preserves ownership and unparsed contents');
 
   localTools=await open(card('Review manga Vol. 1').querySelector('.local-metadata-tools'));
@@ -238,7 +238,7 @@ try{
   await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.source==='epub','EPUB review did not apply.');
   await pause();
   queueFilter.value='undo';queueFilter.dispatchEvent(new Event('change'));
-  const undoRef=values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.selectionRef;row=workbench.querySelector(`[data-review-id="${undoRef}"]`);check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Undo selected enrichments').click();
+  const undoRef=values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.selectionRef;row=workbench.querySelector(`[data-review-id="${undoRef}"]`);check=row.querySelector('input[type="checkbox"]');check.checked=true;check.dispatchEvent(new Event('change'));button(workbench,'Undo selected source choices').click();
   await wait(()=>values.galacticLibraryDatabase.providerItems[queuedRecord.id].metadata.enrichment.localMetadata.source==='comicinfo','Batch undo did not restore prior ComicInfo selection.');
   await wait(()=>card('Review manga Vol. 1').textContent.includes('Collects Review manga Vol. One'),'Undo did not rerender.');
   checks.push('actual EPUB file import requires review and workbench batch undo restores previous metadata without changing provider evidence');

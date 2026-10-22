@@ -34,7 +34,7 @@ export const {
   separateEdition, undoEditionSeparation, saveTitleAliases,
   saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
   saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
-  saveContentReview, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
+  saveContentReview, confirmContentsSuggestions, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
   getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge, getShowEnrichmentActions, saveShowEnrichmentActions
 } = client;
 

@@ -50,5 +50,5 @@ export async function checkContentsReviewUsability(assert){
  choice.value='contents-information';choice.dispatchEvent(new Event('change'));
  assert(queue.element.querySelectorAll('.review-items > li').length===1&&queue.element.querySelector('.review-items').textContent.includes('collects 6 issues'),'Queue information filter agrees with the individual zero-suggestion explanation');
  choice.value='contents-suggestions';choice.dispatchEvent(new Event('change'));
- assert(queue.element.querySelectorAll('.review-items > li').length===1&&queue.element.querySelector('.review-items').textContent.includes('3 suggested entries'),'Useful proposals are separate from descriptions without an issue list');queue.element.remove();
+ assert(queue.element.querySelectorAll('.review-items > li').length===1&&queue.element.querySelector('.contents-queue-issues')?.textContent.includes('Alpha (2001) #1'),'Useful proposals are separate from descriptions without an issue list');queue.element.remove();
 }

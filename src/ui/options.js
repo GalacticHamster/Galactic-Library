@@ -54,7 +54,7 @@ import { comicMangaEvidence, libraryBroadGenreValues } from '../lib/genre-hints.
 import { googleBooksEnrichment, googleBooksGenreHint, googleBooksGenreHintCandidate, googleBooksMatchClassification, highConfidenceGoogleBooksCandidate } from '../lib/google-books.js';
 import { openLibraryEnrichment } from '../lib/open-library.js';
 import { compareTitles } from '../lib/title-sort.js';
-import { saveContentReview, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision } from '../lib/storage.js';
+import { saveContentReview, confirmContentsSuggestions, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision } from '../lib/storage.js';
 import { createContentsEditor } from './contents-editor.js';
 import { createEvidenceInspector } from './evidence-inspector.js';
 import { separateEdition, undoEditionSeparation } from '../lib/storage.js';
@@ -748,6 +748,8 @@ function render(timing = null) {
       apply:async selections=>{database=await drafts.commit(()=>applyReviewedEnrichments(selections));googleBooksSearches.clear();openLibrarySearches.clear();},
       dismiss:async refs=>{database=await drafts.commit(()=>dismissEnrichmentReviews(refs));googleBooksSearches.clear();openLibrarySearches.clear();},
       undo:async refs=>{database=await drafts.commit(()=>undoEnrichmentSelections(refs));},
+      confirmContents:async requests=>{const result=await drafts.commit(()=>confirmContentsSuggestions(requests));database=result.database;return result;},
+      undoContents:async id=>{database=await drafts.commit(()=>removeContentReview(id));},
       retry:retryEnrichmentReview,inspect:inspectEnrichmentRecords,refresh:render
     });document.querySelector('#books-workspace').append(enrichmentWorkbench.element);
   }

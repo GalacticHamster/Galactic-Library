@@ -26,6 +26,7 @@ import {KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY,bindKindleRefresh,KINDLE_
 import {selectManifest,MANIFEST_INTERPRETATION_VERSION} from '../lib/kindle-manifest.js';
 import {CONTENTS_FILTER_VERSION} from '../lib/contents-quality.js';
 import {contentsSourceBaseline} from '../lib/contents.js';
+import {contentsConfirmation,contentsConfirmationToken,sameConfirmedContents} from '../lib/contents-confirmation.js';
 import {applyCoverageResolutions,applyCoverageReferenceDecision} from '../lib/coverage-resolution.js';
 import {contentsObservation} from '../lib/kindle-contents-observations.js';
 import { createEmptyDatabase, normalizeProviderItem, providerItemKey, rebuildCanonicalItems, validateDatabase,validateDatabaseAsync } from '../lib/models.js';
@@ -1622,11 +1623,36 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database);
   }
 
-  async function saveContentReview(itemId, value) {
-    const database=await getDatabase();
+  function setContentReview(database,itemId,value){
     if (!database.providerItems[itemId] || !['book','game'].includes(database.providerItems[itemId].mediaType)) throw new Error('Contents can be reviewed only for a current book or game record.');
     database.contentReviews[itemId]=validateContentReview({...value,referenceDecisions:database.contentReviews[itemId]?.referenceDecisions,sourceBaseline:contentsSourceBaseline(database.providerItems[itemId]),verifiedAt:new Date().toISOString()});
+  }
+  async function saveContentReview(itemId, value) {
+    const database=await getDatabase();setContentReview(database,itemId,value);
     return persistDatabase(database);
+  }
+
+  async function confirmContentsSuggestions(requests){
+    if(!Array.isArray(requests)||!requests.length||requests.length>50||new Set(requests.map(r=>r?.recordRef)).size!==requests.length)throw Error('Select 1-50 distinct book records.');
+    const database=await getDatabase(),results=[];let writes=0;
+    for(const request of requests){
+      try{
+        if(request?.confirmed!==true||typeof request.token!=='string'||!/^[a-f0-9]{64}$/u.test(request.token))throw Error('Preview and confirm this issue list first.');
+        const record=database.providerItems[request.itemId];
+        if(!record||record.recordRef!==request.recordRef)throw Error('This book or account changed. Review the current list before retrying.');
+        const review=database.contentReviews[record.id];
+        const candidate=contentsConfirmation(record,review?{...database,contentReviews:{}}:database);
+        if(!candidate.eligible)throw Error(candidate.reason);
+        if(await contentsConfirmationToken(record,candidate.value)!==request.token)throw Error('This book, source or proposed list changed. Review the current list before retrying.');
+        if(review){if(!sameConfirmedContents(review,record,candidate.value))throw Error('A contents review or correction was saved meanwhile. Open Review details.');}
+        else{setContentReview(database,record.id,candidate.value);writes++;}
+        results.push({itemId:record.id,recordRef:record.recordRef,status:review?'already-confirmed':'confirmed'});
+      }catch(error){results.push({itemId:request?.itemId,recordRef:request?.recordRef,status:'failed',message:error.message});}
+    }
+    // Independent validation failures do not block other selected books. All
+    // successful validations share one atomic save; a storage failure throws
+    // rather than reporting any uncommitted review as successful.
+    return {database:writes?await persistDatabase(database):database,results};
   }
 
   async function saveCoverageResolutions(request){
@@ -1790,7 +1816,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     saveManualMatchDecision, savePreferredDisplayTitle, removeManualMatchDecision, saveOpenLibraryEnrichment, saveEnrichmentReview, dismissEnrichmentReview, undoEnrichmentSelection, applyReviewedEnrichments, dismissEnrichmentReviews, undoEnrichmentSelections,
     saveGoogleBooksEnrichments, saveGoogleBooksGenreHints, saveKindleComicContents, reparseKindleContents,
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
-    saveContentReview, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
+    saveContentReview, confirmContentsSuggestions, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
     getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
   };

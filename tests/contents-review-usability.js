@@ -28,7 +28,7 @@ export const contentsReviewUsabilityTests=[
  ['queue distinguishes useful contents suggestions, information gaps and changed reviews using the editor summary',()=>{
   const a=batmanReviewBook(),b=coverageBook('review-ready'),c=coverageBook('review-changed'),db=coverageDatabase(a,b,c);
   db.contentReviews[c.id]=confirmed([issue()]);
-  const rows=enrichmentWorkbenchRows(db,{includeMissing:false});assert.deepEqual(rows.map(r=>r.contentsState),['information','suggestions','changed']);
+  const rows=enrichmentWorkbenchRows(db,{includeMissing:false}).filter(r=>r.category==='unparsed');assert.deepEqual(rows.map(r=>r.contentsState),['information','suggestions','changed']);
   for(const book of [a,b,c]){const p=manifestReviewProposal(book.metadata.enrichment.kindleProductComicContents,book.title),expected=contentsReviewSummary(book,p,db.contentReviews[book.id]);assert.ok(rows.find(r=>r.recordRefs.includes(book.recordRef)).reason.startsWith(expected.summary));}
   assert.equal(contentsReviewSummary({title:'No source',metadata:{}},null,null).kind,'information');
  }],

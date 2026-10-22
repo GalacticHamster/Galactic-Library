@@ -4,6 +4,7 @@ import {editionEnrichmentConflicts} from './identity.js';
 import {contentsStatement,contentsReviewChanged,proposeContentsForReview} from './contents.js';
 import {manifestReviewProposal} from './kindle-manifest.js';
 import {contentsReviewSummary} from './contents-review-summary.js';
+import {contentsConfirmation} from './contents-confirmation.js';
 
 export function candidateConflicts(records,source,candidate){
   if(source==='openLibrary')return [];
@@ -34,10 +35,11 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
       const proposal = saved?manifestReviewProposal(saved,record.title,statement,{series:record.metadata.series}):proposeContentsForReview(statement,record.title);
       const presentation=contentsReviewSummary(record,proposal,review);
       if(proposal.outcome!=='filtered' || review || proposal.descriptionMayBeIncomplete)rows.push({id:`contents:${record.recordRef}`,category:'unparsed',title:record.title,recordRefs:[record.recordRef],
-        contentsState:presentation.kind,reason:`${presentation.summary} ${presentation.statement}`});
+        contentsState:presentation.kind,contentsConfirmation:contentsConfirmation(record,database,proposal),reason:`${presentation.summary} ${presentation.statement}`});
     }
+    if(includeContents&&review)rows.push({id:`contents-history:${record.recordRef}`,category:'review-history',title:record.title,recordRefs:[record.recordRef],itemId:record.id,contentsReview:review,reason:review.status==='rejected'?'Contents rejected. Undo restores source-derived suggestions.':'Reviewed contents saved. Undo restores source-derived suggestions, which may change inferred issue coverage.'});
     for(const [kind,entry]of Object.entries(record.metadata.enrichment??{})){
-      if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],reason:`${kind}: ${entry.matchBasis||'source evidence'}; retrieved ${entry.retrievedAt||entry.checkedAt||'unknown'}`});
+      if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],history:{kind,previous:database.enrichmentHistory[entry.selectionRef].previous!==null,selectedAt:entry.retrievedAt||entry.checkedAt||'',technical:entry},reason:'A saved source choice can be undone. Purchases and saved contents reviews are kept; source-derived suggestions and inferred coverage may change.'});
       if(!['googleBooks','localMetadata'].includes(kind))continue;
       const conflicts=candidateConflicts([{...record,metadata:{...record.metadata,enrichment:{}}}],kind,entry);
       if(conflicts.length)rows.push({id:`conflict:${record.recordRef}:${kind}`,category:'conflicts',title:record.title,recordRefs:[record.recordRef],reason:`Selected ${kind} differs from provider evidence: ${conflicts.join(', ')}. Inspect the sources or undo the selection.`});

@@ -2,10 +2,41 @@
 
 ## Review status and comparisons
 
-In **Books & Contents > Review book suggestions**, contents are separated into
-**Contents suggestions to check**, **Descriptions without an issue list**, and
-**Descriptions changed since review**. Information gaps are optional; they are
-not thousands of required confirmations. Existing reviewed decisions stay saved.
+In **Books & Contents > Review book suggestions**, choose a task:
+
+- **Ready to confirm**: explicit issue lists and book information candidates.
+- **Needs more information**: descriptions without issue lists, lists needing more
+  context, missing optional book details, and failed lookups.
+- **Conflicts and changes**: conflicting sources and descriptions changed since review.
+- **Review history / Undo**: completed source choices and contents reviews or rejections.
+
+The **Show** selector exposes only that task's categories. **All review tasks**
+keeps older all-record and contents-queue links available. Search and pagination
+remain in the same view. Optional information gaps are not required confirmations.
+Book lists, metadata suggestions, decisions, gaps and history have separate counts.
+
+Under **Issue lists ready to confirm**, each card shows the proposed series, run
+and issue ranges. Check the lists you know are correct, select individual cards or
+**Select all on page**, then **Confirm selected**. The confirmation window shows
+each book/account and the total number of book records and issue entries. Nothing
+is saved until **Confirm these lists**. Up to 50 independent book records share one
+atomic save, using the same review validation as the detailed editor. Stale or
+ineligible records are reported individually; successful lists leave Ready and
+failed lists can be retried. An identical retry does not rewrite a saved review.
+
+Quick confirmation requires an explicit, fully interpreted numbered issue list
+with publication runs. Unresolved text, excerpts, named supplements, missing runs,
+other captured claims, truncated statements and existing reviews/corrections need
+**Review details**. A page-wide Read more hint does not itself truncate a proven
+complete selected clause. Confirming that clause never asserts complete book
+contents. No ownership/access status changes.
+
+In **Review history / Undo > Source choice history**, **Undo selected source
+choices** restores the preceding enrichment source, or removes the added source
+if none preceded it. Original purchases and saved contents reviews remain; inferred
+suggestions and coverage may change. Raw source fields stay under Technical details.
+**Contents review history** separately offers **Undo contents review**, restoring
+source-derived contents while retaining existing ignored-reference decisions.
 
 Opening a contents review shows the captured description and source attribution
 immediately. For a description such as "Collecting the first six issues of the hit
