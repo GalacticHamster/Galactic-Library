@@ -78,9 +78,9 @@ try{
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
-  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:largeFixtureMode?180000:importerMode?90000:30000,maxBuffer:4*1024*1024},resolve);});
+  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:largeFixtureMode?180000:(importerMode||amazonVideoMode)?90000:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
-  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,largeFixtureMode?150000:importerMode?60000:20000);})]);}
+  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,largeFixtureMode?150000:(importerMode||amazonVideoMode)?60000:20000);})]);}
   finally{clearTimeout(timeout);child?.kill();await exited;}
   assert.ok(result,'The browser did not finish the UI fixture.');
   const requestedOutput=process.argv.find(value=>value.startsWith('--output='))?.slice(9);

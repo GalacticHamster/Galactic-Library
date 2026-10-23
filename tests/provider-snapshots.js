@@ -209,7 +209,7 @@ export const providerSnapshotTests = [
       scrollTo: ({ top }) => { scrollingElement.scrollTop = Math.max(0, top - 500); scrollingElement.scrollHeight += 1000; },
       document: { scrollingElement, querySelectorAll: () => [], querySelector: () => null, body: { textContent: 'Purchases' } }
     });
-    await assert.rejects(context.GalacticAmazonVideo.fetchAmazonVideoLibrary(), /pass limit before the library finished/u);
+    await assert.rejects(context.GalacticAmazonVideo.fetchAmazonVideoLibrary(), /250-pass limit/u);
   }],
   ['Audible rejects a non-library page instead of treating it as the end', async () => {
     const context = providerContext('audible', async () => ({ ok: true, text: async () => 'Signed-out page' }), {

@@ -124,6 +124,11 @@
       if (/^(?:auto|scroll|overlay)$/u.test(global.getComputedStyle(node).overflowY)
           && node.scrollHeight > node.clientHeight) { scroller = node; break; }
     }
+    // Independent vertical lists need separate visits even when their common
+    // parent is the document. The document bottom cannot certify those lists.
+    const unfinished = scrollableContainers({ root, cards }).find(([node]) => node !== scroller
+      && !node.contains(scroller) && node.scrollTop + node.clientHeight < node.scrollHeight - 4);
+    if (unfinished) scroller = unfinished[0];
     return { root, scroller, cards, nested: scroller !== (document.scrollingElement ?? document.documentElement) };
   }
 
@@ -164,8 +169,7 @@
     return { top: scroller.scrollTop, height, extent: scroller.scrollHeight };
   }
 
-  function inspectListing() {
-    const context = listingContext(global.document);
+  function scrollableContainers(context) {
     const containers = new Map();
     for (const card of context.cards) {
       for (let node = card.parentElement; node && context.root.contains(node); node = node.parentElement) {
@@ -174,9 +178,43 @@
         if (node === context.root) break;
       }
     }
-    const scrollable = [...containers].filter(([node, cards]) => cards > 1 && node.clientHeight > 0
+    return [...containers].filter(([node, cards]) => cards > 1 && node.clientHeight > 0
       && /^(?:auto|scroll|overlay)$/u.test(global.getComputedStyle(node).overflowY)
       && node.scrollHeight > node.clientHeight);
+  }
+
+  function reportedTotal(context) {
+    // Whole-list labels only: never join body text or turn grid row counts or
+    // a user's manual count into a provider-reported total.
+    if (context.root === global.document.body) return null;
+    const totals = new Set();
+    for (const node of context.root.querySelectorAll('p, h1, h2, h3, [role="status"]')) {
+      if (node.closest(CARD_SELECTOR) || node.closest('aside, nav, footer') || !visible(node)) continue;
+      const match = compactText(node.textContent).match(/^(?:all items|purchases\s*&\s*rentals)\s*\(([\d,]+)\)$/iu);
+      if (!match) continue;
+      const value = Number(match[1].replace(/,/gu, ''));
+      if (Number.isSafeInteger(value) && value >= 0) totals.add(value);
+    }
+    if (totals.size > 1) throw new Error('Amazon Video showed conflicting whole-library totals. No library changes were saved.');
+    return totals.size ? [...totals][0] : null;
+  }
+
+  function observeTotal(context) {
+    const expected = reportedTotal(context);
+    if (expected !== null) {
+      if (diagnostics.expectedCount !== null && diagnostics.expectedCount !== expected) {
+        diagnostics.reason = 'reported-total-changed';
+        throw new Error('Amazon Video changed its whole-library total during the scan. No library changes were saved.');
+      }
+      diagnostics.expectedCount = expected;
+      diagnostics.countEvidence = 'whole-list-label';
+    }
+    return expected;
+  }
+
+  function inspectListing() {
+    const context = listingContext(global.document);
+    const scrollable = scrollableContainers(context);
     const remaining = scrollable.filter(([node]) => node !== context.scroller && !node.contains(context.scroller)
       && node.scrollTop + node.clientHeight < node.scrollHeight - 4);
     const nextControls = [...global.document.querySelectorAll('button, a')].filter(node => !node.disabled
@@ -200,19 +238,21 @@
     };
   }
 
-  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null) {
-    diagnostics = { format: 2, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0, passes: [] };
+  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false } = {}) {
+    diagnostics = { format: 3, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
+      completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
+      discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
     try {
-      return await scanLibrary(reportProgress, knownItemIds);
+      return await scanLibrary(reportProgress, knownItemIds, readOnly);
     } catch (error) {
-      diagnostics.state = 'failed';
+      if (diagnostics.state === 'scanning') diagnostics.state = 'failed';
       // Only fixed reason codes/numeric page structure, never page text or IDs.
       diagnostics.reason ??= 'scan-rejected';
       throw error;
     }
   }
 
-  async function scanLibrary(reportProgress, knownItemIds) {
+  async function scanLibrary(reportProgress, knownItemIds, readOnly) {
     const itemsById = new Map();
     const incremental = Array.isArray(knownItemIds);
     const renderedItemIds = new Set();
@@ -221,6 +261,9 @@
     let finished = false;
     let passesRead = 0;
     let previousContext = listingContext(global.document);
+    // Reset all visible list scrollers, not just the one chosen for this pass.
+    for (const [node] of scrollableContainers(previousContext)) node.scrollTo({ top: 0, behavior: 'instant' });
+    global.scrollTo({ top: 0, behavior: 'instant' });
     scrollListing(previousContext, 0);
     await wait(SCROLL_PAUSE_MS);
     for (let pass = 0; pass < MAX_SCROLLS; pass += 1) {
@@ -233,10 +276,22 @@
       for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
       const itemsToSave = incremental ? newAmazonVideoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
       for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
+      for (const item of newlyRenderedItems) diagnostics.mediaTypes[item.mediaType] += 1;
       diagnostics.itemCount = itemsById.size;
+      diagnostics.discoveredItems = renderedItemIds.size;
+      observeTotal(context);
       const movies = [...itemsById.values()].filter(item => item.mediaType === 'movie').length;
-      reportProgress({ passes: pass, movies, tv: itemsById.size - movies });
-      if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
+      reportProgress({ passes: pass, movies, tv: itemsById.size - movies,
+        phase: unchangedPasses >= 3 ? 'awaiting-confirmation' : 'reading' });
+      if (incremental && newlyRenderedItems.length && !itemsToSave.length) {
+        diagnostics.passes.push({ pass: passesRead, cards: context.cards.length,
+          newlyDiscoveredItems: newlyRenderedItems.length, distinctItems: renderedItemIds.size,
+          scrollTarget: context.nested ? 'nested' : 'document', ...beforeGeometry,
+          completionConfirmed: false, stop: 'known-newest-group' });
+        diagnostics.state = 'bounded';
+        diagnostics.reason = 'known-newest-group';
+        finished = true; break;
+      }
       const controlsBefore = continuationControls(global.document, context.root);
       // Visit overlapping viewports so a virtualized list cannot skip middle
       // groups merely because its full scroll range is already allocated.
@@ -246,6 +301,7 @@
       if (!controlsBefore.loading.length) controlsBefore.more[0]?.click();
       await wait(SCROLL_PAUSE_MS);
       const afterContext = listingContext(global.document);
+      const currentExpected = observeTotal(afterContext);
       const afterGeometry = geometry(afterContext);
       const controls = continuationControls(global.document, afterContext.root);
       const afterRendered = amazonVideoItemsFromDocument(global.document);
@@ -261,36 +317,48 @@
         && !controls.loading.length && !controls.more.length
         && !controlsBefore.loading.length && !controlsBefore.more.length;
       unchangedPasses = stable ? unchangedPasses + 1 : 0;
-      diagnostics.passes.push({ pass: passesRead, cards: context.cards.length, distinctItems: renderedItemIds.size,
+      diagnostics.passes.push({ pass: passesRead, cards: context.cards.length,
+        newlyDiscoveredItems: newlyRenderedItems.length, distinctItems: renderedItemIds.size,
         scrollTarget: afterContext.nested ? 'nested' : 'document', controlScope: afterContext.root === global.document.body ? 'page' : 'main',
         ...afterGeometry, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
-        ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses });
+        ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses,
+        expectedCount: diagnostics.expectedCount, currentReportedCount: currentExpected, completionConfirmed: false });
       previousContext = afterContext;
-      if (unchangedPasses >= 3) {
-        if (inspectListing().remainingOtherScrollers) {
-          diagnostics.reason = 'unvisited-list-scrollers';
-          throw new Error('Amazon Video still has another scrolling title list with unread content. No library changes were saved. Export scan diagnostics so its layout can be checked.');
-        }
+      // Quiet bottom geometry is only a candidate boundary. A separately
+      // declared full-list total must agree with the distinct observed IDs.
+      // Otherwise keep traversing within the budget; idle passes never certify
+      // completeness, however many there have been.
+      if (unchangedPasses >= 3 && currentExpected !== null
+          && diagnostics.expectedCount === renderedItemIds.size && !inspectListing().remainingOtherScrollers) {
+        diagnostics.completionConfirmed = true;
+        diagnostics.passes.at(-1).completionConfirmed = true;
         finished = true; break;
       }
     }
-    if (!finished) {
-      diagnostics.reason = 'scroll-limit';
-      throw new Error(`Amazon Video reached its ${MAX_SCROLLS}-pass limit before the library finished loading. No library changes were saved.`);
-    }
     if (!itemsById.size && !incremental) {
-      throw new Error('Amazon Video showed no readable movie or TV cards. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.');
+      throw new Error(`Amazon Video showed no readable movie or TV cards${finished ? '' : ` within its ${MAX_SCROLLS}-pass limit`}. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.`);
     }
     for (const card of observedCards) {
       if (!amazonVideoItemFromCardData(cardDataFromElement(card))) throw new Error('Amazon Video showed unreadable library cards. No library changes were saved.');
     }
     const items = [...itemsById.values()];
-    const countMatch = compactText(global.document.body?.textContent).match(/(?:purchases|library|all items)\s*\(([\d,]+)\)/iu);
-    const expected = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
-    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expected, 'scroll-end', passesRead)]);
-    diagnostics.state = 'complete';
-    diagnostics.reason = incremental ? 'quick-update' : 'scroll-end';
-    return { items, snapshot };
+    if (!finished) {
+      diagnostics.state = 'uncertain';
+      diagnostics.reason = diagnostics.expectedCount === null ? 'completion-unconfirmed'
+        : diagnostics.expectedCount !== renderedItemIds.size ? 'reported-count-unreached' : 'continuation-unresolved';
+      diagnostics.stop = 'traversal-budget';
+      const countDetail = diagnostics.reason === 'reported-count-unreached'
+        ? `It reported ${diagnostics.expectedCount} items but returned ${items.length}. ` : '';
+      if (!readOnly) throw new Error(`Amazon Video read ${items.length} titles but could not confirm the entire library was loaded within its ${MAX_SCROLLS}-pass limit. ${countDetail}No library changes were saved. Use Scan diagnostics to inspect the listing without importing.`);
+      return { items, completionConfirmed: false };
+    }
+    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items,
+      [global.GalacticProviderSnapshot.completedScope('library', items.length, diagnostics.expectedCount, 'reported-count', passesRead)]);
+    if (!incremental) {
+      diagnostics.state = 'complete';
+      diagnostics.reason = 'reported-count-reconciled';
+    }
+    return { items, snapshot, completionConfirmed: diagnostics.completionConfirmed };
   }
 
   global.GalacticAmazonVideo = {
