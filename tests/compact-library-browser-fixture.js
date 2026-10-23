@@ -5,6 +5,7 @@ import {providerCheckDigest} from '../src/lib/provider-scan-checks.js';
 import {mountLibraryRow,compactAccessStatus} from '../src/ui/library-layout.js';
 import {accessLabel} from '../src/ui/item-presentation.js';
 import {UI_PREFERENCES_KEY} from '../src/lib/ui-preferences.js';
+import {checkCompactProviderLogos} from './compact-provider-logos-fixture.js';
 
 const checks=[],values=JSON.parse(sessionStorage.getItem('compact-fixture')||'{}'),listeners=[];
 const assert=(value,message)=>{if(!value)throw Error(message);checks.push(message);};
@@ -21,6 +22,7 @@ const open=row=>{const details=row.querySelector('.library-compact-entry');detai
 const rows=()=>[...document.querySelectorAll('#library-items > li')];
 const find=title=>rows().find(row=>row.querySelector('.library-compact-title')?.textContent===title);
 try{
+ if(!sessionStorage.getItem('compact-fixture'))await checkCompactProviderLogos(assert);
  for(const [states,expected,label] of [
   [['owned','unknown'],'owned','Owned'],[['owned','subscription'],'owned','Owned'],
   [['subscription','unknown'],'subscription','Subscription'],[['unknown'],'unknown','Ownership unconfirmed'],
@@ -71,6 +73,7 @@ try{
   assert(layout.value==='compact'&&rows().every(row=>row.querySelector('.library-compact-entry')),'Fresh Library defaults to Compact');
   change(layout,'detailed');
   assert(document.querySelector('#library-items .library-result-summary'),'Detailed keeps the existing card view');
+  assert(document.querySelector('#library-items .library-result-summary .library-item-providers')?.textContent.includes('Kindle')&&!document.querySelector('#library-items .provider-logo'),'Detailed keeps provider names instead of logos');
   const detailedHeight=rows()[0].getBoundingClientRect().height;
   change(layout,'compact');
   assert(rows().length===50&&rows().every(row=>row.querySelector('.library-compact-entry')),'Compact preserves page size and renders expandable rows');

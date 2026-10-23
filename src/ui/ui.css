@@ -314,6 +314,8 @@ button.danger { background:var(--gh-danger-fill); }
 .library-compact-media,.library-compact-provider,.library-compact-access { font-size:.78rem; white-space:nowrap; }
 .library-compact-media { color:var(--gh-text-muted); }
 .library-compact-provider,.library-compact-access { padding:1px 6px; border:1px solid var(--gh-border); border-radius:999px; }
+.library-compact-provider-logo { flex:0 0 24px; width:24px; height:24px; padding:0; border:0; border-radius:0; pointer-events:auto; }
+.library-compact-provider-logo img { width:24px; height:24px; }
 .library-compact-access[data-access="subscription"],.library-compact-access[data-access="borrowed"] { color:var(--gh-info); }
 .library-compact-access[data-access="unknown"] { color:var(--gh-text-muted); border-style:dashed; }
 .library-compact-body { padding:10px 12px; border-top:1px solid var(--gh-border); }

@@ -1,19 +1,9 @@
+import {providerLogo} from './provider-logo.js';
 import {formatDate} from './formatters.js';
 import {afterFeedbackPaint} from './operation-feedback.js';
 import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions} from './provider-accounts.js';
 
 const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
-const providerArtwork={steam:'steam',gog:'gog',epic:'epic-games', 'amazon-games':'amazon-games',audible:'audible',kindle:'kindle','amazon-video':'amazon-video','fandango-at-home':'fandango-at-home',kobo:'kobo',fanatical:'fanatical',humble:'humble-bundle',xbox:'xbox',playstation:'playstation',nintendo:'nintendo'};
-function providerLogo(provider){
- const artwork=providerArtwork[provider];if(!artwork)return null;
- const logo=node('span');logo.className='provider-logo';logo.setAttribute('aria-hidden','true');
- for(const theme of provider==='epic'?['light','dark']:['']){
-  const image=node('img');image.src=`icons/provider-icons/${artwork}${theme?'-'+theme:''}-64.png`;image.alt='';image.width=36;image.height=36;
-  if(theme)image.dataset.logoTheme=theme;
-  image.addEventListener('error',()=>{image.remove();if(!logo.childElementCount)logo.remove();});logo.append(image);
- }
- return logo;
-}
 const date=value=>value?formatDate(value):'Not yet';
 const nickname=p=>p.nickname||(['humble','fanatical'].includes(p.provider)?'Default account':'Unnamed account');
 const health=p=>({running:'Update in progress',succeeded:'Last update completed',failed:'Last update failed',partial:'Last update incomplete',cancelled:'Update cancelled'})[p.syncHealth?.status]??'No recent update details';

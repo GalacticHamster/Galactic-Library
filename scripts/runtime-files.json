@@ -159,6 +159,7 @@
   "src/ui/product-details.js",
   "src/ui/provider-accounts.js",
   "src/ui/providers-view.js",
+  "src/ui/provider-logo.js",
   "src/ui/reading-presentation.js",
   "src/ui/reading.js",
   "src/ui/reminders.js",
