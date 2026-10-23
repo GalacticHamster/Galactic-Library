@@ -35,6 +35,28 @@ try{
  assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Books & Contents|Settings','Wrong main navigation.');
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
  assert(document.querySelectorAll('.provider-card').length===PROVIDERS.length,'Supported provider choices missing.');
+ const providerCards=[...document.querySelectorAll('.provider-card')],images=providerCards.flatMap(card=>[...card.querySelectorAll(':scope > summary .provider-logo img')]);
+ await wait(()=>images.every(image=>image.complete&&image.naturalWidth===28&&image.naturalHeight===28),'Bundled 28px provider logos did not load');
+ assert(providerCards.length===14&&images.length===15&&providerCards.every(card=>card.querySelector('.provider-logo')),'A supported provider has no supplied logo');
+ assert(images.every(image=>image.alt===''&&image.closest('[aria-hidden="true"]')&&image.width===28&&image.height===28),'Provider logos are not decorative 28px images');
+ const originalSources=images.filter(image=>!image.dataset.logoTheme).map(image=>image.src);
+ const epic=document.querySelector('[data-provider="epic"]'),epicLight=epic.querySelector('[data-logo-theme="light"]'),epicDark=epic.querySelector('[data-logo-theme="dark"]');
+ let savedAppearance='light';
+ const appearance=globalThis.GalacticHamsterTheme.mount({role:'gl',storage:{onChanged:{addListener(){}}},runtime:{sendMessage:async request=>{if(request.type==='GH_SET_APPEARANCE')savedAppearance=request.mode;return {ok:true,appearance:{mode:savedAppearance,followGl:false}};}}});
+ await appearance.ready;
+ const visible=image=>getComputedStyle(image).display!=='none';
+ assert(document.documentElement.dataset.ghTheme==='light'&&visible(epicLight)&&!visible(epicDark),'Saved light appearance did not select black Epic artwork');
+ for(const mode of ['dark','light','system']){
+  const select=document.querySelector('#appearance-mode');select.value=mode;select.dispatchEvent(new Event('change',{bubbles:true}));
+  await wait(()=>!select.disabled&&appearance.preferences.mode===mode,'Theme selection did not finish');
+  const resolved=mode==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):mode;
+  assert(document.documentElement.dataset.ghTheme===resolved&&visible(epicLight)===(resolved==='light')&&visible(epicDark)===(resolved==='dark'),'Epic artwork disagrees with resolved '+mode+' appearance');
+  assert(JSON.stringify(images.filter(image=>!image.dataset.logoTheme).map(image=>image.src))===JSON.stringify(originalSources),'Another provider changed artwork with the theme');
+ }
+ for(const card of providerCards){const summary=card.querySelector(':scope > summary'),title=summary.querySelector('strong'),logo=title.querySelector('.provider-logo');assert(logo.getBoundingClientRect().right<=title.getBoundingClientRect().right&&summary.getBoundingClientRect().right<=innerWidth,'Provider title or logo clips at this viewport');}
+ const first=providerCards[0];first.querySelector('summary').click();assert(first.open,'Logo-bearing summary no longer expands the card');first.querySelector('summary').click();assert(!first.open,'Logo-bearing summary no longer collapses the card');
+ first.querySelector('img').dispatchEvent(new Event('error'));assert(!first.querySelector('.provider-logo')&&first.querySelector('strong').textContent==='Steam','Missing-logo fallback removed the provider name');
+ checks.push('All fourteen bundled logos load decoratively; saved, switched and system themes select Epic artwork without changing other logos; expansion and missing-image fallback remain usable');
  assert(document.querySelector('.provider-card[data-provider="xbox"]')&&document.querySelector('.provider-card[data-provider="playstation"]')&&document.querySelector('.provider-card[data-provider="nintendo"]'),'Console provider entry points missing.');
  const syncHost=document.querySelector('#purchase-sharing-humble [data-purchase-handoff]'),manual=syncHost.querySelector('[data-purchase-manual]');
  assert(document.querySelector('.provider-card[data-provider="humble"]').contains(syncHost)&&document.querySelectorAll('#purchase-sharing-humble').length===1,'Connection is separate or duplicated');

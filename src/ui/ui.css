@@ -66,6 +66,12 @@ button:disabled,.button-like[aria-disabled="true"] { opacity:.65; cursor:default
 .secondary-navigation { margin-top:8px; font-size:.9rem; }
 .provider-cards { display:grid; gap:12px; }
 .provider-card > summary { align-items:center; }
+.provider-card-title { display:inline-flex; align-items:center; gap:8px; min-width:0; }
+.provider-logo { display:inline-flex; flex:0 0 28px; width:28px; height:28px; align-items:center; justify-content:center; pointer-events:none; }
+.provider-logo img { width:28px; height:28px; object-fit:contain; }
+.provider-logo [data-logo-theme="light"] { display:none; }
+[data-gh-theme="light"] .provider-logo [data-logo-theme="light"] { display:block; }
+[data-gh-theme="light"] .provider-logo [data-logo-theme="dark"] { display:none; }
 .provider-card > p:first-of-type { margin-top:12px; }
 .saved-account { margin-top:16px; padding:12px; border:1px solid var(--gh-border); border-radius:6px; }
 .saved-account h4 { margin:0 0 8px; }

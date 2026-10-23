@@ -9,6 +9,9 @@ import {createRelease,projectRoot,readRuntimeZip,validateRuntime} from '../scrip
 export const releaseTests=[['release ZIP contains only the explicit runtime, validates dependencies and is deterministic across line endings and file times',async()=>{
   const first=await createRelease(),second=await createRelease();assert.deepEqual(first.zip,second.zip);assert.deepEqual(first.report,second.report);
   assert.equal(first.files.size,first.report.files.length);assert(first.files.has('src/ui/library-icon.png'));
+  const logos=[...first.files].filter(([path])=>path.startsWith('icons/provider-icons/'));
+  assert.equal(logos.length,15,'Every provider and both Epic variants must be bundled');
+  for(const [path,bytes]of logos){assert.match(path,/-28\.png$/u);assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),28);assert.equal(bytes.readUInt32BE(20),28);}
   const backupRuntime=new Set(['src/ui/backup-restore.js','src/ui/backup-export.js']);
   assert([...backupRuntime].every(path=>first.files.has(path)));
   assert(![...first.files.keys()].some(path=>/^(?:tests|scripts|docs|dist)\//u.test(path)||!backupRuntime.has(path)&&/backup|start\.txt|package\.json|README|recommendations/iu.test(path)));

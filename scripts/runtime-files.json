@@ -196,5 +196,20 @@
   "src/lib/coverage-disposition.js",
   "src/lib/coverage-resolution.js",
   "src/lib/scoped-coverage.js",
-  "src/ui/coverage-resolution.js"
+  "src/ui/coverage-resolution.js",
+  "icons/provider-icons/amazon-games-28.png",
+  "icons/provider-icons/amazon-video-28.png",
+  "icons/provider-icons/audible-28.png",
+  "icons/provider-icons/epic-games-dark-28.png",
+  "icons/provider-icons/epic-games-light-28.png",
+  "icons/provider-icons/fanatical-28.png",
+  "icons/provider-icons/fandango-at-home-28.png",
+  "icons/provider-icons/gog-28.png",
+  "icons/provider-icons/humble-bundle-28.png",
+  "icons/provider-icons/kindle-28.png",
+  "icons/provider-icons/kobo-28.png",
+  "icons/provider-icons/nintendo-28.png",
+  "icons/provider-icons/playstation-28.png",
+  "icons/provider-icons/steam-28.png",
+  "icons/provider-icons/xbox-28.png"
 ]
