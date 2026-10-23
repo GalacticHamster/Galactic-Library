@@ -212,5 +212,9 @@
   "icons/provider-icons/nintendo-64.png",
   "icons/provider-icons/playstation-64.png",
   "icons/provider-icons/steam-64.png",
-  "icons/provider-icons/xbox-64.png"
+  "icons/provider-icons/xbox-64.png",
+  "icons/icon16.png",
+  "icons/icon32.png",
+  "icons/icon48.png",
+  "icons/icon128.png"
 ]
