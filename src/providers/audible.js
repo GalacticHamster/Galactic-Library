@@ -127,37 +127,56 @@
     return totals.size?[...totals][0]:null;
   }
   function pagination(document,page){
-    let next=false,disabledNext=0,ignoredNext=0,invalid=false;
-    const targets=new Set(),selected=[];
+    let next=false,disabledNext=0,ignoredNext=0,invalid=false,ignoredBackwardPlaceholders=0;
+    const targets=new Set(),selected=[],problems=new Set(),invalidControls=[];
     for(const control of document.querySelectorAll('a, button')){
       const label=`${control.textContent??''} ${control.getAttribute('aria-label')??''} ${control.className??''}`;
       const nextLabel=/\bnext\b|pagingNext|pagination-next/iu.test(label);
+      const previousLabel=/\bprevious\b|\bprev\b|\bfirst\b|pagingPrevious|pagination-prev/iu.test(label);
       const pager=control.closest('.bc-pagination, .pagingElements, [data-testid*="pagination"], nav[aria-label*="pagination" i], [role="navigation"][aria-label*="pagination" i]');
       let url;try{if(control.getAttribute('href'))url=new URL(control.getAttribute('href'),global.location.origin);}catch{/* An unrelated or malformed link cannot advance the library. */}
       const libraryLink=url&&url.origin===global.location.origin&&/^\/library(?:\/titles)?\/?$/u.test(url.pathname);
       if(!libraryLink&&!pager){if(nextLabel)ignoredNext++;continue;}
-      const raw=libraryLink?url.searchParams.get('page'):null,target=pageNumber(raw);
-      if(raw!==null&&target===null)invalid=true;
       if(control.getAttribute('aria-current')==='page'){const current=pageNumber(String(control.textContent??'').trim());if(current!==null)selected.push(current);}
       const disabled=control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true'||Boolean(control.closest('[class*="disabled" i]'));
       if(disabled){if(nextLabel)disabledNext++;continue;}
-      if(target!==null){targets.add(target);if(nextLabel&&target<=page)invalid=true;}
-      if(nextLabel||target!==null&&target>page)next=true;
+      // Disabled controls can retain placeholder URLs such as Previous?page=0.
+      // Validate only active destinations; they are the requests we could follow.
+      const raw=libraryLink?url.searchParams.get('page'):null,target=pageNumber(raw);
+      if(page===1&&previousLabel&&!nextLabel&&raw==='0'){ignoredBackwardPlaceholders++;continue;}
+      // Library sort/filter links also reset page parameters; they are not a
+      // continuation unless they are inside the pager or explicitly labelled Next.
+      if(raw!==null&&target===null&&(nextLabel||pager)){
+        invalid=true;problems.add('invalid-page-parameter');
+        if(invalidControls.length<10)invalidControls.push({direction:nextLabel?'next':previousLabel?'previous':'other',valueKind:raw===''?'empty':raw==='0'?'zero':/^\d+$/u.test(raw)?'out-of-range':'non-numeric',inPager:Boolean(pager)});
+      }
+      if(target!==null){targets.add(target);if(nextLabel&&target<=page){invalid=true;problems.add('non-advancing-next');}}
+      if(nextLabel||!previousLabel&&target!==null&&target>page)next=true;
     }
     for(const current of document.querySelectorAll('.bc-pagination [aria-current="page"], .pagingElements [aria-current="page"]')){const number=pageNumber(String(current.textContent??'').trim());if(number!==null)selected.push(number);}
-    const selectedPages=[...new Set(selected)];if(selectedPages.length>1)invalid=true;
+    const selectedPages=[...new Set(selected)];if(selectedPages.length>1){invalid=true;problems.add('conflicting-current-pages');}
     // A disabled library Next control is independent terminal evidence. Mere
     // absence of a Next label is not enough to forgive a repeated response.
-    return {next,disabledNext,ignoredNext,invalid,selectedPage:selectedPages[0]??null,targets:[...targets].sort((a,b)=>a-b).slice(0,20),terminal:disabledNext>0&&!next};
+    return {next,disabledNext,ignoredNext,ignoredBackwardPlaceholders,invalid,problems:[...problems],invalidControls,selectedPage:selectedPages[0]??null,targets:[...targets].sort((a,b)=>a-b).slice(0,20),terminal:disabledNext>0&&!next};
   }
   function diagnosticPage(data,page,previous,seen){
     const ids=new Set(data.items.map(item=>item.providerItemId)),same=Boolean(previous&&previous.size===ids.size&&[...ids].every(id=>previous.has(id)));
-    const row={requestedPage:page,responsePage:data.responsePage,selectedPage:data.pagination.selectedPage,rows:ids.size,newProducts:[...ids].filter(id=>!seen.has(id)).length,sameProductsAsPrevious:same,overlapWithPrevious:previous?[...ids].filter(id=>previous.has(id)).length:0,reportedTotal:data.expectedCount,countCandidates:data.countCandidates,enabledLibraryNext:data.next,disabledLibraryNext:data.pagination.disabledNext,ignoredOtherNext:data.pagination.ignoredNext,nextPageTargets:data.pagination.targets,invalidPagination:data.pagination.invalid,terminalSignal:data.pagination.terminal};
+    const row={
+      requestedPage:page,responsePage:data.responsePage,selectedPage:data.pagination.selectedPage,
+      rows:ids.size,newProducts:[...ids].filter(id=>!seen.has(id)).length,
+      sameProductsAsPrevious:same,overlapWithPrevious:previous?[...ids].filter(id=>previous.has(id)).length:0,
+      reportedTotal:data.expectedCount,countCandidates:data.countCandidates,entryScope:data.entryScope,
+      enabledLibraryNext:data.next,disabledLibraryNext:data.pagination.disabledNext,
+      ignoredOtherNext:data.pagination.ignoredNext,ignoredBackwardPlaceholders:data.pagination.ignoredBackwardPlaceholders,
+      nextPageTargets:data.pagination.targets,invalidPagination:data.pagination.invalid,
+      paginationProblems:data.pagination.problems,invalidControls:data.pagination.invalidControls,
+      terminalSignal:data.pagination.terminal
+    };
     return {ids,row};
   }
   async function inspectPagination(){
     lastDiagnostics={format:1,provider:'audible',readOnly:true,state:'checking',pages:[]};let previous=null;const seen=new Set();
-    for(const page of [18,19,20]){
+    for(const page of [1,18,19,20]){
       try{const data=await fetchAudibleLibraryPage(page),result=diagnosticPage(data,page,previous,seen);lastDiagnostics.pages.push(result.row);previous=result.ids;for(const id of result.ids)seen.add(id);}
       catch(error){lastDiagnostics.pages.push({requestedPage:page,error:error.audibleReason??'request-failed'});}
       if(page<20)await wait(BETWEEN_PAGES_MS);
@@ -186,7 +205,8 @@
     const paging=pagination(document,page);
     let responsePage=null;try{responsePage=pageNumber(new URL(response.url).searchParams.get('page'));}catch{/* Some fixture or opaque responses have no final URL. */}
     if (!items.length && expectedCount !== 0) fail('empty-unconfirmed','Audible returned an empty or unreadable library page without an explicit zero count. No library changes were saved.');
-    return { items, expectedCount, countCandidates,next:paging.next, pagination:paging,responsePage };
+    const entryScope={libraryRowElements:document.querySelectorAll('.adbl-library-content-row').length,productLinks:document.querySelectorAll('a[href*="/pd/"]').length,productLinksInRows:document.querySelectorAll('.adbl-library-content-row a[href*="/pd/"]').length,productLinksInLibrary:document.querySelectorAll('#library-content a[href*="/pd/"],[data-testid="library-titles"] a[href*="/pd/"]').length};
+    return { items, expectedCount, countCandidates,entryScope,next:paging.next, pagination:paging,responsePage };
   }
 
   async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
@@ -202,7 +222,7 @@
       reportProgress({ pagesRead: page - 1, audiobooks: itemsById.size });
       const pageData = await fetchAudibleLibraryPage(page);
       const observed=diagnosticPage(pageData,page,previous,new Set(itemsById.keys()));lastDiagnostics.pages.push(observed.row);previous=observed.ids;
-      if(pageData.pagination.invalid)fail('pagination-invalid','Audible returned invalid or non-advancing library pagination. No library changes were saved.');
+      if(pageData.pagination.invalid)fail('pagination-invalid',`Audible returned invalid library pagination on page ${page}. No library changes were saved. Export pagination diagnostics from the panel so the failing page can be checked.`);
       const pageItems = pageData.items;
       if (page > 1 && pageData.expectedCount !== expectedCount) fail('reported-total-changed','Audible changed its reported library total during the scan. Please retry.');
       expectedCount = pageData.expectedCount;
