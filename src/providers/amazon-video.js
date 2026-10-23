@@ -164,8 +164,44 @@
     return { top: scroller.scrollTop, height, extent: scroller.scrollHeight };
   }
 
+  function inspectListing() {
+    const context = listingContext(global.document);
+    const containers = new Map();
+    for (const card of context.cards) {
+      for (let node = card.parentElement; node && context.root.contains(node); node = node.parentElement) {
+        if (!containers.has(node)) containers.set(node, 0);
+        containers.set(node, containers.get(node) + 1);
+        if (node === context.root) break;
+      }
+    }
+    const scrollable = [...containers].filter(([node, cards]) => cards > 1 && node.clientHeight > 0
+      && /^(?:auto|scroll|overlay)$/u.test(global.getComputedStyle(node).overflowY)
+      && node.scrollHeight > node.clientHeight);
+    const remaining = scrollable.filter(([node]) => node !== context.scroller && !node.contains(context.scroller)
+      && node.scrollTop + node.clientHeight < node.scrollHeight - 4);
+    const nextControls = [...global.document.querySelectorAll('button, a')].filter(node => !node.disabled
+      && node.getAttribute('aria-disabled') !== 'true' && visible(node)
+      && /^(?:next(?:\s+page)?|load\s+more|show\s+more|see\s+more)$/iu.test(compactText(node.getAttribute('aria-label') || node.textContent)));
+    const types = { movie: 0, tv: 0, unreadable: 0 };
+    for (const card of context.cards) {
+      const item = amazonVideoItemFromCardData(cardDataFromElement(card));
+      types[item?.mediaType ?? 'unreadable'] += 1;
+    }
+    return {
+      renderedCards: context.cards.length, readableDistinctItems: amazonVideoItemsFromDocument(global.document).length,
+      cardTypes: types, controlScope: context.root === global.document.body ? 'page' : 'main',
+      selectedScrollTarget: context.nested ? 'nested' : 'document', ...geometry(context),
+      visibleNextLikeControls: nextControls.length,
+      nextLikeControlsInMain: nextControls.filter(node => context.root.contains(node)).length,
+      scrollableContainers: scrollable.length, remainingOtherScrollers: remaining.length,
+      containers: scrollable.slice(0, 20).map(([node, cards]) => ({ cards, selected: node === context.scroller,
+        top: node.scrollTop, height: node.clientHeight, extent: node.scrollHeight,
+        atEnd: node.scrollTop + node.clientHeight >= node.scrollHeight - 4 }))
+    };
+  }
+
   async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null) {
-    diagnostics = { format: 1, provider: 'amazon-video', readOnly: true, state: 'scanning', passes: [] };
+    diagnostics = { format: 2, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0, passes: [] };
     try {
       return await scanLibrary(reportProgress, knownItemIds);
     } catch (error) {
@@ -197,6 +233,7 @@
       for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
       const itemsToSave = incremental ? newAmazonVideoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
       for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
+      diagnostics.itemCount = itemsById.size;
       const movies = [...itemsById.values()].filter(item => item.mediaType === 'movie').length;
       reportProgress({ passes: pass, movies, tv: itemsById.size - movies });
       if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
@@ -229,7 +266,13 @@
         ...afterGeometry, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
         ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses });
       previousContext = afterContext;
-      if (unchangedPasses >= 3) { finished = true; break; }
+      if (unchangedPasses >= 3) {
+        if (inspectListing().remainingOtherScrollers) {
+          diagnostics.reason = 'unvisited-list-scrollers';
+          throw new Error('Amazon Video still has another scrolling title list with unread content. No library changes were saved. Export scan diagnostics so its layout can be checked.');
+        }
+        finished = true; break;
+      }
     }
     if (!finished) {
       diagnostics.reason = 'scroll-limit';
@@ -251,7 +294,7 @@
   }
 
   global.GalacticAmazonVideo = {
-    getDiagnostics: () => diagnostics ? JSON.parse(JSON.stringify(diagnostics)) : null,
+    getDiagnostics: () => diagnostics ? { ...JSON.parse(JSON.stringify(diagnostics)), currentPage: inspectListing() } : null,
     amazonVideoItemFromCardData,
     amazonVideoItemsFromDocument,
     newAmazonVideoItems,

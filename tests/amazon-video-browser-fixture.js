@@ -63,6 +63,10 @@ try{
  page.list.style.position='relative';renderWindow();page.onScroll(renderWindow);
  result=await page.api.fetchAmazonVideoLibrary();
  assert(result.items.length===10&&Array.from({length:10},(_,i)=>i+1).every(n=>result.items.some(item=>item.providerItemId.endsWith('-'+n))),'Overlapping viewport traversal retains every group in a preallocated virtualized range');
+ page=await setup({nested:true});page.doc.querySelector('main').insertAdjacentHTML('beforeend',`<div style="height:180px;overflow-y:auto">${[5,6,7,8].map(n=>card(n)).join('')}</div><button aria-label="Next page">&gt;</button>`);
+ await rejects(page,/another scrolling title list/,'Separate nested title lists cannot be mistaken for a completed document');
+ const layout=page.api.getDiagnostics().currentPage;
+ assert(layout.scrollableContainers===2&&layout.remainingOtherScrollers===2&&layout.visibleNextLikeControls===1,'Export distinguishes unvisited scrollers and accessible Next controls without recording their text');
  // A busy listing never qualifies, even when geometry/count stops changing.
  page=await setup({inside:'<div role="progressbar"></div>'});
  await rejects(page,/250-pass limit/,'A permanently busy listing fails instead of certifying a partial collection');
@@ -82,27 +86,43 @@ try{
  const writer=createStorageWriter(storage);
  await writer.mergeProviderItems('amazon-video',[{providerItemId:'old-video',title:'Preserved video',mediaType:'movie',ownership:'owned'}]);
  await writer.mergeProviderItems('gog',[{providerItemId:'old-game',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);
- const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow;
+ const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow,knownIds=[],messages=[];
  page=await setup({inside:'<div role="progressbar"></div>'});
  const renderPanel=()=>{
   const original=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=original.call(this,options);return shadow;};
   page.win.GalacticSync={send:async request=>{
-   if(request.type==='GET_PROVIDER_SYNC_STATE')return {ok:true,hasFullBaseline:true,syncState:{knownProviderItemIds:[]}};
+   messages.push(request.type);
+   if(request.type==='GET_PROVIDER_SYNC_STATE')return {ok:true,hasFullBaseline:true,syncState:{knownProviderItemIds:knownIds}};
    if(request.type==='IMPORT_PROVIDER_ITEMS'){imports++;const database=await writer.replaceProviderItems('amazon-video',JSON.parse(JSON.stringify(request.items)),{syncMode:'full'},JSON.parse(JSON.stringify(request.snapshot)));return {ok:true,movieCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='movie').length,tvCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='tv').length};}
    throw Error('Unexpected message');},failed:async()=>{failures++;}};
   page.win.eval(panelCode.replace("if (!location.pathname.includes('/gp/video/')",'if (false'));
   page.win.Element.prototype.attachShadow=original;
  };
  const waitFor=async predicate=>{for(let n=0;n<500;n++){if(predicate())return;await new Promise(resolve=>nativeTimeout(resolve,10));}throw Error('Panel did not finish');};
- renderPanel();assert(shadow.querySelector('[data-export-diagnostics]').hidden,'Diagnostic export is unobtrusive before a scan fails');
+ renderPanel();assert(shadow.querySelector('details summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'Scan diagnostics is discoverable before importing and export explains availability through its disabled state');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
  assert(imports===0&&JSON.stringify(await writer.getDatabase())===before,'A failed production-panel scan sends no import and preserves all saved records');
- assert(!shadow.querySelector('[data-export-diagnostics]').hidden,'A failed scan exposes an ordinary UI diagnostic export action');
+ assert(!shadow.querySelector('[data-export-diagnostics]').disabled,'A failed scan enables the ordinary UI diagnostic export action');
  let exported;page.win.URL.createObjectURL=blob=>{exported=blob;return 'blob:fixture';};page.win.URL.revokeObjectURL=()=>{};page.win.HTMLAnchorElement.prototype.click=function(){};
  shadow.querySelector('[data-export-diagnostics]').click();assert(exported&&JSON.parse(await exported.text()).reason==='scroll-limit'&&JSON.stringify(await writer.getDatabase())===before,'Export action creates diagnostic JSON without modifying storage');
  page.doc.querySelector('[role="progressbar"]').remove();shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===1&&!shadow.querySelector('.status').dataset.busy);
- assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete')&&shadow.querySelector('[data-export-diagnostics]').hidden,'A successful retest saves through the production writer and hides the failure-only export');
+ assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete')&&!shadow.querySelector('[data-export-diagnostics]').disabled&&shadow.querySelector('details').open,'Successful scans also expose diagnostics instead of hiding evidence of premature completion');
  const db=await writer.getDatabase();assert(Object.values(db.providerItems).filter(item=>item.provider==='amazon-video').length===4&&Object.values(db.providerItems).some(item=>item.provider==='gog'),'A validated full snapshot updates only Amazon Video records');
+ const beforeCheck=JSON.stringify(db);messages=[];shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(messages.length===0&&imports===1&&failures===1&&JSON.stringify(await writer.getDatabase())===beforeCheck,'Check listing neither begins a sync lease nor writes scan health, records or imports');
+ assert(shadow.querySelector('.status').textContent.includes('4 titles found')&&shadow.querySelector('.status').textContent.includes('does not confirm the entire collection'),'A successful read-only check reports observations without claiming full-library completeness');
+ shadow.querySelector('[data-export-diagnostics]').click();assert(JSON.parse(await exported.text()).operation.outcome==='checked-without-import','Read-only export identifies a check rather than a saved import');
+ knownIds=['amzn1.dv.gti.fixture-1','amzn1.dv.gti.fixture-2','amzn1.dv.gti.fixture-3','amzn1.dv.gti.fixture-4','unseen-saved-product'];
+ shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===2&&!shadow.querySelector('.status').dataset.busy);
+ assert(imports===1&&JSON.stringify(await writer.getDatabase())===beforeCheck&&shadow.querySelector('.status').textContent.includes('1 previously saved title'),'An uncorroborated shorter listing cannot replace the existing complete snapshot');
+ shadow.querySelector('[data-export-diagnostics]').click();const comparison=JSON.parse(await exported.text()).operation.baselineComparison;
+ assert(comparison.previousItems===5&&comparison.foundItems===4&&comparison.missingPreviousItems===1,'Export reports baseline membership differences as counts without exposing product IDs');
+ page.doc.querySelector('main').insertAdjacentHTML('afterbegin','<p>Purchases (4)</p>');
+ shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===2&&!shadow.querySelector('.status').dataset.busy);
+ assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete'),'A reconciled provider total permits a genuinely shorter snapshot through the existing validation gate');
+ page.doc.querySelector('main').insertAdjacentHTML('beforeend','<div role="progressbar"></div>');messages=[];const beforeFailedCheck=JSON.stringify(await writer.getDatabase());
+ shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(messages.length===0&&failures===2&&JSON.stringify(await writer.getDatabase())===beforeFailedCheck&&!shadow.querySelector('[data-export-diagnostics]').disabled,'An incomplete read-only check still exports evidence without recording a failed library sync');
  await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}
