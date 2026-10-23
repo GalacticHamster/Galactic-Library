@@ -100,6 +100,32 @@
   let lastDiagnostics=null;
   const fail=(reason,message)=>{const error=new Error(message);error.audibleReason=reason;throw error;};
   const pageNumber=value=>typeof value==='string'&&/^\d{1,6}$/u.test(value)&&Number(value)>0?Number(value):null;
+  // Report where numeric count matches occur, never their surrounding text.
+  // A parsed document includes script text and hidden UI, unlike the visible page.
+  function countDiagnostics(document){
+    const candidates=[],walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    let node;while((node=walker.nextNode())&&candidates.length<20){
+      const parent=node.parentElement;if(!parent)continue;
+      for(const match of node.textContent.matchAll(/\b([\d,]+)\s+(?:titles|audiobooks)\b/giu)){
+        const value=Number(match[1].replace(/,/gu,''));
+        candidates.push({value:Number.isSafeInteger(value)?value:null,tag:parent.tagName.toLowerCase(),inScriptOrStyle:Boolean(parent.closest('script,style,template,noscript')),hiddenMarkup:Boolean(parent.closest('[hidden],[aria-hidden="true"],[style*="display:none" i],[style*="display: none" i]')),inControl:Boolean(parent.closest('button,select,option,input,[role="button"]')),inLibrary:Boolean(parent.closest('#library-content,[data-testid="library-titles"]')),inEntry:Boolean(parent.closest('.adbl-library-content-row,a[href*="/pd/"]'))});
+        if(candidates.length===20)break;
+      }
+    }
+    return candidates;
+  }
+  function libraryTotal(document){
+    const totals=new Set();
+    // Allow inline markup in a single library summary, but never manufacture a
+    // count by joining unrelated page blocks (for example a counter and heading).
+    for(const summary of document.querySelectorAll('#library-content p,#library-content h1,#library-content h2,#library-content h3,#library-content [role="status"],[data-testid="library-titles"] p,[data-testid="library-titles"] h1,[data-testid="library-titles"] h2,[data-testid="library-titles"] h3,[data-testid="library-titles"] [role="status"]')){
+      if(summary.closest('.adbl-library-content-row,[hidden],[aria-hidden="true"],button,select,[role="button"],[style*="display:none" i],[style*="display: none" i]')||summary.querySelector('a,button,select,input,script,style,template,[hidden],[aria-hidden="true"],[role="button"],[style*="display:none" i],[style*="display: none" i],p,h1,h2,h3,[role="status"]'))continue;
+      for(const match of summary.textContent.matchAll(/\b([\d,]+)\s+(?:titles|audiobooks)\b/giu))totals.add(Number(match[1].replace(/,/gu,'')));
+    }
+    if([...totals].some(value=>!Number.isSafeInteger(value)||value<0))fail('reported-total-invalid','Audible returned invalid library totals. No library changes were saved.');
+    if(totals.size>1)fail('reported-total-conflict','Audible returned conflicting library totals. No library changes were saved.');
+    return totals.size?[...totals][0]:null;
+  }
   function pagination(document,page){
     let next=false,disabledNext=0,ignoredNext=0,invalid=false;
     const targets=new Set(),selected=[];
@@ -126,7 +152,7 @@
   }
   function diagnosticPage(data,page,previous,seen){
     const ids=new Set(data.items.map(item=>item.providerItemId)),same=Boolean(previous&&previous.size===ids.size&&[...ids].every(id=>previous.has(id)));
-    const row={requestedPage:page,responsePage:data.responsePage,selectedPage:data.pagination.selectedPage,rows:ids.size,newProducts:[...ids].filter(id=>!seen.has(id)).length,sameProductsAsPrevious:same,overlapWithPrevious:previous?[...ids].filter(id=>previous.has(id)).length:0,reportedTotal:data.expectedCount,enabledLibraryNext:data.next,disabledLibraryNext:data.pagination.disabledNext,ignoredOtherNext:data.pagination.ignoredNext,nextPageTargets:data.pagination.targets,invalidPagination:data.pagination.invalid,terminalSignal:data.pagination.terminal};
+    const row={requestedPage:page,responsePage:data.responsePage,selectedPage:data.pagination.selectedPage,rows:ids.size,newProducts:[...ids].filter(id=>!seen.has(id)).length,sameProductsAsPrevious:same,overlapWithPrevious:previous?[...ids].filter(id=>previous.has(id)).length:0,reportedTotal:data.expectedCount,countCandidates:data.countCandidates,enabledLibraryNext:data.next,disabledLibraryNext:data.pagination.disabledNext,ignoredOtherNext:data.pagination.ignoredNext,nextPageTargets:data.pagination.targets,invalidPagination:data.pagination.invalid,terminalSignal:data.pagination.terminal};
     return {ids,row};
   }
   async function inspectPagination(){
@@ -156,13 +182,11 @@
       const id = audibleItemIdFromUrl(link.getAttribute('href'));
       if (!id || !readableIds.has(id)) fail('unreadable-library-entry','Audible returned unreadable library entries. No library changes were saved.');
     }
-    const countMatch = String(document.body?.textContent ?? '').match(/\b([\d,]+)\s+(?:titles|audiobooks)\b/iu);
-    const expectedCount = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
-    if(expectedCount!==null&&(!Number.isSafeInteger(expectedCount)||expectedCount<0))fail('reported-total-invalid','Audible returned invalid library totals. No library changes were saved.');
+    const countCandidates=countDiagnostics(document),expectedCount=libraryTotal(document);
     const paging=pagination(document,page);
     let responsePage=null;try{responsePage=pageNumber(new URL(response.url).searchParams.get('page'));}catch{/* Some fixture or opaque responses have no final URL. */}
     if (!items.length && expectedCount !== 0) fail('empty-unconfirmed','Audible returned an empty or unreadable library page without an explicit zero count. No library changes were saved.');
-    return { items, expectedCount, next:paging.next, pagination:paging,responsePage };
+    return { items, expectedCount, countCandidates,next:paging.next, pagination:paging,responsePage };
   }
 
   async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
