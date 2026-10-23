@@ -97,32 +97,72 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
+  let lastDiagnostics=null;
+  const fail=(reason,message)=>{const error=new Error(message);error.audibleReason=reason;throw error;};
+  const pageNumber=value=>typeof value==='string'&&/^\d{1,6}$/u.test(value)&&Number(value)>0?Number(value):null;
+  function pagination(document,page){
+    let next=false,disabledNext=0,ignoredNext=0,invalid=false;
+    const targets=new Set(),selected=[];
+    for(const control of document.querySelectorAll('a, button')){
+      const label=`${control.textContent??''} ${control.getAttribute('aria-label')??''} ${control.className??''}`;
+      const nextLabel=/\bnext\b|pagingNext|pagination-next/iu.test(label);
+      const pager=control.closest('.bc-pagination, .pagingElements, [data-testid*="pagination"], nav[aria-label*="pagination" i], [role="navigation"][aria-label*="pagination" i]');
+      let url;try{if(control.getAttribute('href'))url=new URL(control.getAttribute('href'),global.location.origin);}catch{/* An unrelated or malformed link cannot advance the library. */}
+      const libraryLink=url&&url.origin===global.location.origin&&/^\/library(?:\/titles)?\/?$/u.test(url.pathname);
+      if(!libraryLink&&!pager){if(nextLabel)ignoredNext++;continue;}
+      const raw=libraryLink?url.searchParams.get('page'):null,target=pageNumber(raw);
+      if(raw!==null&&target===null)invalid=true;
+      if(control.getAttribute('aria-current')==='page'){const current=pageNumber(String(control.textContent??'').trim());if(current!==null)selected.push(current);}
+      const disabled=control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true'||Boolean(control.closest('[class*="disabled" i]'));
+      if(disabled){if(nextLabel)disabledNext++;continue;}
+      if(target!==null){targets.add(target);if(nextLabel&&target<=page)invalid=true;}
+      if(nextLabel||target!==null&&target>page)next=true;
+    }
+    for(const current of document.querySelectorAll('.bc-pagination [aria-current="page"], .pagingElements [aria-current="page"]')){const number=pageNumber(String(current.textContent??'').trim());if(number!==null)selected.push(number);}
+    const selectedPages=[...new Set(selected)];if(selectedPages.length>1)invalid=true;
+    // A disabled library Next control is independent terminal evidence. Mere
+    // absence of a Next label is not enough to forgive a repeated response.
+    return {next,disabledNext,ignoredNext,invalid,selectedPage:selectedPages[0]??null,targets:[...targets].sort((a,b)=>a-b).slice(0,20),terminal:disabledNext>0&&!next};
+  }
+  function diagnosticPage(data,page,previous,seen){
+    const ids=new Set(data.items.map(item=>item.providerItemId)),same=Boolean(previous&&previous.size===ids.size&&[...ids].every(id=>previous.has(id)));
+    const row={requestedPage:page,responsePage:data.responsePage,selectedPage:data.pagination.selectedPage,rows:ids.size,newProducts:[...ids].filter(id=>!seen.has(id)).length,sameProductsAsPrevious:same,overlapWithPrevious:previous?[...ids].filter(id=>previous.has(id)).length:0,reportedTotal:data.expectedCount,enabledLibraryNext:data.next,disabledLibraryNext:data.pagination.disabledNext,ignoredOtherNext:data.pagination.ignoredNext,nextPageTargets:data.pagination.targets,invalidPagination:data.pagination.invalid,terminalSignal:data.pagination.terminal};
+    return {ids,row};
+  }
+  async function inspectPagination(){
+    lastDiagnostics={format:1,provider:'audible',readOnly:true,state:'checking',pages:[]};let previous=null;const seen=new Set();
+    for(const page of [18,19,20]){
+      try{const data=await fetchAudibleLibraryPage(page),result=diagnosticPage(data,page,previous,seen);lastDiagnostics.pages.push(result.row);previous=result.ids;for(const id of result.ids)seen.add(id);}
+      catch(error){lastDiagnostics.pages.push({requestedPage:page,error:error.audibleReason??'request-failed'});}
+      if(page<20)await wait(BETWEEN_PAGES_MS);
+    }
+    lastDiagnostics.state='checked';return getDiagnostics();
+  }
+  function getDiagnostics(){return lastDiagnostics?JSON.parse(JSON.stringify(lastDiagnostics)):null;}
+  function recordSaveState(state){if(lastDiagnostics&&!lastDiagnostics.readOnly&&['not-sent','committed','not-confirmed'].includes(state))lastDiagnostics.saveState=state;}
+
   async function fetchAudibleLibraryPage(page) {
     const url = new URL('/library/titles', location.origin);
     url.searchParams.set('pageSize', String(PAGE_SIZE));
     url.searchParams.set('page', String(page));
     url.searchParams.set('sortBy', 'PURCHASE_DATE.dsc');
     const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
-    if (!response.ok) throw new Error(`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
+    if (!response.ok) fail('http-error',`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
-    if (!document.querySelector('select[name="sortBy"], .adbl-library-content-row, #library-content, [data-testid="library-titles"]')) throw new Error('Audible returned a page without its library structure. No library changes were saved.');
+    if (!document.querySelector('select[name="sortBy"], .adbl-library-content-row, #library-content, [data-testid="library-titles"]')) fail('library-structure-missing','Audible returned a page without its library structure. No library changes were saved.');
     const items = entriesFromLibraryDocument(document);
     const readableIds = new Set(items.map((item) => item.providerItemId));
     for (const link of document.querySelectorAll('a[href*="/pd/"]')) {
       const id = audibleItemIdFromUrl(link.getAttribute('href'));
-      if (!id || !readableIds.has(id)) throw new Error('Audible returned unreadable library entries. No library changes were saved.');
+      if (!id || !readableIds.has(id)) fail('unreadable-library-entry','Audible returned unreadable library entries. No library changes were saved.');
     }
     const countMatch = String(document.body?.textContent ?? '').match(/\b([\d,]+)\s+(?:titles|audiobooks)\b/iu);
     const expectedCount = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
-    const next = [...document.querySelectorAll('a, button')].some((control) => {
-      if (control.hasAttribute('disabled') || control.getAttribute('aria-disabled') === 'true' || control.closest('[class*="disabled" i]')) return false;
-      const label = `${control.textContent ?? ''} ${control.getAttribute('aria-label') ?? ''} ${control.className ?? ''}`;
-      const href = control.getAttribute('href');
-      const targetPage = href ? Number(new URL(href, global.location.origin).searchParams.get('page')) : 0;
-      return /\bnext\b|pagingNext|pagination-next/iu.test(label) || targetPage > page;
-    });
-    if (!items.length && expectedCount !== 0) throw new Error('Audible returned an empty or unreadable library page without an explicit zero count. No library changes were saved.');
-    return { items, expectedCount, next };
+    if(expectedCount!==null&&(!Number.isSafeInteger(expectedCount)||expectedCount<0))fail('reported-total-invalid','Audible returned invalid library totals. No library changes were saved.');
+    const paging=pagination(document,page);
+    let responsePage=null;try{responsePage=pageNumber(new URL(response.url).searchParams.get('page'));}catch{/* Some fixture or opaque responses have no final URL. */}
+    if (!items.length && expectedCount !== 0) fail('empty-unconfirmed','Audible returned an empty or unreadable library page without an explicit zero count. No library changes were saved.');
+    return { items, expectedCount, next:paging.next, pagination:paging,responsePage };
   }
 
   async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
@@ -130,12 +170,17 @@
     const incremental = Array.isArray(knownItemIds);
     let finished = false;
     let pagesRead = 0;
-    let expectedCount;
+    let expectedCount,previous=null;
+    lastDiagnostics={format:1,provider:'audible',mode:incremental?'incremental':'full',state:'scanning',saveState:'not-sent',pages:[]};
+    try{
     for (let page = 1; page <= MAX_PAGES; page += 1) {
+      lastDiagnostics.lastRequestedPage=page;
       reportProgress({ pagesRead: page - 1, audiobooks: itemsById.size });
       const pageData = await fetchAudibleLibraryPage(page);
+      const observed=diagnosticPage(pageData,page,previous,new Set(itemsById.keys()));lastDiagnostics.pages.push(observed.row);previous=observed.ids;
+      if(pageData.pagination.invalid)fail('pagination-invalid','Audible returned invalid or non-advancing library pagination. No library changes were saved.');
       const pageItems = pageData.items;
-      if (page > 1 && pageData.expectedCount !== expectedCount) throw new Error('Audible changed its reported library total during the scan. Please retry.');
+      if (page > 1 && pageData.expectedCount !== expectedCount) fail('reported-total-changed','Audible changed its reported library total during the scan. Please retry.');
       expectedCount = pageData.expectedCount;
       pagesRead = page;
       const itemsToSave = incremental ? newAudibleItems(pageItems, knownItemIds) : pageItems;
@@ -146,15 +191,21 @@
       }
       reportProgress({ pagesRead: page, audiobooks: itemsById.size });
       if (incremental && pageItems.length && !itemsToSave.length) { finished = true; break; }
+      if(added===0){
+        if(!incremental&&pageData.pagination.terminal&&expectedCount!==null&&itemsById.size===expectedCount){finished=true;break;}
+        fail(observed.row.sameProductsAsPrevious?'server-repeat':'fully-overlapping-page','Audible repeated saved page contents without a trustworthy, reconciled end of the library; no library changes were saved. Export Audible pagination diagnostics from the panel.');
+      }
+      if(pageData.pagination.selectedPage!==null&&pageData.pagination.selectedPage!==page)fail('returned-page-mismatch','Audible returned a different library page than requested. No library changes were saved.');
       if (!pageData.next) { finished = true; break; }
-      if (added === 0) throw new Error('Audible repeated a page before the library ended; no library changes were saved.');
       await wait(BETWEEN_PAGES_MS);
     }
     if (!finished) throw new Error(`Audible reached its ${MAX_PAGES}-page limit before the end of the library.`);
     if (!itemsById.size && !incremental) throw new Error('Audible returned no readable library titles. Please try again later.');
     const items = [...itemsById.values()];
-    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('audible', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expectedCount, 'pagination-end', pagesRead)]) };
+    const result={ items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('audible', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expectedCount, 'pagination-end', pagesRead)]) };
+    lastDiagnostics.state='prepared';return result;
+    }catch(error){lastDiagnostics.state='failed';lastDiagnostics.reason=error.audibleReason??'scan-incomplete';throw error;}
   }
 
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks };
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState };
 }(globalThis));

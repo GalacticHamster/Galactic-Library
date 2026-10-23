@@ -144,6 +144,7 @@ try{
     const snapshot=completeProviderSnapshot(provider,items,scopes);
     const result={items,snapshot,unresolvedApps:[],newAppCount:1,skippedCount:0,failures:[],knownPurchaseIds:['fixture-purchase'],purchasesRead:1,skippedKnown:0,diagnostics:{windowsRead:1,categoryCounts:{'personal-documents':0}}};
     if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>method==='readFandangoGrid'?items:result};
+    if(provider==='audible')Object.assign(globalThis[globalName],{getDiagnostics:()=>null,recordSaveState(){}});
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full',rejectCommit=false;
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{

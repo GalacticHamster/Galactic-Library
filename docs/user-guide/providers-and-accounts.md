@@ -67,6 +67,19 @@ Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
 
+## Audible pagination checks
+
+If an Audible scan reports a repeated or incomplete page, it does not submit
+that incomplete scan to replace your saved library. In the GL panel on Audible,
+expand **Audible pagination diagnostics**. **Export pagination diagnostics**
+downloads the latest scan's page counts and pagination signals.
+
+For a failure near page 19, choose **Check pages 18–20**, then export the report.
+This read-only check requests only those three pages and does not import or
+change library records. The report includes page numbers, totals and overlap
+counts, but no titles, product IDs, page contents, URLs or credentials. It is
+available only in that tab until it is reloaded or another check replaces it.
+
 ## PlayStation PS4/PS5 Purchased Library
 
 Open **Providers → PlayStation — PS4/PS5 Purchased Library** and open its website.
