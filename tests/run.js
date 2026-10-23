@@ -313,7 +313,9 @@ const tests = [
     assert.deepEqual(newAudibleItems([{ providerItemId: 'B000000001' }, { providerItemId: 'B000000002' }], ['B000000001']).map((item) => item.providerItemId), ['B000000002']);
     const url = 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K?ref_paginate';
     assert.equal(audibleItemIdFromUrl(url), 'B08G9PRS1K');
-    assert.equal(ownershipFromLibraryAction('Remove'), 'subscription');
+    assert.equal(ownershipFromLibraryAction('Remove'), 'unknown');
+    assert.equal(ownershipFromLibraryAction('Remove from favorites'), 'unknown');
+    assert.equal(ownershipFromLibraryAction('Remove from Plus Catalog'), 'subscription');
     assert.equal(ownershipFromLibraryAction('Listen now'), 'unknown');
     assert.deepEqual(audibleItemFromLibraryEntry({
       url,
@@ -330,6 +332,7 @@ const tests = [
       ownership: 'subscription',
       metadata: {
         source: 'audible-library-page',
+        asin: 'B08G9PRS1K',
         detailUrl: 'https://www.audible.com/pd/Project-Hail-Mary-Audiobook/B08G9PRS1K',
         authors: ['Andy Weir'],
         narrators: ['Ray Porter'],

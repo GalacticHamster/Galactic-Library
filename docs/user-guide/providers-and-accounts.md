@@ -67,18 +67,24 @@ Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
 
-## Audible pagination checks
+## Audible updates
 
-If an Audible scan reports a repeated or incomplete page, it does not submit
-that incomplete scan to replace your saved library. In the GL panel on Audible,
-expand **Audible pagination diagnostics**. **Export pagination diagnostics**
-downloads the latest scan's page counts and pagination signals.
+Use **Full rescan** to refresh metadata and source access information for the
+selected Audible account. Products are matched by Audible product ID. Missing
+records move to **Earlier imports**; other providers and saved reviews remain.
+Quick update checks for additions and stops at a page of already saved titles;
+use a full rescan to refresh existing records.
 
-For a failure near page 19, choose **Check library pagination**, then export the report.
-This read-only check requests pages 1, 18, 19 and 20 and does not import or
-change library records. The report includes page numbers, totals and overlap
-counts, but no titles, product IDs, page contents, URLs or credentials. It is
-available only in that tab until it is reloaded or another check replaces it.
+Favorites, wishlist controls and a plain **Remove** action do not establish
+purchase or subscription access. GL leaves access unconfirmed unless explicit
+evidence or your saved ownership correction establishes it. A full rescan
+repairs earlier source classifications without replacing your corrections.
+
+Incomplete scans do not replace the saved library. If a scan fails, keep the
+provider page open, check that you are signed in and retry. Before updating an
+important library, export a GL backup in Settings; restore that complete backup
+if you need to return to it. Do not restore another browser's partial library
+over a more complete library merely to update one provider.
 
 ## PlayStation PS4/PS5 Purchased Library
 

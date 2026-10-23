@@ -41,6 +41,7 @@
       metadata: {
         ...(global.GalacticProviderMetadata?.extract(entry) ?? {}),
         source: 'audible-library-page',
+        ...(/^[A-Z0-9]{10}$/u.test(providerItemId)?{asin:providerItemId}:{}),
         detailUrl,
         authors: global.GalacticProviderMetadata?.extract(entry).authors ?? (Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : []),
         narrators: Array.isArray(entry.narrators) ? entry.narrators.filter(Boolean) : [],
@@ -51,7 +52,10 @@
   }
 
   function ownershipFromLibraryAction(actionText) {
-    return /\bremove\b/iu.test(String(actionText ?? '')) ? 'subscription' : 'unknown';
+    const action=String(actionText??'').replace(/\s+/gu,' ').trim();
+    // List management and a bare Remove button do not establish access rights.
+    if(/\bfavou?rites?\b|\bwish\s?list\b|\bcollections?\b/iu.test(action))return 'unknown';
+    return /^(?:remove from (?:your )?(?:audible )?plus (?:catalog|catalogue)(?: library)?|included (?:in|with) (?:your )?(?:audible )?plus (?:membership|subscription|catalog|catalogue))[.!]?$/iu.test(action)?'subscription':'unknown';
   }
 
   function newAudibleItems(items, knownItemIds = []) {
@@ -60,9 +64,9 @@
   }
 
   function libraryActionFromContainer(container) {
-    return [...container.querySelectorAll('button, [role="button"], a')]
-      .map((element) => textOf(element))
-      .find((text) => /\bremove\b/iu.test(text)) ?? '';
+    const actions=[...container.querySelectorAll('button, [role="button"], a:not([href*="/pd/"])')].map(element=>textOf(element));
+    return actions.find(text=>ownershipFromLibraryAction(text)==='subscription')
+      ?? actions.find(text=>/\bremove\b/iu.test(text)) ?? '';
   }
 
   function namedLinks(container, selector) {
@@ -201,8 +205,12 @@
     url.searchParams.set('sortBy', 'PURCHASE_DATE.dsc');
     const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) fail('http-error',`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
+    let filtered=false;
+    try{const returned=new URL(response.url);filtered=['search','searchTerm','query','q','filter','filterBy'].some(key=>{const value=returned.searchParams.get(key)?.trim();return value&&!/^all$/iu.test(value);});}catch{/* Opaque responses may not expose a final URL. */}
+    if(filtered)fail('filtered-library','Audible returned a filtered library instead of the complete listing. Clear library search and filters, then retry. Your saved library was not replaced.');
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
     if (!document.querySelector('select[name="sortBy"], .adbl-library-content-row, #library-content, [data-testid="library-titles"]')) fail('library-structure-missing','Audible returned a page without its library structure. No library changes were saved.');
+    if([...document.querySelectorAll('form[action*="/library"] input[name="search"],form[action*="/library"] input[name="searchTerm"],form[action*="/library"] input[name="query"]')].some(input=>input.getAttribute('value')?.trim()))fail('filtered-library','Audible returned library search results instead of the complete listing. Clear the library search and retry. Your saved library was not replaced.');
     const links=libraryProductLinks(document);
     const items = entriesFromLibraryDocument(document,links);
     const readableIds = new Set(items.map((item) => item.providerItemId));
@@ -220,6 +228,7 @@
 
   async function fetchAudibleAudiobooks(reportProgress = () => {}, knownItemIds = null) {
     const itemsById = new Map();
+    const checkedIds=new Set();
     const incremental = Array.isArray(knownItemIds);
     let finished = false;
     let pagesRead = 0;
@@ -231,8 +240,9 @@
       reportProgress({ pagesRead: page - 1, audiobooks: itemsById.size });
       const pageData = await fetchAudibleLibraryPage(page);
       const observed=diagnosticPage(pageData,page,previous,new Set(itemsById.keys()));lastDiagnostics.pages.push(observed.row);previous=observed.ids;
-      if(pageData.pagination.invalid)fail('pagination-invalid',`Audible returned invalid library pagination on page ${page}. No library changes were saved. Export pagination diagnostics from the panel so the failing page can be checked.`);
+      if(pageData.pagination.invalid)fail('pagination-invalid',`Audible returned invalid library pagination on page ${page}. Your saved library was not replaced. Please retry the full rescan.`);
       const pageItems = pageData.items;
+      for(const item of pageItems)checkedIds.add(item.providerItemId);
       if (page > 1 && pageData.expectedCount !== expectedCount) fail('reported-total-changed','Audible changed its reported library total during the scan. Please retry.');
       expectedCount = pageData.expectedCount;
       pagesRead = page;
@@ -246,7 +256,7 @@
       if (incremental && pageItems.length && !itemsToSave.length) { finished = true; break; }
       if(added===0){
         if(!incremental&&pageData.pagination.terminal&&expectedCount!==null&&itemsById.size===expectedCount){finished=true;break;}
-        fail(observed.row.sameProductsAsPrevious?'server-repeat':'fully-overlapping-page','Audible repeated saved page contents without a trustworthy, reconciled end of the library; no library changes were saved. Export Audible pagination diagnostics from the panel.');
+        fail(observed.row.sameProductsAsPrevious?'server-repeat':'fully-overlapping-page','Audible repeated a page before a complete library could be established. Your saved library was not replaced. Please retry the full rescan.');
       }
       if(pageData.pagination.selectedPage!==null&&pageData.pagination.selectedPage!==page)fail('returned-page-mismatch','Audible returned a different library page than requested. No library changes were saved.');
       if (!pageData.next) { finished = true; break; }
@@ -255,7 +265,7 @@
     if (!finished) throw new Error(`Audible reached its ${MAX_PAGES}-page limit before the end of the library.`);
     if (!itemsById.size && !incremental) throw new Error('Audible returned no readable library titles. Please try again later.');
     const items = [...itemsById.values()];
-    const result={ items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('audible', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expectedCount, 'pagination-end', pagesRead)]) };
+    const result={ items, checkedCount:checkedIds.size,snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('audible', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expectedCount, 'pagination-end', pagesRead)]) };
     lastDiagnostics.state='prepared';return result;
     }catch(error){lastDiagnostics.state='failed';lastDiagnostics.reason=error.audibleReason??'scan-incomplete';throw error;}
   }

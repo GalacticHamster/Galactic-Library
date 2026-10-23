@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { withWorker, snapshotFixture } from './storage.js';
 import { validateProviderSnapshot, completedScope, completeProviderSnapshot } from '../src/lib/provider-snapshot.js';
+import {audibleRescanTests} from './audible-rescan.js';
 
 // Exercise the actual classic importers in isolated signed-in page contexts.
 // Timers resolve immediately; no network, credentials, or real account is used.
@@ -47,6 +48,15 @@ async function scanAndImport(context, dispatch) {
 }
 
 export const providerSnapshotTests = [
+  ...audibleRescanTests,
+  ['Audible runtime completion returns committed added, updated and retired source counts',()=>withWorker(async({pageA,dispatch})=>{
+    const prior=[{providerItemId:'B000000001',title:'Existing audio',mediaType:'audiobook',ownership:'unknown'},{providerItemId:'B000000002',title:'Wishlist audio',mediaType:'audiobook',ownership:'unknown'}];
+    await pageA.mergeProviderItems('audible',prior);
+    const items=[{...prior[0],metadata:{authors:['Writer'],narrators:['Narrator'],asin:'B000000001'}}];
+    const snapshot=completeProviderSnapshot('audible',items,[completedScope('library',1,1,'pagination-end',1)]);
+    const response=await dispatch({type:'IMPORT_PROVIDER_ITEMS',provider:'audible',mode:'full',items,snapshot},{id:kindleSender.id,url:'https://www.audible.com/library/titles'});
+    assert.equal(response.ok,true,response.error);assert.equal(response.audiobookCount,1);assert.equal(response.changes.added,0);assert.equal(response.changes.updated,1);assert.equal(response.changes.missing,1);
+  })],
   ['Kindle 1,000-item response then malformed page leaves the entire saved snapshot intact', () => withWorker(async (worker) => {
     const before = await seed(worker);
     let requests = 0;
