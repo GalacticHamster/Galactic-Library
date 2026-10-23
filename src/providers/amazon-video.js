@@ -6,6 +6,8 @@
 
   const MAX_SCROLLS = 250;
   const SCROLL_PAUSE_MS = 700;
+  const CARD_SELECTOR = '[data-card-entity-type], [data-entity-type], [data-testid="card"]';
+  let diagnostics = null;
 
   function compactText(value) {
     return String(value ?? '').replace(/\s+/gu, ' ').trim();
@@ -90,7 +92,7 @@
   }
 
   function amazonVideoItemsFromDocument(document) {
-    const cards = [...document.querySelectorAll('[data-card-entity-type], [data-entity-type], [data-testid="card"]')];
+    const cards = [...document.querySelectorAll(CARD_SELECTOR)];
     const itemsById = new Map();
     for (const card of cards) {
       const item = amazonVideoItemFromCardData(cardDataFromElement(card));
@@ -108,7 +110,73 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
+  // Scope continuation controls to the content region, never the page chrome.
+  // Geometry must come from the actual vertical scroller, not always window.
+  function listingContext(document) {
+    const cards = [...document.querySelectorAll(CARD_SELECTOR)];
+    const first = cards[0];
+    const main = first?.closest('main, [role="main"]');
+    const root = main && cards.every(card => main.contains(card)) ? main : document.body;
+    let common = first;
+    while (common && !cards.every(card => common.contains(card))) common = common.parentElement;
+    let scroller = document.scrollingElement ?? document.documentElement;
+    for (let node = common; node && node !== document.documentElement; node = node.parentElement) {
+      if (/^(?:auto|scroll|overlay)$/u.test(global.getComputedStyle(node).overflowY)
+          && node.scrollHeight > node.clientHeight) { scroller = node; break; }
+    }
+    return { root, scroller, cards, nested: scroller !== (document.scrollingElement ?? document.documentElement) };
+  }
+
+  function visible(element) {
+    if (element.closest('[hidden], [aria-hidden="true"]')) return false;
+    const style = global.getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+  }
+
+  function continuationControls(document, root) {
+    const inListing = element => {
+      // An explicitly associated pager can legitimately sit outside <main>.
+      const associated = compactText(element.getAttribute('aria-controls')).split(' ').some(id => {
+        const target = id && document.getElementById(id);
+        return target && (root.contains(target) || target.contains(root));
+      });
+      return (root.contains(element) || element.contains(root) || associated) && visible(element);
+    };
+    const loading = [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')];
+    const more = [...document.querySelectorAll('button, a')].filter(element => !element.disabled
+      && element.getAttribute('aria-disabled') !== 'true'
+      && /^(?:load|show|see)\s+more$/iu.test(compactText(element.textContent)));
+    return {
+      loading: loading.filter(inListing), more: more.filter(inListing),
+      ignoredLoading: loading.filter(element => !inListing(element)).length,
+      ignoredMore: more.filter(element => !inListing(element)).length
+    };
+  }
+
+  function scrollListing(context, top) {
+    if (context.nested) context.scroller.scrollTo({ top, behavior: 'instant' });
+    else global.scrollTo({ top, behavior: 'instant' });
+  }
+
+  function geometry(context) {
+    const { scroller, nested } = context;
+    const height = scroller.clientHeight || (!nested ? global.innerHeight : 0);
+    return { top: scroller.scrollTop, height, extent: scroller.scrollHeight };
+  }
+
   async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null) {
+    diagnostics = { format: 1, provider: 'amazon-video', readOnly: true, state: 'scanning', passes: [] };
+    try {
+      return await scanLibrary(reportProgress, knownItemIds);
+    } catch (error) {
+      diagnostics.state = 'failed';
+      // Only fixed reason codes/numeric page structure, never page text or IDs.
+      diagnostics.reason ??= 'scan-rejected';
+      throw error;
+    }
+  }
+
+  async function scanLibrary(reportProgress, knownItemIds) {
     const itemsById = new Map();
     const incremental = Array.isArray(knownItemIds);
     const renderedItemIds = new Set();
@@ -116,36 +184,57 @@
     let unchangedPasses = 0;
     let finished = false;
     let passesRead = 0;
-    const scrollingElement = global.document.scrollingElement ?? global.document.documentElement;
-    // The signed-in library's Most recent addition order is only useful if
-    // the scan starts at its first rendered group, not the user's scroll spot.
-    global.scrollTo({ top: 0, behavior: 'auto' });
+    let previousContext = listingContext(global.document);
+    scrollListing(previousContext, 0);
     await wait(SCROLL_PAUSE_MS);
-    for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 3; pass += 1) {
+    for (let pass = 0; pass < MAX_SCROLLS; pass += 1) {
       passesRead = pass + 1;
-      for (const card of global.document.querySelectorAll('[data-card-entity-type], [data-entity-type], [data-testid="card"]')) observedCards.add(card);
-      const before = itemsById.size;
-      const newlyRenderedItems = amazonVideoItemsFromDocument(global.document)
-        .filter((item) => !renderedItemIds.has(item.providerItemId));
+      const context = listingContext(global.document);
+      const beforeGeometry = geometry(context);
+      for (const card of context.cards) observedCards.add(card);
+      const rendered = amazonVideoItemsFromDocument(global.document);
+      const newlyRenderedItems = rendered.filter(item => !renderedItemIds.has(item.providerItemId));
       for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
       const itemsToSave = incremental ? newAmazonVideoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
       for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
-      const movies = [...itemsById.values()].filter((item) => item.mediaType === 'movie').length;
-      const tv = itemsById.size - movies;
-      reportProgress({ passes: pass, movies, tv });
-      // Cards are rendered newest first. A complete newly rendered group with
-      // no unknown title is a safe stopping point for a quick update.
+      const movies = [...itemsById.values()].filter(item => item.mediaType === 'movie').length;
+      reportProgress({ passes: pass, movies, tv: itemsById.size - movies });
       if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
-      global.scrollTo({ top: scrollingElement.scrollHeight, behavior: 'auto' });
+      const controlsBefore = continuationControls(global.document, context.root);
+      // Visit overlapping viewports so a virtualized list cannot skip middle
+      // groups merely because its full scroll range is already allocated.
+      scrollListing(context, Math.min(context.scroller.scrollHeight,
+        beforeGeometry.top + Math.max(1, beforeGeometry.height * 0.8)));
+      // Give an already-running request time; do not repeatedly activate its button.
+      if (!controlsBefore.loading.length) controlsBefore.more[0]?.click();
       await wait(SCROLL_PAUSE_MS);
-      const atEnd = scrollingElement.scrollTop + global.innerHeight >= scrollingElement.scrollHeight - 4;
-      const loading = global.document.querySelector('[aria-busy="true"], [role="progressbar"]');
-      const loadMore = [...global.document.querySelectorAll('button, a')].find((control) => !control.disabled && /^(?:load|show|see)\s+more$/iu.test(compactText(control.textContent)));
-      if (loadMore) loadMore.click();
-      unchangedPasses = atEnd && !loading && !loadMore && itemsById.size === before ? unchangedPasses + 1 : 0;
+      const afterContext = listingContext(global.document);
+      const afterGeometry = geometry(afterContext);
+      const controls = continuationControls(global.document, afterContext.root);
+      const afterRendered = amazonVideoItemsFromDocument(global.document);
+      const sameCards = rendered.length === afterRendered.length
+        && rendered.every((item, index) => item.providerItemId === afterRendered[index].providerItemId);
+      const sameContext = previousContext.scroller === context.scroller
+        && context.scroller === afterContext.scroller && context.root === afterContext.root;
+      const atEnd = afterGeometry.height > 0 && afterGeometry.top + afterGeometry.height >= afterGeometry.extent - 4;
+      // A newly arrived batch, changed viewport/scroll range or active library
+      // continuation resets the quiet period, even if all IDs were seen before.
+      const stable = (afterContext.cards.length > 0 || renderedItemIds.size === 0) && sameContext && sameCards && beforeGeometry.extent === afterGeometry.extent
+        && beforeGeometry.height === afterGeometry.height && atEnd
+        && !controls.loading.length && !controls.more.length
+        && !controlsBefore.loading.length && !controlsBefore.more.length;
+      unchangedPasses = stable ? unchangedPasses + 1 : 0;
+      diagnostics.passes.push({ pass: passesRead, cards: context.cards.length, distinctItems: renderedItemIds.size,
+        scrollTarget: afterContext.nested ? 'nested' : 'document', controlScope: afterContext.root === global.document.body ? 'page' : 'main',
+        ...afterGeometry, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
+        ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses });
+      previousContext = afterContext;
       if (unchangedPasses >= 3) { finished = true; break; }
     }
-    if (!finished) throw new Error(`Amazon Video reached its ${MAX_SCROLLS}-pass limit before the library finished loading.`);
+    if (!finished) {
+      diagnostics.reason = 'scroll-limit';
+      throw new Error(`Amazon Video reached its ${MAX_SCROLLS}-pass limit before the library finished loading. No library changes were saved.`);
+    }
     if (!itemsById.size && !incremental) {
       throw new Error('Amazon Video showed no readable movie or TV cards. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.');
     }
@@ -155,10 +244,14 @@
     const items = [...itemsById.values()];
     const countMatch = compactText(global.document.body?.textContent).match(/(?:purchases|library|all items)\s*\(([\d,]+)\)/iu);
     const expected = countMatch ? Number(countMatch[1].replace(/,/gu, '')) : null;
-    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expected, 'scroll-end', passesRead)]) };
+    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items, [global.GalacticProviderSnapshot.completedScope('library', items.length, expected, 'scroll-end', passesRead)]);
+    diagnostics.state = 'complete';
+    diagnostics.reason = incremental ? 'quick-update' : 'scroll-end';
+    return { items, snapshot };
   }
 
   global.GalacticAmazonVideo = {
+    getDiagnostics: () => diagnostics ? JSON.parse(JSON.stringify(diagnostics)) : null,
     amazonVideoItemFromCardData,
     amazonVideoItemsFromDocument,
     newAmazonVideoItems,
