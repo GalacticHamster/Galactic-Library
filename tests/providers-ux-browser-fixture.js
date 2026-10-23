@@ -36,9 +36,12 @@ try{
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
  assert(document.querySelectorAll('.provider-card').length===PROVIDERS.length,'Supported provider choices missing.');
  const providerCards=[...document.querySelectorAll('.provider-card')],images=providerCards.flatMap(card=>[...card.querySelectorAll(':scope > summary .provider-logo img')]);
- await wait(()=>images.every(image=>image.complete&&image.naturalWidth===28&&image.naturalHeight===28),'Bundled 28px provider logos did not load');
+ await wait(()=>images.every(image=>image.complete&&image.naturalWidth===64&&image.naturalHeight===64),'Bundled 64px provider logos did not load');
  assert(providerCards.length===14&&images.length===15&&providerCards.every(card=>card.querySelector('.provider-logo')),'A supported provider has no supplied logo');
- assert(images.every(image=>image.alt===''&&image.closest('[aria-hidden="true"]')&&image.width===28&&image.height===28),'Provider logos are not decorative 28px images');
+ assert(images.every(image=>image.alt===''&&image.closest('[aria-hidden="true"]')&&image.width===36&&image.height===36),'Provider logos are not decorative 36px images');
+ const baseline=document.createElement('style');baseline.textContent='.provider-card-title {gap:8px!important}.provider-logo {flex-basis:28px!important;width:28px!important}.provider-logo img {width:28px!important;height:28px!important}';document.head.append(baseline);
+ const previousHeights=providerCards.map(card=>card.getBoundingClientRect().height);baseline.remove();
+ if(innerWidth>=1000)assert(providerCards.every((card,index)=>Math.abs(card.getBoundingClientRect().height-previousHeights[index])<1),'Larger logos unnecessarily changed desktop card heights');
  const originalSources=images.filter(image=>!image.dataset.logoTheme).map(image=>image.src);
  const epic=document.querySelector('[data-provider="epic"]'),epicLight=epic.querySelector('[data-logo-theme="light"]'),epicDark=epic.querySelector('[data-logo-theme="dark"]');
  let savedAppearance='light';
@@ -53,7 +56,7 @@ try{
   assert(document.documentElement.dataset.ghTheme===resolved&&visible(epicLight)===(resolved==='light')&&visible(epicDark)===(resolved==='dark'),'Epic artwork disagrees with resolved '+mode+' appearance');
   assert(JSON.stringify(images.filter(image=>!image.dataset.logoTheme).map(image=>image.src))===JSON.stringify(originalSources),'Another provider changed artwork with the theme');
  }
- for(const card of providerCards){const summary=card.querySelector(':scope > summary'),title=summary.querySelector('strong'),logo=title.querySelector('.provider-logo');assert(logo.getBoundingClientRect().right<=title.getBoundingClientRect().right&&summary.getBoundingClientRect().right<=innerWidth,'Provider title or logo clips at this viewport');}
+ for(const card of providerCards){const summary=card.querySelector(':scope > summary'),title=summary.querySelector('strong'),logo=title.querySelector('.provider-logo'),art=[...logo.querySelectorAll('img')].find(visible),rect=art.getBoundingClientRect(),cardRect=card.getBoundingClientRect(),titleRect=title.getBoundingClientRect(),count=summary.lastElementChild.getBoundingClientRect();assert(rect.width===36&&rect.height===36&&getComputedStyle(title).gap==='10px','Provider artwork size or name spacing is incorrect');assert(Math.abs((rect.top+rect.bottom)-(titleRect.top+titleRect.bottom))<1,'Provider artwork is not vertically centered');assert(rect.top>=cardRect.top&&rect.bottom<=cardRect.bottom&&logo.getBoundingClientRect().right<=titleRect.right&&summary.getBoundingClientRect().right<=innerWidth,'Provider title or logo clips at this viewport');assert(count.top>=titleRect.bottom||count.bottom<=titleRect.top||count.left>=titleRect.right,'Account counts overlap the provider name');}
  const first=providerCards[0];first.querySelector('summary').click();assert(first.open,'Logo-bearing summary no longer expands the card');first.querySelector('summary').click();assert(!first.open,'Logo-bearing summary no longer collapses the card');
  first.querySelector('img').dispatchEvent(new Event('error'));assert(!first.querySelector('.provider-logo')&&first.querySelector('strong').textContent==='Steam','Missing-logo fallback removed the provider name');
  checks.push('All fourteen bundled logos load decoratively; saved, switched and system themes select Epic artwork without changing other logos; expansion and missing-image fallback remain usable');

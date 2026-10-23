@@ -8,7 +8,7 @@ function providerLogo(provider){
  const artwork=providerArtwork[provider];if(!artwork)return null;
  const logo=node('span');logo.className='provider-logo';logo.setAttribute('aria-hidden','true');
  for(const theme of provider==='epic'?['light','dark']:['']){
-  const image=node('img');image.src=`icons/provider-icons/${artwork}${theme?'-'+theme:''}-28.png`;image.alt='';image.width=28;image.height=28;
+  const image=node('img');image.src=`icons/provider-icons/${artwork}${theme?'-'+theme:''}-64.png`;image.alt='';image.width=36;image.height=36;
   if(theme)image.dataset.logoTheme=theme;
   image.addEventListener('error',()=>{image.remove();if(!logo.childElementCount)logo.remove();});logo.append(image);
  }
