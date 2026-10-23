@@ -71,13 +71,21 @@
       .filter((name, index, values) => name.length > 1 && values.indexOf(name) === index);
   }
 
-  function entriesFromLibraryDocument(document) {
-    const links = [...document.querySelectorAll('a[href*="/pd/"]')];
+  function libraryProductLinks(document) {
+    // Product carousels elsewhere on the page are not library observations.
+    // Prefer the provider's item rows; never fall back to the whole document.
+    const selector=document.querySelector('.adbl-library-content-row')
+      ? '.adbl-library-content-row a[href*="/pd/"]'
+      : '#library-content a[href*="/pd/"], [data-testid="library-titles"] a[href*="/pd/"]';
+    return [...document.querySelectorAll(selector)];
+  }
+
+  function entriesFromLibraryDocument(document, links) {
     const entriesById = new Map();
     for (const link of links) {
       const url = new URL(link.getAttribute('href') ?? '', global.location?.origin ?? 'https://www.audible.com').toString();
       const title = textOf(link);
-      const container = link.closest('li, [data-testid*="library"], [class*="library"], [class*="tile"], [class*="item"]') ?? link.parentElement ?? link;
+      const container = link.closest('.adbl-library-content-row') ?? link.closest('li, [data-testid*="library"], [class*="library"], [class*="tile"], [class*="item"]') ?? link.parentElement ?? link;
       const libraryAction = libraryActionFromContainer(container);
       const item = audibleItemFromLibraryEntry({
         url,
@@ -195,9 +203,10 @@
     if (!response.ok) fail('http-error',`Audible returned ${response.status} while loading your library. Confirm that you are signed in to Audible.`);
     const document = new DOMParser().parseFromString(await response.text(), 'text/html');
     if (!document.querySelector('select[name="sortBy"], .adbl-library-content-row, #library-content, [data-testid="library-titles"]')) fail('library-structure-missing','Audible returned a page without its library structure. No library changes were saved.');
-    const items = entriesFromLibraryDocument(document);
+    const links=libraryProductLinks(document);
+    const items = entriesFromLibraryDocument(document,links);
     const readableIds = new Set(items.map((item) => item.providerItemId));
-    for (const link of document.querySelectorAll('a[href*="/pd/"]')) {
+    for (const link of links) {
       const id = audibleItemIdFromUrl(link.getAttribute('href'));
       if (!id || !readableIds.has(id)) fail('unreadable-library-entry','Audible returned unreadable library entries. No library changes were saved.');
     }
