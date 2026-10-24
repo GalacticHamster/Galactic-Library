@@ -27,6 +27,7 @@ async function setup(windows){
    const body=doc.createElement('pre');body.id=`${row.id}-body`;body.textContent=row.delayed?'Collected on\n2026-01-01':row.body;
    button.onclick=()=>{if(row.actionButton){redemptions++;return;}expansions++;button.setAttribute('aria-expanded','true');if(row.delayed)pending.push({left:2,body,text:row.body});};
    const redeem=doc.createElement('button');redeem.textContent='Claim Code';redeem.onclick=()=>{redemptions++;};body.append(doc.createTextNode('\n'),redeem);
+   header.scrollIntoView=()=>{header.dataset.scrolledTo='true';};
    header.append(button,title,label);if(!row.omitBody)header.append(body);doc.querySelector('#rows').append(header);
   }
  };
@@ -84,9 +85,21 @@ try{
  assert(!Object.values(db.providerItems).some(item=>item.providerItemId==='xbox-code')&&!JSON.stringify(db).includes('SYNTHETIC_SECRET'),'Full import never saves Copy code as an Amazon or Xbox acquisition and never retains the code');
  const quickCodeRoute=await page.api.fetchAmazonGames(()=>{},true);
  assert(quickCodeRoute.items.length===1&&quickCodeRoute.diagnostics.productKeyClaims===1&&page.redemptions()===0,'Quick update applies the same Copy code exclusion without executing its action');
+ const failedExternal={id:'failed-external',title:'Synthetic failed external game',label:'Undeliverable',body:'Sorry, we are unable to deliver this game.\nCollected on\nFeb 11, 2023\nSent to\nEpic Games Store library'};
+ const failedUnconfirmed={id:'failed-unknown',label:'Undeliverable',body:'',expanded:true,omitBody:true};
+ page=await setup({'2026':[{...failedUnconfirmed,id:'direct-a'},failedUnconfirmed,failedExternal,{...direct,id:'direct-b',delayed:false}],'past-3-months':[failedUnconfirmed,failedExternal]});
+ const failedDeliveryResult=await page.api.fetchAmazonGames();
+ assert(failedDeliveryResult.items.length===3&&failedDeliveryResult.items.filter(item=>item.ownership==='unknown').length===2&&failedDeliveryResult.diagnostics.otherLibraryClaims===1,'Undeliverable does not abort mixed imports: explicit external destinations are excluded and missing destinations stay unconfirmed');
+ assert(failedDeliveryResult.items.find(item=>item.providerItemId==='failed-unknown').metadata.delivery==='Undeliverable; delivery not confirmed','A failed delivery with no linked details never invents confirmed access');
+ await save(failedDeliveryResult);db=await writer.getDatabase();
+ const retained=db.providerItems[saved.id];
+ assert(retained.ownership==='claimed'&&effectiveOwnershipRecord(retained,db).ownership==='returned'&&!Object.values(db.providerItems).some(item=>item.providerItemId==='failed-external'),'Delivery failure does not revoke earlier confirmed evidence or overwrite manual corrections; external failure is not imported');
+ const quickFailure=await page.api.fetchAmazonGames(()=>{},true);
+ assert(quickFailure.items.length===1&&quickFailure.items[0].ownership==='unknown'&&quickFailure.diagnostics.otherLibraryClaims===1,'Quick update handles failed delivery with the same conservative access and destination rules');
  page=await setup({'2026':[{id:'broken',label:'Unknown',body:''}]});let error;
  try{await page.api.fetchAmazonGames();}catch(value){error=value;}
  assert(error&&/claim information/.test(error.message),'An unfamiliar label without collected or delivered evidence remains a safe failure, not guessed ownership');
+ assert(error.amazonGamesEntryTitle==='Synthetic game'&&page.doc.querySelector('[data-scrolled-to="true"]'),'An unsupported entry is identified locally and scrolled into view without another scan');
  assert(page.api.getDiagnostics().failedEntry?.detailsPresent===true&&page.api.getDiagnostics().failedEntry?.collectedLabelPresent===false&&page.api.getDiagnostics().failedEntry?.deliveryLabelPresent===true,'Failure report distinguishes missing claim labels from missing details without copying private text');
  page=await setup({'2026':[{id:'bad-date',label:'Unknown',body:'Collected on\nSYNTHETIC_SECRET_DO_NOT_EXPORT'}]});
  try{await page.api.fetchAmazonGames();}catch{}
@@ -102,6 +115,9 @@ try{
  assert(shadow.querySelector('[data-export-report]').hidden,'The normal importer has no permanent diagnostics panel or visible export control');
  shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
  assert(imports===0&&JSON.stringify(await writer.getDatabase())===before&&!shadow.querySelector('[data-export-report]').hidden,'Failed full import preserves stored records and offers a report without requiring another scan');
+ page.win.GalacticAmazonGames.fetchAmazonGames=async()=>{const failure=new Error('Claim information unavailable. No library changes were saved.');failure.amazonGamesEntryTitle='Synthetic failing title';throw failure;};
+ shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
+ assert(shadow.querySelector('.status').textContent.includes('Synthetic failing title')&&(shadow.querySelector('.status').textContent.match(/Export the scan report/g)||[]).length===1,'Failure UI identifies the affected title locally and gives the export instruction exactly once');
  let exported;page.win.URL.createObjectURL=blob=>{exported=blob;return 'blob:synthetic';};page.win.URL.revokeObjectURL=()=>{};page.win.HTMLAnchorElement.prototype.click=function(){};
  shadow.querySelector('[data-export-report]').click();
  assert(exported&&JSON.parse(await exported.text()).state==='failed'&&!/Synthetic|SYNTHETIC_SECRET|broken/.test(await exported.text()),'Failure export works through ordinary UI and contains only sanitized scan evidence');

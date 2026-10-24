@@ -39,7 +39,7 @@
     } catch (error) {
       await globalThis.GalacticSync.failed('amazon-games',error);
       exportButton.hidden = !(scanStarted && globalThis.GalacticAmazonGames.getDiagnostics?.());
-      status.textContent = `Amazon Games import failed: ${error.message}${exportButton.hidden ? '' : ' Export the scan report if you need help; it contains no titles or redemption codes.'}`;
+      status.textContent = `Amazon Games import failed: ${error.amazonGamesEntryTitle ? `Could not read the claim details for “${error.amazonGamesEntryTitle}”. ` : ''}${error.message}${exportButton.hidden ? '' : ' Export the scan report if you need help; it contains no titles or redemption codes.'}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });
       delete status.dataset.busy;

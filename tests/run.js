@@ -285,6 +285,10 @@ const tests = [
     const row={providerItemId:'synthetic-body',title:'Synthetic game',collected:true};
     assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Claim Code'}),null);
     assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Copy code'}),null);
+    assert.equal(amazonGamesItemFromCardData({...row,collected:false,deliveryText:'Undeliverable'}).ownership,'unknown');
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Undeliverable',deliveryTarget:'Amazon Games library'}).ownership,'unknown');
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Undeliverable',deliveryTarget:'Epic Games Store library'}),null);
+    assert.equal(amazonGamesItemFromCardData({...row,collected:false,deliveryText:'Undeliverable offer'}),null);
     assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Product Key'}),null);
     assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Delivered',deliveryTarget:'Epic Games Store library'}),null);
     assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Not delivered',deliveryTarget:'Amazon Games library'}).ownership,'unknown');

@@ -47,11 +47,13 @@
     const deliveryTarget = compactText(card?.deliveryTarget);
     if (!providerItemId || !title) return null;
     const delivered = /^delivered[.!]?$/iu.test(delivery);
+    const undeliverable = /^undeliverable[.!]?$/iu.test(delivery);
     const code = isCodeDelivery(delivery);
-    if (!delivered && card?.collected !== true) return null;
-    const direct = delivered && /^amazon games library[.!]?$/iu.test(deliveryTarget);
-    if (code || delivered && deliveryTarget && !direct) return null;
-    const description = direct ? 'Amazon Games library' : delivered ? (deliveryTarget ? 'Delivered outside Amazon Games; redemption unconfirmed' : 'Delivered; destination unconfirmed')
+    if (!delivered && !undeliverable && card?.collected !== true) return null;
+    const amazonDestination = /^amazon games library[.!]?$/iu.test(deliveryTarget);
+    const direct = delivered && amazonDestination;
+    if (code || (delivered || undeliverable) && deliveryTarget && !amazonDestination) return null;
+    const description = direct ? 'Amazon Games library' : undeliverable ? 'Undeliverable; delivery not confirmed' : delivered ? (deliveryTarget ? 'Delivered outside Amazon Games; redemption unconfirmed' : 'Delivered; destination unconfirmed')
         : /^(?:pending|not delivered|processing|awaiting delivery)[.!]?$/iu.test(delivery) ? 'Pending delivery; collection claim observed'
           : 'Unknown delivery; collection claim observed';
     return {
@@ -160,7 +162,8 @@
     const details = await detailsFromClaimHeader(header, /^delivered[.!]?$/iu.test(compactText(card.deliveryText)));
     const item = amazonGamesItemFromCardData({ ...card, ...details });
     const label = compactText(card.deliveryText);
-    const reason = /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
+    const reason = /^undeliverable[.!]?$/iu.test(label) ? (details.deliveryTarget && !/^amazon games library[.!]?$/iu.test(details.deliveryTarget) ? 'other-library' : 'not-delivered')
+      : /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
         : /^(?:pending|not delivered|processing|awaiting delivery)[.!]?$/iu.test(label) ? 'not-delivered' : 'unknown-delivery';
     if (!item && /^(?:available to claim|not claimed|claim now)[.!]?$/iu.test(label)) return { item: null, reason: 'unclaimed-offer' };
     return { item, reason: item?.ownership === 'claimed' ? 'direct' : reason, evidence: {
@@ -257,7 +260,11 @@
           // Delivery uncertainty is retained, but lack of a valid collection
           // observation is not permission to invent or silently omit a claim.
           diagnostics.failedEntry = result.evidence;
-          throw new Error('An Amazon Games entry did not expose enough claim information. No library changes were saved. Export the scan report so this entry can be investigated.');
+          header.scrollIntoView?.({block: 'center', behavior: 'auto'});
+          const error = new Error('An Amazon Games entry did not expose enough claim information. No library changes were saved.');
+          // Page-local context only. Never include titles in exported reports.
+          error.amazonGamesEntryTitle = card.title;
+          throw error;
         }
       }
       const cardsRead = processedCardIds.size;
