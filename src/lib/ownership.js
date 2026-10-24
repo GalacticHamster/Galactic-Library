@@ -1,6 +1,6 @@
 import '../providers/kobo-ownership.js';
 import '../providers/kindle-ownership.js';
-import {PROVIDERS} from './constants.js';
+import {PROVIDERS,normalizeOwnership} from './constants.js';
 
 export const defaultOwnershipPolicy = () => ({allOwned:false,providers:{}});
 
@@ -16,6 +16,7 @@ export function validateOwnershipPolicy(value) {
 }
 
 export function providerOwnership(provider, ownership, metadata) {
+  ownership=normalizeOwnership(ownership);
   if(['returned','revoked','expired'].includes(ownership))return ownership;
   if(provider==='kindle'){
     const access=globalThis.GalacticKindleOwnership.classify(metadata??{});
@@ -38,6 +39,7 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
     const {ownershipInference,...original}=item;
     item={...original,ownership:ownershipInference.observedOwnership};
   }
+  if(normalizeOwnership(item.ownership)!==item.ownership)item={...item,ownership:normalizeOwnership(item.ownership)};
   const review=database.ownershipReviews?.[item.recordRef];
   if(review?.source==='user-correction')return reviewedOwnershipRecord(item,review,now);
   // Explicit loss of access is not uncertainty to assume away. Keep the raw
@@ -71,7 +73,7 @@ function reviewedOwnershipRecord(item,review,now){
   const expired=review.expiresAt&&Date.parse(review.expiresAt)<=now;
   const key=item.metadata?.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
   const negativeKey=key&&item.metadata?.expiresAt&&Date.parse(item.metadata.expiresAt)<=now||item.metadata?.entitlement==='third-party-key'&&['expired','unavailable'].includes(item.metadata.keyStatus);
-  const ownership=expired||negativeKey&&['owned','claimed'].includes(review.ownership)?'unknown':review.ownership;
+  const ownership=expired||negativeKey&&normalizeOwnership(review.ownership)==='owned'?'unknown':normalizeOwnership(review.ownership);
   return {...item,ownership,manualOwnershipEvidence:{source:review.source,confirmedAt:review.confirmedAt,evidenceDate:review.evidenceDate,expiresAt:review.expiresAt}};
 }
 
@@ -103,4 +105,19 @@ export function entitlementEvidence(item) {
   const key=item.metadata?.entitlement==='third-party-key'||['game','software'].includes(item.mediaType);
   return {purchaseEvidence:'confirmed',activationStatus:key?'unknown':'not-applicable',
     ...(key?{keyStatus:item.metadata?.keyStatus||'unknown',expiresAt:item.metadata?.expiresAt||null}: {})};
+}
+
+// A narrow migration proof: nothing except legacy permanent-claim states and
+// their acquisition provenance may differ. The writer uses this to retain and
+// validate observations against their original base before its atomic save.
+export function normalizePermanentClaimsDatabase(value) {
+  const result=structuredClone(value);
+  const record=item=>{if(item && normalizeOwnership(item.ownership)!==item.ownership){
+    item.ownership=normalizeOwnership(item.ownership);
+    item.metadata={...item.metadata,acquisitionMethod:'permanent-claim'};
+  }};
+  for(const item of Object.values(result.providerItems??{}))record(item);
+  for(const entry of Object.values(result.providerHistory??{}))record(entry.item);
+  for(const review of Object.values(result.ownershipReviews??{}))review.ownership=normalizeOwnership(review.ownership);
+  return result;
 }

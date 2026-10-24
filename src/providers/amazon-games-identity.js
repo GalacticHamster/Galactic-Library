@@ -46,7 +46,7 @@
     const groups=new Map();
     for(const raw of items){const item=await identify(raw),previous=groups.get(item.providerItemId);
       if(!previous)groups.set(item.providerItemId,item);
-      else{const preferred=item.ownership==='claimed'?item:previous;
+      else{const preferred=['owned','claimed','permanently_claimed'].includes(item.ownership)?item:previous;
         const observations=[...new Set([...(previous.metadata.observationIds??[]),...(item.metadata.observationIds??[])])].sort();
         groups.set(item.providerItemId,{...preferred,metadata:{...preferred.metadata,...(observations.length?{observationIds:observations}:{})}});
       }

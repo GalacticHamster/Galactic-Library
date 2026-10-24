@@ -9,7 +9,7 @@ const text=(tag,value,className)=>Object.assign(document.createElement(tag),{tex
 // of access. No state here creates purchase evidence or changes provider records.
 export function compactAccessStatus(records,database){
   const states=new Set(records.map(({record})=>effectiveOwnershipRecord(record,database).ownership));
-  return ['owned','subscription','unknown','claimed','borrowed','rental','returned','revoked','expired'].find(state=>states.has(state))??'unknown';
+  return ['owned','subscription','unknown','borrowed','rental','returned','revoked','expired'].find(state=>states.has(state))??'unknown';
 }
 
 // The existing card/actions are constructed once, only when this page's row

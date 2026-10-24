@@ -13,7 +13,7 @@
     if(subscription)return {ownership:'subscription',ownershipBasis:'kobo-plus-subscription'};
     if(temporary)return {ownership:temporary,ownershipBasis:temporary};
     if(purchaseAttribute||purchaseLabel)return {ownership:'owned',ownershipBasis:purchaseAttribute?'purchase-attribute':'purchase-label'};
-    if(freeClaim)return {ownership:'claimed',ownershipBasis:'free-claim'};
+    if(freeClaim)return {ownership:'owned',ownershipBasis:'free-claim'};
     if(card?.isPurchased===false)return {ownership:'unknown',ownershipBasis:'not-purchased'};
     if(type==='free'||labels.some(value=>/^free$/iu.test(value)))return {ownership:'unknown',ownershipBasis:'free-availability'};
     return {ownership:'unknown',ownershipBasis:labels.some(value=>/^kobo plus$/iu.test(value))?'kobo-plus-availability':'library-presence-only'};
@@ -22,7 +22,7 @@
     if(metadata.ownershipBasis==='kobo-plus-subscription')return 'subscription';
     if(['borrowed','rental'].includes(metadata.ownershipBasis))return metadata.ownershipBasis;
     if(['purchase-attribute','purchase-label'].includes(metadata.ownershipBasis))return ownership==='owned'?'owned':'unknown';
-    if(metadata.ownershipBasis==='free-claim')return ownership==='claimed'?'claimed':'unknown';
+    if(metadata.ownershipBasis==='free-claim')return ['owned','claimed','permanently_claimed'].includes(ownership)?'owned':'unknown';
     return 'unknown';
   }
   global.GalacticKoboOwnership={classify,fromMetadata};

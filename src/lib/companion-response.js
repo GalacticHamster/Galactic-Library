@@ -1,4 +1,4 @@
-import { PROVIDERS, OWNERSHIP_STATES } from './constants.js';
+import { PROVIDERS, OWNERSHIP_STATES, normalizeOwnership } from './constants.js';
 import { compact, names, validIsbn } from './identity.js';
 import { date } from './validation.js';
 
@@ -14,7 +14,7 @@ export function companionMatch(value) {
   const provider = PROVIDERS.includes(value.provider) ? value.provider : 'unknown';
   return {
     provider, itemRef: recordReference(value.itemRef), title: compact(value.title),
-    ownership: OWNERSHIP_STATES.includes(value.ownership) ? value.ownership : 'unknown',
+    ownership: OWNERSHIP_STATES.includes(normalizeOwnership(value.ownership)) ? normalizeOwnership(value.ownership) : 'unknown',
     confidence: Number.isFinite(value.confidence) ? Math.max(0, Math.min(1, value.confidence)) : 0,
     relationship: ['same-work', 'same-edition', 'contains'].includes(value.relationship) ? value.relationship : 'same-work',
     reason: compact(value.reason),
@@ -25,7 +25,7 @@ export function companionMatch(value) {
       source: SOURCES.has(evidence.source) ? evidence.source : provider, checkedAt: publicDate(evidence.checkedAt),
       ...(evidence.ownershipBasis==='dated-manual-confirmation'?{ownershipBasis:evidence.ownershipBasis,ownershipConfirmedAt:publicDate(evidence.ownershipConfirmedAt),accessExpiresAt:publicDate(evidence.accessExpiresAt)}:{}),
       ...(evidence.ownershipBasis==='user-assumed-owned'?{ownershipBasis:evidence.ownershipBasis,
-        observedOwnership:OWNERSHIP_STATES.includes(evidence.observedOwnership)?evidence.observedOwnership:'unknown'}:{}),
+        observedOwnership:OWNERSHIP_STATES.includes(normalizeOwnership(evidence.observedOwnership))?normalizeOwnership(evidence.observedOwnership):'unknown'}:{}),
       ...(evidence.availability==='not-observed-in-last-full-scan'?{availability:evidence.availability}:{}),
       ...(['humble','fanatical'].includes(provider)?{
         purchaseEvidence:evidence.purchaseEvidence==='confirmed'?'confirmed':'unknown',

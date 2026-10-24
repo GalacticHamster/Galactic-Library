@@ -2,7 +2,7 @@
 export const providerLabel=id=>({steam:'Steam',gog:'GOG',epic:'Epic',kindle:'Kindle',audible:'Audible',kobo:'Kobo',humble:'Humble Bundle',fanatical:'Fanatical','amazon-games':'Amazon Games','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',nintendo:'Nintendo',xbox:'Xbox — Web Library',playstation:'PlayStation — PS4/PS5 Purchased Library'}[id]??id);
 export const mediaLabel=id=>({book:'Book',audiobook:'Audiobook',game:'Game',software:'Software',movie:'Movie',tv:'TV show'}[id]??id);
 export const accountLabel=(record,db)=>`${providerLabel(record.provider)} — ${db.providerProfiles?.[record.profileId]?.nickname||'Unnamed account'}`;
-export const accessLabel=value=>({owned:'Owned',claimed:'Permanently claimed',borrowed:'Borrowed',subscription:'Subscription access',rental:'Rented',unknown:'Ownership unconfirmed',returned:'Returned / Refunded',revoked:'Access revoked',expired:'Access expired'}[value]??'Access unconfirmed');
+export const accessLabel=value=>({owned:'Owned',claimed:'Owned',permanently_claimed:'Owned',borrowed:'Borrowed',subscription:'Subscription access',rental:'Rented',unknown:'Ownership unconfirmed',returned:'Returned / Refunded',revoked:'Access revoked',expired:'Access expired'}[value]??'Access unconfirmed');
 export const readingAccessLabel=value=>({unknown:'Access not checked',accessible:'Accessible',unavailable:'Unavailable'}[value]??'Access not checked');
 export const countLabel=(count,singular,plural=singular+'s')=>`${count} ${count===1?singular:plural}`;
 export const rangeLabel=(first,last)=>`${first}–${last}`;

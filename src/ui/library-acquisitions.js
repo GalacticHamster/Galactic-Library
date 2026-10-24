@@ -147,6 +147,7 @@ export function createAcquisitionHistory(history,database={}){
       item.append(text('p',entry.accounts.join('; ')));
       if(entry.claims===1)item.append(text('p',(entry.confirmedPurchase?'Purchase date: ':'Acquisition date: ')+datesLabel(entry.dates)));
       item.append(text('p',entry.access.join('; ')));
+      if(entry.records.some(record=>record.metadata?.acquisitionMethod==='permanent-claim'||record.metadata?.ownershipBasis==='free-claim'))item.append(text('p','Acquisition method: Permanently claimed'));
       if(!entry.confirmedPurchase)item.append(text('small','Purchase details are not recorded; this is a saved library record.'));
       if(entry.provider==='amazon-games'){
         const originals=Object.values(database.providerHistory??{}).filter(value=>value.reason==='duplicate-observation'&&entry.records.some(record=>record.recordRef===value.duplicateOf));

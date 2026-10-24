@@ -1,5 +1,4 @@
 import {PROVIDERS} from './constants.js';
-import {VALIDATION_ALGORITHM_VERSION} from './validation-certificate.js';
 import {validateProviderStates} from './provider-state.js';
 import {equalDatabaseData} from './data-equality.js';
 
@@ -7,6 +6,9 @@ import {equalDatabaseData} from './data-equality.js';
 export const OBSERVATION_KEY='galacticLibraryObservations';
 export const OBSERVATION_HEAD_KEY='galacticLibraryObservationHead';
 export const OBSERVATION_LIMITS=Object.freeze({bytes:1048576,records:5000,origins:10000,providers:14});
+// Observation shape and raw-base binding are unchanged by ownership aliases.
+// Keep existing packets readable while catalog validation certificates expire.
+const OBSERVATION_VALIDATION_VERSION='database-validation-2026-10-16-provider-differences-v1';
 const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu,hash=/^[a-f0-9]{64}$/u;
 const fail=()=>{throw Error('Saved observation information is incomplete or invalid. Your library was kept. Restore a complete backup or retry the interrupted operation.');};
 const exact=(value,keys)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||keys.some(k=>!Object.hasOwn(value,k)))fail();};
@@ -26,7 +28,7 @@ export function validateObservationOverlay(base,digest,head,packet){
  if(head==null&&packet==null)return null;
  if(head)validateObservationHead(head);
  if(packet){exact(packet,['format','baseDigest','generation','revision','validationVersion','entries']);
-  if(packet.format!==1||packet.validationVersion!==VALIDATION_ALGORITHM_VERSION||!hash.test(packet.baseDigest)||!uuid.test(packet.generation))fail();integer(packet.revision);
+  if(packet.format!==1||packet.validationVersion!==OBSERVATION_VALIDATION_VERSION||!hash.test(packet.baseDigest)||!uuid.test(packet.generation))fail();integer(packet.revision);
   if(!Array.isArray(packet.entries)||!packet.entries.length||packet.entries.length>OBSERVATION_LIMITS.providers||new TextEncoder().encode(JSON.stringify(packet)).length>OBSERVATION_LIMITS.bytes)fail();
  }
  if(head?.status==='retiring')fail();
@@ -90,7 +92,7 @@ export function materializeObservations(base,packet){
 // Overflow requires the existing validated full save.
 export function consolidateObservations(base,digest,previous,entry){
  if(previous&&!validateObservationOverlay(base,digest,observationHead(previous),previous))fail();
- const incoming={format:1,baseDigest:digest,generation:previous?.generation??crypto.randomUUID(),revision:(previous?.revision??0)+1,validationVersion:VALIDATION_ALGORITHM_VERSION,entries:[entry]};
+ const incoming={format:1,baseDigest:digest,generation:previous?.generation??crypto.randomUUID(),revision:(previous?.revision??0)+1,validationVersion:OBSERVATION_VALIDATION_VERSION,entries:[entry]};
  validateObservationOverlay(base,digest,observationHead(incoming),incoming);
  const old=previous?.entries.find(e=>e.provider===entry.provider);let merged=entry;
  if(old&&entry.observations.kind==='records'){

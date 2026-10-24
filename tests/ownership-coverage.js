@@ -32,7 +32,7 @@ export const ownershipCoverageTests=[
  }],
  ['explicit access, missing context, account corrections and expiry override legacy inference',()=>{
    const {gods,database}=ownershipCoverageFixture();
-   for(const state of ['owned','claimed','borrowed','subscription','rental'])assert.equal(effectiveOwnershipRecord({...gods,ownership:state},database).ownership,state);
+   for(const state of ['owned','claimed','borrowed','subscription','rental'])assert.equal(effectiveOwnershipRecord({...gods,ownership:state},database).ownership,state==='claimed'?'owned':state);
    for(const patch of [{source:'other-source'},{libraryCategory:'personal-documents'},{itemStatus:'Borrowed'},{originType:'ComixologyUnlimited'}])assert.equal(effectiveOwnershipRecord({...gods,metadata:{...gods.metadata,...patch}},database).ownership,'unknown');
    database.ownershipReviews[gods.recordRef]=review('unknown');assert.equal(effectiveOwnershipRecord(gods,database).ownership,'unknown');assert.equal(coverageAccessExclusion(gods,database).reason,'user-unconfirmed');
    database.ownershipReviews[gods.recordRef]=review('subscription','2020-01-01');assert.equal(effectiveOwnershipRecord(gods,database).ownership,'unknown');assert.equal(coverageAccessExclusion(gods,database).reason,'expired');

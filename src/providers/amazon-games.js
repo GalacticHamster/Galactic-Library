@@ -60,10 +60,11 @@
       providerItemId,
       title,
       mediaType: 'game',
-      ownership: direct ? 'claimed' : 'unknown',
+      ownership: direct ? 'owned' : 'unknown',
       acquiredAt: card.collectedOn ? card.collectedOn+'T00:00:00.000Z' : null,
       metadata: {
         source: 'amazon-games-collection',
+        ...(direct ? {acquisitionMethod:'permanent-claim'} : {}),
         detailUrl: '',
         imageUrl: absoluteUrl(card?.imageUrl),
         delivery: description,
@@ -224,7 +225,7 @@
       : /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
         : /^(?:pending|not delivered|processing|awaiting delivery)[.!]?$/iu.test(label) ? 'not-delivered' : 'unknown-delivery';
     if (!item && /^(?:available to claim|not claimed|claim now)[.!]?$/iu.test(label)) return { item: null, reason: 'unclaimed-offer' };
-    return { item, reason: item?.ownership === 'claimed' ? 'direct' : reason, evidence: {
+    return { item, reason: item?.ownership === 'owned' ? 'direct' : reason, evidence: {
       deliveryKind: reason, deliveryLabelPresent: Boolean(label), detailsPresent: details.bodyPresent,
       collectedLabelPresent: details.collectedLabelPresent, collectedDateRecognized: details.collected,
       destinationPresent: Boolean(details.deliveryTarget),
@@ -374,7 +375,7 @@
       scopes.push({ ...result.scope, id: timeWindow.id || result.scope.id });
       for (const item of result.items) {
         if (itemsById.has(item.providerItemId)) totals.crossWindowDuplicates += 1;
-        if (!itemsById.has(item.providerItemId) || item.ownership === 'claimed') itemsById.set(item.providerItemId, item);
+        if (!itemsById.has(item.providerItemId) || item.ownership === 'owned') itemsById.set(item.providerItemId, item);
       }
       for (const key of ['cardsRead', 'otherLibraryClaims', 'productKeyClaims', 'duplicateAmazonClaims', 'unreadableCards', 'unclaimedOffers', 'loadMoreActivations']) {
         totals[key] += result.diagnostics[key];
@@ -400,7 +401,7 @@
       delete result.completedScopes;
       const {timeWindows, ...counts} = result.diagnostics;
       diagnostics = { ...diagnostics, state: 'complete', counters: {...counts,evidenceGroups:result.items.length,missingAcquisitionDates:result.items.filter(item=>!item.acquiredAt).length},
-        access: { direct: result.items.filter(item => item.ownership === 'claimed').length,
+        access: { direct: result.items.filter(item => item.ownership === 'owned').length,
           unconfirmed: result.items.filter(item => item.ownership === 'unknown').length } };
       return result;
     } catch (error) {

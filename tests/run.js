@@ -1,3 +1,4 @@
+import {permanentClaimTests} from './permanent-claims.js';
 import {amazonGamesClaimTests} from './amazon-games-claims.js';
 import {sourceHistoryTests} from './source-history.js';
 import {contentsConfirmationTests} from './contents-confirmation.js';
@@ -304,8 +305,8 @@ const tests = [
       providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1-body', title: 'Wall World 2',
       imageUrl: 'https://images.example.test/wall-world.jpg?size=large', deliveryText: 'Delivered', deliveryTarget: 'Amazon Games library'
     }), {
-      providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1', title: 'Wall World 2', mediaType: 'game', ownership: 'claimed', acquiredAt:null,
-      metadata: { source: 'amazon-games-collection', detailUrl: '', imageUrl: 'https://images.example.test/wall-world.jpg', delivery: 'Amazon Games library' }
+      providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1', title: 'Wall World 2', mediaType: 'game', ownership: 'owned', acquiredAt:null,
+      metadata: { source: 'amazon-games-collection', detailUrl: '', imageUrl: 'https://images.example.test/wall-world.jpg', delivery: 'Amazon Games library', acquisitionMethod:'permanent-claim' }
     });
     assert.equal(amazonGamesItemFromCardData({
       providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1-body', title: 'Wall World 2', deliveryText: 'Delivered', deliveryTarget: 'Epic Games Store'
@@ -636,7 +637,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...amazonGamesClaimTests, ...fanaticalNavigationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...permanentClaimTests, ...amazonGamesClaimTests, ...fanaticalNavigationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -647,4 +648,4 @@ for (const [name, run] of [...amazonGamesClaimTests, ...fanaticalNavigationTests
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${amazonGamesClaimTests.length + fanaticalNavigationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${permanentClaimTests.length + amazonGamesClaimTests.length + fanaticalNavigationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);

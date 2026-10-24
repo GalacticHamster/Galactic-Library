@@ -5,6 +5,9 @@ import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src/lib/models.js';
 import {newProviderProfile} from '../src/lib/provider-profiles.js';
 import {acquisitionHistory,createAcquisitionHistory} from '../src/ui/library-acquisitions.js';
+import {mountLibraryRow} from '../src/ui/library-layout.js';
+import {itemPresentation} from '../src/ui/item-presentation.js';
+import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/library-browse.js';
 const checks=[];
 const assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
 const codes=await Promise.all(['provider-snapshot','amazon-games','amazon-games-content','amazon-games-identity'].map(async name=>(await fetch(`/src/providers/${name}.js`)).text()));
@@ -79,7 +82,7 @@ try{
  assert(sends===0&&dateShadow.querySelector('.status').textContent.includes('1 of 3')&&!dateShadow.querySelector('[data-export-report]').hidden&&!dateShadow.querySelector('[data-mode="full"]').disabled,'The ordinary panel date check completes with counts and an export without accessing or changing stored library data');
  const windows={'2026':[direct,code,external,mystery,pending,unavailable,offered],'2025':[{...direct,delayed:false},{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}],'past-3-months':[direct,code,external]};
  let page=await setup(windows),result=await page.api.fetchAmazonGames();
- assert(result.items.length===5&&result.items.filter(item=>item.ownership==='claimed').length===2,'Mixed full import retains direct deliveries and valid unconfirmed claims while excluding code and external-store entries');
+ assert(result.items.length===5&&result.items.filter(item=>item.ownership==='owned').length===2,'Mixed full import retains direct deliveries and valid unconfirmed claims while excluding code and external-store entries');
  assert(result.diagnostics.productKeyClaims===1&&result.diagnostics.otherLibraryClaims===1,'Claim Code without Sent to and external Delivered rows are accounted for without a fatal unknown-delivery error');
  assert(result.items.filter(item=>item.ownership==='unknown').length===3&&!result.items.some(item=>item.providerItemId==='offer-a'),'Unknown routes, pending delivery and missing destinations do not become owned; unclaimed offers are excluded');
  assert(result.items.some(item=>item.acquiredAt==='2025-01-01T00:00:00.000Z')&&result.diagnostics.crossWindowDuplicates===1,'Evidence keys collapse repeated observations but retain different collected dates for the same title');
@@ -88,15 +91,15 @@ try{
  const data={},area={get:async defaults=>structuredClone({...defaults,...data}),set:async patch=>Object.assign(data,structuredClone(patch))};let writer=createStorageWriter(area);
  const save=async value=>writer.replaceProviderItems('amazon-games',JSON.parse(JSON.stringify(value.items)),{},JSON.parse(JSON.stringify(value.snapshot)));
  await save(result);let db=await writer.getDatabase();const originals=Object.values(db.providerItems);
- assert(originals.length===5&&originals.filter(item=>item.ownership==='claimed').length===2&&originals.filter(item=>item.ownership==='unknown').length===3,'Persisted source records keep confirmed Amazon delivery separate from unconfirmed claim access');
+ assert(originals.length===5&&originals.filter(item=>item.ownership==='owned').length===2&&originals.filter(item=>item.ownership==='unknown').length===3,'Persisted source records keep confirmed Amazon delivery separate from unconfirmed claim access');
  assert(!Object.values(db.providerItems).some(item=>item.provider==='gog'||item.provider==='epic')&&!JSON.stringify(db).includes('SYNTHETIC_SECRET'),'Import never invents downstream storefront ownership or saves secret code contents');
  result=await page.api.fetchAmazonGames();await save(result);db=await writer.getDatabase();
  assert(Object.values(db.providerItems).length===5&&originals.every(item=>db.providerItems[item.id]?.recordRef===item.recordRef),'An unchanged full repeat preserves every source identity with no duplicate records');
- const saved=Object.values(db.providerItems).find(item=>item.acquiredAt==='2026-01-01T00:00:00.000Z'&&item.ownership==='claimed');
+ const saved=Object.values(db.providerItems).find(item=>item.acquiredAt==='2026-01-01T00:00:00.000Z'&&item.ownership==='owned');
  await writer.saveOwnershipCorrections([{recordRef:saved.recordRef,provider:saved.provider,profileId:saved.profileId,expectedReviewRef:null}],{ownership:'returned'});
  const sparse={...windows,'2026':[{...mystery,id:'direct-a',title:direct.title},code,external,mystery,pending,unavailable,offered],'2025':[{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}]};
  page=await setup(sparse);await save(await page.api.fetchAmazonGames());db=await writer.getDatabase();
- assert(db.providerItems[saved.id].ownership==='claimed'&&db.providerItems[saved.id].metadata.delivery.includes('Amazon Games library')&&effectiveOwnershipRecord(db.providerItems[saved.id],db).ownership==='returned','A later uncertain delivery preserves earlier direct evidence and authoritative manual corrections');
+ assert(db.providerItems[saved.id].ownership==='owned'&&db.providerItems[saved.id].metadata.delivery.includes('Amazon Games library')&&effectiveOwnershipRecord(db.providerItems[saved.id],db).ownership==='returned','A later uncertain delivery preserves earlier direct evidence and authoritative manual corrections');
  await writer.restoreDatabase(parseBackup(createBackup(db)));writer=createStorageWriter(area);db=await writer.getDatabase();
  assert(effectiveOwnershipRecord(db.providerItems[saved.id],db).ownership==='returned','Delivery evidence and separate ownership corrections survive backup restore and writer reload');
  page=await setup(windows);const quick=await page.api.fetchAmazonGames(()=>{},true);
@@ -121,7 +124,7 @@ try{
  assert(failedDeliveryResult.items.find(item=>item.ownership==='unknown').metadata.delivery==='Undeliverable; delivery not confirmed','A failed delivery with no linked details never invents confirmed access');
  await save(failedDeliveryResult);db=await writer.getDatabase();
  const retained=db.providerItems[saved.id];
- assert(retained.ownership==='claimed'&&effectiveOwnershipRecord(retained,db).ownership==='returned'&&!Object.values(db.providerItems).some(item=>item.providerItemId==='failed-external'),'Delivery failure does not revoke earlier confirmed evidence or overwrite manual corrections; external failure is not imported');
+ assert(retained.ownership==='owned'&&effectiveOwnershipRecord(retained,db).ownership==='returned'&&!Object.values(db.providerItems).some(item=>item.providerItemId==='failed-external'),'Delivery failure does not revoke earlier confirmed evidence or overwrite manual corrections; external failure is not imported');
  const quickFailure=await page.api.fetchAmazonGames(()=>{},true);
  assert(quickFailure.items.length===1&&quickFailure.items[0].ownership==='unknown'&&quickFailure.diagnostics.otherLibraryClaims===1,'Quick update handles failed delivery with the same conservative access and destination rules');
  page=await setup({'2026':[{id:'broken',label:'Unknown',body:''}]});let error;
@@ -181,7 +184,7 @@ try{
  const savedInflation={},inflationWriter=createStorageWriter({get:async defaults=>structuredClone({...defaults,...savedInflation}),set:async patch=>Object.assign(savedInflation,structuredClone(patch))});
  page=await setup({'2026':inflation,'past-3-months':[inflation[0]]},{churn:true});
  const reduced=await page.api.fetchAmazonGames();
- assert(reduced.items.length===189&&reduced.items.filter(item=>item.ownership==='claimed').length===188,'1401 transient observations become 189 evidence groups, not 1401 persisted acquisitions');
+ assert(reduced.items.length===189&&reduced.items.filter(item=>item.ownership==='owned').length===188,'1401 transient observations become 189 evidence groups, not 1401 persisted acquisitions');
  await inflationWriter.replaceProviderItems('amazon-games',JSON.parse(JSON.stringify(reduced.items)),{},JSON.parse(JSON.stringify(reduced.snapshot)));
  const firstDatabase=await inflationWriter.getDatabase(),firstRefs=Object.values(firstDatabase.providerItems).map(item=>item.recordRef).sort();
  assert(Object.values(firstDatabase.providerItems).every(item=>item.acquiredAt&&item.metadata.collectedOn),'Collected on dates persist for every readable direct and failed-delivery entry');
@@ -200,6 +203,28 @@ try{
  assert(history.textContent.includes('Acquisition date:')&&history.textContent.includes('2025')&&history.textContent.includes('29')&&history.querySelectorAll(':scope > ul > li').length===1&&history.textContent.includes('Earlier observations (2)'),'Purchase/access history shows one date-bearing entry with preserved observations separately expandable');
  await inflationWriter.restoreDatabase(parseBackup(createBackup(recovered)));await inflationWriter.mergeProviderItems('amazon-games',[{...observed,providerItemId:'another-new-dom-id'}],{profileId:legacyProfile.profileId});
  assert(Object.keys((await inflationWriter.getDatabase()).providerHistory).length===2,'Backup restore and another import do not multiply retained observations');history.remove();
+ assert(![...document.querySelector('#ownership-filter').options].some(option=>['claimed','permanently_claimed'].includes(option.value)||option.textContent==='Permanently claimed'),'Library ownership dropdown offers Owned without a separate permanently-claimed category');
+ const legacySaved=structuredClone(recovered),claim=Object.values(legacySaved.providerItems)[0];
+ claim.ownership='permanently_claimed';delete claim.metadata.acquisitionMethod;
+ const normalizedState={galacticLibraryDatabase:legacySaved},normalizedArea={get:async defaults=>structuredClone({...defaults,...normalizedState}),set:async patch=>Object.assign(normalizedState,structuredClone(patch)),remove:async keys=>{for(const key of Array.isArray(keys)?keys:[keys])delete normalizedState[key];}};
+ let normalizedWriter=createStorageWriter(normalizedArea);let normalized=await normalizedWriter.getDatabase();
+ assert(normalizedState.galacticLibraryDatabase.providerItems[claim.id].ownership==='owned'&&normalized.providerItems[claim.id].metadata.acquisitionMethod==='permanent-claim'&&normalized.providerItems[claim.id].acquiredAt===claim.acquiredAt,'Existing legacy claims persist as Owned with their acquisition method and original date without another scan');
+ await normalizedWriter.mergeProviderItems('gog',[{providerItemId:'independent-gog',title:claim.title,mediaType:'game',ownership:'owned',metadata:{source:'gog-account-library'}}]);
+ normalized=await normalizedWriter.getDatabase();
+ const ownedRows=libraryBrowseResults(createLibraryBrowseProjection()(normalized),{filters:{ownership:'owned'}});
+ assert(ownedRows.total===1&&ownedRows.rows[0].records.length===2,'Owned filtering combines independently supported Amazon and GOG records without manufacturing a storefront acquisition');
+ const view=document.createElement('li'),row=ownedRows.rows[0];document.body.append(view);
+ mountLibraryRow(view,row,normalized,{layout:'compact',onToggle(){}},body=>{
+  for(const entry of itemPresentation(row.canonical,row.records.map(value=>value.record),normalized).records){const p=document.createElement('p');p.textContent=entry.label+': '+entry.access;body.append(p);}
+  body.append(createAcquisitionHistory(acquisitionHistory(row.records.map(value=>value.record),normalized),normalized));
+ });
+ assert(view.querySelector('.library-compact-access').textContent==='Owned'&&view.querySelectorAll('.library-compact-provider').length===2,'Compact permanent-claim badge displays Owned and retains both provider logos');
+ const expand=view.querySelector('details');expand.open=true;expand.dispatchEvent(new Event('toggle'));
+ const purchases=view.querySelector('.library-purchase-history');purchases.open=true;purchases.dispatchEvent(new Event('toggle'));
+ assert(view.querySelector('.library-compact-body').textContent.includes('Amazon Games')&&view.querySelector('.library-compact-body').textContent.includes('GOG')&&view.textContent.includes('Acquisition method: Permanently claimed')&&view.textContent.includes('2025'),'Expanded details retain Owned for both providers and distinguish permanent-claim provenance from access status');
+ const priorRefs=Object.values(normalized.providerItems).map(item=>item.recordRef).sort().join(),priorHistory=Object.keys(normalized.providerHistory).length;
+ await normalizedWriter.restoreDatabase(parseBackup(createBackup(normalized)));normalizedWriter=createStorageWriter(normalizedArea);normalized=await normalizedWriter.getDatabase();
+ assert(Object.values(normalized.providerItems).map(item=>item.recordRef).sort().join()===priorRefs&&Object.keys(normalized.providerHistory).length===priorHistory&&Object.values(normalized.providerItems).every(item=>item.ownership==='owned'),'Reload and backup restore retain permanent-claim normalization without new source or acquisition-history entries');view.remove();
  await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}

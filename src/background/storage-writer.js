@@ -1,3 +1,4 @@
+import {normalizePermanentClaimsDatabase} from '../lib/ownership.js';
 import {identicalCapture} from '../lib/source-history.js';
 import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
@@ -804,6 +805,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = await timedAsync('read_validation',()=>validateForWriter(stored[DATABASE_STORAGE_KEY]));
     if(reuseCommittedValidation&&cacheQuerySnapshots&&epoch!==querySnapshotEpoch){timed('read_certificate_retry',()=>{});return readDatabase(true);}
     if (timed('migration_compare',()=>!equalDatabaseData(stored[DATABASE_STORAGE_KEY], database))) {
+      const claimsOnly=normalizePermanentClaimsDatabase(stored[DATABASE_STORAGE_KEY]);
+      if(equalDatabaseData(claimsOnly,database)){
+        // Validate the original observation binding before retiring it through
+        // the ordinary atomic writer. Foreign/damaged observations still fail.
+        return persistDatabase(await checkedProviderView(database,stored[DATABASE_STORAGE_KEY]));
+      }
+
       // An identity repair cannot silently detach authoritative observations
       // from their exact original base. Explicit restore/clear remains available.
       await requireNoObservations();
@@ -873,6 +881,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     incoming=preserveKoboObservation(incoming,previous);
     if(incoming.provider==='amazon-games'&&previous){
       incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...incoming.metadata,
+        ...(previous.metadata.acquisitionMethod&&!incoming.metadata.acquisitionMethod?{acquisitionMethod:previous.metadata.acquisitionMethod}:{}),
         ...(previous.metadata.collectedOn&&!incoming.metadata.collectedOn?{collectedOn:previous.metadata.collectedOn}:{}),
         ...(previous.metadata.observationIds?.length?{observationIds:previous.metadata.observationIds}:{})}};
     }

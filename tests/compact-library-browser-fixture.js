@@ -27,7 +27,7 @@ try{
   [['owned','unknown'],'owned','Owned'],[['owned','subscription'],'owned','Owned'],
   [['subscription','unknown'],'subscription','Subscription'],[['unknown'],'unknown','Ownership unconfirmed'],
   [['returned','borrowed'],'borrowed','Borrowed'],[['expired','revoked'],'revoked','Access revoked'],
-  [['claimed'],'claimed','Permanently claimed']
+  [['claimed'],'owned','Owned']
  ]){
   const records=states.map((ownership,n)=>({record:{provider:n?'kobo':'humble',ownership,metadata:{},recordRef:'compact-'+n}}));
   const before=JSON.stringify(records),host=document.createElement('li');document.body.append(host);

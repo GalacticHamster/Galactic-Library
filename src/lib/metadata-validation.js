@@ -15,7 +15,7 @@ const FIELDS = {
   playstation:['productId','titleId','conceptId','accessBasis','membership','subscriptionService','isActive','isTrial'],
   nintendo:['cardId','applicationId','accessBasis','productKind','lendingExpiresAt','isHidden','isLending','isPartialLending','hasApplication','hasAddOnContents','hasReleasedApplication','hasReleasedAddOnContents','hasReleasedUpgrade']
 };
-const COMMON = ['source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
+const COMMON = ['acquisitionMethod','source','authors','contributors','series','isbn','isbns','asin','workId','publisher','language','edition','volume','issue','unitType','run','seriesYear','publicationDate','format','collects','contentsStatement','detailUrl','imageUrl'];
 const LISTS = new Set(['authors','series','narrators','collections','drm','formats','genres']);
 const LIMITS = {language:80,run:100,seriesYear:100,volume:80,issue:80,unitType:20,asin:32,source:100,collects:10000,contentsStatement:10000,steamAppId:16,purchaseId:256,bundleId:256,parentProviderItemId:500};
 
@@ -93,6 +93,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
     else if(key==='expiresAt'||provider==='nintendo'&&key==='lendingExpiresAt')result[key]=date(value[key]);
     else result[key]=text(value[key],LIMITS[key]??500,key);
   }
+  if(result.acquisitionMethod && result.acquisitionMethod!=='permanent-claim')throw Error('Invalid acquisition method.');
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
   if(result.keyStatus&&!['unknown','unrevealed','revealed','expired','unavailable'].includes(result.keyStatus))throw new Error('Invalid key status.');
   if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental','free-claim','free-availability','not-purchased'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');

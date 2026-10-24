@@ -1,10 +1,10 @@
-import {PROVIDERS,MEDIA_TYPES,OWNERSHIP_STATES} from './constants.js';
+import {PROVIDERS,MEDIA_TYPES,OWNERSHIP_STATES,normalizeOwnership} from './constants.js';
 import {object,text,date,url} from './validation.js';
 import {identityEvidence,validIsbn,titleIdentity} from './identity.js';
 
 const uuid=value=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(value);
 export function validateOwnershipReview(value){
-  object(value,'Ownership confirmation');const ownership=text(value.ownership,20,'Ownership');
+  object(value,'Ownership confirmation');const ownership=normalizeOwnership(text(value.ownership,20,'Ownership'));
   if(!OWNERSHIP_STATES.includes(ownership)||!['manual-confirmation','local-purchase-history','user-correction'].includes(value.source))throw new Error('Invalid ownership confirmation.');
   const quick=value.source==='user-correction';
   const note=text(value.note,2000,'Ownership evidence');if(!quick&&!note)throw new Error('Describe the ownership evidence.');

@@ -1,6 +1,6 @@
 import {validateDisplayTitlePreferences} from './display-title.js';
 import {migrateProviderProfiles,validateProviderProfiles,profileRef,profileItemKey} from './provider-profiles.js';
-import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS } from './constants.js';
+import { DATABASE_SCHEMA_VERSION, MEDIA_TYPES, OWNERSHIP_STATES, PROVIDERS, normalizeOwnership } from './constants.js';
 import { normalizeGameTitle } from './normalization.js';
 import { identityConflicts, identityEvidence, sameEditionEvidence } from './identity.js';
 import { validateContentReview } from './contents.js';
@@ -50,7 +50,8 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
   const providerItemId = text(value.providerItemId,500,'Provider item ID');
   const title = text(value.title,500,'Title');
   const mediaType = text(value.mediaType ?? 'game',40,'Media type').toLowerCase();
-  const ownership = text(value.ownership ?? 'unknown',40,'Ownership').toLowerCase();
+  const observedOwnership = text(value.ownership ?? 'unknown',40,'Ownership').toLowerCase();
+  const ownership = normalizeOwnership(observedOwnership);
   if (!PROVIDERS.includes(provider)) throw new Error(`Unsupported provider: ${provider || '(missing)'}.`);
   if (!providerItemId) throw new Error('Provider item needs a providerItemId.');
   if (!title) throw new Error('Provider item needs a title.');
@@ -59,6 +60,7 @@ export function normalizeProviderItem(value, now = new Date().toISOString(), opt
   const titleParts = normalizeGameTitle(title);
   if (!titleParts.normalizedTitle) throw new Error('Provider item title cannot normalize to an empty value.');
   const metadata=validateMetadata(provider,value.metadata,options);
+  if (observedOwnership !== ownership) metadata.acquisitionMethod = 'permanent-claim';
 
   return {
     id: providerItemKey(provider, providerItemId, options.profileKeySpace??value.profileId??''),

@@ -41,8 +41,8 @@ revisionMatchingTests.push(['revision contract: identity confidence is independe
     assert.equal(result.matches.length,1);assert.equal(result.possibleMatches.length,0);assert.equal(result.confidence,1);assert.equal(result.matches[0].relationship,'same-edition');
     const overridden=policy.allOwned||policy.providers.kindle;
     assert.equal(result.owned,Boolean(overridden)||['owned','claimed'].includes(ownership));
-    assert.equal(result.matches[0].ownership,overridden?'owned':ownership);
-    if(overridden)assert.equal(result.matches[0].evidence.observedOwnership,ownership);
+    assert.equal(result.matches[0].ownership,overridden||ownership==='claimed'?'owned':ownership);
+    if(overridden)assert.equal(result.matches[0].evidence.observedOwnership,ownership==='claimed'?'owned':ownership);
     const possible=run([record],{title:record.title+', Revised'},'book',policy);
     assert.equal(possible.owned,false);assert.equal(possible.matches.length,0);assert.equal(possible.possibleMatches.length,1);
   }

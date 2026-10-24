@@ -112,7 +112,7 @@ export const koboWorkflowTests=[
  }],
  ['Kobo explicit contradictory access replaces earlier purchase evidence, while UI availability does not invent purchases',async()=>{
    const parse=globalThis.GalacticKobo.koboItemFromCardData,base={title:'Example',detailUrl:'https://www.kobo.com/ebook/example',typeText:'ebook'};
-   for(const [data,ownership]of [[{},'unknown'],[{isPurchased:true},'owned'],[{isKoboPlus:true},'subscription'],[{ownershipLabels:['Borrowed until tomorrow']},'borrowed'],[{ownershipType:'rental'},'rental'],[{ownershipType:'free'},'unknown'],[{ownershipType:'free-claim'},'claimed'],[{isPurchased:false},'unknown'],[{isPurchased:true,isKoboPlus:true},'unknown']]){
+   for(const [data,ownership]of [[{},'unknown'],[{isPurchased:true},'owned'],[{isKoboPlus:true},'subscription'],[{ownershipLabels:['Borrowed until tomorrow']},'borrowed'],[{ownershipType:'rental'},'rental'],[{ownershipType:'free'},'unknown'],[{ownershipType:'free-claim'},'owned'],[{isPurchased:false},'unknown'],[{isPurchased:true,isKoboPlus:true},'unknown']]){
      const value=parse({...base,...data});assert.equal(value.ownership,ownership);assert.equal(normalizeProviderItem({...value,provider:'kobo'}).ownership,ownership);
    }
    const {writer}=memory();let db=await writer.mergeProviderItems('kobo',[{...item(1,{ownershipBasis:'purchase-label'}),ownership:'owned'}]);

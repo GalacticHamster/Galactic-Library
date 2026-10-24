@@ -10,4 +10,7 @@ export const SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY = 'galacticLibraryShowEnrichmen
 
 export const PROVIDERS = Object.freeze(['steam', 'gog', 'epic', 'amazon-games', 'audible', 'kindle', 'amazon-video', 'fandango-at-home', 'kobo', 'fanatical', 'humble', 'nintendo', 'playstation', 'xbox']);
 export const MEDIA_TYPES = Object.freeze(['game', 'game-addon', 'software', 'audiobook', 'book', 'movie', 'tv']);
-export const OWNERSHIP_STATES = Object.freeze(['owned', 'claimed', 'subscription', 'borrowed', 'rental', 'unknown', 'returned', 'revoked', 'expired']);
+export const OWNERSHIP_STATES = Object.freeze(['owned', 'subscription', 'borrowed', 'rental', 'unknown', 'returned', 'revoked', 'expired']);
+
+// Legacy input spellings only; permanent acquisition method is provenance.
+export const normalizeOwnership = value => ['claimed','permanently_claimed'].includes(value) ? 'owned' : value;
