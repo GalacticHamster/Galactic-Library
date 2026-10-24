@@ -121,6 +121,18 @@ try{
  assert(labels.api.amazonVideoItemsFromDocument(labels.doc)[0].ownership==='unknown','Split episode-only wording cannot be truncated into a full-product purchase label');
  labels.list.innerHTML=card(1,{ownership:'PURCHASED'}).replace('PRIVATE_TITLE','Purchased');
  assert(labels.api.amazonVideoItemsFromDocument(labels.doc)[0].ownership==='unknown','A title that happens to be an ownership word is not purchase evidence');
+ labels=await setup({ids:[1,2,3,4,5]});
+ const tvCard=(n,title,evidence)=>card(n,{ownership:evidence}).replace('PRIVATE_TITLE',title).replace(/data-card-entity-type="[^"]+"/,'data-card-entity-type="TV Show"');
+ labels.list.innerHTML=tvCard(1,'A show Season One','<span>You purchased this</span>')+tvCard(2,'A show Volume 3','<span>You purchased this</span><span>Included with Prime</span>')+tvCard(3,'A show Volume 3','<button>Free trial or buy</button>')+tvCard(4,'A show Season 2','<span>Included with Prime</span>')+tvCard(5,'A named set','<button>Watch now</button>');
+ const exactProducts=JSON.parse(JSON.stringify(labels.api.amazonVideoItemsFromDocument(labels.doc)));
+ assert(exactProducts.map(item=>item.ownership).join(',')==='owned,owned,unknown,subscription,unknown','Explicit TV product purchases do not require numeric season titles; Prime access and purchase offers stay distinct');
+ const tvData={},tvWriter=createStorageWriter({get:async defaults=>({...defaults,...tvData}),set:async patch=>Object.assign(tvData,structuredClone(patch))});
+ await tvWriter.mergeProviderItems('amazon-video',exactProducts.map(item=>({...item,ownership:'unknown',metadata:{...item.metadata,ownershipEvidence:''}})));
+ const beforeTv=Object.values((await tvWriter.getDatabase()).providerItems);
+ await tvWriter.replaceProviderItems('amazon-video',exactProducts,{},JSON.parse(JSON.stringify(labels.win.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video',exactProducts,[labels.win.GalacticProviderSnapshot.completedScope('library',5,null,'scroll-end',8)]))));
+ const afterTv=Object.values((await tvWriter.getDatabase()).providerItems);
+ assert(afterTv.filter(item=>item.ownership==='owned').length===2&&afterTv.filter(item=>item.ownership==='subscription').length===1&&afterTv.length===5&&afterTv.every(item=>beforeTv.some(old=>old.id===item.id&&old.recordRef===item.recordRef)),'Existing TV records upgrade without duplicate source identities, including a Prime subscription');
+ assert(afterTv.find(item=>item.providerItemId.endsWith('fixture-3')).ownership==='unknown','A purchase on another stable ID does not grant ownership to a same-title TV product');
  let page=await virtualLibrary({plateau:true});let result=await page.api.fetchAmazonVideoLibrary();
  assert(result.items.length===343&&result.completionStatus==='inferred'&&!result.completionConfirmed,'A delayed 180-item plateau is passed and all 343 virtualized identities converge without a provider total');
  let evidence=page.api.getDiagnostics();
@@ -213,9 +225,11 @@ try{
  page=await setup({total:99});await rejects(page,/could not establish/,'An explicit library count mismatch cannot become a complete snapshot');
  page=await setup({ids:[]});await rejects(page,/no readable movie or TV cards/,'A missing or empty listing cannot erase the saved library');
  page=await setup();page.list.insertAdjacentHTML('beforeend',card(99,{bad:true}));await rejects(page,/unreadable library cards/,'Unreadable cards still prevent replacement');
- page=await setup({ids:[1,2,3]});page.list.innerHTML=card(1,{ownership:'Rental'})+card(2,{ownership:'Purchased'})+card(3,{ownership:'Included with Prime'});
+ page=await setup({ids:[1,2,3,4]});page.list.innerHTML=card(1,{ownership:'Rental'})+card(2,{ownership:'Purchased'})+card(3,{ownership:'Included with Prime'})+card(4,{ownership:'Watch now'});
  result=await page.api.fetchAmazonVideoLibrary();
- assert(result.items[0].ownership==='rental'&&result.items[1].ownership==='owned'&&result.items[2].ownership==='unknown','Rental, purchase and unconfirmed access distinctions remain unchanged');
+ assert(result.items[0].ownership==='rental'&&result.items[1].ownership==='owned'&&result.items[2].ownership==='subscription'&&result.items[3].ownership==='unknown','Rental, purchase, explicit Prime access and unconfirmed access remain distinct');
+ page.list.querySelector('article').insertAdjacentHTML('beforeend','<span>You purchased this</span>');
+ assert(page.api.amazonVideoItemsFromDocument(page.doc)[0].ownership==='unknown','Conflicting rental and purchase labels do not silently establish ownership');
  page=await setup();result=await page.api.fetchAmazonVideoLibrary(()=>{},['amzn1.dv.gti.fixture-1','amzn1.dv.gti.fixture-2','amzn1.dv.gti.fixture-3','amzn1.dv.gti.fixture-4']);
  assert(!result.snapshot&&result.items.length===0,'A quick update stops at an already known rendered group without replacing the full library');
  // Real content panel and production writer, with entirely disposable memory.

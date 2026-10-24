@@ -41,7 +41,7 @@
     const text = compactText(value).toLocaleLowerCase();
     if (/^(?:rental(?: expires?\b.*)?|rent until\b.+|rented(?:\b.*)?)\.?$/u.test(text)) return 'rental';
     if (/^(?:you purchased this|purchased(?: in (?:hd|uhd|sd|4k))?|owned)\.?$/u.test(text)) return 'owned';
-    if (/^(?:included with your (?:prime|subscription)|your subscription includes this)\.?$/u.test(text)) return 'subscription';
+    if (/^(?:included with (?:your )?(?:prime(?: video)?|subscription)|your subscription includes this)\.?$/u.test(text)) return 'subscription';
     return 'unknown';
   }
 
@@ -60,6 +60,9 @@
     const recognized = labels.filter(label => label && label.toLocaleLowerCase() !== compactText(title).toLocaleLowerCase()
       && ownershipFromCardText(label) !== 'unknown');
     const states = new Set(recognized.map(ownershipFromCardText));
+    // Prime availability can coexist with a purchase of this same product.
+    // A rental/purchase contradiction still requires investigation.
+    if (states.has('owned') && !states.has('rental')) return recognized.find(label => ownershipFromCardText(label) === 'owned');
     // Conflicting labels require investigation rather than a guessed purchase.
     return states.size === 1 ? recognized[0] : '';
   }
@@ -77,8 +80,9 @@
       providerItemId,
       title,
       mediaType,
-      ownership: ownershipFromCardText(ownershipEvidence) === 'owned' && mediaType === 'tv'
-        && !/SEASON/iu.test(card?.entityType) && !/\bseason\s+\d+\b/iu.test(title) ? 'unknown' : ownershipFromCardText(ownershipEvidence),
+      // This is the entitlement to this exact provider product, not a claim
+      // about every season/episode of a series with a similar title.
+      ownership: ownershipFromCardText(ownershipEvidence),
       metadata: {
         source: 'amazon-prime-video-purchases-library',
         detailUrl,

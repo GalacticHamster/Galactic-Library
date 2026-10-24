@@ -432,9 +432,11 @@ const tests = [
     for(const offer of ['Buy','Buy now','Purchase','Purchase options','You purchased this episode','A movie about a purchased painting'])assert.equal(ownershipFromCardText(offer),'unknown');
     assert.equal(ownershipFromCardText('You purchased this.'),'owned');
     assert.equal(ownershipFromCardText('Included with your subscription'),'subscription');
+    assert.equal(ownershipFromCardText('Included with Prime'),'subscription');
+    assert.equal(ownershipFromCardText('Free trial or buy'),'unknown');
     const item=(entityType,title)=>amazonVideoItemFromCardData({providerItemId:'test',title,entityType,ownershipEvidence:'You purchased this'});
     assert.equal(item('TV_SEASON','A season').ownership,'owned');
-    assert.equal(item('TV_SHOW','A complete series').ownership,'unknown');
+    assert.equal(item('TV_SHOW','A named television product').ownership,'owned');
     assert.equal(item('TV_SHOW','A show: Season 2').ownership,'owned');
   }],
   ['keeps Amazon Video movie and TV entitlement identities without guessing ambiguous ownership', () => {
