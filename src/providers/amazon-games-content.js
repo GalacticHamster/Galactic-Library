@@ -54,5 +54,19 @@
   });
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
   globalThis.GalacticFloatingPanel?.attach(shadow, 'amazon-games');
+  // Page CSP can block <style> elements inside a content-script shadow root.
+  // Construct the existing local rules (including the shared account controls)
+  // through CSSOM instead; no page permissions or policy changes are required.
+  const styles = [...shadow.querySelectorAll('style')];
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(styles.map(style => style.textContent).join('\n') + `
+    :host { width:360px; max-width:calc(100vw - 36px); }
+    .panel { box-sizing:border-box; max-height:calc(100vh - 36px); overflow:auto; color:var(--gh-text); }
+    .panel > p:first-child { padding-right:72px; }
+    button { margin:3px 2px 3px 0; }
+    .status { overflow-wrap:anywhere; }
+  `);
+  shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
+  styles.forEach(style => style.remove());
   document.documentElement.append(host);
 }());

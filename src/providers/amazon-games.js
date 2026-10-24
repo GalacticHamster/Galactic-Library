@@ -131,7 +131,7 @@
     const read = () => {
       const body = bodyId ? header.ownerDocument.getElementById(bodyId) : null;
       const text = body?.innerText || body?.textContent || '';
-      return { deliveryTarget: deliveryTargetFromText(text), collected:
+      return { bodyPresent: Boolean(body), collectedLabelPresent: /\bCollected on\b/iu.test(text), deliveryTarget: deliveryTargetFromText(text), collected:
         /\bCollected on\s*:?\s*(?:\d{4}-\d{2}-\d{2}|[a-z]{3,9}\s+\d{1,2},?\s*\d{4}|\d{1,2}\s+[a-z]{3,9}\s+\d{4})\b/iu.test(text) };
     };
     let details = read();
@@ -157,7 +157,12 @@
       : /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
         : /^(?:pending|not delivered|processing|awaiting delivery)[.!]?$/iu.test(label) ? 'not-delivered' : 'unknown-delivery';
     if (!item && /^(?:available to claim|not claimed|claim now)[.!]?$/iu.test(label)) return { item: null, reason: 'unclaimed-offer' };
-    return { item, reason: item?.ownership === 'claimed' ? 'direct' : reason };
+    return { item, reason: item?.ownership === 'claimed' ? 'direct' : reason, evidence: {
+      deliveryKind: reason, deliveryLabelPresent: Boolean(label), detailsPresent: details.bodyPresent,
+      collectedLabelPresent: details.collectedLabelPresent, collectedDateRecognized: details.collected,
+      destinationPresent: Boolean(details.deliveryTarget),
+      accordionExpanded: header.querySelector('button[aria-controls]')?.getAttribute('aria-expanded') === 'true'
+    } };
   }
 
   function allTimeWindowOptionsFromDocument(document) {
@@ -245,7 +250,8 @@
         else {
           // Delivery uncertainty is retained, but lack of a valid collection
           // observation is not permission to invent or silently omit a claim.
-          throw new Error('An Amazon Games entry did not expose enough claim information. Open My Collection, select Games, let it finish loading, then retry. No library changes were saved.');
+          diagnostics.failedEntry = result.evidence;
+          throw new Error('An Amazon Games entry did not expose enough claim information. No library changes were saved. Export the scan report so this entry can be investigated.');
         }
       }
       const cardsRead = processedCardIds.size;

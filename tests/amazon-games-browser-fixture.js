@@ -79,6 +79,11 @@ try{
  page=await setup({'2026':[{id:'broken',label:'Unknown',body:''}]});let error;
  try{await page.api.fetchAmazonGames();}catch(value){error=value;}
  assert(error&&/claim information/.test(error.message),'An unfamiliar label without collected or delivered evidence remains a safe failure, not guessed ownership');
+ assert(page.api.getDiagnostics().failedEntry?.detailsPresent===true&&page.api.getDiagnostics().failedEntry?.collectedLabelPresent===false&&page.api.getDiagnostics().failedEntry?.deliveryLabelPresent===true,'Failure report distinguishes missing claim labels from missing details without copying private text');
+ page=await setup({'2026':[{id:'bad-date',label:'Unknown',body:'Collected on\nSYNTHETIC_SECRET_DO_NOT_EXPORT'}]});
+ try{await page.api.fetchAmazonGames();}catch{}
+ const failedEvidence=page.api.getDiagnostics();
+ assert(failedEvidence.state==='failed'&&failedEvidence.failedEntry.collectedLabelPresent&&!failedEvidence.failedEntry.collectedDateRecognized&&!JSON.stringify(failedEvidence).includes('SYNTHETIC_SECRET'),'Failure report identifies unreadable date formatting without exporting dates, instructions or codes');
  page=await setup({'2026':[{id:'broken',title:'',label:'Delivered',body:'Collected on\n2026-01-01'}]});error=null;
  try{await page.api.fetchAmazonGames();}catch(value){error=value;}
  assert(error&&/ID or title/.test(error.message),'Malformed identities still stop a full scan before saving');
@@ -102,6 +107,23 @@ try{
  shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
  assert(imports===1&&shadow.querySelector('.status').textContent.includes('Full import complete. 5 Amazon Games entries saved.')&&shadow.querySelector('[data-export-report]').hidden,'A normal mixed-delivery Full import saves successfully and hides development reporting after success');
  assert(!/scan pass|loadMore|parser|reconciliation/.test(shadow.querySelector('.status').textContent),'Normal completion explains saved entries and excluded stores without internal parser or traversal counters');
+ page=await setup(windows);
+ const policy=page.doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';policy.content="style-src 'none'";page.doc.head.append(policy);
+ const theme=new page.win.CSSStyleSheet();theme.replaceSync(await (await fetch('/shared/theme.css')).text());page.doc.adoptedStyleSheets=[theme];
+ page.win.chrome={runtime:{sendMessage:async()=>({ok:true,profileLabel:'Synthetic',profiles:[],reuseAllowed:true,profileId:'synthetic'})}};
+ page.win.eval(await (await fetch('/src/providers/floating-panel.js')).text());
+ const styledAttach=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=styledAttach.call(this,options);return shadow;};
+ page.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));
+ const host=page.doc.querySelector('#galactic-library-amazon-games-importer');host.dataset.ghTheme='dark';
+ const panel=shadow.querySelector('.panel'),computed=element=>page.win.getComputedStyle(element);
+ assert(computed(panel).backgroundColor==='rgb(31, 41, 55)'&&computed(panel).paddingTop==='14px','Restrictive page CSP cannot strip the Amazon Games panel background or spacing');
+ host.dataset.ghTheme='light';assert(computed(panel).backgroundColor==='rgb(255, 255, 255)','Amazon Games panel follows light and dark themes under page CSP');
+ const minimize=shadow.querySelector('[data-galactic-floating-panel-control="minimize"]');
+ minimize.click();assert(panel.hidden&&!shadow.querySelector('[data-galactic-floating-panel-control="restore"]').hidden,'Styled panel still minimizes normally');
+ shadow.querySelector('[data-galactic-floating-panel-control="restore"]').click();assert(!panel.hidden,'Styled panel restores without losing its controls');
+ const exportControl=shadow.querySelector('[data-export-report]');exportControl.hidden=false;
+ assert(computed(exportControl).display!=='none'&&exportControl.getBoundingClientRect().width>90&&computed(minimize).position==='absolute','Export and shared account/minimize controls remain visibly styled under page CSP');
+ assert(panel.getBoundingClientRect().height<=page.win.innerHeight-36&&host.getBoundingClientRect().width<=page.win.innerWidth-36,'Account and failure controls stay within the viewport with scrollable panel contents');
  await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}
