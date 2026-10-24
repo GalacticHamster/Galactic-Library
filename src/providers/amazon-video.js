@@ -150,6 +150,26 @@
     };
     if (!sameCard()) return null;
     diagnostics.hoverChecks.attempted += 1;
+    // A gesture on the outer card never reaches handlers on its children.
+    // Target the artwork, letting over/move events bubble through its links.
+    const target = card.querySelector('img') || card.querySelector('a[href*="/detail/"]') || card;
+    diagnostics.hoverChecks.targetKinds ??= {};
+    diagnostics.hoverChecks.targetKinds[target.tagName] = (diagnostics.hoverChecks.targetKinds[target.tagName] ?? 0) + 1;
+    const rect = target.getBoundingClientRect();
+    const gesture = entering => {
+      const position = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+        relatedTarget: global.document.body, composed: true };
+      for (const type of entering ? ['pointerover', 'mouseover', 'pointermove', 'mousemove'] : ['pointerout', 'mouseout']) {
+        const EventClass = type.startsWith('pointer') ? global.PointerEvent : global.MouseEvent;
+        if (EventClass) target.dispatchEvent(new EventClass(type, { ...position, bubbles: true, pointerType: 'mouse' }));
+      }
+      for (let node = target; node && card.contains(node); node = node.parentElement) {
+        for (const type of entering ? ['pointerenter', 'mouseenter'] : ['pointerleave', 'mouseleave']) {
+          const EventClass = type.startsWith('pointer') ? global.PointerEvent : global.MouseEvent;
+          if (EventClass) node.dispatchEvent(new EventClass(type, { ...position, bubbles: false, pointerType: 'mouse' }));
+        }
+      }
+    };
     let result = null, timer;
     await new Promise(resolve => {
       const finish = () => { observer.disconnect(); resolve(); };
@@ -165,16 +185,12 @@
       // Website handlers may retrieve details. GL never clicks a purchase or
       // play control, calls an undocumented API, or reads session credentials.
       try {
-        if (global.PointerEvent) for (const type of ['pointerover', 'pointerenter']) card.dispatchEvent(new global.PointerEvent(type, { bubbles: type === 'pointerover', pointerType: 'mouse' }));
-        for (const type of ['mouseover', 'mouseenter']) card.dispatchEvent(new global.MouseEvent(type, { bubbles: type === 'mouseover' }));
+        gesture(true);
         check();
       } catch { finish(); } // Unavailable hover details are not lost ownership.
     });
     clearTimeout(timer);
-    if (card.isConnected) for (const type of ['pointerout', 'pointerleave', 'mouseout', 'mouseleave']) {
-      const EventClass = type.startsWith('pointer') ? global.PointerEvent : global.MouseEvent;
-      if (EventClass) card.dispatchEvent(new EventClass(type, { bubbles: type.endsWith('out') }));
-    }
+    if (card.isConnected) gesture(false);
     diagnostics.hoverChecks[result ? 'recognized' : 'unavailable'] += 1;
     return result;
   }
@@ -182,13 +198,29 @@
   // A small, user-operated check establishes where this page variant exposes
   // hover labels before considering any automated per-card hover requests.
   async function checkPurchaseLabels(report = () => {}) {
-    const observed = new Map();
+    const observed = new Map(), physicalHovers = new Map(), observedPhysicalPurchases = new Set();
+    const physicalHover = event => {
+      if (!event.isTrusted) return;
+      const card = event.target.closest?.(CARD_SELECTOR);
+      const item = card && amazonVideoItemFromCardData(cardDataFromElement(card));
+      if (!item) return;
+      physicalHovers.set(item.providerItemId, Date.now());
+      const path = [];
+      for (let node = event.target; node && card.contains(node) && path.length < 6; node = node.parentElement) path.push(node.tagName);
+      if (diagnostics.manualHover.targetPaths.length < 10) diagnostics.manualHover.targetPaths.push(path);
+      diagnostics.manualHover.events += 1;
+    };
     const collect = () => {
       for (const item of amazonVideoItemsFromDocument(global.document)) retainObservation(observed, item);
       diagnostics.ownership = ownershipCounts(observed);
       diagnostics.purchaseLabels = { movie: 0, season: 0, unscopedTv: 0 };
       for (const item of observed.values()) if (ownershipFromCardText(item.metadata.ownershipEvidence) === 'owned') {
         diagnostics.purchaseLabels[item.mediaType === 'movie' ? 'movie' : item.ownership === 'owned' ? 'season' : 'unscopedTv'] += 1;
+        if (physicalHovers.has(item.providerItemId) && !observedPhysicalPurchases.has(item.providerItemId)) {
+          observedPhysicalPurchases.add(item.providerItemId);
+          diagnostics.manualHover.purchaseLabels += 1;
+          diagnostics.manualHover.maximumLabelDelayMs = Math.max(diagnostics.manualHover.maximumLabelDelayMs, Date.now() - physicalHovers.get(item.providerItemId));
+        }
       }
       // Unassociated labels are diagnostic only: never attach a portal's text
       // to a nearby card, the hovered title, or every visible product.
@@ -198,10 +230,27 @@
       report(diagnostics.ownership);
     };
     diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'checking-purchase-labels' };
+    diagnostics.manualHover = { events: 0, targetPaths: [], purchaseLabels: 0, maximumLabelDelayMs: 0 };
+    diagnostics.hoverChecks = { enabled: true, sampleOnly: true, attempted: 0, recognized: 0, unavailable: 0, maximumWaitMs: 600 };
     collect();
     const observer = new global.MutationObserver(collect);
     observer.observe(global.document.body, { subtree: true, childList: true, characterData: true });
-    try { await wait(15000); collect(); } finally { observer.disconnect(); }
+    global.document.addEventListener('mouseover', physicalHover, true);
+    try {
+      const sample = [...global.document.querySelectorAll(CARD_SELECTOR)].filter(card => {
+        const rect = card.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < global.innerHeight;
+      }).slice(0, 3);
+      for (const card of sample) {
+        const item = amazonVideoItemFromCardData(cardDataFromElement(card));
+        if (item && item.ownership === 'unknown') {
+          const evidence = await readHoverLabel(card, item);
+          if (evidence) retainObservation(observed, evidence);
+        }
+      }
+      diagnostics.automaticSample = { ...diagnostics.hoverChecks };
+      await wait(15000); collect();
+    } finally { observer.disconnect(); global.document.removeEventListener('mouseover', physicalHover, true); }
     diagnostics.state = 'purchase-label-check-complete';
     return diagnostics.ownership;
   }

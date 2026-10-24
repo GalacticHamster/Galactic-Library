@@ -96,6 +96,15 @@ try{
  const checked=await labels.api.checkPurchaseLabels();
  assert(checked.owned===1&&checked.unknown===1,'The read-only manual-hover diagnostic recognizes a dynamically added label without leaking it to a nearby card');
  assert(labels.api.getDiagnostics().state==='purchase-label-check-complete','Purchase-label diagnostics finish without requesting an import');
+ labels=await setup({ids:[1]});
+ labels.list.innerHTML=card(1,{ownership:'Buy'});
+ const artwork=labels.doc.createElement('img');artwork.alt='PRIVATE_TITLE';labels.list.querySelector('a').append(artwork);
+ labels.list.querySelector('a').addEventListener('mouseover',event=>{
+  if(event.target===artwork)labels.list.querySelector('article').insertAdjacentHTML('beforeend','<span>You purchased this</span>');
+ },{once:true});
+ const childTimer=labels.win.setTimeout;labels.win.setTimeout=(callback,ms,...args)=>ms===15000?nativeTimeout(callback,0):childTimer(callback,ms,...args);
+ const sample=await labels.api.checkPurchaseLabels();
+ assert(sample.owned===1&&labels.api.getDiagnostics().automaticSample.recognized===1&&labels.api.getDiagnostics().automaticSample.attempted<=3,'The short diagnostic targets artwork handlers inside a visible card rather than dispatching only on the outer wrapper');
  labels=await setup({ids:[1,2,3,4]});
  labels.list.innerHTML=[1,2,3,4].map(n=>card(n,{ownership:'Buy'})).join('');
  for(const [index,node] of [...labels.list.querySelectorAll('article')].entries())node.addEventListener('mouseenter',()=>{
