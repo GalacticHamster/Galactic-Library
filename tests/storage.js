@@ -189,6 +189,15 @@ function game(id, title = `Game ${id}`) {
 }
 
 export const storageTests = [
+  ['Audible feasibility reads return saved ASINs without scan leases or library mutations',()=>withWorker(async({memory,pageA,dispatch})=>{
+    await pageA.mergeProviderItems('audible',[{providerItemId:'B000000001',title:'Synthetic audiobook',mediaType:'audiobook',ownership:'unknown',metadata:{asin:'B000000001'}}],{profileLabel:'Personal'});
+    const before=await pageA.getDatabase(),stored=structuredClone(memory.values),sender={id:chrome.runtime.id,url:'https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1',tab:{id:45}};
+    const result=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false},sender);
+    assert.equal(result.ok,true,result.error);assert.deepEqual(result.syncState.knownProviderItemIds,['B000000001']);assert.equal(result.scanToken,undefined);
+    assert.deepEqual(await pageA.getDatabase(),before);assert.deepEqual(memory.values,stored);
+    const foreign=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false},{...sender,url:'https://example.invalid/account/purchase-history'});
+    assert.equal(foreign.ok,false);assert.deepEqual(memory.values,stored);
+  })],
   ['profile scans reject stale commits across restart, restore, clear and account switches', profileSafetyFixture],
   ['concurrent provider tabs retain both full imports in the actual worker', () => withWorker(async ({ memory, pageA, importItems }) => {
     const responses = await Promise.all([

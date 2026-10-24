@@ -20,6 +20,7 @@ const amazonVideoMode=process.argv.includes('--amazon-video');
 const steamOwnedMode=process.argv.includes('--steam-owned');
 const amazonGamesMode=process.argv.includes('--amazon-games');
 const audibleMode=process.argv.includes('--audible');
+const audibleOwnershipMode=process.argv.includes('--audible-ownership');
 const importerMode=process.argv.includes('--importers');
 const koboMode=process.argv.includes('--kobo');
 const uxMode=process.argv.includes('--ux');
@@ -64,7 +65,7 @@ const server=createServer(async(request,response)=>{
       if(pathname==='/src/ui/options.js')body=body.toString().replace("if(workspace.workspace==='providers')providerAccountsView.update(database);",'providerAccountsView.update(database);').replace("if(workspace.workspace==='ownership')renderDuplicateReview();",'renderDuplicateReview();');
       if(pathname==='/src/ui/contents-workspace.js')body=body.toString().replace('if(!active&&!selected)return;','');
     }
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${steamOwnedMode?'steam-owned-browser-fixture':amazonGamesMode?'amazon-games-browser-fixture':amazonVideoMode?'amazon-video-browser-fixture':audibleMode?'audible-pagination-browser-fixture':sourceHistoryMode?'source-history-browser-fixture':contentsQueueMode?'contents-queue-browser-fixture':contentsReviewMode?'contents-review-browser-fixture':compactMode?'compact-library-browser-fixture':reconciliationMode?'manual-reconciliation-browser-fixture':paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${audibleOwnershipMode?'audible-ownership-browser-fixture':steamOwnedMode?'steam-owned-browser-fixture':amazonGamesMode?'amazon-games-browser-fixture':amazonVideoMode?'amazon-video-browser-fixture':audibleMode?'audible-pagination-browser-fixture':sourceHistoryMode?'source-history-browser-fixture':contentsQueueMode?'contents-queue-browser-fixture':contentsReviewMode?'contents-review-browser-fixture':compactMode?'compact-library-browser-fixture':reconciliationMode?'manual-reconciliation-browser-fixture':paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}

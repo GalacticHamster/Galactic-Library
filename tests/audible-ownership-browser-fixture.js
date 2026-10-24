@@ -1,0 +1,66 @@
+// Synthetic purchase-page structure only. No private orders, accounts or payment data.
+import '../src/providers/audible.js';
+const checks=[],assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
+const originalFetch=globalThis.fetch.bind(globalThis),inspect=globalThis.GalacticAudible.inspectPurchaseHistory;
+const url='https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1',id=n=>'B'+String(n).padStart(9,'0');
+const holder=document.createElement('main');document.body.append(holder);
+const filters='<select><option>Your orders</option><option>Pre-orders</option><option>Membership charges</option><option>Refund history</option></select><select><option>Last 90 days</option><option>Last 180 days</option><option selected>Last 365 days</option>'+Array.from({length:14},(_,i)=>'<option>'+(2026-i)+'</option>').join('')+'</select>';
+const row=(n,total='1 Credit',options='<a href="/account/order-details/ORDER_SECRET">Order details</a><a>Return this title</a>',date='09-22-2026')=>`<tr><td><a href="/pd/${id(n)}?secret=TOKEN_SECRET">PRIVATE_TITLE</a></td><td>${date}</td><td>${total}</td><td>${options}</td></tr>`;
+const table=rows=>filters+'<table><thead><tr><th>Title</th><th>Purchased</th><th>Total</th><th>Options</th></tr></thead><tbody>'+rows+'</tbody></table>';
+const set=html=>{holder.innerHTML=html;};
+const check=(html,known=[id(1),id(2)])=>{set(html);return inspect(document,{url,knownItemIds:known});};
+let shadow,downloads=[],reportBlob,messages=[];const oldAttach=Element.prototype.attachShadow,oldClick=HTMLAnchorElement.prototype.click,oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;
+try{
+ let r=check(table(row(1)+row(2,'$6.99')));
+ assert(r.rows===2&&r.rowsWithCreditTotal===1&&r.rowsWithCashTotal===1&&r.rowsWithPurchaseDate===2,'Visible Purchased/Total columns expose cash/credit/date presence without assigning ownership');
+ assert(r.rowsWithOneAsin===2&&r.distinctSavedAsinMatches===2&&r.rowsMatchingSavedAsin===2,'Product ASINs compare exactly with existing saved Audible identifiers');
+ assert(r.rowsWithReturnAction===2&&r.rowsWithCompletedReturnWording===0,'Return this title is an available action, never a completed refund');
+ assert(r.timeOptions.includes(2013)&&r.timeOptions.includes(2026)&&r.selectedTime==='last-365-days'&&r.selectedView==='orders','Date filters retain only recognized preset/year labels and selected view');
+ assert(r.readOnly&&r.historyComplete===false&&r.accountVerified===false,'A visible page never certifies complete history or signed-in account equivalence');
+ assert(!/PRIVATE_TITLE|ORDER_SECRET|TOKEN_SECRET|B\d{9}|6\.99|09-22|https?:/u.test(JSON.stringify(r)),'The exported shape contains no titles, dates, prices, ASINs, order identifiers, URLs or credentials');
+ r=check(table(row(3,'$0.00','Refunded')),[id(1)]);
+ assert(r.rowsWithZeroCashTotal===1&&r.rowsWithCompletedReturnWording===1&&r.rowsMatchingSavedAsin===0,'Zero-price and refund wording are diagnostic counts, and another edition does not match');
+ r=check(table(row(1).replace('href="/pd/','href="https://example.invalid/pd/')));
+ assert(r.rowsWithOneAsin===0,'Foreign-host product links cannot supply an Audible ASIN');
+ r=check(table(row(1).replace('</td>','<span data-asin="'+id(2)+'"></span></td>')));
+ assert(r.rowsWithMultipleAsins===1&&r.rowsMatchingSavedAsin===0,'Conflicting identifiers within a row are reported without choosing a publication');
+ r=check(table(row(1).replace('<tr>','<tr data-asin="'+id(1)+'">').replace(/<a href="\/pd\/[^>]+>PRIVATE_TITLE<\/a>/u,'PRIVATE_TITLE')));
+ assert(r.rowsWithOneAsin===1&&r.rowsMatchingSavedAsin===1,'An explicit row ASIN can establish identifier presence without a product link');
+ r=check(filters+'<section><div class="bc-row-responsive"><div>Title</div><div>Purchased</div><div>Total</div><div>Options</div></div><div class="bc-row-responsive"><div><a href="/pd/'+id(1)+'">PRIVATE_TITLE</a></div><div>09-22-2026</div><div>1 Credit</div><div>Order details</div></div></section>');
+ assert(r.rows===1&&r.rowsWithCreditTotal===1&&r.rowsMatchingSavedAsin===1,'Explicit column headers also bound a responsive div layout');
+ const repeat=inspect(document,{url,knownItemIds:[id(1),id(2)]});assert(JSON.stringify(repeat)===JSON.stringify(r),'Repeated page inspection yields the same sanitized report without accumulating history');
+ r=check(table(row(3))+'<aside><a href="/pd/'+id(1)+'">PRIVATE_TITLE recommendation</a></aside>',[id(1)]);
+ assert(r.rowsMatchingSavedAsin===0&&r.visiblePageProductAsins===2,'A recommendation outside the purchase table is not a purchased-row match');
+ r=check(table(row(1).replace('<tr>','<tr hidden>')+row(2)));
+ assert(r.rows===1&&r.distinctSavedAsinMatches===1,'Hidden order rows do not become visible-page evidence');
+ r=check(table(row(1,'Other payment format','','02-31-2026')));
+ assert(r.rowsWithUnrecognizedTotal===1&&r.rowsWithPurchaseDate===0,'Unknown payment wording and invalid calendar dates remain unrecognized');
+ r=check(table(row(1)).replace('<th>Total</th>','<th>Something else</th>'));
+ assert(r.state==='structure-unrecognized'&&r.rows===0,'Unrecognized columns cannot masquerade as a validated order layout');
+ r=check(table(Array.from({length:101},(_,i)=>row(i+1)).join('')));
+ assert(r.rows===100&&r.boundReached&&!r.historyComplete,'Inspection is bounded and cannot claim an entire purchase history');
+ r=inspect(document,{url:'https://www.audible.com/library'});
+ assert(r.state==='wrong-page','The feasibility inspector is limited to the purchase-history route');
+ r=check(table(row(1)),null);assert(r.libraryComparison==='unavailable'&&r.rowsWithOneAsin===1,'Missing saved-library access does not discard observable page structure');
+ // The production panel uses the existing raw read, bypassing the scan-start wrapper.
+ const code=await (await originalFetch('/src/providers/audible-content.js')).text();
+ Element.prototype.attachShadow=function(options){shadow=oldAttach.call(this,options);return shadow;};
+ globalThis.GalacticAudible.inspectPurchaseHistory=(doc,opts)=>inspect(doc,{...opts,url});
+ globalThis.GalacticSync={send:()=>{throw Error('Diagnostic must not start a scan');},failed:()=>{throw Error('Diagnostic must not persist failure state');}};
+ globalThis.chrome={runtime:{sendMessage:async request=>{messages.push(request);return {ok:true,syncState:{knownProviderItemIds:[id(1),id(2)]}};}}};
+ globalThis.fetch=()=>{throw Error('No provider/history requests permitted');};
+ history.replaceState({},'',location.pathname);(0,eval)(code);
+ assert(shadow.querySelectorAll('[data-mode]').length===2&&!shadow.textContent.includes('Check this page'),'Normal Audible panel keeps its existing import controls and exposes no diagnostic controls');
+ document.querySelector('#galactic-library-audible-importer').remove();history.replaceState({},'','/account/purchase-history?gl-audible-ownership-check=1');set(table(row(1)+row(2,'$6.99')));(0,eval)(code);
+ assert(!shadow.querySelector('[data-mode]')&&shadow.textContent.includes('Check this page (no import)'),'Only explicit purchase-history troubleshooting mode shows the read-only check');
+ const buttons=[...shadow.querySelectorAll('button')],run=buttons.find(b=>b.textContent==='Check this page (no import)'),download=buttons.find(b=>b.textContent==='Export check report');
+ run.click();for(let i=0;i<100&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert(messages.length===1&&messages[0].type==='GET_PROVIDER_SYNC_STATE'&&messages[0].beginScan===false,'The real check performs one raw library read, with no scan lease, commit or provider requests');
+ assert(shadow.querySelector('.status').textContent.includes('2 match')&&!download.disabled,'The actual panel reports aggregate identifier matches and enables export');
+ URL.createObjectURL=blob=>{reportBlob=blob;return 'blob:synthetic-check';};URL.revokeObjectURL=()=>{};HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};download.click();
+ const exported=JSON.parse(await reportBlob.text());assert(downloads[0]==='GL-audible-ownership-check.json'&&exported.rows===2&&!/PRIVATE_TITLE|ORDER_SECRET|TOKEN_SECRET|B\d{9}|6\.99|09-22|https?:/u.test(JSON.stringify(exported)),'The actual download uses only the sanitized aggregate report');
+ chrome.runtime.sendMessage=async()=>{throw Error('PRIVATE_ERROR_WITH_ORDER_SECRET');};run.click();for(let i=0;i<100&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert(shadow.querySelector('.status').textContent.includes('comparison was unavailable')&&!shadow.textContent.includes('PRIVATE_ERROR'),'A failed library read remains read-only and exposes no raw error or transaction data');
+ await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
+}catch(error){await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
+finally{globalThis.fetch=originalFetch;Element.prototype.attachShadow=oldAttach;HTMLAnchorElement.prototype.click=oldClick;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;}

@@ -15,6 +15,28 @@
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
 
+  if(/^\/account\/purchase-history\/?$/u.test(location.pathname)&&new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'){
+    const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check this visible purchase-history page only. No books or access statuses will change. The report omits titles, purchase dates, prices, identifiers and account details.';
+    for(const button of buttons)button.remove();
+    const check=document.createElement('button'),download=document.createElement('button');check.type=download.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;
+    panel.insertBefore(check,status);panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(download,status);
+    let report=null;
+    check.addEventListener('click',async()=>{
+      check.disabled=true;download.disabled=true;report=null;status.dataset.busy='true';status.textContent='Checking this page and comparing its audiobook links with your saved Audible account...';
+      try{
+        // Bypass GalacticSync.send: that wrapper starts an import lease.
+        const saved=await chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}).catch(()=>null);
+        report=globalThis.GalacticAudible.inspectPurchaseHistory(document,{knownItemIds:saved?.ok?saved.syncState?.knownProviderItemIds:null});
+        status.textContent=report.state==='checked'?`Page checked. ${report.rows} rows; ${report.rowsWithOneAsin} have one audiobook identifier; ${report.rowsMatchingSavedAsin} match your selected saved Audible account. No library changes were made. This does not verify the signed-in account or complete history.`:'The purchase table was not recognized. No library changes were made. Export the check report so its structure can be investigated.';
+        if(report.libraryComparison==='unavailable')status.textContent+=' Saved-library comparison was unavailable.';
+        download.disabled=false;
+      }catch{status.textContent='The page check could not complete. No library changes were made. Reload this purchase-history page and try again.';}
+      finally{check.disabled=false;delete status.dataset.busy;}
+    });
+    download.addEventListener('click',()=>{if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='GL-audible-ownership-check.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+    globalThis.GalacticFloatingPanel?.attach(shadow);document.documentElement.append(host);return;
+  }
+
   async function sync(mode) {
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';

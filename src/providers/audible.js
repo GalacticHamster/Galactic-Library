@@ -270,5 +270,70 @@
     }catch(error){lastDiagnostics.state='failed';lastDiagnostics.reason=error.audibleReason??'scan-incomplete';throw error;}
   }
 
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState };
+  // Feasibility only: inspect the rendered purchase page, never follow links,
+  // fetch orders, assign ownership or retain transaction/identifier values.
+  function inspectPurchaseHistory(document,{url=global.location?.href,knownItemIds=null}={}){
+    const report={format:1,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
+    let page;try{page=new URL(url);}catch{return report;}
+    if(page.origin!=='https://www.audible.com'||!/^\/account\/purchase-history\/?$/u.test(page.pathname))return report;
+    const label=element=>String(element?.textContent??'').replace(/\s+/gu,' ').trim().slice(0,200);
+    const visible=element=>!element.closest('[hidden],[aria-hidden="true"]')&&(!document.defaultView||element.getClientRects().length>0);
+    const rowSelector='tr,[role="row"],.bc-row-responsive,.bc-row';
+    const cells=row=>[...row.children].filter(visible);
+    const known=Array.isArray(knownItemIds)?new Set(knownItemIds.filter(id=>typeof id==='string'&&/^[A-Z0-9]{10}$/u.test(id))):null;
+    const asinFromLink=link=>{try{const u=new URL(link.getAttribute('href'),page.origin);if(u.origin===page.origin&&/^\/pd\//u.test(u.pathname)){const id=audibleItemIdFromUrl(u.href);if(/^[A-Z0-9]{10}$/u.test(id))return id;}}catch{}return null;};
+    const viewName=text=>({'your orders':'orders','pre-orders':'pre-orders','membership charges':'membership-charges','refund history':'refund-history'}[text.toLowerCase()]??null);
+    const timeName=text=>/^\d{4}$/u.test(text)&&Number(text)>=1900&&Number(text)<=2100?Number(text):/^last (?:90|180|365) days$/iu.test(text)?text.toLowerCase().replaceAll(' ','-'):null;
+    const views=new Set(),selectedViews=new Set(),periods=new Set();let selectedPeriod=null;
+    for(const select of [...document.querySelectorAll('select')].filter(visible).slice(0,30)){
+      for(const option of [...select.options].slice(0,200)){
+        const text=label(option),view=viewName(text),period=timeName(text);
+        if(view){views.add(view);if(option.selected)selectedViews.add(view);}
+        if(period!==null){periods.add(period);if(option.selected)selectedPeriod=period;}
+      }
+    }
+    const candidates=[...document.querySelectorAll(rowSelector)].filter(visible),headers=candidates.slice(0,2000).filter(row=>{
+      const names=cells(row).map(cell=>label(cell).toLowerCase());return ['title','purchased','total','options'].every(name=>names.includes(name));
+    });
+    // Fixed labels and tag/count structure help diagnose an unfamiliar layout
+    // without exporting classes, DOM IDs, surrounding prose or order contents.
+    const tag=element=>/^(?:table|thead|tbody|tr|th|td|div|span|p|section|main|ul|li|form|body|html)$/u.test(element.tagName.toLowerCase())?element.tagName.toLowerCase():'other';
+    const headerElements=[...document.querySelectorAll('th,[role="columnheader"],span,div,p')],headerShapes=[];
+    for(const element of headerElements.slice(0,5000)){
+      const field=label(element).toLowerCase();if(!['title','purchased','total','options'].includes(field)||!visible(element)||headerShapes.some(shape=>shape.field===field))continue;
+      const ancestors=[];let parent=element.parentElement;for(let depth=0;parent&&depth<3;depth++,parent=parent.parentElement)ancestors.push({tag:tag(parent),children:parent.children.length});
+      headerShapes.push({field,tag:tag(element),ancestors});
+    }
+    const rows=new Map();
+    for(const header of headers){
+      const names=cells(header).map(cell=>label(cell).toLowerCase()),scope=header.closest('table,[role="table"]')??header.parentElement;
+      for(const row of scope.querySelectorAll(rowSelector)){
+        if(rows.size>=100)break;
+        const parts=cells(row);if(row===header||!visible(row)||parts.length!==names.length||headers.includes(row))continue;
+        rows.set(row,{parts,names});
+      }
+    }
+    const totals={rows:rows.size,rowsWithPurchaseDate:0,rowsWithCreditTotal:0,rowsWithCashTotal:0,rowsWithZeroCashTotal:0,rowsWithUnrecognizedTotal:0,rowsWithOneAsin:0,rowsWithMultipleAsins:0,rowsMatchingSavedAsin:0,rowsWithOrderDetails:0,rowsWithReturnAction:0,rowsWithCompletedReturnWording:0};
+    const asins=new Set(),matches=new Set();
+    for(const [row,{parts,names}]of rows){
+      const value=name=>label(parts[names.indexOf(name)]),date=value('purchased').match(/^(\d{2})-(\d{2})-(\d{4})$/u);
+      if(date){const [,m,d,y]=date,parsed=new Date(Date.UTC(Number(y),Number(m)-1,Number(d)));if(parsed.getUTCFullYear()===Number(y)&&parsed.getUTCMonth()===Number(m)-1&&parsed.getUTCDate()===Number(d))totals.rowsWithPurchaseDate++;}
+      const total=value('total');
+      if(/^\d+(?:\.\d+)? credits?$/iu.test(total))totals.rowsWithCreditTotal++;
+      else if(/^\$\s*\d[\d,]*(?:\.\d{2})?$/u.test(total)){totals.rowsWithCashTotal++;if(Number(total.replace(/[$,\s]/gu,''))===0)totals.rowsWithZeroCashTotal++;}
+      else totals.rowsWithUnrecognizedTotal++;
+      const ids=new Set([...row.querySelectorAll('a[href]')].filter(visible).slice(0,100).map(asinFromLink).filter(Boolean));
+      for(const element of [row,...row.querySelectorAll('[data-asin]')])if(visible(element)&&/^[A-Z0-9]{10}$/iu.test(element.getAttribute('data-asin')??''))ids.add(element.getAttribute('data-asin').toUpperCase());
+      for(const id of ids)asins.add(id);
+      if(ids.size===1){totals.rowsWithOneAsin++;const id=[...ids][0];if(known?.has(id)){totals.rowsMatchingSavedAsin++;matches.add(id);}}
+      else if(ids.size>1)totals.rowsWithMultipleAsins++;
+      const options=parts[names.indexOf('options')],actions=[...options.querySelectorAll('a,button,[role="button"]')].filter(visible).map(label);
+      if(actions.some(text=>/^order details$/iu.test(text)))totals.rowsWithOrderDetails++;
+      if(actions.some(text=>/^return this title$/iu.test(text)))totals.rowsWithReturnAction++;
+      if(/^(?:returned|refunded|return complete|refund complete)(?:[.!]|\s+on\s+\S.*)?$/iu.test(label(options)))totals.rowsWithCompletedReturnWording++;
+    }
+    const visibleLinks=[...document.querySelectorAll('a[href]')].filter(visible).slice(0,2000),pageAsins=new Set(visibleLinks.map(asinFromLink).filter(Boolean));
+    return {...report,state:headers.length?'checked':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000};
+  }
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory };
 }(globalThis));
