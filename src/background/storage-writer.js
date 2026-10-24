@@ -869,6 +869,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
+    if(incoming.provider==='amazon-video'&&previous?.mediaType===incoming.mediaType
+        &&[previous.ownership,incoming.ownership].includes('owned')
+        &&['owned','subscription'].includes(previous.ownership)&&['owned','subscription'].includes(incoming.ownership)){
+      const purchase=incoming.ownership==='owned'?incoming:previous,other=purchase===incoming?previous:incoming;
+      incoming={...incoming,ownership:'owned',metadata:{...incoming.metadata,ownershipEvidence:
+        [...new Set([purchase,other].flatMap(item=>(item.metadata.ownershipEvidence||'').split(' | ')).filter(Boolean))].join(' | ')}};
+    }
     // A sparse Video card is not evidence that an earlier entitlement ended.
     // Source observations stay separate from authoritative user corrections.
     if(incoming.provider==='amazon-video'&&previous?.mediaType===incoming.mediaType

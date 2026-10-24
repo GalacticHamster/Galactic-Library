@@ -251,6 +251,25 @@ export const providerSnapshotTests = [
     await full({...raw,ownership:'rental',metadata:{...raw.metadata,ownershipEvidence:'Rental expires in 2 days'}});
     assert.equal((await pageA.getDatabase()).providerItems[original.id].ownership,'rental');
   })],
+  ['Amazon Video purchases outrank later Prime availability across merge, inferred, confirmed and restored records', () => withWorker(async ({pageA}) => {
+    const prime=id=>({providerItemId:id,title:'Same TV title',mediaType:'tv',ownership:'subscription',metadata:{entityType:'TV Show',ownershipEvidence:'Included with Prime'}});
+    const purchase={...prime('purchase'),ownership:'owned',metadata:{...prime('purchase').metadata,ownershipEvidence:'You purchased this'}};
+    const rows=[prime('purchase'),prime('prime-only')];
+    await pageA.mergeProviderItems('amazon-video',rows);
+    const original=Object.values((await pageA.getDatabase()).providerItems).find(item=>item.providerItemId==='purchase');
+    const inferred=items=>pageA.replaceProviderItems('amazon-video',items,{},completeProviderSnapshot('amazon-video',items,[completedScope('library',items.length,null,'scroll-end',8)]));
+    await inferred([purchase,rows[1]]);
+    await pageA.replaceProviderItems('amazon-video',rows,{},snapshotFixture('amazon-video',rows));
+    for(let n=0;n<2;n++){await pageA.mergeProviderItems('amazon-video',[purchase,rows[1]]);await inferred(rows);}
+    let db=await pageA.getDatabase(),saved=db.providerItems[original.id];
+    assert.equal(saved.ownership,'owned');assert.equal(saved.recordRef,original.recordRef);assert.equal(Object.keys(db.providerItems).length,2);
+    assert(saved.metadata.ownershipEvidence.includes('You purchased this'));assert(saved.metadata.ownershipEvidence.includes('Included with Prime'));
+    assert.equal(Object.values(db.providerItems).find(item=>item.providerItemId==='prime-only').ownership,'subscription');
+    await pageA.saveOwnershipCorrections([{recordRef:saved.recordRef,provider:saved.provider,profileId:saved.profileId,expectedReviewRef:null}],{ownership:'returned'});
+    await inferred(rows);db=await pageA.getDatabase();assert.equal(effectiveOwnershipRecord(db.providerItems[original.id],db).ownership,'returned');
+    await pageA.restoreDatabase(parseBackup(createBackup(db)));db=await pageA.getDatabase();
+    assert.equal(db.providerItems[original.id].ownership,'owned');assert.equal(effectiveOwnershipRecord(db.providerItems[original.id],db).ownership,'returned');
+  })],
   ['Amazon Video inferred reconciliation still rejects malformed complete-snapshot attestations', () => withWorker(async ({pageA}) => {
     const items=[{providerItemId:'one',title:'Retained movie',mediaType:'movie',ownership:'owned'}];
     await pageA.mergeProviderItems('amazon-video',items);const before=await pageA.getDatabase();

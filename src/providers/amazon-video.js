@@ -39,6 +39,11 @@
 
   function ownershipFromCardText(value) {
     const text = compactText(value).toLocaleLowerCase();
+    if (text.includes(' | ')) {
+      const states = new Set(text.split(' | ').map(ownershipFromCardText));
+      if (states.has('unknown') || states.has('owned') && states.has('rental')) return 'unknown';
+      return states.has('owned') ? 'owned' : states.size === 1 ? [...states][0] : 'unknown';
+    }
     if (/^(?:rental(?: expires?\b.*)?|rent until\b.+|rented(?:\b.*)?)\.?$/u.test(text)) return 'rental';
     if (/^(?:you purchased this|purchased(?: in (?:hd|uhd|sd|4k))?|owned)\.?$/u.test(text)) return 'owned';
     if (/^(?:included with (?:your )?(?:prime(?: video)?|subscription)|your subscription includes this)\.?$/u.test(text)) return 'subscription';
@@ -62,7 +67,8 @@
     const states = new Set(recognized.map(ownershipFromCardText));
     // Prime availability can coexist with a purchase of this same product.
     // A rental/purchase contradiction still requires investigation.
-    if (states.has('owned') && !states.has('rental')) return recognized.find(label => ownershipFromCardText(label) === 'owned');
+    if (states.has('owned') && !states.has('rental')) return [recognized.find(label => ownershipFromCardText(label) === 'owned'),
+      recognized.find(label => ownershipFromCardText(label) === 'subscription')].filter(Boolean).join(' | ');
     // Conflicting labels require investigation rather than a guessed purchase.
     return states.size === 1 ? recognized[0] : '';
   }
@@ -121,7 +127,7 @@
     const itemsById = new Map();
     for (const card of cards) {
       const item = amazonVideoItemFromCardData(cardDataFromElement(card));
-      if (item) itemsById.set(item.providerItemId, item);
+      if (item) retainObservation(itemsById, item);
     }
     return [...itemsById.values()];
   }
@@ -133,6 +139,12 @@
 
   function retainObservation(items, item) {
     const previous = items.get(item.providerItemId);
+    if (previous?.mediaType === item.mediaType && [previous.ownership, item.ownership].includes('owned')
+        && ['owned', 'subscription'].includes(previous.ownership) && ['owned', 'subscription'].includes(item.ownership)) {
+      const purchase = item.ownership === 'owned' ? item : previous, other = purchase === item ? previous : item;
+      item = { ...item, ownership: 'owned', metadata: { ...item.metadata, ownershipEvidence:
+        [...new Set([purchase, other].flatMap(record => (record.metadata.ownershipEvidence || '').split(' | ')).filter(Boolean))].join(' | ') } };
+    }
     if (previous && item.ownership === 'unknown' && previous.ownership !== 'unknown') {
       item = { ...item, ownership: previous.ownership, metadata: { ...item.metadata,
         ownershipEvidence: previous.metadata.ownershipEvidence } };
@@ -181,7 +193,10 @@
         if (!sameCard()) { finish(); return; }
         const item = amazonVideoItemFromCardData(cardDataFromElement(card));
         if (item?.providerItemId === expected.providerItemId && item.mediaType === expected.mediaType
-            && item.ownership !== 'unknown') { result = item; finish(); }
+            && item.ownership !== 'unknown') {
+          result = item;
+          if (item.ownership !== 'subscription') finish();
+        }
       };
       const observer = new global.MutationObserver(check);
       observer.observe(global.document.body, { subtree: true, childList: true, characterData: true });
@@ -391,7 +406,7 @@
     };
   }
 
-  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false, readPurchaseLabels = false } = {}) {
+  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false, readPurchaseLabels = true } = {}) {
     diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
       completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
       discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
@@ -437,6 +452,7 @@
   async function scanLibrary(reportProgress, knownItemIds, readOnly, itemsById, readPurchaseLabels) {
     const discovered = new Set(), observedCards = new Set(), hoverAttempted = new Set();
     const incremental = Array.isArray(knownItemIds);
+    const known = new Set(knownItemIds ?? []);
     let phase = 'discovery', quiet = 0, candidate = null, passesRead = 0;
     let sweepSeen = new Set();
     diagnostics.completionStatus = 'uncertain';
@@ -452,7 +468,8 @@
         const enriched = new Map(rendered.map(item => [item.providerItemId, item]));
         for (const card of context.cards) {
           const item = amazonVideoItemFromCardData(cardDataFromElement(card));
-          if (!item || item.ownership !== 'unknown' || hoverAttempted.has(item.providerItemId)) continue;
+          if (!item || !['unknown', 'subscription'].includes(item.ownership) || hoverAttempted.has(item.providerItemId)
+              || incremental && known.has(item.providerItemId) || itemsById.get(item.providerItemId)?.ownership === 'owned') continue;
           hoverAttempted.add(item.providerItemId);
           reportProgress({ passes: pass, movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv, phase: 'purchase-labels' });
           const evidence = await readHoverLabel(card, item);
@@ -578,7 +595,7 @@
     if (diagnostics.completionStatus === 'bounded') return { items, completionConfirmed: false, completionStatus: 'bounded' };
     diagnostics.state = 'uncertain'; diagnostics.reason ??= 'traversal-budget';
     diagnostics.stop = passesRead === MAX_SCROLLS ? 'emergency-budget' : 'verification-not-converged';
-    if (!readOnly) throw new Error(`Amazon Video read ${items.length} titles but could not establish a stable complete traversal. No library changes were saved. Export scan diagnostics and retry after the listing finishes loading.`);
+    if (!readOnly) throw new Error(`Amazon Video read ${items.length} titles but could not establish that the full listing had loaded. No library changes were saved. Retry after the listing finishes loading.`);
     return { items, completionConfirmed: false, completionStatus: 'uncertain' };
   }
 

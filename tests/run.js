@@ -434,6 +434,9 @@ const tests = [
     assert.equal(ownershipFromCardText('Included with your subscription'),'subscription');
     assert.equal(ownershipFromCardText('Included with Prime'),'subscription');
     assert.equal(ownershipFromCardText('Free trial or buy'),'unknown');
+    assert.equal(ownershipFromCardText('You purchased this | Included with Prime'),'owned');
+    assert.equal(ownershipFromCardText('Buy | You purchased this'),'unknown');
+    assert.equal(ownershipFromCardText('Rental | You purchased this'),'unknown');
     const item=(entityType,title)=>amazonVideoItemFromCardData({providerItemId:'test',title,entityType,ownershipEvidence:'You purchased this'});
     assert.equal(item('TV_SEASON','A season').ownership,'owned');
     assert.equal(item('TV_SHOW','A named television product').ownership,'owned');

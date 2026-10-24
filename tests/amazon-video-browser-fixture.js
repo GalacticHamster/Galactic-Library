@@ -16,7 +16,7 @@ async function setup({nested=false,ids=[1,2,3,4],outside='',inside='',total=ids.
  frame.srcdoc=`<!doctype html><style>html,body{margin:0}main{display:block}#list{${nested?'height:180px;overflow-y:auto;':''}}aside,footer,header,nav{position:fixed;right:0;top:0}</style><main>${total===null?'':`<p>All items (${total})</p>`}<div id="list">${ids.map(n=>card(n)).join('')}</div>${inside}</main>${outside}`;
  document.body.append(frame);await ready;
  const win=frame.contentWindow,doc=win.document,list=doc.querySelector('#list');let pauses=0,scrolls=0,onPause=()=>{},onScroll=()=>{};
- win.setTimeout=(callback,ms,...args)=>nativeTimeout(()=>{if(ms===700){pauses++;onPause(pauses);}callback(...args);},ms===700?0:ms);
+ win.setTimeout=(callback,ms,...args)=>nativeTimeout(()=>{if(ms===700){pauses++;onPause(pauses);}callback(...args);},ms===700||ms===600?0:ms);
  const originalScroll=win.scrollTo.bind(win);win.scrollTo=options=>{scrolls++;originalScroll(options);onScroll(scrolls);};
  const originalListScroll=list.scrollTo.bind(list);list.scrollTo=options=>{scrolls++;originalListScroll(options);onScroll(scrolls);};
  win.eval(snapshotCode);win.eval(importerCode);
@@ -113,8 +113,8 @@ try{
  },{once:true});
  const hoverTimer=labels.win.setTimeout;
  labels.win.setTimeout=(callback,ms,...args)=>ms===600?nativeTimeout(callback,10):hoverTimer(callback,ms,...args);
- const hovered=await labels.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true,readPurchaseLabels:true});
- assert(hovered.items.map(item=>item.ownership).join(',')==='owned,owned,unknown,unknown','Opt-in hover acquisition recognizes a movie and a complete season without promoting Buy-only or unresponsive seasons');
+ const hovered=await labels.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true});
+ assert(hovered.items.map(item=>item.ownership).join(',')==='owned,owned,unknown,unknown','Default hover acquisition recognizes a movie and a complete season without promoting Buy-only or unresponsive seasons');
  assert(labels.api.getDiagnostics().hoverChecks.attempted===4&&labels.api.getDiagnostics().hoverChecks.recognized===2,'Hover work is bounded to one attempt per product and reports unavailable evidence without inventing access');
  labels=await setup({ids:[1]});
  labels.list.innerHTML=card(1,{ownership:'<span>You purchased this <em>episode</em></span>'});
@@ -133,6 +133,20 @@ try{
  const afterTv=Object.values((await tvWriter.getDatabase()).providerItems);
  assert(afterTv.filter(item=>item.ownership==='owned').length===2&&afterTv.filter(item=>item.ownership==='subscription').length===1&&afterTv.length===5&&afterTv.every(item=>beforeTv.some(old=>old.id===item.id&&old.recordRef===item.recordRef)),'Existing TV records upgrade without duplicate source identities, including a Prime subscription');
  assert(afterTv.find(item=>item.providerItemId.endsWith('fixture-3')).ownership==='unknown','A purchase on another stable ID does not grant ownership to a same-title TV product');
+ labels=await setup({ids:[5,1,2,3],total:null});
+ labels.list.innerHTML=[5,1,2,3].map(n=>card(n,{ownership:'Buy'})).join('');
+ labels.list.querySelector('article').addEventListener('mouseenter',event=>event.currentTarget.insertAdjacentHTML('beforeend','<span>You purchased this</span>'),{once:true});
+ labels.onPause(n=>{if(n===2)labels.list.innerHTML=[1,2,3,4].map(n=>card(n,{ownership:'Buy'})).join('');});
+ const quick=await labels.api.fetchAmazonVideoLibrary(()=>{},[1,2,3,4].map(n=>'amzn1.dv.gti.fixture-'+n));
+ assert(quick.items.length===1&&quick.items[0].ownership==='owned'&&labels.api.getDiagnostics().hoverChecks.attempted===1,'Default Quick update checks purchase labels for the new product only, not already saved cards');
+ assert(labels.api.getDiagnostics().state==='bounded'&&labels.api.getDiagnostics().passes.length===2,'Quick update still stops at the next wholly known group without a historical traversal');
+ labels=await setup({ids:[1,2],total:null});
+ labels.list.innerHTML=card(1,{ownership:'<span>Included with Prime</span>'})+card(2,{ownership:'<span>You purchased this</span>'});
+ labels.list.querySelector('article').addEventListener('mouseenter',event=>event.currentTarget.insertAdjacentHTML('beforeend','<span>You purchased this</span>'),{once:true});
+ labels.onPause(n=>{if(n===2)labels.list.innerHTML=card(1,{ownership:'<span>Included with Prime</span>'})+card(2,{ownership:'<span>Included with Prime</span>'});});
+ const temporal=await labels.api.fetchAmazonVideoLibrary();
+ assert(temporal.items.every(item=>item.ownership==='owned'&&item.metadata.ownershipEvidence.includes('You purchased this')&&item.metadata.ownershipEvidence.includes('Included with Prime')),'Same-scan Prime then purchase and purchase then Prime both preserve purchase precedence and both source labels');
+ assert(labels.api.getDiagnostics().hoverChecks.attempted===1,'A full verification sweep does not repeat hover work for already confirmed purchases');
  let page=await virtualLibrary({plateau:true});let result=await page.api.fetchAmazonVideoLibrary();
  assert(result.items.length===343&&result.completionStatus==='inferred'&&!result.completionConfirmed,'A delayed 180-item plateau is passed and all 343 virtualized identities converge without a provider total');
  let evidence=page.api.getDiagnostics();
@@ -239,18 +253,23 @@ try{
  await writer.mergeProviderItems('gog',[{providerItemId:'old-game',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);
  const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow,knownIds=[],messages=[];
  page=await setup({inside:'<div role="progressbar"></div>'});
- const renderPanel=()=>{
+ const renderPanel=(diagnostics=false)=>{
   const original=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=original.call(this,options);return shadow;};
   page.win.GalacticSync={send:async request=>{
    messages.push(request.type);
    if(request.type==='GET_PROVIDER_SYNC_STATE')return {ok:true,hasFullBaseline:true,syncState:{knownProviderItemIds:knownIds}};
    if(request.type==='IMPORT_PROVIDER_ITEMS'){imports++;const items=JSON.parse(JSON.stringify(request.items));const database=request.mode==='full'?await writer.replaceProviderItems('amazon-video',items,{syncMode:'full'},JSON.parse(JSON.stringify(request.snapshot))):await writer.mergeProviderItems('amazon-video',items,{syncMode:'incremental'});return {ok:true,movieCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='movie').length,tvCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='tv').length};}
    throw Error('Unexpected message');},failed:async()=>{failures++;}};
-  page.win.eval(panelCode.replace("if (!location.pathname.includes('/gp/video/')",'if (false'));
+  page.win.eval((diagnostics?panelCode.replace('const SHOW_SCAN_DIAGNOSTICS = false;','const SHOW_SCAN_DIAGNOSTICS = true;'):panelCode).replace("if (!location.pathname.includes('/gp/video/')",'if (false'));
   page.win.Element.prototype.attachShadow=original;
  };
  const waitFor=async predicate=>{for(let n=0;n<500;n++){if(predicate())return;await new Promise(resolve=>nativeTimeout(resolve,10));}throw Error('Panel did not finish');};
- renderPanel();assert(shadow.querySelector('details summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'Scan diagnostics is discoverable before importing and export explains availability through its disabled state');
+ renderPanel();
+ assert(!shadow.querySelector('input[type="checkbox"]')&&!shadow.querySelector('details')&&shadow.querySelectorAll('button').length===2,'The ordinary Amazon Video panel shows only Quick update and Full rescan, with no ownership option or diagnostics');
+ shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
+ assert(page.api.getDiagnostics().hoverChecks.enabled&&imports===0&&JSON.stringify(await writer.getDatabase())===before,'Normal Full rescan enables purchase detection automatically and keeps internal sanitized diagnostics on failure');
+ page.doc.querySelector('#galactic-library-amazon-video-importer').remove();failures=0;messages=[];
+ renderPanel(true);assert(shadow.querySelector('details summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'A troubleshooting build retains the existing read-only checks and sanitized export');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
  assert(imports===0&&JSON.stringify(await writer.getDatabase())===before,'A failed production-panel scan sends no import and preserves all saved records');
  assert(!shadow.querySelector('[data-export-diagnostics]').disabled,'A failed scan enables the ordinary UI diagnostic export action');
@@ -268,7 +287,7 @@ try{
  const unseen=JSON.stringify(Object.values((await writer.getDatabase()).providerItems).find(item=>item.providerItemId==='unseen-saved-product'));
  knownIds=['amzn1.dv.gti.fixture-1','amzn1.dv.gti.fixture-2','amzn1.dv.gti.fixture-3','amzn1.dv.gti.fixture-4','unseen-saved-product'];
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===2&&!shadow.querySelector('.status').dataset.busy);
- assert(shadow.querySelector('.status').textContent.includes('inferred end')&&JSON.stringify(Object.values((await writer.getDatabase()).providerItems).find(item=>item.providerItemId==='unseen-saved-product'))===unseen,'Inferred full rescans save observations additively and preserve unseen source identity, metadata and access');
+ assert(shadow.querySelector('.status').textContent.includes('Amazon did not confirm a complete listing')&&JSON.stringify(Object.values((await writer.getDatabase()).providerItems).find(item=>item.providerItemId==='unseen-saved-product'))===unseen,'Inferred full rescans save observations additively and preserve unseen source identity, metadata and access');
  shadow.querySelector('[data-export-diagnostics]').click();const inferred=JSON.parse(await exported.text());
  assert(inferred.completionStatus==='inferred'&&!inferred.completionConfirmed&&inferred.verification.completed,'Export distinguishes inferred convergence from provider-confirmed completeness');
  page.doc.querySelector('main').insertAdjacentHTML('afterbegin','<p>All items (4)</p>');
@@ -284,11 +303,10 @@ try{
  assert(shadow.querySelector('.status').textContent.includes('Newest-title check added 0')&&shadow.querySelector('.status').textContent.includes('Older titles were not fully checked'),'Quick-update UI makes its newest-only limitation explicit even when a legacy baseline was incomplete');
  assert(Object.values((await writer.getDatabase()).providerItems).filter(item=>item.provider==='amazon-video').length===4,'The bounded quick update preserves existing source membership without inventing older missing titles');
  const beforeHoverCheck=JSON.stringify(await writer.getDatabase());messages=[];
- shadow.querySelector('[data-read-purchase-labels]').checked=true;
  shadow.querySelector('[data-mode="inspect"]').click();
- assert(shadow.querySelector('[data-read-purchase-labels]').disabled,'The purchase-label option cannot change during an active scan');
+ assert([...shadow.querySelectorAll('[data-mode]')].every(button=>button.disabled),'Conflicting scan actions remain disabled during a running check');
  await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
- assert(page.api.getDiagnostics().hoverChecks.enabled&&messages.length===0&&JSON.stringify(await writer.getDatabase())===beforeHoverCheck,'The production read-only panel passes the opt-in hover setting without changing stored records');
+ assert(page.api.getDiagnostics().hoverChecks.enabled&&messages.length===0&&JSON.stringify(await writer.getDatabase())===beforeHoverCheck,'The internal read-only check uses automatic ownership extraction without changing stored records');
  const panelTimer=page.win.setTimeout;page.win.setTimeout=(callback,ms,...args)=>ms===15000?nativeTimeout(callback,0):panelTimer(callback,ms,...args);
  shadow.querySelector('[data-mode="ownership"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
  assert(messages.length===0&&page.api.getDiagnostics().state==='purchase-label-check-complete'&&shadow.querySelector('.status').textContent.includes('No library records changed'),'The manual-hover diagnostic is accessible through the panel and cannot begin an import or scan lease');
