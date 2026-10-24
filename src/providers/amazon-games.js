@@ -36,6 +36,10 @@
     return compactText(value).match(/^([a-z0-9-]+)-body$/iu)?.[1] ?? '';
   }
 
+  function isCodeDelivery(value) {
+    return /^(?:claim code|copy code|product key)[.!]?$/iu.test(compactText(value));
+  }
+
   function amazonGamesItemFromCardData(card) {
     const providerItemId = claimEntryId(card?.providerItemId);
     const title = compactText(card?.title);
@@ -43,7 +47,7 @@
     const deliveryTarget = compactText(card?.deliveryTarget);
     if (!providerItemId || !title) return null;
     const delivered = /^delivered[.!]?$/iu.test(delivery);
-    const code = /^(?:claim code|product key)[.!]?$/iu.test(delivery);
+    const code = isCodeDelivery(delivery);
     if (!delivered && card?.collected !== true) return null;
     const direct = delivered && /^amazon games library[.!]?$/iu.test(deliveryTarget);
     if (code || delivered && deliveryTarget && !direct) return null;
@@ -138,7 +142,7 @@
     if (details.deliveryTarget || !needsDestination && details.collected) return details;
     // Expand only the existing claim accordion, never a Claim Code/redeem action.
     if (button?.getAttribute('aria-expanded') !== 'true') {
-      if (/^(?:claim code|claim now|get code|redeem(?: code)?)[.!]?$/iu.test(compactText(button?.textContent))) return details;
+      if (isCodeDelivery(button?.textContent) || /^(?:claim now|get code|redeem(?: code)?)[.!]?$/iu.test(compactText(button?.textContent))) return details;
       button?.click();
     }
     for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -150,11 +154,13 @@
   }
 
   async function amazonGamesItemFromClaimHeader(header, card) {
+    // A known code route is outside the direct Amazon Games library. Reading
+    // its details is unnecessary and must never activate a copy/redeem action.
+    if (isCodeDelivery(card.deliveryText)) return { item: null, reason: 'product-key' };
     const details = await detailsFromClaimHeader(header, /^delivered[.!]?$/iu.test(compactText(card.deliveryText)));
     const item = amazonGamesItemFromCardData({ ...card, ...details });
     const label = compactText(card.deliveryText);
-    const reason = /^(?:claim code|product key)[.!]?$/iu.test(label) ? 'product-key'
-      : /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
+    const reason = /^delivered[.!]?$/iu.test(label) ? (details.deliveryTarget ? 'other-library' : 'unknown-delivery')
         : /^(?:pending|not delivered|processing|awaiting delivery)[.!]?$/iu.test(label) ? 'not-delivered' : 'unknown-delivery';
     if (!item && /^(?:available to claim|not claimed|claim now)[.!]?$/iu.test(label)) return { item: null, reason: 'unclaimed-offer' };
     return { item, reason: item?.ownership === 'claimed' ? 'direct' : reason, evidence: {

@@ -21,13 +21,13 @@ async function setup(windows){
   if(!rows.length)doc.querySelector('#rows').textContent='No games collected';
   for(const row of rows){
    const header=doc.createElement('section');header.dataset.aTarget='accordion-header';
-   const button=doc.createElement('button');button.setAttribute('aria-controls',`${row.id}-body`);button.setAttribute('aria-expanded','false');button.textContent=row.actionButton?'Claim Code':'Details';
+   const button=doc.createElement('button');button.setAttribute('aria-controls',`${row.id}-body`);button.setAttribute('aria-expanded',row.expanded?'true':'false');button.textContent=row.actionButton===true?'Claim Code':row.actionButton||'Details';
    const title=doc.createElement('h3');title.title=row.title??'Synthetic game';title.textContent=title.title;
    const label=doc.createElement('span');label.dataset.aTarget='claim-entry-list_label-text';label.textContent=row.label;
    const body=doc.createElement('pre');body.id=`${row.id}-body`;body.textContent=row.delayed?'Collected on\n2026-01-01':row.body;
    button.onclick=()=>{if(row.actionButton){redemptions++;return;}expansions++;button.setAttribute('aria-expanded','true');if(row.delayed)pending.push({left:2,body,text:row.body});};
    const redeem=doc.createElement('button');redeem.textContent='Claim Code';redeem.onclick=()=>{redemptions++;};body.append(doc.createTextNode('\n'),redeem);
-   header.append(button,title,label,body);doc.querySelector('#rows').append(header);
+   header.append(button,title,label);if(!row.omitBody)header.append(body);doc.querySelector('#rows').append(header);
   }
  };
  for(const id of Object.keys(windows)){
@@ -76,6 +76,14 @@ try{
  page=await setup({'2026':[{...direct,delayed:false},{id:'unsafe-code',label:'Claim Code',body:'',actionButton:true}]});
  const noRedemption=await page.api.fetchAmazonGames();
  assert(page.redemptions()===0&&noRedemption.items.length===1&&noRedemption.diagnostics.productKeyClaims===1,'Even a Claim Code action with aria-controls cannot be clicked as though it were an accordion');
+ const xboxCode={id:'xbox-code',title:'Synthetic external console game',label:'Copy code',body:'Instructions\nFor Xbox Series and Xbox One:\nRedeem\nSYNTHETIC_SECRET_DO_NOT_EXPORT',actionButton:'Copy code',expanded:true,omitBody:true};
+ page=await setup({'2026':[{...direct,delayed:false},xboxCode],'past-3-months':[{...direct,delayed:false},xboxCode]});
+ const codeOnlyRoute=await page.api.fetchAmazonGames();
+ assert(codeOnlyRoute.items.length===1&&codeOnlyRoute.diagnostics.productKeyClaims===1&&page.redemptions()===0,'Copy code with an expanded header and no linked details is excluded without copying or redeeming the code');
+ await save(codeOnlyRoute);db=await writer.getDatabase();
+ assert(!Object.values(db.providerItems).some(item=>item.providerItemId==='xbox-code')&&!JSON.stringify(db).includes('SYNTHETIC_SECRET'),'Full import never saves Copy code as an Amazon or Xbox acquisition and never retains the code');
+ const quickCodeRoute=await page.api.fetchAmazonGames(()=>{},true);
+ assert(quickCodeRoute.items.length===1&&quickCodeRoute.diagnostics.productKeyClaims===1&&page.redemptions()===0,'Quick update applies the same Copy code exclusion without executing its action');
  page=await setup({'2026':[{id:'broken',label:'Unknown',body:''}]});let error;
  try{await page.api.fetchAmazonGames();}catch(value){error=value;}
  assert(error&&/claim information/.test(error.message),'An unfamiliar label without collected or delivered evidence remains a safe failure, not guessed ownership');
