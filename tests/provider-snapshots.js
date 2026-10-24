@@ -192,11 +192,12 @@ export const providerSnapshotTests = [
     const result = await complete.GalacticEpic.fetchEpicGames();
     validateProviderSnapshot('epic', plain(result.items), plain(result.snapshot));
   }],
-  ['Steam unresolved owned apps block full replacement but allow a non-destructive quick merge', async () => {
+  ['Steam unresolved metadata preserves complete owned-ID evidence without inventing catalog records', async () => {
     const context = providerContext('steam-store', async (url) => json(String(url).startsWith('/dynamicstore')
       ? { rgOwnedApps: [1, 2] }
       : { response: { store_items: [{ appid: 1, name: 'Resolved game', type: 0 }] } }));
-    await assert.rejects(context.GalacticSteamStore.fetchOwnedSteamGames(), /could not resolve 1 owned apps/u);
+    const full=await context.GalacticSteamStore.fetchOwnedSteamGames();
+    assert.equal(full.items.length,1);assert.equal(full.applications.appIds.length,2);assert.equal(full.applications.issues.length,1);assert(full.snapshot.complete);
     const quick = await context.GalacticSteamStore.fetchOwnedSteamGames(() => {}, []);
     assert.equal(quick.items.length, 1);
     assert.equal(quick.unresolvedApps.length, 1);

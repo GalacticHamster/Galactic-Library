@@ -4,6 +4,15 @@ Quick update reads Steam's owned-ID list and resolves metadata only for IDs not
 already saved in the selected provider/account. Candidates include retries and
 unsupported types; they are not necessarily new purchases or missing games.
 
+**October 24 update:** The [B4-Steam release entry](1.0-release-checklist.md#b4-steam-complete-ownership-index-with-unavailable-metadata)
+supersedes the former full-import failure behavior described historically below.
+A complete checked application index now saves even when title metadata is
+unavailable. ID-only evidence lives in existing account-scoped provider state,
+outside named catalogs; ordinary game/DLC records still require real metadata.
+Subscription and automatic-grant exceptions remain distinct from ownership.
+New backups retain this import evidence. No fake titles or acquisition dates,
+new permissions, metadata endpoints or storage schema are introduced.
+
 ## Acquisition and demonstrated corrections
 
 1. Read same-origin `/dynamicstore/userdata/` with browser-managed credentials
@@ -18,7 +27,7 @@ unsupported types; they are not necessarily new purchases or missing games.
 3. Query `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/` using
    `input_json`, explicit `ids:[{appid:Number(id)}]`, English/US/realm 1 context,
    and `data_request.include_basic_info:true`. Keep 100 IDs per batch and the
-   existing 500 ms inter-batch delay. No new requests, permissions or login.
+   existing 500 ms inter-batch delay. No new endpoints, permissions or login.
 4. Match `response.store_items[].appid` to requested canonical IDs. For diagnostics
    only, a row without a valid `appid` may be correlated by `id` when `item_type`
    explicitly equals application type 0, `id` is a requested canonical App ID,
@@ -32,7 +41,8 @@ unsupported types; they are not necessarily new purchases or missing games.
    Package/bundle IDs and missing namespaces cannot establish app correlation.
 5. Require explicit type 0 (game) or 4 (DLC) and a usable string name. DLC parent
    IDs are optional relationships, not a saving prerequisite. Ownership evidence
-   comes from membership in the owned-ID selection, not a public metadata lookup.
+   comes from membership in the owned-ID selection with the access exceptions
+   documented in B4-Steam, not a public metadata lookup.
 
 Earlier fixes retain valid neighbors in malformed batches and prevent null types
 from becoming games. The current ID correction is demonstrated offline: owned
@@ -116,7 +126,9 @@ acquisition partition. A status receipt certifies status, not item observations.
 
 ## Aggregate export
 
-1. Open the signed-in Steam Store page with its GL panel.
+1. Open the signed-in [Steam Store troubleshooting page](https://store.steampowered.com/?gl-steam-diagnostics=1).
+   The deliberate `gl-steam-diagnostics=1` URL flag exposes controls hidden from
+   the ordinary panel, without DevTools or a different build.
 2. Expand **Steam diagnostics** and check **Profile the next Quick Update**.
    The status says it is armed for this tab.
 3. Run **Quick update**. The control automatically unchecks at startup; wait
@@ -143,10 +155,12 @@ is independent of detailed profiling.
 
 ## Optional separate App-ID sample
 
-App IDs may reveal part of a Steam library. Samples are never included in ordinary
-timing exports, backups or GL storage. To opt in:
+App IDs may reveal part of a Steam library. The optional diagnostic sample itself
+is page-local and excluded from timing exports and storage. The separate import
+evidence intentionally retains application IDs in account state/backups.
+To opt in to a diagnostic sample:
 
-1. Expand **Steam diagnostics** in the Steam GL panel.
+1. Open the troubleshooting URL above and expand **Steam diagnostics**.
 2. Check **Sample unresolved App IDs on the next update** after reading its
    privacy explanation. This does not enable timing profiling; use the steps above
    for aggregate timing as well.
@@ -177,8 +191,8 @@ unmatched `appid` results with 143 unidentifiable rows, plus 16 unsupported type
 Six shared unresolved IDs checked directly against official public Steam
 returned app placeholders (`appid:0`, empty name, result 15); none recovered via
 public app-details. Two retain Community pages. The remaining 137 failure shapes
-were not retained in the export, so their exact code/visibility remains unproven.
-Version 3 now measures this without exporting private IDs.
+were not retained in export 10. Export 11's aggregate subsequently established
+result 15 and false visibility for all 143, without retaining the complete ID set.
 
 | Candidate fallback | Evidence and decision |
 | --- | --- |
@@ -193,7 +207,8 @@ Official references: [IStoreService](https://partner.steamgames.com/doc/webapi/I
 [IPlayerService](https://partner.steamgames.com/doc/webapi/IPlayerService#GetOwnedGames).
 The export-10 follow-up used only the explicitly shared small sample against
 official public Steam sources, without credentials or third-party lookups.
-This implementation batch makes no additional live provider requests.
+The full-import repair consulted the public Store client code, not a signed-in
+account or additional private application pages.
 
 Unresolved/missing metadata remains retryable, never revoked ownership. Saved
 IDs stop recurring; unsupported types remain candidates because metadata/support
@@ -201,8 +216,10 @@ can change. Future throttling would require account/ID/endpoint-context scope,
 bounded expiry, version invalidation, Full rescan bypass and successful-ID removal.
 That design is deferred: no blacklist or suppression of future acquisitions.
 
-The panel separates owned-list retrieval, imported game/DLC changes, unavailable catalog metadata, IDs with no identifiable response row,
-missing/invalid titles, invalid/conflicting types, unsupported types and request
-failures. Unresolved entries keep the result incomplete. Valid neighbors still
-save incrementally. Eligible unchanged incomplete checks preserve shared receipts,
-cold certificate reuse, success baselines and ownership; no storage change.
+Historically, unresolved entries kept the result incomplete and readable
+neighbors saved only incrementally. B4-Steam supersedes that behavior: a checked
+complete index saves alongside metadata gaps, preserving named records and
+durable source evidence. Detailed partitions remain in deliberate diagnostics;
+ordinary messages summarize identified titles and remaining gaps. Metadata
+network/429/5xx failures get one retry after 500 ms. Authentication, malformed
+responses and explicit unavailable placeholders are not retried in that scan.

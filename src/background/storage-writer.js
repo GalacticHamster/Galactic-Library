@@ -1,4 +1,5 @@
 import {normalizePermanentClaimsDatabase} from '../lib/ownership.js';
+import {validateSteamApplicationImport,steamApplicationAccess} from '../lib/provider-state.js';
 import {identicalCapture} from '../lib/source-history.js';
 import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
@@ -881,6 +882,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return new Map([...groups].filter(([,items])=>items.length===1).map(([id,items])=>[id,items[0]]));
   }
   function preserveEnrichment(incoming, previous,stableSparse=false) {
+    if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
     if(incoming.provider==='amazon-games'&&previous){
@@ -957,6 +959,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    if(provider==='steam'&&syncDetails.syncState?.applications){
+      const applications=validateSteamApplicationImport(values,syncDetails.syncState.applications,[],true);
+      const scope=snapshot.scopes[0];
+      if(snapshot.scopes.length!==1||scope.id!=='library'||scope.end!=='index-complete'||scope.readCount!==applications.appIds.length||scope.expectedCount!==applications.appIds.length)throw Error('Steam owned enumeration is incomplete. Previous records were kept.');
+      // Ownership enumeration is complete even when catalog metadata is not.
+      // Keep ID-only evidence in this account's state, outside named catalogs;
+      // never remove a saved title merely because its metadata cannot be read.
+      return mergeIntoDatabase(provider,values,{...syncDetails,syncState:{applications},snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},authoritativeDatabase,null,beforeSave,completion);
+    }
     if(provider==='amazon-games'&&snapshot.scopes.some(scope=>scope.expectedCount===null))return mergeIntoDatabase(provider,values,{...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,coverageLimit:'inferred-scroll-convergence-preserve-unseen'}},authoritativeDatabase,null,beforeSave,completion);
     // Amazon's count-independent traversal is inferred, not authoritative
     // absence evidence. Reuse additive reconciliation under the same lease,
@@ -1053,12 +1064,27 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='steam'&&syncDetails.syncState?.applications){
+      const applications=validateSteamApplicationImport(values,syncDetails.syncState.applications,Object.values(database.providerItems).filter(item=>item.profileId===profile.profileId),syncDetails.syncMode==='full');
+      const latest=new Set(applications.appIds),prior=profile.state.syncState?.applications;
+      const supplied=new Set(values.map(item=>item.providerItemId)),pending=new Set(applications.issues.map(issue=>issue.appId));
+      if(syncDetails.syncMode!=='full')for(const issue of prior?.issues??[])if(latest.has(issue.appId)&&!pending.has(issue.appId)&&!supplied.has(issue.appId))throw Error('Steam did not recheck a pending application. Previous records were kept.');
+      const earlier=[...new Set([...(prior?.previouslyObservedAppIds??[]),...(prior?.appIds??[]),...(applications.previouslyObservedAppIds??[])])].filter(id=>!latest.has(id)).sort((a,b)=>Number(a)-Number(b));
+      if(earlier.length)applications.previouslyObservedAppIds=earlier;
+      syncDetails={...syncDetails,syncState:{applications}};
+      const accessFor=steamApplicationAccess(applications);
+      const accessUpdates=Object.values(database.providerItems).filter(item=>item.profileId===profile.profileId&&latest.has(item.providerItemId)&&!supplied.has(item.providerItemId)).flatMap(item=>{
+        const {basis,ownership}=accessFor(item.providerItemId);
+        return item.ownership!==ownership||item.metadata.ownershipBasis!==basis?[{...item,ownership,metadata:{...item.metadata,ownershipBasis:basis}}]:[];
+      });
+      if(accessUpdates.length){values=[...values,...accessUpdates];preparedIncoming=null;}
+    }
     const now = new Date().toISOString();
     if(provider==='amazon-games'){values=await prepareAmazonGamesImport(database,profile.profileId,values);preparedIncoming=null;}
     const incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(provider==='amazon-games'&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

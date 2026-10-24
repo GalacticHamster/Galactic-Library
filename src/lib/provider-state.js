@@ -2,6 +2,47 @@ import { PROVIDERS } from './constants.js';
 import { object, text, strings, date, count } from './validation.js';
 import {validateSyncHealth} from './sync-health.js';
 
+const STEAM_METADATA_ISSUES=['unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','http','authentication','malformed','classification','network','other'];
+export function validateSteamApplications(value){
+  object(value,'Steam owned applications');
+  if(value.version!==1||value.source!=='dynamicstore-owned-apps'||value.complete!==true||Object.keys(value).some(k=>!['version','source','complete','appIds','issues','access','previouslyObservedAppIds'].includes(k)))throw Error('Invalid Steam owned application evidence.');
+  const ids=strings(value.appIds,50000,10,'Steam owned App IDs');
+  if(!Array.isArray(value.appIds)||!ids.length||ids.length!==value.appIds.length||ids.some(id=>!/^\d+$/u.test(id)||String(Number(id))!==id||Number(id)<1||Number(id)>0xffffffff))throw Error('Invalid Steam owned application identity.');
+  const owned=new Set(ids),seen=new Set();
+  const accessSeen=new Set(),access=value.access??[];
+  if(!Array.isArray(access)||access.length>ids.length)throw Error('Invalid Steam access evidence.');
+  const accessEvidence=access.map(entry=>{
+    object(entry,'Steam access evidence');
+    if(Object.keys(entry).some(k=>!['appId','basis'].includes(k))||!owned.has(entry.appId)||accessSeen.has(entry.appId)||!['master-subscription','auto-grant'].includes(entry.basis))throw Error('Invalid Steam access evidence.');
+    accessSeen.add(entry.appId);return {appId:entry.appId,basis:entry.basis};
+  }).sort((a,b)=>Number(a.appId)-Number(b.appId));
+  if(!Array.isArray(value.issues)||value.issues.length>ids.length)throw Error('Invalid Steam metadata issues.');
+  const issues=value.issues.map(issue=>{
+    object(issue,'Steam metadata issue');
+    if(Object.keys(issue).some(k=>!['appId','kind','reportedType','title'].includes(k))||!owned.has(issue.appId)||seen.has(issue.appId)||!STEAM_METADATA_ISSUES.includes(issue.kind))throw Error('Invalid Steam metadata issue.');
+    seen.add(issue.appId);const entry={appId:issue.appId,kind:issue.kind};
+    if(issue.reportedType!==undefined){if(!Number.isSafeInteger(issue.reportedType)||Math.abs(issue.reportedType)>100000)throw Error('Invalid Steam application type.');entry.reportedType=issue.reportedType;}
+    if(issue.title!==undefined){entry.title=text(issue.title,500,'Steam application title');if(!entry.title)throw Error('Empty Steam application title.');}
+    return entry;
+  }).sort((a,b)=>Number(a.appId)-Number(b.appId));
+  const previous=value.previouslyObservedAppIds===undefined?[]:strings(value.previouslyObservedAppIds,50000,10,'Earlier Steam App IDs');
+  if(value.previouslyObservedAppIds!==undefined&&(!Array.isArray(value.previouslyObservedAppIds)||previous.length!==value.previouslyObservedAppIds.length||previous.some(id=>!/^\d+$/u.test(id)||String(Number(id))!==id||Number(id)<1||Number(id)>0xffffffff||owned.has(id))))throw Error('Invalid earlier Steam application evidence.');
+  return {version:1,source:'dynamicstore-owned-apps',complete:true,appIds:ids.sort((a,b)=>Number(a)-Number(b)),issues,...(accessEvidence.length?{access:accessEvidence}:{}),...(previous.length?{previouslyObservedAppIds:previous.sort((a,b)=>Number(a)-Number(b))}:{})};
+}
+
+export const steamApplicationAccess=registry=>{
+  const access=new Map((registry.access??[]).map(entry=>[entry.appId,entry.basis]));
+  return id=>{const basis=access.get(id)??'owned-app-index';return {basis,ownership:basis==='master-subscription'?'subscription':basis==='auto-grant'?'unknown':'owned'};};
+};
+
+export function validateSteamApplicationImport(values,evidence,existing=[],full=false){
+  const registry=validateSteamApplications(evidence),owned=new Set(registry.appIds),issues=new Set(registry.issues.map(i=>i.appId)),captured=new Set(),accessFor=steamApplicationAccess(registry);
+  for(const item of values){const id=String(item.providerItemId??'');if(!owned.has(id)||issues.has(id)||captured.has(id)||item.ownership!==accessFor(id).ownership||!['game','game-addon'].includes(item.mediaType))throw Error('Steam application evidence does not match its readable records.');captured.add(id);}
+  if(!full)for(const item of existing)if(owned.has(item.providerItemId)&&!issues.has(item.providerItemId))captured.add(item.providerItemId);
+  if(registry.appIds.some(id=>!captured.has(id)&&!issues.has(id)))throw Error('Steam owned enumeration has unexplained applications. Previous records were kept.');
+  return registry;
+}
+
 export function validateProviderStates(value = {}) {
   object(value,'Provider states');
   return Object.fromEntries(PROVIDERS.filter(provider=>Object.hasOwn(value,provider)).map(provider=>{
@@ -18,6 +59,7 @@ export function validateProviderStates(value = {}) {
     if(state.syncHealth!==undefined)result.syncHealth=validateSyncHealth(state.syncHealth);
     if(state.syncState!==undefined){
       object(state.syncState,'Provider sync state');result.syncState={};
+      if(provider==='steam'&&state.syncState.applications!==undefined)result.syncState.applications=validateSteamApplications(state.syncState.applications);
       if(provider==='humble')result.syncState.knownPurchaseIds=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
       if(provider==='fanatical'){
         const fingerprints=strings(state.syncState.knownOrderFingerprints,50000,64,'Order fingerprints');

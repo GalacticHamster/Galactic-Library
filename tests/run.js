@@ -1,3 +1,4 @@
+import {steamOwnedApplicationTests} from './steam-owned-applications.js';
 import {permanentClaimTests} from './permanent-claims.js';
 import {amazonGamesClaimTests} from './amazon-games-claims.js';
 import {sourceHistoryTests} from './source-history.js';
@@ -637,7 +638,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...permanentClaimTests, ...amazonGamesClaimTests, ...fanaticalNavigationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...steamOwnedApplicationTests, ...permanentClaimTests, ...amazonGamesClaimTests, ...fanaticalNavigationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -648,4 +649,4 @@ for (const [name, run] of [...permanentClaimTests, ...amazonGamesClaimTests, ...
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${permanentClaimTests.length + amazonGamesClaimTests.length + fanaticalNavigationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${steamOwnedApplicationTests.length + permanentClaimTests.length + amazonGamesClaimTests.length + fanaticalNavigationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);

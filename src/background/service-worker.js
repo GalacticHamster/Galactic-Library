@@ -454,10 +454,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             reuseAllowed:profiles.length===1&&profile?.state.connected===true&&Boolean(profile.state.lastSync),
             profiles:profiles.map(p=>({profileId:p.profileId,nickname:p.nickname}))});return;
         }
+        const pendingSteamIds=new Set(request.provider==='steam'?(state.syncState?.applications?.issues??[]).map(issue=>issue.appId):[]);
         const knownProviderItemIds = Object.values(database.providerItems)
           .filter((item) => item.provider === request.provider&&item.profileId===activeId)
           .map((item) => item.providerItemId)
-          .filter(Boolean)
+          .filter(id=>Boolean(id)&&!pendingSteamIds.has(id))
           .slice(0, 50000);
         reply({
           ok: true,
@@ -536,6 +537,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         syncMode: incrementalProvider ? 'incremental' : 'full',
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
       };
+  if(request.provider==='steam'&&request.syncState!==undefined)syncDetails.syncState=request.syncState;
   if(request.scanDiagnostics!==undefined){
     const raw=request.scanDiagnostics;
     if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.incomplete!==undefined&&typeof raw.incomplete!=='boolean'||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}

@@ -14,6 +14,7 @@ function fixture(ids,requests,{owned={ok:true,status:200,body:{rgOwnedApps:ids}}
   for(const file of ['provider-snapshot','steam-store'])vm.runInContext(readFileSync(new URL('../src/providers/'+file+'.js',import.meta.url),'utf8'),context);
   return {S:context.GalacticSteamStore,calls:()=>calls};
 }
+export {fixture as steamOutcomeFixture};
 const response=rows=>({body:{response:{store_items:rows}}});
 const run=(ids,rows)=>fixture(ids,[response(rows)]).S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});
 // Synthetic shape from the observed StoreBrowse failure contract; no user IDs.
@@ -181,26 +182,28 @@ export const steamOutcomeTests=[
    assert.equal(b.newAppCount,1);assert.equal(b.unresolvedApps.length,0);assert.equal(b.unsupportedAppCount,1);assert.equal(b.diagnostics.unsupportedTypes['6'],1);
  }],
  ...[400,401,403,429,500].map(status=>['Steam outcomes: HTTP '+status+' is retained without inventing a session diagnosis',async()=>{
-   const f=fixture([1,2],[{ok:false,status}]),r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);
-   assert.equal(r.failedRequestCount,1);assert.equal(r.diagnostics.httpStatuses[status],1);assert.equal(r.diagnostics.outcomes[[401,403].includes(status)?'authentication':'http'],2);
+   const f=fixture([1,2],[{ok:false,status},{ok:false,status}]),r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);
+   const attempts=status===429||status>=500?2:1;
+   assert.equal(r.failedRequestCount,attempts);assert.equal(r.diagnostics.httpStatuses[status],attempts);assert.equal(r.diagnostics.outcomes[[401,403].includes(status)?'authentication':'http'],2);
    assert.equal(r.diagnostics.firstFailure.httpStatus,status);assert.match(r.failureSummary,new RegExp(String(status)));
  }]),
  ['Steam outcomes: malformed JSON, malformed envelope and network failures remain distinct',async()=>{
    for(const [request,kind] of [[{jsonError:true},'malformed'],[{body:{error:'PRIVATE RESPONSE'}},'malformed'],[{networkError:true},'network']]){
-     const r=await fixture([1],[request]).S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);assert.equal(r.diagnostics.outcomes[kind],1);
+     const r=await fixture([1],[request,request]).S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);assert.equal(r.diagnostics.outcomes[kind],1);
      if(kind==='malformed')assert.equal(r.diagnostics.firstFailure.httpStatus,200);else assert.equal(r.diagnostics.firstFailure.httpStatus,undefined);
      assert(!r.failureSummary.includes('PRIVATE'));
    }
  }],
  ['Steam outcomes: batches reconcile attempted IDs, unique unresolved IDs, request statuses and valid saves independently',async()=>{
-   const ids=Array.from({length:159},(_,i)=>i+1),f=fixture(ids,[{ok:false,status:400},{ok:false,status:429}]);
+   const ids=Array.from({length:159},(_,i)=>i+1),f=fixture(ids,[{ok:false,status:400},{ok:false,status:429},{ok:false,status:429}]);
    const r=await f.S.fetchOwnedSteamGames(()=>{},[],{diagnostics:true});reconcile(r);
-   assert.equal(r.newAppCount,159);assert.equal(r.unresolvedApps.length,159);assert.equal(r.failedRequestCount,2);assert.equal(r.diagnostics.titleRequests,2);
-   assert.equal(r.diagnostics.outcomes.http,159);assert.equal(f.calls(),2);
+   assert.equal(r.newAppCount,159);assert.equal(r.unresolvedApps.length,159);assert.equal(r.failedRequestCount,3);assert.equal(r.diagnostics.titleRequests,3);
+   assert.equal(r.diagnostics.outcomes.http,159);assert.equal(f.calls(),3);
  }],
- ['Steam outcomes: full failures preserve diagnostic evidence and never return a replacement snapshot',async()=>{
+ ['Steam outcomes: full metadata failures retain owned IDs separately from readable catalog records',async()=>{
    for(const request of [{ok:false,status:403},response([{appid:1,type:null}])]){
-     await assert.rejects(fixture([1],[request]).S.fetchOwnedSteamGames(()=>{},null,{diagnostics:true}),e=>Boolean(e.steamDiagnostics?.firstFailure));
+     const result=await fixture([1],[request]).S.fetchOwnedSteamGames(()=>{},null,{diagnostics:true});
+     assert(result.diagnostics.firstFailure);assert.equal(result.applications.issues.length,1);assert.equal(result.items.length,0);assert(result.snapshot.complete);
    }
  }],
  ['Steam outcomes: owned-list failures are distinguished before any title requests',async()=>{

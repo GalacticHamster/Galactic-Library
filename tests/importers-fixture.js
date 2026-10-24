@@ -157,7 +157,7 @@ try{
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
       if(request.type==='COMMIT_PROVIDER_SCAN'){
         if(rejectCommit)return {ok:false,error:'Synthetic save rejection'};
-        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics},request.snapshot,request.scanToken,1);
+        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics,...(provider==='steam'&&request.syncState?.applications?{syncState:request.syncState}:{})},request.snapshot,request.scanToken,1);
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state,changes:state.syncHealth?.differences};
       }
       if(request.type==='GL_PROVIDER_UI_TIMING'){providerTimings.push(request.timing);return {ok:true};}
@@ -205,10 +205,10 @@ try{
       const shadow=shadows.at(-1);shadow.querySelector('button[data-mode="incremental"]').click();
       await wait(()=>providerTimings.length>timingBefore&&!shadow.querySelector('.status').dataset.busy);
       const text=shadow.querySelector('.status').textContent,diagnostic=providerTimings.at(-1)?.steamDiagnostics;
-      assert(/incomplete; no readable games or DLC saved/iu.test(text)&&text.includes('HTTP 400')&&text.includes('159 unresolved App IDs will be retried'),'Steam incomplete UI hides its actual result');
+      assert(text.includes('Quick update complete')&&text.includes('159 applications still need title or type information')&&!text.includes('HTTP 400'),'Steam metadata-only gaps are not explained as saved access evidence');
       assert(diagnostic?.outcomes.http===159&&diagnostic.saveState==='committed'&&diagnostic.savedCount===0,'Steam aggregate outcomes or save boundary absent');
       assert(!JSON.stringify(diagnostic).includes('PRIVATE')&&JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Steam diagnostics leaked raw data or altered saved records');
-      checks.push('Steam opt-in incomplete diagnostics reconcile 159 HTTP failures, zero saved IDs and a concrete safe error without leaking titles or IDs');
+      checks.push('Steam metadata-only completion retains detailed failed-request diagnostics without leaking technical errors or private fields into normal UI');
       rejectCommit=true;
       globalThis.GalacticSteamStore.fetchOwnedSteamGames=async()=>({items:[{providerItemId:'777',title:'Save rejection fixture',mediaType:'game',ownership:'owned'}],newAppCount:1,unresolvedApps:[],failedRequestCount:0,unsupportedAppCount:0,diagnostics:{ownedListRead:true,ownedIdCount:1,candidateCount:1,attemptedCount:1,titleRequests:1,failedRequests:0,unresolvedCount:0,malformedRows:0,outcomes:{games:1},httpStatuses:{200:1},unsupportedTypes:{}}});
       const beforeRejected=providerTimings.length;shadow.querySelector('button[data-mode="incremental"]').click();
@@ -228,7 +228,7 @@ try{
         checkbox.click();const sampleTiming=providerTimings.length;shadow.querySelector('button[data-mode="incremental"]').click();
         await wait(()=>providerTimings.length>sampleTiming&&!shadow.querySelector('.status').dataset.busy);
         const resultText=shadow.querySelector('.status').textContent,aggregate=providerTimings.at(-1).steamDiagnostics;
-        for(const label of ['Owned App-ID list read','Steam catalog entries reported unavailable: 1','Requested IDs with no identifiable response row: 1','Returned entries without titles: 1','Entries with invalid title data: 1','Entries without a valid application type: 1','IDs with conflicting returned entries: 1','App IDs with unsupported types: 1'])assert(resultText.includes(label),'Missing outcome text: '+label);
+        assert(resultText.includes('6 applications still need title or type information')&&resultText.includes('1 other application is saved separately')&&!/App-ID|conflicting returned|parser|HTTP/iu.test(resultText),'Normal Steam status must distinguish unidentified metadata without developer terminology');
         assert(aggregate?.outcomes.absent===1&&aggregate.outcomes.missingTitle===1&&aggregate.outcomes.unavailable===1&&aggregate.requests[0].matchedIdCount===5&&aggregate.requests[0].placeholderRowCount===1,'Detailed aggregate split/request counts absent');
         assert(!JSON.stringify(aggregate).includes('PRIVATE')&&!aggregate.samples,'Ordinary timing included private samples');
         assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===before,'Unresolved metadata changed saved ownership');

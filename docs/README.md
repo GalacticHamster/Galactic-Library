@@ -39,6 +39,7 @@ Start with the [project overview](../README.md) and [privacy policy](../PRIVACY.
 - [Audit tooling and private-input reproduction](development/audit-tooling.md)
 - [PlayStation/Nintendo signed-in web validation](development/console-web-validation.md)
 - [Provider performance and Steam outcome diagnostics](development/steam-outcome-diagnostics.md)
+- [Deferred importer resilience hardening](development/importer-resilience-hardening.md)
 - [Provider profiling and cold-worker benchmarks](development/provider-performance.md)
 - [Selected historical engineering investigations](audits/README.md)
 

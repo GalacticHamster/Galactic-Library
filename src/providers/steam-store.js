@@ -69,7 +69,7 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function fetchStoreItems(batch) {
+  async function requestStoreItems(batch) {
     const input = {
       ids: batch.map((appid) => ({ appid: Number(appid) })),
       context: { language: 'english', country_code: 'US', steam_realm: 1 },
@@ -84,6 +84,16 @@
     return {body,status:response.status};
   }
 
+  async function fetchStoreItems(batch,onRetry){
+    for(let attempt=0;;attempt++){
+      try{return await requestStoreItems(batch);}
+      catch(error){
+        if(attempt||!(error.steamFailure==='network'||error.steamFailure==='http'&&(error.httpStatus===429||error.httpStatus>=500)))throw error;
+        onRetry(error);await wait(500);
+      }
+    }
+  }
+
   async function fetchOwnedSteamGames(reportProgress = () => {}, knownAppIds = null,{diagnostics=false}={}) {
     const generation=++sampleGeneration,sample=sampling?{groups:{}}:null;lastSample=null;
     try{return await acquireOwnedSteamGames(reportProgress,knownAppIds,{diagnostics},sample);}
@@ -96,22 +106,35 @@
       ownedStatus=ownedResponse.status;
       if(!ownedResponse.ok)throw failure([401,403].includes(ownedStatus)?'authentication':'http',ownedStatus);
       try{account=await ownedResponse.json();}catch{throw failure('malformed',ownedStatus);}
-      if(!Array.isArray(account?.rgOwnedApps)||account.rgOwnedApps.some(id=>!appId(id)))throw failure('malformed',ownedStatus);
+      if(!Array.isArray(account?.rgOwnedApps)||account.rgOwnedApps.length>50000||account.rgOwnedApps.some(id=>!appId(id))
+        ||account.success===false||account.bLoggedIn===false||account.complete===false||account.has_more===true)throw failure('malformed',ownedStatus);
+      for(const key of ['rgMasterSubApps','rgAutoGrantApps'])if(account[key]!==undefined&&(!Array.isArray(account[key])||account[key].length>50000||account[key].some(id=>!appId(id))))throw failure('malformed',ownedStatus);
     }catch(error){
       error.message=error.steamFailure==='malformed'?'Steam returned a malformed owned-App-ID list. No library changes were saved.':error.httpStatus?'Steam owned-App-ID list returned HTTP '+error.httpStatus+'. No library changes were saved.':'Steam owned-App-ID list could not be read. No library changes were saved.';
       if(diagnostics)error.steamDiagnostics={outcomeVersion:3,ownedListRead:false,ownedIdCount:0,candidateCount:0,attemptedCount:0,titleRequests:0,failedRequests:0,unresolvedCount:0,malformedRows:0,outcomes:{},httpStatuses:{},unsupportedTypes:{},firstFailure:{stage:'owned-list',kind:error.steamFailure??'other',...(error.httpStatus?{httpStatus:error.httpStatus}:{})}};
       throw error;
     }
     const appIds = ownedAppIdsFromDynamicStore(account);
+    const subscriptions=new Set((account.rgMasterSubApps??[]).map(appId)),autoGrants=new Set((account.rgAutoGrantApps??[]).map(appId));
+    const access=appIds.flatMap(id=>subscriptions.has(id)?[{appId:id,basis:'master-subscription'}]:autoGrants.has(id)?[{appId:id,basis:'auto-grant'}]:[]).sort((a,b)=>Number(a.appId)-Number(b.appId));
     if (!appIds.length) throw new Error('Steam Store did not return owned apps. Confirm you are signed in to Steam Store in this tab.');
     const incremental = Array.isArray(knownAppIds);
     const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
 
     const itemsById = new Map();
-    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),types={},httpStatuses={},requests=[],placeholderResultCodes={},placeholderVisibility={};let failedRequestCount=0,titleRequests=0,malformedRows=0,firstFailure=null;
+    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),issueEvidence=new Map(),types={},httpStatuses={},requests=[],placeholderResultCodes={},placeholderVisibility={};let failedRequestCount=0,titleRequests=0,malformedRows=0,firstFailure=null;
     const countCode=(counts,code)=>{let key=Number.isSafeInteger(code)&&Math.abs(code)<=100000?String(code):'other';if(!Object.hasOwn(counts,key)&&Object.keys(counts).length>=31)key='other';counts[key]=(counts[key]??0)+1;};
     const observeFailure=value=>{firstFailure??={stage:'titles',kind:value.kind,...(value.httpStatus?{httpStatus:value.httpStatus}:{})};};
-    const outcome=(id,kind,item,returnedEntry)=>{outcomes.set(id,kind);sampleOutcome(sample,id,kind,item,returnedEntry);};
+    const outcome=(id,kind,item,returnedEntry)=>{
+      outcomes.set(id,kind);sampleOutcome(sample,id,kind,item,returnedEntry);
+      if(['games','dlc'].includes(kind))issueEvidence.delete(id);
+      else{
+        const entry={appId:id,kind},type=appType(item?.type),name=titleText(item?.name);
+        if(type!==null&&Math.abs(type)<=100000)entry.reportedType=type;
+        if(name&&name.length<=500)entry.title=name;
+        issueEvidence.set(id,entry);
+      }
+    };
     const unresolved=(id,kind,status,item,returnedEntry)=>{outcome(id,kind,item,returnedEntry);unresolvedById.set(id,{appId:id,status:failureLabel({kind,httpStatus:status})});observeFailure({kind,httpStatus:status});};
     const aggregate=()=>({outcomeVersion:3,ownedListRead:true,ownedIdCount:appIds.length,candidateCount:appIdsToResolve.length,attemptedCount:outcomes.size,titleRequests,failedRequests:failedRequestCount,unresolvedCount:unresolvedById.size,malformedRows,
       outcomes:Object.fromEntries(OUTCOMES.map(kind=>[kind,[...outcomes.values()].filter(value=>value===kind).length])),httpStatuses,unsupportedTypes:types,placeholderResultCodes,placeholderVisibility,requests,requestSamplesDropped:Math.max(0,titleRequests-requests.length),...(firstFailure?{firstFailure}:{})});
@@ -121,7 +144,10 @@
       const requestCounts={requestedCount:batch.length};
       try {
         titleRequests++;
-        const {body,status}=await fetchStoreItems(batch);
+        const {body,status}=await fetchStoreItems(batch,error=>{
+          titleRequests++;failedRequestCount++;
+          if(diagnostics&&error.httpStatus)httpStatuses[error.httpStatus]=(httpStatuses[error.httpStatus]??0)+1;
+        });
         if(Number.isInteger(status)&&status>=100&&status<=599)requestCounts.httpStatus=status;
         requestCounts.returnedRowCount=body.response.store_items.length;requestCounts.unexpectedRowCount=0;requestCounts.malformedRowCount=0;requestCounts.duplicateRowCount=0;requestCounts.matchedRowCount=0;requestCounts.placeholderRowCount=0;requestCounts.unavailableCount=0;requestCounts.conflictingIdCount=0;
         if(diagnostics&&Number.isInteger(status)&&status>=100&&status<=599)httpStatuses[status]=(httpStatuses[status]??0)+1;
@@ -165,6 +191,8 @@
           if(typeof item.name!=='string'){unresolved(id,'invalidTitle',undefined,item,true);continue;}
           const parsed=libraryItemsFromStoreItems({response:{store_items:[item]}},requested)[0];
           if(!parsed){unresolved(id,'classification',undefined,item,true);continue;}
+          parsed.ownership=subscriptions.has(id)?'subscription':autoGrants.has(id)?'unknown':'owned';
+          parsed.metadata.ownershipBasis=subscriptions.has(id)?'master-subscription':autoGrants.has(id)?'auto-grant':'owned-app-index';
           itemsById.set(id,parsed);outcome(id,type===0?'games':'dlc',item,true);
           }catch{
             // A parser fault belongs to this ID, never to its HTTP request or
@@ -178,18 +206,16 @@
         if(error.httpStatus)requestCounts.httpStatus=error.httpStatus;
         if(diagnostics&&error.httpStatus)httpStatuses[error.httpStatus]=(httpStatuses[error.httpStatus]??0)+1;
         for(const appId of batch)if(!outcomes.has(appId))unresolved(appId,kind,error.httpStatus);
-        if(!incremental){if(diagnostics&&requests.length<32)requests.push(requestCounts);throw Object.assign(new Error(`${error.message} The full Steam snapshot was not replaced.`),diagnostics?{steamDiagnostics:aggregate()}:{});}
       }
       if(diagnostics&&requests.length<32)requests.push(requestCounts);
       reportProgress({ completed: offset + batch.length, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
       if (offset + STORE_ITEMS_BATCH_SIZE < appIdsToResolve.length) await wait(BETWEEN_BATCHES_MS);
     }
-    if (!incremental && ![...itemsById.values()].some((item) => item.mediaType === 'game')) throw Object.assign(new Error('Steam returned owned apps but no game titles. Please try again later.'),diagnostics?{steamDiagnostics:aggregate()}:{});
     const unresolvedApps=[...unresolvedById.values()];
-    if (!incremental && unresolvedApps.length) throw Object.assign(new Error(`Steam could not resolve ${unresolvedApps.length} owned apps. A complete full replacement is unavailable; previous records were kept. Quick update can still add readable new apps.`),diagnostics?{steamDiagnostics:aggregate()}:{});
     const items = [...itemsById.values()];
     const metadataOutcomes=Object.fromEntries(OUTCOMES.map(kind=>[kind,[...outcomes.values()].filter(value=>value===kind).length]));
-    return { items, unresolvedApps, failedRequestCount,unsupportedAppCount:unsupportedIds.size,metadataOutcomes,...(firstFailure?{failureSummary:failureLabel(firstFailure)}:{}),...(diagnostics?{diagnostics:aggregate()}:{}),ownedAppIds: appIds, newAppCount: appIdsToResolve.length, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('steam', items, [global.GalacticProviderSnapshot.completedScope('library', appIds.length, appIds.length, 'index-complete', Math.max(1, Math.ceil(appIds.length / STORE_ITEMS_BATCH_SIZE)))]) };
+    const applications={version:1,source:'dynamicstore-owned-apps',complete:true,appIds:[...appIds].sort((a,b)=>Number(a)-Number(b)),issues:[...issueEvidence.values()].sort((a,b)=>Number(a.appId)-Number(b.appId)),...(access.length?{access}:{})};
+    return { items, applications, unresolvedApps, failedRequestCount,unsupportedAppCount:unsupportedIds.size,metadataOutcomes,...(firstFailure?{failureSummary:failureLabel(firstFailure)}:{}),...(diagnostics?{diagnostics:aggregate()}:{}),ownedAppIds: appIds, newAppCount: appIdsToResolve.length, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('steam', items, [global.GalacticProviderSnapshot.completedScope('library', appIds.length, appIds.length, 'index-complete', Math.max(1, Math.ceil(appIds.length / STORE_ITEMS_BATCH_SIZE)))]) };
   }
 
   global.GalacticSteamStore = { ownedAppIdsFromDynamicStore, newOwnedAppIds, libraryItemsFromStoreItems, fetchOwnedSteamGames,setDiagnosticSampling,getDiagnosticSample };

@@ -18,6 +18,8 @@ export function validateOwnershipPolicy(value) {
 export function providerOwnership(provider, ownership, metadata) {
   ownership=normalizeOwnership(ownership);
   if(['returned','revoked','expired'].includes(ownership))return ownership;
+  if(provider==='steam'&&metadata?.ownershipBasis==='master-subscription')return 'subscription';
+  if(provider==='steam'&&metadata?.ownershipBasis==='auto-grant')return 'unknown';
   if(provider==='kindle'){
     const access=globalThis.GalacticKindleOwnership.classify(metadata??{});
     if(['returned-access','revoked-access','expired-access','inactive-access','conflicting-access-evidence'].includes(access.basis))return access.ownership;
@@ -49,6 +51,7 @@ export function effectiveOwnershipRecord(item,database={},now=Date.now(),{ignore
   const observed=providerOwnership(item.provider,item.ownership,item.metadata);
   if(terminal(item.ownership)||terminal(observed))return {...item,ownership:terminal(observed)?observed:item.ownership};
   if(item.provider==='kindle'&&observed==='unknown'&&observed!==item.ownership)item={...item,ownership:observed};
+  if(item.provider==='steam'&&observed!==item.ownership)item={...item,ownership:observed};
   const policy=database.ownershipPolicy;
   if(!ignoreOverride&&(policy?.allOwned===true||policy?.providers?.[item.provider]===true)){
     return {...item,ownership:'owned',ownershipOverride:{observedOwnership:item.ownership,
