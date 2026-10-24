@@ -281,6 +281,17 @@ const tests = [
     });
     assert.equal(nextCursorFromPage(page), 'next-page');
   }],
+  ['Amazon Games delivery uncertainty never establishes direct access or external redemption', () => {
+    const row={providerItemId:'synthetic-body',title:'Synthetic game',collected:true};
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Claim Code'}),null);
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Product Key'}),null);
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Delivered',deliveryTarget:'Epic Games Store library'}),null);
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Not delivered',deliveryTarget:'Amazon Games library'}).ownership,'unknown');
+    assert.equal(amazonGamesItemFromCardData({...row,deliveryText:'Unfamiliar delivery'}).ownership,'unknown');
+    assert.equal(amazonGamesItemFromCardData({...row,collected:false,deliveryText:'Unfamiliar delivery'}),null);
+    assert.equal(deliveryTargetFromText('Delivered to\nAmazon Games library'),'Amazon Games library');
+    assert.equal(deliveryTargetFromText('Sent to: Epic Games Store library'),'Epic Games Store library');
+  }],
   ['keeps delivered Amazon Games claims from the Luna collection', () => {
     assert.deepEqual(amazonGamesItemFromCardData({
       providerItemId: 'f768b9eab0028c35991883bc9e3afbce-1-body', title: 'Wall World 2',

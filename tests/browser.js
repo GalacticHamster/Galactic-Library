@@ -17,6 +17,7 @@ const narrow=process.argv.includes('--narrow');
 const medium=process.argv.includes('--medium'),tiny=process.argv.includes('--tiny'),width=tiny?420:narrow?560:medium?820:1200;
 const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
 const amazonVideoMode=process.argv.includes('--amazon-video');
+const amazonGamesMode=process.argv.includes('--amazon-games');
 const audibleMode=process.argv.includes('--audible');
 const importerMode=process.argv.includes('--importers');
 const koboMode=process.argv.includes('--kobo');
@@ -62,7 +63,7 @@ const server=createServer(async(request,response)=>{
       if(pathname==='/src/ui/options.js')body=body.toString().replace("if(workspace.workspace==='providers')providerAccountsView.update(database);",'providerAccountsView.update(database);').replace("if(workspace.workspace==='ownership')renderDuplicateReview();",'renderDuplicateReview();');
       if(pathname==='/src/ui/contents-workspace.js')body=body.toString().replace('if(!active&&!selected)return;','');
     }
-    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${amazonVideoMode?'amazon-video-browser-fixture':audibleMode?'audible-pagination-browser-fixture':sourceHistoryMode?'source-history-browser-fixture':contentsQueueMode?'contents-queue-browser-fixture':contentsReviewMode?'contents-review-browser-fixture':compactMode?'compact-library-browser-fixture':reconciliationMode?'manual-reconciliation-browser-fixture':paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
+    if(pathname==='/options.html')body=body.toString().replace('src="src/ui/options.js"',`src="tests/${amazonGamesMode?'amazon-games-browser-fixture':amazonVideoMode?'amazon-video-browser-fixture':audibleMode?'audible-pagination-browser-fixture':sourceHistoryMode?'source-history-browser-fixture':contentsQueueMode?'contents-queue-browser-fixture':contentsReviewMode?'contents-review-browser-fixture':compactMode?'compact-library-browser-fixture':reconciliationMode?'manual-reconciliation-browser-fixture':paginationMode?'pagination-browser-fixture':operationMode?'operation-feedback-browser-fixture':polishMode?'ui-polish-browser-fixture':libraryBrowseMode?'library-browse-browser-fixture':itemDetailsMode?'item-details-browser-fixture':contentsDeepLinkMode?'contents-deep-link-browser-fixture':contentsUxMode?'contents-ux-browser-fixture':uxMode?'providers-ux-browser-fixture':'browser-fixture'}.js"`);
     response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(target)]||'application/octet-stream');
     response.end(body);
   }catch(error){response.writeHead(404);response.end(error.message);}
@@ -78,9 +79,9 @@ try{
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};
-  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:largeFixtureMode?180000:(importerMode||amazonVideoMode)?90000:30000,maxBuffer:4*1024*1024},resolve);});
+  const exited=new Promise(resolve=>{child=execFile(browser,args,{env,windowsHide:true,timeout:largeFixtureMode?180000:(importerMode||amazonVideoMode||amazonGamesMode)?90000:30000,maxBuffer:4*1024*1024},resolve);});
   let timeout;
-  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,largeFixtureMode?150000:(importerMode||amazonVideoMode)?60000:20000);})]);}
+  try{await Promise.race([fixtureFinished,exited,new Promise(resolve=>{timeout=setTimeout(resolve,largeFixtureMode?150000:(importerMode||amazonVideoMode||amazonGamesMode)?60000:20000);})]);}
   finally{clearTimeout(timeout);child?.kill();await exited;}
   assert.ok(result,'The browser did not finish the UI fixture.');
   const requestedOutput=process.argv.find(value=>value.startsWith('--output='))?.slice(9);

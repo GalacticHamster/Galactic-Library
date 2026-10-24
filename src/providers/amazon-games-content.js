@@ -9,36 +9,49 @@
   const shadow = host.attachShadow({ mode: 'closed' });
   shadow.innerHTML = `
     <style>.panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }</style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> scans Amazon's past-three-month claims window. <strong>Full rescan</strong> scans every available calendar year. Only games delivered to the Amazon Games library are recorded.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
-  const buttons = [...shadow.querySelectorAll('button')];
+    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> scans Amazon's past-three-month claims window. <strong>Full rescan</strong> scans every available calendar year. Code claims and deliveries to other stores are excluded. Unclear delivery details are kept unconfirmed.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><button type="button" data-export-report hidden>Export scan report</button><p class="status" role="status"></p></div>`;
+  const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
+  const exportButton = shadow.querySelector('[data-export-report]');
 
   async function sync(mode) {
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
+    exportButton.hidden = true;
+    let scanStarted = false;
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'amazon-games' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Amazon Games sync state.');
       const ageMs = Date.now() - Date.parse(state.lastSuccessfulSyncAt || '');
       const fullRescan = mode === 'full' || !state.hasFullBaseline || !Number.isFinite(ageMs) || ageMs > 70 * 24 * 60 * 60 * 1000;
-      if (fullRescan && mode !== 'full') status.textContent = state.hasFullBaseline ? 'Your last Amazon Games sync is over 70 days old; scanning all years to avoid a gap…' : 'No full Amazon Games baseline yet; scanning every year once…';
-      const { items, diagnostics, snapshot } = await globalThis.GalacticAmazonGames.fetchAmazonGames(({ timeWindow, windowsRead, windowsTotal, passes, games, cardsRead, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, loadMoreActivations }) => {
-        status.textContent = `Reading Amazon Games collection: ${timeWindow} (${windowsRead}/${windowsTotal} date ranges); ${passes} scan pass${passes === 1 ? '' : 'es'}; ${games} direct Amazon Games title${games === 1 ? '' : 's'} found from ${cardsRead} checked claim${cardsRead === 1 ? '' : 's'}${otherLibraryClaims ? `; ${otherLibraryClaims} sent to another store` : ''}${productKeyClaims ? `; ${productKeyClaims} product-key claim${productKeyClaims === 1 ? '' : 's'}` : ''}${duplicateAmazonClaims ? `; ${duplicateAmazonClaims} duplicate card${duplicateAmazonClaims === 1 ? '' : 's'} collapsed` : ''}${loadMoreActivations ? `; opened ${loadMoreActivations} more batch${loadMoreActivations === 1 ? '' : 'es'}` : ''}.`;
+      if (fullRescan && mode !== 'full') status.textContent = state.hasFullBaseline ? 'Your last Amazon Games sync is over 70 days old; scanning all years to avoid a gap…' : 'No complete Amazon Games import yet; checking all years…';
+      scanStarted = true;
+      const { items, diagnostics, snapshot } = await globalThis.GalacticAmazonGames.fetchAmazonGames(({ totalGames }) => {
+        status.textContent = `Checking your Amazon Games collection: ${totalGames} game entries found.`;
       }, !fullRescan);
-      if (!items.length && fullRescan) throw new Error('No delivered Amazon Games claims were found. Open My Collection, select Games, and wait for it to load.');
-      status.textContent = items.length ? `Saving ${items.length} Amazon Games claim${items.length === 1 ? '' : 's'} locally...` : 'No new direct Amazon Games titles; recording the completed check...';
+      if (!items.length && fullRescan) throw new Error('No Amazon Games library entries were found. Code claims and deliveries to other stores are excluded. Select Games in My Collection and wait for it to load before retrying. No library records were replaced.');
+      status.textContent = items.length ? `Saving ${items.length} Amazon Games claim${items.length === 1 ? '' : 's'} locally...` : 'Recording the completed Amazon Games check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-games', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Games import did not complete.');
-      const scope = fullRescan ? `Full rescan saved ${response.gameCount} direct Amazon Games title${response.gameCount === 1 ? '' : 's'} from ${diagnostics.windowsRead} date range${diagnostics.windowsRead === 1 ? '' : 's'}` : `Quick update checked Amazon's past-three-month window and found ${items.length} new direct title${items.length === 1 ? '' : 's'}`;
-      status.textContent = `${scope}.${diagnostics.emptyRanges ? ` ${diagnostics.emptyRanges} date range${diagnostics.emptyRanges === 1 ? ' had' : 's had'} no claims.` : ''}${diagnostics.otherLibraryClaims ? ` ${diagnostics.otherLibraryClaims} claim${diagnostics.otherLibraryClaims === 1 ? ' was' : 's were'} sent directly to another game library, such as Epic, so ${diagnostics.otherLibraryClaims === 1 ? 'it is' : 'they are'} not Amazon Games titles.` : ''}${diagnostics.productKeyClaims ? ` ${diagnostics.productKeyClaims} claim${diagnostics.productKeyClaims === 1 ? ' used' : 's used'} a product key, such as GOG; sync that store after redemption to track ${diagnostics.productKeyClaims === 1 ? 'it' : 'them'}.` : ''}${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates ? ` ${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates} repeated Amazon claim card${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates === 1 ? ' was' : 's were'} the same title and ${diagnostics.duplicateAmazonClaims + diagnostics.crossWindowDuplicates === 1 ? 'was' : 'were'} combined.` : ''}${diagnostics.unreadableCards ? ` ${diagnostics.unreadableCards} claim${diagnostics.unreadableCards === 1 ? ' used' : 's used'} another delivery method that Amazon does not identify as a direct Amazon Games library title, so ${diagnostics.unreadableCards === 1 ? 'it was' : 'they were'} left out.` : ''}`;
+      const scope = fullRescan ? `Full import complete. ${response.gameCount} Amazon Games entries saved.`
+        : `Recent claims checked. ${items.length} Amazon Games entries refreshed; earlier entries were kept.`;
+      status.textContent = `${scope}${diagnostics.otherLibraryClaims || diagnostics.productKeyClaims ? ' Code claims and deliveries to other stores were not added.' : ''}${diagnostics.unreadableCards ? ` ${diagnostics.unreadableCards} entries lacked clear delivery details; earlier confirmed access and your corrections were kept.` : ''}`;
     } catch (error) {
       await globalThis.GalacticSync.failed('amazon-games',error);
-      status.textContent = `Amazon Games import failed: ${error.message}`;
+      exportButton.hidden = !(scanStarted && globalThis.GalacticAmazonGames.getDiagnostics?.());
+      status.textContent = `Amazon Games import failed: ${error.message}${exportButton.hidden ? '' : ' Export the scan report if you need help; it contains no titles or redemption codes.'}`;
     } finally {
       buttons.forEach((button) => { button.disabled = false; });
       delete status.dataset.busy;
     }
   }
+  exportButton.addEventListener('click', () => {
+    const report = globalThis.GalacticAmazonGames.getDiagnostics?.();
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'GL-amazon-games-scan.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
   globalThis.GalacticFloatingPanel?.attach(shadow, 'amazon-games');
   document.documentElement.append(host);

@@ -869,6 +869,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
+    if(incoming.provider==='amazon-games'&&previous?.mediaType===incoming.mediaType
+        &&incoming.ownership==='unknown'&&['owned','claimed'].includes(previous.ownership)){
+      incoming={...incoming,ownership:previous.ownership,metadata:{...incoming.metadata,delivery:
+        [...new Set([previous.metadata?.delivery,incoming.metadata?.delivery].flatMap(value=>(value||'').split(' | ')).filter(Boolean))].join(' | ')}};
+    }
     if(incoming.provider==='amazon-video'&&previous?.mediaType===incoming.mediaType
         &&[previous.ownership,incoming.ownership].includes('owned')
         &&['owned','subscription'].includes(previous.ownership)&&['owned','subscription'].includes(incoming.ownership)){
