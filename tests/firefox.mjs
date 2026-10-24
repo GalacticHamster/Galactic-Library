@@ -9,6 +9,10 @@ import {setTimeout as pause} from 'node:timers/promises';
 import {freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,projectRoot} from '../scripts/release.mjs';
 import {seedConsoleCompanionLibrary,checkConsoleCompanionResults} from './fixtures/console-companion-native.mjs';
+import {providerSyncLibrary} from './provider-sync-fixture.js';
+import {observationPacket} from './observation-fixture.js';
+import {activeObservationEnvelope,OBSERVATION_REGISTRATION} from '../src/lib/observation-transactions.js';
+import {providerCheckDigest} from '../src/lib/provider-scan-checks.js';
 
 const candidates=[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe'];
 if(process.platform==='win32'){try{const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}catch{}}
@@ -38,6 +42,39 @@ try{
     await area.set({'adapter-test':{safe:'before'}});try{await area.set({'adapter-test':{safe:'after'},invalid:()=>{}});}catch{}if((await area.get('adapter-test'))['adapter-test'].safe!=='before')throw Error('IndexedDB did not roll back a failed multi-key write');await area.remove('adapter-test');
     return ['valid Firefox reminder manifest, required alarms and opt-in notifications','reminder permission request uses only the installed optional notification permission','module event page and queued library writer','library/API keys stay outside public storage.local','private database survives a new connection','invalid restore is atomic','backup round-trip','failed multi-key private write rolls back'];
   `);checks.forEach(name=>console.log('PASS installed Firefox GL: '+name));
+  for(const withPacket of [false,true]){
+    const oldWindow=await driver.send('WebDriver:GetWindowHandle');
+    const controlWindow=await driver.send('WebDriver:NewWindow',{type:'tab'});
+    await driver.send('WebDriver:SwitchToWindow',{handle:oldWindow.value??oldWindow});
+    const legacy=providerSyncLibrary('amazon-games'),claim=Object.values(legacy.providerItems)[0];
+    claim.ownership='claimed';claim.acquiredAt='2025-07-29T00:00:00.000Z';
+    claim.metadata={...claim.metadata,delivery:'Amazon Games library',collectedOn:'2025-07-29'};
+    const packet=withPacket?await observationPacket(legacy,'amazon-games',{whole:true}):null;
+    const seed={galacticLibraryDatabase:legacy,galacticLibraryObservations:activeObservationEnvelope(await providerCheckDigest(legacy),packet),galacticLibraryObservationHead:OBSERVATION_REGISTRATION};
+    await evaluate(`
+      const P=await import('./src/background/private-storage.js');
+      await P.createPrivateStorage(indexedDB).set(${JSON.stringify(seed)});
+      return true;
+    `);
+    await driver.send('WebDriver:SwitchToWindow',{handle:(controlWindow.value??controlWindow).handle});
+    await driver.send('Marionette:SetContext',{value:'chrome'});
+    await driver.send('WebDriver:ExecuteAsyncScript',{script:'const done=arguments[arguments.length-1]; ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs").AddonManager.getAddonByID(arguments[0]).then(addon=>addon.reload()).then(()=>done(true),error=>done({error:error.message}));',args:[installed.id],newSandbox:true});
+    await pause(250);
+    await navigate(installed.id,installed.manifest.options_page);
+    assert(await evaluate(`
+      const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js');
+      const view=await Promise.race([S.getCommittedLibraryView(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Claim upgrade left the background lookup stalled')),5000))]);
+      const items=Object.values(view.database.providerItems),item=items[0];
+      if(items.length!==1||item.recordRef!==${JSON.stringify(claim.recordRef)}||item.ownership!=='owned'||item.acquiredAt!==${JSON.stringify(claim.acquiredAt)}||item.metadata.acquisitionMethod!=='permanent-claim')throw Error('Cold claim upgrade lost source identity, date or ownership');
+      if(Object.keys(view.database.providerHistory).length)throw Error('Claim upgrade added acquisition history');
+      const stored=await P.createPrivateStorage(indexedDB).get({galacticLibraryDatabase:null});
+      if(stored.galacticLibraryDatabase.providerItems[item.id].ownership!=='owned')throw Error('Claim upgrade did not persist');
+      if(${withPacket}&&item.observedAt!=='2026-10-17T06:00:00.000Z')throw Error('Claim upgrade lost pending observation');
+      if(Object.values((await S.getDatabase()).providerItems)[0].ownership!=='owned')throw Error('Background receiver stopped after upgrade');
+      return true;
+    `));
+    console.log('PASS installed Firefox GL: reload upgrades existing claims with '+(withPacket?'pending':'empty')+' registered observations without a stalled Library or lost dates/identities');
+  }
   const emptyCheck=await evaluate(`
     const S=await import('./src/lib/storage.js'),P=await import('./src/background/private-storage.js'),client=S.createStorageClient(message=>chrome.runtime.sendMessage(message)),area=P.createPrivateStorage(indexedDB);
     await S.mergeProviderItems('steam',[{providerItemId:'empty-native',title:'Disposable empty-check game',mediaType:'game',ownership:'owned'}],{profileLabel:'Empty check fixture',fullSyncAt:'2026-01-01'});

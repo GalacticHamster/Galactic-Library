@@ -72,6 +72,24 @@ export const permanentClaimTests=[
   await assert.rejects(foreign.writer.getDatabase(),/observation|library|damaged/i);
   assert.deepEqual(foreign.stored.galacticLibraryDatabase,original);
  }],
+ ['Cold Library loading normalizes claims with a registered observation envelope without re-entering its own queue',async()=>{
+  for(const withPacket of [false,true]){
+   const db=legacy(),h=memory(db),packet=withPacket?await observationPacket(db,'amazon-games',{whole:true}):null;
+   const digest=packet?.baseDigest??await (await import('../src/lib/provider-scan-checks.js')).providerCheckDigest(db);
+   h.stored[OBSERVATION_KEY]=activeObservationEnvelope(digest,packet);
+   h.stored[OBSERVATION_HEAD_KEY]=structuredClone(OBSERVATION_REGISTRATION);
+   const writer=createStorageWriter(h.area,Promise.resolve(),{cacheQuerySnapshots:true,observationCompletions:true});
+   let timer;
+   try{
+    const view=await Promise.race([writer.getCommittedLibraryView(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Cold claim normalization stalled')),2000);})]);
+    const item=Object.values(view.database.providerItems)[0];assert.equal(item.ownership,'owned');
+    assert.equal(item.recordRef,Object.values(db.providerItems)[0].recordRef);
+    if(withPacket)assert.equal(item.observedAt,observationDate);
+    assert.equal(h.stored.galacticLibraryDatabase.providerItems[item.id].ownership,'owned');
+    assert.deepEqual((await writer.getCommittedLibraryView()).database,view.database);
+   }finally{clearTimeout(timer);}
+  }
+ }],
  ['Owned filtering and saved legacy filters include permanent claims; companion output uses canonical Owned',()=>{
   const db=validateDatabase(legacy());const results=libraryBrowseResults(createLibraryBrowseProjection()(db),{filters:{ownership:'owned'}});
   assert.equal(results.total,1);

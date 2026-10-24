@@ -809,7 +809,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(equalDatabaseData(claimsOnly,database)){
         // Validate the original observation binding before retiring it through
         // the ordinary atomic writer. Foreign/damaged observations still fail.
-        return persistDatabase(await checkedProviderView(database,stored[DATABASE_STORAGE_KEY]));
+        // Give the journal an immutable view of its original, fully checked
+        // base. Otherwise it tries to load the snapshot currently awaiting this
+        // migration and waits on its own queued getDatabase operation.
+        const original=registerCommittedSnapshot(freezeQuerySnapshot(structuredClone(stored[DATABASE_STORAGE_KEY])));
+        return persistDatabase(await checkedProviderView(database,original));
       }
 
       // An identity repair cannot silently detach authoritative observations
