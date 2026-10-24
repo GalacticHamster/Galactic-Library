@@ -133,17 +133,48 @@
     return compactText(text.match(/(?:^|\r?\n)\s*(?:Sent to|Delivered to(?: your)?)\s*:?\s+(.+?)(?:\s+on\s+|\.(?:\s|$)|$)/iu)?.[1]);
   }
 
+  function dateEvidenceFromDetails(body) {
+    const identity = global.GalacticAmazonGamesIdentity;
+    const text = body?.innerText || body?.textContent || '';
+    const dates = new Set();
+    const textDate = identity.collectedFromText(text);
+    if (textDate) dates.add(textDate);
+    // Read the value of this specific field, not dates elsewhere in instructions.
+    // A grid's flattened text need not put a field label beside its value.
+    const labels = [...(body?.querySelectorAll('*') ?? [])]
+      .filter(element => /^Collected on\s*:?$/iu.test(compactText(element.textContent))
+        && ![...element.children].some(child => /^Collected on\s*:?$/iu.test(compactText(child.textContent))));
+    let fieldDateRecognized = false;
+    for (const label of labels) {
+      const values = [label.nextElementSibling?.textContent];
+      const parent = label.parentElement;
+      if (parent && parent !== body) {
+        values.push(compactText(parent.textContent).replace(/^Collected on\s*:?\s*/iu, ''));
+        if (compactText(parent.textContent) === compactText(label.textContent)) values.push(parent.nextElementSibling?.textContent);
+      }
+      for (const value of values) {
+        const date = identity.collectedDate(value);
+        if (date) { dates.add(date); fieldDateRecognized = true; }
+      }
+    }
+    return { collectedOn: dates.size === 1 ? [...dates][0] : null,
+      dateEvidence: { collectedLabelPresent: /\bCollected on\b/iu.test(text), fieldLabels: labels.length,
+        textDateRecognized: Boolean(textDate), fieldDateRecognized, conflictingDates: dates.size > 1 } };
+  }
+
   async function detailsFromClaimHeader(header, needsDestination) {
     const button = header.querySelector('button[aria-controls]');
     const bodyId = button?.getAttribute('aria-controls');
     const read = () => {
       const body = bodyId ? header.ownerDocument.getElementById(bodyId) : null;
       const text = body?.innerText || body?.textContent || '';
-      const collectedOn=global.GalacticAmazonGamesIdentity.collectedFromText(text);
-      return { bodyPresent: Boolean(body), collectedLabelPresent: /\bCollected on\b/iu.test(text), deliveryTarget: deliveryTargetFromText(text), collectedOn, collected:Boolean(collectedOn) };
+      const {collectedOn, dateEvidence} = dateEvidenceFromDetails(body);
+      return { bodyPresent: Boolean(body), collectedLabelPresent: dateEvidence.collectedLabelPresent, deliveryTarget: deliveryTargetFromText(text), collectedOn, collected:Boolean(collectedOn), dateEvidence };
     };
+    const ready = details => details.collected && (!needsDestination || details.deliveryTarget)
+      || details.deliveryTarget && !/^amazon games library[.!]?$/iu.test(details.deliveryTarget);
     let details = read();
-    if (details.deliveryTarget || !needsDestination && details.collected) return details;
+    if (ready(details)) return details;
     // Expand only the existing claim accordion, never a Claim Code/redeem action.
     if (button?.getAttribute('aria-expanded') !== 'true') {
       if (isCodeDelivery(button?.textContent) || /^(?:claim now|get code|redeem(?: code)?)[.!]?$/iu.test(compactText(button?.textContent))) return details;
@@ -152,9 +183,34 @@
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await wait(150);
       details = read();
-      if (details.deliveryTarget || !needsDestination && details.collected) return details;
+      if (ready(details)) return details;
     }
     return details;
+  }
+
+  async function checkAcquisitionDates() {
+    // Bounded read-only check of the current listing: no year navigation, library
+    // writes, code actions, titles, identifiers, dates or arbitrary page text exported.
+    diagnostics = {format: 1, provider: 'amazon-games', mode: 'acquisition-date-check', state: 'checking', readOnly: true, samples: []};
+    try {
+      const cards = claimCardsFromDocument(global.document).cards
+        .filter(({card}) => /^delivered[.!]?$/iu.test(compactText(card.deliveryText))).slice(0, 3);
+      for (const {header} of cards) {
+        const button = header.querySelector('button[aria-controls]');
+        const wasExpanded = button?.getAttribute('aria-expanded') === 'true';
+        let details;
+        try { details = await detailsFromClaimHeader(header, true); }
+        finally { if (!wasExpanded && button?.getAttribute('aria-expanded') === 'true') button.click(); }
+        diagnostics.samples.push({...details.dateEvidence, bodyPresent: details.bodyPresent,
+          dateRecognized: Boolean(details.collectedOn), destinationPresent: Boolean(details.deliveryTarget),
+          amazonDestination: /^amazon games library[.!]?$/iu.test(details.deliveryTarget)});
+      }
+      diagnostics.state = 'complete';
+      return JSON.parse(JSON.stringify(diagnostics));
+    } catch (error) {
+      diagnostics.state = 'failed';
+      throw error;
+    }
   }
 
   async function amazonGamesItemFromClaimHeader(header, card) {
@@ -356,5 +412,5 @@
     }
   }
 
-  global.GalacticAmazonGames = { getDiagnostics: () => diagnostics ? JSON.parse(JSON.stringify(diagnostics)) : null, amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, allTimeWindowOptionsFromDocument, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument, claimCardsFromDocument, fetchAmazonGames };
+  global.GalacticAmazonGames = { getDiagnostics: () => diagnostics ? JSON.parse(JSON.stringify(diagnostics)) : null, checkAcquisitionDates, amazonGamesItemFromCardData, amazonGamesTitleKey, isLoadMoreText, deliveryTargetFromText, allTimeWindowOptionsFromDocument, timeWindowOptionsFromDocument, timeWindowHeaderFromDocument, claimCardsFromDocument, fetchAmazonGames };
 }(globalThis));
