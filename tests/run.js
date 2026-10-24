@@ -428,6 +428,15 @@ const tests = [
       authors: ['Cory Doctorow'], categories: ['Young Adult Fiction'], isbn: ['9780765319852'], publisher: 'Tor Teen', publishedDate: '2008-04-29', pageCount: 382, language: 'en', appliedAt: '2026-09-18T00:00:00.000Z'
     });
   }],
+  ['Amazon Video requires explicit full-product labels, not purchase offers or series presence', () => {
+    for(const offer of ['Buy','Buy now','Purchase','Purchase options','You purchased this episode','A movie about a purchased painting'])assert.equal(ownershipFromCardText(offer),'unknown');
+    assert.equal(ownershipFromCardText('You purchased this.'),'owned');
+    assert.equal(ownershipFromCardText('Included with your subscription'),'subscription');
+    const item=(entityType,title)=>amazonVideoItemFromCardData({providerItemId:'test',title,entityType,ownershipEvidence:'You purchased this'});
+    assert.equal(item('TV_SEASON','A season').ownership,'owned');
+    assert.equal(item('TV_SHOW','A complete series').ownership,'unknown');
+    assert.equal(item('TV_SHOW','A show: Season 2').ownership,'owned');
+  }],
   ['keeps Amazon Video movie and TV entitlement identities without guessing ambiguous ownership', () => {
     assert.equal(ownershipFromCardText('Purchased in HD'), 'owned');
     assert.equal(ownershipFromCardText('Rental expires in 12 days'), 'rental');

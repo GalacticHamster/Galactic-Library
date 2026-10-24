@@ -1,5 +1,7 @@
 // Synthetic Prime Video layouts; no provider session, captured pages or real titles.
 import {createStorageWriter} from '../src/background/storage-writer.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 const checks=[];
 const assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
 const nativeFetch=globalThis.fetch,nativeTimeout=globalThis.setTimeout;
@@ -54,6 +56,62 @@ async function virtualLibrary({plateau=false}={}){
  });return page;
 }
 try{
+ let labels=await setup({ids:[1,2,3,4],outside:'<aside>You purchased this</aside>'});
+ labels.list.innerHTML=card(1,{ownership:'<span hidden>You purchased this.</span>'})+card(2,{ownership:'<span>You purchased this</span>'})+card(3,{ownership:'<button>Buy</button><p>Purchase this movie</p>'})+card(4,{ownership:'<span>Rental expires in 2 days</span>'});
+ let extracted=labels.api.amazonVideoItemsFromDocument(labels.doc);
+ assert(extracted.map(item=>item.ownership).join(',')==='owned,owned,unknown,rental','Hidden movie labels and full-season purchases are recognized; Buy and unrelated page labels cannot establish ownership');
+ const purchaseData={},purchaseArea={get:async defaults=>({...defaults,...purchaseData}),set:async patch=>Object.assign(purchaseData,structuredClone(patch))};
+ let purchaseWriter=createStorageWriter(purchaseArea);
+ const records=JSON.parse(JSON.stringify(extracted)),unknownRecords=records.map(item=>({...item,ownership:'unknown',metadata:{...item.metadata,ownershipEvidence:''}}));
+ await purchaseWriter.mergeProviderItems('amazon-video',unknownRecords);
+ const originalRecords=Object.values((await purchaseWriter.getDatabase()).providerItems);
+ const savePurchaseScan=async values=>purchaseWriter.replaceProviderItems('amazon-video',values,{},JSON.parse(JSON.stringify(labels.win.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video',values,[labels.win.GalacticProviderSnapshot.completedScope('library',values.length,null,'scroll-end',8)]))));
+ await savePurchaseScan(records);
+ let purchaseDb=await purchaseWriter.getDatabase(),saved=Object.values(purchaseDb.providerItems);
+ assert(saved.filter(item=>item.ownership==='owned').length===2&&saved.filter(item=>item.ownership==='unknown').length===1&&saved.filter(item=>item.ownership==='rental').length===1,'Extracted movie, season, Buy and rental labels persist as two Owned, one Unknown and one Rental');
+ assert(saved.every(item=>originalRecords.some(old=>old.id===item.id&&old.recordRef===item.recordRef))&&saved.length===4,'Purchase enrichment upgrades the existing identities rather than creating duplicate records');
+ const corrected=saved.find(item=>item.providerItemId.endsWith('fixture-1'));
+ await purchaseWriter.saveOwnershipCorrections([{recordRef:corrected.recordRef,provider:corrected.provider,profileId:corrected.profileId,expectedReviewRef:null}],{ownership:'returned'});
+ for(let repeat=0;repeat<2;repeat++)await savePurchaseScan(unknownRecords);
+ purchaseWriter=createStorageWriter(purchaseArea);purchaseDb=await purchaseWriter.getDatabase();
+ assert(purchaseDb.providerItems[corrected.id].ownership==='owned'&&effectiveOwnershipRecord(purchaseDb.providerItems[corrected.id],purchaseDb).ownership==='returned','Two sparse rescans and a fresh writer retain purchase evidence while the manual returned correction remains authoritative');
+ await purchaseWriter.restoreDatabase(parseBackup(createBackup(purchaseDb)));
+ purchaseDb=await purchaseWriter.getDatabase();
+ assert(purchaseDb.providerItems[corrected.id].metadata.ownershipEvidence==='You purchased this.'&&effectiveOwnershipRecord(purchaseDb.providerItems[corrected.id],purchaseDb).ownership==='returned','Backup restore retains both source purchase evidence and the separate manual correction');
+ labels.list.innerHTML=card(1,{ownership:'<span>Buy</span>'});
+ labels.onPause(n=>{if(n===2)labels.list.querySelector('article').insertAdjacentHTML('beforeend','<span>You purchased this</span>');if(n===3)labels.list.innerHTML=card(1,{ownership:'Buy'});});
+ // The mutation observer must retain evidence before virtual-card remounting.
+ labels.doc.querySelector('main p').textContent='All items (2)';
+ labels.onScroll(()=>{});
+ let delayed=await labels.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true});
+ assert(delayed.items[0].ownership==='owned','Delayed card-local evidence survives an unknown remount of the same stable product');
+ labels=await setup({ids:[1,2]});
+ labels.list.innerHTML=card(1,{ownership:'Buy'})+card(2,{ownership:'Buy'});
+ labels.list.querySelector('article').addEventListener('mouseenter',event=>event.currentTarget.insertAdjacentHTML('beforeend','<span>You purchased this</span>'),{once:true});
+ const originalTimer=labels.win.setTimeout;
+ labels.win.setTimeout=(callback,ms,...args)=>{
+  if(ms===15000){labels.list.querySelector('article').dispatchEvent(new labels.win.MouseEvent('mouseenter'));return nativeTimeout(callback,0);}
+  return originalTimer(callback,ms,...args);
+ };
+ const checked=await labels.api.checkPurchaseLabels();
+ assert(checked.owned===1&&checked.unknown===1,'The read-only manual-hover diagnostic recognizes a dynamically added label without leaking it to a nearby card');
+ assert(labels.api.getDiagnostics().state==='purchase-label-check-complete','Purchase-label diagnostics finish without requesting an import');
+ labels=await setup({ids:[1,2,3,4]});
+ labels.list.innerHTML=[1,2,3,4].map(n=>card(n,{ownership:'Buy'})).join('');
+ for(const [index,node] of [...labels.list.querySelectorAll('article')].entries())node.addEventListener('mouseenter',()=>{
+  if(index<2)node.insertAdjacentHTML('beforeend','<span>You purchased this</span>');
+  else if(index===2)labels.list.querySelector('article').insertAdjacentHTML('beforeend','<span>You purchased this</span>');
+ },{once:true});
+ const hoverTimer=labels.win.setTimeout;
+ labels.win.setTimeout=(callback,ms,...args)=>ms===600?nativeTimeout(callback,10):hoverTimer(callback,ms,...args);
+ const hovered=await labels.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true,readPurchaseLabels:true});
+ assert(hovered.items.map(item=>item.ownership).join(',')==='owned,owned,unknown,unknown','Opt-in hover acquisition recognizes a movie and a complete season without promoting Buy-only or unresponsive seasons');
+ assert(labels.api.getDiagnostics().hoverChecks.attempted===4&&labels.api.getDiagnostics().hoverChecks.recognized===2,'Hover work is bounded to one attempt per product and reports unavailable evidence without inventing access');
+ labels=await setup({ids:[1]});
+ labels.list.innerHTML=card(1,{ownership:'<span>You purchased this <em>episode</em></span>'});
+ assert(labels.api.amazonVideoItemsFromDocument(labels.doc)[0].ownership==='unknown','Split episode-only wording cannot be truncated into a full-product purchase label');
+ labels.list.innerHTML=card(1,{ownership:'PURCHASED'}).replace('PRIVATE_TITLE','Purchased');
+ assert(labels.api.amazonVideoItemsFromDocument(labels.doc)[0].ownership==='unknown','A title that happens to be an ownership word is not purchase evidence');
  let page=await virtualLibrary({plateau:true});let result=await page.api.fetchAmazonVideoLibrary();
  assert(result.items.length===343&&result.completionStatus==='inferred'&&!result.completionConfirmed,'A delayed 180-item plateau is passed and all 343 virtualized identities converge without a provider total');
  let evidence=page.api.getDiagnostics();
@@ -202,6 +260,15 @@ try{
  shadow.querySelector('[data-mode="incremental"]').click();await waitFor(()=>imports===4&&!shadow.querySelector('.status').dataset.busy);
  assert(shadow.querySelector('.status').textContent.includes('Newest-title check added 0')&&shadow.querySelector('.status').textContent.includes('Older titles were not fully checked'),'Quick-update UI makes its newest-only limitation explicit even when a legacy baseline was incomplete');
  assert(Object.values((await writer.getDatabase()).providerItems).filter(item=>item.provider==='amazon-video').length===4,'The bounded quick update preserves existing source membership without inventing older missing titles');
+ const beforeHoverCheck=JSON.stringify(await writer.getDatabase());messages=[];
+ shadow.querySelector('[data-read-purchase-labels]').checked=true;
+ shadow.querySelector('[data-mode="inspect"]').click();
+ assert(shadow.querySelector('[data-read-purchase-labels]').disabled,'The purchase-label option cannot change during an active scan');
+ await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(page.api.getDiagnostics().hoverChecks.enabled&&messages.length===0&&JSON.stringify(await writer.getDatabase())===beforeHoverCheck,'The production read-only panel passes the opt-in hover setting without changing stored records');
+ const panelTimer=page.win.setTimeout;page.win.setTimeout=(callback,ms,...args)=>ms===15000?nativeTimeout(callback,0):panelTimer(callback,ms,...args);
+ shadow.querySelector('[data-mode="ownership"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(messages.length===0&&page.api.getDiagnostics().state==='purchase-label-check-complete'&&shadow.querySelector('.status').textContent.includes('No library records changed'),'The manual-hover diagnostic is accessible through the panel and cannot begin an import or scan lease');
  await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}

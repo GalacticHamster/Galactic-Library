@@ -869,6 +869,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
+    // A sparse Video card is not evidence that an earlier entitlement ended.
+    // Source observations stay separate from authoritative user corrections.
+    if(incoming.provider==='amazon-video'&&previous?.mediaType===incoming.mediaType
+        &&incoming.ownership==='unknown'&&previous.ownership!=='unknown'){
+      incoming={...incoming,ownership:previous.ownership,metadata:{...incoming.metadata,
+        ...(previous.metadata?.ownershipEvidence?{ownershipEvidence:previous.metadata.ownershipEvidence}:{})}};
+    }
     // Kobo sparse observations with no meaningful metadata/access change have
     // historically retained their saved representation and observation date.
     // Normalize that policy here; persistence can then compare exact records.

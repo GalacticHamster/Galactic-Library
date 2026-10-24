@@ -39,9 +39,29 @@
 
   function ownershipFromCardText(value) {
     const text = compactText(value).toLocaleLowerCase();
-    if (/\b(rental|rent until|rented)\b/u.test(text)) return 'rental';
-    if (/\b(purchased|purchase|owned)\b/u.test(text)) return 'owned';
+    if (/^(?:rental(?: expires?\b.*)?|rent until\b.+|rented(?:\b.*)?)\.?$/u.test(text)) return 'rental';
+    if (/^(?:you purchased this|purchased(?: in (?:hd|uhd|sd|4k))?|owned)\.?$/u.test(text)) return 'owned';
+    if (/^(?:included with your (?:prime|subscription)|your subscription includes this)\.?$/u.test(text)) return 'subscription';
     return 'unknown';
+  }
+
+  function cardOwnership(card, title) {
+    // Inspect individual labels, including hidden ones, without joining title,
+    // plot, offer or adjacent-card text into supposed entitlement evidence.
+    const labels = [];
+    const walker = card.ownerDocument?.createTreeWalker(card, 4);
+    if (walker) {
+      while (walker.nextNode()) {
+        const node = walker.currentNode, parent = node.parentElement;
+        if (parent?.closest(CARD_SELECTOR) !== card || parent.closest('h1, h2, h3, script, style')) continue;
+        labels.push(compactText(parent === card ? node.textContent : parent.textContent));
+      }
+    } else labels.push(compactText(card.textContent));
+    const recognized = labels.filter(label => label && label.toLocaleLowerCase() !== compactText(title).toLocaleLowerCase()
+      && ownershipFromCardText(label) !== 'unknown');
+    const states = new Set(recognized.map(ownershipFromCardText));
+    // Conflicting labels require investigation rather than a guessed purchase.
+    return states.size === 1 ? recognized[0] : '';
   }
 
   function amazonVideoItemFromCardData(card) {
@@ -57,7 +77,8 @@
       providerItemId,
       title,
       mediaType,
-      ownership: ownershipFromCardText(ownershipEvidence),
+      ownership: ownershipFromCardText(ownershipEvidence) === 'owned' && mediaType === 'tv'
+        && !/SEASON/iu.test(card?.entityType) && !/\bseason\s+\d+\b/iu.test(title) ? 'unknown' : ownershipFromCardText(ownershipEvidence),
       metadata: {
         source: 'amazon-prime-video-purchases-library',
         detailUrl,
@@ -87,7 +108,7 @@
       entityType,
       detailUrl: detailLink?.getAttribute('href'),
       imageUrl: image?.currentSrc ?? image?.getAttribute('src'),
-      ownershipEvidence: compactText(card.textContent)
+      ownershipEvidence: cardOwnership(card, firstAttribute(card, ['data-card-title', 'data-title', 'aria-label']) || compactText(image?.getAttribute('alt')))
     };
   }
 
@@ -104,6 +125,85 @@
   function newAmazonVideoItems(items, knownItemIds = []) {
     const known = new Set((Array.isArray(knownItemIds) ? knownItemIds : []).map((id) => String(id ?? '').trim()).filter(Boolean));
     return (Array.isArray(items) ? items : []).filter((item) => !known.has(String(item?.providerItemId ?? '').trim()));
+  }
+
+  function retainObservation(items, item) {
+    const previous = items.get(item.providerItemId);
+    if (previous && item.ownership === 'unknown' && previous.ownership !== 'unknown') {
+      item = { ...item, ownership: previous.ownership, metadata: { ...item.metadata,
+        ownershipEvidence: previous.metadata.ownershipEvidence } };
+    }
+    items.set(item.providerItemId, item);
+  }
+
+  function ownershipCounts(items) {
+    const counts = { owned: 0, rental: 0, subscription: 0, unknown: 0 };
+    for (const item of items.values()) counts[item.ownership] += 1;
+    return counts;
+  }
+
+  async function readHoverLabel(card, expected) {
+    const sameCard = () => {
+      const item = card.isConnected && amazonVideoItemFromCardData(cardDataFromElement(card));
+      return item && item.providerItemId === expected.providerItemId && item.mediaType === expected.mediaType
+        && item.metadata.entityType === expected.metadata.entityType;
+    };
+    if (!sameCard()) return null;
+    diagnostics.hoverChecks.attempted += 1;
+    let result = null, timer;
+    await new Promise(resolve => {
+      const finish = () => { observer.disconnect(); resolve(); };
+      const check = () => {
+        if (!sameCard()) { finish(); return; }
+        const item = amazonVideoItemFromCardData(cardDataFromElement(card));
+        if (item?.providerItemId === expected.providerItemId && item.mediaType === expected.mediaType
+            && item.ownership !== 'unknown') { result = item; finish(); }
+      };
+      const observer = new global.MutationObserver(check);
+      observer.observe(global.document.body, { subtree: true, childList: true, characterData: true });
+      timer = setTimeout(() => { check(); finish(); }, 600);
+      // Website handlers may retrieve details. GL never clicks a purchase or
+      // play control, calls an undocumented API, or reads session credentials.
+      try {
+        if (global.PointerEvent) for (const type of ['pointerover', 'pointerenter']) card.dispatchEvent(new global.PointerEvent(type, { bubbles: type === 'pointerover', pointerType: 'mouse' }));
+        for (const type of ['mouseover', 'mouseenter']) card.dispatchEvent(new global.MouseEvent(type, { bubbles: type === 'mouseover' }));
+        check();
+      } catch { finish(); } // Unavailable hover details are not lost ownership.
+    });
+    clearTimeout(timer);
+    if (card.isConnected) for (const type of ['pointerout', 'pointerleave', 'mouseout', 'mouseleave']) {
+      const EventClass = type.startsWith('pointer') ? global.PointerEvent : global.MouseEvent;
+      if (EventClass) card.dispatchEvent(new EventClass(type, { bubbles: type.endsWith('out') }));
+    }
+    diagnostics.hoverChecks[result ? 'recognized' : 'unavailable'] += 1;
+    return result;
+  }
+
+  // A small, user-operated check establishes where this page variant exposes
+  // hover labels before considering any automated per-card hover requests.
+  async function checkPurchaseLabels(report = () => {}) {
+    const observed = new Map();
+    const collect = () => {
+      for (const item of amazonVideoItemsFromDocument(global.document)) retainObservation(observed, item);
+      diagnostics.ownership = ownershipCounts(observed);
+      diagnostics.purchaseLabels = { movie: 0, season: 0, unscopedTv: 0 };
+      for (const item of observed.values()) if (ownershipFromCardText(item.metadata.ownershipEvidence) === 'owned') {
+        diagnostics.purchaseLabels[item.mediaType === 'movie' ? 'movie' : item.ownership === 'owned' ? 'season' : 'unscopedTv'] += 1;
+      }
+      // Unassociated labels are diagnostic only: never attach a portal's text
+      // to a nearby card, the hovered title, or every visible product.
+      diagnostics.unassociatedPurchaseLabels = Math.max(diagnostics.unassociatedPurchaseLabels ?? 0, [...global.document.querySelectorAll('body *')].filter(node =>
+        !node.closest(CARD_SELECTOR) && node.children.length === 0
+        && /^you purchased this\.?$/iu.test(compactText(node.textContent))).length);
+      report(diagnostics.ownership);
+    };
+    diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'checking-purchase-labels' };
+    collect();
+    const observer = new global.MutationObserver(collect);
+    observer.observe(global.document.body, { subtree: true, childList: true, characterData: true });
+    try { await wait(15000); collect(); } finally { observer.disconnect(); }
+    diagnostics.state = 'purchase-label-check-complete';
+    return diagnostics.ownership;
   }
 
   function wait(milliseconds) {
@@ -238,12 +338,20 @@
     };
   }
 
-  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false } = {}) {
+  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false, readPurchaseLabels = false } = {}) {
     diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
       completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
       discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
+    diagnostics.hoverChecks = { enabled: readPurchaseLabels, attempted: 0, recognized: 0, unavailable: 0, maximumWaitMs: 600 };
+    const observations = new Map();
+    const observer = global.MutationObserver ? new global.MutationObserver(() => {
+      for (const item of amazonVideoItemsFromDocument(global.document)) {
+        if (observations.has(item.providerItemId)) retainObservation(observations, item);
+      }
+    }) : null;
+    observer?.observe(global.document.body, { subtree: true, childList: true, characterData: true });
     try {
-      return await scanLibrary(reportProgress, knownItemIds, readOnly);
+      return await scanLibrary(reportProgress, knownItemIds, readOnly, observations, readPurchaseLabels);
     } catch (error) {
       if (diagnostics.state === 'scanning') {
         diagnostics.state = 'failed'; diagnostics.completionStatus = 'failed'; diagnostics.completionConfirmed = false;
@@ -251,6 +359,8 @@
       // Only fixed reason codes/numeric page structure, never page text or IDs.
       diagnostics.reason ??= 'scan-rejected';
       throw error;
+    } finally {
+      observer?.disconnect();
     }
   }
 
@@ -271,8 +381,8 @@
       && Math.abs(other.height - entry.height) <= 4 && Math.abs(other.extent - entry.extent) <= 4));
   }
 
-  async function scanLibrary(reportProgress, knownItemIds, readOnly) {
-    const itemsById = new Map(), discovered = new Set(), observedCards = new Set();
+  async function scanLibrary(reportProgress, knownItemIds, readOnly, itemsById, readPurchaseLabels) {
+    const discovered = new Set(), observedCards = new Set(), hoverAttempted = new Set();
     const incremental = Array.isArray(knownItemIds);
     let phase = 'discovery', quiet = 0, candidate = null, passesRead = 0;
     let sweepSeen = new Set();
@@ -284,11 +394,24 @@
       passesRead = pass + 1;
       const context = listingContext(global.document), before = geometry(context);
       for (const card of context.cards) observedCards.add(card);
-      const rendered = amazonVideoItemsFromDocument(global.document);
+      let rendered = amazonVideoItemsFromDocument(global.document);
+      if (readPurchaseLabels) {
+        const enriched = new Map(rendered.map(item => [item.providerItemId, item]));
+        for (const card of context.cards) {
+          const item = amazonVideoItemFromCardData(cardDataFromElement(card));
+          if (!item || item.ownership !== 'unknown' || hoverAttempted.has(item.providerItemId)) continue;
+          hoverAttempted.add(item.providerItemId);
+          reportProgress({ passes: pass, movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv, phase: 'purchase-labels' });
+          const evidence = await readHoverLabel(card, item);
+          if (evidence) retainObservation(enriched, evidence);
+        }
+        rendered = [...enriched.values()];
+      }
       const fresh = rendered.filter(item => !discovered.has(item.providerItemId));
       for (const item of fresh) { discovered.add(item.providerItemId); diagnostics.mediaTypes[item.mediaType] += 1; }
-      const save = incremental ? newAmazonVideoItems(fresh, knownItemIds) : fresh;
-      for (const item of save) itemsById.set(item.providerItemId, item);
+      const save = incremental ? newAmazonVideoItems(fresh, knownItemIds) : rendered;
+      for (const item of save) retainObservation(itemsById, item);
+      diagnostics.ownership = ownershipCounts(itemsById);
       diagnostics.itemCount = itemsById.size; diagnostics.discoveredItems = discovered.size;
       observeTotal(context);
       if (candidate && fresh.length) { candidate = null; phase = 'discovery'; quiet = 0; }
@@ -388,6 +511,7 @@
       }
     }
     const items = [...itemsById.values()];
+    diagnostics.ownership = ownershipCounts(itemsById);
     if (!items.length && !incremental) throw new Error(`Amazon Video showed no readable movie or TV cards${passesRead === MAX_SCROLLS ? ` within its ${MAX_SCROLLS}-pass limit` : ''}. No library changes were saved.`);
     if (['confirmed', 'inferred'].includes(diagnostics.completionStatus)) {
       const confirmed = diagnostics.completionStatus === 'confirmed';
@@ -411,6 +535,7 @@
     amazonVideoItemsFromDocument,
     newAmazonVideoItems,
     ownershipFromCardText,
+    checkPurchaseLabels,
     fetchAmazonVideoLibrary
   };
 }(globalThis));

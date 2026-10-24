@@ -4,6 +4,8 @@ import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { withWorker, snapshotFixture } from './storage.js';
 import { validateProviderSnapshot, completedScope, completeProviderSnapshot } from '../src/lib/provider-snapshot.js';
+import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {audibleRescanTests} from './audible-rescan.js';
 
 // Exercise the actual classic importers in isolated signed-in page contexts.
@@ -224,6 +226,30 @@ export const providerSnapshotTests = [
     const countedScan=await begin('Personal');const counted=await commit(countedScan,[inferred[1]],snapshotFixture('amazon-video',[inferred[1]]));assert.equal(counted.ok,true,counted.error);
     const confirmed=await pageA.getDatabase();assert.equal(Object.values(confirmed.providerItems).filter(item=>item.profileId===scan.profileId).length,1);
     assert(Object.values(confirmed.providerHistory).some(entry=>entry.item.providerItemId==='unseen'&&entry.item.profileId===scan.profileId));
+  })],
+  ['Amazon Video purchase evidence upgrades existing records and survives sparse rescans, reviews and restore', () => withWorker(async ({pageA}) => {
+    const raw={providerItemId:'same-movie',title:'A movie',mediaType:'movie',ownership:'unknown',metadata:{entityType:'MOVIE'}};
+    await pageA.mergeProviderItems('amazon-video',[raw]);
+    const original=Object.values((await pageA.getDatabase()).providerItems)[0];
+    const purchase={...raw,ownership:'owned',metadata:{...raw.metadata,ownershipEvidence:'You purchased this'}};
+    const full=async item=>pageA.replaceProviderItems('amazon-video',[item],{},completeProviderSnapshot('amazon-video',[item],[completedScope('library',1,null,'scroll-end',8)]));
+    await full(purchase);
+    let db=await pageA.getDatabase(),item=Object.values(db.providerItems)[0];
+    assert.equal(item.id,original.id);assert.equal(item.recordRef,original.recordRef);assert.equal(item.ownership,'owned');
+    assert.equal(Object.keys(db.providerItems).length,1);
+    await pageA.saveOwnershipCorrections([{recordRef:item.recordRef,provider:item.provider,profileId:item.profileId,expectedReviewRef:null}],{ownership:'returned'});
+    const corrected=await pageA.getDatabase();
+    for(const observation of [raw,purchase,raw]){
+      await full(observation);db=await pageA.getDatabase();item=db.providerItems[original.id];
+      assert.equal(item.ownership,'owned');assert.equal(item.metadata.ownershipEvidence,'You purchased this');
+      assert.equal(effectiveOwnershipRecord(item,db).ownership,'returned');
+      assert.deepEqual(db.ownershipReviews,corrected.ownershipReviews);assert.equal(Object.keys(db.providerItems).length,1);
+    }
+    await pageA.restoreDatabase(parseBackup(createBackup(db)));
+    db=await pageA.getDatabase();assert.equal(db.providerItems[original.id].ownership,'owned');assert.equal(effectiveOwnershipRecord(db.providerItems[original.id],db).ownership,'returned');
+    // An explicit changed entitlement is not treated as an absent label.
+    await full({...raw,ownership:'rental',metadata:{...raw.metadata,ownershipEvidence:'Rental expires in 2 days'}});
+    assert.equal((await pageA.getDatabase()).providerItems[original.id].ownership,'rental');
   })],
   ['Amazon Video inferred reconciliation still rejects malformed complete-snapshot attestations', () => withWorker(async ({pageA}) => {
     const items=[{providerItemId:'one',title:'Retained movie',mediaType:'movie',ownership:'owned'}];
