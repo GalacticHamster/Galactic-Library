@@ -239,126 +239,170 @@
   }
 
   async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false } = {}) {
-    diagnostics = { format: 3, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
+    diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
       completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
       discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
     try {
       return await scanLibrary(reportProgress, knownItemIds, readOnly);
     } catch (error) {
-      if (diagnostics.state === 'scanning') diagnostics.state = 'failed';
+      if (diagnostics.state === 'scanning') {
+        diagnostics.state = 'failed'; diagnostics.completionStatus = 'failed'; diagnostics.completionConfirmed = false;
+      }
       // Only fixed reason codes/numeric page structure, never page text or IDs.
       diagnostics.reason ??= 'scan-rejected';
       throw error;
     }
   }
 
-  async function scanLibrary(reportProgress, knownItemIds, readOnly) {
-    const itemsById = new Map();
-    const incremental = Array.isArray(knownItemIds);
-    const renderedItemIds = new Set();
-    const observedCards = new Set();
-    let unchangedPasses = 0;
-    let finished = false;
-    let passesRead = 0;
-    let previousContext = listingContext(global.document);
-    // Reset all visible list scrollers, not just the one chosen for this pass.
-    for (const [node] of scrollableContainers(previousContext)) node.scrollTo({ top: 0, behavior: 'instant' });
+  function resetTraversal(context) {
+    for (const [node] of scrollableContainers(context)) node.scrollTo({ top: 0, behavior: 'instant' });
     global.scrollTo({ top: 0, behavior: 'instant' });
-    scrollListing(previousContext, 0);
+    scrollListing(listingContext(global.document), 0);
+  }
+
+  function boundaryEvidence(context) {
+    const nodes = [...new Set([global.document.scrollingElement ?? global.document.documentElement,
+      ...scrollableContainers(context).map(([node]) => node)])];
+    return nodes.map(node => ({ node, height: node.clientHeight || global.innerHeight, extent: node.scrollHeight }));
+  }
+
+  function sameBoundary(before, after) {
+    return before.length === after.length && before.every(entry => after.some(other => other.node === entry.node
+      && Math.abs(other.height - entry.height) <= 4 && Math.abs(other.extent - entry.extent) <= 4));
+  }
+
+  async function scanLibrary(reportProgress, knownItemIds, readOnly) {
+    const itemsById = new Map(), discovered = new Set(), observedCards = new Set();
+    const incremental = Array.isArray(knownItemIds);
+    let phase = 'discovery', quiet = 0, candidate = null, passesRead = 0;
+    let sweepSeen = new Set();
+    diagnostics.completionStatus = 'uncertain';
+    diagnostics.verification = { attempts: 0, completed: false, revisitedItems: 0, missingItems: 0 };
+    resetTraversal(listingContext(global.document));
     await wait(SCROLL_PAUSE_MS);
     for (let pass = 0; pass < MAX_SCROLLS; pass += 1) {
       passesRead = pass + 1;
-      const context = listingContext(global.document);
-      const beforeGeometry = geometry(context);
+      const context = listingContext(global.document), before = geometry(context);
       for (const card of context.cards) observedCards.add(card);
       const rendered = amazonVideoItemsFromDocument(global.document);
-      const newlyRenderedItems = rendered.filter(item => !renderedItemIds.has(item.providerItemId));
-      for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
-      const itemsToSave = incremental ? newAmazonVideoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
-      for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
-      for (const item of newlyRenderedItems) diagnostics.mediaTypes[item.mediaType] += 1;
-      diagnostics.itemCount = itemsById.size;
-      diagnostics.discoveredItems = renderedItemIds.size;
+      const fresh = rendered.filter(item => !discovered.has(item.providerItemId));
+      for (const item of fresh) { discovered.add(item.providerItemId); diagnostics.mediaTypes[item.mediaType] += 1; }
+      const save = incremental ? newAmazonVideoItems(fresh, knownItemIds) : fresh;
+      for (const item of save) itemsById.set(item.providerItemId, item);
+      diagnostics.itemCount = itemsById.size; diagnostics.discoveredItems = discovered.size;
       observeTotal(context);
-      const movies = [...itemsById.values()].filter(item => item.mediaType === 'movie').length;
-      reportProgress({ passes: pass, movies, tv: itemsById.size - movies,
-        phase: unchangedPasses >= 3 ? 'awaiting-confirmation' : 'reading' });
-      if (incremental && newlyRenderedItems.length && !itemsToSave.length) {
-        diagnostics.passes.push({ pass: passesRead, cards: context.cards.length,
-          newlyDiscoveredItems: newlyRenderedItems.length, distinctItems: renderedItemIds.size,
-          scrollTarget: context.nested ? 'nested' : 'document', ...beforeGeometry,
-          completionConfirmed: false, stop: 'known-newest-group' });
-        diagnostics.state = 'bounded';
-        diagnostics.reason = 'known-newest-group';
-        finished = true; break;
+      if (candidate && fresh.length) { candidate = null; phase = 'discovery'; quiet = 0; }
+      if (phase === 'verification') for (const item of rendered) sweepSeen.add(item.providerItemId);
+      reportProgress({ passes: pass, movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv,
+        phase: phase === 'verification' ? 'verification' : phase.startsWith('probe') ? 'boundary-probe' : 'reading' });
+      if (incremental && fresh.length && !save.length) {
+        diagnostics.state = 'bounded'; diagnostics.reason = 'known-newest-group'; diagnostics.completionStatus = 'bounded';
+        diagnostics.passes.push({ pass: passesRead, phase, newlyDiscoveredItems: fresh.length, distinctItems: discovered.size,
+          ...before, completionConfirmed: false, stop: 'known-newest-group' });
+        break;
       }
-      const controlsBefore = continuationControls(global.document, context.root);
-      // Visit overlapping viewports so a virtualized list cannot skip middle
-      // groups merely because its full scroll range is already allocated.
-      scrollListing(context, Math.min(context.scroller.scrollHeight,
-        beforeGeometry.top + Math.max(1, beforeGeometry.height * 0.8)));
-      // Give an already-running request time; do not repeatedly activate its button.
+      const controlsBefore = continuationControls(global.document, context.root), action = phase;
+      const target = action === 'probe-back' ? Math.max(0, before.top - before.height)
+        : action === 'probe-forward' ? before.extent + before.height
+        : Math.min(before.extent, before.top + Math.max(1, before.height * 0.8));
+      scrollListing(context, target);
       if (!controlsBefore.loading.length) controlsBefore.more[0]?.click();
       await wait(SCROLL_PAUSE_MS);
-      const afterContext = listingContext(global.document);
+      const afterContext = listingContext(global.document), after = geometry(afterContext);
       const currentExpected = observeTotal(afterContext);
-      const afterGeometry = geometry(afterContext);
       const controls = continuationControls(global.document, afterContext.root);
       const afterRendered = amazonVideoItemsFromDocument(global.document);
       const sameCards = rendered.length === afterRendered.length
         && rendered.every((item, index) => item.providerItemId === afterRendered[index].providerItemId);
-      const sameContext = previousContext.scroller === context.scroller
-        && context.scroller === afterContext.scroller && context.root === afterContext.root;
-      const atEnd = afterGeometry.height > 0 && afterGeometry.top + afterGeometry.height >= afterGeometry.extent - 4;
-      // A newly arrived batch, changed viewport/scroll range or active library
-      // continuation resets the quiet period, even if all IDs were seen before.
-      const stable = (afterContext.cards.length > 0 || renderedItemIds.size === 0) && sameContext && sameCards && beforeGeometry.extent === afterGeometry.extent
-        && beforeGeometry.height === afterGeometry.height && atEnd
-        && !controls.loading.length && !controls.more.length
+      const atEnd = after.height > 0 && after.top + after.height >= after.extent - 4;
+      const stableGeometry = context.scroller === afterContext.scroller && sameCards && atEnd
+        && Math.abs(before.extent - after.extent) <= 4 && before.height === after.height;
+      const clear = !controls.loading.length && !controls.more.length
         && !controlsBefore.loading.length && !controlsBefore.more.length;
-      unchangedPasses = stable ? unchangedPasses + 1 : 0;
-      diagnostics.passes.push({ pass: passesRead, cards: context.cards.length,
-        newlyDiscoveredItems: newlyRenderedItems.length, distinctItems: renderedItemIds.size,
-        scrollTarget: afterContext.nested ? 'nested' : 'document', controlScope: afterContext.root === global.document.body ? 'page' : 'main',
-        ...afterGeometry, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
-        ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses,
-        expectedCount: diagnostics.expectedCount, currentReportedCount: currentExpected, completionConfirmed: false });
-      previousContext = afterContext;
-      // Quiet bottom geometry is only a candidate boundary. A separately
-      // declared full-list total must agree with the distinct observed IDs.
-      // Otherwise keep traversing within the budget; idle passes never certify
-      // completeness, however many there have been.
-      if (unchangedPasses >= 3 && currentExpected !== null
-          && diagnostics.expectedCount === renderedItemIds.size && !inspectListing().remainingOtherScrollers) {
-        diagnostics.completionConfirmed = true;
-        diagnostics.passes.at(-1).completionConfirmed = true;
-        finished = true; break;
+      quiet = stableGeometry ? quiet + 1 : 0;
+      const row = { pass: passesRead, phase: action, cards: context.cards.length, newlyDiscoveredItems: fresh.length,
+        distinctItems: discovered.size, scrollTarget: afterContext.nested ? 'nested' : 'document',
+        controlScope: afterContext.root === global.document.body ? 'page' : 'main', ...after,
+        requestedTop: target, beforeTop: before.top, beforeExtent: before.extent, renderedListingStable: sameCards,
+        movement: afterContext.scroller === context.scroller ? after.top - before.top : null,
+        rangeChange: after.extent - before.extent, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
+        ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses: quiet,
+        expectedCount: diagnostics.expectedCount, currentReportedCount: currentExpected, completionConfirmed: false };
+      diagnostics.passes.push(row);
+      if (quiet >= 3 && clear && currentExpected !== null && currentExpected === discovered.size
+          && !inspectListing().remainingOtherScrollers) {
+        diagnostics.completionStatus = 'confirmed'; diagnostics.completionConfirmed = true;
+        diagnostics.reason = 'reported-count-reconciled'; row.completionConfirmed = true; break;
+      }
+      if (action === 'probe-back') {
+        diagnostics.boundaryProbe.backMoved = row.movement !== null && row.movement < -4;
+        diagnostics.boundaryProbe.backPossible = before.top > 4;
+        phase = 'probe-forward'; quiet = 0; continue;
+      }
+      if (action === 'probe-forward') {
+        diagnostics.boundaryProbe.beyondAttempted = true;
+        diagnostics.boundaryProbe.rangeExtended = !sameBoundary(candidate.ranges, boundaryEvidence(afterContext));
+        diagnostics.boundaryProbe.returnedToBoundary = atEnd;
+        const returnedTail = candidate.tail.length === afterRendered.length
+          && candidate.tail.every((id, index) => id === afterRendered[index].providerItemId);
+        if (!returnedTail || !atEnd || diagnostics.boundaryProbe.rangeExtended) {
+          candidate = null; phase = 'discovery'; quiet = 0; continue;
+        }
+        if (diagnostics.boundaryProbe.backPossible && !diagnostics.boundaryProbe.backMoved) {
+          diagnostics.reason = 'boundary-probe-did-not-move'; break;
+        }
+        sweepSeen = new Set(); phase = 'verification'; quiet = 0;
+        diagnostics.verification.startedAtPass = passesRead + 1;
+        resetTraversal(afterContext); await wait(SCROLL_PAUSE_MS); continue;
+      }
+      if (quiet < 3) continue;
+      if (!rendered.length) { diagnostics.reason = 'no-readable-listing'; break; }
+      if (phase === 'discovery') {
+        candidate = { ids: new Set(discovered), ranges: boundaryEvidence(afterContext),
+          tail: afterRendered.map(item => item.providerItemId) };
+        diagnostics.verification.attempts += 1;
+        diagnostics.boundaryProbe = { backMoved: false, beyondAttempted: false, rangeExtended: false };
+        phase = 'probe-back'; quiet = 0; continue;
+      }
+      if (phase === 'verification') {
+        const missing = [...candidate.ids].filter(id => !sweepSeen.has(id)).length;
+        const rangesStable = sameBoundary(candidate.ranges, boundaryEvidence(afterContext));
+        const sameTail = candidate.tail.length === afterRendered.length
+          && candidate.tail.every((id, index) => id === afterRendered[index].providerItemId);
+        diagnostics.verification = { ...diagnostics.verification, completed: true, finishedAtPass: passesRead, revisitedItems: sweepSeen.size,
+          missingItems: missing, newItems: discovered.size - candidate.ids.size, rangesStable, sameTail, clear,
+          allListsExhausted: !inspectListing().remainingOtherScrollers };
+        if (missing || !rangesStable || !sameTail || !clear || !diagnostics.verification.allListsExhausted
+            || diagnostics.expectedCount !== null) {
+          diagnostics.reason = !clear ? 'continuation-unresolved' : missing ? 'verification-membership-mismatch'
+            : diagnostics.expectedCount !== null ? 'reported-count-unreached' : 'verification-boundary-conflict';
+          break;
+        }
+        diagnostics.completionStatus = 'inferred'; diagnostics.reason = 'verified-traversal-converged'; break;
       }
     }
-    if (!itemsById.size && !incremental) {
-      throw new Error(`Amazon Video showed no readable movie or TV cards${finished ? '' : ` within its ${MAX_SCROLLS}-pass limit`}. Open My Stuff > Purchases & Rentals, wait for titles to load, then try again.`);
-    }
     for (const card of observedCards) {
-      if (!amazonVideoItemFromCardData(cardDataFromElement(card))) throw new Error('Amazon Video showed unreadable library cards. No library changes were saved.');
+      if (!amazonVideoItemFromCardData(cardDataFromElement(card))) {
+        diagnostics.reason = 'unreadable-card';
+        throw new Error('Amazon Video showed unreadable library cards. No library changes were saved.');
+      }
     }
     const items = [...itemsById.values()];
-    if (!finished) {
-      diagnostics.state = 'uncertain';
-      diagnostics.reason = diagnostics.expectedCount === null ? 'completion-unconfirmed'
-        : diagnostics.expectedCount !== renderedItemIds.size ? 'reported-count-unreached' : 'continuation-unresolved';
-      diagnostics.stop = 'traversal-budget';
-      const countDetail = diagnostics.reason === 'reported-count-unreached'
-        ? `It reported ${diagnostics.expectedCount} items but returned ${items.length}. ` : '';
-      if (!readOnly) throw new Error(`Amazon Video read ${items.length} titles but could not confirm the entire library was loaded within its ${MAX_SCROLLS}-pass limit. ${countDetail}No library changes were saved. Use Scan diagnostics to inspect the listing without importing.`);
-      return { items, completionConfirmed: false };
+    if (!items.length && !incremental) throw new Error(`Amazon Video showed no readable movie or TV cards${passesRead === MAX_SCROLLS ? ` within its ${MAX_SCROLLS}-pass limit` : ''}. No library changes were saved.`);
+    if (['confirmed', 'inferred'].includes(diagnostics.completionStatus)) {
+      const confirmed = diagnostics.completionStatus === 'confirmed';
+      const snapshot = global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items,
+        [global.GalacticProviderSnapshot.completedScope('library', items.length, confirmed ? diagnostics.expectedCount : null,
+          confirmed ? 'reported-count' : 'scroll-end', passesRead)]);
+      diagnostics.state = confirmed ? 'complete' : 'inferred';
+      diagnostics.stop = confirmed ? 'reported-count' : 'verification-converged';
+      return { items, snapshot, completionConfirmed: confirmed, completionStatus: diagnostics.completionStatus };
     }
-    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-video', items,
-      [global.GalacticProviderSnapshot.completedScope('library', items.length, diagnostics.expectedCount, 'reported-count', passesRead)]);
-    if (!incremental) {
-      diagnostics.state = 'complete';
-      diagnostics.reason = 'reported-count-reconciled';
-    }
-    return { items, snapshot, completionConfirmed: diagnostics.completionConfirmed };
+    if (diagnostics.completionStatus === 'bounded') return { items, completionConfirmed: false, completionStatus: 'bounded' };
+    diagnostics.state = 'uncertain'; diagnostics.reason ??= 'traversal-budget';
+    diagnostics.stop = passesRead === MAX_SCROLLS ? 'emergency-budget' : 'verification-not-converged';
+    if (!readOnly) throw new Error(`Amazon Video read ${items.length} titles but could not establish a stable complete traversal. No library changes were saved. Export scan diagnostics and retry after the listing finishes loading.`);
+    return { items, completionConfirmed: false, completionStatus: 'uncertain' };
   }
 
   global.GalacticAmazonVideo = {

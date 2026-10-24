@@ -20,7 +20,7 @@ async function setup({nested=false,ids=[1,2,3,4],outside='',inside='',total=ids.
  win.eval(snapshotCode);win.eval(importerCode);
  return {win,doc,list,api:win.GalacticAmazonVideo,add:(...ids)=>list.insertAdjacentHTML('beforeend',ids.map(n=>card(n)).join('')),onPause:fn=>{onPause=fn;},onScroll:fn=>{onScroll=fn;},pauses:()=>pauses,scrolls:()=>scrolls};
 }
-async function rejects(page,pattern,message){let error;try{await page.api.fetchAmazonVideoLibrary();}catch(value){error=value;}assert(error&&pattern.test(error.message),message);return error;}
+async function rejects(page,pattern,message){let error;try{await page.api.fetchAmazonVideoLibrary();}catch(value){error=value;}assert(error&&pattern.test(error.message),message+(error?": "+error.message:": unexpectedly returned"));return error;}
 // Numeric progression derived from the sanitized live export; synthetic IDs,
 // titles and DOM only. The plateau is deliberately longer than in that export
 // to reproduce the timing-dependent premature-success branch.
@@ -31,14 +31,54 @@ async function plateauListing(total=null){
  const batches=new Map([[1,60],[4,100],[6,140],[8,180],[15,220],[18,260],[20,300],[22,340],[24,343]]);
  page.restart=()=>{const origin=page.pauses();render(60);page.onPause(n=>{if(batches.has(n-origin))render(batches.get(n-origin));});};page.restart();return page;
 }
+// Scroll-driven virtual grid: returning to the start really renders the head
+// again, so the verification sweep must rediscover every identity. Delayed
+// requests continue while the user/scanner moves away from the old boundary.
+async function virtualLibrary({plateau=false}={}){
+ const page=await setup({nested:true,ids:Array.from({length:60},(_,i)=>i+1),total:null});
+ let loaded=60,due=null;page.list.style.position='relative';
+ const render=()=>{
+  const first=Math.max(1,(Math.floor(page.list.scrollTop/20)-2)*6+1);
+  page.list.innerHTML=`<div style="height:${Math.ceil(loaded/6)*20}px"></div>`+Array.from({length:Math.max(0,Math.min(70,loaded-first+1))},(_,i)=>first+i).map(n=>card(n).replace('height:110px',`position:absolute;top:${Math.floor((n-1)/6)*20}px;left:${((n-1)%6)*16}%;height:20px`)).join('');
+ };
+ render();page.onScroll(render);
+ const liveProgression=new Map([[3,90],[4,100],[5,138],[6,140],[7,180],[8,216],[9,220],[10,260],[11,288],[12,300],[13,336],[14,343]]);
+ page.onPause(n=>{
+  if(!plateau){
+   const next=liveProgression.get(n);
+   if(next&&next>loaded){const anchored=page.list.scrollTop+page.list.clientHeight>=page.list.scrollHeight-4;loaded=next;render();if(anchored)page.list.scrollTo({top:page.list.scrollHeight,behavior:'instant'});}
+   return;
+  }
+  if(due!==null&&n>=due){loaded=Math.min(343,loaded+40);due=null;render();}
+  if(loaded<343&&due===null&&page.list.scrollTop+page.list.clientHeight>=page.list.scrollHeight-4)due=n+(plateau&&loaded===180?6:1);
+ });return page;
+}
 try{
- let page=await plateauListing();
- await rejects(page,/could not confirm/,'A six-pass unmarked plateau cannot become successful full coverage, even after all 343 synthetic titles are observed');
+ let page=await virtualLibrary({plateau:true});let result=await page.api.fetchAmazonVideoLibrary();
+ assert(result.items.length===343&&result.completionStatus==='inferred'&&!result.completionConfirmed,'A delayed 180-item plateau is passed and all 343 virtualized identities converge without a provider total');
  let evidence=page.api.getDiagnostics();
- assert(evidence.itemCount===343&&evidence.state==='uncertain'&&!evidence.completionConfirmed&&evidence.reason==='completion-unconfirmed','Unknown termination remains explicitly uncertain after traversing all later batches');
+ assert(!evidence.passes.some(pass=>pass.distinctItems===180&&pass.completionConfirmed)&&evidence.verification.revisitedItems===343&&evidence.verification.missingItems===0,'The final verification sweep independently revisits the whole discovered membership instead of accepting 180');
+ assert(evidence.boundaryProbe.beyondAttempted&&evidence.boundaryProbe.backMoved&&evidence.verification.rangesStable,'Inference requires active boundary movement, beyond-end attempts and stable scroll ranges');
+ assert(evidence.passes.length<80&&evidence.stop==='verification-converged','Converged traversal terminates through its protocol, far before the emergency 250-pass cap');
+ page=await virtualLibrary();result=await page.api.fetchAmazonVideoLibrary();
+ assert(result.items.length===343&&result.completionStatus==='inferred'&&page.api.getDiagnostics().passes.length<70,'An ordinary countless terminal library completes after a verification sweep rather than spinning to 250');
+ assert(page.api.getDiagnostics().passes.find(pass=>pass.distinctItems===343)?.pass===14,'The no-total live-progression fixture discovers all 343 identities by pass 14 without using that number as its stopping rule');
+ const sameItems=JSON.stringify(result.items);result=await page.api.fetchAmazonVideoLibrary();
+ assert(JSON.stringify(result.items)===sameItems&&result.completionStatus==='inferred','Repeated unchanged count-independent full traversals retain exact membership and inference classification');
+ page=await setup({total:null,inside:'<div id="pending" role="progressbar" hidden></div>'});
+ page.onPause(n=>{page.doc.querySelector('#pending').hidden=n!==2&&n<8;});
+ await rejects(page,/could not establish/,'Loading indicators disappearing and returning during verification cannot produce inferred success');
+ assert(page.api.getDiagnostics().reason==='continuation-unresolved'&&page.api.getDiagnostics().passes.length<40,'Unresolved loading terminates through a bounded failed verification instead of 250 idle polls');
+ page=await setup();page.onScroll(()=>{throw Error('Synthetic navigation failure');});
+ await rejects(page,/Synthetic navigation failure/,'An actual navigation exception fails rather than inferring a terminal state');
+ assert(page.api.getDiagnostics().state==='failed'&&page.api.getDiagnostics().completionStatus==='failed','Diagnostics distinguish operational failure from uncertain convergence');
+ page=await plateauListing();
+ await rejects(page,/could not establish/,'A six-pass unmarked plateau cannot become successful full coverage, even after all 343 synthetic titles are observed');
+ evidence=page.api.getDiagnostics();
+ assert(evidence.itemCount===343&&evidence.state==='uncertain'&&!evidence.completionConfirmed&&evidence.reason==='verification-membership-mismatch','Unknown termination remains explicitly uncertain after traversing all later batches');
  assert(evidence.passes.some(pass=>pass.distinctItems===180&&pass.unchangedPasses>=3)&&evidence.passes.some(pass=>pass.distinctItems>180),'Traversal continues beyond the old three-idle-pass stop at 180');
  assert(evidence.mediaTypes.movie===302&&evidence.mediaTypes.tv===41,'Diagnostics retain cumulative distinct movie and TV counts across virtualization');
- page=await plateauListing();let result=await page.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true});
+ page=await plateauListing();result=await page.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true});
  assert(result.items.length===343&&!result.snapshot&&!result.completionConfirmed,'Read-only discovery can return all observed items without certifying a complete snapshot');
  assert(page.api.getDiagnostics().passes.some(pass=>pass.newlyDiscoveredItems===0&&pass.distinctItems===180),'Diagnostics distinguish a temporary zero-discovery pass from cumulative membership');
  page=await plateauListing(343);result=await page.api.fetchAmazonVideoLibrary();
@@ -49,7 +89,7 @@ try{
  assert(result.items.length===0&&!result.snapshot&&!result.completionConfirmed&&page.api.getDiagnostics().reason==='known-newest-group','Quick update after a bad 180-item baseline checks the known newest group, not older missing titles');
  page=await setup({total:null,inside:'<aside><p>All items (4)</p></aside>',outside:'<p>All items (4)</p>'});
  result=await page.api.fetchAmazonVideoLibrary(()=>{},null,{readOnly:true});
- assert(result.items.length===4&&!result.snapshot&&page.api.getDiagnostics().countEvidence==='unavailable','A genuine-looking quiet terminal without library evidence stays uncertain; unrelated totals cannot certify it');
+ assert(result.items.length===4&&result.completionStatus==='inferred'&&result.snapshot.scopes[0].end==='scroll-end'&&page.api.getDiagnostics().countEvidence==='unavailable','A stable revisitable listing can infer completion without mistaking unrelated totals for confirmation');
  page=await setup();page.onPause(n=>{if(n===2)page.doc.querySelector('main p').textContent='All items (5)';});
  await rejects(page,/changed its whole-library total/,'A changing provider total invalidates the scan rather than approving a stale count');
  // The old implementation reads global continuation controls and never finishes.
@@ -99,11 +139,11 @@ try{
  assert(layout.scrollableContainers===2&&layout.remainingOtherScrollers===0&&layout.visibleNextLikeControls===1,'Export records visited scroller boundaries and accessible Next controls without recording their text');
  // A busy listing never qualifies, even when geometry/count stops changing.
  page=await setup({inside:'<div role="progressbar"></div>'});
- await rejects(page,/250-pass limit/,'A permanently busy listing fails instead of certifying a partial collection');
- assert(page.api.getDiagnostics().state==='uncertain'&&page.api.getDiagnostics().reason==='continuation-unresolved'&&page.api.getDiagnostics().passes.length===250,'Bounded failure diagnostics identify the unsatisfied continuation checks');
+ await rejects(page,/could not establish/,'A permanently busy listing fails instead of certifying a partial collection');
+ assert(page.api.getDiagnostics().state==='uncertain'&&page.api.getDiagnostics().reason==='continuation-unresolved'&&page.api.getDiagnostics().passes.length<40,'Bounded failure diagnostics identify the unsatisfied continuation checks');
  assert(!/PRIVATE_TITLE|amzn1|fixture-|https?:|cookie|token|account/i.test(JSON.stringify(page.api.getDiagnostics())),'Diagnostic export contains no titles, product IDs, URLs, account details or credentials');
- page=await setup({inside:'<button>Show more</button>'});await rejects(page,/250-pass limit/,'An unresponsive real library continuation control remains an incomplete scan');
- page=await setup({total:99});await rejects(page,/reported 99 items but returned 4/,'An explicit library count mismatch cannot become a complete snapshot');
+ page=await setup({inside:'<button>Show more</button>'});await rejects(page,/could not establish/,'An unresponsive real library continuation control remains an incomplete scan');
+ page=await setup({total:99});await rejects(page,/could not establish/,'An explicit library count mismatch cannot become a complete snapshot');
  page=await setup({ids:[]});await rejects(page,/no readable movie or TV cards/,'A missing or empty listing cannot erase the saved library');
  page=await setup();page.list.insertAdjacentHTML('beforeend',card(99,{bad:true}));await rejects(page,/unreadable library cards/,'Unreadable cards still prevent replacement');
  page=await setup({ids:[1,2,3]});page.list.innerHTML=card(1,{ownership:'Rental'})+card(2,{ownership:'Purchased'})+card(3,{ownership:'Included with Prime'});
@@ -140,24 +180,26 @@ try{
  const db=await writer.getDatabase();assert(Object.values(db.providerItems).filter(item=>item.provider==='amazon-video').length===4&&Object.values(db.providerItems).some(item=>item.provider==='gog'),'A validated full snapshot updates only Amazon Video records');
  const beforeCheck=JSON.stringify(db);messages=[];shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
  assert(messages.length===0&&imports===1&&failures===1&&JSON.stringify(await writer.getDatabase())===beforeCheck,'Check listing neither begins a sync lease nor writes scan health, records or imports');
- assert(shadow.querySelector('.status').textContent.includes('4 titles found')&&shadow.querySelector('.status').textContent.includes('match a whole-list total'),'A confirmed read-only check describes the actual count evidence without importing');
- shadow.querySelector('[data-export-diagnostics]').click();assert(JSON.parse(await exported.text()).operation.outcome==='checked-without-import','Read-only export identifies a check rather than a saved import');
+ assert(shadow.querySelector('.status').textContent.includes('4 titles found')&&shadow.querySelector('.status').textContent.includes('confirmed by a whole-list total'),'A confirmed read-only check describes the actual count evidence without importing');
+ shadow.querySelector('[data-export-diagnostics]').click();assert(JSON.parse(await exported.text()).operation.outcome==='confirmed-without-import','Read-only export identifies a check rather than a saved import');
  page.doc.querySelector('main p').remove();
+ await writer.mergeProviderItems('amazon-video',[{providerItemId:'unseen-saved-product',title:'Earlier saved title',mediaType:'movie',ownership:'rental',metadata:{authors:['Preserved creator']}}]);
+ const unseen=JSON.stringify(Object.values((await writer.getDatabase()).providerItems).find(item=>item.providerItemId==='unseen-saved-product'));
  knownIds=['amzn1.dv.gti.fixture-1','amzn1.dv.gti.fixture-2','amzn1.dv.gti.fixture-3','amzn1.dv.gti.fixture-4','unseen-saved-product'];
- shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===2&&!shadow.querySelector('.status').dataset.busy);
- assert(imports===1&&JSON.stringify(await writer.getDatabase())===beforeCheck&&shadow.querySelector('.status').textContent.includes('could not confirm'),'An uncorroborated shorter listing cannot replace the existing complete snapshot');
- shadow.querySelector('[data-export-diagnostics]').click();const uncertain=JSON.parse(await exported.text());
- assert(uncertain.completionConfirmed===false&&uncertain.reason==='completion-unconfirmed','Export explicitly marks uncertain completion without exposing product IDs');
- page.doc.querySelector('main').insertAdjacentHTML('afterbegin','<p>All items (4)</p>');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===2&&!shadow.querySelector('.status').dataset.busy);
+ assert(shadow.querySelector('.status').textContent.includes('inferred end')&&JSON.stringify(Object.values((await writer.getDatabase()).providerItems).find(item=>item.providerItemId==='unseen-saved-product'))===unseen,'Inferred full rescans save observations additively and preserve unseen source identity, metadata and access');
+ shadow.querySelector('[data-export-diagnostics]').click();const inferred=JSON.parse(await exported.text());
+ assert(inferred.completionStatus==='inferred'&&!inferred.completionConfirmed&&inferred.verification.completed,'Export distinguishes inferred convergence from provider-confirmed completeness');
+ page.doc.querySelector('main').insertAdjacentHTML('afterbegin','<p>All items (4)</p>');
+ shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===3&&!shadow.querySelector('.status').dataset.busy);
  assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete'),'A reconciled provider total permits a genuinely shorter snapshot through the existing validation gate');
  page.doc.querySelector('main').insertAdjacentHTML('beforeend','<div role="progressbar"></div>');messages=[];const beforeFailedCheck=JSON.stringify(await writer.getDatabase());
  shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
- assert(messages.length===0&&failures===2&&JSON.stringify(await writer.getDatabase())===beforeFailedCheck&&!shadow.querySelector('[data-export-diagnostics]').disabled,'An incomplete read-only check still exports evidence without recording a failed library sync');
- assert(shadow.querySelector('.status').textContent.includes('Completeness remains unconfirmed')&&page.api.getDiagnostics().completionConfirmed===false,'The read-only panel explains uncertainty instead of displaying a complete-library success');
+ assert(messages.length===0&&failures===1&&JSON.stringify(await writer.getDatabase())===beforeFailedCheck&&!shadow.querySelector('[data-export-diagnostics]').disabled,'An incomplete read-only check still exports evidence without recording a failed library sync');
+ assert(shadow.querySelector('.status').textContent.includes('Completion uncertain')&&page.api.getDiagnostics().completionConfirmed===false,'The read-only panel explains uncertainty instead of displaying a complete-library success');
  page.doc.querySelector('[role="progressbar"]').remove();page.doc.querySelector('main p').textContent='All items (8)';
  knownIds=['amzn1.dv.gti.fixture-1','amzn1.dv.gti.fixture-2','amzn1.dv.gti.fixture-3','amzn1.dv.gti.fixture-4'];
- shadow.querySelector('[data-mode="incremental"]').click();await waitFor(()=>imports===3&&!shadow.querySelector('.status').dataset.busy);
+ shadow.querySelector('[data-mode="incremental"]').click();await waitFor(()=>imports===4&&!shadow.querySelector('.status').dataset.busy);
  assert(shadow.querySelector('.status').textContent.includes('Newest-title check added 0')&&shadow.querySelector('.status').textContent.includes('Older titles were not fully checked'),'Quick-update UI makes its newest-only limitation explicit even when a legacy baseline was incomplete');
  assert(Object.values((await writer.getDatabase()).providerItems).filter(item=>item.provider==='amazon-video').length===4,'The bounded quick update preserves existing source membership without inventing older missing titles');
  await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

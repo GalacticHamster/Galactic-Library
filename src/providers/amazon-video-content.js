@@ -10,7 +10,7 @@
     <style>
       .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> checks newest additions and stops at an already saved group; it cannot repair older gaps from an incomplete scan. <strong>Full rescan</strong> replaces the saved listing only when completeness can be confirmed.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><details><summary>Scan diagnostics</summary><p>Check the listing without importing or changing your library, then export the scan checks.</p><button type="button" data-mode="inspect">Check listing (no import)</button> <button type="button" data-export-diagnostics disabled>Export scan diagnostics</button></details><p class="status" role="status"></p></div>`;
+    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> checks newest additions and stops at an already saved group; it cannot repair older gaps from an incomplete scan. <strong>Full rescan</strong> replaces the saved listing after checking the full traversal; an inferred end keeps earlier saved titles.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><details><summary>Scan diagnostics</summary><p>Check the listing without importing or changing your library, then export the scan checks.</p><button type="button" data-mode="inspect">Check listing (no import)</button> <button type="button" data-export-diagnostics disabled>Export scan diagnostics</button></details><p class="status" role="status"></p></div>`;
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const exportButton = shadow.querySelector('[data-export-diagnostics]');
   const status = shadow.querySelector('.status');
@@ -26,11 +26,11 @@
       if (mode === 'inspect') {
         scanStarted = true;
         await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ movies, tv, phase }) => {
-          status.textContent = `Checking listing: ${movies} movies and ${tv} TV titles found.${phase === 'awaiting-confirmation' ? ' Waiting for end-of-library evidence.' : ''} No library records will be changed.`;
+          status.textContent = `Checking listing: ${movies} movies and ${tv} TV titles found.${phase === 'verification' ? ' Verifying the listing again.' : phase === 'boundary-probe' ? ' Checking the end of the list.' : ''} No library records will be changed.`;
         }, null, { readOnly: true });
         const checked = globalThis.GalacticAmazonVideo.getDiagnostics();
-        exportContext.outcome = checked.completionConfirmed ? 'checked-without-import' : 'uncertain-without-import';
-        status.textContent = `Listing check ended: ${checked.itemCount} titles found (${checked.mediaTypes.movie} movies and ${checked.mediaTypes.tv} TV titles). ${checked.completionConfirmed ? 'The observed IDs match a whole-list total shown on the page.' : 'Completeness remains unconfirmed; a loading pause is not proof of the end.'} No library records were changed. Export the scan diagnostics for investigation.`;
+        exportContext.outcome = checked.completionStatus + '-without-import';
+        status.textContent = `Listing check ended: ${checked.itemCount} titles found (${checked.mediaTypes.movie} movies and ${checked.mediaTypes.tv} TV titles). ${checked.completionStatus === 'confirmed' ? 'Completion confirmed by a whole-list total.' : checked.completionStatus === 'inferred' ? 'End inferred from boundary checks and a verification sweep; Amazon did not confirm a total.' : 'Completion uncertain; the traversal checks did not agree.'} No library records were changed. Export the scan diagnostics for investigation.`;
         return;
       }
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'amazon-video' });
@@ -38,21 +38,25 @@
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Amazon Video baseline yet; reading the complete library once…';
       scanStarted = true;
-      const { items, snapshot } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv, phase }) => {
-        status.textContent = `Reading Amazon Video library: ${movies} movies and ${tv} TV titles found.${phase === 'awaiting-confirmation' ? ' Waiting for end-of-library evidence; no records will be replaced without confirmation.' : ''}`;
+      const { items, snapshot, completionStatus } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv, phase }) => {
+        status.textContent = `Reading Amazon Video library: ${movies} movies and ${tv} TV titles found.${phase === 'verification' ? ' Verifying the listing again.' : phase === 'boundary-probe' ? ' Checking the end of the list.' : ''}`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       if (fullRescan) {
         const found = new Set(items.map(item => item.providerItemId));
         const known = new Set(state.syncState?.knownProviderItemIds ?? []);
         const missing = [...known].filter(id => !found.has(id)).length;
         exportContext.baselineComparison = { previousItems: known.size, foundItems: found.size, missingPreviousItems: missing };
-        if (missing && snapshot?.scopes?.[0]?.expectedCount === null) throw new Error(`The listing did not include ${missing} previously saved title${missing === 1 ? '' : 's'}, and Amazon did not provide a total to confirm completeness. No library changes were saved. Use Scan diagnostics to check the listing without importing.`);
+        if (missing && completionStatus !== 'inferred' && snapshot?.scopes?.[0]?.expectedCount === null) throw new Error(`The listing did not include ${missing} previously saved title${missing === 1 ? '' : 's'}, and Amazon did not provide a total to confirm completeness. No library changes were saved. Use Scan diagnostics to check the listing without importing.`);
       }
       status.textContent = items.length ? `Saving ${items.length} Amazon Video title${items.length === 1 ? '' : 's'} locally...` : 'No new Amazon Video titles; recording the completed check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-video', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Video import did not complete.');
       exportContext.outcome = 'saved';
+      if (fullRescan && completionStatus === 'inferred') {
+        status.textContent = `Full rescan finished (inferred end). ${items.filter(item => item.mediaType === 'movie').length} movies and ${items.filter(item => item.mediaType === 'tv').length} TV titles found. Observed titles saved; earlier saved titles were kept.`;
+      } else {
       status.textContent = `${fullRescan ? 'Full rescan complete' : `Newest-title check added ${items.length} Amazon Video title${items.length === 1 ? '' : 's'}`}. ${response.movieCount} Amazon Video movie${response.movieCount === 1 ? '' : 's'} and ${response.tvCount} TV title${response.tvCount === 1 ? '' : 's'} stored locally.${fullRescan ? '' : ' Older titles were not fully checked.'}`;
+      }
     } catch (error) {
       exportContext.outcome = 'failed';
       if (mode !== 'inspect') await globalThis.GalacticSync.failed('amazon-video',error);

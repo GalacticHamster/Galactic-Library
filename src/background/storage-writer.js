@@ -918,6 +918,23 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    // Amazon's count-independent traversal is inferred, not authoritative
+    // absence evidence. Reuse additive reconciliation under the same lease,
+    // validation and stale-save guards; never archive an unseen title.
+    if (provider === 'amazon-video') {
+      const scope = snapshot.scopes[0];
+      if (snapshot.scopes.length !== 1 || scope.id !== 'library' || scope.readCount !== snapshot.itemCount) {
+        throw Error('Amazon Video provided inconsistent library completion evidence. Previous records were kept.');
+      }
+      if (scope.end === 'scroll-end' && scope.expectedCount === null) {
+        return mergeIntoDatabase(provider, values, { ...syncDetails,
+          scanDiagnostics: { ...syncDetails.scanDiagnostics, coverageLimit: 'inferred-scroll-convergence-preserve-unseen' }
+        }, authoritativeDatabase, null, beforeSave, completion);
+      }
+      if (scope.end !== 'reported-count' || scope.expectedCount === null) {
+        throw Error('Amazon Video did not provide supported completion evidence. Previous records were kept.');
+      }
+    }
     const database = authoritativeDatabase??await getDatabase();
     const now = new Date().toISOString();
     const priorActiveId=database.providers[provider]?.activeProfileId;

@@ -202,6 +202,38 @@ export const providerSnapshotTests = [
     const malformed = providerContext('steam-store', async () => json({ rgOwnedApps: [1, 'invalid'] }));
     await assert.rejects(malformed.GalacticSteamStore.fetchOwnedSteamGames(), /malformed owned-App-ID list/u);
   }],
+  ['Amazon Video inferred full scans preserve unseen records and other accounts in the actual worker', () => withWorker(async ({dispatch,pageA,importItems}) => {
+    await importItems('gog',[{providerItemId:'unrelated',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);
+    const sender={...kindleSender,url:'https://www.amazon.com/gp/video/library',tab:{id:17}};
+    const items=[{providerItemId:'seen',title:'Seen movie',mediaType:'movie',ownership:'unknown'},
+      {providerItemId:'unseen',title:'Preserved rental',mediaType:'movie',ownership:'rental',metadata:{authors:['Preserved creator']}}];
+    const begin=async label=>{const result=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'amazon-video',beginScan:true,confirmed:true,profileLabel:label,mode:'full',switchProfile:true},sender);assert.equal(result.ok,true,result.error);return result;};
+    const commit=(scan,values,snapshot)=>dispatch({type:'COMMIT_PROVIDER_SCAN',provider:'amazon-video',mode:'full',scanToken:scan.scanToken,items:values,snapshot},sender);
+    for(const label of ['Personal','Other account']){const response=await commit(await begin(label),items,snapshotFixture('amazon-video',items));assert.equal(response.ok,true,response.error);}
+    const scan=await begin('Personal'),before=await pageA.getDatabase();
+    const inferred=[items[0],{providerItemId:'new',title:'New observation',mediaType:'tv',ownership:'unknown'}];
+    const snapshot=completeProviderSnapshot('amazon-video',inferred,[completedScope('library',2,null,'scroll-end',12)]);
+    const response=await commit(scan,inferred,snapshot);assert.equal(response.ok,true,response.error);
+    const after=await pageA.getDatabase();
+    for(const [id,item]of Object.entries(before.providerItems))if(item.profileId!==scan.profileId||item.providerItemId==='unseen')assert.deepEqual(after.providerItems[id],item);
+    assert.equal(Object.keys(after.providerHistory).length,Object.keys(before.providerHistory).length);
+    assert.equal(after.providerProfiles[scan.profileId].state.syncHealth.status,'partial');
+    assert.equal(after.providerProfiles[scan.profileId].state.syncHealth.coverageLimit,'inferred-scroll-convergence-preserve-unseen');
+    assert.equal(Object.values(after.providerItems).filter(item=>item.profileId===scan.profileId).length,3);
+    const stale=await commit(scan,inferred,snapshot);assert.equal(stale.ok,false);assert.deepEqual((await pageA.getDatabase()).providerItems,after.providerItems);
+    const countedScan=await begin('Personal');const counted=await commit(countedScan,[inferred[1]],snapshotFixture('amazon-video',[inferred[1]]));assert.equal(counted.ok,true,counted.error);
+    const confirmed=await pageA.getDatabase();assert.equal(Object.values(confirmed.providerItems).filter(item=>item.profileId===scan.profileId).length,1);
+    assert(Object.values(confirmed.providerHistory).some(entry=>entry.item.providerItemId==='unseen'&&entry.item.profileId===scan.profileId));
+  })],
+  ['Amazon Video inferred reconciliation still rejects malformed complete-snapshot attestations', () => withWorker(async ({pageA}) => {
+    const items=[{providerItemId:'one',title:'Retained movie',mediaType:'movie',ownership:'owned'}];
+    await pageA.mergeProviderItems('amazon-video',items);const before=await pageA.getDatabase();
+    const snapshot=completeProviderSnapshot('amazon-video',items,[completedScope('library',1,null,'scroll-end',8)]);
+    await assert.rejects(pageA.replaceProviderItems('amazon-video',items,{syncMode:'full'},{...snapshot,itemCount:2}),/snapshot item count/);
+    await assert.rejects(pageA.replaceProviderItems('amazon-video',items,{syncMode:'full'},{...snapshot,scopes:[{...snapshot.scopes[0],readCount:2}]}),/inconsistent library completion/);
+    await assert.rejects(pageA.replaceProviderItems('amazon-video',items,{syncMode:'full'},{...snapshot,scopes:[{...snapshot.scopes[0],end:'pagination-end'}]}),/supported completion evidence/);
+    assert.deepEqual(await pageA.getDatabase(),before);
+  })],
   ['Amazon Video rejects a scroll limit instead of certifying a partial library', async () => {
     const scrollingElement = { scrollTop: 0, scrollHeight: 1000 };
     const context = providerContext('amazon-video', async () => { throw new Error('No fetch expected.'); }, {
