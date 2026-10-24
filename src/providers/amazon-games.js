@@ -61,11 +61,13 @@
       title,
       mediaType: 'game',
       ownership: direct ? 'claimed' : 'unknown',
+      acquiredAt: card.collectedOn ? card.collectedOn+'T00:00:00.000Z' : null,
       metadata: {
         source: 'amazon-games-collection',
         detailUrl: '',
         imageUrl: absoluteUrl(card?.imageUrl),
-        delivery: description
+        delivery: description,
+        ...(card.collectedOn?{collectedOn:card.collectedOn}:{})
       }
     };
   }
@@ -137,8 +139,8 @@
     const read = () => {
       const body = bodyId ? header.ownerDocument.getElementById(bodyId) : null;
       const text = body?.innerText || body?.textContent || '';
-      return { bodyPresent: Boolean(body), collectedLabelPresent: /\bCollected on\b/iu.test(text), deliveryTarget: deliveryTargetFromText(text), collected:
-        /\bCollected on\s*:?\s*(?:\d{4}-\d{2}-\d{2}|[a-z]{3,9}\s+\d{1,2},?\s*\d{4}|\d{1,2}\s+[a-z]{3,9}\s+\d{4})\b/iu.test(text) };
+      const collectedOn=global.GalacticAmazonGamesIdentity.collectedFromText(text);
+      return { bodyPresent: Boolean(body), collectedLabelPresent: /\bCollected on\b/iu.test(text), deliveryTarget: deliveryTargetFromText(text), collectedOn, collected:Boolean(collectedOn) };
     };
     let details = read();
     if (details.deliveryTarget || !needsDestination && details.collected) return details;
@@ -324,9 +326,10 @@
     }
     if (!rangesWithClaims) throw new Error('No readable claim cards were found in any selected date range. Open My Collection, select Games, and wait for it to load.');
     return {
-      items: [...itemsById.values()],
+      items: await global.GalacticAmazonGamesIdentity.consolidate([...itemsById.values()]),
       diagnostics: { ...totals, windowsRead: selectedWindows.length, windowsTotal: selectedWindows.length, rangesWithClaims, emptyRanges: selectedWindows.length - rangesWithClaims, timeWindows: selectedWindows.map((window) => window.label) },
-      snapshot: quickUpdate ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-games', [...itemsById.values()], scopes)
+      snapshot: undefined,
+      completedScopes: scopes
     };
   }
 
@@ -337,8 +340,10 @@
         diagnostics.counters = Object.fromEntries(Object.entries(progress).filter(([, value]) => typeof value === 'number'));
         reportProgress(progress);
       }, quickUpdate);
+      if(!quickUpdate)result.snapshot=global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-games',result.items,result.completedScopes);
+      delete result.completedScopes;
       const {timeWindows, ...counts} = result.diagnostics;
-      diagnostics = { ...diagnostics, state: 'complete', counters: counts,
+      diagnostics = { ...diagnostics, state: 'complete', counters: {...counts,evidenceGroups:result.items.length,missingAcquisitionDates:result.items.filter(item=>!item.acquiredAt).length},
         access: { direct: result.items.filter(item => item.ownership === 'claimed').length,
           unconfirmed: result.items.filter(item => item.ownership === 'unknown').length } };
       return result;

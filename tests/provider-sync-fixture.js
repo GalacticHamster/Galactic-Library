@@ -2,11 +2,14 @@ import {createEmptyDatabase,validateDatabase,normalizeProviderItem} from '../src
 import {newProviderProfile} from '../src/lib/provider-profiles.js';
 import {PROVIDER_SOURCES} from '../src/lib/metadata-validation.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
+import '../src/providers/amazon-games-identity.js';
+const amazonValue=await globalThis.GalacticAmazonGamesIdentity.identify({provider:'amazon-games',providerItemId:'transient-example',title:'Synthetic parity record',mediaType:'game',ownership:'owned',metadata:{source:PROVIDER_SOURCES['amazon-games']}});
 
 export const providerSyncModes=p=>p==='epic'||p==='nintendo'?['full']:['full','incremental'];
 export const consoleProvider=p=>['nintendo','playstation','xbox'].includes(p);
 export const fingerprint='a'.repeat(64),oldObservation='2020-01-01T00:00:00.000Z';
 export function providerSyncValue(provider){
+ if(provider==='amazon-games')return structuredClone(amazonValue);
  const mediaType=['kindle','kobo','humble','fanatical'].includes(provider)?'book':provider==='audible'?'audiobook':['amazon-video','fandango-at-home'].includes(provider)?'movie':'game';
  return {provider,providerItemId:provider==='xbox'?'9N0000000001':'synthetic-1',title:'Synthetic parity record',mediaType,ownership:'owned',metadata:{source:PROVIDER_SOURCES[provider],
   ...(provider==='xbox'?{productId:'9N0000000001',accessBasis:'personal-owned-web-catalog',accessTypes:[1]}:{})}};

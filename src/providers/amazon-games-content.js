@@ -26,14 +26,14 @@
       const fullRescan = mode === 'full' || !state.hasFullBaseline || !Number.isFinite(ageMs) || ageMs > 70 * 24 * 60 * 60 * 1000;
       if (fullRescan && mode !== 'full') status.textContent = state.hasFullBaseline ? 'Your last Amazon Games sync is over 70 days old; scanning all years to avoid a gap…' : 'No complete Amazon Games import yet; checking all years…';
       scanStarted = true;
-      const { items, diagnostics, snapshot } = await globalThis.GalacticAmazonGames.fetchAmazonGames(({ totalGames }) => {
-        status.textContent = `Checking your Amazon Games collection: ${totalGames} game entries found.`;
+      const { items, diagnostics, snapshot } = await globalThis.GalacticAmazonGames.fetchAmazonGames(() => {
+        status.textContent = 'Checking your Amazon Games collection...';
       }, !fullRescan);
       if (!items.length && fullRescan) throw new Error('No Amazon Games library entries were found. Code claims and deliveries to other stores are excluded. Select Games in My Collection and wait for it to load before retrying. No library records were replaced.');
       status.textContent = items.length ? `Saving ${items.length} Amazon Games claim${items.length === 1 ? '' : 's'} locally...` : 'Recording the completed Amazon Games check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-games', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Games import did not complete.');
-      const scope = fullRescan ? `Full import complete. ${response.gameCount} Amazon Games entries saved.`
+      const scope = fullRescan ? `Full import complete. ${new Set(items.map(item=>item.title)).size} games found. ${response.gameCount} library entries saved.`
         : `Recent claims checked. ${items.length} Amazon Games entries refreshed; earlier entries were kept.`;
       status.textContent = `${scope}${diagnostics.otherLibraryClaims || diagnostics.productKeyClaims ? ' Code claims and deliveries to other stores were not added.' : ''}${diagnostics.unreadableCards ? ` ${diagnostics.unreadableCards} entries lacked clear delivery details; earlier confirmed access and your corrections were kept.` : ''}`;
     } catch (error) {

@@ -93,6 +93,8 @@
   "src/lib/zip-metadata.js",
   "src/providers/amazon-games-content.js",
   "src/providers/amazon-games.js",
+  "src/providers/amazon-games-identity.js",
+  "src/lib/amazon-games-reconciliation.js",
   "src/providers/amazon-video-content.js",
   "src/providers/amazon-video.js",
   "src/providers/audible-content.js",

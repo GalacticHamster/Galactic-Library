@@ -30,6 +30,7 @@ export function consolidateLibraryRows(rows,database){
   }
   const historical=new Map();
   for(const entry of Object.values(database.providerHistory??{})){
+    if(entry.reason==='duplicate-observation')continue;
     const record=entry.item;if(!record)continue;
     const key=record.mediaType+':'+policy.presentationTitle(record.title,record.mediaType),list=historical.get(key)??[];
     list.push({...record,historical:true});historical.set(key,list);
@@ -80,6 +81,7 @@ export function acquisitionHistory(records,database){
     entry.dates=unique([...entry.dates,source.date]);entry.confirmedPurchase||=source.confirmed===true;entries.set(key,entry);return entry;
   };
   for(const record of records){
+    if(database.providerHistory?.[record.recordRef]?.reason==='duplicate-observation')continue;
     const scope=JSON.stringify([record.provider,record.profileId??'']),metadata=record.metadata??{};
     if(record.provider==='humble'&&metadata.purchaseId){
       const entry=add(humbleOrder(record),record,{bundle:metadata.sourceBundle,date:record.acquiredAt,confirmed:true});entry.purchaseRef=metadata.purchaseId;continue;
@@ -96,7 +98,7 @@ export function acquisitionHistory(records,database){
       continue;
     }
     // A catalog record without an order/occurrence is not another proven purchase.
-    add(scope+':record:'+(record.providerItemId||record.recordRef),record,{bundle:metadata.sourceBundle||metadata.bundleTitle,date:record.acquiredAt});
+    add(scope+':record:'+(record.providerItemId||record.recordRef),record,{bundle:metadata.sourceBundle||metadata.bundleTitle,date:record.provider==='amazon-games'?(metadata.collectedOn||record.acquiredAt):record.acquiredAt});
   }
   for(const [key,group]of fanGroups)entries.get(key).quantity=Math.max(group.native.size,group.maximum);
   const claims=repeatedClaimProjection(database),groups=new Map();
@@ -146,6 +148,11 @@ export function createAcquisitionHistory(history,database={}){
       if(entry.claims===1)item.append(text('p',(entry.confirmedPurchase?'Purchase date: ':'Acquisition date: ')+datesLabel(entry.dates)));
       item.append(text('p',entry.access.join('; ')));
       if(!entry.confirmedPurchase)item.append(text('small','Purchase details are not recorded; this is a saved library record.'));
+      if(entry.provider==='amazon-games'){
+        const originals=Object.values(database.providerHistory??{}).filter(value=>value.reason==='duplicate-observation'&&entry.records.some(record=>record.recordRef===value.duplicateOf));
+        if(originals.length){const saved=text('details','');saved.append(text('summary','Earlier observations ('+originals.length+')'));
+          saved.addEventListener('toggle',()=>{if(!saved.open||saved.dataset.built)return;saved.dataset.built='true';const list=text('ul','');for(const value of originals)list.append(text('li',value.item.title+' — '+value.item.providerItemId));saved.append(list);});item.append(saved);}
+      }
       if(entry.confirmedPurchase){const originals=text('details','');originals.className='acquisition-transactions';originals.append(text('summary',entry.claims>1?'Original transactions ('+entry.claims+')':'Original transaction'));let loaded=false;
         originals.addEventListener('toggle',()=>{if(!originals.open||loaded)return;loaded=true;const transactions=text('ul','');for(const transaction of entry.transactions)transactions.append(transactionItem(transaction,database));originals.append(transactions);});item.append(originals);
       }

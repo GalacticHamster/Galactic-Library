@@ -7,7 +7,7 @@ import {validateKindleCategoryPaths} from './kindle-categories.js';
 export const PROVIDER_SOURCES = Object.freeze({steam:'steam-store-browse-items',gog:'gog-account-library',epic:'epic-store-library','amazon-games':'amazon-games-collection',audible:'audible-library-page',kindle:'amazon-kindle-content-library','amazon-video':'amazon-prime-video-purchases-library','fandango-at-home':'fandango-at-home-library',kobo:'kobo-my-books-library',fanatical:'fanatical-order-history',humble:'humble-purchase-library',nintendo:'nintendo-virtual-game-cards',playstation:'playstation-web-purchased-library',xbox:'xbox-web-library'});
 const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com'],'amazon-games':['gaming.amazon.com','luna.amazon.com'],audible:['audible.com'],kindle:['amazon.com'],'amazon-video':['amazon.com'],'fandango-at-home':['athome.fandango.com'],kobo:['kobo.com'],fanatical:['fanatical.com'],humble:['humblebundle.com']};
 const FIELDS = {
-  steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery'],
+  steam:['parentProviderItemId'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery','collectedOn','claimKey','claimProductKey','claimBasis','observationIds','deliveryDestination'],
   audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
   fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
@@ -76,6 +76,10 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
   const result = {};
   for (const key of [...COMMON,...(FIELDS[provider]??[])]) {
     if (!Object.hasOwn(value,key)) continue;
+    if(provider==='amazon-games'&&key==='observationIds'){result[key]=strings(value[key],10000,500,key);continue;}
+    if(provider==='amazon-games'&&key==='collectedOn'){const parsed=date(value[key],key);if(parsed)result[key]=parsed.slice(0,10);continue;}
+    if(provider==='amazon-games'&&['claimKey','claimProductKey'].includes(key)){if(!/^[a-f0-9]{64}$/u.test(value[key]))throw Error('Invalid Amazon Games evidence key.');result[key]=value[key];continue;}
+    if(provider==='amazon-games'&&key==='claimBasis'){if(!['dated-evidence','undated-evidence'].includes(value[key]))throw Error('Invalid Amazon Games evidence basis.');result[key]=value[key];continue;}
     if(provider==='xbox'&&['accessTypes','supportedPlatforms'].includes(key)){if(!Array.isArray(value[key])||value[key].length>64||value[key].some(n=>!Number.isSafeInteger(n)||n<1||n>2147483647))throw Error('Invalid Xbox access/platform flags.');result[key]=[...new Set(value[key])].sort((a,b)=>a-b);}
     else if(key==='purchaseOrigins')result[key]=validatePurchaseOrigins(value[key]);
     else if(provider==='playstation'&&['isActive','isTrial'].includes(key)){if(typeof value[key]!=='boolean')throw Error('Invalid PlayStation access flag.');result[key]=value[key];}

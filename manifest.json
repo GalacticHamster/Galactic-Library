@@ -158,6 +158,7 @@
         "src/providers/floating-panel.js",
         "src/providers/provider-snapshot.js",
         "src/providers/metadata.js",
+        "src/providers/amazon-games-identity.js",
         "src/providers/amazon-games.js",
         "src/providers/amazon-games-content.js"
       ],

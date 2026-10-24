@@ -67,7 +67,9 @@ export const providerFullStartTests=[
    if(consoleProvider(p)){assert(missing.providerItems[prior.id]);assert.equal(missing.providerItems[prior.id].observedAt,prior.observedAt);}
    else{assert(!missing.providerItems[prior.id]);assert.equal(missing.providerHistory[prior.recordRef].item.observedAt,prior.observedAt);}
    s=await begin(h,p);await finish(h,p,s,[{...raw,title:'Changed metadata'},added]);
-   const restored=await h.writer.getDatabase();assert.equal(restored.providerItems[prior.id].title,'Changed metadata');assert.equal(restored.providerItems[prior.id].recordRef,prior.recordRef);assert(!restored.providerHistory[prior.recordRef]);
+   const restored=await h.writer.getDatabase();
+   if(p==='amazon-games'){assert(Object.values(restored.providerItems).some(item=>item.title==='Changed metadata'));assert(restored.providerHistory[prior.recordRef]);}
+   else{assert.equal(restored.providerItems[prior.id].title,'Changed metadata');assert.equal(restored.providerItems[prior.id].recordRef,prior.recordRef);assert(!restored.providerHistory[prior.recordRef]);}
  }]),
  ['full admission: concurrent scans, wrong tabs/mode and changed catalog reject stale full results',async()=>{
    const h=performanceWriter(library('epic'));await h.writer.getQueryDatabase();const a=await begin(h,'epic'),b=await begin(h,'epic');

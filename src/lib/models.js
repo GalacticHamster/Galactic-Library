@@ -217,13 +217,19 @@ function* databaseSteps(value) {
   object(value.providerHistory??{},'Provider history');
   if(Object.keys(value.providerHistory??{}).length>500000)throw new Error('Provider history exceeds its limit.');
   const historyEntries=[];
+  let currentByReference;
   for(const [ref,entry] of Object.entries(value.providerHistory??{})){
     yield;
     object(entry,'Historical record');
-    if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref)||!['missing-from-complete-scan','profile-switch'].includes(entry.reason))throw new Error('Invalid historical record.');
+    if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(ref)||!['missing-from-complete-scan','profile-switch','duplicate-observation'].includes(entry.reason))throw new Error('Invalid historical record.');
     const item=normalizeProviderItem({...entry.item,observedAt:entry.item?.observedAt??null},entry.item?.updatedAt,{profileKeySpace:profileFor(entry.item).keySpace});
     if(item.recordRef!==ref)throw Error('Historical reference does not match its record.');
-    historyEntries.push([ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason}]);
+    if(entry.reason==='duplicate-observation'){
+      currentByReference??=new Map(Object.values(providerItems).map(row=>[row.recordRef,row]));
+      const target=currentByReference.get(entry.duplicateOf)??(value.providerHistory?.[entry.duplicateOf]?.reason!=='duplicate-observation'?value.providerHistory?.[entry.duplicateOf]?.item:null);
+      if(item.provider!=='amazon-games'||!target||target.provider!=='amazon-games'||target.profileId!==item.profileId||target.recordRef===item.recordRef)throw Error('Invalid repeated Amazon Games observation association.');
+    }
+    historyEntries.push([ref,{item,profileLabel:text(entry.profileLabel??'',100,'Historical profile'),missingSince:date(entry.missingSince),reason:entry.reason,...(entry.reason==='duplicate-observation'?{duplicateOf:entry.duplicateOf}:{})}]);
   }
   const providerHistory=Object.fromEntries(historyEntries);
   const refs=new Set();

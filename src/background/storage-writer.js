@@ -1,4 +1,5 @@
 import {identicalCapture} from '../lib/source-history.js';
+import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
 import {comicCoverageNameKey} from '../lib/comic-series-names.js';
 import {comicCoverage} from '../lib/comic-coverage.js';
@@ -591,6 +592,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave,completion);
     }
     if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
+      &&(provider!=='amazon-games'||!values.length||!Object.values(database.providerItems).some(item=>item.profileId===profile.profileId&&!item.providerItemId.startsWith('claim-v1-')))
       &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics','syncState'].includes(key))
       &&(!Object.hasOwn(syncDetails,'syncState')||equalDatabaseData(syncDetails.syncState,profile.state.syncState))){
       preparedIncoming=timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
@@ -869,6 +871,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
+    if(incoming.provider==='amazon-games'&&previous){
+      incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...incoming.metadata,
+        ...(previous.metadata.collectedOn&&!incoming.metadata.collectedOn?{collectedOn:previous.metadata.collectedOn}:{}),
+        ...(previous.metadata.observationIds?.length?{observationIds:previous.metadata.observationIds}:{})}};
+    }
     if(incoming.provider==='amazon-games'&&previous?.mediaType===incoming.mediaType
         &&incoming.ownership==='unknown'&&['owned','claimed'].includes(previous.ownership)){
       incoming={...incoming,ownership:previous.ownership,metadata:{...incoming.metadata,delivery:
@@ -937,6 +944,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    if(provider==='amazon-games'&&snapshot.scopes.some(scope=>scope.expectedCount===null))return mergeIntoDatabase(provider,values,{...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,coverageLimit:'inferred-scroll-convergence-preserve-unseen'}},authoritativeDatabase,null,beforeSave,completion);
     // Amazon's count-independent traversal is inferred, not authoritative
     // absence evidence. Reuse additive reconciliation under the same lease,
     // validation and stale-save guards; never archive an unseen title.
@@ -958,6 +966,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const now = new Date().toISOString();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='amazon-games')values=await prepareAmazonGamesImport(database,profile.profileId,values);
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
     const historicalById=historicalRecords(database,profile.profileId);
     if(activeTiming)activeTiming.recordsNormalized=(activeTiming.recordsNormalized??0)+values.length;
@@ -1032,9 +1041,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
     const now = new Date().toISOString();
+    if(provider==='amazon-games'){values=await prepareAmazonGamesImport(database,profile.profileId,values);preparedIncoming=null;}
     const incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
+    if(provider==='amazon-games'&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

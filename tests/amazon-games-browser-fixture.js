@@ -2,24 +2,28 @@
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {createEmptyDatabase,normalizeProviderItem,validateDatabase} from '../src/lib/models.js';
+import {newProviderProfile} from '../src/lib/provider-profiles.js';
+import {acquisitionHistory,createAcquisitionHistory} from '../src/ui/library-acquisitions.js';
 const checks=[];
 const assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
-const codes=await Promise.all(['provider-snapshot','amazon-games','amazon-games-content'].map(async name=>(await fetch(`/src/providers/${name}.js`)).text()));
+const codes=await Promise.all(['provider-snapshot','amazon-games','amazon-games-content','amazon-games-identity'].map(async name=>(await fetch(`/src/providers/${name}.js`)).text()));
 const nativeTimeout=setTimeout;
 let frame;
-async function setup(windows){
+async function setup(windows,{churn=false,reverse=false}={}){
  frame?.remove();frame=document.createElement('iframe');frame.style.cssText='width:800px;height:500px';
  const loaded=new Promise(resolve=>frame.onload=resolve);
  frame.srcdoc='<main><div data-a-target="time-window-filter-dropdown"><p title="2026">2026</p></div><div id="rows"></div></main><aside><div data-a-target="accordion-header">Unrelated card</div><button>See 10 more</button></aside><div data-a-target="time-window-filter-flyout"></div>';
  document.body.append(frame);await loaded;
- const win=frame.contentWindow,doc=win.document;let pending=[],expansions=0,redemptions=0,selected=[];
+ const win=frame.contentWindow,doc=win.document;let pending=[],expansions=0,redemptions=0,selected=[],renders=0;
  const render=id=>{
   selected.push(id);doc.querySelector('[data-a-target="time-window-filter-dropdown"] p').title=id==='past-3-months'?'Past 3 months':id;
   doc.querySelector('[data-a-target="time-window-filter-dropdown"] p').textContent=id;
   doc.querySelector('#rows').innerHTML='';pending=[];
-  const rows=windows[id]??[];
+  renders++;const rows=[...(windows[id]??[])];if(reverse)rows.reverse();
   if(!rows.length)doc.querySelector('#rows').textContent='No games collected';
-  for(const row of rows){
+  for(const original of rows){
+   const row=churn?{...original,id:`render-${renders}-${original.id}`}:original;
    const header=doc.createElement('section');header.dataset.aTarget='accordion-header';
    const button=doc.createElement('button');button.setAttribute('aria-controls',`${row.id}-body`);button.setAttribute('aria-expanded',row.expanded?'true':'false');button.textContent=row.actionButton===true?'Claim Code':row.actionButton||'Details';
    const title=doc.createElement('h3');title.title=row.title??'Synthetic game';title.textContent=title.title;
@@ -28,7 +32,7 @@ async function setup(windows){
    button.onclick=()=>{if(row.actionButton){redemptions++;return;}expansions++;button.setAttribute('aria-expanded','true');if(row.delayed)pending.push({left:2,body,text:row.body});};
    const redeem=doc.createElement('button');redeem.textContent='Claim Code';redeem.onclick=()=>{redemptions++;};body.append(doc.createTextNode('\n'),redeem);
    header.scrollIntoView=()=>{header.dataset.scrolledTo='true';};
-   header.append(button,title,label);if(!row.omitBody)header.append(body);doc.querySelector('#rows').append(header);
+   header.append(button,title,label);if(row.image){const image=doc.createElement('img');Object.defineProperty(image,'currentSrc',{value:row.image});header.append(image);}if(!row.omitBody)header.append(body);doc.querySelector('#rows').append(header);
   }
  };
  for(const id of Object.keys(windows)){
@@ -38,23 +42,23 @@ async function setup(windows){
  win.setTimeout=(callback,ms)=>nativeTimeout(()=>{if(ms===150)for(const p of pending)if(--p.left===0)p.body.textContent=p.text;callback();},0);
  win.scrollTo=()=>{};
  Object.defineProperty(doc.documentElement,'scrollHeight',{get:()=>500});Object.defineProperty(win,'innerHeight',{value:500});
- win.eval(codes[0]);win.eval(codes[1]);
+ win.eval(codes[0]);win.eval(codes[3]);win.eval(codes[1]);
  return {win,doc,api:win.GalacticAmazonGames,selected,redemptions:()=>redemptions,expansions:()=>expansions};
 }
-const direct={id:'direct-a',label:'Delivered',body:'Collected on\n2026-01-01\nSent to\nAmazon Games library',delayed:true};
+const direct={id:'direct-a',title:'Synthetic direct game',label:'Delivered',body:'Collected on\n2026-01-01\nSent to\nAmazon Games library',delayed:true};
 const code={id:'code-a',label:'Claim Code',body:'Collected on\n2026-01-01\nInstructions\nRedeem through GOG\nSYNTHETIC_SECRET_DO_NOT_EXPORT'};
 const external={id:'external-a',label:'Delivered',body:'Collected on\n2026-01-01\nSent to\nEpic Games Store library'};
-const mystery={id:'unknown-a',label:'Unfamiliar route',body:'Collected on\n2026-01-01'};
-const pending={id:'pending-a',label:'Not delivered',body:'Collected on\n2026-01-01\nSent to\nAmazon Games library'};
-const unavailable={id:'destination-a',label:'Delivered',body:'Collected on\n2026-01-01'};
+const mystery={id:'unknown-a',title:'Synthetic uncertain game',label:'Unfamiliar route',body:'Collected on\n2026-01-01'};
+const pending={id:'pending-a',title:'Synthetic pending game',label:'Not delivered',body:'Collected on\n2026-01-01\nSent to\nAmazon Games library'};
+const unavailable={id:'destination-a',title:'Synthetic missing destination game',label:'Delivered',body:'Collected on\n2026-01-01'};
 const offered={id:'offer-a',label:'Claim now',body:'Available to claim'};
 try{
- const windows={'2026':[direct,code,external,mystery,pending,unavailable,offered],'2025':[{...direct,delayed:false},{...direct,id:'direct-b',delayed:false}],'past-3-months':[direct,code,external]};
+ const windows={'2026':[direct,code,external,mystery,pending,unavailable,offered],'2025':[{...direct,delayed:false},{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}],'past-3-months':[direct,code,external]};
  let page=await setup(windows),result=await page.api.fetchAmazonGames();
  assert(result.items.length===5&&result.items.filter(item=>item.ownership==='claimed').length===2,'Mixed full import retains direct deliveries and valid unconfirmed claims while excluding code and external-store entries');
  assert(result.diagnostics.productKeyClaims===1&&result.diagnostics.otherLibraryClaims===1,'Claim Code without Sent to and external Delivered rows are accounted for without a fatal unknown-delivery error');
  assert(result.items.filter(item=>item.ownership==='unknown').length===3&&!result.items.some(item=>item.providerItemId==='offer-a'),'Unknown routes, pending delivery and missing destinations do not become owned; unclaimed offers are excluded');
- assert(result.items.some(item=>item.providerItemId==='direct-b')&&result.diagnostics.crossWindowDuplicates===1,'Stable IDs deduplicate repeated observations across years without collapsing independent same-title claims');
+ assert(result.items.some(item=>item.acquiredAt==='2025-01-01T00:00:00.000Z')&&result.diagnostics.crossWindowDuplicates===1,'Evidence keys collapse repeated observations but retain different collected dates for the same title');
  assert(page.redemptions()===0&&page.expansions()>0,'Only read-only accordions are expanded; Claim Code or redemption actions are never clicked');
  assert(!/SYNTHETIC_SECRET|GOG|Synthetic game|direct-a/.test(JSON.stringify(page.api.getDiagnostics())),'Sanitized diagnostics retain counters without titles, claim IDs, account details or redemption codes');
  const data={},area={get:async defaults=>structuredClone({...defaults,...data}),set:async patch=>Object.assign(data,structuredClone(patch))};let writer=createStorageWriter(area);
@@ -64,9 +68,9 @@ try{
  assert(!Object.values(db.providerItems).some(item=>item.provider==='gog'||item.provider==='epic')&&!JSON.stringify(db).includes('SYNTHETIC_SECRET'),'Import never invents downstream storefront ownership or saves secret code contents');
  result=await page.api.fetchAmazonGames();await save(result);db=await writer.getDatabase();
  assert(Object.values(db.providerItems).length===5&&originals.every(item=>db.providerItems[item.id]?.recordRef===item.recordRef),'An unchanged full repeat preserves every source identity with no duplicate records');
- const saved=Object.values(db.providerItems).find(item=>item.providerItemId==='direct-a');
+ const saved=Object.values(db.providerItems).find(item=>item.acquiredAt==='2026-01-01T00:00:00.000Z'&&item.ownership==='claimed');
  await writer.saveOwnershipCorrections([{recordRef:saved.recordRef,provider:saved.provider,profileId:saved.profileId,expectedReviewRef:null}],{ownership:'returned'});
- const sparse={...windows,'2026':[{...mystery,id:'direct-a'},code,external,mystery,pending,unavailable,offered],'2025':[{...direct,id:'direct-b',delayed:false}]};
+ const sparse={...windows,'2026':[{...mystery,id:'direct-a',title:direct.title},code,external,mystery,pending,unavailable,offered],'2025':[{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}]};
  page=await setup(sparse);await save(await page.api.fetchAmazonGames());db=await writer.getDatabase();
  assert(db.providerItems[saved.id].ownership==='claimed'&&db.providerItems[saved.id].metadata.delivery.includes('Amazon Games library')&&effectiveOwnershipRecord(db.providerItems[saved.id],db).ownership==='returned','A later uncertain delivery preserves earlier direct evidence and authoritative manual corrections');
  await writer.restoreDatabase(parseBackup(createBackup(db)));writer=createStorageWriter(area);db=await writer.getDatabase();
@@ -86,11 +90,11 @@ try{
  const quickCodeRoute=await page.api.fetchAmazonGames(()=>{},true);
  assert(quickCodeRoute.items.length===1&&quickCodeRoute.diagnostics.productKeyClaims===1&&page.redemptions()===0,'Quick update applies the same Copy code exclusion without executing its action');
  const failedExternal={id:'failed-external',title:'Synthetic failed external game',label:'Undeliverable',body:'Sorry, we are unable to deliver this game.\nCollected on\nFeb 11, 2023\nSent to\nEpic Games Store library'};
- const failedUnconfirmed={id:'failed-unknown',label:'Undeliverable',body:'',expanded:true,omitBody:true};
- page=await setup({'2026':[{...failedUnconfirmed,id:'direct-a'},failedUnconfirmed,failedExternal,{...direct,id:'direct-b',delayed:false}],'past-3-months':[failedUnconfirmed,failedExternal]});
+ const failedUnconfirmed={id:'failed-unknown',title:'Synthetic failed game',label:'Undeliverable',body:'',expanded:true,omitBody:true};
+ page=await setup({'2026':[{...failedUnconfirmed,id:'direct-a',title:direct.title},failedUnconfirmed,failedExternal,{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}],'past-3-months':[failedUnconfirmed,failedExternal]});
  const failedDeliveryResult=await page.api.fetchAmazonGames();
  assert(failedDeliveryResult.items.length===3&&failedDeliveryResult.items.filter(item=>item.ownership==='unknown').length===2&&failedDeliveryResult.diagnostics.otherLibraryClaims===1,'Undeliverable does not abort mixed imports: explicit external destinations are excluded and missing destinations stay unconfirmed');
- assert(failedDeliveryResult.items.find(item=>item.providerItemId==='failed-unknown').metadata.delivery==='Undeliverable; delivery not confirmed','A failed delivery with no linked details never invents confirmed access');
+ assert(failedDeliveryResult.items.find(item=>item.ownership==='unknown').metadata.delivery==='Undeliverable; delivery not confirmed','A failed delivery with no linked details never invents confirmed access');
  await save(failedDeliveryResult);db=await writer.getDatabase();
  const retained=db.providerItems[saved.id];
  assert(retained.ownership==='claimed'&&effectiveOwnershipRecord(retained,db).ownership==='returned'&&!Object.values(db.providerItems).some(item=>item.providerItemId==='failed-external'),'Delivery failure does not revoke earlier confirmed evidence or overwrite manual corrections; external failure is not imported');
@@ -129,7 +133,7 @@ try{
  },failed:async()=>{throw Error('A valid mixed import unexpectedly failed');}};
  page.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));
  shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
- assert(imports===1&&shadow.querySelector('.status').textContent.includes('Full import complete. 5 Amazon Games entries saved.')&&shadow.querySelector('[data-export-report]').hidden,'A normal mixed-delivery Full import saves successfully and hides development reporting after success');
+ assert(imports===1&&shadow.querySelector('.status').textContent.includes('Full import complete. 4 games found.')&&shadow.querySelector('[data-export-report]').hidden,'A normal mixed-delivery Full import saves successfully and hides development reporting after success');
  assert(!/scan pass|loadMore|parser|reconciliation/.test(shadow.querySelector('.status').textContent),'Normal completion explains saved entries and excluded stores without internal parser or traversal counters');
  page=await setup(windows);
  const policy=page.doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';policy.content="style-src 'none'";page.doc.head.append(policy);
@@ -148,6 +152,30 @@ try{
  const exportControl=shadow.querySelector('[data-export-report]');exportControl.hidden=false;
  assert(computed(exportControl).display!=='none'&&exportControl.getBoundingClientRect().width>90&&computed(minimize).position==='absolute','Export and shared account/minimize controls remain visibly styled under page CSP');
  assert(panel.getBoundingClientRect().height<=page.win.innerHeight-36&&host.getBoundingClientRect().width<=page.win.innerWidth-36,'Account and failure controls stay within the viewport with scrollable panel contents');
+ const inflation=Array.from({length:1400},(_,index)=>({id:`observation-${index}`,title:`Synthetic library game ${index%188}`,image:`https://images.example.test/game-${index%188}.jpg`,label:'Delivered',body:'Collected on\nSep 1, 2026\nSent to\nAmazon Games library'}));
+ inflation.push({id:'failed',title:'Synthetic undelivered game',label:'Undeliverable',body:'Collected on\nSep 2, 2026'});
+ const savedInflation={},inflationWriter=createStorageWriter({get:async defaults=>structuredClone({...defaults,...savedInflation}),set:async patch=>Object.assign(savedInflation,structuredClone(patch))});
+ page=await setup({'2026':inflation,'past-3-months':[inflation[0]]},{churn:true});
+ const reduced=await page.api.fetchAmazonGames();
+ assert(reduced.items.length===189&&reduced.items.filter(item=>item.ownership==='claimed').length===188,'1401 transient observations become 189 evidence groups, not 1401 persisted acquisitions');
+ await inflationWriter.replaceProviderItems('amazon-games',JSON.parse(JSON.stringify(reduced.items)),{},JSON.parse(JSON.stringify(reduced.snapshot)));
+ const firstDatabase=await inflationWriter.getDatabase(),firstRefs=Object.values(firstDatabase.providerItems).map(item=>item.recordRef).sort();
+ assert(Object.values(firstDatabase.providerItems).every(item=>item.acquiredAt&&item.metadata.collectedOn),'Collected on dates persist for every readable direct and failed-delivery entry');
+ page=await setup({'2026':inflation.map(row=>({...row,id:'new-'+row.id})),'past-3-months':[{...inflation[0],id:'recent-new'}]},{churn:true,reverse:true});
+ const repeated=await page.api.fetchAmazonGames();await inflationWriter.replaceProviderItems('amazon-games',JSON.parse(JSON.stringify(repeated.items)),{},JSON.parse(JSON.stringify(repeated.snapshot)));
+ const recent=await page.api.fetchAmazonGames(()=>{},true);await inflationWriter.mergeProviderItems('amazon-games',JSON.parse(JSON.stringify(recent.items)));
+ const repeatedDatabase=await inflationWriter.getDatabase();
+ assert(Object.values(repeatedDatabase.providerItems).map(item=>item.recordRef).sort().join()===firstRefs.join()&&Object.keys(repeatedDatabase.providerHistory).length===0,'Second Full scan and unchanged Quick update with new DOM IDs and reversed order retain records and add no acquisition history');
+ const legacy=createEmptyDatabase(),legacyProfile=newProviderProfile('amazon-games','Synthetic repair');legacy.providerProfiles[legacyProfile.profileId]=legacyProfile;legacy.providers['amazon-games']={activeProfileId:legacyProfile.profileId};
+ for(let index=0;index<3;index++){const row=normalizeProviderItem({provider:'amazon-games',profileId:legacyProfile.profileId,providerItemId:`obsolete-dom-${index}`,title:'Synthetic recovered game',mediaType:'game',ownership:'claimed',metadata:{source:'amazon-games-collection',imageUrl:'https://images.example.test/recovered.jpg',delivery:'Amazon Games library'}},'2026-01-01',{profileKeySpace:legacyProfile.keySpace});legacy.providerItems[row.id]=row;}
+ await inflationWriter.restoreDatabase(validateDatabase(legacy));const legacyCanonical=Object.keys((await inflationWriter.getDatabase()).canonicalItems)[0];
+ const observed={provider:'amazon-games',providerItemId:'new-dom-id',title:'Synthetic recovered game',mediaType:'game',ownership:'claimed',acquiredAt:'2025-07-29',metadata:{source:'amazon-games-collection',imageUrl:'https://images.example.test/recovered.jpg',delivery:'Amazon Games library',collectedOn:'2025-07-29'}};
+ await inflationWriter.mergeProviderItems('amazon-games',[observed],{profileId:legacyProfile.profileId});const recovered=await inflationWriter.getDatabase();
+ assert(Object.keys(recovered.providerItems).length===1&&Object.keys(recovered.providerHistory).length===2&&Object.keys(recovered.canonicalItems)[0]===legacyCanonical,'Existing repeated observations reconcile transactionally while retaining originals and the catalog identity');
+ const history=createAcquisitionHistory(acquisitionHistory(Object.values(recovered.providerItems),recovered),recovered);document.body.append(history);history.open=true;history.dispatchEvent(new Event('toggle'));
+ assert(history.textContent.includes('Acquisition date:')&&history.textContent.includes('2025')&&history.textContent.includes('29')&&history.querySelectorAll(':scope > ul > li').length===1&&history.textContent.includes('Earlier observations (2)'),'Purchase/access history shows one date-bearing entry with preserved observations separately expandable');
+ await inflationWriter.restoreDatabase(parseBackup(createBackup(recovered)));await inflationWriter.mergeProviderItems('amazon-games',[{...observed,providerItemId:'another-new-dom-id'}],{profileId:legacyProfile.profileId});
+ assert(Object.keys((await inflationWriter.getDatabase()).providerHistory).length===2,'Backup restore and another import do not multiply retained observations');history.remove();
  await fetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}
