@@ -122,19 +122,35 @@ account UI. A year being offered does not establish every purchase in that year
 is accessible. A Return action does not establish a completed refund. Screenshots
 cannot establish underlying ASINs, account binding or pagination completeness.
 
+**First live read-only report:** The current Your orders page for the last 365
+days exposed 44 distinct row ASINs, all matching the 796-item saved Audible
+profile, with no within-row identifier conflicts. It recognized 14 date fields,
+10 credit totals and four cash totals; 30 totals were unrecognized by the original
+one-book/one-date diagnostic. This confirms the live identifier join for this
+sample, not a purchase count or a forecast of ownership across all 796 books.
+No library data changed.
+
+The user explains that multi-item orders share a single date and order total,
+including a 22-book cash order and a two-book one-credit promotion. The original
+checker incorrectly expected each book to repeat those order-level fields.
+This is a diagnostic interpretation limitation, not evidence that the child
+books are subscription items or that their purchase information is absent.
+Actual personal transaction dates/amounts are not retained in this document or
+committed fixtures. Live grouped-order association is the next bounded check.
+
 ## Ten feasibility questions
 
 | Question | Finding at this gate |
 | --- | --- |
 | Can the library distinguish purchases from subscription access? | Some explicit subscription wording is supported, but the 796 saved action labels do not distinguish purchases. Hidden/title-detail evidence remains unobserved. |
 | Does purchase history provide reliable permanent-acquisition evidence? | The visible Your orders rows are promising positive acquisition evidence. Exact item binding and reversals still need validation. |
-| Can history match library ASINs? | All 796 library ASINs are usable. History ASIN availability and edition consistency are not yet demonstrated. |
-| Are credit purchases included? | Yes: user confirmation and the Total column show credit purchases. Matching identifiers and reversals remain unverified. |
-| Are cash purchases included? | Yes: user confirmation and the Total column show cash purchases. Matching identifiers and reversals remain unverified. |
+| Can history match library ASINs? | Yes for the observed page: 44 unique ASINs match 44 existing library items without within-row conflicts. Other years/editions and account equivalence remain to be checked. |
+| Are credit purchases included? | Yes: user confirmation and the Total column show credit purchases, with exact ASIN matches on the first page. Shared child-row association and reversals remain unverified. |
+| Are cash purchases included? | Yes: user confirmation and the Total column show cash purchases, with exact ASIN matches on the first page. Shared child-row association and reversals remain unverified. |
 | Are promotional acquisitions represented? | Several distinct mechanisms exist; account-history inclusion and permanent-acquisition evidence remain unknown. |
 | Can returns/refunds be identified? | A refund-history view is documented. Exact item binding, chronology and actual status fields remain unknown. |
 | Is historical coverage complete? | Unproven. Years 2013–2026 are offered; actual coverage, pagination, migrations, gifts and Amazon purchases remain to be checked. |
-| What percentage can be classified? | No defensible forecast. The saved evidence currently establishes zero purchases, not zero actual owned books. |
+| What percentage can be classified? | No defensible forecast. The library backup alone establishes no purchases; the history sample does not support a forecast for all 796 books. |
 | What remains uncertain? | History structure/access, account binding, ASIN joins, dates, reversals, older formats, gifts and promotions. |
 
 ## Decision and next evidence
@@ -160,14 +176,15 @@ Initial user check, with no rescan or library writes:
    refund to distinguish acquisition from present access. Do not perform a return
    or purchase to produce test evidence.
 
-The first two checks above are now supported by the screenshots. For the remaining
-ASIN/layout question, open the signed-in
+The first two checks above are supported by the screenshots; the first live
+report also establishes the ASIN join for its 44-book sample. For the remaining
+shared-order association check, open the signed-in
 [read-only purchase-page check](https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1)
 after reloading the updated extension. Click **Check this page (no import)**, then
 **Export check report**. There is no need to rescan the 796-title library or open
 order details. This diagnostic has no normal release-panel entry point.
 
-The checker reads at most 100 rendered rows with explicitly recognized columns.
+The format-2 checker reads at most 100 rendered rows with explicitly recognized columns.
 It counts product-link/explicit-row ASIN presence, exact matches against the
 currently selected saved Audible profile, date/payment-format presence and
 action/status wording. It does not assign ownership, click orders/returns, change
@@ -183,8 +200,30 @@ omits titles, individual purchase dates, prices, ASIN values, order IDs, account
 details, credentials and raw bodies. Recommendations outside a recognized table
 are not purchase-row matches. Unexpected layouts return an unrecognized-structure
 report rather than guessed order mappings. The function returns diagnostic
-counters only, not importable records. Live recognition is still pending; fixture
-passes are not account-page validation.
+counters only, not importable records. Live shared-order recognition is pending; fixture
+passes are not account-page validation of the updated grouping rules.
+
+**Grouped orders:** Dates, cash totals and credit totals describe the order, not
+necessarily each individual book. The checker preserves logical columns across
+explicit HTML row/column spans. It reports proposed grouping through explicit
+same-site order keys/links or a declared row group with one supported shared
+date/payment pair. It also supports the user-confirmed Your orders presentation:
+a valid date/payment row with an actual Order details link followed by contiguous
+book rows with both shared fields blank. Only that recognized view/table and
+uninterrupted row group qualify. New headers, unknown intervening rows, invalid
+or conflicting nonempty fields, separate row groups and other history views do
+not inherit the prior order. A generic blank cell is never sufficient evidence.
+
+The report distinguishes candidate order counts, unique book identifiers,
+shared-evidence rows and still-unbound rows. Exact order keys exist only in
+temporary page memory to compare grouping; only allowlisted attribute/parameter
+names and aggregate counts are exported. No price is allocated to individual
+books, and a two-book one-credit deal does not imply two credits were spent.
+Repeated rows for the same ASIN do not become multiple distinct books.
+These are grouping diagnostics, not automatic ownership or refund decisions.
+Per-book returns, current access and manual corrections still require their own
+handling before any ownership write. No history requests or provider actions
+are performed.
 
 Future implementation must first prove persistence on disposable data: exact
 account/ASIN assignment, cash/credit/free/gift semantics where observed, explicit
@@ -203,9 +242,11 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 25 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 42 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
-  date/payment recognition and read failures without imports or network requests.
+  date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
+  conflicts and read failures without imports or network requests. Multi-book
+  examples use synthetic transactions rather than the user's order data.
 - These do not establish live ownership enrichment. No automatic classification
   implementation is appropriate until the account-evidence contract is demonstrated.
 

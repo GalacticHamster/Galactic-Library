@@ -27,7 +27,7 @@
         // Bypass GalacticSync.send: that wrapper starts an import lease.
         const saved=await chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}).catch(()=>null);
         report=globalThis.GalacticAudible.inspectPurchaseHistory(document,{knownItemIds:saved?.ok?saved.syncState?.knownProviderItemIds:null});
-        status.textContent=report.state==='checked'?`Page checked. ${report.rows} rows; ${report.rowsWithOneAsin} have one audiobook identifier; ${report.rowsMatchingSavedAsin} match your selected saved Audible account. No library changes were made. This does not verify the signed-in account or complete history.`:'The purchase table was not recognized. No library changes were made. Export the check report so its structure can be investigated.';
+        status.textContent=report.state==='checked'?`Page checked. ${report.rows} book rows; ${report.rowsMatchingSavedAsin} match your selected saved Audible account. ${report.grouping.bookRowsWithDatedOrderEvidence} have direct or shared dated order information. No library changes were made. This does not verify the signed-in account or complete history.`:'The purchase table was not recognized. No library changes were made. Export the check report so its structure can be investigated.';
         if(report.libraryComparison==='unavailable')status.textContent+=' Saved-library comparison was unavailable.';
         download.disabled=false;
       }catch{status.textContent='The page check could not complete. No library changes were made. Reload this purchase-history page and try again.';}

@@ -273,7 +273,7 @@
   // Feasibility only: inspect the rendered purchase page, never follow links,
   // fetch orders, assign ownership or retain transaction/identifier values.
   function inspectPurchaseHistory(document,{url=global.location?.href,knownItemIds=null}={}){
-    const report={format:1,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
+    const report={format:2,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
     let page;try{page=new URL(url);}catch{return report;}
     if(page.origin!=='https://www.audible.com'||!/^\/account\/purchase-history\/?$/u.test(page.pathname))return report;
     const label=element=>String(element?.textContent??'').replace(/\s+/gu,' ').trim().slice(0,200);
@@ -304,23 +304,46 @@
       const ancestors=[];let parent=element.parentElement;for(let depth=0;parent&&depth<3;depth++,parent=parent.parentElement)ancestors.push({tag:tag(parent),children:parent.children.length});
       headerShapes.push({field,tag:tag(element),ancestors});
     }
-    const rows=new Map();
+    const rows=new Map(),invalidRows=new Set();
     for(const header of headers){
       const names=cells(header).map(cell=>label(cell).toLowerCase()),scope=header.closest('table,[role="table"]')??header.parentElement;
-      for(const row of scope.querySelectorAll(rowSelector)){
+      const scopedRows=[...scope.querySelectorAll(rowSelector)].slice(0,2000);let previousGroup=null,carry=[];
+      for(const row of scopedRows){
         if(rows.size>=100)break;
-        const parts=cells(row);if(row===header||!visible(row)||parts.length!==names.length||headers.includes(row))continue;
-        rows.set(row,{parts,names});
+        if(row===header||!visible(row)||headers.includes(row)||scope.tagName==='TABLE'&&row.closest('table')!==scope)continue;
+        const group=row.closest('tbody,[role="rowgroup"]')??scope;
+        if(group!==previousGroup){carry=[];previousGroup=group;}
+        const parts=Array.from({length:names.length},(_,i)=>carry[i]?.cell??null),next=carry.map(span=>span?.remaining>1?{...span,remaining:span.remaining-1}:null);
+        let valid=true;
+        for(const cell of cells(row)){
+          const column=parts.findIndex(part=>!part),rawCol=cell.getAttribute('colspan'),rawRow=cell.getAttribute('rowspan');
+          const span=rawCol===null?1:/^[1-9]\d?$/u.test(rawCol)?Number(rawCol):0;
+          let height=rawRow===null?1:/^\d{1,3}$/u.test(rawRow)?Number(rawRow):-1;
+          if(height===0)height=Math.min(100,scopedRows.slice(scopedRows.indexOf(row)).filter(nextRow=>(nextRow.closest('tbody,[role="rowgroup"]')??scope)===group).length);
+          if(column<0||!span||height<1||height>100||column+span>names.length){valid=false;break;}
+          for(let i=column;i<column+span;i++){
+            if(parts[i]){valid=false;break;}parts[i]=cell;if(height>1)next[i]={cell,remaining:height-1};
+          }
+          if(!valid)break;
+        }
+        carry=valid?next:[];
+        if(!valid||parts.some(part=>!part)){invalidRows.add(row);continue;}
+        rows.set(row,{parts,names,group,scope});
       }
     }
-    const totals={rows:rows.size,rowsWithPurchaseDate:0,rowsWithCreditTotal:0,rowsWithCashTotal:0,rowsWithZeroCashTotal:0,rowsWithUnrecognizedTotal:0,rowsWithOneAsin:0,rowsWithMultipleAsins:0,rowsMatchingSavedAsin:0,rowsWithOrderDetails:0,rowsWithReturnAction:0,rowsWithCompletedReturnWording:0};
-    const asins=new Set(),matches=new Set();
-    for(const [row,{parts,names}]of rows){
+    const totals={rows:rows.size,rowsWithPurchaseDate:0,rowsWithBlankPurchaseDate:0,rowsWithCreditTotal:0,rowsWithCashTotal:0,rowsWithZeroCashTotal:0,rowsWithUnrecognizedTotal:0,rowsWithBlankTotal:0,rowsWithOneAsin:0,rowsWithMultipleAsins:0,rowsMatchingSavedAsin:0,rowsWithOrderDetails:0,rowsWithReturnAction:0,rowsWithCompletedReturnWording:0};
+    const asins=new Set(),matches=new Set(),facts=[],orderAttributes={},orderParameters={};
+    const orderAttributeNames=['data-order-id','data-orderid','data-order-number','data-purchase-order-id'];
+    for(const [row,{parts,names,group,scope}]of rows){
       const value=name=>label(parts[names.indexOf(name)]),date=value('purchased').match(/^(\d{2})-(\d{2})-(\d{4})$/u);
-      if(date){const [,m,d,y]=date,parsed=new Date(Date.UTC(Number(y),Number(m)-1,Number(d)));if(parsed.getUTCFullYear()===Number(y)&&parsed.getUTCMonth()===Number(m)-1&&parsed.getUTCDate()===Number(d))totals.rowsWithPurchaseDate++;}
+      let dateValid=false;
+      if(!value('purchased'))totals.rowsWithBlankPurchaseDate++;
+      if(date){const [,m,d,y]=date,parsed=new Date(Date.UTC(Number(y),Number(m)-1,Number(d)));if(parsed.getUTCFullYear()===Number(y)&&parsed.getUTCMonth()===Number(m)-1&&parsed.getUTCDate()===Number(d)){totals.rowsWithPurchaseDate++;dateValid=true;}}
       const total=value('total');
-      if(/^\d+(?:\.\d+)? credits?$/iu.test(total))totals.rowsWithCreditTotal++;
-      else if(/^\$\s*\d[\d,]*(?:\.\d{2})?$/u.test(total)){totals.rowsWithCashTotal++;if(Number(total.replace(/[$,\s]/gu,''))===0)totals.rowsWithZeroCashTotal++;}
+      if(!total)totals.rowsWithBlankTotal++;
+      let payment=null;
+      if(/^\d+(?:\.\d+)? credits?$/iu.test(total)){totals.rowsWithCreditTotal++;payment='credit';}
+      else if(/^\$\s*\d[\d,]*(?:\.\d{2})?$/u.test(total)){totals.rowsWithCashTotal++;payment='cash';if(Number(total.replace(/[$,\s]/gu,''))===0)totals.rowsWithZeroCashTotal++;}
       else totals.rowsWithUnrecognizedTotal++;
       const ids=new Set([...row.querySelectorAll('a[href]')].filter(visible).slice(0,100).map(asinFromLink).filter(Boolean));
       for(const element of [row,...row.querySelectorAll('[data-asin]')])if(visible(element)&&/^[A-Z0-9]{10}$/iu.test(element.getAttribute('data-asin')??''))ids.add(element.getAttribute('data-asin').toUpperCase());
@@ -331,9 +354,70 @@
       if(actions.some(text=>/^order details$/iu.test(text)))totals.rowsWithOrderDetails++;
       if(actions.some(text=>/^return this title$/iu.test(text)))totals.rowsWithReturnAction++;
       if(/^(?:returned|refunded|return complete|refund complete)(?:[.!]|\s+on\s+\S.*)?$/iu.test(label(options)))totals.rowsWithCompletedReturnWording++;
+      const orderLinks=new Set();
+      for(const link of options.querySelectorAll('a[href]'))if(visible(link)&&/^order details$/iu.test(label(link))){try{const u=new URL(link.getAttribute('href'),page.origin);if(u.origin===page.origin&&/^\/account\/(?:order-details|order-history)(?:\/|$)/u.test(u.pathname))orderLinks.add(u.href);}catch{}}
+      const orderKeys=new Set(),orderContainer=row.closest(orderAttributeNames.map(key=>'['+key+']').join(','));
+      const orderElements=[...(orderContainer&&scope.contains(orderContainer)?[orderContainer]:[]),...row.querySelectorAll(orderAttributeNames.map(key=>'['+key+']').join(','))].slice(0,100);
+      for(const element of new Set(orderElements))for(const key of orderAttributeNames){const value=element.getAttribute(key);if(value&&value.length<=200){orderKeys.add('attribute:'+key+':'+value);orderAttributes[key]=(orderAttributes[key]??0)+1;}}
+      for(const link of row.querySelectorAll('a[href]')){try{const u=new URL(link.getAttribute('href'),page.origin);if(u.origin!==page.origin||!u.pathname.startsWith('/account/'))continue;
+        for(const key of ['orderId','orderID','orderNumber','purchaseOrderId']){const value=u.searchParams.get(key);if(value&&value.length<=200){orderKeys.add('parameter:'+key+':'+value);orderParameters[key]=(orderParameters[key]??0)+1;}}
+      }catch{}}
+      facts.push({row,scope,group,ids,date:value('purchased'),dateValid,dateCell:parts[names.indexOf('purchased')],total,payment,totalCell:parts[names.indexOf('total')],orderLinks,orderKeys});
     }
+    // These are grouping candidates, not ownership decisions. A date/total
+    // never flows into the next row just because its own cells are blank.
+    const grouping={declaredRowGroups:new Set(facts.map(f=>f.group)).size,rowsWithOrderKeys:facts.filter(f=>f.orderKeys.size).length,orderAttributeNames:orderAttributes,orderParameterNames:orderParameters,unreadableRowLayouts:invalidRows.size,candidateOrders:0,candidateMultiBookOrders:0,bookRowsWithDatedOrderEvidence:0,matchingBookRowsWithDatedOrderEvidence:0,bookRowsUsingSharedOrderEvidence:0,unboundBookRows:0,incompatibleGroupCandidates:0,candidateOrderSizeCounts:{},candidateOrdersByBasis:{}};
+    const used=new Set(),seenGroups=new Set(),datedAsins=new Set(),datedMatches=new Set();
+    const admit=(members,basis)=>{
+      if(members.length<1||members.some(f=>used.has(f)))return;
+      const dated=members.filter(f=>f.date),paid=members.filter(f=>f.total),linkKeys=new Set(members.flatMap(f=>[...f.orderLinks])),dataKeys=new Set(members.flatMap(f=>[...f.orderKeys]));
+      if(!dated.length||!paid.length)return;
+      const keyValues=new Map();for(const key of dataKeys){const split=key.indexOf(':',key.indexOf(':')+1),namespace=key.slice(0,split),values=keyValues.get(namespace)??new Set();values.add(key.slice(split+1));keyValues.set(namespace,values);}
+      const conflicts=dated.some(f=>!f.dateValid)||paid.some(f=>!f.payment)||new Set(dated.map(f=>f.date)).size!==1||new Set(paid.map(f=>f.total)).size!==1||linkKeys.size>1||[...keyValues.values()].some(values=>values.size>1);
+      if(conflicts){const key=members[0].group;if(!seenGroups.has(key)){seenGroups.add(key);grouping.incompatibleGroupCandidates++;}return;}
+      // A row group containing repeated separate date/total cells could be
+      // independent same-day purchases. Only one shared pair is accepted here.
+      if(basis==='row-group'&&(new Set(dated.map(f=>f.dateCell)).size!==1||new Set(paid.map(f=>f.totalCell)).size!==1))return;
+      if(basis==='row-group'&&[...invalidRows].some(row=>(row.closest('tbody,[role="rowgroup"]')??members[0].scope)===members[0].group))return;
+      if(basis==='row-group'&&!members.some(f=>f.orderLinks.size||f.dateCell.closest(rowSelector)!==f.row||f.totalCell.closest(rowSelector)!==f.row))return;
+      const books=members.filter(f=>f.ids.size===1);if(!books.length)return;
+      const unique=new Set(books.map(f=>[...f.ids][0]));for(const id of unique){datedAsins.add(id);if(known?.has(id))datedMatches.add(id);}
+      members.forEach(f=>used.add(f));grouping.candidateOrders++;if(unique.size>1)grouping.candidateMultiBookOrders++;
+      grouping.bookRowsWithDatedOrderEvidence+=books.length;grouping.matchingBookRowsWithDatedOrderEvidence+=books.filter(f=>known?.has([...f.ids][0])).length;
+      grouping.bookRowsUsingSharedOrderEvidence+=books.filter(f=>!f.dateValid||!f.payment||f.dateCell.closest(rowSelector)!==f.row||f.totalCell.closest(rowSelector)!==f.row).length;
+      grouping.candidateOrderSizeCounts[unique.size]=(grouping.candidateOrderSizeCounts[unique.size]??0)+1;
+      grouping.candidateOrdersByBasis[basis]=(grouping.candidateOrdersByBasis[basis]??0)+1;
+    };
+    const groupBy=(values,key)=>{const result=new Map();for(const fact of values){for(const k of key(fact)){const group=result.get(k)??[];group.push(fact);result.set(k,group);}}return [...result.values()];};
+    for(const scope of new Set(facts.map(f=>f.scope))){
+      const scoped=facts.filter(f=>f.scope===scope);
+      for(const members of groupBy(scoped,f=>f.orderKeys))if(members.length>1)admit(members,'explicit-order-key');
+      for(const members of groupBy(scoped,f=>f.orderLinks))if(members.length>1)admit(members,'shared-order-link');
+      for(const members of groupBy(scoped,f=>[f.group]))if(members.length>1)admit(members,'row-group');
+      // The live Your orders layout uses a dated/payment-bearing order header
+      // followed by book rows with blank shared fields. Require its actual
+      // Order details link, contiguous siblings and the same declared row group;
+      // any new/nonempty/unknown row ends that candidate. This is not a generic
+      // carry-forward rule for blank cells or other history views.
+      if(selectedViews.size===1&&selectedViews.has('orders')){
+        let members=[];
+        const flush=()=>{if(members.length>1)admit(members,'order-header-continuation');members=[];};
+        for(const fact of scoped){
+          const previous=members.at(-1);
+          if(previous&&(previous.group!==fact.group||previous.row.nextElementSibling!==fact.row))flush();
+          if(used.has(fact)){flush();continue;}
+          if(fact.dateValid&&fact.payment&&fact.orderLinks.size===1&&fact.ids.size===1){flush();members=[fact];}
+          else if(members.length&&!fact.date&&!fact.total&&fact.ids.size===1&&!fact.orderLinks.size)members.push(fact);
+          else flush();
+        }
+        flush();
+      }
+    }
+    for(const fact of facts)if(!used.has(fact)&&fact.dateValid&&fact.payment)admit([fact],'direct-row');
+    grouping.unboundBookRows=facts.filter(f=>f.ids.size===1&&!used.has(f)).length;
+    grouping.distinctAsinsWithDatedOrderEvidence=datedAsins.size;grouping.distinctSavedMatchesWithDatedOrderEvidence=datedMatches.size;
     const visibleLinks=[...document.querySelectorAll('a[href]')].filter(visible).slice(0,2000),pageAsins=new Set(visibleLinks.map(asinFromLink).filter(Boolean));
-    return {...report,state:headers.length?'checked':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000};
+    return {...report,state:headers.length?'checked':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000};
   }
   global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory };
 }(globalThis));
