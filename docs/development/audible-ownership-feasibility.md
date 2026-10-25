@@ -337,6 +337,71 @@ wishlist exclusion and unrelated-provider preservation. Absence from history
 must never become Subscription or revoke a purchase. No supported percentage,
 automatic implementation or live enrichment has been claimed at this checkpoint.
 
+## Automatic Full/Quick enrichment: implementation gate
+
+The automatic I3 requirement supersedes the earlier private-file/manual-review
+bridge as the intended user workflow. Full rescan and Quick update must eventually
+perform discovery, history checking, reconciliation and save with one click. A
+separate receipt import or additional ownership confirmation is not acceptance.
+That integrated implementation is **not yet complete**; no new normal-user
+ownership control, automatic classification, date write or checkpoint is claimed.
+
+The retained evidence demonstrates positive purchases and exact ASIN joins, but
+not a safe automated historical traversal. Aggregate reports intentionally omitted
+native select values, form submissions and raw requests. Both observed history
+samples reported no navigation controls; that does not establish pagination
+semantics for other years. The refund sample was empty, so populated refund and
+repurchase chronology remain unobserved. No saved authenticated page, request
+capture or provider contract in this checkout establishes those missing details.
+The development process has no access to the user's signed-in browser session.
+Inventing year-query parameters, treating no Next as sufficient end evidence, or
+using successful synthetic purchases as full-history proof would violate Gate A.
+
+**Bounded read-only access probe:** The existing deliberate troubleshooting panel
+now offers **Test automatic history access**. This is not a production ownership
+button or a manual import substitute. It opens the same-origin purchase-history
+page in a temporary off-screen frame with a real layout, reads the rendered
+history/year controls, selects Your orders if necessary, and selects one other
+offered year using its actual option value/change event. It does not guess API
+or URL filter parameters, copy credentials, override framing policies, submit a
+purchase/return action, navigate the visible tab or save library information.
+Audible may remember its history filter as it does with ordinary browsing.
+
+The probe requires a replacement, fully loaded document with recognizable
+purchase columns, the expected selected view/year and purchase-date years
+consistent with that selection. A mere dropdown value change, repeated/wrong-year
+document, old purchase dates, missing controls, access challenge, blocked frame or
+timeout cannot verify navigation. Same-document asynchronous navigation is
+currently deliberately unverified rather than assuming stale rows are current.
+Each load is bounded to 15 seconds (initial page, optional view change, year
+change); the frame is removed on success or failure. It reads only one other year,
+not every historical page. Recognized aggregate reports and offered years enter
+the exported `automaticAccess` section; URLs, actual option values, raw exceptions,
+identifiers, titles, purchase dates and credentials do not. Aggregate counts by
+purchase-date year help detect stale rows without exporting individual dates.
+
+Controlled tests validate this driver contract, including delayed readiness,
+discovered synthetic years, provider-defined option values, stale/wrong responses,
+challenge/unreadable documents, cleanup and sanitized UI exports. They do **not**
+establish live framing support, native event behavior or historical completeness.
+
+| Gate | Current evidence and remaining work |
+| --- | --- |
+| A: traversal | Blocked on authenticated automation evidence. Run the opt-in access probe once and export its report; do not run an integrated Full rescan yet. A successful year switch still requires verified all-year/page completion behavior. |
+| B: semantics | Cash/credit and grouped dates demonstrated. The diagnostic's strict payment recognition is not the final classifier; unfamiliar totals must not invalidate an independently established completed purchase. Populated refunds, gifts/promotions and chronology remain unverified. |
+| C: identity | Exact ASIN joins demonstrated in both live samples and the private evidence file. No automatic title matching or transaction-created audiobook records are authorized. |
+| D: data safety | Existing no-write checker and account-isolation tests pass. Integrated acquisition/ownership replay has not run because its writer is not implemented. Preserve the 796-record frozen baseline. |
+| E: integration | Not implemented. Full/Quick still use the working library-only importer. The earlier evidence-file bridge is not the production solution. |
+| F: browsers | Focused packaged probe/importer tests pass; these are not integrated-import validation. |
+
+After A/B are established, implement provider-evidence reconciliation with exact
+account/ASIN scope, date-only calendar preservation, stronger-evidence retention,
+manual-override precedence and idempotence. A historical ownership checkpoint may
+be persisted only after complete traversal is demonstrated; no recent-window
+Quick strategy is justified by the current reports. Incomplete history must not
+discard successful library discovery or revoke prior ownership. Keep I3 open and
+request one integrated live Full rescan only after all six gates pass.
+
 ## Existing regression baseline
 
 - `node tests/run.js`: 1,713 passing tests, including existing Audible rescan
@@ -346,7 +411,7 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 85 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 98 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
   date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
   conflicts, navigation, refund-specific layouts, explicit versus pending/refund

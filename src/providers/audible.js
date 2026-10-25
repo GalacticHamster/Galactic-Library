@@ -479,7 +479,8 @@
       }
     }
     const limits={purchaseRowScan:candidates.length>2000||rows.size>=100,headerShapes:headerElements.length>5000,pageLinks:visibleLinks.length>=2000,navigation:navigation.boundReached,refundRows:refundHistory.boundReached};
-    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,navigation,refundHistory,limits,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:Object.values(limits).some(Boolean)};
+    const purchaseDateYears={};for(const fact of facts)if(fact.dateValid){const year=fact.date.slice(-4);purchaseDateYears[year]=(purchaseDateYears[year]??0)+1;}
+    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,purchaseDateYears,grouping,navigation,refundHistory,limits,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:Object.values(limits).some(Boolean)};
   }
   function inspectPurchaseHistory(document,options){return readPurchaseHistory(document,options);}
   function previewPurchaseHistory(document,options){
@@ -500,5 +501,80 @@
     report.preview={entries:entries.length,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
     return {state:blocked?'blocked':entries.length?'ready':'empty',report,entries,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
   }
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory };
+  function historyFrame(){
+    if(global.location?.origin!=='https://www.audible.com')throw Error('unsupported-origin');
+    const frame=global.document.createElement('iframe');
+    frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms');
+    frame.title='Audible read-only history access check';frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;
+    // Keep a real layout so provider-rendered tables can be inspected. Do not
+    // hide with display:none or relax the provider's framing/security policies.
+    frame.style.cssText='position:fixed;left:-12000px;top:0;width:1000px;height:800px;border:0;pointer-events:none;';
+    frame.src=new URL('/account/purchase-history',global.location.origin).href;global.document.documentElement.append(frame);
+    return {
+      read(){
+        const doc=frame.contentDocument;if(!doc)return null;
+        const url=new URL(doc.URL);if(url.protocol==='about:')return null;
+        if(url.origin!==global.location.origin||!/^\/account\/purchase-history\/?$/u.test(url.pathname))throw Error('history-access-not-verified');
+        return doc;
+      },
+      choose(select,option){
+        if(select.disabled||option.disabled||select.ownerDocument!==frame.contentDocument)throw Error('history-control-unavailable');
+        select.value=option.value;select.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+      },
+      close(){frame.remove();}
+    };
+  }
+  // Feasibility gate for the one-click importer: exercise Audible's actual
+  // native controls, not invented filter URLs. No imports or ownership writes.
+  // The optional driver is used only by disposable tests, never from messages.
+  async function probePurchaseHistoryAccess({knownItemIds=null,driverFactory=historyFrame,timeoutMs=15000,pollMs=150,progress=()=>{}}={}){
+    const result={format:1,provider:'audible',purpose:'automatic-history-access',readOnly:true,historyComplete:false,accountVerified:false,state:'blocked',reason:'history-access-not-verified',availableYears:[],documentNavigationObserved:false};
+    let driver;
+    const inspect=doc=>inspectPurchaseHistory(doc,{url:'https://www.audible.com/account/purchase-history',knownItemIds});
+    const yearControl=doc=>{
+      const found=[...doc.querySelectorAll('select')].filter(select=>[...select.options].filter(option=>/^\d{4}$/u.test(textOf(option))&&!option.disabled).length>0);
+      return found.length===1?found[0]:null;
+    };
+    const waitFor=async(previous,expected={})=>{
+      const end=Date.now()+Math.max(1,Math.min(timeoutMs,30000));
+      while(Date.now()<end){
+        const doc=driver.read();
+        if(doc&&doc!==previous&&doc.readyState==='complete'){
+          const report=inspect(doc),select=yearControl(doc);
+          if(report.state==='checked'&&select&&(expected.view===undefined||report.selectedView===expected.view)&&(expected.year===undefined||report.selectedTime===expected.year&&Object.keys(report.purchaseDateYears).every(year=>Number(year)===expected.year)))return {doc,report,select};
+        }
+        await wait(Math.max(1,pollMs));
+      }
+      throw Error(previous?'history-navigation-not-verified':'history-access-not-verified');
+    };
+    try{
+      progress('Opening Audible purchase history without importing...');driver=driverFactory();
+      let current=await waitFor(null);
+      if(current.report.selectedView!=='orders'){
+        const views=[...current.doc.querySelectorAll('select')].filter(select=>[...select.options].some(option=>/^your orders$/iu.test(textOf(option))));
+        if(views.length!==1)throw Error('history-control-unavailable');
+        const option=[...views[0].options].find(option=>/^your orders$/iu.test(textOf(option)));
+        driver.choose(views[0],option);current=await waitFor(current.doc,{view:'orders'});
+      }
+      result.initial=current.report;
+      const options=[...current.select.options].filter(option=>/^\d{4}$/u.test(textOf(option))&&!option.disabled);
+      const years=options.map(option=>Number(textOf(option))).filter(year=>year>=1900&&year<=2100).sort((a,b)=>b-a);
+      result.availableYears=[...new Set(years)];
+      // Prefer a past offered year, with no fixed calendar or query-value rule.
+      const target=years.find(year=>year!==years[0]&&year!==current.report.selectedTime)??years.find(year=>year!==current.report.selectedTime);
+      if(target===undefined)throw Error('history-year-unavailable');
+      const option=options.find(option=>Number(textOf(option))===target);result.targetYear=target;
+      progress('Checking whether Audible can open another year automatically...');
+      driver.choose(current.select,option);
+      const changed=await waitFor(current.doc,{view:'orders',year:target});result.selected=changed.report;
+      result.documentNavigationObserved=true;result.state='navigation-verified';result.reason=null;
+      // A successful switch proves neither all-page traversal nor refunds. The
+      // importer must remain gated until those completion contracts are known.
+    }catch(error){
+      const allowed=['unsupported-origin','history-access-not-verified','history-control-unavailable','history-navigation-not-verified','history-year-unavailable'];
+      result.reason=allowed.includes(error.message)?error.message:'history-access-not-verified';
+    }finally{driver?.close();}
+    return result;
+  }
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory,probePurchaseHistoryAccess };
 }(globalThis));

@@ -34,13 +34,25 @@
     const check=document.createElement('button'),download=document.createElement('button'),end=document.createElement('button');check.type=download.type=end.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;end.textContent='End check';
     panel.insertBefore(check,status);panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(download,status);
     panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(end,status);
-    const previewButton=document.createElement('button'),evidenceDownload=document.createElement('button'),previewArea=document.createElement('div');
+    const previewButton=document.createElement('button'),evidenceDownload=document.createElement('button'),previewArea=document.createElement('div'),automaticCheck=document.createElement('button');
     previewButton.type=evidenceDownload.type='button';previewButton.textContent='Preview purchase evidence';evidenceDownload.textContent='Download purchase evidence for review';evidenceDownload.disabled=true;
     previewArea.style.cssText='max-height:50vh;overflow:auto;';
     panel.insertBefore(document.createElement('br'),status);panel.insertBefore(previewButton,status);panel.insertBefore(previewArea,status);
+    automaticCheck.type='button';automaticCheck.textContent='Test automatic history access';panel.insertBefore(automaticCheck,status);
+    const automaticHelp=document.createElement('p');automaticHelp.textContent='This read-only test opens purchase history in the background and selects one offered year. It does not scan every year or save books.';panel.insertBefore(automaticHelp,status);
     let purchasePreview=null,previewContext=null;
     const clearPreview=()=>{purchasePreview=null;previewContext=null;previewArea.replaceChildren();evidenceDownload.disabled=true;};
-    const setBusy=busy=>{check.disabled=end.disabled=previewButton.disabled=busy;if(busy)status.dataset.busy='true';else delete status.dataset.busy;};
+    const setBusy=busy=>{check.disabled=end.disabled=previewButton.disabled=automaticCheck.disabled=busy;if(busy)status.dataset.busy='true';else delete status.dataset.busy;};
+    automaticCheck.addEventListener('click',async()=>{
+      clearPreview();setBusy(true);download.disabled=true;report=null;
+      try{
+        const saved=await chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}).catch(()=>null);
+        const access=await globalThis.GalacticAudible.probePurchaseHistoryAccess({knownItemIds:saved?.ok?saved.syncState?.knownProviderItemIds:null,progress:message=>{status.textContent=message;}});
+        report={format:4,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,automaticAccess:access};download.disabled=false;
+        status.textContent=access.state==='navigation-verified'?'Audible opened another purchase-history year automatically. No library changes were made. Export the check report. This verifies access and year switching, not complete history or refund handling.':'Automatic history access could not be verified. No library changes were made. Export the check report so the access or navigation problem can be investigated.';
+      }catch{status.textContent='The automatic access test could not complete. No library changes were made. Reload this page and try again.';}
+      finally{setBusy(false);}
+    });
     async function previewSavedAccount(){
       const [saved,profile]=await Promise.all([
         chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true}),
