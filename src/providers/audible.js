@@ -486,15 +486,19 @@
     const observed=[],report=readPurchaseHistory(document,options,entry=>observed.push(entry));
     const known=new Set(Array.isArray(options?.knownItemIds)?options.knownItemIds:[]),entries=[],seen=new Set(),returned=new Set(observed.filter(entry=>entry.kind==='returned').map(entry=>entry.asin));
     const blocked=report.state!=='checked'||report.selectedView!=='orders'||report.libraryComparison==='unavailable'||report.grouping.conflictingOrderGroups>0;
-    let unmatched=0,missingTitles=0;
+    let unmatched=0,missingTitles=0,titlesFromSavedLibrary=0;
     if(!blocked)for(const entry of observed){
       if(entry.kind!=='purchase'||returned.has(entry.asin))continue;
       if(!known.has(entry.asin)){unmatched++;continue;}
-      if(!entry.title){missingTitles++;continue;}
+      const savedTitle=Object.hasOwn(options?.knownItemTitles??{},entry.asin)?options.knownItemTitles[entry.asin]:null;
+      const title=entry.title||(typeof savedTitle==='string'&&savedTitle.trim()&&savedTitle.length<=500?savedTitle:'');
+      if(!title){missingTitles++;continue;}
       const key=entry.asin+':'+entry.acquiredAt;if(seen.has(key))continue;seen.add(key);
-      entries.push({provider:'audible',mediaType:'audiobook',title:entry.title,asin:entry.asin,providerItemId:entry.asin,acquiredAt:entry.acquiredAt,sourceLabel:'Audible purchase history'});
+      if(!entry.title)titlesFromSavedLibrary++;
+      entries.push({provider:'audible',mediaType:'audiobook',title,asin:entry.asin,providerItemId:entry.asin,acquiredAt:entry.acquiredAt,sourceLabel:'Audible purchase history'});
     }
-    return {state:blocked?'blocked':entries.length?'ready':'empty',report,entries,unmatched,missingTitles,excludedReturned:returned.size};
+    report.preview={entries:entries.length,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
+    return {state:blocked?'blocked':entries.length?'ready':'empty',report,entries,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
   }
   global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory };
 }(globalThis));

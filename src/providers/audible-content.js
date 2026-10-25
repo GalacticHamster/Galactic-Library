@@ -43,11 +43,11 @@
     const setBusy=busy=>{check.disabled=end.disabled=previewButton.disabled=busy;if(busy)status.dataset.busy='true';else delete status.dataset.busy;};
     async function previewSavedAccount(){
       const [saved,profile]=await Promise.all([
-        chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}),
+        chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true}),
         chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider:'audible',beginScan:false})
       ]).catch(()=>{throw Error('The saved Audible account could not be read. Reload GL and preview again. No library changes were made.');});
       if(!saved?.ok||!profile?.ok||!saved.profileId||saved.profileId!==profile.profileId||!profile.profileLabel)throw Error('Choose your saved Audible account in Providers, then preview again. No library changes were made.');
-      return {profileId:profile.profileId,profileLabel:profile.profileLabel,knownItemIds:saved.syncState?.knownProviderItemIds??[]};
+      return {profileId:profile.profileId,profileLabel:profile.profileLabel,knownItemIds:saved.syncState?.knownProviderItemIds??[],knownItemTitles:saved.syncState?.knownItemTitles??{}};
     }
     previewButton.addEventListener('click',async()=>{
       clearPreview();setBusy(true);download.disabled=true;report=null;const pageUrl=location.href;
@@ -55,12 +55,13 @@
       try{
         const account=await previewSavedAccount();
         if(location.href!==pageUrl)throw Error('The history page changed. Wait for it to load, then preview again.');
-        const result=globalThis.GalacticAudible.previewPurchaseHistory(document,{knownItemIds:account.knownItemIds});
+        const result=globalThis.GalacticAudible.previewPurchaseHistory(document,{knownItemIds:account.knownItemIds,knownItemTitles:account.knownItemTitles});
         report=result.report;download.disabled=false;
         if(result.state==='blocked')throw Error('Choose Your orders and wait for its purchase table to load. Conflicting order information or an unavailable saved-account comparison must be resolved before previewing. No library changes were made.');
-        if(!result.entries.length){status.textContent='No purchases with a readable title, dated order evidence and matching saved Audible identifier are available on this page. Unmatched books and books with completed-return wording remain unchanged.';return;}
+        if(!result.entries.length){status.textContent=`No purchase evidence is ready. ${result.report.grouping.matchingBookRowsWithDatedOrderEvidence} dated rows match your saved account; ${result.missingTitles} have no readable page or saved title. ${result.unmatched} unmatched rows and ${result.excludedReturned} returned identifiers were left out. No library changes were made. Export the check report if you expected purchases here.`;return;}
         purchasePreview=result;previewContext={...account,pageUrl};
         const explanation=document.createElement('p');explanation.textContent=`${result.entries.length} purchase entries match saved Audible account “${account.profileLabel}”. These are purchase evidence, not confirmed current ownership. Existing ownership corrections remain unchanged. Only this visible page was read.`;
+        if(result.titlesFromSavedLibrary)explanation.textContent+=` ${result.titlesFromSavedLibrary} names use the matching saved book titles; purchase dates come from this page.`;
         const details=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');summary.textContent='Books and purchase dates';list.style.cssText='max-height:220px;overflow:auto;padding-left:22px;';
         for(const entry of result.entries){const row=document.createElement('li');row.textContent=`${entry.title} — ${entry.acquiredAt}`;list.append(row);}details.append(summary,list);
         const note=document.createElement('p');note.textContent='This separate evidence file contains book titles, identifiers and purchase dates. Keep it private. In GL, select this same Audible account under Providers, then open Library → Ownership and access → Match purchase receipts → Receipt files. Import the file and review each matching account copy. Nothing is applied automatically; no order totals are copied or divided among books. The purchase date is stored as evidence, not a replacement provider acquisition date.';
@@ -76,7 +77,7 @@
       if(!purchasePreview||!previewContext||evidenceDownload.disabled)return;
       const previous=purchasePreview,context=previewContext;setBusy(true);evidenceDownload.disabled=true;
       try{
-        const account=await previewSavedAccount(),current=globalThis.GalacticAudible.previewPurchaseHistory(document,{knownItemIds:account.knownItemIds});
+        const account=await previewSavedAccount(),current=globalThis.GalacticAudible.previewPurchaseHistory(document,{knownItemIds:account.knownItemIds,knownItemTitles:account.knownItemTitles});
         if(location.href!==context.pageUrl||account.profileId!==context.profileId||account.profileLabel!==context.profileLabel||current.state!=='ready'||current.report.selectedTime!==previous.report.selectedTime||JSON.stringify(current.entries)!==JSON.stringify(previous.entries))throw Error('The account or purchase page changed. Preview again before downloading. No library changes were made.');
         const url=URL.createObjectURL(new Blob([JSON.stringify({entries:current.entries},null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='GL-audible-purchase-evidence-private.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
         status.textContent='Private purchase evidence downloaded for manual review. No library records or ownership statuses changed. The file does not establish complete history or rule out later refunds.';

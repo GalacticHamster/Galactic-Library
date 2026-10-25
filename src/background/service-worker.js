@@ -460,6 +460,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           .map((item) => item.providerItemId)
           .filter(id=>Boolean(id)&&!pendingSteamIds.has(id))
           .slice(0, 50000);
+        // Only the explicit Audible purchase preview needs saved title labels.
+        // Normal sync/diagnostic reads retain their existing minimal response.
+        let knownItemTitles;
+        if(request.provider==='audible'&&request.includePurchaseTitles===true&&/^\/account\/purchase-history\/?$/u.test(new URL(sender.url).pathname)){
+          const titles=new Map(),conflicts=new Set();
+          for(const item of Object.values(database.providerItems)){
+            if(item.provider!=='audible'||item.profileId!==activeId||item.mediaType!=='audiobook'||!/^[A-Z0-9]{10}$/u.test(item.providerItemId)||typeof item.title!=='string'||!item.title.trim()||item.title.length>500)continue;
+            if(titles.has(item.providerItemId)&&titles.get(item.providerItemId)!==item.title)conflicts.add(item.providerItemId);
+            titles.set(item.providerItemId,item.title);
+          }
+          knownItemTitles=Object.fromEntries([...titles].filter(([id])=>!conflicts.has(id)).slice(0,50000));
+        }
         reply({
           ok: true,
           scanToken,profileLabel,profileId:activeId,
@@ -472,7 +484,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean))].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds }
+            : { knownProviderItemIds,...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));

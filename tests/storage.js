@@ -194,13 +194,21 @@ export const storageTests = [
     const before=await pageA.getDatabase(),stored=structuredClone(memory.values),sender={id:chrome.runtime.id,url:'https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1',tab:{id:45}};
     const result=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false},sender);
     assert.equal(result.ok,true,result.error);assert.deepEqual(result.syncState.knownProviderItemIds,['B000000001']);assert.equal(result.scanToken,undefined);
+    assert.equal(result.syncState.knownItemTitles,undefined);
+    const titleRead=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true},sender);
+    assert.equal(titleRead.ok,true,titleRead.error);assert.deepEqual(titleRead.syncState.knownItemTitles,{B000000001:'Synthetic audiobook'});
+    const libraryRead=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true},{...sender,url:'https://www.audible.com/library'});
+    assert.equal(libraryRead.syncState.knownItemTitles,undefined);
     const profile=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'audible',beginScan:false},sender);
     assert.equal(profile.ok,true,profile.error);assert.equal(profile.profileId,result.profileId);assert.equal(profile.profileLabel,'Personal');assert.equal(profile.scanToken,undefined);
     assert.deepEqual(await pageA.getDatabase(),before);assert.deepEqual(memory.values,stored);
-    const foreign=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false},{...sender,url:'https://example.invalid/account/purchase-history'});
+    const foreign=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true},{...sender,url:'https://example.invalid/account/purchase-history'});
     assert.equal(foreign.ok,false);assert.deepEqual(memory.values,stored);
     const foreignProfile=await dispatch({type:'GET_PROVIDER_PROFILE',provider:'audible',beginScan:false},{...sender,url:'https://example.invalid/account/purchase-history'});
     assert.equal(foreignProfile.ok,false);assert.deepEqual(memory.values,stored);
+    await pageA.mergeProviderItems('audible',[{providerItemId:'B000000002',title:'Other account audiobook',mediaType:'audiobook',ownership:'unknown'}],{profileLabel:'Other'});
+    const other=await dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true},sender);
+    assert.notEqual(other.profileId,result.profileId);assert.deepEqual(other.syncState.knownItemTitles,{B000000002:'Other account audiobook'});
   })],
   ['profile scans reject stale commits across restart, restore, clear and account switches', profileSafetyFixture],
   ['concurrent provider tabs retain both full imports in the actual worker', () => withWorker(async ({ memory, pageA, importItems }) => {

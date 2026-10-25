@@ -284,7 +284,7 @@ to diagnose it. Reaching a header-shape limit is not itself purchase-row loss.
 **Preview purchase evidence** reuses the validated order grouping and reads the
 saved profile/known IDs through existing no-scan messages. Both reads must name
 the same profile; a missing profile or nickname blocks preview. Only exact known
-ASINs, readable product-link titles and validated direct/shared order dates enter
+ASINs, readable product-link titles (or exact-ASIN saved-title labels) and validated direct/shared order dates enter
 the private preview. Identical ASIN/date observations are deduplicated; different
 purchase dates are retained rather than silently selecting an acquisition date.
 Cash, credit and explicit zero-price orders share the same evidence path. No
@@ -293,6 +293,20 @@ order-key/link groups block creation; rejected whole-table grouping hypotheses
 alone do not block separate supported orders. Explicit completed-return wording
 excludes that ASIN from positive evidence without assuming repurchase chronology.
 This is not validation of populated Refund history or automatic current access.
+
+**Missing-title correction:** The initial preview required the readable title
+inside a matching product link in the logical Title column. That rejects a valid
+row when its ASIN comes from artwork or a row attribute and its name is plain
+text elsewhere. A five-column synthetic reproduction demonstrates the failure;
+the user's sanitized reports do not reveal the exact live title markup. The
+preview now optionally reads saved audiobook titles from the same active profile
+on the purchase-history route only. A missing linked title may reuse that label
+only after the row ASIN also matches the saved-ID comparison. Conflicting saved
+labels are omitted, unrelated IDs never supply labels, and readable source-link
+titles retain precedence. Dates still come solely from validated page evidence.
+Normal sync reads do not return titles. The preview discloses saved-label use;
+diagnostics retain only counts, including missing/fallback-title reasons. No title
+matching, ownership inference or record content is changed by this fallback.
 
 The user can inspect titles/dates, confirm the saved account and download
 `GL-audible-purchase-evidence-private.json`. The download rechecks the profile,
@@ -332,7 +346,7 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 79 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 85 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
   date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
   conflicts, navigation, refund-specific layouts, explicit versus pending/refund
@@ -340,7 +354,7 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   or network requests. Purchase-preview checks cover shared dates, zero-price
   orders, exact joins, duplicate observations, conflicting orders, completed
   returns, private-versus-sanitized exports, existing receipt-parser compatibility,
-  and changed-page/account guards. Multi-book
+and changed-page/account guards. Multi-book
   examples use synthetic transactions rather than the user's order data.
 - These do not establish live ownership enrichment. The preview is bounded to
   visible positive evidence and explicit manual receipt review. Automatic
