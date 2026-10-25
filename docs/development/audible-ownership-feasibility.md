@@ -200,8 +200,15 @@ omits titles, individual purchase dates, prices, ASIN values, order IDs, account
 details, credentials and raw bodies. Recommendations outside a recognized table
 are not purchase-row matches. Unexpected layouts return an unrecognized-structure
 report rather than guessed order mappings. The function returns diagnostic
-counters only, not importable records. Live shared-order recognition is pending; fixture
-passes are not account-page validation of the updated grouping rules.
+counters only, not importable records. The subsequent live format-2 report
+validated shared-order recognition for the displayed sample: all 44 distinct
+book ASINs matched saved items and dated order evidence, with 30 using shared
+evidence and none unbound. Fourteen orders comprised five single-book orders,
+seven two-book orders, one three-book order and one 22-book order. Nine groups
+used explicit order keys; five used direct rows. No conflicting groups were
+reported. One unreadable row layout did not leave any book rows unbound; its
+purpose cannot be established from this sanitized report. This is a sample of
+the last 365 days, not verification of the full library or refund history.
 
 **Grouped orders:** Dates, cash totals and credit totals describe the order, not
 necessarily each individual book. The checker preserves logical columns across
@@ -225,6 +232,29 @@ Per-book returns, current access and manual corrections still require their own
 handling before any ownership write. No history requests or provider actions
 are performed.
 
+**History navigation and refund check (format 3):** The opt-in checker now
+reports visible Next/Previous controls, disabled states, numbered pagination
+controls and a small allowlist of same-page navigation parameter names. It
+exports no destination URLs or parameter values, follows no links and does not
+change filters. Absence of Next does not prove historical completeness.
+
+Select **Refund history** in Audible's View menu, wait for the page to load,
+then use **Check this page (no import)** and **Export check report**. The report
+looks for allowlisted table headers, exact per-row ASINs and explicit completed
+refund wording in Status/Options cells. Return actions, pending wording,
+conflicting ASINs and unfamiliar columns do not establish completed refunds.
+Unknown headers are counted without exporting their text. An empty or unfamiliar
+refund page does not prove that no refunds exist. This is structural feasibility
+inspection, not a validated refund parser or ownership importer.
+
+Also inspect **Your orders** with a specific prior year selected (2025 is a useful
+initial sample) and export a separate report after it loads. If Next is present,
+check the next page separately. These samples establish live navigation and
+refund layouts before any automatic traversal is implemented. No full library
+rescan, return action, transaction screenshot or private order export is needed.
+The extension cannot inspect an authenticated account page from the development
+checkout; these sanitized reports supply that missing live evidence.
+
 Future implementation must first prove persistence on disposable data: exact
 account/ASIN assignment, cash/credit/free/gift semantics where observed, explicit
 returns/repurchases, incomplete history, different narrations, authoritative
@@ -242,10 +272,11 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 42 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 54 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
   date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
-  conflicts and read failures without imports or network requests. Multi-book
+  conflicts, navigation, refund-specific layouts, explicit versus pending/refund
+  actions and read failures without imports or network requests. Multi-book
   examples use synthetic transactions rather than the user's order data.
 - These do not establish live ownership enrichment. No automatic classification
   implementation is appropriate until the account-evidence contract is demonstrated.

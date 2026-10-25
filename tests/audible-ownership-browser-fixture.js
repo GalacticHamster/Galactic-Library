@@ -77,6 +77,26 @@ try{
  r=inspect(document,{url:'https://www.audible.com/library'});
  assert(r.state==='wrong-page','The feasibility inspector is limited to the purchase-history route');
  r=check(table(row(1)),null);assert(r.libraryComparison==='unavailable'&&r.rowsWithOneAsin===1,'Missing saved-library access does not discard observable page structure');
+ r=check(table(row(1))+'<nav aria-label="Pagination"><a href="?page=2&timeFilter=PRIVATE_SECRET&orderId=ORDER_SECRET" rel="next">Next</a><button disabled>Previous</button><a href="?page=1">1</a></nav>');
+ assert(r.format===3&&r.navigation.enabledNext===1&&r.navigation.disabledPrevious===1&&r.navigation.numberedControls===1,'Visible history pagination distinguishes enabled, disabled and numbered controls');
+ assert(r.navigation.queryParameterNames.join(',')==='page,timeFilter'&&r.navigation.otherQueryParameters===1&&!/PRIVATE_SECRET|ORDER_SECRET/u.test(JSON.stringify(r)),'Navigation reports only allowlisted parameter names, never values or unknown parameter names');
+ r=check(table(row(1))+'<a href="https://example.invalid/history?page=2" rel="next">Next</a><button aria-disabled="true" aria-label="Next page">→</button><button hidden>Next</button>');
+ assert(r.navigation.otherDestinations===1&&r.navigation.disabledNext===1&&r.navigation.controls===2&&!r.historyComplete,'Foreign, disabled and hidden page controls cannot establish traversable complete history');
+ const refundFilters=filters.replace('<option>Your orders</option>','<option>Refund history</option>');
+ const refundTable=rows=>refundFilters+'<table><thead><tr><th>Title</th><th>Refund date</th><th>Refund amount</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>';
+ const refundRow=(n,status)=>'<tr><td><a href="/pd/'+id(n)+'">PRIVATE_TITLE</a></td><td>09-22-2026</td><td>$4.00</td><td>'+status+'</td></tr>';
+ r=check(refundTable(refundRow(1,'Refund complete')+refundRow(2,'<button>Return this title</button>')+refundRow(3,'Pending')));
+ assert(r.state==='refund-structure-observed'&&r.refundHistory.bookRows===3&&r.refundHistory.rowsMatchingSavedAsin===2,'Refund-specific columns are observed separately from the purchase table and joined only by exact ASIN');
+ assert(r.refundHistory.rowsWithCompletedStatus===1&&r.refundHistory.matchingRowsWithCompletedStatus===1&&r.refundHistory.rowsWithReturnAction===1,'Explicit completed refunds remain distinct from pending refunds and available Return actions');
+ assert(!/PRIVATE_TITLE|09-22|4\.00|B\d{9}|https?:/u.test(JSON.stringify(r))&&!r.historyComplete&&!r.accountVerified,'Refund reports omit transaction data and never certify account binding or complete history');
+ r=check(refundTable(refundRow(1,'Refunded').replace('</td>','<span data-asin="'+id(2)+'"></span></td>'))+'<aside><a href="/pd/'+id(2)+'">PRIVATE_TITLE</a></aside>');
+ assert(r.refundHistory.rowsWithMultipleAsins===1&&r.refundHistory.rowsWithCompletedStatus===0&&r.refundHistory.rowsMatchingSavedAsin===0,'Conflicting refund identities and outside recommendations cannot establish item-level completed refunds');
+ r=check(refundFilters+'<p>No orders shown</p>');
+ assert(r.state==='structure-unrecognized'&&!r.refundHistory.candidateTables&&!r.historyComplete,'An empty unrecognized refund view never establishes no refunds or complete refund history');
+ r=check(refundTable(refundRow(1,'Refunded')).replace('<th>Status</th>','<th>PRIVATE_HEADER_SECRET</th>'));
+ assert(r.refundHistory.unrecognizedHeaders===1&&!r.refundHistory.rowsWithCompletedStatus&&!JSON.stringify(r).includes('PRIVATE_HEADER_SECRET'),'Unknown refund headers are counted without exporting prose or guessing their semantics');
+ r=check(refundTable(refundRow(1,'Refunded')).replace('<option>Refund history</option>','<option>Your orders</option>'));
+ assert(!r.refundHistory.selected&&!r.refundHistory.bookRows,'Refund structure probing is limited to the explicitly selected Refund history view');
  // The production panel uses the existing raw read, bypassing the scan-start wrapper.
  const code=await (await originalFetch('/src/providers/audible-content.js')).text();
  Element.prototype.attachShadow=function(options){shadow=oldAttach.call(this,options);return shadow;};
@@ -94,6 +114,9 @@ try{
  assert(shadow.querySelector('.status').textContent.includes('2 match')&&!download.disabled,'The actual panel reports aggregate identifier matches and enables export');
  URL.createObjectURL=blob=>{reportBlob=blob;return 'blob:synthetic-check';};URL.revokeObjectURL=()=>{};HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};download.click();
  const exported=JSON.parse(await reportBlob.text());assert(downloads[0]==='GL-audible-ownership-check.json'&&exported.rows===2&&!/PRIVATE_TITLE|ORDER_SECRET|TOKEN_SECRET|B\d{9}|6\.99|09-22|https?:/u.test(JSON.stringify(exported)),'The actual download uses only the sanitized aggregate report');
+ set(refundTable(refundRow(1,'Refund complete'))+'<a href="?page=2" rel="next">Next</a>');run.click();for(let i=0;i<100&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert(shadow.querySelector('.status').textContent.includes('Refund page checked. 1 book rows')&&shadow.querySelector('.status').textContent.includes('Next page control')&&!download.disabled,'The actual panel explains refund evidence and remaining pages without claiming complete history');
+ download.click();const refundExport=JSON.parse(await reportBlob.text());assert(refundExport.refundHistory.rowsWithCompletedStatus===1&&messages.every(message=>message.type==='GET_PROVIDER_SYNC_STATE'&&message.beginScan===false),'Refund exports use the same read-only no-lease path and contain the current page rather than an earlier purchase report');
  chrome.runtime.sendMessage=async()=>{throw Error('PRIVATE_ERROR_WITH_ORDER_SECRET');};run.click();for(let i=0;i<100&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
  assert(shadow.querySelector('.status').textContent.includes('comparison was unavailable')&&!shadow.textContent.includes('PRIVATE_ERROR'),'A failed library read remains read-only and exposes no raw error or transaction data');
  await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

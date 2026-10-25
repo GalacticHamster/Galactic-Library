@@ -16,7 +16,7 @@
   const status = shadow.querySelector('.status');
 
   if(/^\/account\/purchase-history\/?$/u.test(location.pathname)&&new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'){
-    const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check this visible purchase-history page only. No books or access statuses will change. The report omits titles, purchase dates, prices, identifiers and account details.';
+    const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check the visible page, including its page controls. Use Audible\'s View menu to check Your orders or Refund history, and its date menu to check a year. Run a new check after each page loads. No books or access statuses will change. Reports omit titles, transaction dates, prices, identifiers and account details.';
     for(const button of buttons)button.remove();
     const check=document.createElement('button'),download=document.createElement('button');check.type=download.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;
     panel.insertBefore(check,status);panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(download,status);
@@ -28,6 +28,9 @@
         const saved=await chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}).catch(()=>null);
         report=globalThis.GalacticAudible.inspectPurchaseHistory(document,{knownItemIds:saved?.ok?saved.syncState?.knownProviderItemIds:null});
         status.textContent=report.state==='checked'?`Page checked. ${report.rows} book rows; ${report.rowsMatchingSavedAsin} match your selected saved Audible account. ${report.grouping.bookRowsWithDatedOrderEvidence} have direct or shared dated order information. No library changes were made. This does not verify the signed-in account or complete history.`:'The purchase table was not recognized. No library changes were made. Export the check report so its structure can be investigated.';
+        if(report.refundHistory?.selected)status.textContent=report.refundHistory.candidateTables?`Refund page checked. ${report.refundHistory.bookRows} book rows; ${report.refundHistory.rowsMatchingSavedAsin} match your selected saved Audible account. ${report.refundHistory.rowsWithCompletedStatus} have explicit completed-return wording. Other rows remain unverified. No library changes were made; this does not establish complete refund history.`:'The refund table was not recognized. No library changes were made. Export this report so its structure can be investigated; an empty or unfamiliar page does not prove there were no refunds.';
+        if(report.navigation?.enabledNext)status.textContent+=' A Next page control is available; this report covers only the current page.';
+        if(report.boundReached)status.textContent+=' The check reached its safety limit; some page information was not inspected.';
         if(report.libraryComparison==='unavailable')status.textContent+=' Saved-library comparison was unavailable.';
         download.disabled=false;
       }catch{status.textContent='The page check could not complete. No library changes were made. Reload this purchase-history page and try again.';}

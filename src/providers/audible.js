@@ -273,7 +273,7 @@
   // Feasibility only: inspect the rendered purchase page, never follow links,
   // fetch orders, assign ownership or retain transaction/identifier values.
   function inspectPurchaseHistory(document,{url=global.location?.href,knownItemIds=null}={}){
-    const report={format:2,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
+    const report={format:3,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
     let page;try{page=new URL(url);}catch{return report;}
     if(page.origin!=='https://www.audible.com'||!/^\/account\/purchase-history\/?$/u.test(page.pathname))return report;
     const label=element=>String(element?.textContent??'').replace(/\s+/gu,' ').trim().slice(0,200);
@@ -417,7 +417,63 @@
     grouping.unboundBookRows=facts.filter(f=>f.ids.size===1&&!used.has(f)).length;
     grouping.distinctAsinsWithDatedOrderEvidence=datedAsins.size;grouping.distinctSavedMatchesWithDatedOrderEvidence=datedMatches.size;
     const visibleLinks=[...document.querySelectorAll('a[href]')].filter(visible).slice(0,2000),pageAsins=new Set(visibleLinks.map(asinFromLink).filter(Boolean));
-    return {...report,state:headers.length?'checked':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000};
+    // Observe navigation contracts without exporting destinations, arbitrary text,
+    // filter values or identifiers. A missing Next button never proves completeness.
+    const navigation={controls:0,enabledNext:0,disabledNext:0,enabledPrevious:0,disabledPrevious:0,numberedControls:0,samePageLinks:0,otherDestinations:0,queryParameterNames:[],otherQueryParameters:0,boundReached:false};
+    const parameterNames=new Set(),controls=[...document.querySelectorAll('a,button,[role="button"]')].filter(visible);
+    for(const control of controls.slice(0,2000)){
+      const text=label(control),accessible=control.getAttribute('aria-label')??'',rel=control.getAttribute('rel')??'';
+      const named=[text,accessible].map(value=>value.replace(/[«»‹›←→]/gu,'').trim());
+      const next=/\bnext\b/iu.test(rel)||named.some(value=>/^(?:next|next page|go to next page)$/iu.test(value));
+      const previous=/\bprev\b/iu.test(rel)||named.some(value=>/^(?:previous|previous page|go to previous page|prev)$/iu.test(value));
+      const paging=control.closest('nav[aria-label*="agin"], [role="navigation"][aria-label*="agin"], .pagination, .bc-pagination');
+      const numbered=!!paging&&/^\d{1,4}$/u.test(text);
+      if(!next&&!previous&&!numbered)continue;
+      navigation.controls++;const disabled=control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true';
+      if(next)navigation[disabled?'disabledNext':'enabledNext']++;
+      if(previous)navigation[disabled?'disabledPrevious':'enabledPrevious']++;
+      if(numbered)navigation.numberedControls++;
+      if(control.hasAttribute('href')){try{
+        const destination=new URL(control.getAttribute('href'),page);
+        if(destination.origin===page.origin&&destination.pathname===page.pathname){
+          navigation.samePageLinks++;
+          for(const key of new Set(destination.searchParams.keys()))if(['page','pageNumber','pageSize','offset','limit','orderFilter','timeFilter','view','year'].includes(key))parameterNames.add(key);else navigation.otherQueryParameters++;
+        }else navigation.otherDestinations++;
+      }catch{navigation.otherDestinations++;}}
+    }
+    navigation.queryParameterNames=[...parameterNames].sort();navigation.boundReached=controls.length>2000;
+    // Refund layouts are not assumed to use purchase columns. Report only a
+    // small allowlist of header/status shapes and exact row ASIN presence. Being
+    // on Refund history, or having a Return button, is not a completed return.
+    const refundFields=['title','purchased','total','options','date','returned','refunded','return date','refund date','refund amount','amount','status'];
+    const refundHistory={selected:selectedViews.size===1&&selectedViews.has('refund-history'),recognizedHeaders:[],candidateTables:0,bookRows:0,rowsWithOneAsin:0,rowsWithMultipleAsins:0,rowsMatchingSavedAsin:0,rowsWithCompletedStatus:0,matchingRowsWithCompletedStatus:0,rowsWithReturnAction:0,unrecognizedHeaders:0,boundReached:false};
+    if(refundHistory.selected){
+      const seenTables=new Set();
+      for(const header of candidates.slice(0,2000)){
+        const headerCells=[...header.children].filter(cell=>visible(cell)&&(cell.tagName==='TH'||cell.getAttribute('role')==='columnheader'));
+        if(!headerCells.length)continue;
+        const names=headerCells.map(cell=>label(cell).toLowerCase()),recognized=names.filter(name=>refundFields.includes(name));
+        for(const name of recognized)if(!refundHistory.recognizedHeaders.includes(name))refundHistory.recognizedHeaders.push(name);
+        refundHistory.unrecognizedHeaders+=names.filter(name=>name&&!refundFields.includes(name)).length;
+        if(!names.includes('title')||!recognized.some(name=>name!=='title'))continue;
+        const scope=header.closest('table,[role="table"]');if(!scope||seenTables.has(scope))continue;
+        seenTables.add(scope);refundHistory.candidateTables++;
+        const scopedRows=[...scope.querySelectorAll(rowSelector)].filter(row=>visible(row)&&row!==header&&row.closest('table,[role="table"]')===scope);
+        if(scopedRows.length>100)refundHistory.boundReached=true;
+        for(const row of scopedRows.slice(0,100)){
+          const ids=new Set([...row.querySelectorAll('a[href]')].filter(visible).slice(0,100).map(asinFromLink).filter(Boolean));
+          for(const element of [row,...row.querySelectorAll('[data-asin]')].slice(0,100))if(visible(element)&&/^[A-Z0-9]{10}$/iu.test(element.getAttribute('data-asin')??''))ids.add(element.getAttribute('data-asin').toUpperCase());
+          if(!ids.size)continue;refundHistory.bookRows++;
+          if(ids.size>1){refundHistory.rowsWithMultipleAsins++;continue;}
+          refundHistory.rowsWithOneAsin++;const matching=known?.has([...ids][0]);if(matching)refundHistory.rowsMatchingSavedAsin++;
+          const parts=cells(row),statusColumns=names.map((name,i)=>['status','options'].includes(name)?i:-1).filter(i=>i>=0);
+          const completed=parts.length===header.children.length&&statusColumns.some(i=>/^(?:returned|refunded|return complete|refund complete)(?:[.!]|\s+on\s+\S.*)?$/iu.test(label(parts[i])));
+          if(completed){refundHistory.rowsWithCompletedStatus++;if(matching)refundHistory.matchingRowsWithCompletedStatus++;}
+          if([...row.querySelectorAll('a,button,[role="button"]')].filter(visible).some(element=>/^return this title$/iu.test(label(element))))refundHistory.rowsWithReturnAction++;
+        }
+      }
+    }
+    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,navigation,refundHistory,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000||navigation.boundReached||refundHistory.boundReached};
   }
   global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory };
 }(globalThis));
