@@ -255,6 +255,21 @@ rescan, return action, transaction screenshot or private order export is needed.
 The extension cannot inspect an authenticated account page from the development
 checkout; these sanitized reports supply that missing live evidence.
 
+The live format-3 Refund history sample showed the usual Title/Purchased/Total/
+Options headers but zero book rows, zero product ASINs and no navigation controls
+for the last 365 days. This is consistent with the user's statement that they
+have no refunds. It does not validate populated refund rows or all-year history;
+no return should be performed just to obtain a fixture. The older-year order
+and pagination samples remain outstanding.
+
+Audible drops extra URL parameters when changing history filters. Opening the
+opt-in URL now remembers check mode on purchase-history pages in the same tab
+for up to two hours. Only an expiry timestamp is stored in site session storage;
+no account or transaction information is stored there. **End check** clears it
+and removes the opt-in URL parameter while retaining Audible's other filters.
+The normal library page is unaffected. If browser settings block session storage,
+the explicit URL flag still works but cannot persist across filter navigation.
+
 Future implementation must first prove persistence on disposable data: exact
 account/ASIN assignment, cash/credit/free/gift semantics where observed, explicit
 returns/repurchases, incomplete history, different narrations, authoritative
@@ -272,11 +287,12 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 54 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 60 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
   date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
   conflicts, navigation, refund-specific layouts, explicit versus pending/refund
-  actions and read failures without imports or network requests. Multi-book
+  actions, tab-local opt-in/expiry/end behavior and read failures without imports
+  or network requests. Multi-book
   examples use synthetic transactions rather than the user's order data.
 - These do not establish live ownership enrichment. No automatic classification
   implementation is appropriate until the account-evidence contract is demonstrated.

@@ -119,6 +119,19 @@ try{
  download.click();const refundExport=JSON.parse(await reportBlob.text());assert(refundExport.refundHistory.rowsWithCompletedStatus===1&&messages.every(message=>message.type==='GET_PROVIDER_SYNC_STATE'&&message.beginScan===false),'Refund exports use the same read-only no-lease path and contain the current page rather than an earlier purchase report');
  chrome.runtime.sendMessage=async()=>{throw Error('PRIVATE_ERROR_WITH_ORDER_SECRET');};run.click();for(let i=0;i<100&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));
  assert(shadow.querySelector('.status').textContent.includes('comparison was unavailable')&&!shadow.textContent.includes('PRIVATE_ERROR'),'A failed library read remains read-only and exposes no raw error or transaction data');
+ const sessionKey='galactic-library-audible-ownership-check-until',readsBefore=messages.length;
+ document.querySelector('#galactic-library-audible-importer').remove();history.replaceState({},'','/account/purchase-history?view=refunds&year=2025');(0,eval)(code);
+ assert(shadow.textContent.includes('Check this page (no import)')&&!shadow.querySelector('[data-mode]')&&messages.length===readsBefore,'A tab-local opt-in survives Audible dropping the query flag when changing views, without starting a scan or check');
+ const until=sessionStorage.getItem(sessionKey);assert(/^\d+$/u.test(until)&&Number(until)>Date.now()&&Number(until)<=Date.now()+7200000,'Check-mode session stores only a timestamp bounded to two hours');
+ document.querySelector('#galactic-library-audible-importer').remove();history.replaceState({},'','/library');(0,eval)(code);
+ assert(shadow.querySelectorAll('[data-mode]').length===2&&!shadow.textContent.includes('Check this page'),'A remembered opt-in never changes normal library-page controls');
+ document.querySelector('#galactic-library-audible-importer').remove();history.replaceState({},'','/account/purchase-history?view=refunds&year=2025');(0,eval)(code);
+ [...shadow.querySelectorAll('button')].find(button=>button.textContent==='End check').click();
+ assert(!sessionStorage.getItem(sessionKey)&&!new URLSearchParams(location.search).has('gl-audible-ownership-check')&&new URLSearchParams(location.search).get('year')==='2025'&&shadow.querySelectorAll('[data-mode]').length===2,'End check clears the tab opt-in and restores ordinary controls without losing Audible filters or altering library data');
+ document.querySelector('#galactic-library-audible-importer').remove();sessionStorage.setItem(sessionKey,String(Date.now()-1000));(0,eval)(code);
+ assert(!sessionStorage.getItem(sessionKey)&&!shadow.textContent.includes('Check this page'),'Expired opt-ins are cleared instead of leaving troubleshooting enabled indefinitely');
+ document.querySelector('#galactic-library-audible-importer').remove();sessionStorage.setItem(sessionKey,'PRIVATE_INVALID_VALUE');(0,eval)(code);
+ assert(!sessionStorage.getItem(sessionKey)&&shadow.querySelectorAll('[data-mode]').length===2,'Malformed session opt-ins are discarded without touching saved library records');
  await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{globalThis.fetch=originalFetch;Element.prototype.attachShadow=oldAttach;HTMLAnchorElement.prototype.click=oldClick;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;}

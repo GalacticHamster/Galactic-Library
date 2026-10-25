@@ -15,14 +15,34 @@
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
 
-  if(/^\/account\/purchase-history\/?$/u.test(location.pathname)&&new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'){
+  // Audible replaces its query string when changing history views or years.
+  // Retain only a short-lived opt-in timestamp in this tab, never account data.
+  const checkSessionKey='galactic-library-audible-ownership-check-until';
+  const historyPage=/^\/account\/purchase-history\/?$/u.test(location.pathname);
+  let checkSession=false;
+  if(historyPage){try{
+    const until=Number(sessionStorage.getItem(checkSessionKey));
+    checkSession=until>Date.now()&&until<=Date.now()+2*60*60*1000;
+    if(!checkSession)sessionStorage.removeItem(checkSessionKey);
+    if(new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'){
+      sessionStorage.setItem(checkSessionKey,String(Date.now()+2*60*60*1000));checkSession=true;
+    }
+  }catch{/* A blocked session store leaves the explicit URL opt-in available. */}}
+  if(historyPage&&(checkSession||new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1')){
     const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check the visible page, including its page controls. Use Audible\'s View menu to check Your orders or Refund history, and its date menu to check a year. Run a new check after each page loads. No books or access statuses will change. Reports omit titles, transaction dates, prices, identifiers and account details.';
     for(const button of buttons)button.remove();
-    const check=document.createElement('button'),download=document.createElement('button');check.type=download.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;
+    const check=document.createElement('button'),download=document.createElement('button'),end=document.createElement('button');check.type=download.type=end.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;end.textContent='End check';
     panel.insertBefore(check,status);panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(download,status);
+    panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(end,status);
+    end.addEventListener('click',()=>{
+      if(check.disabled)return;
+      try{sessionStorage.removeItem(checkSessionKey);}catch{}
+      const url=new URL(location.href);url.searchParams.delete('gl-audible-ownership-check');history.replaceState(history.state,'',url.href);
+      host.remove();attachAudibleSync();
+    });
     let report=null;
     check.addEventListener('click',async()=>{
-      check.disabled=true;download.disabled=true;report=null;status.dataset.busy='true';status.textContent='Checking this page and comparing its audiobook links with your saved Audible account...';
+      check.disabled=true;end.disabled=true;download.disabled=true;report=null;status.dataset.busy='true';status.textContent='Checking this page and comparing its audiobook links with your saved Audible account...';
       try{
         // Bypass GalacticSync.send: that wrapper starts an import lease.
         const saved=await chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false}).catch(()=>null);
@@ -34,7 +54,7 @@
         if(report.libraryComparison==='unavailable')status.textContent+=' Saved-library comparison was unavailable.';
         download.disabled=false;
       }catch{status.textContent='The page check could not complete. No library changes were made. Reload this purchase-history page and try again.';}
-      finally{check.disabled=false;delete status.dataset.busy;}
+      finally{check.disabled=false;end.disabled=false;delete status.dataset.busy;}
     });
     download.addEventListener('click',()=>{if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='GL-audible-ownership-check.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
     globalThis.GalacticFloatingPanel?.attach(shadow);document.documentElement.append(host);return;
