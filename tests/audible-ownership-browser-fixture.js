@@ -159,14 +159,17 @@ try{
  assert(access.state==='blocked'&&driver.closed===1&&!access.selected,'Unrecognized sign-in or challenge documents produce no history or ownership conclusion');
  driver=fakeHistory({readError:true});access=await probe({driverFactory:()=>driver,timeoutMs:15,pollMs:1});
  assert(access.state==='blocked'&&access.reason==='history-access-not-verified'&&!JSON.stringify(access).includes('PRIVATE_TOKEN')&&driver.closed===1,'Blocked frame access and unexpected errors reveal no private details and always clean up');
- const fullHistoryDriver=({years=[2032,2031],repeat=false,delay=0,failRefund=false,challenge=false,lazy=false,unknownEmpty=false,refunded=false,unreadablePurchase=false}={})=>{
+ const fullHistoryDriver=({years=[2032,2031],repeat=false,delay=0,failRefund=false,challenge=false,lazy=false,unknownEmpty=false,refunded=false,unreadablePurchase=false,externalEmpty=false,hiddenEmpty=false,conflictingPurchase=false}={})=>{
    let view='orders',year=years[0],page=1,doc,closed=0;const visits=[];
    const build=()=>{
      const controls='<select><option value="VIEW_SECRET_ORDERS"'+(view==='orders'?' selected':'')+'>Your orders</option><option value="VIEW_SECRET_REFUNDS"'+(view==='refund-history'?' selected':'')+'>Refund history</option></select><select>'+years.map(y=>'<option value="YEAR_SECRET_'+y+'"'+(year===y?' selected':'')+'>'+y+'</option>').join('')+'</select>';
      const purchase=(n,total='1 Credit',status='')=>row(n,total,'<a href="/account/order-details/ORDER_SECRET_'+n+'_'+year+'">Order details</a><span>'+status+'</span>','09-22-'+year).replace('<tr>','<tr data-order-id="ORDER_SECRET_'+n+'_'+year+'">');
      let body=view==='orders'?(year===years[0]?(page===1?purchase(1,'$4.00')+purchase(2)+purchase(3,'Unfamiliar payment')+purchase(4,'$0.00')+purchase(5,'1 Credit','Pending')+purchase(6,'1 Credit','Gift for someone else')+purchase(7,'1 Credit','Borrowed')+purchase(10,'Gift','Gift redeemed')+purchase(11,'Promotion','Promotional acquisition complete'):purchase(8)):purchase(9)):refunded?'<tr><td><a href="/pd/'+id(2)+'">PRIVATE_TITLE</a></td><td>01-02-'+year+'</td><td>1 Credit</td><td>Refund complete</td></tr>':'<tr><td colspan="4">'+(unknownEmpty?'No recognizable statement':'No refunds found.')+'</td></tr>';
      if(unreadablePurchase&&view==='orders')body=body.replace('09-22-'+year,'');
+     if(conflictingPurchase&&view==='orders'&&year===years[0]&&page===1)body+=purchase(12,'$4.00').replaceAll('ORDER_SECRET_12_'+year,'ORDER_SECRET_CONFLICT_'+year)+purchase(13,'$5.00').replaceAll('ORDER_SECRET_13_'+year,'ORDER_SECRET_CONFLICT_'+year);
      let markup=table(body).replace(filters,controls);
+     if(externalEmpty&&view==='refund-history')markup=table('').replace(filters,controls)+'<div'+(hiddenEmpty===true?' hidden':'')+'><p'+(hiddenEmpty==='child'?' hidden':'')+'>Looks like you don&#39;t have any refunds in your purchase history.</p><p>Get started by browsing our catalog of audiobooks</p><a href="/search">Find your first book</a></div>';
+     if(externalEmpty&&hiddenEmpty==='child')markup=markup.replace('<p hidden>','<div><p hidden>').replace('history.</p>','history.</p></div>');
      if(view==='refund-history'&&refunded)markup=markup.replace('<th>Purchased</th>','<th>Refund date</th>');
      if(view==='orders'&&year===years[0])markup+='<nav class="bc-pagination"><span aria-current="page">'+page+'</span>'+(page===1?'<a href="/account/purchase-history?CURSOR_SECRET=NEXT" data-page="2" rel="next">Next</a>':'<button disabled>Next</button>')+'</nav>';
      if(lazy&&view==='orders')markup+='<button>Load more purchases</button>';
@@ -185,6 +188,10 @@ try{
  assert(h.scope==='recent'&&h.ordersComplete&&h.refundsComplete&&h.pagesRead===5&&h.years.join(',')==='2032,2031'&&driver.visits.every(v=>v[1]>=2031),'Quick checks only current and previous calendar years, performing fewer reads than Full without visiting older filters');
  driver=fullHistoryDriver({years:[2020,2019]});h=await scanHistory({mode:'incremental',now:new Date('2032-10-24T12:00:00Z'),driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(h.scope==='recent'&&!h.ordersComplete&&!h.refundsComplete&&h.pagesRead===0&&driver.visits.length===1,'Unavailable recent-year filters never turn Quick into an old-history sweep');
+ driver=fullHistoryDriver({years:[2032,2031,2013],externalEmpty:true,conflictingPurchase:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.ordersComplete&&h.refundsComplete&&h.failures.length===1&&h.failures[0].view==='orders'&&h.failures[0].conflictingGroups===1&&h.purchases.some(p=>p.date.startsWith('2013-'))&&driver.visits.some(v=>v[0]==='orders'&&v[1]===2013)&&!h.purchases.some(p=>[id(12),id(13)].includes(p.asin)),'A conflicting order is excluded without direct-row fallback while valid purchase pages and older years through 2013 continue; completeness remains partial');
+ driver=fullHistoryDriver({years:[2032,2031,2013],externalEmpty:true,conflictingPurchase:true});h=await scanHistory({mode:'incremental',now:new Date('2032-10-24T12:00:00Z'),driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.ordersComplete&&h.refundsComplete&&h.years.join(',')==='2032,2031'&&driver.visits.every(v=>v[1]>=2031),'An unreadable recent order never expands Quick update into historical years');
  driver=fullHistoryDriver({unreadablePurchase:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(!h.ordersComplete&&h.refundsComplete&&h.reason==='history-unreadable-entries','A purchase with unreadable dated evidence prevents historical completeness instead of being silently skipped');
  driver=fullHistoryDriver({repeat:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
@@ -193,6 +200,14 @@ try{
  assert(!h.ordersComplete&&!h.refundsComplete&&!h.purchases.length&&driver.closed===1,'An authentication/challenge document yields incomplete history with no fabricated purchases');
  const drivers=[];h=await scanHistory({driverFactory:()=>{const d=fullHistoryDriver({failRefund:true});drivers.push(d);return d;},timeoutMs:15,pollMs:1});
  assert(!h.refundsComplete&&h.ordersComplete&&h.purchases.length===8&&drivers.every(d=>d.closed===1),'Failed refund access does not discard readable purchase dates or prevent cleanup and bounded recovery for the order view');
+ driver=fullHistoryDriver({externalEmpty:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.refundsComplete&&h.ordersComplete&&h.failures.length===0,'The live explicit no-refunds sentence outside the table establishes an empty refund year without weakening purchase checks');
+ driver=fullHistoryDriver({externalEmpty:true,hiddenEmpty:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.refundsComplete&&h.reason==='history-empty-unconfirmed','Hidden empty-refund wording cannot prove that the visible refund list is empty');
+ driver=fullHistoryDriver({externalEmpty:true,hiddenEmpty:'child'});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.refundsComplete&&h.reason==='history-empty-unconfirmed','A visible container cannot make its hidden empty-refund sentence authoritative');
+ driver=fullHistoryDriver({unknownEmpty:true,unreadablePurchase:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.refundsComplete&&!h.ordersComplete&&h.failures.length===2&&h.failures[0].view==='refund-history'&&h.failures[0].reason==='history-empty-unconfirmed'&&h.failures[1].view==='orders'&&h.failures[1].year===2032&&h.failures[1].unboundRows===1&&!/PRIVATE_TITLE|ORDER_SECRET|YEAR_SECRET/u.test(JSON.stringify(h.failures)),'Separate refund and order failures retain year and safe row counts instead of overwriting the first blocker');
  driver=fullHistoryDriver({unknownEmpty:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(!h.refundsComplete&&h.reason==='history-empty-unconfirmed','An unrecognized empty history table is not accepted as proof of no refunds');
  driver=fullHistoryDriver({lazy:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});

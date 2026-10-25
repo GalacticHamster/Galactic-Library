@@ -1,4 +1,4 @@
-import {date,object,text} from './validation.js';
+import {count,date,object,text} from './validation.js';
 
 export function audibleCalendarDate(value){
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/u.test(value)||date(value).slice(0,10)!==value)throw Error('Invalid Audible purchase date.');
@@ -7,6 +7,15 @@ export function audibleCalendarDate(value){
 export function audiblePurchaseEvidence(values){
   if(!Array.isArray(values)||values.length>10000)throw Error('Too much Audible purchase evidence.');
   return [...new Map(values.map(value=>{object(value,'Audible purchase');const day=audibleCalendarDate(value.date),method=text(value.method,20);if(!['cash','credit','free','purchase','promotion','gift'].includes(method))throw Error('Invalid Audible purchase method.');return [day+':'+method,{date:day,method}];})).values()].sort((a,b)=>a.date.localeCompare(b.date)||a.method.localeCompare(b.method));
+}
+// Aggregate failure context only: no titles, IDs, transaction dates or page text.
+export function audibleHistoryFailures(values=[]){
+  if(!Array.isArray(values)||values.length>3)throw Error('Invalid Audible history failures.');
+  return values.map(value=>{
+    object(value,'Audible history failure');
+    if(!['initial','orders','refund-history'].includes(value.view)||value.year!==null&&(!Number.isInteger(value.year)||value.year<1900||value.year>2100)||!/^history-[a-z-]{1,80}$/u.test(value.reason)||typeof value.limited!=='boolean')throw Error('Invalid Audible history failure.');
+    return {view:value.view,year:value.year,reason:value.reason,limited:value.limited,...Object.fromEntries(['pagesRead','rows','unboundRows','conflictingGroups','multipleIdentities'].map(k=>[k,count(value[k],k,100000)]))};
+  });
 }
 export function validateAudibleHistory(value){
   object(value,'Audible history');
@@ -18,7 +27,7 @@ export function validateAudibleHistory(value){
   const refunds=ids(value.refunds).map(e=>({asin:asin(e.asin),date:audibleCalendarDate(e.date)}));
   const uncertainRefundAsins=[...new Set(ids(value.uncertainRefundAsins).map(asin))].sort();
   if(!Array.isArray(value.years)||value.years.length>200||value.years.some(y=>!Number.isInteger(y)||y<1900||y>2100)||!Number.isSafeInteger(value.pagesRead)||value.pagesRead<0||value.pagesRead>10000)throw Error('Invalid Audible history traversal.');
-  return {format:1,scope,ordersComplete:value.ordersComplete,refundsComplete:value.refundsComplete,purchases,refunds,uncertainRefundAsins,years:[...new Set(value.years)].sort((a,b)=>b-a),pagesRead:value.pagesRead,reason:text(value.reason??'',100)};
+  return {format:1,scope,failures:audibleHistoryFailures(value.failures),ordersComplete:value.ordersComplete,refundsComplete:value.refundsComplete,purchases,refunds,uncertainRefundAsins,years:[...new Set(value.years)].sort((a,b)=>b-a),pagesRead:value.pagesRead,reason:text(value.reason??'',100)};
 }
 
 // Historical facts enrich one existing source record; they never create a

@@ -376,15 +376,15 @@
     // These are grouping candidates, not ownership decisions. A date/total
     // never flows into the next row just because its own cells are blank.
     const grouping={declaredRowGroups:new Set(facts.map(f=>f.group)).size,rowsWithOrderKeys:facts.filter(f=>f.orderKeys.size).length,orderAttributeNames:orderAttributes,orderParameterNames:orderParameters,unreadableRowLayouts:invalidRows.size,candidateOrders:0,candidateMultiBookOrders:0,bookRowsWithDatedOrderEvidence:0,matchingBookRowsWithDatedOrderEvidence:0,bookRowsUsingSharedOrderEvidence:0,unboundBookRows:0,incompatibleGroupCandidates:0,conflictingOrderGroups:0,candidateOrderSizeCounts:{},candidateOrdersByBasis:{}};
-    const used=new Set(),seenGroups=new Set(),datedAsins=new Set(),datedMatches=new Set();
+    const used=new Set(),rejected=new Set(),seenGroups=new Set(),datedAsins=new Set(),datedMatches=new Set();
     const admit=(members,basis)=>{
-      if(members.length<1||members.some(f=>used.has(f)))return;
+      if(members.length<1||members.some(f=>used.has(f)||forImport&&rejected.has(f)))return;
       const dated=members.filter(f=>f.date),paid=members.filter(f=>f.total),linkKeys=new Set(members.flatMap(f=>[...f.orderLinks])),dataKeys=new Set(members.flatMap(f=>[...f.orderKeys]));
       const completedOrder=forImport&&selectedViews.size===1&&selectedViews.has('orders')&&members.some(f=>f.orderLinks.size||f.orderKeys.size)&&!members.some(f=>f.nonPurchase);
       if(!dated.length||!paid.length&&!completedOrder)return;
       const keyValues=new Map();for(const key of dataKeys){const split=key.indexOf(':',key.indexOf(':')+1),namespace=key.slice(0,split),values=keyValues.get(namespace)??new Set();values.add(key.slice(split+1));keyValues.set(namespace,values);}
       const conflicts=dated.some(f=>!f.dateValid)||paid.some(f=>!f.payment)&&!completedOrder||new Set(dated.map(f=>f.date)).size!==1||paid.length>0&&new Set(paid.map(f=>f.total)).size!==1||linkKeys.size>1||[...keyValues.values()].some(values=>values.size>1);
-      if(conflicts){if(['explicit-order-key','shared-order-link'].includes(basis))grouping.conflictingOrderGroups++;const key=members[0].group;if(!seenGroups.has(key)){seenGroups.add(key);grouping.incompatibleGroupCandidates++;}return;}
+      if(conflicts){if(['explicit-order-key','shared-order-link'].includes(basis)){grouping.conflictingOrderGroups++;if(forImport)members.forEach(f=>rejected.add(f));}const key=members[0].group;if(!seenGroups.has(key)){seenGroups.add(key);grouping.incompatibleGroupCandidates++;}return;}
       // A row group containing repeated separate date/total cells could be
       // independent same-day purchases. Only one shared pair is accepted here.
       if(basis==='row-group'&&(new Set(dated.map(f=>f.dateCell)).size!==1||new Set(paid.map(f=>f.totalCell)).size!==1))return;
@@ -590,9 +590,16 @@
   }
   async function scanPurchaseHistory({mode='full',now=new Date(),driverFactory=historyFrame,timeoutMs=15000,pollMs=150,progress=()=>{}}={}){
     const scope=mode==='incremental'?'recent':'full';
-    const history={format:1,scope,ordersComplete:false,refundsComplete:false,purchases:[],refunds:[],uncertainRefundAsins:[],years:[],pagesRead:0,reason:null};
+    const history={format:1,scope,failures:[],ordersComplete:false,refundsComplete:false,purchases:[],refunds:[],uncertainRefundAsins:[],years:[],pagesRead:0,reason:null};
     let driver,current;const purchases=new Map(),refunds=new Map(),purchaseCounts=new Map(),refundCounts=new Map(),uncertain=new Set(),started=Date.now();
     const visible=e=>!e.closest('[hidden],[aria-hidden="true"]')&&(!e.ownerDocument.defaultView||e.getClientRects().length>0);
+    const recordFailure=(view,year,reason,pagesRead,report)=>{
+      history.reason=reason;
+      // Keep the first blocker for each view, even if a later view also fails.
+      const existing=history.failures.find(f=>f.view===view);
+      if(existing){existing.pagesRead=pagesRead;return;}
+      history.failures.push({view,year,reason,pagesRead,rows:report?.rows??0,unboundRows:report?.unresolvedPurchaseRows??0,conflictingGroups:report?.grouping?.conflictingOrderGroups??0,multipleIdentities:report?.rowsWithMultipleAsins??0,limited:!!report?.limits?.purchaseRowScan});
+    };
     const yearSelect=doc=>{const matches=[...doc.querySelectorAll('select')].filter(s=>visible(s)&&[...s.options].some(o=>/^\d{4}$/u.test(textOf(o))));if(matches.length!==1)throw Error('history-controls');return matches[0];};
     const read=doc=>{
       const events=[],report=readPurchaseHistory(doc,{url:'https://www.audible.com/account/purchase-history',forImport:true},e=>events.push(e));
@@ -646,6 +653,19 @@
       const values=[...links.values()],next=values.find(e=>/\bnext\b/iu.test((e.getAttribute('rel')??'')+' '+textOf(e)+' '+(e.getAttribute('aria-label')??'')));
       return {next:next??values.sort((a,b)=>Number(textOf(a))-Number(textOf(b)))[0]??null,terminal};
     };
+    const emptyHistory=(doc,view)=>{
+      const tables=[...doc.querySelectorAll('table,[role="table"]')].filter(t=>[...t.querySelectorAll('th,[role="columnheader"]')].some(e=>/^title$/iu.test(textOf(e))));
+      if(!tables.length)return false;
+      // The live empty-refund panel is outside/after the table. Its explicit
+      // fixed sentence is valid only in the selected refund view with no books;
+      // generic page prose or a merely empty table never establishes completion.
+      if(view==='refund-history'){
+        const message=/^looks like you (?:don['\u2019]t|do not) have any refunds in your purchase history[.!]?$/iu;
+        const matches=e=>[...e.childNodes].some(n=>n.nodeType===3&&message.test((n.textContent??'').replace(/\s+/gu,' ').trim()))||message.test(textOf(e))&&[...e.querySelectorAll('*')].every(visible);
+        if([...doc.querySelectorAll('p,div,span,h1,h2,h3,h4')].filter(e=>visible(e)&&!e.closest('aside,footer,nav')).some(matches))return true;
+      }
+      return tables.some(t=>/\b(?:no\s+(?:results|orders|purchases|refunds|transactions)|(?:not|haven't|have not|did not)[^.]{0,100}(?:orders|purchases|refunds|transactions))\b/iu.test(textOf(t.querySelector('tbody')??t)));
+    };
     const refundRows=doc=>{
       const result=[];
       for(const table of doc.querySelectorAll('table,[role="table"]')){
@@ -672,18 +692,24 @@
       if(scope==='recent'){const year=now.getFullYear();history.years=history.years.filter(y=>y===year||y===year-1);}
       if(!history.years.length)throw Error('history-year-unavailable');
       for(const view of ['refund-history','orders']){
+        let attemptedYear=null,viewPages=0;
         try{
           if(!driver){driver=driverFactory();current=await ready(null);}
           for(const [index,year]of history.years.entries()){
+            attemptedYear=year;
             progress(`${view==='orders'?'Checking purchase history':'Checking return history'}: ${year} (${index+1} of ${history.years.length})...`);
             await change(view,year);const seen=new Set();
             while(true){
               if(Date.now()-started>600000||history.pagesRead>=10000||purchases.size+refunds.size>50000)throw Error('history-safety-limit');
               const {doc,report,events}=current;
-              if(report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||view==='orders'&&report.unresolvedPurchaseRows)throw Error('history-unreadable-entries');
+              // Invalid groups contribute no purchase facts. Keep their view
+              // incomplete, but continue real pages/years so independent dated
+              // purchases are not discarded because of an unrelated bad order.
+              const unreadable=report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||view==='orders'&&report.unresolvedPurchaseRows;
               const negative=view==='refund-history'?refundRows(doc):[];
               const fingerprint=JSON.stringify([events,negative,[...doc.querySelectorAll('[data-order-id]')].map(e=>e.getAttribute('data-order-id'))]);
-              if(seen.has(fingerprint))throw Error('history-repeated-page');seen.add(fingerprint);history.pagesRead++;
+              if(seen.has(fingerprint))throw Error('history-repeated-page');seen.add(fingerprint);history.pagesRead++;viewPages++;
+              if(unreadable)recordFailure(view,year,'history-unreadable-entries',viewPages,report);
               if(view==='orders')for(const event of events){if(event.kind==='returned')uncertain.add(event.asin);else if(event.kind==='purchase'){
                 const key=event.asin+':'+event.acquiredAt+':'+event.method;
                 if(!purchases.has(key)){if(purchases.size>=50000||(purchaseCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');purchaseCounts.set(event.asin,(purchaseCounts.get(event.asin)??0)+1);}
@@ -692,21 +718,25 @@
               else for(const event of negative){if(event.confirmed){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}else uncertain.add(event.asin);}
               const books=view==='orders'?report.rowsWithOneAsin:negative.length;
               if(!books){
-                const tables=[...doc.querySelectorAll('table,[role="table"]')].filter(t=>[...t.querySelectorAll('th,[role="columnheader"]')].some(e=>/^title$/iu.test(textOf(e))));
-                const empty=tables.some(t=>/\b(?:no\s+(?:results|orders|purchases|refunds|transactions)|(?:not|haven't|have not|did not)[^.]{0,100}(?:orders|purchases|refunds|transactions))\b/iu.test(textOf(t.querySelector('tbody')??t)));
-                if(!empty)throw Error('history-empty-unconfirmed');
+                if(!emptyHistory(doc,view))throw Error('history-empty-unconfirmed');
               }
               const page=continuation(doc);if(!page.next)break;
               if(typeof driver.follow!=='function')throw Error('history-next-unverified');driver.follow(page.next);current=await ready(doc,view,year);
             }
           }
-          if(view==='orders')history.ordersComplete=true;else history.refundsComplete=true;
-        }catch(error){history.reason=/^history-[a-z-]{1,80}$/u.test(error.message)?error.message:'history-incomplete';driver?.close();driver=null;}
+          const complete=!history.failures.some(f=>f.view===view);
+          if(view==='orders')history.ordersComplete=complete;else history.refundsComplete=complete;
+        }catch(error){
+          const reason=/^history-[a-z-]{1,80}$/u.test(error.message)?error.message:'history-incomplete';
+          const r=current?.report?.selectedView===view&&current.report.selectedTime===attemptedYear?current.report:null;
+          recordFailure(view,attemptedYear,reason,viewPages,r);
+          driver?.close();driver=null;
+        }
       }
     }catch{history.reason='history-inaccessible';}
     finally{driver?.close();}
     history.purchases=[...purchases.values()];history.refunds=[...refunds.values()];history.uncertainRefundAsins=[...uncertain].sort();
-    if(lastDiagnostics)lastDiagnostics.ownershipHistory={scope,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,purchaseObservations:history.purchases.length,refundObservations:history.refunds.length,uncertainRefunds:uncertain.size,reason:history.reason};
+    if(lastDiagnostics)lastDiagnostics.ownershipHistory={scope,failures:history.failures,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,purchaseObservations:history.purchases.length,refundObservations:history.refunds.length,uncertainRefunds:uncertain.size,reason:history.reason};
     return history;
   }
   global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory,probePurchaseHistoryAccess,scanPurchaseHistory };

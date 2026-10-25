@@ -146,10 +146,15 @@
       const changes=response.changes;
       const differences=changes&&['added','updated','missing'].every(key=>Number.isSafeInteger(changes[key])&&changes[key]>=0)
         ? `${changes.added} new · ${changes.updated} updated${fullRescan?` · ${changes.missing} moved to Earlier imports`:''}`:'';
-      status.textContent = `${fullRescan?'Full rescan complete':'Quick update complete'}. ${[checked,differences].filter(Boolean).join(' · ')}${checked||differences?'. ':''}${response.audiobookCount} Audible audiobook${response.audiobookCount===1?'':'s'} stored locally.`;
+      const historyIncomplete=!audibleHistory.ordersComplete||!audibleHistory.refundsComplete||audibleHistory.uncertainRefundAsins.length>0;
+      status.textContent = `${fullRescan?'Full rescan':'Quick update'} ${historyIncomplete?'saved; purchase-history checking was incomplete':'complete'}. ${[checked,differences].filter(Boolean).join(' · ')}${checked||differences?'. ':''}${response.audiobookCount} Audible audiobook${response.audiobookCount===1?'':'s'} stored locally.`;
       if(response.ownership)status.textContent+=` ${response.ownership.owned??0} owned; ${response.ownership.unknown??0} ownership unconfirmed${response.ownership.subscription?`; ${response.ownership.subscription} subscription access`:''}${response.ownership.returned?`; ${response.ownership.returned} returned/refunded`:''}.`;
       if(!fullRescan){status.textContent+=' Quick update checks only current and previous calendar-year history.';if(!state.syncState?.audibleHistory?.fullCheckedAt)status.textContent+=' No completed all-year purchase-history baseline is saved. Use Full rescan for older purchases or historical reconciliation.';}
-      if(!audibleHistory.ordersComplete||!audibleHistory.refundsComplete||audibleHistory.uncertainRefundAsins.length)status.textContent+=' Purchase-history checking was incomplete. Library discoveries and earlier ownership evidence were kept. Check that you are signed in and retry later; uncertain returns may need Change access.';
+      if(historyIncomplete){
+        status.textContent+=' Library discoveries and earlier ownership evidence were kept.';
+        for(const failure of audibleHistory.failures??[])status.textContent+=` ${failure.view==='orders'?'Purchase':'Return'} history${failure.year?` for ${failure.year}`:''}: ${failure.reason==='history-empty-unconfirmed'?'GL could not verify the empty list':failure.reason==='history-unreadable-entries'?'GL could not read every entry':'the check could not finish'}.`;
+        status.textContent+=' Uncertain access stays unconfirmed; a GL backup includes the failure details for investigation.';
+      }
     } catch (error) {
       if(globalThis.GalacticAudible.getDiagnostics()?.state==='prepared')globalThis.GalacticAudible.recordSaveState('not-confirmed');
       await globalThis.GalacticSync.failed('audible',error);

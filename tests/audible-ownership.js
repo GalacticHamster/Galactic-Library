@@ -66,7 +66,7 @@ export const audibleOwnershipTests=[
    const {writer:w}=memory(),items=[1,2,3,4].map(n=>item(n));await w.mergeProviderItems('audible',items);
    const h=history([purchase(1),purchase(2,'credit','2026-02-01'),purchase(3,'cash','2026-01-01'),purchase(4)],{refunds:[{asin:id(1),date:'2026-01-01'},{asin:id(2),date:'2026-01-01'},{asin:id(3),date:'2026-01-01'}],uncertainRefundAsins:[id(4)]});
    const db=await w.mergeProviderItems('audible',[],{audibleHistory:h});const state=n=>rows(db).find(i=>i.providerItemId===id(n)).ownership;
-   assert.equal(state(1),'returned');assert.equal(state(2),'owned');assert.equal(state(3),'unknown');assert.equal(state(4),'unknown');assert.equal(Object.keys(db.providerHistory).length,0);
+   assert.equal(state(1),'returned');assert.equal(state(2),'owned');assert.equal(state(3),'unknown');assert.equal(state(4),'unknown');assert.equal(db.providers.audible.syncState.audibleHistory.uncertainRefunds,1);assert.equal(Object.keys(db.providerHistory).length,0);
  }],
  ['Audible repeated Full and Quick enrichment is idempotent in records, acquisitions, corrections and backup restore',async()=>{
    const {writer:w}=memory(),items=[item(1)],h=history([purchase(1),purchase(1),purchase(1,'credit','2026-01-30')]);
@@ -89,6 +89,14 @@ export const audibleOwnershipTests=[
    db=await w.mergeProviderItems('audible',[],{audibleHistory:history([],{scope:'recent'})});
    assert.equal(db.providers.audible.syncState.audibleHistory.fullCheckedAt,baseline);assert.equal(rows(db).find(r=>r.providerItemId===id(1)).ownership,'owned');assert.equal(rows(db).find(r=>r.providerItemId===id(1)).metadata.audiblePurchaseEvidence[0].date,'2014-02-01');
    assert.equal(parseBackup(createBackup(db)).providers.audible.syncState.audibleHistory.fullCheckedAt,baseline);
+ }],
+ ['Audible per-view failure details survive reload and backup without accepting arbitrary page text',async()=>{
+   const {writer:w}=memory();await w.mergeProviderItems('audible',[item(1)]);
+   const failures=[{view:'refund-history',year:2026,reason:'history-empty-unconfirmed',pagesRead:1,rows:0,unboundRows:0,conflictingGroups:0,multipleIdentities:0,limited:false},{view:'orders',year:2021,reason:'history-unreadable-entries',pagesRead:5,rows:12,unboundRows:1,conflictingGroups:0,multipleIdentities:0,limited:false}];
+   const db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(1)],{ordersComplete:false,refundsComplete:false,failures})});
+   assert.deepEqual(db.providers.audible.syncState.audibleHistory.failures,failures);assert.equal(rows(db)[0].ownership,'unknown');assert.equal(rows(db)[0].acquiredAt,'2025-12-07T00:00:00.000Z');
+   assert.deepEqual((await w.getDatabase()).providers.audible.syncState.audibleHistory.failures,failures);assert.deepEqual(parseBackup(createBackup(db)).providers.audible.syncState.audibleHistory.failures,failures);
+   assert.throws(()=>validateAudibleHistory(history([],{failures:[{...failures[0],reason:'PRIVATE_PAGE_TEXT'}]})));assert.throws(()=>validateAudibleHistory(history([],{failures:[{...failures[0],rows:-1}]})));
  }],
  ['Audible invalid snapshots, malformed purchase dates and failed writes are atomic',async()=>{
    const {writer:w,values,fail}=memory(),items=[item(1)];await w.mergeProviderItems('audible',items);const before=structuredClone(values);

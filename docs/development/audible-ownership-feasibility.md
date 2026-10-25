@@ -109,3 +109,36 @@ older-year pagination and unsupported site-layout changes remain explicit risks.
 The optional diagnostic/private evidence preview remains troubleshooting only;
 normal updates require no evidence file, second ownership action or receipt
 approval. No predicted full-account ownership percentage is justified yet.
+
+## First integrated Firefox result and follow-up
+
+The first live integrated Full rescan retained 796 library records, captured
+purchase evidence and acquisition dates for 361 audiobooks from 2022 through
+2026, and confirmed zero Owned classifications because refund traversal was
+incomplete. Its saved final reason was history-unreadable-entries; the summary
+overwriting the earlier refund failure prevented complete diagnosis from the
+backup. The 370 updated records included date/evidence and source metadata
+changes, not 370 newly established purchases.
+
+The supplied empty-refund screenshot explicitly says "Looks like you don't have
+any refunds in your purchase history." The former empty-list check did not
+recognize this wording and searched only within the table. The repair recognizes
+this exact visible refund-only message outside the recognized table while
+retaining failure for hidden, blank, loading and unrecognized lists. Purchase
+and refund failures now retain separate view/year/reason and aggregate row
+counts in the saved summary and backup; no source prose, IDs or order data is
+added to those diagnostics. The normal completion message describes the actual
+failure instead of suggesting every parser failure is a login problem.
+
+The 2021 read-only report contains 79 rows / 77 distinct ASINs, 20 dated orders,
+one conflicting order group, 15 unbound rows and two completed-return labels.
+The exact conflicting values are not exported and must not be guessed. A bad
+group now contributes no purchase evidence, including through a direct-row
+fallback, while independently supported orders/pages/years continue through
+2013. The orders scope remains incomplete if anything is unreadable; ambiguous
+returns stay unconfirmed. Safe positives can contribute only after the selected
+refund scope completes. Saved summaries retain the first failure per view and
+the number of uncertain refund identities. Full and recent scopes are unchanged.
+
+Revised live verification is still pending; no predicted number of Owned titles
+or complete-history claim is justified by these controlled repairs.
