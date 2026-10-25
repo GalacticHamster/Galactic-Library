@@ -270,9 +270,10 @@
     }catch(error){lastDiagnostics.state='failed';lastDiagnostics.reason=error.audibleReason??'scan-incomplete';throw error;}
   }
 
-  // Feasibility only: inspect the rendered purchase page, never follow links,
-  // fetch orders, assign ownership or retain transaction/identifier values.
-  function inspectPurchaseHistory(document,{url=global.location?.href,knownItemIds=null}={}){
+  // Read the visible purchase page only; never fetch orders or assign ownership.
+  // Diagnostics contain counts only. An explicit private-preview collector may
+  // receive titles/ASINs/dates in memory; nothing is persisted here.
+  function readPurchaseHistory(document,{url=global.location?.href,knownItemIds=null}={},onEvidence=null){
     const report={format:3,provider:'audible',purpose:'ownership-feasibility',readOnly:true,historyComplete:false,accountVerified:false,state:'wrong-page'};
     let page;try{page=new URL(url);}catch{return report;}
     if(page.origin!=='https://www.audible.com'||!/^\/account\/purchase-history\/?$/u.test(page.pathname))return report;
@@ -353,7 +354,7 @@
       const options=parts[names.indexOf('options')],actions=[...options.querySelectorAll('a,button,[role="button"]')].filter(visible).map(label);
       if(actions.some(text=>/^order details$/iu.test(text)))totals.rowsWithOrderDetails++;
       if(actions.some(text=>/^return this title$/iu.test(text)))totals.rowsWithReturnAction++;
-      if(/^(?:returned|refunded|return complete|refund complete)(?:[.!]|\s+on\s+\S.*)?$/iu.test(label(options)))totals.rowsWithCompletedReturnWording++;
+      if(/^(?:returned|refunded|return complete|refund complete)(?:[.!]|\s+on\s+\S.*)?$/iu.test(label(options))){totals.rowsWithCompletedReturnWording++;if(onEvidence&&ids.size===1)onEvidence({kind:'returned',asin:[...ids][0]});}
       const orderLinks=new Set();
       for(const link of options.querySelectorAll('a[href]'))if(visible(link)&&/^order details$/iu.test(label(link))){try{const u=new URL(link.getAttribute('href'),page.origin);if(u.origin===page.origin&&/^\/account\/(?:order-details|order-history)(?:\/|$)/u.test(u.pathname))orderLinks.add(u.href);}catch{}}
       const orderKeys=new Set(),orderContainer=row.closest(orderAttributeNames.map(key=>'['+key+']').join(','));
@@ -362,11 +363,13 @@
       for(const link of row.querySelectorAll('a[href]')){try{const u=new URL(link.getAttribute('href'),page.origin);if(u.origin!==page.origin||!u.pathname.startsWith('/account/'))continue;
         for(const key of ['orderId','orderID','orderNumber','purchaseOrderId']){const value=u.searchParams.get(key);if(value&&value.length<=200){orderKeys.add('parameter:'+key+':'+value);orderParameters[key]=(orderParameters[key]??0)+1;}}
       }catch{}}
-      facts.push({row,scope,group,ids,date:value('purchased'),dateValid,dateCell:parts[names.indexOf('purchased')],total,payment,totalCell:parts[names.indexOf('total')],orderLinks,orderKeys});
+      const titleCell=parts[names.indexOf('title')],titleLinks=[...titleCell.querySelectorAll('a[href]')].filter(link=>visible(link)&&ids.has(asinFromLink(link)));
+      const title=titleLinks.map(label).find(Boolean)??'';
+      facts.push({row,scope,group,ids,title,date:value('purchased'),dateValid,dateCell:parts[names.indexOf('purchased')],total,payment,totalCell:parts[names.indexOf('total')],orderLinks,orderKeys});
     }
     // These are grouping candidates, not ownership decisions. A date/total
     // never flows into the next row just because its own cells are blank.
-    const grouping={declaredRowGroups:new Set(facts.map(f=>f.group)).size,rowsWithOrderKeys:facts.filter(f=>f.orderKeys.size).length,orderAttributeNames:orderAttributes,orderParameterNames:orderParameters,unreadableRowLayouts:invalidRows.size,candidateOrders:0,candidateMultiBookOrders:0,bookRowsWithDatedOrderEvidence:0,matchingBookRowsWithDatedOrderEvidence:0,bookRowsUsingSharedOrderEvidence:0,unboundBookRows:0,incompatibleGroupCandidates:0,candidateOrderSizeCounts:{},candidateOrdersByBasis:{}};
+    const grouping={declaredRowGroups:new Set(facts.map(f=>f.group)).size,rowsWithOrderKeys:facts.filter(f=>f.orderKeys.size).length,orderAttributeNames:orderAttributes,orderParameterNames:orderParameters,unreadableRowLayouts:invalidRows.size,candidateOrders:0,candidateMultiBookOrders:0,bookRowsWithDatedOrderEvidence:0,matchingBookRowsWithDatedOrderEvidence:0,bookRowsUsingSharedOrderEvidence:0,unboundBookRows:0,incompatibleGroupCandidates:0,conflictingOrderGroups:0,candidateOrderSizeCounts:{},candidateOrdersByBasis:{}};
     const used=new Set(),seenGroups=new Set(),datedAsins=new Set(),datedMatches=new Set();
     const admit=(members,basis)=>{
       if(members.length<1||members.some(f=>used.has(f)))return;
@@ -374,7 +377,7 @@
       if(!dated.length||!paid.length)return;
       const keyValues=new Map();for(const key of dataKeys){const split=key.indexOf(':',key.indexOf(':')+1),namespace=key.slice(0,split),values=keyValues.get(namespace)??new Set();values.add(key.slice(split+1));keyValues.set(namespace,values);}
       const conflicts=dated.some(f=>!f.dateValid)||paid.some(f=>!f.payment)||new Set(dated.map(f=>f.date)).size!==1||new Set(paid.map(f=>f.total)).size!==1||linkKeys.size>1||[...keyValues.values()].some(values=>values.size>1);
-      if(conflicts){const key=members[0].group;if(!seenGroups.has(key)){seenGroups.add(key);grouping.incompatibleGroupCandidates++;}return;}
+      if(conflicts){if(['explicit-order-key','shared-order-link'].includes(basis))grouping.conflictingOrderGroups++;const key=members[0].group;if(!seenGroups.has(key)){seenGroups.add(key);grouping.incompatibleGroupCandidates++;}return;}
       // A row group containing repeated separate date/total cells could be
       // independent same-day purchases. Only one shared pair is accepted here.
       if(basis==='row-group'&&(new Set(dated.map(f=>f.dateCell)).size!==1||new Set(paid.map(f=>f.totalCell)).size!==1))return;
@@ -387,6 +390,8 @@
       grouping.bookRowsUsingSharedOrderEvidence+=books.filter(f=>!f.dateValid||!f.payment||f.dateCell.closest(rowSelector)!==f.row||f.totalCell.closest(rowSelector)!==f.row).length;
       grouping.candidateOrderSizeCounts[unique.size]=(grouping.candidateOrderSizeCounts[unique.size]??0)+1;
       grouping.candidateOrdersByBasis[basis]=(grouping.candidateOrdersByBasis[basis]??0)+1;
+      // Private preview collector only. Never place these values in diagnostics.
+      if(onEvidence){const [month,day,year]=dated[0].date.split('-');for(const book of books)onEvidence({kind:'purchase',asin:[...book.ids][0],title:book.title,acquiredAt:`${year}-${month}-${day}`});}
     };
     const groupBy=(values,key)=>{const result=new Map();for(const fact of values){for(const k of key(fact)){const group=result.get(k)??[];group.push(fact);result.set(k,group);}}return [...result.values()];};
     for(const scope of new Set(facts.map(f=>f.scope))){
@@ -473,7 +478,23 @@
         }
       }
     }
-    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,navigation,refundHistory,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:candidates.length>2000||headerElements.length>5000||rows.size>=100||visibleLinks.length>=2000||navigation.boundReached||refundHistory.boundReached};
+    const limits={purchaseRowScan:candidates.length>2000||rows.size>=100,headerShapes:headerElements.length>5000,pageLinks:visibleLinks.length>=2000,navigation:navigation.boundReached,refundRows:refundHistory.boundReached};
+    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,grouping,navigation,refundHistory,limits,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:Object.values(limits).some(Boolean)};
   }
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory };
+  function inspectPurchaseHistory(document,options){return readPurchaseHistory(document,options);}
+  function previewPurchaseHistory(document,options){
+    const observed=[],report=readPurchaseHistory(document,options,entry=>observed.push(entry));
+    const known=new Set(Array.isArray(options?.knownItemIds)?options.knownItemIds:[]),entries=[],seen=new Set(),returned=new Set(observed.filter(entry=>entry.kind==='returned').map(entry=>entry.asin));
+    const blocked=report.state!=='checked'||report.selectedView!=='orders'||report.libraryComparison==='unavailable'||report.grouping.conflictingOrderGroups>0;
+    let unmatched=0,missingTitles=0;
+    if(!blocked)for(const entry of observed){
+      if(entry.kind!=='purchase'||returned.has(entry.asin))continue;
+      if(!known.has(entry.asin)){unmatched++;continue;}
+      if(!entry.title){missingTitles++;continue;}
+      const key=entry.asin+':'+entry.acquiredAt;if(seen.has(key))continue;seen.add(key);
+      entries.push({provider:'audible',mediaType:'audiobook',title:entry.title,asin:entry.asin,providerItemId:entry.asin,acquiredAt:entry.acquiredAt,sourceLabel:'Audible purchase history'});
+    }
+    return {state:blocked?'blocked':entries.length?'ready':'empty',report,entries,unmatched,missingTitles,excludedReturned:returned.size};
+  }
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory };
 }(globalThis));

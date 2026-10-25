@@ -270,7 +270,52 @@ and removes the opt-in URL parameter while retaining Audible's other filters.
 The normal library page is unaffected. If browser settings block session storage,
 the explicit URL flag still works but cannot persist across filter navigation.
 
-Future implementation must first prove persistence on disposable data: exact
+**2025 live sample:** The next report contains 64 distinct purchase ASINs, all
+matching saved library IDs and dated order evidence across 20 orders: 13 credit
+and seven cash totals (one zero-price). Forty-four rows share order evidence;
+none are unbound or conflicting. No navigation controls were recognized. Its
+overall safety flag is set, so it does not establish complete 2025 history. The
+format-3 report now separates purchase-row, diagnostic-header-shape, page-link,
+navigation and refund-row limits; the earlier aggregate cannot establish which
+limit caused that particular flag. No additional user export is required solely
+to diagnose it. Reaching a header-shape limit is not itself purchase-row loss.
+
+**Bounded purchase preview (implemented):** In the same opt-in panel,
+**Preview purchase evidence** reuses the validated order grouping and reads the
+saved profile/known IDs through existing no-scan messages. Both reads must name
+the same profile; a missing profile or nickname blocks preview. Only exact known
+ASINs, readable product-link titles and validated direct/shared order dates enter
+the private preview. Identical ASIN/date observations are deduplicated; different
+purchase dates are retained rather than silently selecting an acquisition date.
+Cash, credit and explicit zero-price orders share the same evidence path. No
+prices, order keys or payment allocations enter evidence. Conflicts in actual
+order-key/link groups block creation; rejected whole-table grouping hypotheses
+alone do not block separate supported orders. Explicit completed-return wording
+excludes that ASIN from positive evidence without assuming repurchase chronology.
+This is not validation of populated Refund history or automatic current access.
+
+The user can inspect titles/dates, confirm the saved account and download
+`GL-audible-purchase-evidence-private.json`. The download rechecks the profile,
+page URL, selected period and extracted entries; a changed selection requires a
+fresh preview/confirmation. The file deliberately contains private book titles,
+identifiers and dates, with an adjacent disclosure. It is not the sanitized
+diagnostic file and must not be requested as a routine diagnostic. Diagnostic
+exports remain aggregate-only, even after a private preview. No provider requests,
+scan leases, proposals, ownership reviews or acquisition records are written by
+preview/download. No new message type, schema, permission or ownership rule is
+introduced.
+
+To reuse the existing review architecture, users can select the same Audible
+account in Providers and import the file through Library / Ownership and access /
+Match purchase receipts / Receipt files. The existing importer scopes proposals
+to the active saved account and requires explicit candidate confirmation. The
+file itself does not bind a profile or bypass that confirmation. Existing user
+corrections are not changed by preview/import; confirming a receipt is an explicit
+ownership-review decision. Its date is evidenceDate, not a provider acquiredAt
+replacement. Provider acquisition-date enrichment, automatic history traversal,
+automatic ownership writes and refund/repurchase reconciliation remain deferred.
+
+Future automatic implementation must first prove persistence on disposable data: exact
 account/ASIN assignment, cash/credit/free/gift semantics where observed, explicit
 returns/repurchases, incomplete history, different narrations, authoritative
 manual corrections, dates, unchanged repeated enrichment, Full/Quick survival,
@@ -287,15 +332,19 @@ automatic implementation or live enrichment has been claimed at this checkpoint.
   77 packaged checks in each browser for existing library extraction, boundaries,
   access labels, persistence and messages.
 - `node tests/browser.js --release --audible-ownership`, with and without
-  `--firefox`: 60 focused packaged checks cover the actual read-only panel,
+  `--firefox`: 79 focused packaged checks cover the actual read-only panel,
   sanitized download, bounds, identifier conflicts, hidden/recommendation rows,
   date/payment recognition, grouped bulk/credit orders, spans, group boundaries,
   conflicts, navigation, refund-specific layouts, explicit versus pending/refund
   actions, tab-local opt-in/expiry/end behavior and read failures without imports
-  or network requests. Multi-book
+  or network requests. Purchase-preview checks cover shared dates, zero-price
+  orders, exact joins, duplicate observations, conflicting orders, completed
+  returns, private-versus-sanitized exports, existing receipt-parser compatibility,
+  and changed-page/account guards. Multi-book
   examples use synthetic transactions rather than the user's order data.
-- These do not establish live ownership enrichment. No automatic classification
-  implementation is appropriate until the account-evidence contract is demonstrated.
+- These do not establish live ownership enrichment. The preview is bounded to
+  visible positive evidence and explicit manual receipt review. Automatic
+  classification requires the remaining account/history/refund safeguards.
 
 Private aggregate baseline output is under ignored `audit-artifacts/`; it is not
 a committed fixture. No original backup or installed library was modified.
