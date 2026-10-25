@@ -1,4 +1,5 @@
 import {normalizePermanentClaimsDatabase} from '../lib/ownership.js';
+import {validateAudibleHistory,enrichAudibleRecords} from '../lib/audible-ownership.js';
 import {validateSteamApplicationImport,steamApplicationAccess} from '../lib/provider-state.js';
 import {identicalCapture} from '../lib/source-history.js';
 import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
@@ -882,6 +883,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return new Map([...groups].filter(([,items])=>items.length===1).map(([id,items])=>[id,items[0]]));
   }
   function preserveEnrichment(incoming, previous,stableSparse=false) {
+    if(incoming.provider==='audible'&&previous?.mediaType===incoming.mediaType){
+      const metadata={...incoming.metadata};
+      for(const key of ['audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn','audibleOwnershipBasis'])if(previous.metadata?.[key]!==undefined)metadata[key]=previous.metadata[key];
+      incoming={...incoming,metadata,acquiredAt:previous.acquiredAt??incoming.acquiredAt,
+        ...(['owned','returned','revoked','expired'].includes(previous.ownership)&&['unknown','subscription'].includes(incoming.ownership)?{ownership:previous.ownership}:{})};
+    }
     if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
@@ -952,6 +959,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     profile.state={...state};delete profile.state.activeProfileId;
     database.providers[profile.provider]={...state,profileLabel:profile.nickname,activeProfileId:profile.profileId};
   }
+  function audibleHistoryDetails(provider,details,profile,now){
+    if(provider!=='audible'||details.audibleHistory===undefined)return {details,history:undefined};
+    const history=validateAudibleHistory(details.audibleHistory),next={...details};delete next.audibleHistory;
+    const complete=history.ordersComplete&&history.refundsComplete&&!history.uncertainRefundAsins.length;
+    const fullCheckedAt=history.scope==='full'&&complete?now:profile.state.syncState?.audibleHistory?.fullCheckedAt;
+    next.syncState={...profile.state.syncState,audibleHistory:{version:1,scope:history.scope,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,checkedAt:now,...(fullCheckedAt?{fullCheckedAt}:{}),reason:history.reason}};
+    next.scanDiagnostics={...details.scanDiagnostics,incomplete:!complete,failedRequestCount:0};
+    return {details:next,history};
+  }
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
@@ -990,15 +1006,17 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const now = new Date().toISOString();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    const audible=audibleHistoryDetails(provider,syncDetails,profile,now);syncDetails=audible.details;
     if(provider==='amazon-games')values=await prepareAmazonGamesImport(database,profile.profileId,values);
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
     const historicalById=historicalRecords(database,profile.profileId);
     if(activeTiming)activeTiming.recordsNormalized=(activeTiming.recordsNormalized??0)+values.length;
-    const incoming = timed('entry_validation',()=>values.map((value) => {
+    let incoming = timed('entry_validation',()=>values.map((value) => {
       const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source = PROVIDER_SOURCES[provider];
       return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
     }));
+    if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history,{full:true});
     const unique = new Map(incoming.map((item) => [item.id, item]));
     for(const item of Object.values(database.providerItems))if(item.profileId===profile.profileId&&!unique.has(item.id))database.providerHistory[item.recordRef]={item,profileLabel:profile.nickname,reason:'missing-from-complete-scan',missingSince:now};
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];
@@ -1081,7 +1099,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     const now = new Date().toISOString();
     if(provider==='amazon-games'){values=await prepareAmazonGamesImport(database,profile.profileId,values);preparedIncoming=null;}
-    const incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
+    const audible=audibleHistoryDetails(provider,syncDetails,profile,now);syncDetails=audible.details;
+    let incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
+    if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
     if(['amazon-games','steam'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';

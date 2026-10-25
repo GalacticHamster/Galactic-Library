@@ -1,7 +1,7 @@
 import {identityConflicts,sameEditionEvidence,identityEvidence,identityKey} from '../lib/identity.js';
 import {editionBarriers,pairKey} from '../lib/relationships.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
-import {providerLabel,accountLabel,accessLabel,formatDate} from './formatters.js';
+import {providerLabel,accountLabel,accessLabel,formatDate,acquisitionDate} from './formatters.js';
 import '../lib/matching-policy.js';
 
 // A view only. Never replace canonical items or use these rows for matching.
@@ -98,7 +98,7 @@ export function acquisitionHistory(records,database){
       continue;
     }
     // A catalog record without an order/occurrence is not another proven purchase.
-    add(scope+':record:'+(record.providerItemId||record.recordRef),record,{bundle:metadata.sourceBundle||metadata.bundleTitle,date:record.provider==='amazon-games'?(metadata.collectedOn||record.acquiredAt):record.acquiredAt});
+    add(scope+':record:'+(record.providerItemId||record.recordRef),record,{bundle:metadata.sourceBundle||metadata.bundleTitle,date:acquisitionDate(record)});
   }
   for(const [key,group]of fanGroups)entries.get(key).quantity=Math.max(group.native.size,group.maximum);
   const claims=repeatedClaimProjection(database),groups=new Map();

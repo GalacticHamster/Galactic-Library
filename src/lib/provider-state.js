@@ -60,6 +60,11 @@ export function validateProviderStates(value = {}) {
     if(state.syncState!==undefined){
       object(state.syncState,'Provider sync state');result.syncState={};
       if(provider==='steam'&&state.syncState.applications!==undefined)result.syncState.applications=validateSteamApplications(state.syncState.applications);
+      if(provider==='audible'&&state.syncState.audibleHistory!==undefined){
+        const h=object(state.syncState.audibleHistory,'Audible history checkpoint');
+        if(h.version!==1||!['full','recent'].includes(h.scope??'full')||typeof h.ordersComplete!=='boolean'||typeof h.refundsComplete!=='boolean'||!Array.isArray(h.years)||h.years.length>200||h.years.some(y=>!Number.isInteger(y)||y<1900||y>2100))throw Error('Invalid Audible history checkpoint.');
+        result.syncState.audibleHistory={version:1,scope:h.scope??'full',ordersComplete:h.ordersComplete,refundsComplete:h.refundsComplete,years:[...new Set(h.years)],pagesRead:count(h.pagesRead,'Audible pages',10000),checkedAt:date(h.checkedAt),...(h.fullCheckedAt?{fullCheckedAt:date(h.fullCheckedAt)}:{}),reason:text(h.reason??'',100)};
+      }
       if(provider==='humble')result.syncState.knownPurchaseIds=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
       if(provider==='fanatical'){
         const fingerprints=strings(state.syncState.knownOrderFingerprints,50000,64,'Order fingerprints');

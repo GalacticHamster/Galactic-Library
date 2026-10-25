@@ -61,6 +61,7 @@
   "src/lib/matcher.js",
   "src/lib/matching-policy.js",
   "src/lib/metadata-validation.js",
+  "src/lib/audible-ownership.js",
   "src/lib/models.js",
   "src/lib/observation-overlays.js",
   "src/lib/observation-completion.js",

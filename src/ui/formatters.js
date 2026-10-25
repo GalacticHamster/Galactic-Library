@@ -6,6 +6,11 @@ export const accessLabel=value=>({owned:'Owned',claimed:'Owned',permanently_clai
 export const readingAccessLabel=value=>({unknown:'Access not checked',accessible:'Accessible',unavailable:'Unavailable'}[value]??'Access not checked');
 export const countLabel=(count,singular,plural=singular+'s')=>`${count} ${count===1?singular:plural}`;
 export const rangeLabel=(first,last)=>`${first}–${last}`;
+export function acquisitionDate(record){
+  if(record.provider==='amazon-games')return record.metadata?.collectedOn||record.acquiredAt;
+  const day=record.metadata?.audibleAcquiredOn;
+  return record.provider==='audible'&&day&&record.acquiredAt?.slice(0,10)===day?day:record.acquiredAt;
+}
 export function formatDate(value,{time=true,locale}={}){
   if(!value)return 'Not recorded';
   const dateOnly=/^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value));

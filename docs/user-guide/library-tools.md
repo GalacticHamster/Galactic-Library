@@ -43,11 +43,14 @@ Expand **Confirm ownership with dated evidence** on any current record. Select p
 
 The **Library → Ownership and access → Match purchase receipts → Receipt files** workbench accepts CSV/JSON exports under 5 MB, up to 1,000 entries per import. Use `title`, `acquiredAt`/`Purchase Date` (ISO date), optional `asin`, `isbn`, `providerItemId`/`Catalog ID`, `provider`, and `mediaType`. Select Kindle for Comixology evidence or Audible for audiobook receipts. Unknown customer/payment/redemption fields are discarded immediately; raw receipts never leave the browser and are not retained. This is structured-export import, not PDF/email/OCR extraction.
 
-For an Audible purchase-history page, the optional [visible-page checker](https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1) also offers **Preview purchase evidence**. Select **Your orders**, wait for the page to load, and preview the books and dates matched by exact Audible identifiers to your saved account. Shared order dates are supported; order totals are never allocated to individual books. This checks only the displayed page and does not establish complete history or current ownership.
-
-If Audible identifies a book but does not expose a readable linked title, the preview can use that exact identifier's saved book title. It tells you when saved names are used. Purchase dates still come from the history page; surrounding author or promotional text is not guessed as the title.
-
-After checking the account and any later returns, you may download a separate **private purchase evidence** file containing titles, identifiers and purchase dates. Unlike the diagnostic report, this file contains personal library information; keep it private. Select the same saved Audible account in Providers, import the file through **Receipt files**, and review each candidate before confirming ownership. The preview/download makes no library changes. Refund pages, unavailable account comparisons, conflicting order keys, missing titles and unmatched identifiers cannot produce positive evidence for those entries; explicit completed-return wording excludes the affected identifier from the preview. Unknown refunds and repurchases still need your review. The existing receipt workflow stores the purchase date as ownership evidence; it does not fill or replace the provider record's acquisition date. Existing corrections remain until you explicitly change or confirm them.
+Audible's normal **Full rescan** and **Quick update** automatically check purchase
+and return history and enrich matching saved audiobooks. Full rescan checks all
+offered years; Quick checks only the current and previous calendar years along
+with incremental library discovery. Existing acquisition dates and ownership
+corrections remain intact. See [Audible updates](providers-and-accounts.md#audible-updates).
+You do not need the receipt workbench, a downloaded evidence file or another
+ownership action for normal Audible updates. The optional visible-page checker
+is troubleshooting only; a checked page does not establish complete history.
 
 ASIN/ISBN/catalog IDs take priority when generating candidates. Title-only candidates remain proposals. Select and explicitly confirm the actual current edition/account before a receipt establishes a dated purchase confirmation. Known identifier/unit/edition conflicts reject approval. Unmatched receipts stay pending; sync the provider and refresh their candidates. Refresh never silently moves a receipt to a different profile. This reconciles existing library records; it does not invent provider records for unmatched receipts.
 

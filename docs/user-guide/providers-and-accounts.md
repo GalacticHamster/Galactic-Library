@@ -69,22 +69,37 @@ not replace another remembered account.
 
 ## Audible updates
 
-Use **Full rescan** to refresh metadata and source access information for the
-selected Audible account. Products are matched by Audible product ID. Missing
-records move to **Earlier imports**; other providers and saved reviews remain.
-Quick update checks for additions and stops at a page of already saved titles;
-use a full rescan to refresh existing records.
+**Full rescan** reads the complete Audible library and all available calendar
+purchase/refund-history years. It refreshes source metadata and reconciles
+supported ownership and acquisition dates. Missing library records move to
+**Earlier imports**; transaction history never creates extra audiobook records.
 
-Favorites, wishlist controls and a plain **Remove** action do not establish
-purchase or subscription access. GL leaves access unconfirmed unless explicit
-evidence or your saved ownership correction establishes it. A full rescan
-repairs earlier source classifications without replacing your corrections.
+**Quick update** uses the existing Date added discovery and stops at a page of
+already saved titles. It checks only the current and previous calendar years of
+purchase/refund history, including matches to previously unconfirmed saved
+books. It intentionally does not reconcile older transactions. Use Full rescan
+for older purchases, historical corrections or recovery. Both buttons perform
+ownership enrichment automatically; no evidence file or separate action is needed.
 
-Incomplete scans do not replace the saved library. If a scan fails, keep the
-provider page open, check that you are signed in and retry. Before updating an
-important library, export a GL backup in Settings; restore that complete backup
-if you need to return to it. Do not restore another browser's partial library
-over a more complete library merely to update one provider.
+Quick update requires an initial complete library import. Without one it asks
+for Full rescan and stops, rather than silently performing a full import. An
+older library without a completed all-year purchase-history check can still use
+Quick update, with an explicit notice that historical reconciliation is missing.
+There are no scheduled full-history rescans.
+
+Exact Audible identifiers and the selected account determine matches. Supported
+purchase dates retain their calendar day; saved reliable dates, purchase evidence
+and your corrections are preserved. Shared order totals are never assigned to
+individual books. Favorites, wishlist controls and a plain **Remove** action do
+not establish purchase or subscription access. Missing evidence remains unconfirmed.
+
+Incomplete library discovery prevents replacement. If history alone is
+inaccessible or incomplete, discovered library titles and prior evidence are
+kept, with a partial-completion message. Unchecked refunds prevent new automatic
+ownership confirmations; readable purchase dates can still be retained. Keep the
+provider tab open until completion. Export a GL backup in Settings before
+important updates; never replace a complete library with another browser's
+partial backup merely to refresh one provider.
 
 ## PlayStation PS4/PS5 Purchased Library
 

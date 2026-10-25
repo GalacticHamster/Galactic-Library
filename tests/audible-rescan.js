@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {audibleOwnershipTests} from './audible-ownership.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
@@ -33,6 +34,7 @@ async function fixture(){
 }
 
 export const audibleRescanTests=[
+ ...audibleOwnershipTests,
  ['Audible access evidence excludes favorites, wishlist, collections and ambiguous Remove controls',()=>{
    for(const action of ['Remove','Remove from favorites','Remove from favourites','Remove from wishlist','Remove from collection','Listen now','Audible Plus available'])assert.equal(api.ownershipFromLibraryAction(action),'unknown',action);
    for(const action of ['Remove from Plus Catalog','Included in your Audible Plus membership'])assert.equal(api.ownershipFromLibraryAction(action),'subscription',action);

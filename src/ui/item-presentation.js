@@ -1,4 +1,4 @@
-import {providerLabel,mediaLabel,accountLabel,accessLabel} from './formatters.js';
+import {providerLabel,mediaLabel,accountLabel,accessLabel,acquisitionDate} from './formatters.js';
 export {providerLabel,mediaLabel,accountLabel,accessLabel} from './formatters.js';
 import {identityEvidence} from '../lib/identity.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
@@ -17,7 +17,7 @@ export function itemPresentation(canonical,records,database){
     records:records.map(record=>{
       const effective=effectiveOwnershipRecord(record,database),review=database.ownershipReviews?.[record.recordRef],reading=database.readingStates?.[record.recordRef];
       return {record,label:accountLabel(record,database),access:accessLabel(effective.ownership),observedAccess:accessLabel(record.ownership),override:Boolean(effective.ownershipOverride),inferred:Boolean(effective.ownershipInference),reviewed:Boolean(review),
-        acquiredAt:(record.provider==='amazon-games'?record.metadata?.collectedOn||record.acquiredAt:record.acquiredAt)||'',observedAt:record.observedAt||'',
+        acquiredAt:acquisitionDate(record)||'',observedAt:record.observedAt||'',
         accessCheckedAt:reading?.accessCheckedAt||'',readingAccess:reading?.access??'unknown',reviewExpiresAt:review?.expiresAt||'',
         reading:['book','audiobook'].includes(record.mediaType)?reading?`${reading.status} · ${reading.progress}%${reading.downloaded?' · downloaded locally':''}`:'Reading status not saved':null,
         contents:record.mediaType==='book'?contentsSummary(record,database):null};

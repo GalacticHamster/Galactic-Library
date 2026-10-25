@@ -24,6 +24,7 @@ import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY} from '../lib/observation-overlays.js';
 import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
 import {PROVIDERS} from '../lib/constants.js';
+import {effectiveOwnershipRecord} from '../lib/ownership.js';
 
 let workerLifecycle,purchaseSync;
 const queryDiagnostics=createQueryDiagnostics({onActivity:(stage,details)=>workerLifecycle?.observe(details.operation??stage)});
@@ -484,7 +485,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean))].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));
@@ -550,6 +551,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ...(incrementalProvider ? { quickSyncAt: now } : { fullSyncAt: now })
       };
   if(request.provider==='steam'&&request.syncState!==undefined)syncDetails.syncState=request.syncState;
+  if(request.provider==='audible'&&request.audibleHistory!==undefined)syncDetails.audibleHistory=request.audibleHistory;
   if(request.scanDiagnostics!==undefined){
     const raw=request.scanDiagnostics;
     if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.incomplete!==undefined&&typeof raw.incomplete!=='boolean'||['failedRequestCount','retries'].some(key=>raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0||raw[key]>100000))){sendResponse({ok:false,error:'Invalid sync diagnostics.'});return undefined;}
@@ -565,6 +567,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
       audiobookCount: database.providers[request.provider].audiobookCount ?? 0,
+      ...(request.provider==='audible'?{ownership:Object.values(database.providerItems).filter(i=>i.provider==='audible'&&i.profileId===database.providers.audible.activeProfileId).reduce((counts,i)=>{const state=effectiveOwnershipRecord(i,database).ownership;counts[state]=(counts[state]??0)+1;return counts;},{})}:{}),
       softwareCount:database.providers[request.provider].softwareCount??0,
       bookCount: database.providers[request.provider].bookCount ?? 0,
       movieCount: database.providers[request.provider].movieCount ?? 0,

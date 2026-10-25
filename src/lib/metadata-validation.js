@@ -3,12 +3,13 @@ import { object, text, strings, date, url, count } from './validation.js';
 import {validatePurchaseOrigins} from './purchase-origins.js';
 import {validateManifest} from './kindle-manifest.js';
 import {validateKindleCategoryPaths} from './kindle-categories.js';
+import {audiblePurchaseEvidence,audibleCalendarDate} from './audible-ownership.js';
 
 export const PROVIDER_SOURCES = Object.freeze({steam:'steam-store-browse-items',gog:'gog-account-library',epic:'epic-store-library','amazon-games':'amazon-games-collection',audible:'audible-library-page',kindle:'amazon-kindle-content-library','amazon-video':'amazon-prime-video-purchases-library','fandango-at-home':'fandango-at-home-library',kobo:'kobo-my-books-library',fanatical:'fanatical-order-history',humble:'humble-purchase-library',nintendo:'nintendo-virtual-game-cards',playstation:'playstation-web-purchased-library',xbox:'xbox-web-library'});
 const HOSTS = {steam:['steampowered.com'],gog:['gog.com'],epic:['epicgames.com'],'amazon-games':['gaming.amazon.com','luna.amazon.com'],audible:['audible.com'],kindle:['amazon.com'],'amazon-video':['amazon.com'],'fandango-at-home':['athome.fandango.com'],kobo:['kobo.com'],fanatical:['fanatical.com'],humble:['humblebundle.com']};
 const FIELDS = {
   steam:['parentProviderItemId','ownershipBasis'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery','collectedOn','claimKey','claimProductKey','claimBasis','observationIds','deliveryDestination'],
-  audible:['narrators','libraryAction'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
+  audible:['narrators','libraryAction','audibleOwnershipBasis','audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
   fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
   xbox:['productId','accessBasis','accessTypes','productKind','supportedPlatforms'],
@@ -76,6 +77,9 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
   const result = {};
   for (const key of [...COMMON,...(FIELDS[provider]??[])]) {
     if (!Object.hasOwn(value,key)) continue;
+    if(provider==='audible'&&key==='audiblePurchaseEvidence'){result[key]=audiblePurchaseEvidence(value[key]);continue;}
+    if(provider==='audible'&&key==='audibleRefundDates'){result[key]=strings(value[key],10000,10,key).map(audibleCalendarDate).sort();continue;}
+    if(provider==='audible'&&key==='audibleAcquiredOn'){result[key]=audibleCalendarDate(value[key]);continue;}
     if(provider==='amazon-games'&&key==='observationIds'){result[key]=strings(value[key],10000,500,key);continue;}
     if(provider==='amazon-games'&&key==='collectedOn'){const parsed=date(value[key],key);if(parsed)result[key]=parsed.slice(0,10);continue;}
     if(provider==='amazon-games'&&['claimKey','claimProductKey'].includes(key)){if(!/^[a-f0-9]{64}$/u.test(value[key]))throw Error('Invalid Amazon Games evidence key.');result[key]=value[key];continue;}
@@ -94,6 +98,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
     else result[key]=text(value[key],LIMITS[key]??500,key);
   }
   if(result.acquisitionMethod && result.acquisitionMethod!=='permanent-claim')throw Error('Invalid acquisition method.');
+  if(provider==='audible'&&result.audibleOwnershipBasis&&!['audible-purchase-history','audible-refund-history'].includes(result.audibleOwnershipBasis))throw Error('Invalid Audible ownership basis.');
   if(provider==='steam'&&result.ownershipBasis&&!['owned-app-index','master-subscription','auto-grant'].includes(result.ownershipBasis))throw Error('Invalid Steam access basis.');
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
   if(result.keyStatus&&!['unknown','unrevealed','revealed','expired','unavailable'].includes(result.keyStatus))throw new Error('Invalid key status.');
