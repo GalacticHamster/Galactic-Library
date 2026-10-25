@@ -90,6 +90,13 @@ export const audibleOwnershipTests=[
    assert.equal(db.providers.audible.syncState.audibleHistory.fullCheckedAt,baseline);assert.equal(rows(db).find(r=>r.providerItemId===id(1)).ownership,'owned');assert.equal(rows(db).find(r=>r.providerItemId===id(1)).metadata.audiblePurchaseEvidence[0].date,'2014-02-01');
    assert.equal(parseBackup(createBackup(db)).providers.audible.syncState.audibleHistory.fullCheckedAt,baseline);
  }],
+ ['Audible complete refund enumeration holds only undated refund identities, allowing unrelated supported purchases',async()=>{
+   const {writer:w}=memory();await w.mergeProviderItems('audible',[item(1),item(2),item(3)]);
+   const db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(1),purchase(2)],{ordersComplete:false,uncertainRefundAsins:[id(1)]})});
+   assert.equal(rows(db).find(r=>r.providerItemId===id(1)).ownership,'unknown');assert.equal(rows(db).find(r=>r.providerItemId===id(2)).ownership,'owned');assert.equal(rows(db).find(r=>r.providerItemId===id(3)).ownership,'unknown');
+   assert.equal(db.providers.audible.syncState.audibleHistory.refundsComplete,true);assert.equal(db.providers.audible.syncState.audibleHistory.uncertainRefunds,1);assert.equal(db.providers.audible.syncState.audibleHistory.fullCheckedAt,undefined);
+   assert.equal(rows(db).filter(r=>r.acquiredAt==='2025-12-07T00:00:00.000Z').length,2);
+ }],
  ['Audible per-view failure details survive reload and backup without accepting arbitrary page text',async()=>{
    const {writer:w}=memory();await w.mergeProviderItems('audible',[item(1)]);
    const failures=[{view:'refund-history',year:2026,reason:'history-empty-unconfirmed',pagesRead:1,rows:0,unboundRows:0,conflictingGroups:0,multipleIdentities:0,limited:false},{view:'orders',year:2021,reason:'history-unreadable-entries',pagesRead:5,rows:12,unboundRows:1,conflictingGroups:0,multipleIdentities:0,limited:false}];

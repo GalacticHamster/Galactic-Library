@@ -1,5 +1,8 @@
 // Synthetic purchase-page structure only. No private orders, accounts or payment data.
 import '../src/providers/audible.js';
+import {createStorageWriter} from '../src/background/storage-writer.js';
+import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {parsePurchaseEvidence} from '../src/lib/ownership-review.js';
 const checks=[],assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
 const originalFetch=globalThis.fetch.bind(globalThis),inspect=globalThis.GalacticAudible.inspectPurchaseHistory;
@@ -159,21 +162,30 @@ try{
  assert(access.state==='blocked'&&driver.closed===1&&!access.selected,'Unrecognized sign-in or challenge documents produce no history or ownership conclusion');
  driver=fakeHistory({readError:true});access=await probe({driverFactory:()=>driver,timeoutMs:15,pollMs:1});
  assert(access.state==='blocked'&&access.reason==='history-access-not-verified'&&!JSON.stringify(access).includes('PRIVATE_TOKEN')&&driver.closed===1,'Blocked frame access and unexpected errors reveal no private details and always clean up');
- const fullHistoryDriver=({years=[2032,2031],repeat=false,delay=0,failRefund=false,challenge=false,lazy=false,unknownEmpty=false,refunded=false,unreadablePurchase=false,externalEmpty=false,hiddenEmpty=false,conflictingPurchase=false}={})=>{
+ const fullHistoryDriver=({years=[2032,2031],repeat=false,delay=0,failRefund=false,challenge=false,lazy=false,unknownEmpty=false,refunded=false,unreadablePurchase=false,externalEmpty=false,hiddenEmpty=false,conflictingPurchase=false,originalRefundGroups=false,missingRefundIdentity=false,delayedEmpty=false,mixedRefundOrder=false,returnStamp='07-29-21'}={})=>{
    let view='orders',year=years[0],page=1,doc,closed=0;const visits=[];
    const build=()=>{
      const controls='<select><option value="VIEW_SECRET_ORDERS"'+(view==='orders'?' selected':'')+'>Your orders</option><option value="VIEW_SECRET_REFUNDS"'+(view==='refund-history'?' selected':'')+'>Refund history</option></select><select>'+years.map(y=>'<option value="YEAR_SECRET_'+y+'"'+(year===y?' selected':'')+'>'+y+'</option>').join('')+'</select>';
-     const purchase=(n,total='1 Credit',status='')=>row(n,total,'<a href="/account/order-details/ORDER_SECRET_'+n+'_'+year+'">Order details</a><span>'+status+'</span>','09-22-'+year).replace('<tr>','<tr data-order-id="ORDER_SECRET_'+n+'_'+year+'">');
+     const purchase=(n,total='1 Credit',status='')=>row(n,total,'<a href="/account/order-details/ORDER_SECRET_'+n+'_'+year+'">Order details</a><span>'+status+'</span>',(mixedRefundOrder?'01-02-':'09-22-')+year).replace('<tr>','<tr data-order-id="ORDER_SECRET_'+n+'_'+year+'">');
      let body=view==='orders'?(year===years[0]?(page===1?purchase(1,'$4.00')+purchase(2)+purchase(3,'Unfamiliar payment')+purchase(4,'$0.00')+purchase(5,'1 Credit','Pending')+purchase(6,'1 Credit','Gift for someone else')+purchase(7,'1 Credit','Borrowed')+purchase(10,'Gift','Gift redeemed')+purchase(11,'Promotion','Promotional acquisition complete'):purchase(8)):purchase(9)):refunded?'<tr><td><a href="/pd/'+id(2)+'">PRIVATE_TITLE</a></td><td>01-02-'+year+'</td><td>1 Credit</td><td>Refund complete</td></tr>':'<tr><td colspan="4">'+(unknownEmpty?'No recognizable statement':'No refunds found.')+'</td></tr>';
+     if(mixedRefundOrder&&year===years[0]){
+       const returned=n=>row(n,'','Returned on '+returnStamp,'');
+       if(view==='orders'&&page===1)body=Array.from({length:15},(_,i)=>purchase(i+1,'$2.00')).join('')+returned(1)+returned(2);
+       if(view==='refund-history')body=Array.from({length:15},(_,i)=>row(i+1,i===0?'Mixed refund total':'',i<2?'Returned on '+returnStamp:'<span>Return status: Not eligible</span><a>Why?</a>',i===0?'01-02-'+year:'').replace('<tr>','<tr data-order-id="ORDER_SECRET_WHOLE_REFUND_ORDER">')).join('');
+     }
+     if(originalRefundGroups&&view==='refund-history')body=[1,...Array.from({length:14},(_,i)=>101+i)].map((n,i)=>row(n,'$'+(i+1)+'.00','Refund complete',String(i+1).padStart(2,'0')+'-01-'+year).replace('<tr>','<tr data-order-id="ORDER_SECRET_ORIGINAL">')).join('');
+     if(missingRefundIdentity&&view==='refund-history')body='<tr><td>PRIVATE_UNLINKED_TITLE</td><td>01-02-'+year+'</td><td>1 Credit</td><td>Refund complete</td></tr>';
      if(unreadablePurchase&&view==='orders')body=body.replace('09-22-'+year,'');
      if(conflictingPurchase&&view==='orders'&&year===years[0]&&page===1)body+=purchase(12,'$4.00').replaceAll('ORDER_SECRET_12_'+year,'ORDER_SECRET_CONFLICT_'+year)+purchase(13,'$5.00').replaceAll('ORDER_SECRET_13_'+year,'ORDER_SECRET_CONFLICT_'+year);
      let markup=table(body).replace(filters,controls);
-     if(externalEmpty&&view==='refund-history')markup=table('').replace(filters,controls)+'<div'+(hiddenEmpty===true?' hidden':'')+'><p'+(hiddenEmpty==='child'?' hidden':'')+'>Looks like you don&#39;t have any refunds in your purchase history.</p><p>Get started by browsing our catalog of audiobooks</p><a href="/search">Find your first book</a></div>';
+     if((externalEmpty||mixedRefundOrder)&&view==='refund-history'&&!(mixedRefundOrder&&year===years[0]))markup=table('').replace(filters,controls)+'<div'+(hiddenEmpty===true?' hidden':'')+'><p'+(hiddenEmpty==='child'?' hidden':'')+'>Looks like you don&#39;t have any refunds in your purchase history.</p><p>Get started by browsing our catalog of audiobooks</p><a href="/search">Find your first book</a></div>';
      if(externalEmpty&&hiddenEmpty==='child')markup=markup.replace('<p hidden>','<div><p hidden>').replace('history.</p>','history.</p></div>');
      if(view==='refund-history'&&refunded)markup=markup.replace('<th>Purchased</th>','<th>Refund date</th>');
      if(view==='orders'&&year===years[0])markup+='<nav class="bc-pagination"><span aria-current="page">'+page+'</span>'+(page===1?'<a href="/account/purchase-history?CURSOR_SECRET=NEXT" data-page="2" rel="next">Next</a>':'<button disabled>Next</button>')+'</nav>';
      if(lazy&&view==='orders')markup+='<button>Load more purchases</button>';
-     const next=new DOMParser().parseFromString(markup,'text/html');Object.defineProperty(next,'readyState',{value:delay?'loading':'complete',configurable:true});doc=next;visits.push([view,year,page]);if(delay)setTimeout(()=>{if(!closed)Object.defineProperty(next,'readyState',{value:'complete'});},delay);
+     if(delayedEmpty&&view==='refund-history')markup=table('').replace(filters,controls);
+     const next=new DOMParser().parseFromString(markup,'text/html');if(mixedRefundOrder)for(const row of next.querySelectorAll('table tr'))if(row.children.length===4){const cell=next.createElement(row.querySelector('th')?'th':'td');row.prepend(cell);}Object.defineProperty(next,'readyState',{value:delay?'loading':'complete',configurable:true});doc=next;visits.push([view,year,page]);if(delay)setTimeout(()=>{if(!closed)Object.defineProperty(next,'readyState',{value:'complete'});},delay);
+     if(delayedEmpty&&view==='refund-history')setTimeout(()=>{if(!closed){const p=next.createElement('p');p.textContent="Looks like you don't have any refunds in your purchase history.";next.body.append(p);}},5);
    };build();return {visits,get closed(){return closed;},read(){if(challenge||failRefund&&view==='refund-history')return new DOMParser().parseFromString('<form>Security challenge</form>','text/html');return doc;},choose(select,option){if(/^\d{4}$/u.test(option.textContent))year=Number(option.textContent);else view=/^Refund history$/u.test(option.textContent)?'refund-history':'orders';page=1;build();},follow(control){page=repeat?1:Number(control.getAttribute('data-page'));build();},close(){closed++;}};
  };
  driver=fullHistoryDriver();let h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
@@ -212,6 +224,29 @@ try{
  assert(!h.refundsComplete&&h.reason==='history-empty-unconfirmed','An unrecognized empty history table is not accepted as proof of no refunds');
  driver=fullHistoryDriver({lazy:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(!h.ordersComplete&&h.reason==='history-lazy-loading-unverified','Unverified Load more controls cannot silently truncate automatic history');
+ driver=fullHistoryDriver({delayedEmpty:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.ordersComplete&&h.refundsComplete&&!h.failures.length,'History waits for a late-rendered empty-refund message even after the document and filters are already loaded');
+ driver=fullHistoryDriver({years:[2021,2016,2013],mixedRefundOrder:true});h=await scanHistory({now:new Date('2026-10-25T12:00:00Z'),driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.refundsComplete&&h.ordersComplete&&!h.failures.length&&!h.uncertainRefundAsins.length&&h.refunds.length===2&&h.refunds.every(r=>[id(1),id(2)].includes(r.asin)&&r.date==='2021-07-29'),'A whole 15-book order shown in Refund history contributes only the two explicitly Returned on 07-29-21 items; Not eligible siblings are not refunds');
+ const mixedEvidence=structuredClone(h),mixedMemory={},mixedWriter=createStorageWriter({get:async defaults=>structuredClone({...defaults,...mixedMemory}),set:async patch=>Object.assign(mixedMemory,structuredClone(patch))});
+ const mixedBooks=Array.from({length:15},(_,i)=>({providerItemId:id(i+1),title:'Synthetic recording '+(i+1),mediaType:'audiobook',ownership:'unknown',metadata:{asin:id(i+1)}})),mixedSnapshot=completeProviderSnapshot('audible',mixedBooks,[completedScope('library',15,15,'pagination-end',1)]);
+ let mixedDb=await mixedWriter.replaceProviderItems('audible',mixedBooks,{audibleHistory:mixedEvidence},mixedSnapshot),mixedRows=Object.values(mixedDb.providerItems);
+ assert(mixedRows.filter(r=>r.ownership==='owned').length===13&&mixedRows.filter(r=>r.ownership==='returned').length===2&&mixedRows.every(r=>r.acquiredAt),'Actual parser-to-save reconciliation keeps thirteen purchases Owned, marks only two Returned, and retains all fifteen acquisition dates');
+ mixedDb=await mixedWriter.replaceProviderItems('audible',mixedBooks,{audibleHistory:mixedEvidence},mixedSnapshot);
+ assert(mixedDb.providers.audible.syncHealth.differences.updated===0&&Object.values(parseBackup(createBackup(mixedDb)).providerItems).filter(r=>r.ownership==='returned').length===2,'Repeated whole-order refund reconciliation is idempotent and its item-level statuses survive backup/restore');
+ const noPurchaseMemory={},noPurchaseWriter=createStorageWriter({get:async defaults=>structuredClone({...defaults,...noPurchaseMemory}),set:async patch=>Object.assign(noPurchaseMemory,structuredClone(patch))});
+ const noPurchaseDb=await noPurchaseWriter.replaceProviderItems('audible',mixedBooks,{audibleHistory:{...mixedEvidence,purchases:[]}},mixedSnapshot),noPurchaseRows=Object.values(noPurchaseDb.providerItems);
+ assert(noPurchaseRows.filter(r=>r.ownership==='returned').length===2&&noPurchaseRows.filter(r=>r.ownership==='unknown').length===13&&!noPurchaseRows.some(r=>r.ownership==='owned'||r.acquiredAt),'Not eligible wording and membership in a displayed refund order never establish ownership without positive purchase evidence');
+ driver=fullHistoryDriver({years:[2021],mixedRefundOrder:true,returnStamp:'02-30-21'});h=await scanHistory({now:new Date('2026-10-25T12:00:00Z'),driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.refundsComplete&&!h.refunds.length&&h.uncertainRefundAsins.length===2,'An impossible inline return date leaves only the two returned identities uncertain');
+ driver=fullHistoryDriver({years:[1900],mixedRefundOrder:true});h=await scanHistory({now:new Date('2026-10-25T12:00:00Z'),driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.refundsComplete&&!h.refunds.length&&h.uncertainRefundAsins.length===2,'A two-digit return year with two possible centuries remains uncertain instead of guessing');
+ driver=fullHistoryDriver({originalRefundGroups:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.refundsComplete&&h.ordersComplete&&!h.failures.length&&h.uncertainRefundAsins.length===15&&h.uncertainRefundAsins.includes(id(1))&&!h.refunds.length&&h.purchases.some(p=>p.asin===id(2)),'Fifteen exact refund references with conflicting original purchase totals and no refund dates are enumerated successfully; only those identities remain uncertain');
+ driver=fullHistoryDriver({missingRefundIdentity:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(!h.refundsComplete&&h.failures.some(f=>f.reason==='history-refund-identity-unavailable')&&h.ordersComplete,'A populated refund row without an exact product identity still blocks refund completeness instead of being silently skipped');
+ driver=fullHistoryDriver({unreadablePurchase:true,lazy:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
+ assert(h.failures.filter(f=>f.view==='orders').length===2&&h.failures.some(f=>f.reason==='history-unreadable-entries')&&h.failures.some(f=>f.reason==='history-lazy-loading-unverified'),'A later traversal blocker remains visible alongside an earlier entry error in the same history view');
  driver=fullHistoryDriver({refunded:true});h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(h.ordersComplete&&h.refundsComplete&&h.refunds.length===2&&h.refunds.every(r=>r.asin===id(2)&&/01-02$/u.test(r.date)),'Completed refunds require an exact identifier, explicit completion and a real refund-date column rather than the original purchase date');
  // The production panel uses the existing raw read, bypassing the scan-start wrapper.

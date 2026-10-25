@@ -10,7 +10,7 @@ export function audiblePurchaseEvidence(values){
 }
 // Aggregate failure context only: no titles, IDs, transaction dates or page text.
 export function audibleHistoryFailures(values=[]){
-  if(!Array.isArray(values)||values.length>3)throw Error('Invalid Audible history failures.');
+  if(!Array.isArray(values)||values.length>5)throw Error('Invalid Audible history failures.');
   return values.map(value=>{
     object(value,'Audible history failure');
     if(!['initial','orders','refund-history'].includes(value.view)||value.year!==null&&(!Number.isInteger(value.year)||value.year<1900||value.year>2100)||!/^history-[a-z-]{1,80}$/u.test(value.reason)||typeof value.limited!=='boolean')throw Error('Invalid Audible history failure.');

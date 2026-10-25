@@ -142,3 +142,44 @@ the number of uncertain refund identities. Full and recent scopes are unchanged.
 
 Revised live verification is still pending; no predicted number of Owned titles
 or complete-history claim is justified by these controlled repairs.
+
+## Refund-view isolation follow-up (October 25)
+
+The second integrated backup retained 796 books and 485 acquisition dates,
+including purchases back to 2013. Ownership remained unconfirmed because a
+purchase-group conflict was incorrectly treated as failure to enumerate refunds.
+The 2021 refund report identifies all 15 rows exactly. The user's screenshot and
+explanation establish that Refund history displays a complete order: only two
+books are marked Returned on 07-29-21; thirteen siblings say Return status: Not
+eligible. A list entry in this view alone does not establish a refund.
+
+Refund traversal now validates item statuses independently of original purchase
+amount/date grouping. Explicit Not eligible siblings and available Return this
+title actions are not completed returns. Actual Returned/Refunded wording can
+supply a date from the status itself or a dedicated refund-date column. A short
+year is resolved only if the selected purchase year and current calendar leave
+one possible century, with a valid calendar day. Impossible or ambiguous dates
+remain uncertain for that identity. The Purchased column is never a refund date.
+Conflicting status/date evidence remains uncertain. Missing/conflicting product
+identities still prevent completion of the refund scope.
+
+Explicit completed-return rows in Your orders are not unresolved purchase rows
+merely because their original purchase fields are absent. Dated item-level return
+facts from orders and refunds are deduplicated; supported repurchases retain their
+normal chronological comparison. Unknown return chronology continues to hold
+only the affected IDs. Manual corrections, existing dates and source identities
+remain authoritative. No ownership is assigned merely by membership in an order.
+
+The 2016 screenshot/text confirms the same explicit empty-refund sentence, and
+all years remain offered. Ready headers alone could precede that empty panel;
+traversal now waits for entries or a recognized empty message, within the normal
+timeout. Entry errors and a later traversal failure are retained separately in
+a bounded summary rather than hiding the final stopping reason behind the first
+unreadable order. Quick remains limited to current/previous years.
+
+A synthetic five-column, 15-item order reproduces two inline-dated returns and
+thirteen Not eligible siblings, including duplicate returned-only rows in Your
+orders and empty earlier refund years. Parser-to-writer and backup tests establish
+13 Owned / 2 Returned with dates preserved and zero repeated record updates.
+These are regression counts, not a prediction of the live account's final totals.
+Revised normal Firefox Full rescan and backup comparison remain pending.
