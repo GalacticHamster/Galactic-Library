@@ -542,7 +542,11 @@
       read(){
         const doc=frame.contentDocument;if(!doc)return null;
         const url=new URL(doc.URL);if(url.protocol==='about:')return null;
-        if(url.origin!==global.location.origin||!/^\/account\/purchase-history\/?$/u.test(url.pathname))throw Error('history-access-not-verified');
+        if(url.origin!==global.location.origin||!/^\/account\/purchase-history\/?$/u.test(url.pathname)){
+          if(doc.readyState!=='complete')return null;
+          if(url.origin===global.location.origin&&url.pathname==='/500')throw Error('history-provider-error');
+          throw Error('history-access-not-verified');
+        }
         return doc;
       },
       choose(select,option){
@@ -611,7 +615,7 @@
   }
   async function scanPurchaseHistory({mode='full',now=new Date(),driverFactory=historyFrame,timeoutMs=15000,pollMs=150,progress=()=>{}}={}){
     const scope=mode==='incremental'?'recent':'full';
-    const history={format:1,scope,failures:[],ordersComplete:false,refundsComplete:false,purchases:[],refunds:[],uncertainRefundAsins:[],years:[],pagesRead:0,reason:null};
+    const history={format:1,scope,failures:[],ordersComplete:false,refundsComplete:false,purchases:[],refunds:[],uncertainRefundAsins:[],refundPurchaseYearsChecked:[],years:[],pagesRead:0,reason:null};
     let driver,current;const purchases=new Map(),refunds=new Map(),purchaseCounts=new Map(),refundCounts=new Map(),uncertain=new Set(),started=Date.now();
     const visible=e=>!e.closest('[hidden],[aria-hidden="true"]')&&(!e.ownerDocument.defaultView||e.getClientRects().length>0);
     const recordFailure=(view,year,reason,pagesRead,report)=>{
@@ -620,6 +624,7 @@
       // bad rows do not create an unbounded diagnostic log.
       const existing=history.failures.find(f=>f.view===view&&f.reason===reason);
       if(existing){existing.pagesRead=pagesRead;return;}
+      if(history.failures.length>=5)return;
       history.failures.push({view,year,reason,pagesRead,rows:report?.rows??0,unboundRows:report?.unresolvedPurchaseRows??0,conflictingGroups:report?.grouping?.conflictingOrderGroups??0,multipleIdentities:report?.rowsWithMultipleAsins??0,limited:!!report?.limits?.purchaseRowScan});
     };
     const yearSelect=doc=>{const matches=[...doc.querySelectorAll('select')].filter(s=>visible(s)&&[...s.options].some(o=>/^\d{4}$/u.test(textOf(o))));if(matches.length!==1)throw Error('history-controls');return matches[0];};
@@ -628,9 +633,17 @@
       return {doc,report,events};
     };
     const ready=async(previous,view,year)=>{
-      const deadline=Date.now()+Math.min(30000,Math.max(1,timeoutMs));let emptyCandidate=false;
+      const deadline=Date.now()+Math.min(30000,Math.max(1,timeoutMs));let emptyCandidate=false,unverifiedDocument=false;
       while(Date.now()<deadline){
-        const doc=driver.read();
+        let doc;
+        try{doc=driver.read();}
+        catch(error){
+          // Native redirects can briefly expose a different document. Never
+          // inspect it or accept it as history; allow the verified destination
+          // to arrive within the same bounded navigation wait.
+          if(error.message!=='history-access-not-verified')throw error;
+          unverifiedDocument=true;
+        }
         if(doc&&doc!==previous&&doc.readyState==='complete'&&!doc.querySelector('[aria-busy="true"]')){
           const data=read(doc),r=data.report;
           if(['checked','refund-structure-observed'].includes(r.state)&&(!view||r.selectedView===view)&&(year===undefined||r.selectedTime===year&&(view!=='orders'||Object.keys(r.purchaseDateYears).every(y=>Number(y)===year)))){
@@ -643,7 +656,7 @@
         }
         await wait(Math.max(1,pollMs));
       }
-      throw Error(emptyCandidate?'history-empty-unconfirmed':'history-inaccessible-or-not-advancing');
+      throw Error(emptyCandidate?'history-empty-unconfirmed':unverifiedDocument?'history-access-not-verified':'history-inaccessible-or-not-advancing');
     };
     const change=async(view,year)=>{
       if(current.report.selectedView!==view){
@@ -712,9 +725,12 @@
           }
           if(result.length>=10000)throw Error('history-safety-limit');
           const cells=[...row.children],statusCells=names.flatMap((n,i)=>['options','status'].includes(n)?[cells[i]]:[]).filter(Boolean);
-          const statuses=statusCells.flatMap(cell=>[textOf(cell),...[...cell.querySelectorAll('span,p,div,a,button')].filter(visible).map(textOf)]);
+          // Status is visible cell content; an accessibility label such as
+          // "Options" is not the item's access state. Inline fragments and a
+          // separate Why link must not hide the Not eligible wording.
+          const statuses=statusCells.flatMap(cell=>[cell,...cell.querySelectorAll('span,p,div,b,strong,a,button')]).filter(visible).map(e=>String(e.textContent??'').replace(/\s+/gu,' ').trim());
           const returned=statuses.some(s=>completedReturn.test(s));
-          const notReturned=statuses.some(s=>/^return status:\s*not eligible(?:\s*why\??)?[.!]?$/iu.test(s)||/^return this title$/iu.test(s));
+          const notReturned=statuses.some(s=>/return\s*status\s*:\s*not\s*eligible(?:\s|why\b|[?!.]|$)/iu.test(s)||/^return this title$/iu.test(s));
           // Refund history shows complete orders. A non-returnable sibling is
           // not itself a refund; unclear statuses remain scoped uncertainty.
           if(notReturned&&!returned){result.push({asin:[...ids][0],notReturned:true});continue;}
@@ -735,46 +751,64 @@
       if(scope==='recent'){const year=now.getFullYear();history.years=history.years.filter(y=>y===year||y===year-1);}
       if(!history.years.length)throw Error('history-year-unavailable');
       for(const view of ['refund-history','orders']){
-        let attemptedYear=null,viewPages=0;
+        let attemptedYear=null,viewPages=0,completedYears=0;
         try{
           if(!driver){driver=driverFactory();current=await ready(null);}
           for(const [index,year]of history.years.entries()){
             attemptedYear=year;
-            progress(`${view==='orders'?'Checking purchase history':'Checking return history'}: ${year} (${index+1} of ${history.years.length})...`);
-            await change(view,year);const seen=new Set();
-            while(true){
-              if(Date.now()-started>600000||history.pagesRead>=10000||purchases.size+refunds.size>50000)throw Error('history-safety-limit');
-              const {doc,report,events}=current;
-              // Invalid groups contribute no purchase facts. Keep their view
-              // incomplete, but continue real pages/years so independent dated
-              // purchases are not discarded because of an unrelated bad order.
-              // Refunds are enumerated by exact item identity, not original
-              // purchase-date/total grouping. Undated or unclear refunds hold
-              // only their own identities; missing/conflicting identities still
-              // prevent the refund scope from being declared complete.
-              const negative=view==='refund-history'?refundRows(doc,year):[];
-              const unreadable=view==='orders'&&(report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||report.unresolvedPurchaseRows);
-              const fingerprint=JSON.stringify([events,negative,[...doc.querySelectorAll('[data-order-id]')].map(e=>e.getAttribute('data-order-id'))]);
-              if(seen.has(fingerprint))throw Error('history-repeated-page');seen.add(fingerprint);history.pagesRead++;viewPages++;
-              if(unreadable)recordFailure(view,year,'history-unreadable-entries',viewPages,report);
-              if(view==='orders')for(const event of events){if(event.kind==='returned'){
-                if(event.date){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}
-                else uncertain.add(event.asin);
-              }else if(event.kind==='purchase'){
-                const key=event.asin+':'+event.acquiredAt+':'+event.method;
-                if(!purchases.has(key)){if(purchases.size>=50000||(purchaseCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');purchaseCounts.set(event.asin,(purchaseCounts.get(event.asin)??0)+1);}
-                purchases.set(key,{asin:event.asin,date:event.acquiredAt,method:event.method});
-              }}
-              else for(const event of negative){if(event.notReturned)continue;if(event.confirmed){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}else uncertain.add(event.asin);}
-              const books=view==='orders'?report.rowsWithOneAsin:negative.length;
-              if(!books){
-                if(!emptyHistory(doc,view))throw Error('history-empty-unconfirmed');
+            try{
+              if(!driver){driver=driverFactory();current=await ready(null);await change('orders',year);}
+              progress(`${view==='orders'?'Checking purchase history':'Checking return history'}: ${year} (${index+1} of ${history.years.length})...`);
+              await change(view,year);const seen=new Set();let yearReadable=true,purchaseYearScope=true;
+              while(true){
+                if(Date.now()-started>600000||history.pagesRead>=10000||purchases.size+refunds.size>50000)throw Error('history-safety-limit');
+                const {doc,report,events}=current;
+                // Invalid groups contribute no purchase facts. Keep their view
+                // incomplete, but continue real pages/years so independent dated
+                // purchases are not discarded because of an unrelated bad order.
+                // Refunds are enumerated by exact item identity, not original
+                // purchase-date/total grouping. Undated or unclear refunds hold
+                // only their own identities; missing/conflicting identities still
+                // prevent the refund scope from being declared complete.
+                const negative=view==='refund-history'?refundRows(doc,year):[];
+                if(view==='refund-history'){
+                  const dates=Object.keys(report.purchaseDateYears);
+                  // Only the native Purchased-date layout establishes which
+                  // original purchase year a partial refund check covers.
+                  if(!report.recognizedHeaders||dates.some(y=>Number(y)!==year)||negative.length&&!dates.length)purchaseYearScope=false;
+                }
+                const unreadable=view==='orders'&&(report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||report.unresolvedPurchaseRows);
+                const fingerprint=JSON.stringify([events,negative,[...doc.querySelectorAll('[data-order-id]')].map(e=>e.getAttribute('data-order-id'))]);
+                if(seen.has(fingerprint))throw Error('history-repeated-page');seen.add(fingerprint);history.pagesRead++;viewPages++;
+                if(unreadable){yearReadable=false;recordFailure(view,year,'history-unreadable-entries',viewPages,report);}
+                if(view==='orders')for(const event of events){if(event.kind==='returned'){
+                  if(event.date){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}
+                  else uncertain.add(event.asin);
+                }else if(event.kind==='purchase'){
+                  const key=event.asin+':'+event.acquiredAt+':'+event.method;
+                  if(!purchases.has(key)){if(purchases.size>=50000||(purchaseCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');purchaseCounts.set(event.asin,(purchaseCounts.get(event.asin)??0)+1);}
+                  purchases.set(key,{asin:event.asin,date:event.acquiredAt,method:event.method});
+                }}
+                else for(const event of negative){if(event.notReturned)continue;if(event.confirmed){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}else uncertain.add(event.asin);}
+                const books=view==='orders'?report.rowsWithOneAsin:negative.length;
+                if(!books){
+                  if(!emptyHistory(doc,view))throw Error('history-empty-unconfirmed');
+                }
+                const page=continuation(doc);if(!page.next)break;
+                if(typeof driver.follow!=='function')throw Error('history-next-unverified');driver.follow(page.next);current=await ready(doc,view,year);
               }
-              const page=continuation(doc);if(!page.next)break;
-              if(typeof driver.follow!=='function')throw Error('history-next-unverified');driver.follow(page.next);current=await ready(doc,view,year);
+              if(yearReadable)completedYears++;
+              if(view==='refund-history'&&purchaseYearScope)history.refundPurchaseYearsChecked.push(year);
+            }catch(error){
+              // Audible can fail one historical year on its own /500 page.
+              // Never parse that page or mark the year checked. Reopen verified
+              // native history before continuing the remaining offered years.
+              if(error.message!=='history-provider-error')throw error;
+              recordFailure(view,year,error.message,viewPages,null);
+              driver?.close();driver=null;
             }
           }
-          const complete=!history.failures.some(f=>f.view===view);
+          const complete=completedYears===history.years.length;
           if(view==='orders')history.ordersComplete=complete;else history.refundsComplete=complete;
         }catch(error){
           const reason=/^history-[a-z-]{1,80}$/u.test(error.message)?error.message:'history-incomplete';

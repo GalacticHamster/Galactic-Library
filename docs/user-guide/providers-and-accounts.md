@@ -95,8 +95,13 @@ not establish purchase or subscription access. Missing evidence remains unconfir
 
 Incomplete library discovery prevents replacement. If history alone is
 inaccessible or incomplete, discovered library titles and prior evidence are
-kept, with a partial-completion message. Unchecked refunds prevent new automatic
-ownership confirmations; readable purchase dates can still be retained. Keep the
+kept, with a partial-completion message. If Audible returns an error for one
+historical year, Full rescan leaves that year unchecked and continues the others.
+After a complete purchase-history check, purchases can be confirmed only when
+all their known purchase years have been checked for refunds. Books linked to an
+unchecked year remain unconfirmed unless earlier evidence or your correction
+already establishes access. Readable purchase dates and explicit dated returns
+can still be retained. A partial check is never reported as complete. Keep the
 provider tab open until completion. Export a GL backup in Settings before
 important updates; never replace a complete library with another browser's
 partial backup merely to refresh one provider.

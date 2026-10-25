@@ -183,3 +183,53 @@ orders and empty earlier refund years. Parser-to-writer and backup tests establi
 13 Owned / 2 Returned with dates preserved and zero repeated record updates.
 These are regression counts, not a prediction of the live account's final totals.
 Revised normal Firefox Full rescan and backup comparison remain pending.
+
+## Third live result: status text and navigation waits
+
+The next backup retains 796 records and 485 acquisition dates, with purchase
+traversal complete and two dated refund facts saved. No ownership was confirmed
+because refund traversal rejected a document at year 2015 with
+history-access-not-verified. Thirteen other members of the displayed refund
+order still appeared as uncertain, despite the user's Not eligible screenshot.
+The user then reproduced the failure in Audible itself: only Refund history
+2015 redirects to its same-origin /500 error page. Years 2016 onward and 2014
+and 2013 work. This is provider failure, not an empty list or failed login.
+
+Refund statuses now use their visible cell text rather than accessibility labels
+such as Options, and recognize Not eligible wording split across inline elements
+or followed by a separate Why link. This still supplies no positive ownership by
+itself: purchase evidence remains required. Synthetic cases reproduce thirteen
+fragmented/labeled non-refunded siblings alongside two dated returns.
+
+A loading document at another route is not parsed as history. The bounded
+navigation wait also tolerates temporary unverified documents while waiting for
+the original same-origin, expected history route/view/year. A permanently
+unverified destination still fails and cannot establish refund completeness.
+A completed same-origin /500 page is classified as a provider error, never
+parsed. That year remains unchecked; a fresh verified history frame continues
+remaining offered years. Other access, identity and traversal errors still stop
+the affected view. A bounded current-run list records only refund years completed
+in the native Purchased-date layout, with dates matching the selected year.
+Refund-date-only layouts cannot establish original purchase-year scope.
+
+With a complete all-year orders scan, Full can confirm a purchase only if every
+known purchase year for its exact ASIN was checked for refunds. Any link to the
+failed year holds new confirmation; unclear item-level refund statuses also
+hold that item. Explicit dated returns remain usable after complete orders
+traversal even when an unrelated refund year failed. Previously saved evidence
+and manual decisions remain intact. Missing optional year evidence retains the
+older conservative behavior; it is never reconstructed from a backup's year list.
+
+The checked-year list is replaced each run, not a historical cursor or merged
+checkpoint. Quick cannot use partial-year permission and still checks only its
+current/previous-year scope. No failed full run acquires a complete-history
+baseline. No new permissions or credential handling are introduced. Normal live
+verification remains pending; an Audible 2015 failure will still be reported.
+
+Validation for this repair: 1,728 unit tests and 485 contents tests pass.
+Packaged Chrome and Firefox each pass 137 ownership, 87 Audible library,
+105 importer and 68 main-UI checks. Both packages validate 221 runtime files;
+repository layout and diff whitespace checks pass. A read-only controlled replay
+of the frozen backup preserves all 796 identities and 485 acquisition dates,
+including prior purchase/refund evidence. Its assumed completed-year inputs are
+not live proof and are not written back to the backup or installed library.

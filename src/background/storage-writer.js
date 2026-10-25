@@ -964,7 +964,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const history=validateAudibleHistory(details.audibleHistory),next={...details};delete next.audibleHistory;
     const complete=history.ordersComplete&&history.refundsComplete&&!history.uncertainRefundAsins.length;
     const fullCheckedAt=history.scope==='full'&&complete?now:profile.state.syncState?.audibleHistory?.fullCheckedAt;
-    next.syncState={...profile.state.syncState,audibleHistory:{version:1,scope:history.scope,failures:history.failures,uncertainRefunds:history.uncertainRefundAsins.length,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,checkedAt:now,...(fullCheckedAt?{fullCheckedAt}:{}),reason:history.reason}};
+    next.syncState={...profile.state.syncState,audibleHistory:{version:1,scope:history.scope,failures:history.failures,uncertainRefunds:history.uncertainRefundAsins.length,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,refundPurchaseYearsChecked:history.refundPurchaseYearsChecked,years:history.years,pagesRead:history.pagesRead,checkedAt:now,...(fullCheckedAt?{fullCheckedAt}:{}),reason:history.reason}};
     next.scanDiagnostics={...details.scanDiagnostics,incomplete:!complete,failedRequestCount:0};
     return {details:next,history};
   }
