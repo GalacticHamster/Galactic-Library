@@ -1,5 +1,7 @@
 [
   "manifest.json",
+  "src/background/xbox-navigation.js",
+  "src/ui/provider-launch.js",
   "src/providers/xbox-library.js",
   "src/providers/xbox-capture.js",
   "src/providers/xbox-content.js",

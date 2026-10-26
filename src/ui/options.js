@@ -1,3 +1,4 @@
+import {openProviderPage} from './provider-launch.js';
 import {builtinCompanions,companionBrowser} from '../lib/companion-identities.js';
 import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
@@ -181,7 +182,7 @@ const contentsWorkspace=createContentsWorkspace({projection:browseProjection,res
   return root;
 }});
 document.querySelector('#contents-collections-slot').append(contentsWorkspace.element);
-const providerAccountsView=createProvidersView({saveKoboOwnershipAssumption,select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:url=>chrome.tabs.create({url}),onDatabase:next=>{database=next;render();}});
+const providerAccountsView=createProvidersView({saveKoboOwnershipAssumption,select:selectProviderProfile,rename:renameProviderProfile,preview:previewProviderProfileRemoval,remove:removeProviderProfile,reset:resetProviderProfileBaseline,openProvider:openProviderPage,onDatabase:next=>{database=next;render();}});
 document.querySelector('#provider-accounts-slot').append(providerAccountsView.element);
 let ownershipPolicySaving=false;
 async function changeOwnershipPolicy(patch) {

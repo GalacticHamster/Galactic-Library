@@ -1,3 +1,4 @@
+import {createXboxNavigationHandler,currentXboxSender} from './xbox-navigation.js';
 import {purchaseAccounts} from './purchase-handoff.js';
 import {createPurchaseHandoff} from './purchase-handoff.js';
 import {allowedCompanionOperation} from '../lib/companion-identities.js';
@@ -58,6 +59,7 @@ async function observePurchaseSync(database,initialize=false){
 }
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
+chrome.runtime.onMessage.addListener(createXboxNavigationHandler(chrome));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
 const companionTimings=contentsPerformance.collector();
@@ -250,6 +252,7 @@ async function searchGoogleBooks(query) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if(request?.provider==='xbox')sender=currentXboxSender(sender);
   if (sender.id !== chrome.runtime.id) {
     sendResponse({ok:false,error:'Library operations are accepted only from Galactic Library.'});
     return undefined;

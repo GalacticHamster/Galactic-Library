@@ -12,6 +12,8 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {ownershipCorrectionTarget} from '../src/ui/quick-access.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {withWorker} from './storage.js';
+import {createXboxNavigationHandler,currentXboxSender,XBOX_OWNED_URL} from '../src/background/xbox-navigation.js';
+import {openProviderPage} from '../src/ui/provider-launch.js';
 
 export function xboxHarness(){
   const listeners=[],posts=[];let resolve,clock=1000;
@@ -29,6 +31,37 @@ const begin=(w,mode='full',fingerprint=fp,name='Personal',switching=false)=>w.be
 const commit=(w,scan,items,mode='full',fingerprint=fp)=>w.commitProviderScan('xbox',items,{syncMode:mode,...(mode==='full'?{fullSyncAt:'2026-10-16'}:{quickSyncAt:'2026-10-16'})},snapshot(items),scan.scanToken,1,false,fingerprint);
 
 export const xboxImportTests=[
+ ['Xbox launch recovery is explicit, tab-scoped, expiring, one-shot and cannot be granted by a website',async()=>{
+   const values={},updates=[],created=[],removed=[];let now=1000,id=10;
+   const browser={runtime:{id:'gl',getURL:path=>'chrome-extension://gl/'+path},tabs:{create:async options=>{created.push(options);return {id:id++};},update:async(tab,options)=>updates.push({tab,...options}),onRemoved:{addListener:fn=>removed.push(fn)}},storage:{session:{get:async key=>({[key]:values[key]}),set:async patch=>Object.assign(values,patch),remove:async key=>{delete values[key];}}}};
+   const handler=createXboxNavigationHandler(browser,()=>now),own={id:'gl',url:'chrome-extension://gl/options.html'},site=tab=>({id:'gl',url:'https://play.xbox.com/library?tab=playHistory',frameId:0,tab:{id:tab}});
+   const ask=(r,s)=>new Promise(resolve=>handler(r,s,resolve));
+   assert.equal((await ask({type:'OPEN_XBOX_IMPORT'},site(10))).ok,false);
+   assert.equal((await ask({type:'OPEN_XBOX_IMPORT'},own)).ok,true);assert.deepEqual(created,[{url:'about:blank'}]);assert.equal(updates[0].url,XBOX_OWNED_URL);
+   assert.equal((await ask({type:'XBOX_IMPORT_LAUNCH',action:'get'},site(11))).pending,false);
+   assert.equal((await ask({type:'XBOX_IMPORT_LAUNCH',action:'get'},site(10))).pending,true);
+   assert.equal((await ask({type:'XBOX_IMPORT_LAUNCH',action:'consume'},{...site(10),frameId:1})).ok,false);
+   assert.equal((await ask({type:'XBOX_IMPORT_LAUNCH',action:'get'},{...site(10),url:'https://login.live.com/'})).ok,false);
+   const consumed=await Promise.all([ask({type:'XBOX_IMPORT_LAUNCH',action:'consume'},site(10)),ask({type:'XBOX_IMPORT_LAUNCH',action:'consume'},site(10))]);assert.equal(consumed.filter(r=>r.pending).length,1);
+   await ask({type:'OPEN_XBOX_IMPORT'},own);now+=600001;assert.equal((await ask({type:'XBOX_IMPORT_LAUNCH',action:'get'},site(11))).pending,false);
+   await ask({type:'OPEN_XBOX_IMPORT'},own);removed[0](12);await Promise.resolve();assert(!Object.keys(values).length);
+ }],
+ ['Xbox SPA sender uses only browser-provided top-frame navigation on the same exact origin',()=>{
+   const sender={id:'gl',frameId:0,url:'https://play.xbox.com/landing',tab:{id:1,url:XBOX_OWNED_URL}};
+   assert.equal(currentXboxSender(sender).url,XBOX_OWNED_URL);
+   for(const changed of [{frameId:1},{url:'https://evil.example/'},{tab:{id:1,url:'https://play.xbox.com/library-fake'}},{tab:{id:1,url:'https://play.xbox.com.evil.example/library'}}]){
+     const invalid={...sender,...changed};assert.equal(currentXboxSender(invalid),invalid);
+   }
+ }],
+ ['Xbox provider launch uses scoped orchestration while ordinary provider links keep their existing behavior',async()=>{
+   const messages=[],tabs=[],browser={runtime:{sendMessage:async r=>{messages.push(r);return {ok:true};}},tabs:{create:async r=>tabs.push(r)}};
+   await openProviderPage(XBOX_OWNED_URL,browser);assert.deepEqual(messages,[{type:'OPEN_XBOX_IMPORT'}]);assert.equal(tabs.length,0);
+   await openProviderPage('https://example.com/library',browser);assert.deepEqual(tabs,[{url:'https://example.com/library'}]);
+ }],
+ ['Xbox navigation readiness exports only a boolean from stable account-scoped cache without requiring Owned contents',async()=>{
+   const h=xboxHarness();h.get('assembled').status='pending';const r=await h.ask('navigation-ready');assert.deepEqual(r,{channel:'gl-xbox-response',nonce:'c'.repeat(32),ok:true,authenticated:true});
+   h.get('active').status='pending';assert.equal((await h.ask('navigation-ready')).authenticated,false);
+ }],
  ['Xbox projects the live-validated 40/264/37/14 source with stable products, platforms, editions and no invented purchase date',async()=>{
    assert.equal(providerLabel('xbox'),'Xbox — Web Library');
    const h=xboxHarness(),r=await h.ask();assert.equal(r.ok,true,r.error);assert.equal(r.items.length,37);assert.equal(new Set(r.items.map(i=>i.providerItemId)).size,37);assert(r.items.every(i=>i.ownership==='owned'&&i.acquiredAt===null));assert.deepEqual(r.items[0].platform,['Windows','Xbox One','Xbox Series X|S']);assert.equal(r.items[0].metadata.edition,'Deluxe Edition');assert.deepEqual(r.items[0].metadata.accessTypes,[1]);assert.equal(r.snapshot.scopes[0].expectedCount,37);assert.equal(r.snapshot.scopes[0].end,'reported-count');assert.equal((await h.ask('verify')).ok,true);

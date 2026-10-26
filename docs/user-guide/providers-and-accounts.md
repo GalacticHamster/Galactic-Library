@@ -171,8 +171,19 @@ may require granting GL access to the PlayStation Library site.
 
 Open **Providers → Xbox — Web Library**, open its website and sign in. The link
 opens the [Owned catalog](https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned)
-directly. Reload Xbox Library after loading the updated GL extension and let
-the games finish loading. In GL's floating panel, choose/confirm the account nickname and select
+directly. After installing an updated GL extension, reload the Xbox page once.
+Then switching from Play History to Owned, including Back/Forward, shows the
+panel without another refresh. The panel hides on other library tabs and
+retains your account selection when you return to Owned.
+
+For a tab opened from GL, GL remembers the destination for up to ten minutes.
+If sign-in returns that tab to Play History, GL restores Owned once Xbox's
+signed-in account data is ready. It leaves ordinary Xbox browsing alone and
+does not navigate through sign-in or security challenges. If recovery does not
+occur, select Owned using Xbox's interface; the panel appears there.
+Navigation alone never starts an import.
+
+Let the games finish loading. In GL's floating panel, choose/confirm the account nickname and select
 **Full rescan**. After the first import, **Quick update** checks the same complete
 web-visible Owned catalog for additions and changes. Neither action removes
 previously saved products that disappear from this limited view.
@@ -198,7 +209,8 @@ Xbox purchase history, all console/mobile games, a complete DLC inventory, or
 other subscription catalogs. The initial production import has been
 live-validated: 37 checked titles, 37 products and 37 new records. Full/quick
 reimports pass disposable Chrome/Firefox tests; live quick-update acceptance
-has not yet been reported. Reload the website before updating it. If the site
+has not yet been reported. Both update buttons can be used again from the Owned
+panel after a completed import. If the site
 is still loading, its data is invalidated, account changes, or counts/preview IDs
 disagree, GL rejects the import and retains saved items. A zero list requires an
 explicit zero catalog total; GL does not interpret an absent catalog as empty.

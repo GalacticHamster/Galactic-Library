@@ -9,9 +9,10 @@ async function wait(predicate,message){for(let n=0;n<100;n++){if(predicate())ret
 const button=(root,label)=>[...root.querySelectorAll('button')].find(b=>b.textContent===label);
 const navigate=name=>document.querySelector(`#workspace-navigation [data-workspace="${name}"]`).click();
 const account=id=>document.querySelector(`[data-account="${id}"]`);
-const storageListeners=[],runtimeListeners=[],operations=[],opened=[],state={},syncCalls=[];let connected=null,confirmSync=false;globalThis.confirm=()=>confirmSync;
+const storageListeners=[],runtimeListeners=[],operations=[],opened=[],xboxLaunches=[],state={},syncCalls=[];let connected=null,confirmSync=false;globalThis.confirm=()=>confirmSync;
 const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...state}),set:async changes=>Object.assign(state,structuredClone(changes)),remove:async keys=>{for(const k of keys)delete state[k];}});
 globalThis.chrome={runtime:{id:'abcdefghijklmnopabcdefghijklmnop',onMessage:{addListener:fn=>runtimeListeners.push(fn)},sendMessage:async request=>{
+ if(request.type==='OPEN_XBOX_IMPORT'){xboxLaunches.push(request);return {ok:true};}
  if(request.type==='GH_PURCHASE_ACTION'){
   syncCalls.push(request);const accounts=[{stableId:'personal',label:'Personal',count:2},{stableId:'family',label:'Family',count:3}];
   if(request.action==='syncState')return {ok:true,state:connected,accounts};
@@ -74,6 +75,9 @@ try{
  assert(!operations.includes('beginProviderScan')&&opened.length===0,'Onboarding started an import.');checks.push(`Empty Library routes to all ${PROVIDERS.length} providers without acquisition`);
  const xboxLink=new URL(document.querySelector('.provider-card[data-provider="xbox"] .provider-account-body a').href);
  assert(xboxLink.origin+xboxLink.pathname==='https://play.xbox.com/library'&&xboxLink.searchParams.get('tab')==='fullLibrary'&&xboxLink.searchParams.get('view')==='grid'&&xboxLink.searchParams.get('catalog')==='owned','Xbox provider link does not open the full-library Owned grid directly');checks.push('Xbox opens the full-library Owned grid directly without starting an import');
+ document.querySelector('.provider-card[data-provider="xbox"] .provider-account-body a').click();await delay();
+ assert(xboxLaunches.length===1&&opened.length===0&&!operations.includes('beginProviderScan'),'Xbox launch bypassed scoped tab orchestration or started acquisition');
+ checks.push('Xbox website action requests exactly one GL-scoped launch without starting an import');
 
  let d=await writer.replaceProviderItems('kindle',[book],{profileLabel:'',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[book]));const a=d.providers.kindle.activeProfileId,ref=Object.values(d.providerItems)[0].recordRef;
  d=await writer.saveContentReview(Object.keys(d.providerItems)[0],{entries:[{series:'Synthetic',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}],statement:'Collects Synthetic #1',source:'manual-review',sourceUrl:'',verifiedAt:'2026-10-01'});
