@@ -8,6 +8,8 @@ Longer actions show text describing the current work and disable their initiatin
 
 In Settings, **Export backup** shows preparation, validation and browser-handoff feedback. Repeated clicks while it is preparing do not start another export. The completion message means Galactic Library handed the download to your browser. Check your browser's downloads to confirm the file was saved: Galactic Library cannot detect a cancelled save dialog or a silently blocked anchor download.
 
+Backups include saved library records, accounts, reviews and supported comic coverage preferences. API keys, companion pairing, automatic purchase-sync permission, diagnostics settings, appearance and other browser-only preferences are excluded.
+
 ## Restoring a backup
 
 Selecting a file shows reading and validation feedback. It does **not** replace your library. A confirmation explains that restoring replaces the entire local library, including saved accounts and reviews; it does not merge two libraries. You can export your current backup before confirming, or cancel.
@@ -17,6 +19,12 @@ If your saved library changes while you review the confirmation, Galactic Librar
 If the status says the backup **was restored, but the Library view could not reload**, reload the Library view rather than restoring again. If restoration completion **could not be confirmed**, reload and inspect the library before retrying. These messages distinguish a view failure after a confirmed commit from an uncertain worker response. File-read or validation failures do not start a replacement.
 
 Clear Library and another restore cannot run concurrently with an admitted library replacement. This safeguard also applies to another open GL page. Other edits retain the existing ordered writer behavior and confirmation checks.
+
+Restoring does not replace existing API keys, companion pairing or browser-only preferences with values from the file. It resets automatic purchase-sync relationships: reconnect Humble or Fanatical purchase sync afterward.
+
+## Clearing the local library
+
+**Clear local library** asks for confirmation in the browser. Cancelling keeps your data. Confirming clears saved libraries, accounts, reviews, API keys, companion links and local update settings. Appearance remains unchanged and store purchases are unaffected. Export a library backup first to recover library records; keys, companion links and browser-only preferences cannot be recovered from that backup.
 
 ## Provider scans, contents and enrichment
 

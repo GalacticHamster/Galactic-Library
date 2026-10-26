@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {bindBackupRestore} from '../src/ui/backup-restore.js';
+import {bindBackupRestore,BACKUP_SCOPE_HELP,RESTORE_LOCAL_HELP,CLEAR_LIBRARY_HELP,CLEAR_LIBRARY_WARNING} from '../src/ui/backup-restore.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase} from '../src/lib/models.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
@@ -36,3 +36,20 @@ export const backupRestoreFeedbackTests=[
   const parsed=parseBackup(candidate);await writer.restoreDatabase(parsed);assert.equal(stable(await writer.getDatabase()),stable(parsed));assert.ok(!Object.hasOwn(memory.galacticLibraryDatabase,'recoveryManifest'));assert.ok(!Object.hasOwn(createBackup(parsed),'recoveryManifest'));
  }]
 ];
+
+backupRestoreFeedbackTests.push(['Recovery explanations distinguish excluded backup settings, reset sync consent and retained appearance',async()=>{
+ assert.match(BACKUP_SCOPE_HELP,/reviews.*coverage preferences/u);
+ assert.match(BACKUP_SCOPE_HELP,/API keys.*not included/u);
+ assert.match(RESTORE_LOCAL_HELP,/not replaced.*relationships are reset.*reconnect/u);
+ assert.match(CLEAR_LIBRARY_HELP,/Appearance stays unchanged/u);
+ assert.match(CLEAR_LIBRARY_WARNING,/Purchases at your stores are unaffected/u);
+ const values={galacticHamsterAppearance:{mode:'dark'},googleBooksApiKey:'SYNTHETIC',galacticPurchaseSync:{oldConsent:true}};
+ const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async updates=>Object.assign(values,structuredClone(updates)),remove:async keys=>{for(const key of keys)delete values[key];}});
+ const backup=createBackup(createEmptyDatabase());assert(!JSON.stringify(backup).includes('SYNTHETIC'));
+ await writer.restoreDatabase(parseBackup(backup));assert.equal(values.googleBooksApiKey,'SYNTHETIC');assert.deepEqual(values.galacticPurchaseSync,{});assert.equal(values.galacticHamsterAppearance.mode,'dark');
+ await writer.clearDatabase();assert.equal(values.googleBooksApiKey,undefined);assert.equal(values.galacticHamsterAppearance.mode,'dark');
+}]);
+backupRestoreFeedbackTests.push(['Restore prompt explains exclusions before consent and cancellation saves nothing',async()=>{
+ let prompt;const f=fixture({prompt:options=>{prompt=options;return {result:Promise.resolve(false),cancel(){}};}});await f.choose();
+ assert.match(prompt.message,/does not merge libraries/u);assert.match(prompt.message,/API keys.*not included/u);assert.match(prompt.message,/relationships are reset/u);assert.equal(prompt.confirmLabel,'Replace library');assert.equal(prompt.extraLabel,'Export current backup');assert.equal(f.writes,0);
+}]);

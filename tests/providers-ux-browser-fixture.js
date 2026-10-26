@@ -142,5 +142,15 @@ try{
    button(prompt,'Cancel').click();
  }
  checks.push('All fourteen provider actions and dialogs use supported labels; single-action providers omit Quick update and opening instructions never starts an import');
+ navigate('settings');
+ const beforeCancel=JSON.stringify(await writer.getDatabase()),beforeTheme=document.documentElement.dataset.ghTheme;
+ assert(document.querySelector('#backup-scope-help').textContent.includes('not included')&&document.querySelector('#backup-scope-help').textContent.includes('relationships are reset'),'Backup controls omit exclusion or reconnect guidance');
+ const {createBackup}=await import('../src/lib/storage.js');const data=new DataTransfer();data.items.add(new File([JSON.stringify(createBackup(await writer.getDatabase()))],'synthetic.json',{type:'application/json'}));
+ const restoreInput=document.querySelector('#import');restoreInput.files=data.files;restoreInput.dispatchEvent(new Event('change'));await wait(()=>document.querySelector('.confirmation-dialog[open]'),'Restore prompt missing');
+ const restoreDialog=document.querySelector('.confirmation-dialog[open]');assert(restoreDialog.textContent.includes('not replaced')&&restoreDialog.textContent.includes('reconnect'),'Restore prompt confuses excluded and reset state');button(restoreDialog,'Cancel').click();await wait(()=>!restoreInput.disabled,'Restore cancellation did not finish');
+ checks.push('Restore controls and accessible replacement prompt explain exclusions and reconnecting; Cancel keeps synthetic library unchanged');
+ let clearWarning;const priorConfirm=globalThis.confirm;globalThis.confirm=message=>{clearWarning=message;return false;};document.querySelector('#clear').click();await delay();globalThis.confirm=priorConfirm;
+ assert(clearWarning.includes('Appearance stays unchanged')&&clearWarning.includes('Purchases at your stores are unaffected'),'Native clear warning omits actual scope');assert(JSON.stringify(await writer.getDatabase())===beforeCancel&&document.documentElement.dataset.ghTheme===beforeTheme,'Cancelled restore/clear changed data or appearance');
+ checks.push('Native clear confirmation retains truthful scope and cancellation preserves library and appearance');
  await fetch('/test-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checks,error:error.stack||error.message})});}

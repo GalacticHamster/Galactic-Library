@@ -2,7 +2,7 @@ import {openProviderPage} from './provider-launch.js';
 import {builtinCompanions,companionBrowser} from '../lib/companion-identities.js';
 import {createConfirmation} from './confirmation.js';
 import {providerLabel,formatDate,countLabel} from './formatters.js';
-import {bindBackupRestore} from './backup-restore.js';
+import {bindBackupRestore,BACKUP_SCOPE_HELP,RESTORE_LOCAL_HELP,CLEAR_LIBRARY_HELP,CLEAR_LIBRARY_WARNING} from './backup-restore.js';
 import {createLibraryLoader} from './library-loading.js';
 import {createBackupExporter,handoffDownload} from './backup-export.js';
 import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} from './operation-feedback.js';
@@ -951,12 +951,14 @@ bindPerformanceDiagnostics({button:document.querySelector('#export-timing-summar
 
 document.querySelector('label[for="import"]').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();if(!document.querySelector('#import').disabled)document.querySelector('#import').click();}});
 
+document.querySelector('#backup-scope-help').textContent=BACKUP_SCOPE_HELP+' '+RESTORE_LOCAL_HELP;
+document.querySelector('#clear-library-help').textContent=CLEAR_LIBRARY_HELP;
 const backupRestore=bindBackupRestore({input:document.querySelector('#import'),status:backupStatus,parse:value=>({database:parseBackup(value),preferences:parseBackupPreferences(value)}),read:getDatabase,restore:value=>restoreDatabase(value.database,value.preferences),refresh:()=>libraryLoader.reload(),exportCurrent:exportCurrentBackup,canLeave:()=>drafts.allowNavigation(),criticalControls:[document.querySelector('#clear')]});
 
 const clearOperation=createOperation({id:'library-clear',name:'Clearing local library...',status:backupStatus,controls:[document.querySelector('#clear'),document.querySelector('#import'),document.querySelector('#export')]});
 document.querySelector('#clear').addEventListener('click', async () => {
   if(clearOperation.busy||backupRestore.busy||backupExporter.busy)return;
-  if (!confirm('Clear Galactic Library in this browser? This removes saved libraries, account labels, reviews and settings, including your Google Books key and companion links. Purchases in your stores are unaffected. The API key is not included in a library backup.')) return;
+  if (!confirm(CLEAR_LIBRARY_WARNING)) return;
   clearOperation.run(async context=>{await clearDatabase();await context.phase('Reloading cleared Library...');try{await libraryLoader.reload();}catch(error){throw Error('Library cleared, but its view could not reload: '+error.message);}}, {success:'Local library cleared.'}).catch(()=>{});
 });
 downloadComixologyListButton.addEventListener('click', () => performAction({button:downloadComixologyListButton,status:backupStatus,name:'Preparing Comixology review list...',success:'Review list download handed to your browser.',task:() => {
