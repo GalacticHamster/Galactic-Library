@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {providerAccounts,createAccountActions,PROVIDER_SITES,updateEligibility,createProfileManagementActions} from '../src/ui/provider-accounts.js';
+import {providerAccounts,createAccountActions,PROVIDER_SITES,updateEligibility,createProfileManagementActions,providerActionLabel} from '../src/ui/provider-accounts.js';
 import {memory} from './final-gl-features.js';
 import {snapshotFixture} from './storage.js';
 const record={providerItemId:'B000000001',title:'Synthetic Collection',mediaType:'book',ownership:'owned',metadata:{detailUrl:'https://www.amazon.com/dp/B000000001'}};
@@ -47,3 +47,17 @@ providersUxTests.push(
    assert(!d.providerProfiles[a]);assert(d.providerProfiles[b]);for(const i of bRecords)assert.deepEqual(d.providerItems[i.id],i);
  }]
 );
+
+providersUxTests.push(['Provider presentation names supported operations without changing eligibility',()=>{
+ assert.equal(PROVIDER_SITES.length,14);
+ for(const site of PROVIDER_SITES){
+   assert(!site.name.includes(' \u2014 '));
+   assert.equal(providerActionLabel(site.provider,'full'),site.fullLabel);
+   assert.equal(Boolean(site.quickLabel),!['epic','nintendo'].includes(site.provider));
+ }
+ assert.equal(providerActionLabel('epic','full'),'Sync Epic library');
+ assert.equal(providerActionLabel('nintendo','full'),'Import Nintendo cards');
+ assert.match(PROVIDER_SITES.find(s=>s.provider==='xbox').scope,/not.*lifetime/u);
+ assert.match(PROVIDER_SITES.find(s=>s.provider==='playstation').scope,/PS4\/PS5/u);
+ assert.match(PROVIDER_SITES.find(s=>s.provider==='amazon-games').scope,/three months/u);
+}]);

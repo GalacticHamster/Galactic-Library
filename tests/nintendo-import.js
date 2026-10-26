@@ -121,7 +121,7 @@ export const nintendoImportTests=[
    h.start([],0,0)();const empty=await h.ask();assert.equal(empty.ok,true);assert.equal(empty.items.length,0);assert.equal(empty.snapshot.itemCount,0);
  }],
  ['Nintendo is discoverable with a correctly scoped website and complete-list updates only',()=>{
-   const site=PROVIDER_SITES.find(p=>p.provider==='nintendo');assert(site.name.includes('Switch Virtual Game Cards'));assert.equal(site.url,'https://accounts.nintendo.com/portal/vgcs');
+   const site=PROVIDER_SITES.find(p=>p.provider==='nintendo');assert.equal(site.name,'Nintendo');assert(site.scope.includes('Switch Virtual Game Cards'));assert.equal(site.url,'https://accounts.nintendo.com/portal/vgcs');
    const eligibility=updateEligibility({provider:'nintendo',active:true,nickname:'Personal'},{fullSyncAt:'2026-10-15'});assert.equal(eligibility.full,true);assert.equal(eligibility.quick,false);
  }],
  ['Nintendo failed persistence leaves source records and the profile binding unchanged atomically',async()=>{

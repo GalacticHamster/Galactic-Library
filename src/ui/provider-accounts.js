@@ -12,10 +12,16 @@ export const PROVIDER_SITES=[
  ['kobo','Kobo','https://www.kobo.com/us/en/library/books'],
  ['fanatical','Fanatical','https://www.fanatical.com/en/orders'],
  ['humble','Humble Bundle','https://www.humblebundle.com/home/purchases'],
- ['xbox','Xbox — Web Library','https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned'],
- ['playstation','PlayStation — PS4/PS5 Purchased Library','https://library.playstation.com/recently-purchased'],
- ['nintendo','Nintendo — Switch Virtual Game Cards','https://accounts.nintendo.com/portal/vgcs']
-].map(([provider,name,url])=>({provider,name,url}));
+ ['xbox','Xbox','https://play.xbox.com/library?tab=fullLibrary&view=grid&catalog=owned'],
+ ['playstation','PlayStation','https://library.playstation.com/recently-purchased'],
+ ['nintendo','Nintendo','https://accounts.nintendo.com/portal/vgcs']
+].map(([provider,name,url])=>({provider,name,url,
+ quickLabel:['epic','nintendo'].includes(provider)?null:'Quick update',
+ fullLabel:provider==='epic'?'Sync Epic library':provider==='nintendo'?'Import Nintendo cards':'Full rescan',
+ scope:provider==='xbox'?'The complete Owned catalog loaded by Xbox Web Library; not the complete console or lifetime purchase history. Earlier saved items are retained.':provider==='playstation'?'The active PS4/PS5 Purchased web library; older consoles and lifetime order history are not included. Earlier saved items are retained.':provider==='nintendo'?'The loaded, non-hidden Switch Virtual Game Cards list, not all Nintendo purchase history. Earlier saved cards are retained.':provider==='amazon-games'?'Games delivered to Amazon Games. Quick update checks the past three months; Full rescan checks all available calendar years. Code claims and deliveries to other stores are excluded.':''
+}));
+export const providerSite=provider=>PROVIDER_SITES.find(site=>site.provider===provider);
+export const providerActionLabel=(provider,mode)=>mode==='quick'?providerSite(provider)?.quickLabel:providerSite(provider)?.fullLabel;
 
 export function providerAccounts(database){
  const profiles=enumerateProviderProfiles(database);
@@ -24,12 +30,12 @@ export function providerAccounts(database){
 export function updateEligibility(profile,state={},now=Date.now()){
  const fullReason=!profile.active?'Select this account for updates first.':!profile.nickname?'Name this saved account before updating it.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
  let quickReason=fullReason;
- if(!quickReason&&profile.provider==='epic')quickReason='Epic supports complete imports only. Use Full Rescan.';
- if(!quickReason&&profile.provider==='nintendo')quickReason='Nintendo imports the complete loaded card list. Use Full Rescan.';
- if(!quickReason&&!state.fullSyncAt)quickReason='Run a first Full Rescan to establish this account’s import history.';
+ if(!quickReason&&profile.provider==='epic')quickReason='Use Sync Epic library to check the supported listing.';
+ if(!quickReason&&profile.provider==='nintendo')quickReason='Use Import Nintendo cards to check the loaded card list.';
+ if(!quickReason&&!state.fullSyncAt)quickReason='Run a first Full rescan to establish this account’s import history.';
  if(!quickReason&&profile.provider==='amazon-games'){
    const age=now-Date.parse(state.quickSyncAt??state.fullSyncAt??'');
-   if(!Number.isFinite(age)||age>70*24*60*60*1000)quickReason='Amazon Games needs a Full Rescan after more than 70 days without an update.';
+   if(!Number.isFinite(age)||age>70*24*60*60*1000)quickReason='Amazon Games needs a Full rescan after more than 70 days without an update.';
  }
  return {quick:!quickReason,full:!fullReason,quickReason,fullReason};
 }

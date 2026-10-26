@@ -184,7 +184,7 @@
         if(!edited&&result.reuseAllowed&&result.profileId){
           remembered={profileId:result.profileId,profileLabel:result.profileLabel??''};editor.hidden=true;summary.hidden=false;
           controls.querySelector('[data-profile-confirm-label]').hidden=true;
-          controls.querySelector('[data-profile-status]').textContent=`Selected GL account: ${result.profileLabel||'Default account'}`;
+          controls.querySelector('[data-profile-status]').textContent=`Selected account for updates: ${result.profileLabel||'Default account'}`;
         }else if(!edited){remembered=null;editor.hidden=false;summary.hidden=true;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Select and confirm the signed-in account.';}
       }
       session.refresh=async generation=>{

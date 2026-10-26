@@ -13,7 +13,7 @@ export const onboardingUxTests=[
  ['First-import and migrated-account instructions use existing confirmation controls and link to correct destinations',async()=>{
    const html=await readFile(new URL('../options.html',import.meta.url),'utf8'),panel=await readFile(new URL('../src/providers/floating-panel.js',import.meta.url),'utf8'),popup=await readFile(new URL('../popup.html',import.meta.url),'utf8');
    assert.match(html,/id="empty-library"/u);assert.match(html,/data-go-workspace="providers">Add a library/u);
-   assert.match(html,/confirm the signed-in account/u);assert.match(html,/Sync library on Epic/u);assert.match(html,/id="unnamed-accounts-help"/u);
+   assert.match(html,/confirm the signed-in account/u);assert.match(html,/Sync Epic library on Epic/u);assert.match(html,/id="unnamed-accounts-help"/u);
    for(const key of ['data-profile-label','data-profile-confirm','data-profile-switch'])assert(panel.includes(key));
    assert.match(panel,/Account nickname/u);assert.match(panel,/does not sign you in or verify your login/u);assert.match(popup,/options.html#providers/u);
  }]

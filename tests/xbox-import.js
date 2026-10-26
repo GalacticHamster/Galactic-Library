@@ -63,7 +63,7 @@ export const xboxImportTests=[
    h.get('active').status='pending';assert.equal((await h.ask('navigation-ready')).authenticated,false);
  }],
  ['Xbox projects the live-validated 40/264/37/14 source with stable products, platforms, editions and no invented purchase date',async()=>{
-   assert.equal(providerLabel('xbox'),'Xbox — Web Library');
+   assert.equal(providerLabel('xbox'),'Xbox');
    const h=xboxHarness(),r=await h.ask();assert.equal(r.ok,true,r.error);assert.equal(r.items.length,37);assert.equal(new Set(r.items.map(i=>i.providerItemId)).size,37);assert(r.items.every(i=>i.ownership==='owned'&&i.acquiredAt===null));assert.deepEqual(r.items[0].platform,['Windows','Xbox One','Xbox Series X|S']);assert.equal(r.items[0].metadata.edition,'Deluxe Edition');assert.deepEqual(r.items[0].metadata.accessTypes,[1]);assert.equal(r.snapshot.scopes[0].expectedCount,37);assert.equal(r.snapshot.scopes[0].end,'reported-count');assert.equal((await h.ask('verify')).ok,true);
    const serialized=JSON.stringify(r);for(const privateValue of ['private-local-account','1234567890123456','Y00000000000','Z00000000000'])assert(!serialized.includes(privateValue));
    h.access.get(id(0)).staticMetadata.productKind=0;h.access.get(id(1)).staticMetadata.productKind=1;h.access.get(id(2)).staticMetadata.productKind=3;

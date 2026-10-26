@@ -1,7 +1,7 @@
 import {providerLogo} from './provider-logo.js';
 import {formatDate} from './formatters.js';
 import {afterFeedbackPaint} from './operation-feedback.js';
-import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions} from './provider-accounts.js';
+import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions,providerActionLabel} from './provider-accounts.js';
 
 const node=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
 const date=value=>value?formatDate(value):'Not yet';
@@ -54,25 +54,25 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
    const permission=updateEligibility({...p,nickname:current.nickname,syncHealth:current.state.syncHealth},current.state);
    const allowed=mode==='quick'?permission.quick:permission.full;
    if(!allowed){status.textContent=mode==='quick'?permission.quickReason:permission.fullReason;return;}
-   const label=mode==='quick'?'Quick Update':'Full Rescan',d=dialog(label+' · '+site.name);p={...p,nickname:current.nickname};
-   d.root.insertBefore(node('p',site.provider==='xbox'?'Check the complete Owned catalog loaded by Xbox Web Library. This does not include the complete console or lifetime purchase history. Earlier saved items are retained.':site.provider==='playstation'?'Check the complete active PS4/PS5 Purchased web library. Earlier saved items are retained; older consoles and lifetime order history are not included.':site.provider==='nintendo'?'Import the complete non-hidden Virtual Game Cards list loaded by Nintendo. Earlier saved cards remain in GL even if absent from this view.':mode==='quick'?'Check for new items using this account’s saved import history.':'Check the complete inventory for this account. Missing items may move to earlier imports; acquired contents, reviews and other saved accounts are retained.'),d.feedback);
+   const label=providerActionLabel(site.provider,mode),d=dialog(label+' · '+site.name);p={...p,nickname:current.nickname};
+   d.root.insertBefore(node('p',site.scope||(mode==='quick'?'Check the provider update scope using the saved import history. See the provider panel for what is checked.':'Check the complete supported listing for this saved account. Missing items may move to Earlier imports; captured contents, reviews and other saved accounts are retained.')),d.feedback);
    const unambiguous=site.accounts.length===1&&current.state.connected&&current.state.lastSync;
-   d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}. ${unambiguous?'The panel remembers this saved account; choose another nickname before updating a different store account.':'Check the account nickname on the Galactic Library panel and confirm the signed-in account.'} Then choose ${site.provider==='nintendo'?'Import Nintendo cards':site.provider==='epic'?'Sync library':mode==='quick'?'Quick update':'Full rescan'}. Opening the site does not start an import.`),d.feedback);
-   if(site.provider==='fandango-at-home'&&mode==='quick')d.root.insertBefore(node('p','Fandango Quick Update runs from its Recently Purchased View All grids. Full Rescan checks the complete My Library grids.'),d.feedback);
+   d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}. ${unambiguous?'The panel remembers this saved account; choose another nickname before updating a different store account.':'Check the account nickname on the Galactic Library panel and confirm the signed-in account.'} Then choose ${label}. Opening the site does not start an import.`),d.feedback);
+   if(site.provider==='fandango-at-home'&&mode==='quick')d.root.insertBefore(node('p','Fandango Quick update runs from its Recently Purchased View All grids. Full rescan checks the complete My Library grids.'),d.feedback);
    const open=button('Open '+site.name+' for '+label,async()=>{try{await openProvider(site.url);d.feedback.textContent='Provider page opened. Check the selected account and start the update there.';}catch(error){d.feedback.textContent=error.message;}});d.controls.append(open);d.root.showModal();
  }
  function resetAccount(site,p){
    const d=dialog('Reset import history · '+nickname(p));
-   d.root.insertBefore(node('p',`Recovery only: forget the saved update position and coverage for this ${site.name} account. Imported items, acquired contents, source history and your reviews stay saved. The next import must be a Full Rescan. No scan starts now.`),d.feedback);
+   d.root.insertBefore(node('p',`Recovery only: forget the saved update position and coverage for this ${site.name} account. Imported items, acquired contents, source history and your reviews stay saved. The next import must use ${site.fullLabel}. No scan starts now.`),d.feedback);
    const label=node('label');label.className='ownership-choice';const confirm=node('input');confirm.type='checkbox';label.append(confirm,document.createTextNode('I understand the next import requires a complete scan.'));d.root.insertBefore(label,d.feedback);
-   d.controls.append(button('Reset import history',()=>{if(!confirm.checked){d.feedback.textContent='Confirm the reset before continuing.';return;}commit(d,()=>management.reset(p.profileId,true),'Import history reset. Existing records and acquired evidence are retained; the next import requires a Full Rescan.');}));d.root.showModal();
+   d.controls.append(button('Reset import history',()=>{if(!confirm.checked){d.feedback.textContent='Confirm the reset before continuing.';return;}commit(d,()=>management.reset(p.profileId,true),`Import history reset. Existing records and captured evidence are retained; next choose ${site.fullLabel}.`);}));d.root.showModal();
  }
  function koboOwnership(p){
    const d=dialog('Ownership preference · '+nickname(p));
    const label=node('label');label.className='ownership-choice';const input=node('input');input.type='checkbox';input.dataset.koboAssumeOwned='';input.checked=database.providerProfiles[p.profileId]?.assumeUnconfirmedOwned===true;
    label.append(input,document.createTextNode('Treat unconfirmed books in this account as owned.'));
    d.root.insertBefore(label,d.feedback);
-   d.root.insertBefore(node('p','Use this only if you know these books are permanently yours. Kobo has not confirmed their ownership. This changes display and ownership checks for this GL account, preserves source evidence, and can be turned off. Explicit access evidence and individual corrections keep their existing precedence.'),d.feedback);
+   d.root.insertBefore(node('p','Use this only if you know these books are permanently yours. Kobo has not confirmed their ownership. This changes display and ownership checks for this saved Kobo account, preserves source evidence, and can be turned off. Explicit access evidence and individual corrections keep their existing precedence.'),d.feedback);
    d.controls.append(button('Save preference',()=>commit(d,()=>saveKoboOwnershipAssumption(p.profileId,input.checked),'Kobo ownership preference saved. Original access evidence is unchanged.')));d.root.showModal();
  }
  async function removeAccount(site,p){
@@ -105,19 +105,19 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
        body.append(node('p','Saved accounts and store imports below are separate from the purchase-sync connection above. Connecting does not start a website scan.'));
        accountTools.append(node('summary','Saved accounts and store imports'));body.append(accountTools);
      }
-     const accountHost=companion?accountTools:body;
+     const accountHost=companion?accountTools:body;if(site.scope)accountHost.append(node('p',site.scope));
      accountHost.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
      const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';if(site.provider==='xbox')link.addEventListener('click',async event=>{event.preventDefault();try{await openProvider(site.url);}catch(error){status.textContent=error.message;}});accountHost.append(link);
-     if(!site.accounts.length)accountHost.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then start its first full import.'));
-     else accountHost.append(node('p','To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Start a Full Rescan; these remembered accounts remain saved.'));
+     if(!site.accounts.length)accountHost.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then choose '+site.fullLabel+'.'));
+     else accountHost.append(node('p',`To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Choose ${site.fullLabel}; these remembered accounts remain saved.`));
      for(const p of site.accounts){
        const account=node('article');account.className='saved-account';account.dataset.account=p.profileId;
-       account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${p.recordCount} imported items · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Full import saved.':p.lastCompleteScan?'Earlier full import saved.':'Import this account once before using quick updates.'));
+       account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${p.recordCount} imported items · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Full import saved.':p.lastCompleteScan?'Earlier full import saved.':site.quickLabel?'Import this account once before using quick updates.':'No completed import saved yet.'));
        const controls=node('p');controls.className='actions';if(!p.active)controls.append(button('Select for updates',()=>selectAccount(site,p)));controls.append(button(p.nickname?'Rename account':'Name this account',()=>renameAccount(site,p)));account.append(controls);accountHost.append(account);
        const eligibility=updateEligibility(p,database.providerProfiles[p.profileId].state),updates=node('p');updates.className='actions';
-       const quick=button('Quick Update',()=>updateAccount(site,p,'quick')),full=button('Full Rescan',()=>updateAccount(site,p,'full'));
-       quick.disabled=!eligibility.quick;full.disabled=!eligibility.full;updates.append(quick,full);account.append(updates);
-       if(eligibility.quickReason)account.append(node('p',eligibility.quickReason));
+       const quick=site.quickLabel?button(site.quickLabel,()=>updateAccount(site,p,'quick')):null,full=button(site.fullLabel,()=>updateAccount(site,p,'full'));
+       if(quick){quick.disabled=!eligibility.quick;updates.append(quick);}full.disabled=!eligibility.full;updates.append(full);account.append(updates);
+       if(quick&&eligibility.quickReason)account.append(node('p',eligibility.quickReason));
        const advanced=node('details');advanced.append(node('summary','Advanced account recovery and removal'),node('p','Reset import history keeps saved evidence. Remove account deletes its records and related evidence. Neither starts an import.'));
        if(site.provider==='kobo'&&saveKoboOwnershipAssumption)advanced.append(button('Ownership preference',()=>koboOwnership(p)));
        const managementButtons=node('p');managementButtons.className='actions';managementButtons.append(button('Reset import history',()=>resetAccount(site,p)),button('Remove saved account',()=>removeAccount(site,p)));advanced.append(managementButtons);account.append(advanced);

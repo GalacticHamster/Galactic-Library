@@ -10,8 +10,7 @@ or change their ownership.
 Choose **Add a library** from an empty Library or the toolbar popup. In Providers,
 expand a provider and open its website. For a first store scan, sign in, enter a recognizable **Account
 nickname** on the Galactic Library panel, and confirm that it describes the
-signed-in account. Start **Full rescan** for the first import, or **Sync Epic library**
-on Epic, or **Import Nintendo cards** on Nintendo. Keep the provider tab open until the import finishes. Return to Library
+signed-in account. Choose **Sync Epic library** on Epic, **Import Nintendo cards** on Nintendo, or **Full rescan** on other providers. Keep the provider tab open until the import finishes. Return to Library
 to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
@@ -32,7 +31,7 @@ saved account or **Add account**. Changing the input does not rename an account;
 the panel links to GL Providers for renaming. **Cancel account change** restores
 the prior selection without starting an import. With multiple saved accounts,
 confirm the signed-in account as requested; switching needs explicit consent.
-A new alternate account requires Full rescan. Completing initial setup refreshes
+A new alternate account needs its first complete supported-list import (Sync Epic library on Epic; Import Nintendo cards on Nintendo; Full rescan elsewhere). Completing initial setup refreshes
 the account display automatically without overwriting edits made during a save.
 
 Provider cards show accounts, imported counts, update dates, complete-scan
@@ -58,7 +57,7 @@ creating a new nickname through a scan.
 
 ## Update an account
 
-**Quick Update** and **Full Rescan** open instructions for the selected account
+**Quick update** and **Full rescan** open instructions for the selected account
 and a link to its signed-in provider page. Confirm the actual account and start
 the update on that page. Opening the page, selecting an account and navigating
 GL do not automatically start an import.
@@ -68,19 +67,17 @@ update or Full rescan. The importer returns to its required listing or resets
 its traversal as needed, keeping the selected account. Fandango returns from
 Movies/TV View All to My Library automatically. A reusable saved account does
 not require checking a hidden confirmation box again; changing accounts still
-requires confirmation. Providers without Quick update retain their Full-only
-workflow.
+requires confirmation. Epic uses **Sync Epic library** and Nintendo uses **Import Nintendo cards**; neither offers Quick update.
 
-Quick Update uses the selected account's saved import history and reads the
-provider's incremental scope. It is unavailable until a full import exists,
-while an update is running, or until an unnamed account is named. Epic supports
-complete imports only. Nintendo likewise requires a complete loaded card list.
+Quick update uses the selected account's saved import history and reads the
+provider-specific update scope. Xbox and PlayStation check the same supported web listing as Full rescan; their quick operation is not a shorter traversal. It is unavailable until a full import exists,
+while an update is running, or until an unnamed account is named. Epic uses **Sync Epic library**. Nintendo uses **Import Nintendo cards** for the loaded card list.
 Amazon Games needs a full scan after more than 70 days
 without an update. Fandango quick updates run from Recently Purchased View All
 grids; full scans check My Library. The provider panel remains authoritative
 about coverage and any additional restrictions.
 
-Full Rescan reconciles that account's complete inventory. Missing records can
+Full rescan reconciles that account's complete supported listing. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
 
@@ -354,7 +351,7 @@ These operations are under **Advanced account recovery and removal**:
 
 - **Reset import history** forgets the account's update position and coverage.
   Imported records, contents, source history and reviews remain. The next import
-  requires a Full Rescan; reset does not start it.
+  requires a Full rescan; reset does not start it.
 - **Remove saved account** permanently deletes the account's imported records
   and affected source/review state. A current dependency preview lists the
   consequences and affected jobs. Explicit confirmation is required; changes

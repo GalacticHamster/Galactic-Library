@@ -6,12 +6,12 @@ import {PROVIDER_SITES} from '../src/ui/provider-accounts.js';
 export const uiFormattingTests=[
  ['generated provider/account captions retain exact account nicknames',()=>{const record={provider:'humble',profileId:'a'},db={providerProfiles:{a:{nickname:'Family ? 日本語'}}};assert.equal(providerLabel('gog'),'GOG');assert.equal(accountLabel(record,db),'Humble Bundle — Family ? 日本語');assert.equal(accountLabel({...record,profileId:'b'},db),'Humble Bundle — Unnamed account');}],
  ['providerLabel formats console providers and falls back safely for unknown providers',()=>{
-   assert.equal(providerLabel('playstation'),'PlayStation — PS4/PS5 Purchased Library');
-   assert.equal(providerLabel('xbox'),'Xbox — Web Library');
+   assert.equal(providerLabel('playstation'),'PlayStation');
+   assert.equal(providerLabel('xbox'),'Xbox');
    assert.equal(providerLabel('nintendo'),'Nintendo');
    assert.equal(providerLabel('unknown_provider'),'unknown_provider');
    const psSite=PROVIDER_SITES.find(s=>s.provider==='playstation');
-   assert.equal(psSite?.name,'PlayStation — PS4/PS5 Purchased Library');
+   assert.equal(psSite?.name,'PlayStation');
    assert(!psSite?.name.includes('?'),'PlayStation site name must not contain question marks');
  }],
  ['safeProviderUrl resolves valid destinations for console providers and rejects missing/unsafe schemes',()=>{

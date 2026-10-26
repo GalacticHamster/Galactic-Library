@@ -92,20 +92,20 @@ try{
  let d=await writer.replaceProviderItems('kindle',[book],{profileLabel:'',fullSyncAt:'2026-10-01'},snapshotFixture('kindle',[book]));const a=d.providers.kindle.activeProfileId,ref=Object.values(d.providerItems)[0].recordRef;
  d=await writer.saveContentReview(Object.keys(d.providerItems)[0],{entries:[{series:'Synthetic',run:'2020',unitType:'issue',number:'1',language:'en',completeness:'full'}],statement:'Collects Synthetic #1',source:'manual-review',sourceUrl:'',verifiedAt:'2026-10-01'});
  await reconcile();await wait(()=>account(a),'Migrated account missing.');const kindle=document.querySelector('[data-provider="kindle"]');kindle.open=true;await delay();
- assert(!document.querySelector('#unnamed-accounts-help').hidden,'Naming guidance missing.');assert(button(account(a),'Quick Update').disabled,'Unnamed account update offered.');
+ assert(!document.querySelector('#unnamed-accounts-help').hidden,'Naming guidance missing.');assert(button(account(a),'Quick update').disabled,'Unnamed account update offered.');
  button(account(a),'Name this account').click();let dialog=document.querySelector('dialog');dialog.querySelector('input').value='Personal';button(dialog,'Save nickname').click();await wait(()=>!document.querySelector('dialog'),'Rename did not finish.');
  d=await writer.getDatabase();assert(d.providerProfiles[a].nickname==='Personal'&&Object.values(d.providerItems)[0].recordRef===ref,'Rename changed identity.');assert(Object.keys(d.contentReviews).length===1,'Rename erased review.');checks.push('Migrated account naming preserves identity and reviewed contents');assert(document.querySelector('#purchase-sharing-humble [data-purchase-handoff]')===syncHost&&syncHost.querySelector('[data-purchase-manual]')===manual&&!manual.open,'Account reconciliation replaced or expanded manual connection controls');checks.push('Each provider retains one connection panel and its staged controls across account refreshes');
 
  d=await writer.replaceProviderItems('kindle',[{...book,ownership:'borrowed'}],{profileLabel:'Other',fullSyncAt:'2026-10-02'},snapshotFixture('kindle',[book]));const b=d.providers.kindle.activeProfileId;
  await reconcile();await wait(()=>account(b),'Second account missing.');
- assert(account(a)&&account(b),'Remembered account hidden.');assert(button(account(a),'Quick Update').disabled,'Inactive account update offered.');
+ assert(account(a)&&account(b),'Remembered account hidden.');assert(button(account(a),'Quick update').disabled,'Inactive account update offered.');
  button(account(a),'Select for updates').click();dialog=document.querySelector('dialog');button(dialog,'Select account').click();assert(!operations.includes('selectProviderProfile'),'Selection lacked explicit confirmation.');dialog.querySelector('input').checked=true;button(dialog,'Select account').click();await wait(()=>!document.querySelector('dialog'),'Selection did not finish.');
  d=await writer.getDatabase();assert(d.providers.kindle.activeProfileId===a&&Object.keys(d.providerItems).length===2,'Selection lost another account.');assert(d.providers.kindle.fullSyncAt==='2026-10-01T00:00:00.000Z','A baseline not restored.');assert(!operations.includes('beginProviderScan'),'Offline selection began a scan.');checks.push('Two accounts coexist and confirmed offline selection restores the saved baseline');
 
- button(account(a),'Quick Update').click();dialog=document.querySelector('dialog');assert(dialog.textContent.includes('Opening the site does not start an import'),'Update scope unclear.');button(dialog,'Open Kindle for Quick Update').click();await wait(()=>opened.length===1,'Provider page was not opened.');assert(opened[0].startsWith('https://www.amazon.com/hz/mycd/'),'Wrong provider URL.');assert(!operations.includes('beginProviderScan'),'Update guidance acquired data.');closeDialog();checks.push('Quick Update uses the existing signed-in provider flow without auto-scanning');
+ button(account(a),'Quick update').click();dialog=document.querySelector('dialog');assert(dialog.textContent.includes('Opening the site does not start an import'),'Update scope unclear.');button(dialog,'Open Kindle for Quick update').click();await wait(()=>opened.length===1,'Provider page was not opened.');assert(opened[0].startsWith('https://www.amazon.com/hz/mycd/'),'Wrong provider URL.');assert(!operations.includes('beginProviderScan'),'Update guidance acquired data.');closeDialog();checks.push('Quick update uses the existing signed-in provider flow without auto-scanning');
 
  const advanced=account(a).querySelector('details');advanced.open=true;button(advanced,'Reset import history').click();dialog=document.querySelector('dialog');button(dialog,'Reset import history').click();assert(!operations.includes('resetProviderProfileBaseline'),'Reset lacked confirmation.');dialog.querySelector('input').checked=true;button(dialog,'Reset import history').click();await wait(()=>!document.querySelector('dialog'),'Reset did not finish.');
- d=await writer.getDatabase();assert(!d.providerProfiles[a].state.fullSyncAt&&Object.keys(d.contentReviews).length===1,'Reset erased contents or kept import baseline.');assert(button(account(a),'Quick Update').disabled,'Quick Update available after baseline reset.');checks.push('Confirmed baseline reset retains reviewed contents and disables Quick Update');
+ d=await writer.getDatabase();assert(!d.providerProfiles[a].state.fullSyncAt&&Object.keys(d.contentReviews).length===1,'Reset erased contents or kept import baseline.');assert(button(account(a),'Quick update').disabled,'Quick update available after baseline reset.');checks.push('Confirmed baseline reset retains reviewed contents and disables Quick update');
 
  account(b).querySelector('details').open=true;button(account(b),'Remove saved account').click();await wait(()=>document.querySelector('dialog')?.textContent.includes('Remove account permanently'),'Removal preview missing.');dialog=document.querySelector('dialog');assert(dialog.textContent.includes('This is not disconnecting'),'Removal consequences missing.');button(dialog,'Remove account permanently').click();assert(!operations.includes('removeProviderProfile'),'Removal lacked confirmation.');
  // Change dependencies after the preview, without touching production storage.
@@ -125,5 +125,22 @@ try{
  const beforeOps=operations.filter(o=>o.startsWith('begin')||o.startsWith('commit')).length;
  navigate('providers');navigate('contents');navigate('library');await delay();assert(operations.filter(o=>o.startsWith('begin')||o.startsWith('commit')).length===beforeOps,'Navigation started acquisition.');
  checks.push('All UI acquisition is explicit; navigation and selection make no provider requests');
+ const {PROVIDER_SITES}=await import('../src/ui/provider-accounts.js');
+ for(const site of PROVIDER_SITES){
+   await writer.mergeProviderItems(site.provider,[{providerItemId:'presentation-audit',title:'Synthetic entry',mediaType:'game',ownership:'owned'}],{profileLabel:'Presentation',fullSyncAt:new Date().toISOString()});
+ }
+ await reconcile();navigate('providers');await wait(()=>document.querySelector('.provider-card[data-provider=steam] .saved-account'),'Provider reconciliation did not finish');
+ for(const site of PROVIDER_SITES){
+   const card=document.querySelector('.provider-card[data-provider="'+site.provider+'"]');card.open=true;
+   const saved=[...card.querySelectorAll('.saved-account')].find(n=>n.querySelector('h4').textContent.includes('Presentation'));
+   assert(saved&&button(saved,site.fullLabel),'Missing supported action for '+site.provider);
+   assert(Boolean(button(saved,'Quick update'))===Boolean(site.quickLabel),'Incorrect quick capability for '+site.provider);
+   const before=operations.filter(n=>n==='beginProviderScan').length;
+   button(saved,site.fullLabel).click();const prompt=document.querySelector('dialog[open]');
+   assert(prompt&&prompt.getAttribute('aria-label').includes(site.fullLabel),'Dialog action differs from provider action');
+   assert(operations.filter(n=>n==='beginProviderScan').length===before,'Dialog started a scan');
+   button(prompt,'Cancel').click();
+ }
+ checks.push('All fourteen provider actions and dialogs use supported labels; single-action providers omit Quick update and opening instructions never starts an import');
  await fetch('/test-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checks})});
 }catch(error){await fetch('/test-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checks,error:error.stack||error.message})});}

@@ -12,7 +12,7 @@ const urls=PROVIDER_SYNC_URLS;
 export function createSyncHealthView(database,actions){
   const root=node('details');root.id='sync-health-dashboard';root.className='tool-card';root.append(node('summary','Advanced update details and coverage'));let ready=false;
   root.addEventListener('toggle',()=>{
-    if(!root.open||ready)return;ready=true;root.append(node('p','Full rescans check the complete account library. Quick updates check only their reported pages or categories, so a recent quick update does not mean every item was checked. Technical details below use safe failure categories.'));
+    if(!root.open||ready)return;ready=true;root.append(node('p','Full rescans check the complete supported listing, which may not include lifetime purchases. Quick update scope varies by provider: Xbox and PlayStation check the same supported web list; other providers use their saved update history. Epic uses Sync Epic library and Nintendo uses Import Nintendo cards. Technical details below use safe failure categories.'));
     const status=node('p');status.setAttribute('role','status');root.append(status);
     for(const {provider,state,health,fullAgeDays,historicalCount,longRunning}of syncHealthRows(database)){
       const section=node('section');section.append(node('h4',providerLabel(provider)),node('p',`Selected update account: ${state.profileLabel||'Unnamed account'}; ${state.recordCount??0} imported items; ${historicalCount} historical records.`),node('p',`Last full scan: ${state.fullSyncAt?formatDate(state.fullSyncAt):'never'}${fullAgeDays===null?'':` (${fullAgeDays} days ago)`}; last successful quick check: ${state.quickSyncAt?formatDate(state.quickSyncAt):'never'}.`));
