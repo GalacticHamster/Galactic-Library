@@ -1,7 +1,7 @@
 import {createConfirmation} from './confirmation.js';
 import {createOperation} from './operation-feedback.js';
 
-export const BACKUP_SCOPE_HELP='Backups contain library records, saved accounts, reviews and supported comic coverage preferences. API keys, companion pairing, automatic purchase-sync permission, diagnostics settings, appearance and other browser-only preferences are not included.';
+export const BACKUP_SCOPE_HELP='Backups contain library records, saved accounts, reviews and supported comic coverage preferences when present. API keys, companion pairing, automatic purchase-sync permission, diagnostics settings, appearance and other browser-only preferences are not included.';
 export const RESTORE_LOCAL_HELP='Existing API keys, companion pairing and browser preferences are not replaced by the backup. Automatic purchase-sync relationships are reset; reconnect Humble or Fanatical purchase sync after restoring.';
 export const CLEAR_LIBRARY_HELP='Clear saved libraries, account labels, reviews, API keys, companion links and local update settings in this browser. Appearance stays unchanged. Purchases at your stores are unaffected. A library backup does not include API keys, companion links or browser-only settings.';
 export const CLEAR_LIBRARY_WARNING='Clear Galactic Library in this browser? '+CLEAR_LIBRARY_HELP+' Export a library backup first if you need to recover your library records.';
@@ -30,7 +30,7 @@ export function bindBackupRestore({input,status,parse,read,restore,refresh,expor
         const before=JSON.stringify(await read());if(!current())return {cancelled:true};
         if(!canLeave())return {cancelled:true,message:'Restoration cancelled. Your library was not changed.'};
         context.update('Backup checked. Confirm whether to replace your current library.');
-        const decision=prompt({title:'Replace library from backup?',message:'Restoration replaces the library saved in this browser, including its saved accounts, reviews and comic coverage preferences when present in the backup. It does not merge libraries. Changes made after this backup may be lost. '+BACKUP_SCOPE_HELP+' '+RESTORE_LOCAL_HELP+' Keep this page open until restoration finishes.',confirmLabel:'Replace library',extraLabel:'Export current backup',extraAction:exportCurrent});pending=decision;
+        const decision=prompt({title:'Replace library from backup?',message:'Restoration replaces the library saved in this browser. It does not merge libraries. Changes made after this backup may be lost. '+BACKUP_SCOPE_HELP+' '+RESTORE_LOCAL_HELP+' Keep this page open until restoration finishes.',confirmLabel:'Replace library',extraLabel:'Export current backup',extraAction:exportCurrent});pending=decision;
         const accepted=await decision.result;if(pending===decision)pending=null;
         if(!current())return {cancelled:true};
         if(!accepted)return {cancelled:true,message:'Restoration cancelled. Your library was not changed.'};

@@ -39,7 +39,7 @@
       status.textContent='Checking the loaded cards and signed-in Nintendo account…';
       const captured=await bridge('prepare');
       const start=await GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'nintendo',mode:'full',sourceAccountFingerprint:captured.sourceAccountFingerprint});
-      if(!start.ok)throw Error(start.error??'Could not confirm the target GL account.');
+      if(!start.ok)throw Error(start.error??'Could not confirm the target saved account.');
       status.textContent=`Saving ${captured.items.length} loaded cards to Galactic Library…`;
       const current=await bridge('verify');if(current.sourceAccountFingerprint!==captured.sourceAccountFingerprint||current.captureVersion!==captured.captureVersion)throw Error('The Nintendo account or card list changed. No cards were imported. Reload the page.');
       const result=await GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider:'nintendo',mode:'full',items:captured.items,snapshot:captured.snapshot,sourceAccountFingerprint:captured.sourceAccountFingerprint});

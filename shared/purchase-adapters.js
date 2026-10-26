@@ -82,7 +82,7 @@
    else if(candidates.length){category='conflicts';reason='Same purchase/title or record reference conflicts in retained identity, media or delivery.';}
    else if(!r.purchaseRef&&!r.recordRef){category='uncomparable';reason='No purchase or scoped provider observation identity.';}
    else if((gi.title.get(diagnosticTitle(r.title))??[]).length){category='titleOnlyPossible';reason='Title agrees, but purchase identity does not. This is not merge evidence.';candidates=gi.title.get(diagnosticTitle(r.title));}
-   else {category='hbOnly';reason='No corresponding purchase or title observation in the selected GL account.';}
+   else {category='hbOnly';reason='No corresponding purchase or saved title in the selected provider account in GL.';}
    counts[category]++;details.push({side:'hb',observation:n,category,reason,record:r,candidateCount:candidates.length,candidates:candidates.slice(0,50)});
   });
   gr.forEach((r,n)=>{if(!matched.has(n)){counts.glOnly++;details.push({side:'gl',observation:n,category:'glOnly',reason:'No unique HB correspondence established; may be an additional delivery, a conflict or ambiguous evidence, not necessarily an extra product.',record:r});}});

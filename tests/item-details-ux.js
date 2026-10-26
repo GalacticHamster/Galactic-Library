@@ -8,7 +8,7 @@ export const itemDetailsUxTests=[
  ['Item presentation preserves each account access without inventing a shared entitlement or reading progress',()=>{
    const db={providerProfiles:{personal:{nickname:'Personal'},family:{nickname:'Family'}},readingStates:{a:{status:'reading',progress:35}},contentReviews:{'kindle:a':{entries:[{}],statement:'',verifiedAt:'2026-10-01'}}};
    const before=JSON.stringify({a,b,db}),view=itemPresentation(canonical,[a,b],db);
-   assert.deepEqual(view.creators,['Writer']);assert.equal(view.records[0].label,'Kindle — Personal');assert.equal(view.records[1].label,'Kindle — Family');assert.equal(view.records[0].access,'Owned');assert.equal(view.records[1].access,'Borrowed');assert.match(view.records[0].reading,/35%/);assert.equal(view.records[1].reading,'Reading status not saved');assert.equal(view.records[0].contents.count,1);assert.equal(JSON.stringify({a,b,db}),before);
+   assert.deepEqual(view.creators,['Writer']);assert.equal(view.records[0].label,'Kindle — Personal');assert.equal(view.records[1].label,'Kindle — Family');assert.equal(view.records[0].access,'Owned');assert.equal(view.records[1].access,'Borrowed');assert.match(view.records[0].reading,/^Reading.*35%/);assert.equal(view.records[1].reading,'Reading status not saved');assert.equal(view.records[0].contents.count,1);assert.equal(JSON.stringify({a,b,db}),before);
  }],
  ['Sparse and unsupported item metadata remains inspectable without book-only claims',()=>{
    const record={...a,mediaType:'game',metadata:{}};const view=itemPresentation({title:'Game',mediaType:'game'},[record],{});assert.equal(view.title,'Game');assert.equal(view.cover,'');assert.deepEqual(view.creators,[]);assert.equal(view.records[0].reading,null);assert.equal(view.records[0].contents,null);

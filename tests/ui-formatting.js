@@ -41,3 +41,9 @@ uiFormattingTests.push(['Review summary grammar preserves each existing count an
  assert.equal(JSON.stringify(one),before);
  for(const n of [0,2]){const summary=reviewWorkflowSummary(Object.fromEntries(Object.keys(one).map(k=>[k,n])));assert(summary.includes(n+' history records')&&summary.includes(n+' lookup failures / no results'));}
 }]);
+
+uiFormattingTests.push(['Ordinary help retains identity and recovery limits without stale action names or internal lookup scheduling terms',async()=>{
+ const inspector=await readFile(new URL('../src/ui/evidence-inspector.js',import.meta.url),'utf8');assert(inspector.includes('not ownership or purchase evidence'));assert(inspector.includes('Known edition conflicts still prevent this choice'));assert(inspector.includes('Same work keeps editions separate'));
+ const guide=await readFile(new URL('../docs/user-guide/comic-manga-enrichment.md',import.meta.url),'utf8');assert(guide.indexOf('## Technical details')<guide.indexOf('worker-owned two-minute lease'));
+ const options=await readFile(new URL('../src/ui/options.js',import.meta.url),'utf8');assert(!options.includes('wait for its lease to expire'));assert(!options.includes('duplicate decision'));
+}]);

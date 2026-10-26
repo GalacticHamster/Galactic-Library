@@ -9,7 +9,7 @@ const button=(label,run)=>{const node=el('button',label);node.type='button';node
 export function createCollectionOverlapView(database,{openRecord,state={}}={}){
   const generation=state.generation=(state.generation??0)+1;
   const root=el('div');root.className='collection-overlap';
-  root.append(el('p','Find issues shared by your owned collections. Inferred contents are included; reviewed means both collections’ contents were reviewed. Viewing overlaps does not change your library.'));
+  root.append(el('p','Find issues shared by your owned collections. Inferred contents are included; Reviewed contents means both collections’ contents were reviewed. Viewing overlaps does not change your library.'));
   const controls=el('div');controls.className='library-controls';
   const search=el('input');search.type='search';search.placeholder='Search collection titles';search.setAttribute('aria-label','Search overlapping collections');
   const sortLabel=el('label','Sort '),sort=el('select');sort.setAttribute('aria-label','Sort collection overlaps');

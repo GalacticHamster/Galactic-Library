@@ -29,7 +29,7 @@ export function createEvidenceInspector(canonical, records, database, actions, {
   const technical=element('details','');technical.className='identity-technical-details';technical.append(element('summary','Account sources and technical evidence'));root.technical=technical;
   let populated=false;
   function populate(){if(populated)return;populated=true;
-    root.append(element('p','Same work keeps editions separate and supports Possible warnings for related copies. Same edition groups copies only when known identity details agree. Different works prevents that relationship and grouping. These choices do not confirm a purchase. Separating a copy keeps it in its own edition.'));
+    root.append(element('p','Compare account copies or separate an edition. Relationship choices change grouping and related-item warnings, not ownership or purchase evidence. Separating a copy keeps it in its own edition.'));
     technical.append(element('p',`Persistent edition IDs: ${(canonical.sourceCanonicalIds??[canonical.id]).join(', ')}`));
     const editions=element('div','');editions.className='edition-record-actions';
     for(const record of records){

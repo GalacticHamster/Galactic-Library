@@ -1,5 +1,5 @@
 import {providerLogo} from './provider-logo.js';
-import {formatDate} from './formatters.js';
+import {formatDate,countLabel} from './formatters.js';
 import {afterFeedbackPaint} from './operation-feedback.js';
 import {providerAccounts,createAccountActions,updateEligibility,createProfileManagementActions,providerActionLabel} from './provider-accounts.js';
 
@@ -59,7 +59,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
    const unambiguous=site.accounts.length===1&&current.state.connected&&current.state.lastSync;
    d.root.insertBefore(node('p',`On ${site.name}, sign in to ${nickname(p)}. ${unambiguous?'The panel remembers this saved account; choose another nickname before updating a different store account.':'Check the account nickname on the Galactic Library panel and confirm the signed-in account.'} Then choose ${label}. Opening the site does not start an import.`),d.feedback);
    if(site.provider==='fandango-at-home'&&mode==='quick')d.root.insertBefore(node('p','Fandango Quick update runs from its Recently Purchased View All grids. Full rescan checks the complete My Library grids.'),d.feedback);
-   const open=button('Open '+site.name+' for '+label,async()=>{try{await openProvider(site.url);d.feedback.textContent='Provider page opened. Check the selected account and start the update there.';}catch(error){d.feedback.textContent=error.message;}});d.controls.append(open);d.root.showModal();
+   const open=button('Open '+site.name+' website',async()=>{try{await openProvider(site.url);d.feedback.textContent='Provider page opened. Check the selected account and start the update there.';}catch(error){d.feedback.textContent=error.message;}});d.controls.append(open);d.root.showModal();
  }
  function resetAccount(site,p){
    const d=dialog('Reset import history · '+nickname(p));
@@ -97,7 +97,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
    database=next;if(busy)return;
    cards.replaceChildren(...providerAccounts(database).map(site=>{
      const card=companionCards.get(site.provider)??node('details');card.className='tool-card provider-card';card.dataset.provider=site.provider;card.open=openCards.has(site.provider)||card.open;
-     const selected=site.accounts.find(p=>p.active),summary=card.querySelector(':scope > summary')??node('summary');summary.replaceChildren();const title=node('strong',site.name);title.className='provider-card-title';const logo=providerLogo(site.provider);if(logo)title.prepend(logo);summary.append(title,node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${site.accounts.reduce((n,p)=>n+p.recordCount,0)} items`:'Not imported'));card.prepend(summary);
+     const selected=site.accounts.find(p=>p.active),summary=card.querySelector(':scope > summary')??node('summary');summary.replaceChildren();const title=node('strong',site.name);title.className='provider-card-title';const logo=providerLogo(site.provider);if(logo)title.prepend(logo);summary.append(title,node('span',site.accounts.length?`${site.accounts.length} saved account${site.accounts.length===1?'':'s'} · ${countLabel(site.accounts.reduce((n,p)=>n+p.recordCount,0),'item')}`:'Not imported'));card.prepend(summary);
      if(!card.dataset.accountEvents){card.dataset.accountEvents='true';card.addEventListener('toggle',()=>{if(!card.isConnected)return;if(card.open)openCards.add(site.provider);else openCards.delete(site.provider);});}
      card.querySelector(':scope > .provider-account-body')?.remove();const body=node('div');body.className='provider-account-body';card.append(body);
      const companion=['humble','fanatical'].includes(site.provider),accountTools=node('details');
@@ -112,7 +112,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
      else accountHost.append(node('p',`To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Choose ${site.fullLabel}; these remembered accounts remain saved.`));
      for(const p of site.accounts){
        const account=node('article');account.className='saved-account';account.dataset.account=p.profileId;
-       account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${p.recordCount} imported items · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Full import saved.':p.lastCompleteScan?'Earlier full import saved.':site.quickLabel?'Import this account once before using quick updates.':'No completed import saved yet.'));
+       account.append(node('h4',nickname(p)+(p.active?' · Selected for updates':'')),node('p',`${countLabel(p.recordCount,'imported item')} · Last updated: ${date(p.lastSuccessfulUpdate)} · Last full scan: ${date(p.lastCompleteScan)}`),node('p',health(p)),node('p',p.baselineComplete?'Full import saved.':p.lastCompleteScan?'Earlier full import saved.':site.quickLabel?'Import this account once before using quick updates.':'No completed import saved yet.'));
        const controls=node('p');controls.className='actions';if(!p.active)controls.append(button('Select for updates',()=>selectAccount(site,p)));controls.append(button(p.nickname?'Rename account':'Name this account',()=>renameAccount(site,p)));account.append(controls);accountHost.append(account);
        const eligibility=updateEligibility(p,database.providerProfiles[p.profileId].state),updates=node('p');updates.className='actions';
        const quick=site.quickLabel?button(site.quickLabel,()=>updateAccount(site,p,'quick')):null,full=button(site.fullLabel,()=>updateAccount(site,p,'full'));

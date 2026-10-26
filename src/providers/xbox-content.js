@@ -41,7 +41,7 @@
       currentRoute();
       const start=await GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'xbox',mode:button.dataset.mode,sourceAccountFingerprint:actor.sourceAccountFingerprint});
       currentRoute();
-      if(!start.ok)throw Error(start.error??'Could not confirm the target GL account.');
+      if(!start.ok)throw Error(start.error??'Could not confirm the target saved account.');
       const mode=start.forceFull?'full':button.dataset.mode;
       status.textContent='Checking the web-visible Xbox Owned catalog…';const captured=await bridge('prepare');
       currentRoute();

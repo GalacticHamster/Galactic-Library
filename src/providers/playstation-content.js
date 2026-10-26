@@ -27,7 +27,7 @@
     try{
       status.textContent='Confirming the signed-in PlayStation account…';const actor=await bridge('identify');
       const start=await GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'playstation',mode:button.dataset.mode,sourceAccountFingerprint:actor.sourceAccountFingerprint});
-      if(!start.ok)throw Error(start.error??'Could not confirm the target GL account.');
+      if(!start.ok)throw Error(start.error??'Could not confirm the target saved account.');
       const mode=start.forceFull?'full':button.dataset.mode;
       status.textContent='Reading the complete supported PlayStation purchase list…';const captured=await bridge('prepare');
       if(captured.sourceAccountFingerprint!==actor.sourceAccountFingerprint)throw Error('The signed-in PlayStation account changed. No items were saved.');

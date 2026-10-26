@@ -514,7 +514,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(provider==='nintendo'&&mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
       const bound=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.sourceAccountFingerprint===sourceAccountFingerprint);
       if(bound&&bound.profileId!==existing?.profileId)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');
-      if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This GL account belongs to a different '+label+' account. Choose another profile and confirm switching.');
+      if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This saved account belongs to a different '+label+' account. Choose another saved account and confirm switching.');
       if(existing&&!existing.sourceAccountFingerprint&&Object.values(database.providerItems).some(i=>i.profileId===existing.profileId))throw Error('This saved account has no verified '+label+' identity. Use a new account profile.');
       bindingUnchanged=existing?.sourceAccountFingerprint===sourceAccountFingerprint;
     }

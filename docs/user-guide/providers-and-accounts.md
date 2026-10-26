@@ -26,7 +26,7 @@ sides contain purchases, confirm they are the same store account. See
 ## Use remembered accounts
 
 On a provider website, a single connected account eligible for reuse appears as
-**Selected GL account** with **Change account**. Use that action to choose a
+**Selected account for updates** with **Change account**. Use that action to choose a
 saved account or **Add account**. Changing the input does not rename an account;
 the panel links to GL Providers for renaming. **Cancel account change** restores
 the prior selection without starting an import. With multiple saved accounts,
@@ -228,7 +228,7 @@ then checks the account and source again before the atomic save. It makes no
 additional Xbox requests, reads no authentication token, and stores no raw Xbox
 account ID. An opaque account hash prevents a different login from silently
 reusing the saved profile. Switching store accounts requires explicit selection
-and confirmation of a different GL account.
+and confirmation of a different saved Xbox account in GL.
 
 Only first-party products with the signed-in account's personal Owned flag are
 included. Subscription, trial, disc, aggregate/family access and played/installed
