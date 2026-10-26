@@ -169,26 +169,31 @@ may require granting GL access to the PlayStation Library site.
 
 ## Epic session recovery
 
-Epic currently offers **Sync Epic library**, a complete library check. It does
-not have a separate Quick update. Choose the correct saved account and use that
-button after signing in normally on Epic.
+Epic offers **Sync Epic library**, a complete library check; it has no separate
+Quick update. Choose the correct saved account and sync normally.
 
-If Epic cannot authorize the library request, GL stops and keeps your saved
-library. Finish signing in or verifying your session on Epic, complete any
-security check Epic actually shows, and retry **Sync Epic library**. GL does
-not automatically repeat unauthorized requests or navigate to your profile.
-Visiting a profile has helped in reported cases, but its effect on Epic's
-session has not been established; it is not a routine prerequisite.
-The Store can appear signed in without authorizing a library request. A user
-also recovered by opening **My Achievements** from Epic's profile menu and
-retrying there, with no visible security check. This is an observed manual
-workaround, not proof that another sign-in or CAPTCHA is required.
+Epic can display a signed-in account while rejecting library access. If GL
+suggests **My Achievements**, open it through Epic's profile menu, then select
+**Sync Epic library** again. This has restored access in live testing, but its
+cause is unresolved. GL does not visit account pages or retry authorization
+failures automatically. Other sign-in errors use the normal Epic sign-in
+instructions; a CAPTCHA is not assumed.
 
-For a recurring failure, open the panel's **Scan diagnostics → Export scan
-report** before reloading or leaving the page. The report contains request
-counts, response status categories, page-readiness flags and whether a save was requested or confirmed. It excludes titles, account identifiers, cookies and credentials.
-The report describes the last attempt in this tab and is lost on reload.
-These flags do not prove that Epic's library session is authenticated.
+GL automatically keeps a small local report when the library response contains
+the known authorization failure. At most **10 failure reports**, each with its
+first later confirmed successful sync, are retained for **24 hours from the
+failure**. Expired reports are excluded and deleted on the next diagnostic read
+or update. They survive extension reloads and are separate from your library,
+backups and companion synchronization. No special scan or observer is needed.
+
+To export after a natural failure or later success, open the Epic panel's
+**Scan diagnostics** and select **Export scan report**. This reuses the existing
+export and includes the current tab's last scan when available. Reports contain
+error categories/statuses, attempt times, coarse page categories, page-readiness
+flags and save outcomes. They exclude titles, product/account identifiers,
+cookies, credentials and response contents. Page categories describe where
+attempts happened; GL does not monitor browsing between attempts or infer that
+navigation caused recovery. A later success does not verify account continuity.
 
 ## Xbox Web Library
 

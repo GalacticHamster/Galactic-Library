@@ -1,5 +1,6 @@
 [
   "manifest.json",
+  "src/background/epic-auth-diagnostics.js",
   "src/background/xbox-navigation.js",
   "src/ui/provider-launch.js",
   "src/providers/xbox-library.js",

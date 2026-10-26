@@ -7,12 +7,16 @@
   let diagnostics=null,reading=false;
   const sessionMessage='Epic Games could not authorize the library request. Sign in on Epic or finish verifying your session, then retry Sync Epic library. Complete any security check Epic shows. Your saved library is unchanged.';
   function pageState(){
-    return {documentReady:global.document?.readyState==='complete',securityCheckVisible:Boolean(global.document?.querySelector('input[type="password"],iframe[src*="captcha" i],[data-testid*="captcha" i]'))};
+    const element=global.document?.querySelector('input[type="password"],iframe[src*="captcha" i],[data-testid*="captcha" i]');
+    const style=element?global.getComputedStyle?.(element):null;
+    const visible=element&&element.hidden!==true&&element.getAttribute?.('aria-hidden')!=='true'&&element.getClientRects?.().length>0&&style?.visibility!=='hidden'&&style?.display!=='none'&&style?.opacity!=='0';
+    return {documentReady:global.document?.readyState==='complete',securityCheckVisible:Boolean(visible)};
   }
   function failure(kind,httpStatus=null,upstreamStatus=null){
     if(diagnostics&&!diagnostics.firstFailure)diagnostics.firstFailure={stage:'library',kind,httpStatus,upstreamStatus,...pageState()};
-    const error=Error(['authorization','forbidden'].includes(kind)?sessionMessage:kind==='network'?'Epic Games could not connect to its library. Check your connection and retry. Your saved library is unchanged.':'Epic Games could not read your library. Retry later. Your saved library is unchanged.');
-    error.epicFailure=kind;return error;
+    const librarySession=kind==='authorization'&&httpStatus===200&&upstreamStatus===401;
+    const error=Error(librarySession?"Epic's library isn't accepting requests right now, even if the site shows you as signed in. Try opening My Achievements from Epic's profile menu, then select Sync Epic library again. Your saved library hasn't changed.":['authorization','forbidden'].includes(kind)?sessionMessage:kind==='network'?'Epic Games could not connect to its library. Check your connection and retry. Your saved library is unchanged.':'Epic Games could not read your library. Retry later. Your saved library is unchanged.');
+    error.epicFailure=librarySession?'library-session':kind;return error;
   }
   function upstreamStatus(errors){
     for(const error of errors){

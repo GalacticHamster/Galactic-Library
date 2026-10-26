@@ -1,3 +1,4 @@
+import {createEpicAuthDiagnostics} from '../src/background/epic-auth-diagnostics.js';
 import {checkEpicSession} from './epic-session-browser-fixture.js';
 import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import '../src/lib/contents-performance.js';
@@ -149,7 +150,13 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     if(provider==='audible')Object.assign(globalThis[globalName],{getDiagnostics:()=>null,recordSaveState(){}});
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full',rejectCommit=false;
+    const authValues={},authArea={get:async defaults=>structuredClone({...defaults,...authValues}),set:async patch=>Object.assign(authValues,structuredClone(patch)),remove:async key=>{delete authValues[key];}};
+    const epicRuntime={id:'synthetic-gl',getURL:path=>'chrome-extension://synthetic-gl/'+path};
+    const epicSender=()=>({id:epicRuntime.id,frameId:0,url:'https://store.epicgames.com'+location.pathname,tab:{id:1,url:'https://store.epicgames.com'+location.pathname}});
+    let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
+    const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+      if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
       if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
@@ -160,6 +167,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       if(request.type==='COMMIT_PROVIDER_SCAN'){
         if(rejectCommit)return {ok:false,error:'Synthetic save rejection'};
         const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics,...(provider==='steam'&&request.syncState?.applications?{syncState:request.syncState}:{})},request.snapshot,request.scanToken,1);
+        if(provider==='epic')await epicAuth.committed(request,epicSender(),'full');
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state,changes:state.syncHealth?.differences};
       }
       if(request.type==='GL_PROVIDER_UI_TIMING'){providerTimings.push(request.timing);return {ok:true};}
@@ -198,7 +206,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
     }
-    if(provider==='epic')await checkEpicSession({shadow:shadows.at(-1),writer,checks,wait,assert,commits:()=>imported});
+    if(provider==='epic')await checkEpicSession({shadow:shadows.at(-1),writer,checks,wait,assert,commits:()=>imported,reloadDiagnostics:reloadEpicDiagnostics});
     if(provider==='steam'){
       const before=JSON.stringify(values.galacticLibraryDatabase.providerItems),timingBefore=providerTimings.length;
       globalThis.GalacticSteamStore.fetchOwnedSteamGames=async(report,known,options)=>{

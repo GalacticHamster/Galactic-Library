@@ -6,6 +6,7 @@ import {contentsConfirmationTests} from './contents-confirmation.js';
 import {contentsReviewUsabilityTests} from './contents-review-usability.js';
 import {lookupDismissalTests} from './lookup-dismissal.js';
 import {fanaticalNavigationTests} from './fanatical-navigation.js';
+import {epicAuthDiagnosticsTests} from './epic-auth-diagnostics.js';
 import {epicSessionTests} from './epic-session.js';
 import {xboxImportTests} from './xbox-import.js';
 import {observationOverlayTests} from './observation-overlays.js';
@@ -143,6 +144,7 @@ const tests = [
   ...playstationImportTests,
   ...xboxImportTests,
   ...epicSessionTests,
+  ...epicAuthDiagnosticsTests,
   ...koboWorkflowTests,
   ...operationFeedbackTests,
   ...libraryLoadingTests,

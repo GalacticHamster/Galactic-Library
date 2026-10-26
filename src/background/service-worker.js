@@ -1,4 +1,5 @@
 import {createXboxNavigationHandler,currentXboxSender} from './xbox-navigation.js';
+import {createEpicAuthDiagnostics} from './epic-auth-diagnostics.js';
 import {purchaseAccounts} from './purchase-handoff.js';
 import {createPurchaseHandoff} from './purchase-handoff.js';
 import {allowedCompanionOperation} from '../lib/companion-identities.js';
@@ -41,6 +42,8 @@ const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
+const epicAuthDiagnostics=createEpicAuthDiagnostics({area:privateArea,ready:storageReady,runtime:chrome.runtime});
+chrome.runtime.onMessage.addListener(epicAuthDiagnostics.handle);
 workerLifecycle=createWorkerLifecycleDiagnostics({area:chrome.storage.session,ready:storageReady,worker:queryDiagnostics.worker,startedEpochMs:queryDiagnostics.startedEpochMs});
 const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
 const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,observationCompletions:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
@@ -565,7 +568,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (request.type==='COMMIT_PROVIDER_SCAN'
     ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,request.provider==='kobo',request.sourceAccountFingerprint],timing)
     : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))
-    .then((result) => {const database=result.database??result;reply({
+    .then(async (result) => {const database=result.database??result;
+      if(request.provider==='epic')await epicAuthDiagnostics.committed(request,sender,syncDetails.syncMode).catch(()=>{});
+      reply({
       ok: true,
       gameCount: database.providers[request.provider].itemCount,
       addOnCount: database.providers[request.provider].addOnCount ?? 0,
