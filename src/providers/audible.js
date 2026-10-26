@@ -7,6 +7,7 @@
   const PAGE_SIZE = 50;
   const MAX_PAGES = 500;
   const BETWEEN_PAGES_MS = 250;
+  const HISTORY_PAGERS='.bc-pagination,.pagination,.pagingElements,[class*="paging" i],[class*="pagination" i],nav[aria-label*="pagination" i],[role="navigation"][aria-label*="pagination" i]';
 
   function textOf(element) {
     return String(element?.getAttribute?.('aria-label') ?? element?.textContent ?? '').replace(/\s+/gu, ' ').trim();
@@ -401,7 +402,11 @@
     const admit=(members,basis)=>{
       if(members.length<1||members.some(f=>used.has(f)||forImport&&rejected.has(f)))return;
       const dated=members.filter(f=>f.date),paid=members.filter(f=>f.total),linkKeys=new Set(members.flatMap(f=>[...f.orderLinks])),dataKeys=new Set(members.flatMap(f=>[...f.orderKeys]));
-      const completedOrder=forImport&&selectedViews.size===1&&selectedViews.has('orders')&&members.some(f=>f.orderLinks.size||f.orderKeys.size)&&!members.some(f=>f.nonPurchase);
+      // A direct, individually dated cash/credit purchase on Your orders
+      // is already transaction evidence. Order links/keys are required to bind
+      // shared or unfamiliar evidence, not to re-prove this ordinary row.
+      const directPurchase=basis==='direct-row'&&members.length===1&&members[0].dateValid&&!!members[0].payment;
+      const completedOrder=forImport&&selectedViews.size===1&&selectedViews.has('orders')&&(directPurchase||members.some(f=>f.orderLinks.size||f.orderKeys.size))&&!members.some(f=>f.nonPurchase);
       if(!dated.length||!paid.length&&!completedOrder)return;
       const keyValues=new Map();for(const key of dataKeys){const split=key.indexOf(':',key.indexOf(':')+1),namespace=key.slice(0,split),values=keyValues.get(namespace)??new Set();values.add(key.slice(split+1));keyValues.set(namespace,values);}
       const conflicts=dated.some(f=>!f.dateValid)||paid.some(f=>!f.payment)&&!completedOrder||new Set(dated.map(f=>f.date)).size!==1||paid.length>0&&new Set(paid.map(f=>f.total)).size!==1||linkKeys.size>1||[...keyValues.values()].some(values=>values.size>1);
@@ -459,7 +464,7 @@
       const named=[text,accessible].map(value=>value.replace(/[«»‹›←→]/gu,'').trim());
       const next=/\bnext\b/iu.test(rel)||named.some(value=>/^(?:next|next page|go to next page)$/iu.test(value));
       const previous=/\bprev\b/iu.test(rel)||named.some(value=>/^(?:previous|previous page|go to previous page|prev)$/iu.test(value));
-      const paging=control.closest('nav[aria-label*="agin"], [role="navigation"][aria-label*="agin"], .pagination, .bc-pagination');
+      const paging=control.closest(HISTORY_PAGERS);
       const numbered=!!paging&&/^\d{1,4}$/u.test(text);
       if(!next&&!previous&&!numbered)continue;
       navigation.controls++;const disabled=control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true';
@@ -467,7 +472,7 @@
       if(previous)navigation[disabled?'disabledPrevious':'enabledPrevious']++;
       if(numbered)navigation.numberedControls++;
       if(control.hasAttribute('href')){try{
-        const destination=new URL(control.getAttribute('href'),page);
+        const destination=new URL(control.getAttribute('href'),page.href);
         if(destination.origin===page.origin&&destination.pathname===page.pathname){
           navigation.samePageLinks++;
           for(const key of new Set(destination.searchParams.keys()))if(['page','pageNumber','pageSize','offset','limit','orderFilter','timeFilter','view','year'].includes(key))parameterNames.add(key);else navigation.otherQueryParameters++;
@@ -475,6 +480,29 @@
       }catch{navigation.otherDestinations++;}}
     }
     navigation.queryParameterNames=[...parameterNames].sort();navigation.boundReached=controls.length>2000;
+    // Read-only diagnosis of controls not recognized by the traversal above.
+    // Fixed shape labels only: never export text, URLs, field values, arbitrary
+    // classes, order parameters or inline event-handler contents.
+    let navigationShapes;
+    if(!forImport){
+      const shapes=[],elements=[...document.querySelectorAll('a,button,input,select,[role="button"],[role="link"],span')];let shapeBound=false;
+      const pageFields=['page','pageNumber','pageIndex','pageNum','pageSize','offset','limit'];
+      const hints=e=>({pager:/pag(?:in|ing)/iu.test(e.className??''),next:/pagingNext|pagination-next/iu.test(e.className??''),previous:/pagingPrevious|pagination-prev/iu.test(e.className??'')});
+      const destination=raw=>{if(!raw)return {kind:'none',pageParameters:[],otherParameters:0};try{const u=new URL(raw,page.href),same=u.origin===page.origin&&u.pathname===page.pathname,keys=[...new Set(u.searchParams.keys())];return {kind:same?'same-history':'other',pageParameters:same?keys.filter(k=>pageFields.includes(k)):[],otherParameters:same?keys.filter(k=>!pageFields.includes(k)).length:0};}catch{return {kind:'invalid',pageParameters:[],otherParameters:0};}};
+      for(const e of elements.slice(0,30000)){
+        if(!visible(e))continue;
+        const strings=[label(e),e.getAttribute('aria-label')??'',e.getAttribute('title')??'',e.tagName==='INPUT'?e.value:''];
+        const classHints=hints(e),number=strings.some(s=>/^\d{1,4}$/u.test(s)),next=classHints.next||strings.some(s=>/^(?:next|next page|go to next page)$/iu.test(s)),previous=classHints.previous||strings.some(s=>/^(?:previous|previous page|prev)$/iu.test(s)),arrow=strings.some(s=>/^[\s\u2039\u203a\u00ab\u00bb\u2190\u2192<>]+$/u.test(s)&&s.trim());
+        const href=destination(e.getAttribute('href')),form=e.closest('form'),formAction=destination(form?.getAttribute('action'));
+        const numericSelect=e.tagName==='SELECT'&&[...e.options].some(o=>/^\d{1,3}$/u.test(label(o)));
+        if(!number&&!next&&!previous&&!arrow&&!numericSelect&&!classHints.pager&&!href.pageParameters.length)continue;
+        if(shapes.length>=40){shapeBound=true;break;}
+        const ancestors=[];for(let p=e.parentElement,depth=0;p&&depth<3;p=p.parentElement,depth++)ancestors.push({tag:['form','nav','div','span','ul','li','section'].includes(p.tagName.toLowerCase())?p.tagName.toLowerCase():'other',...hints(p)});
+        const name=e.getAttribute('name');
+        shapes.push({tag:['a','button','input','select','span'].includes(e.tagName.toLowerCase())?e.tagName.toLowerCase():'other',kind:numericSelect?'numeric-select':next?'next':previous?'previous':number?'number':arrow?'arrow':'pager',role:['button','link'].includes(e.getAttribute('role'))?e.getAttribute('role'):'none',inputType:e.tagName==='INPUT'?(['submit','button','image','hidden'].includes(e.type)?e.type:'other'):'none',fieldName:pageFields.includes(name)?name:name?'other':'none',href,formAction,formMethod:form?(/^post$/iu.test(form.method)?'post':'get'):'none',inlineHandler:e.hasAttribute('onclick'),disabled:e.hasAttribute('disabled')||e.getAttribute('aria-disabled')==='true',classHints,ancestors});
+      }
+      navigationShapes={controls:shapes,boundReached:shapeBound||elements.length>30000};
+    }
     // Refund layouts are not assumed to use purchase columns. Report only a
     // small allowlist of header/status shapes and exact row ASIN presence. Being
     // on Refund history, or having a Return button, is not a completed return.
@@ -508,7 +536,7 @@
     }
     const limits={purchaseRowScan:candidates.length>rowScanLimit||rows.size>=rowLimit,headerShapes:headerElements.length>5000,pageLinks:visibleLinks.length>=2000,navigation:navigation.boundReached,refundRows:refundHistory.boundReached};
     const purchaseDateYears={};for(const fact of facts)if(fact.dateValid){const year=fact.date.slice(-4);purchaseDateYears[year]=(purchaseDateYears[year]??0)+1;}
-    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,...(forImport?{unresolvedPurchaseRows:facts.filter(f=>f.ids.size===1&&!used.has(f)&&!f.nonPurchase&&!f.isReturned).length}:{}),purchaseDateYears,grouping,navigation,refundHistory,limits,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:Object.values(limits).some(Boolean)};
+    return {...report,state:headers.length?'checked':refundHistory.candidateTables?'refund-structure-observed':'structure-unrecognized',viewOptions:[...views],selectedView:selectedViews.size===1?[...selectedViews][0]:'unknown',timeOptions:[...periods],selectedTime:selectedPeriod,recognizedHeaders:headers.length,headerShapes,...totals,...(forImport?{unresolvedPurchaseRows:facts.filter(f=>f.ids.size===1&&!used.has(f)&&!f.nonPurchase&&!f.isReturned).length}:{navigationShapes}),purchaseDateYears,grouping,navigation,refundHistory,limits,distinctRowAsins:asins.size,distinctSavedAsinMatches:matches.size,visiblePageProductAsins:pageAsins.size,libraryComparison:known?'active-saved-profile-not-account-verified':'unavailable',savedLibraryIds:known?.size??0,boundReached:Object.values(limits).some(Boolean)};
   }
   function inspectPurchaseHistory(document,options){return readPurchaseHistory(document,options);}
   function previewPurchaseHistory(document,options){
@@ -669,8 +697,17 @@
     };
     const continuation=doc=>{
       const links=new Map();let terminal=false,unresolvedNumbers=false,unverifiedControl=false;
-      const pagers='.bc-pagination,.pagination,.pagingElements,nav[aria-label*="pagination" i],[role="navigation"][aria-label*="pagination" i]';
-      const currentPages=[...doc.querySelectorAll(pagers)].flatMap(p=>[...p.querySelectorAll('[aria-current="page"]')]).map(e=>Number(textOf(e))).filter(Number.isSafeInteger);
+      const pagers=HISTORY_PAGERS;
+      const roots=[...doc.querySelectorAll(pagers)].filter(visible);
+      const declared=roots.flatMap(p=>[...p.querySelectorAll('[aria-current="page"]')]).filter(visible);
+      // The live history pager marks its current number with a plain span,
+      // rather than aria-current. Never infer current page from linked numbers.
+      const currentElements=declared.length?declared:roots.flatMap(p=>[p,...p.querySelectorAll('span')]).filter(e=>/^\d{1,4}$/u.test(textOf(e))&&!e.closest('a,button,[role="button"],[role="link"]'));
+      const currentPages=currentElements.filter(visible).map(e=>Number(textOf(e))).filter(n=>Number.isSafeInteger(n)&&n>0);
+      const numberedDestinations=new Set();
+      for(const a of doc.querySelectorAll('a[href]'))if(visible(a)&&a.closest(pagers)&&/^\d{1,4}$/u.test(textOf(a))){
+        try{const u=new URL(a.getAttribute('href'),'https://www.audible.com/account/purchase-history');if(u.origin==='https://www.audible.com'&&/^\/account\/purchase-history\/?$/u.test(u.pathname))numberedDestinations.add(u.href);}catch{}
+      }
       const currentPage=currentPages.length&&new Set(currentPages).size===1?currentPages[0]:null;
       for(const e of [...doc.querySelectorAll('a,button,[role="button"]')].filter(visible)){
         const label=textOf(e),pager=e.closest(pagers),rel=e.getAttribute('rel')??'';
@@ -680,7 +717,7 @@
         const disabled=e.hasAttribute('disabled')||e.getAttribute('aria-disabled')==='true'||Boolean(e.closest('[class*="disabled" i]'));
         if(/^(?:load|show|see)\s+(?:\d+\s+)?more\b/iu.test(label)&&!disabled)throw Error('history-lazy-loading-unverified');
         if(!pager&&!same)continue;
-        if(pager&&!disabled&&!next&&!/^\d+$/u.test(label)&&e.getAttribute('aria-current')!=='page'&&!/^(?:previous|previous page|prev|first|first page)[\s‹«←]*$/iu.test(label)&&!/\bprev\b/iu.test(rel))unverifiedControl=true;
+        if(pager&&!disabled&&!next&&!numberedDestinations.has(url?.href)&&!/^\d+$/u.test(label)&&e.getAttribute('aria-current')!=='page'&&!/^(?:previous|previous page|prev|first|first page)[\s‹«←]*$/iu.test(label)&&!/\bprev\b/iu.test(rel))unverifiedControl=true;
         if(next){if(disabled){terminal=true;continue;}if(!same&&e.hasAttribute('href'))throw Error('history-next-unverified');links.set(same?url.href:'button-next',e);}
         else if(pager&&!disabled&&/^\d+$/u.test(label)&&e.getAttribute('aria-current')!=='page'){
           if(currentPage===null)unresolvedNumbers=true;
@@ -692,7 +729,8 @@
       // Next wins over numbered alternatives. Otherwise use the smallest
       // visible following number, never fabricate a URL or increment a cursor.
       const values=[...links.values()],next=values.find(e=>/\bnext\b/iu.test((e.getAttribute('rel')??'')+' '+textOf(e)+' '+(e.getAttribute('aria-label')??'')));
-      return {next:next??values.sort((a,b)=>Number(textOf(a))-Number(textOf(b)))[0]??null,terminal};
+      const chosen=next??values.sort((a,b)=>Number(textOf(a))-Number(textOf(b)))[0]??null;
+      return {next:chosen,terminal,currentPage,expectedPage:chosen&&/^\d{1,4}$/u.test(textOf(chosen))?Number(textOf(chosen)):null};
     };
     const emptyHistory=(doc,view)=>{
       const tables=[...doc.querySelectorAll('table,[role="table"]')].filter(t=>[...t.querySelectorAll('th,[role="columnheader"]')].some(e=>/^title$/iu.test(textOf(e))));
@@ -796,6 +834,7 @@
                 }
                 const page=continuation(doc);if(!page.next)break;
                 if(typeof driver.follow!=='function')throw Error('history-next-unverified');driver.follow(page.next);current=await ready(doc,view,year);
+                if(page.expectedPage!==null&&continuation(current.doc).currentPage!==page.expectedPage)throw Error('history-pagination-unverified');
               }
               if(yearReadable)completedYears++;
               if(view==='refund-history'&&purchaseYearScope)history.refundPurchaseYearsChecked.push(year);

@@ -233,3 +233,40 @@ repository layout and diff whitespace checks pass. A read-only controlled replay
 of the frozen backup preserves all 796 identities and 485 acquisition dates,
 including prior purchase/refund evidence. Its assumed completed-year inputs are
 not live proof and are not written back to the backup or installed library.
+
+## Fourth live result: missing later purchase pages
+
+The next frozen backup confirms 484 Owned and 312 unconfirmed, with all 796
+identities and 485 acquisition dates preserved. One unconfirmed book has purchase
+evidence linked to the failed 2015 refund year; the other 311 have no matched
+purchase facts. That absence does not establish subscription or non-purchase.
+The user identified a known 2023 purchase and three native purchase-history pages,
+while the saved traversal recorded only one page per year.
+
+The read-only report and screenshot expose numbered anchors inside containers
+whose classes identify pagination, and a plain current-number span. The old
+selector missed those containers and required aria-current for numbered links.
+The absence of a recognized Next control was consequently mistaken for the end.
+Traversal now recognizes this native structure, follows only supplied same-site
+history links, and checks that each selected numbered page actually arrives.
+Unlabelled arrows sharing numbered destinations are not separate unknown actions.
+Conflicting visible current numbers, foreign targets, repeated pages and wrong
+page responses keep the check incomplete. Hidden page markers are ignored.
+
+A separate synthetic reproduction confirmed that individually dated, recognized
+purchase rows without Order details links or transaction keys could be marked
+read but omitted from evidence. Those direct rows now qualify on Your orders;
+shared-order binding, conflicting groups, temporary access, gift and return
+safeguards remain. No ownership is inferred from title similarity or library
+presence. How many live books either fix recovers remains unverified.
+
+The optional checker now reports bounded control shapes, excluding page text,
+URLs, arbitrary class/field names, identifiers and handler contents. It performs
+no navigation or writes. Full/import traversal skips that shape collection.
+Quick retains only current/previous-year traversal; Full checks every offered
+year and its native pages. The isolated 2015 refund failure remains visible.
+
+Validation: 1,728 unit and 485 contents tests pass. Packaged Chrome and Firefox
+each pass 152 ownership, 87 Audible library, 105 importer and 68 main-UI checks.
+Both rebuilt ZIPs validate 221 runtime files; repository layout and diff checks
+pass. All browser reconciliation fixtures use disposable synthetic libraries.
