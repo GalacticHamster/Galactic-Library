@@ -314,8 +314,8 @@ to use newest-first library discovery; it does not traverse purchase history.
 
 If you know your unconfirmed books were purchased, open **Providers → Kobo →
 your saved account → Advanced account recovery and removal → Ownership
-preference**. Enable **Treat unconfirmed books in this Kobo account as
-purchased** and save. This opt-in preference affects display and matching for
+preference**. Enable **Treat unconfirmed books in this account as
+owned** and save. This opt-in preference affects display and matching for
 that account only; it does not rewrite source ownership or invent a receipt.
 Explicit subscription, loan, rental, free, not-purchased, conflicting and
 individually reviewed records are excluded. Turn it off to restore the original

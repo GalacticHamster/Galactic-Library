@@ -70,9 +70,9 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
  function koboOwnership(p){
    const d=dialog('Ownership preference · '+nickname(p));
    const label=node('label');label.className='ownership-choice';const input=node('input');input.type='checkbox';input.dataset.koboAssumeOwned='';input.checked=database.providerProfiles[p.profileId]?.assumeUnconfirmedOwned===true;
-   label.append(input,document.createTextNode('Treat unconfirmed books in this Kobo account as purchased.'));
+   label.append(input,document.createTextNode('Treat unconfirmed books in this account as owned.'));
    d.root.insertBefore(label,d.feedback);
-   d.root.insertBefore(node('p','Your choice affects display and ownership checks. Kobo has not confirmed these purchases; original source evidence stays saved. Subscription, borrowed, rented, free, explicitly not purchased, conflicting, and individually reviewed items stay unchanged. This applies only to this saved account.'),d.feedback);
+   d.root.insertBefore(node('p','Use this only if you know these books are permanently yours. Kobo has not confirmed their ownership. This changes display and ownership checks for this GL account, preserves source evidence, and can be turned off. Explicit access evidence and individual corrections keep their existing precedence.'),d.feedback);
    d.controls.append(button('Save preference',()=>commit(d,()=>saveKoboOwnershipAssumption(p.profileId,input.checked),'Kobo ownership preference saved. Original access evidence is unchanged.')));d.root.showModal();
  }
  async function removeAccount(site,p){

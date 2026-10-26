@@ -67,6 +67,26 @@
     heading.textContent=provider?`Galactic Library · ${names[provider]??provider}`:oldHeading?.textContent??'Galactic Library';
     if(oldHeading){const next=oldHeading.nextSibling;if(next?.nodeName==='BR')next.remove();oldHeading.remove();}
     panel.prepend(heading);
+    const introductions={
+      steam:'Import your Steam games and DLC. Quick update checks new or unidentified applications; Full rescan checks the library again. Saved titles stay when Steam cannot identify them.',
+      gog:'Import your GOG games, including hidden games. Quick update checks recent additions; Full rescan checks every available page.',
+      epic:'Import the games and add-ons Epic reports as owned by the signed-in account. Sync checks the supported library each time.',
+      'amazon-games':'Import games delivered to your Amazon Games library. Games delivered to other stores and code claims are excluded. Quick update checks recent claims; Full rescan checks all available years. Older or first-time imports may require a Full rescan.',
+      audible:'Import your Audible audiobooks and available ownership evidence. Quick update checks new titles and recent purchase, return and gift history. Full rescan checks the library and all available history years. Subscription, expired and unconfirmed access remain distinct.',
+      kindle:'Import your Kindle library. Quick update checks recent additions; Full rescan checks the supported library again. Use Book contents discovery below to find included works for review.',
+      'amazon-video':'Import your Amazon Video movies and TV titles. Quick update checks recent additions; Full rescan refreshes the collection and purchase information. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
+      'fandango-at-home':'Import your Fandango movies and TV shows. Quick update checks recent purchases; Full rescan checks the whole available collection.',
+      kobo:'Import your Kobo books and audiobooks. Quick update checks recent additions; Full rescan checks all available library sections. Library presence alone does not confirm ownership.',
+      fanatical:'Import supported products from completed Fanatical orders. Quick update checks new completed orders; Full rescan checks all completed orders again.',
+      humble:'Import supported books, audiobooks and game entitlements from Humble purchases. Quick update checks new purchases and pending key information; Full rescan checks all supported purchases again.',
+      xbox:'Import the web-visible Xbox Owned catalog. Both actions check this entire list; Quick update adds changes. This is not your complete console or lifetime purchase history. Earlier saved items stay.',
+      playstation:'Import the active PS4/PS5 Purchased web library. Both actions check the supported list; Quick update saves additions and changes. Older consoles and lifetime purchase history are outside this scope. Earlier saved items stay.',
+      nintendo:'Import the non-hidden Switch Virtual Game Cards loaded on this page. Load all cards before importing. Other Nintendo purchase history is not included; earlier saved cards stay.'
+    };
+    if(introductions[provider]){
+      const intro=panel.querySelector('p');
+      if(intro){const help=document.createElement('details'),label=document.createElement('summary');label.textContent='How importing works';help.append(label,intro.cloneNode(true));intro.textContent=introductions[provider];help.dataset.importHelp='';(panel.querySelector('.panel-body')??panel).append(help);}
+    }
     if(provider){
       const controls=document.createElement('div');
       controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>If you signed into another website account, change this selection first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Editing it selects or adds an account; it does not rename one.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
