@@ -81,7 +81,7 @@ try{
   // can finish while an EPUB stream is still awaiting native completion.
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
-  const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):'';
+  const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):process.argv.includes('--provider-diagnostics')?'?provider-diagnostics=1':'';
   const url=`http://127.0.0.1:${server.address().port}/${overlayAuditMode?'tests/overlay-account-audit.html':koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');

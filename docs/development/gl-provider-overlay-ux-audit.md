@@ -1,7 +1,75 @@
 # Provider overlay UX and account lifecycle audit — Phase A
 
-October 26, 2026. **Design proposal; Phase B is pending review.** Production
-code, importer behavior, ownership rules and user libraries are unchanged.
+October 26, 2026. **Phase A findings with approved Phase B implementation results.**
+Sections A–I preserve the original audit of baseline `017de8b`; their descriptions
+of defects and old presentation are historical. Phase A changed no production
+behavior. The implementation status below supersedes the original pending-review
+language and proposed UI descriptions. No live user libraries were used for tests.
+
+## Phase B implementation results
+
+| Package | Local checkpoint | Result |
+| --- | --- | --- |
+| B0 | `ac74154` | Only explicit import gestures reset authority. Diagnostics/help/exports/minimize preserve context; account edits and superseded start replies invalidate it. Actual delayed Kindle/Kobo saves are covered. |
+| B1 | `adbe4a3` | Shared provider heading, reserved Minimize space, viewport bounds, scrolling and focus; Kindle footer and Amazon Games CSP styling retained. |
+| B2 | `0c192fc` | Compact eligible single account; explicit saved-profile selection/Add account/Cancel and Providers rename link; acknowledged-save refresh preserves newer edits. Worker eligibility and console bindings unchanged. |
+| B3 | `e46d15d` | Concise provider copy with retained technical help, Quick-before-Full ordering, accurate console traversal scope and Kobo owned wording. |
+| B4 | `870bdcc` | One default-off local Settings toggle hides all diagnostic controls; supported tools and explicit URL overrides remain available. Collection is unchanged. |
+| B5 | `719e7df` | Kindle Library import/Book contents discovery grouping, review link and stable action footer; feature controls stay available with diagnostics off. |
+| B4 correction found in B6 | `9273c8c` | Register exactly the new settings key in the existing safe-clear metadata allowlist. No library schema/migration change or validation bypass. |
+| B6 | Final Phase B validation checkpoint | Common status → How importing works → diagnostics ordering; updated legacy fixtures to use actual settings visibility and precise action selectors; results below. |
+
+The user approved the layout/account direction and superseded the earlier
+diagnostics proposal: **Settings → Troubleshooting → Enable provider diagnostics**
+is now the common entry. Reopen/reload provider pages to apply it; changing it does
+not interrupt an import. It is outside library backups and resets on Clear local
+library. Existing Steam, Amazon Games and Audible support flags remain optional
+overrides. Audible's specialized checker remains separate, with private purchase
+evidence clearly distinguished from aggregate reports. Epic's retained local
+failure/recovery history continues while controls are hidden.
+
+### Final validation and limits
+
+- Complete unit suite: **1,768 passed**; contents: **485/485 passed**.
+- Chrome/Firefox each: **123 importer checks with diagnostics off and 123 on**,
+  **68 main UI**, **16 Settings/provider UX**, **16 shared account/flag**,
+  **11 Kobo**, **171 Audible ownership**, **58 Amazon Games**, **89 Amazon Video**,
+  **53 Fandango**, and **20 Steam owned-source** checks.
+- Both installed-browser suites: **56 captures each** of all 14 production-source
+  templates and the real shared renderer: initial, returning and diagnostics
+  states, 420 px light and true 320 px dark/short frames. Geometry, real Tab focus
+  indicators, minimize/restore and persisted setting/profile rehydration after a
+  real browser/extension restart pass. Screenshots stay in ignored
+  `audit-artifacts/provider-overlays/`; representative captures were visually
+  inspected. These render fixtures do not run acquisition controllers.
+- Separate native packaged **Xbox, PlayStation, Nintendo and Epic** controllers
+  pass in both browsers, including account guards, additive/repeat saves, source
+  integrity and backup roundtrips. Epic tests collect failures while diagnostics
+  are hidden, restart the browser/extension, enable the preference and export the
+  retained failure plus committed recovery.
+- Disposable private-backup replay: **14,309 provider records, 14 profiles and all
+  22 database sections unchanged**, including reviews, acquisitions, history and
+  associations; original file unchanged. Preference changes do not enter backups.
+- No new permissions, provider acquisition/matching/ownership changes, real
+  account imports, migrations, versions, remote operations or store-asset changes.
+
+Observed failures are retained in the local validation ledger: early screenshot
+harness target/readiness errors and legacy fixtures expecting always-visible or
+absent diagnostic markup were corrected. The first complete unit run found the
+new preference missing from safe-clear metadata, fixed in `9273c8c`. One Firefox
+diagnostics-off importer run hit the previously observed independent-evidence UI
+assertion at `tests/kindle-independent-evidence-fixture.js:43`; two subsequent
+complete off-mode runs and the final on-mode run passed. This is an observed
+intermittent test limitation, not proof that the failure never occurs. No matching
+or contents behavior was changed to suppress it.
+
+Live provider compatibility remains the earlier importer-stabilization evidence,
+not these disposable fixtures. A manual UI smoke check after reloading the rebuilt
+extension is useful: inspect a returning account, open Change account and Cancel,
+toggle diagnostics in Settings and reopen a provider, and check Kindle's two task
+sections. No full import is needed for that inspection. Real authenticated
+14-provider browser/extension restarts are not claimed; native acquisition tests
+cover the four console/Epic controllers, with synthetic source sessions only.
 
 ## A. Executive summary
 
@@ -475,4 +543,4 @@ All runs use disposable fixtures/storage; no live provider imports were performe
 
 Production files and release artifacts require no changes for this audit. Only
 this document, the checklist and isolated test/harness additions are intended for
-the Phase A local commit. Phase B awaits user review.
+the Phase A local commit. The approved Phase B results now appear at the top.

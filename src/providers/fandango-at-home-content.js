@@ -8,7 +8,7 @@
   const shadow = host.attachShadow({ mode: 'closed' });
   shadow.innerHTML = `
     <style>.panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }</style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Fandango's newest-first Recently Purchased View All grids until it reaches known titles. <strong>Full rescan</strong> checks every card against Fandango's reported movie and TV counts.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><details><summary>Scan diagnostics</summary><p>Check the movie listing without importing. From My Library, this opens Movies View All and scrolls through its cards. The report contains counts and page structure, with no titles, product IDs or account information.</p><button type="button" data-check-listing>Check movie listing (no import)</button> <button type="button" data-export-report disabled>Export scan report</button></details><p class="status" role="status"></p></div>`;
+    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Fandango's newest-first Recently Purchased View All grids until it reaches known titles. <strong>Full rescan</strong> checks every card against Fandango's reported movie and TV counts.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><details data-scan-diagnostics><summary>Scan diagnostics</summary><p>Check the movie listing without importing. From My Library, this opens Movies View All and scrolls through its cards. The report contains counts and page structure, with no titles, product IDs or account information.</p><button type="button" data-check-listing>Check movie listing (no import)</button> <button type="button" data-export-report disabled>Export scan report</button></details><p class="status" role="status"></p></div>`;
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const checkButton=shadow.querySelector('[data-check-listing]'),exportButton=shadow.querySelector('[data-export-report]');
   const diagnosticKey='galactic-library-fandango-listing-check';
@@ -208,7 +208,7 @@
     if(pending&&pending.route===routeFor(location.href)&&Number.isFinite(pending.startedAt)&&Date.now()-pending.startedAt>=0&&Date.now()-pending.startedAt<10*60*1000&&['movies','tv'].every(k=>pending.expected?.[k]===null||Number.isInteger(pending.expected?.[k])&&pending.expected[k]>=0&&pending.expected[k]<=50000))diagnostic=pending;
     sessionStorage.removeItem(diagnosticKey);
   }catch{}
-  if(diagnostic){shadow.querySelector('details').open=true;checkListing(diagnostic.expected);return;}
+  if(diagnostic){shadow.querySelector('[data-scan-diagnostics]').open=true;checkListing(diagnostic.expected);return;}
   importState('get').then((state) => {
     if (!state) return;
     if (state.phase === 'start' && /\/content\/browse\/mylibrary\b/iu.test(globalThis.location.pathname)) {

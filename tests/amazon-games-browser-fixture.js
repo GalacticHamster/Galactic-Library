@@ -165,7 +165,7 @@ try{
  page=await setup(windows);
  const policy=page.doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';policy.content="style-src 'none'";page.doc.head.append(policy);
  const theme=new page.win.CSSStyleSheet();theme.replaceSync(await (await fetch('/shared/theme.css')).text());page.doc.adoptedStyleSheets=[theme];
- page.win.chrome={runtime:{sendMessage:async()=>({ok:true,profileLabel:'Synthetic',profiles:[],reuseAllowed:true,profileId:'synthetic'})}};
+ page.win.chrome={runtime:{sendMessage:async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:true}:{ok:true,profileLabel:'Synthetic',profiles:[],reuseAllowed:true,profileId:'synthetic'}}};
  page.win.eval(await (await fetch('/src/providers/floating-panel.js')).text());
  const styledAttach=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=styledAttach.call(this,options);return shadow;};
  page.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));
@@ -176,7 +176,8 @@ try{
  const minimize=shadow.querySelector('[data-galactic-floating-panel-control="minimize"]');
  minimize.click();assert(panel.hidden&&!shadow.querySelector('[data-galactic-floating-panel-control="restore"]').hidden,'Styled panel still minimizes normally');
  shadow.querySelector('[data-galactic-floating-panel-control="restore"]').click();assert(!panel.hidden,'Styled panel restores without losing its controls');
- const exportControl=shadow.querySelector('[data-export-report]');exportControl.hidden=false;
+ for(let n=0;n<100&&panel.dataset.providerDiagnostics!=='enabled';n++)await new Promise(resolve=>nativeTimeout(resolve,5));
+ const exportControl=shadow.querySelector('[data-export-report]');exportControl.hidden=false;exportControl.closest('details').open=true;
  assert(computed(exportControl).display!=='none'&&exportControl.getBoundingClientRect().width>90&&computed(minimize).position==='absolute','Export and shared account/minimize controls remain visibly styled under page CSP');
  assert(panel.getBoundingClientRect().height<=page.win.innerHeight-36&&host.getBoundingClientRect().width<=page.win.innerWidth-36,'Account and failure controls stay within the viewport with scrollable panel contents');
  const inflation=Array.from({length:1400},(_,index)=>({id:`observation-${index}`,title:`Synthetic library game ${index%188}`,image:`https://images.example.test/game-${index%188}.jpg`,label:'Delivered',body:'Collected on\nSep 1, 2026\nSent to\nAmazon Games library'}));

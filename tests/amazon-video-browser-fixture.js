@@ -253,30 +253,32 @@ try{
  await writer.mergeProviderItems('gog',[{providerItemId:'old-game',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);
  const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow,knownIds=[],messages=[];
  page=await setup({inside:'<div role="progressbar"></div>'});
- const renderPanel=(diagnostics=false)=>{
+ const floatingPanelCode=await(await fetch('/src/providers/floating-panel.js')).text();
+ const renderPanel=async(diagnostics=false)=>{
+  page.win.chrome={runtime:{sendMessage:async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:diagnostics}:{ok:true,profiles:[],profileLabel:'Fixture'}}};page.win.eval(floatingPanelCode);
   const original=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=original.call(this,options);return shadow;};
   page.win.GalacticSync={send:async request=>{
    messages.push(request.type);
    if(request.type==='GET_PROVIDER_SYNC_STATE')return {ok:true,hasFullBaseline:true,syncState:{knownProviderItemIds:knownIds}};
    if(request.type==='IMPORT_PROVIDER_ITEMS'){imports++;const items=JSON.parse(JSON.stringify(request.items));const database=request.mode==='full'?await writer.replaceProviderItems('amazon-video',items,{syncMode:'full'},JSON.parse(JSON.stringify(request.snapshot))):await writer.mergeProviderItems('amazon-video',items,{syncMode:'incremental'});return {ok:true,movieCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='movie').length,tvCount:Object.values(database.providerItems).filter(item=>item.provider==='amazon-video'&&item.mediaType==='tv').length};}
    throw Error('Unexpected message');},failed:async()=>{failures++;}};
-  page.win.eval((diagnostics?panelCode.replace('const SHOW_SCAN_DIAGNOSTICS = false;','const SHOW_SCAN_DIAGNOSTICS = true;'):panelCode).replace("if (!location.pathname.includes('/gp/video/')",'if (false'));
-  page.win.Element.prototype.attachShadow=original;
+  page.win.eval(panelCode.replace("if (!location.pathname.includes('/gp/video/')",'if (false'));
+  page.win.Element.prototype.attachShadow=original;await new Promise(resolve=>nativeTimeout(resolve,0));
  };
  const waitFor=async predicate=>{for(let n=0;n<500;n++){if(predicate())return;await new Promise(resolve=>nativeTimeout(resolve,10));}throw Error('Panel did not finish');};
- renderPanel();
- assert(!shadow.querySelector('input[type="checkbox"]')&&!shadow.querySelector('details')&&shadow.querySelectorAll('button').length===2,'The ordinary Amazon Video panel shows only Quick update and Full rescan, with no ownership option or diagnostics');
+ await renderPanel();
+ assert(shadow.querySelectorAll('[data-mode="full"], [data-mode="incremental"]').length===2&&[...shadow.querySelectorAll('[data-provider-diagnostic]')].every(e=>!e.getClientRects().length),'The ordinary Amazon Video panel hides diagnostics while preserving its two import actions and declared-account controls');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
  assert(page.api.getDiagnostics().hoverChecks.enabled&&imports===0&&JSON.stringify(await writer.getDatabase())===before,'Normal Full rescan enables purchase detection automatically and keeps internal sanitized diagnostics on failure');
  page.doc.querySelector('#galactic-library-amazon-video-importer').remove();failures=0;messages=[];
- renderPanel(true);assert(shadow.querySelector('details summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'A troubleshooting build retains the existing read-only checks and sanitized export');
+ await renderPanel(true);assert(shadow.querySelector('details[data-provider-diagnostic] summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'A troubleshooting build retains the existing read-only checks and sanitized export');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
  assert(imports===0&&JSON.stringify(await writer.getDatabase())===before,'A failed production-panel scan sends no import and preserves all saved records');
  assert(!shadow.querySelector('[data-export-diagnostics]').disabled,'A failed scan enables the ordinary UI diagnostic export action');
  let exported;page.win.URL.createObjectURL=blob=>{exported=blob;return 'blob:fixture';};page.win.URL.revokeObjectURL=()=>{};page.win.HTMLAnchorElement.prototype.click=function(){};
  shadow.querySelector('[data-export-diagnostics]').click();assert(exported&&JSON.parse(await exported.text()).reason==='continuation-unresolved'&&JSON.stringify(await writer.getDatabase())===before,'Export action creates diagnostic JSON without modifying storage');
  page.doc.querySelector('[role="progressbar"]').remove();shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>imports===1&&!shadow.querySelector('.status').dataset.busy);
- assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete')&&!shadow.querySelector('[data-export-diagnostics]').disabled&&shadow.querySelector('details').open,'Successful scans also expose diagnostics instead of hiding evidence of premature completion');
+ assert(shadow.querySelector('.status').textContent.startsWith('Full rescan complete')&&!shadow.querySelector('[data-export-diagnostics]').disabled&&shadow.querySelector('[data-export-diagnostics]').closest('details').open,'Successful scans also expose diagnostics instead of hiding evidence of premature completion');
  const db=await writer.getDatabase();assert(Object.values(db.providerItems).filter(item=>item.provider==='amazon-video').length===4&&Object.values(db.providerItems).some(item=>item.provider==='gog'),'A validated full snapshot updates only Amazon Video records');
  const beforeCheck=JSON.stringify(db);messages=[];shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
  assert(messages.length===0&&imports===1&&failures===1&&JSON.stringify(await writer.getDatabase())===beforeCheck,'Check listing neither begins a sync lease nor writes scan health, records or imports');

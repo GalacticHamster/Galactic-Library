@@ -34,6 +34,7 @@ import {ownershipCorrectionTarget} from './src/ui/quick-access.js';
 import {effectiveOwnershipRecord} from './src/lib/ownership.js';
 try{
  const client=createStorageClient(request=>chrome.runtime.sendMessage(request));let d=await client.getDatabase();
+ if(location.search==='?diagnostics')await client.saveProviderDiagnosticsEnabled(true);
  if(location.search==='?seed'){
   await client.mergeProviderItems('gog',[{providerItemId:'unrelated',title:'Unrelated synthetic game',mediaType:'game',ownership:'owned',acquiredAt:'2020-01-02'}]);d=await client.getDatabase();
   await client.saveOwnershipCorrections([ownershipCorrectionTarget(Object.values(d.providerItems).find(i=>i.provider==='epic'),d)],{ownership:'returned',note:'Synthetic correction'});d=await client.getDatabase();
@@ -90,6 +91,7 @@ try{
   await navigate(origin+'/en-US/');await ready();
   const restoredReportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
   const reloaded=await read(restoredReportUrl);assert.equal(reloaded.error,undefined);assert.deepEqual(reloaded.history,failed.history);assert.equal(reloaded.payload,baseline.payload);
+  await read(restoredReportUrl+'?diagnostics');
   await navigate(origin+'/en-US/u/Synthetic/achievements');await ready();await sync();
   assert.equal(await evaluate('return document.documentElement.dataset.fixtureRequests;'),'6');
   await evaluate(`const s=${root};s.querySelector('[data-export-scan]').click();return true;`);

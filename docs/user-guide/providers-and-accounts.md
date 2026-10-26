@@ -10,8 +10,8 @@ or change their ownership.
 Choose **Add a library** from an empty Library or the toolbar popup. In Providers,
 expand a provider and open its website. For a first store scan, sign in, enter a recognizable **Account
 nickname** on the Galactic Library panel, and confirm that it describes the
-signed-in account. Start **Full rescan** for the first import, or **Sync library**
-on Epic, or **Import loaded cards** on Nintendo. Keep the provider tab open until the import finishes. Return to Library
+signed-in account. Start **Full rescan** for the first import, or **Sync Epic library**
+on Epic, or **Import Nintendo cards** on Nintendo. Keep the provider tab open until the import finishes. Return to Library
 to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
@@ -25,6 +25,15 @@ sides contain purchases, confirm they are the same store account. See
 [purchase sync](purchase-sharing.md).
 
 ## Use remembered accounts
+
+On a provider website, a single connected account eligible for reuse appears as
+**Selected GL account** with **Change account**. Use that action to choose a
+saved account or **Add account**. Changing the input does not rename an account;
+the panel links to GL Providers for renaming. **Cancel account change** restores
+the prior selection without starting an import. With multiple saved accounts,
+confirm the signed-in account as requested; switching needs explicit consent.
+A new alternate account requires Full rescan. Completing initial setup refreshes
+the account display automatically without overwriting edits made during a save.
 
 Provider cards show accounts, imported counts, update dates, complete-scan
 coverage and recent update health. **Select for updates** restores that account's
@@ -330,7 +339,7 @@ before it can safely confirm purchases. Neither an unreadable history page nor
 absence from a partial page changes existing evidence. Quick update continues
 to use newest-first library discovery; it does not traverse purchase history.
 
-If you know your unconfirmed books were purchased, open **Providers → Kobo →
+If you know your unconfirmed books are permanently yours, open **Providers → Kobo →
 your saved account → Advanced account recovery and removal → Ownership
 preference**. Enable **Treat unconfirmed books in this account as
 owned** and save. This opt-in preference affects display and matching for

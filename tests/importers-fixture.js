@@ -4,6 +4,7 @@ import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import '../src/lib/contents-performance.js';
 import '../src/lib/kindle-contents-scan.js';
 import '../src/providers/floating-panel.js';
+const providerDiagnosticsEnabled=new URLSearchParams(location.search).get('provider-diagnostics')==='1';
 import { createStorageWriter } from '../src/background/storage-writer.js';
 import { completeProviderSnapshot, completedScope } from '../src/lib/provider-snapshot.js';
 import '../src/providers/metadata.js';
@@ -157,6 +158,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
     const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+      if(request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING')return {ok:true,enabled:providerDiagnosticsEnabled};
       if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE'){const d=await writer.getDatabase(),p=d.providerProfiles[d.providers[provider]?.activeProfileId],profiles=Object.values(d.providerProfiles).filter(p=>p.provider===provider);return {ok:true,profileLabel:p?.nickname??'fixture',profileId:p?.profileId,profiles,reuseAllowed:profiles.length===1&&p?.state.connected===true&&Boolean(p?.state.lastSync)};}
