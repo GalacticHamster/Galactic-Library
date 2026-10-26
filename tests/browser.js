@@ -24,6 +24,7 @@ const fandangoMode=process.argv.includes('--fandango');
 const audibleOwnershipMode=process.argv.includes('--audible-ownership');
 const importerMode=process.argv.includes('--importers');
 const koboMode=process.argv.includes('--kobo');
+const overlayAuditMode=process.argv.includes('--overlay-audit');
 const uxMode=process.argv.includes('--ux');
 const polishMode=process.argv.includes('--polish');
 const compactMode=process.argv.includes('--compact-library');
@@ -51,6 +52,9 @@ const fixtureFinished=new Promise(resolve=>{complete=resolve;});
 const server=createServer(async(request,response)=>{
   try{
     const pathname=new URL(request.url,'http://localhost').pathname;
+    if(pathname==='/tests/overlay-account-audit.html'){
+      response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<html><body><script type="module" src="/tests/overlay-account-audit-fixture.js"></script></body></html>');return;
+    }
     if(pathname==='/tests/metadata.epub'){
       response.setHeader('Content-Type','application/epub+zip');response.end(metadataZip([{name:'META-INF/container.xml',text:containerXml,compressed:deflateRawSync(containerXml)},{name:'OEBPS/content.opf',text:opfXml,compressed:deflateRawSync(opfXml)},{name:'OEBPS/chapter.xhtml',text:'Synthetic chapter; should not be read.'}]));return;
     }
@@ -78,7 +82,7 @@ try{
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
   const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):'';
-  const url=`http://127.0.0.1:${server.address().port}/${koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
+  const url=`http://127.0.0.1:${server.address().port}/${overlayAuditMode?'tests/overlay-account-audit.html':koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};

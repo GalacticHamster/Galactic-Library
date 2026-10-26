@@ -45,6 +45,7 @@ import {navigationUxTests} from './navigation-ux.js';
 import {providersUxTests} from './providers-ux.js';
 import {onboardingUxTests} from './onboarding-ux.js';
 import {providerProfileTests} from './provider-profiles.js';
+import {overlayAccountAuditTests} from './overlay-account-audit.js';
 import {koboWorkflowTests} from './kobo-workflow.js';
 import {kindleScanPerformanceTests} from './kindle-scan-performance.js';
 import {refreshWritePacingTests} from './refresh-write-pacing.js';
@@ -139,6 +140,7 @@ const tests = [
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,
+  ...overlayAccountAuditTests,
   ...consoleLibraryTests,
   ...nintendoImportTests,
   ...playstationImportTests,
