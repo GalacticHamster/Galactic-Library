@@ -295,6 +295,23 @@ Explicit purchase, subscription, borrowing, rental and free-claim evidence is
 kept separately. A claimed free book is not labeled as a paid purchase. When the
 page provides no acquisition evidence, access remains unconfirmed.
 
+To investigate missing ownership evidence without importing again, open Kobo's
+**My Books** page, expand **Scan diagnostics** in the GL overlay, select
+**Check ownership evidence (no import)**, then **Export check report**.
+This checks the visible library page and, only if Kobo exposes a same-site
+Purchase History or Order History link there, its first page. It does not
+traverse history, open order details, change access, or save library records.
+The report contains aggregate counts and structural hints, with no titles,
+identifiers, dates, account details or page contents. Matching counts compare
+exact identifiers with GL's active saved Kobo account; they do not verify the
+website's signed-in account. A date hint is not a confirmed acquisition date.
+
+Automatic purchase-history ownership enrichment is not implemented. Kobo's
+live history layout, identifier relationships and completeness need validation
+before it can safely confirm purchases. Neither an unreadable history page nor
+absence from a partial page changes existing evidence. Quick update continues
+to use newest-first library discovery; it does not traverse purchase history.
+
 If you know your unconfirmed books were purchased, open **Providers → Kobo →
 your saved account → Advanced account recovery and removal → Ownership
 preference**. Enable **Treat unconfirmed books in this Kobo account as

@@ -11,7 +11,12 @@
       .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     </style>
     <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Kobo's newest-first My Books pages until it reaches a page already in your local baseline. <strong>Full rescan</strong> also checks Archive and Audiobooks when Kobo exposes them.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
-  const buttons = [...shadow.querySelectorAll('button')];
+  const diagnostics = document.createElement('details');
+  diagnostics.innerHTML = '<summary>Scan diagnostics</summary><p>Inspect this My Books page and, if linked here, the first purchase-history page. No books or access states will change. Reports contain counts only, not titles, dates, identifiers or account details.</p><button type="button" data-check-evidence>Check ownership evidence (no import)</button> <button type="button" data-export-evidence hidden>Export check report</button>';
+  shadow.querySelector('.panel').insertBefore(diagnostics, shadow.querySelector('.status'));
+  const buttons = [...shadow.querySelectorAll('button[data-mode], [data-check-evidence]')];
+  const exportButton = shadow.querySelector('[data-export-evidence]');
+  let evidenceReport = null;
   const status = shadow.querySelector('.status');
   const performanceApi=globalThis.GalacticContentsPerformance;
   const prefix=crypto.randomUUID().replace(/-/gu,'').slice(0,12);let sequence=100;
@@ -62,7 +67,35 @@
       delete status.dataset.busy;
     }
   }
-  buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+  shadow.querySelector('[data-check-evidence]').addEventListener('click', async () => {
+    buttons.forEach(button => { button.disabled = true; });
+    exportButton.hidden = true; evidenceReport = null;
+    status.dataset.busy = 'true';
+    status.textContent = 'Checking visible Kobo evidence and one linked history page. No library data will change...';
+    try {
+      // Bypass the scan-start wrapper: this is a read, with no lease or save.
+      let savedIds = null;
+      try {
+        const state = await chrome.runtime.sendMessage({type: 'GET_PROVIDER_SYNC_STATE', provider: 'kobo', beginScan: false});
+        if (state?.ok && Array.isArray(state.syncState?.knownProviderItemIds)) savedIds = state.syncState.knownProviderItemIds;
+      } catch { /* Evidence inspection is still possible without saved IDs. */ }
+      evidenceReport = await globalThis.GalacticKoboDiagnostics.check(document, location.href, savedIds);
+      status.textContent = `Evidence check finished. ${evidenceReport.library.parsedLibraryItems} readable library items on this page. Purchase history: ${evidenceReport.purchaseHistory.state === 'link-not-exposed' ? 'no link exposed here' : evidenceReport.purchaseHistory.state === 'content-observed' ? 'first page readable' : evidenceReport.purchaseHistory.state === 'explicit-empty' ? 'an explicit empty list was shown' : 'not verified'}. No library data changed. Export the check report; this does not verify complete history or ownership.`;
+    } catch {
+      status.textContent = 'The evidence check could not finish. No library data changed. Open My Books, let it finish loading, then retry.';
+    } finally {
+      exportButton.hidden = !evidenceReport;
+      buttons.forEach(button => { button.disabled = false; });
+      delete status.dataset.busy;
+    }
+  });
+  exportButton.addEventListener('click', () => {
+    if (!evidenceReport) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(evidenceReport, null, 2)], {type: 'application/json'}));
+    const link = document.createElement('a'); link.href = url; link.download = 'GL-kobo-evidence-check.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  shadow.querySelectorAll('button[data-mode]').forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
   globalThis.GalacticFloatingPanel?.attach(shadow, 'kobo');
   document.documentElement.append(host);
 }());

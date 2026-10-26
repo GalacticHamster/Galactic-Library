@@ -201,6 +201,7 @@
         "src/providers/metadata.js",
         "src/providers/kobo-ownership.js",
         "src/providers/kobo.js",
+        "src/providers/kobo-diagnostics.js",
         "src/providers/kobo-content.js"
       ],
       "run_at": "document_idle",

@@ -1,5 +1,6 @@
 import '../src/providers/metadata.js';
 import '../src/providers/kobo.js';
+import '../src/providers/kobo-diagnostics.js';
 import '../src/providers/floating-panel.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
@@ -25,12 +26,34 @@ try{
   const stableDoc=new DOMParser().parseFromString(`<article data-product-id="${uuid(555)}"><h3>Audiobook Adventures</h3><a data-book-title="Audiobook Adventures" href="https://readnow.kobo.com/${uuid(777)}">Read Now</a><a data-book-title="Audiobook Adventures" href="https://readnow.kobo.com/${uuid(777)}">Read Now</a><span class="book-author">Writer</span></article>`,'text/html');
   const stable=globalThis.GalacticKobo.koboItemsFromDocument(stableDoc);assert(stable.length===1&&stable[0].providerItemId===uuid(777)&&stable[0].mediaType==='book'&&stable[0].metadata.authors[0]==='Writer','Card expansion changed the reader UUID, format or deduplicated metadata.');
   checks.push('Stable reader UUID survives conflicting wrapper IDs and duplicate action links; title words never change book format');
+  // Structural fixtures test diagnostic bounds/privacy, not Kobo's live
+  // purchase-history layout or eligibility for ownership promotion.
+  const diagnostic=globalThis.GalacticKoboDiagnostics;
+  const evidence=diagnostic.inspect(doc,[uuid(0)]);
+  assert(evidence.parsedLibraryItems===24&&evidence.parsedSavedIdMatches===1&&evidence.completeness==='not-established','Diagnostic invented complete history or lost exact identity comparison.');
+  const privateDoc=new DOMParser().parseFromString(`<article><a href="https://www.kobo.com/ebook/private-title">PRIVATE TITLE</a><time datetime="2020-01-01">2020-01-01</time><span>private@example.com Kobo Plus</span></article>`,'text/html');
+  const redacted=JSON.stringify(diagnostic.inspect(privateDoc));
+  assert(!['PRIVATE TITLE','private-title','2020-01-01','private@example.com'].some(value=>redacted.includes(value)),'Diagnostic leaked source content.');
+  assert(diagnostic.inspect(privateDoc).rowsWithDateHints===1&&diagnostic.inspect(privateDoc).rowsWithSubscriptionWording===1,'Structural hints lost.');
+  checks.push('Read-only evidence inventory exports aggregate ID/date/access hints without source values or completeness claims');
+  const linked=new DOMParser().parseFromString('<a href="https://www.kobo.com/account/history">Purchase History</a>','text/html');
+  let requests=0;
+  const report=await diagnostic.check(linked,'https://www.kobo.com/library',[],async(url,options)=>{requests++;assert(options.redirect==='error'&&options.credentials==='include','Diagnostic followed uncontrolled redirects.');return new Response(privateDoc.documentElement.outerHTML);});
+  assert(requests===1&&report.purchaseHistory.scope==='purchase-history-first-page'&&report.purchaseHistory.completeness==='not-established','Diagnostic traversed history or invented completeness.');
+  for(const [response,state]of [[new Response('',{status:403}),'access-denied'],[new Response('<input type="password">'),'sign-in-required'],[new Response('Your purchase history is empty'),'explicit-empty'],[new Response('<main>Unexpected layout</main>'),'unrecognized'],[new Response('x'.repeat(2*1024*1024+1)),'size-limit']])assert((await diagnostic.check(linked,'https://www.kobo.com/library',[],async()=>response)).purchaseHistory.state===state,'Diagnostic conflated empty, unreadable, oversized or inaccessible history.');
+  const foreign=new DOMParser().parseFromString('<a href="https://example.com/history">Purchase History</a>','text/html');
+  const hiddenEmpty=new DOMParser().parseFromString('<main>Unexpected layout</main><script>"Your purchase history is empty"</script><p hidden>Your purchase history is empty</p>','text/html');
+  assert(diagnostic.inspect(hiddenEmpty).state==='unrecognized','Unused script or hidden empty-list wording was treated as evidence.');
+  assert((await diagnostic.check(foreign,'https://www.kobo.com/library',[],()=>{throw Error('must not request');})).requestsMade===0,'Foreign evidence page fetched.');
+  assert((await diagnostic.check(linked,'https://www.kobo.com/library',[],async()=>{throw Error('PRIVATE exception');})).purchaseHistory.state==='inaccessible-or-redirected','Request errors leaked or were treated as empty.');
+  checks.push('History check makes at most one same-site request and distinguishes access, login, explicit empty, unknown, size limits and failures');
   const items=[...cards.map(r=>({...r,metadata:{...r.metadata,librarySection:'my-books'}})),...Array.from({length:113},(_,n)=>({providerItemId:uuid(n+24),title:'Saved Book '+n,mediaType:'book',ownership:'unknown',metadata:{authors:['Saved Writer'],ownershipBasis:'library-presence-only'}}))];
   let db=await writer.replaceProviderItems('kobo',items,{profileLabel:'Sean',fullSyncAt:'2026-10-01'},completeProviderSnapshot('kobo',items,[completedScope('library',137,137,'reported-count')]));
   const profileId=db.providers.kobo.activeProfileId,refs=Object.values(db.providerItems).map(r=>r.recordRef).sort().join();
   let releaseProfile,profilePending=true,started=0,completed=0;const uiTimings=[];
   const profileGate=new Promise(resolve=>{releaseProfile=resolve;});
-  globalThis.fetch=async()=>({ok:true,text:async()=>html});
+  const scanUrls=[];
+  globalThis.fetch=async url=>{scanUrls.push(new URL(url));return {ok:true,text:async()=>html};};
   globalThis.chrome={runtime:{sendMessage:async request=>{
     if(request.type==='GET_PROVIDER_PROFILE_HINT')return {ok:true,hint:await writer.getProviderProfileHint('kobo')};
     if(request.type==='GL_PROVIDER_UI_TIMING'){uiTimings.push(request.timing);return {ok:true};}
@@ -40,6 +63,7 @@ try{
       return {ok:true,profileId:profile.profileId,profileLabel:profile.nickname,reuseAllowed:profiles.length===1&&profile.state.connected,profiles};
     }
     if(request.type==='GET_PROVIDER_SYNC_STATE'){
+      if(request.beginScan===false){const saved=await writer.getDatabase();return {ok:true,syncState:{knownProviderItemIds:Object.values(saved.providerItems).filter(r=>r.profileId===profileId).map(r=>r.providerItemId)}};}
       started++;
       try{const scan=await writer.beginProviderScan('kobo',request.profileLabel,request.mode,request.switchProfile,1,request.profileId,!request.confirmed&&request.rememberedProfile);
         return {ok:true,profileId:scan.profileId,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:Object.values(scan.database.providerItems).filter(r=>r.profileId===scan.profileId).map(r=>r.providerItemId)}};
@@ -53,12 +77,19 @@ try{
     return {ok:false,error:'Unexpected request'};
   }}};
   history.replaceState(null,'','/library');await import('../src/providers/kobo-content.js');let shadow=shadows.at(-1),button=shadow.querySelector('[data-mode="incremental"]');
+  const beforeDiagnostic=JSON.stringify(await writer.getDatabase());
+  shadow.querySelector('[data-check-evidence]').click();await wait(()=>!shadow.querySelector('.status').dataset.busy);
+  assert(started===0&&completed===0&&JSON.stringify(await writer.getDatabase())===beforeDiagnostic&&!shadow.querySelector('[data-export-evidence]').hidden,'Diagnostic started an import or changed the library.');
+  assert(shadow.querySelector('.status').textContent.includes('No library data changed'),'Diagnostic did not explain its read-only result.');
+  checks.push('Overlay evidence check uses a read without starting a scan or modifying records, accounts, reviews or baseline');
   button.click();await pause();assert(started===0,'Scan began before persisted profile selection resolved.');assert(shadow.querySelector('[data-profile-label]').value==='Sean','Display-only remembered nickname waited for full validation.');profilePending=false;releaseProfile();await wait(()=>completed===1);
   assert(shadow.querySelector('[data-profile-label]').value==='Sean'&&!shadow.querySelector('[data-profile-confirm]').checked,'Remembered account required a repeated checkbox confirmation.');
   const accountTiming=uiTimings.find(r=>r.providerPhase==='account');assert(accountTiming&&['provider_hint_message','provider_hint_display','provider_profile_message','provider_verified_display'].every(stage=>accountTiming.events.some(e=>e.stage===stage)),'Account hint, callback and display diagnostics are missing.');
   assert(shadow.querySelector('.status').textContent.includes('24 checked · 0 new · 0 updated'),'Observed cards were reported as changed books.');
   checks.push('A click during delayed account loading waits, then reuses the single saved profile without nickname entry or repeat confirmation');
+  history.replaceState(null,'','/library?pageNumber=9&sort=TitleAsc');
   button.click();await wait(()=>completed===2);assert(shadow.querySelector('.status').textContent.includes('0 updated')&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
+  assert(scanUrls.at(-1).searchParams.get('pageNumber')==='1'&&scanUrls.at(-1).searchParams.get('sort')==='DateAddedDesc','Repeated scan failed to reset My Books paging and ordering.');
   assert(JSON.stringify(parseBackup(createBackup(db)))===JSON.stringify(db),'Author/genre backup roundtrip changed metadata.');
   checks.push('Two actual unchanged quick scans report zero new/updated, retain all 137 UUIDs and preserve metadata through backup restore');
   db=await writer.mergeProviderItems('kobo',[{providerItemId:uuid(999),title:'Other Account Book',mediaType:'book'}],{profileLabel:'Other'});
