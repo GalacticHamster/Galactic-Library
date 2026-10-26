@@ -54,7 +54,7 @@
       providerItemId,
       title,
       mediaType: 'audiobook',
-      ownership: entry?.ownership === 'subscription' ? 'subscription' : 'unknown',
+      ownership: ['subscription','expired'].includes(entry?.ownership) ? entry.ownership : 'unknown',
       metadata: {
         ...(global.GalacticProviderMetadata?.extract(entry) ?? {}),
         source: 'audible-library-page',
@@ -63,16 +63,21 @@
         authors: global.GalacticProviderMetadata?.extract(entry).authors ?? (Array.isArray(entry.authors) ? entry.authors.filter(Boolean) : []),
         narrators: Array.isArray(entry.narrators) ? entry.narrators.filter(Boolean) : [],
         series: global.GalacticProviderMetadata?.extract(entry).series ?? (Array.isArray(entry.series) ? entry.series.filter(Boolean) : []),
-        libraryAction: String(entry?.libraryAction ?? '')
+        libraryAction: String(entry?.libraryAction ?? ''),
+        ...(entry?.libraryAvailability==='unavailable'?{libraryAvailability:'unavailable'}:{}),
+        ...(entry?.ownership==='expired'?{audibleOwnershipBasis:'audible-library-action'}:{})
       }
     };
   }
 
-  function ownershipFromLibraryAction(actionText) {
+  function ownershipFromLibraryAction(actionText,availabilityText='') {
     const action=String(actionText??'').replace(/\s+/gu,' ').trim();
-    // List management and a bare Remove button do not establish access rights.
+    // The standalone library Remove action is distinct from list management.
+    // Its absence never establishes ownership. Locked temporary access has no
+    // known expiration date; purchase/gift evidence is reconciled separately.
     if(/\bfavou?rites?\b|\bwish\s?list\b|\bcollections?\b/iu.test(action))return 'unknown';
-    return /^(?:remove from (?:your )?(?:audible )?plus (?:catalog|catalogue)(?: library)?|included (?:in|with) (?:your )?(?:audible )?plus (?:membership|subscription|catalog|catalogue))[.!]?$/iu.test(action)?'subscription':'unknown';
+    const temporary=/^(?:remove|remove from (?:your )?(?:audible )?plus (?:catalog|catalogue)(?: library)?|included (?:in|with) (?:your )?(?:audible )?plus (?:membership|subscription|catalog|catalogue))[.!]?$/iu.test(action);
+    return temporary?(String(availabilityText).trim().toLowerCase()==='unavailable'?'expired':'subscription'):'unknown';
   }
 
   function newAudibleItems(items, knownItemIds = []) {
@@ -81,9 +86,14 @@
   }
 
   function libraryActionFromContainer(container) {
-    const actions=[...container.querySelectorAll('button, [role="button"], a:not([href*="/pd/"])')].map(element=>textOf(element));
+    const actions=libraryControls(container).map(element=>textOf(element));
     return actions.find(text=>ownershipFromLibraryAction(text)==='subscription')
       ?? actions.find(text=>/\bremove\b/iu.test(text)) ?? '';
+  }
+
+  function libraryControls(container){
+    return [...container.querySelectorAll('button,[role="button"],a:not([href*="/pd/"])')]
+      .filter(element=>!element.closest('[hidden],[aria-hidden="true"],template,script,style,[style*="display:none" i],[style*="display: none" i]'));
   }
 
   function namedLinks(container, selector) {
@@ -108,11 +118,14 @@
       const title = textOf(link);
       const container = link.closest('.adbl-library-content-row') ?? link.closest('li, [data-testid*="library"], [class*="library"], [class*="tile"], [class*="item"]') ?? link.parentElement ?? link;
       const libraryAction = libraryActionFromContainer(container);
+      // Read the row's action/status labels, never its title or synopsis.
+      const unavailable=libraryControls(container).some(element=>/^unavailable$/iu.test(textOf(element)));
       const item = audibleItemFromLibraryEntry({
         url,
         title,
-        ownership: ownershipFromLibraryAction(libraryAction),
+        ownership:ownershipFromLibraryAction(libraryAction,unavailable?'unavailable':''),
         libraryAction,
+        libraryAvailability:unavailable?'unavailable':'',
         authors: namedLinks(container, 'a[href^="/author/"], a[href*="searchAuthor="], a[href*="libItem_author"]'),
         narrators: namedLinks(container, 'a[href*="searchNarrator="], a[href*="libItem_narrator"]'),
         series: namedLinks(container, 'a[href^="/series/"], a[href*="libItem_series"]')
@@ -789,8 +802,8 @@
       // generic page prose or a merely empty table never establishes completion.
       if(view==='gift-received'){
         if(readReceivedGifts(doc,{forImport:true,now}).orderCount===0)return true;
-        const message=/^(?:you (?:have not|haven['\u2019]t) received any gifts|no gifts received)[.!]?$/iu;
-        if([...doc.querySelectorAll('p,div,span')].filter(e=>visible(e)&&!e.closest('table,[role="table"]')&&!e.querySelector('table,[role="table"]')).some(e=>message.test(textOf(e))))return true;
+        const message=/^(?:you (?:have not|haven['\u2019]t) received any gifts|no gifts received|your gift history is empty)[.!]?$/iu;
+        if([...doc.querySelectorAll('p,div,span')].filter(e=>visible(e)&&!e.closest('table,[role="table"],aside,footer,nav')&&!e.querySelector('table,[role="table"]')).some(e=>message.test(textOf(e))))return true;
         return false;
       }
       if(view==='refund-history'){

@@ -204,7 +204,7 @@ try{
      if(delayedEmpty&&view==='refund-history')setTimeout(()=>{if(!closed){const p=next.createElement('p');p.textContent="Looks like you don't have any refunds in your purchase history.";next.body.append(p);}},5);
    };build();return {visits,get closed(){return closed;},read(){if(view==='refund-history'&&year===providerErrorYear)throw Error('history-provider-error');if(permanentDocument&&view==='refund-history'||unverifiedReads-->0)throw Error('history-access-not-verified');if(challenge||failRefund&&view==='refund-history')return new DOMParser().parseFromString('<form>Security challenge</form>','text/html');return doc;},choose(select,option){if(/^\d{4}$/u.test(option.textContent))year=Number(option.textContent);else view=/^Refund history$/u.test(option.textContent)?'refund-history':'orders';page=1;build();if(transientDocument)unverifiedReads=2;},follow(control){page=repeat?1:wrongNumberedPage?3:Number(control.getAttribute('data-page'));build();},close(){closed++;}};
  };
- const giftHistoryDriver=({badDate=false,conflicting=false,missing=false,blocked=false,unknownEmpty=false,foreignNext=false,sentFirst=false,missingPager=false,malformed=false}={})=>{
+ const giftHistoryDriver=({badDate=false,conflicting=false,missing=false,blocked=false,unknownEmpty=false,foreignNext=false,sentFirst=false,missingPager=false,malformed=false,liveEmpty=false,hiddenGiftEmpty=false}={})=>{
    const years=[2026,2025,2023,2022];let year=years[0],page=1,view=sentFirst?'Gift given':'Gift received',doc,closed=0;const visits=[];
    const build=()=>{
      const controls='<select>'+['Gift given','Gift received'].map(v=>'<option'+(v===view?' selected':'')+'>'+v+'</option>').join('')+'</select><select>'+years.map(y=>'<option'+(y===year?' selected':'')+'>'+y+'</option>').join('')+'</select>';
@@ -212,7 +212,7 @@ try{
      const rows=numbers.map(n=>'<tr><td><a href="/pd/'+id(n)+'"><img alt="PRIVATE_COVER"></a></td><td>Synthetic gift '+n+(conflicting&&n===83?'<a href="/pd/'+id(999)+'">Conflicting edition</a>':'')+'</td><td>'+(missing&&n===83?'':badDate&&n===83?'02-30-22':'01-02-'+String(year).slice(-2))+'</td><td>PRIVATE_SENDER@example.invalid <span>PRIVATE_GIFT_CODE</span></td></tr>').join('');
      let html=controls+'<h2>Gift history</h2><div>'+(year===2023?2:numbers.length)+' Orders</div><table><thead><tr><th></th><th>Title</th><th>Redeemed date</th><th>Received from</th></tr></thead><tbody>'+rows+'</tbody></table>';
      if(malformed&&year===2022)html=html.replace('<td>Synthetic gift 83</td>','');
-     if(!numbers.length)html+='<p>'+(unknownEmpty?'Unrecognized empty page':'You have not received any gifts.')+'</p>';
+     if(!numbers.length){if(liveEmpty)html=html.replace('<div>0 Orders</div>','');html+='<p'+(hiddenGiftEmpty?' hidden':'')+'>'+(liveEmpty?'Your gift history is empty.':unknownEmpty?'Unrecognized empty page':'You have not received any gifts.')+'</p>';}
      if(year===2023&&!missingPager)html+='<div class="history-paging"><span>'+page+'</span>'+(page===1?'<a href="'+(foreignNext?'https://example.invalid':'https://www.audible.com')+'/account/gift-history?CURSOR_SECRET=next" data-page="2">2</a>':'<a href="/account/gift-history?CURSOR_SECRET=previous" data-page="1">1</a>')+'</div>';
      doc=new DOMParser().parseFromString(blocked?'<form>Sign in</form>':html,'text/html');Object.defineProperty(doc,'readyState',{value:'complete'});visits.push([view,year,page]);
    };build();return {visits,get closed(){return closed;},read:()=>doc,choose(select,option){if(/^\d{4}$/u.test(option.textContent))year=Number(option.textContent);else view=option.textContent;page=1;build();},follow(control){page=Number(control.getAttribute('data-page'));build();},close(){closed++;}};
@@ -235,6 +235,10 @@ try{
  assert(Object.values(giftDb.providerItems).find(r=>r.providerItemId===id(83)).acquiredAt==='2022-01-02T00:00:00.000Z'&&Object.values(giftDb.providerItems).filter(r=>r.ownership==='owned').length===8,'Recent-only zero-item Quick updates retain older gift ownership and redemption dates');
  giftRun=await runGifts({unknownEmpty:true});
  assert(giftRun.result.giftsComplete,'An explicit zero Orders count beside Gift history verifies an empty received-gift year without guessing empty-page prose');
+ giftRun=await runGifts({liveEmpty:true});
+ assert(giftRun.result.giftsComplete&&giftRun.result.giftPagesRead===5&&!giftRun.result.failures.length,'The observed Your gift history is empty sentence verifies the selected received-gift year without a zero count and allows later years to continue');
+ giftRun=await runGifts({liveEmpty:true,hiddenGiftEmpty:true});
+ assert(!giftRun.result.giftsComplete&&giftRun.result.failures.some(f=>f.view==='gift-received'&&f.reason==='history-empty-unconfirmed'),'A hidden empty-gift sentence cannot prove that a year has no received gifts');
  giftRun=await runGifts({missingPager:true});
  assert(!giftRun.result.giftsComplete&&giftRun.result.failures.some(f=>f.reason==='history-count-mismatch'),'A received-gift count exceeding the read rows prevents false completion if pagination is missed');
  for(const issue of ['badDate','missing','conflicting','malformed']){

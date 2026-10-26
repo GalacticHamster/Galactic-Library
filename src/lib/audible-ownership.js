@@ -41,6 +41,11 @@ export function validateAudibleHistory(value){
   return {format:1,scope,...audibleGiftHistory(value),failures:audibleHistoryFailures(value.failures),ordersComplete:value.ordersComplete,refundsComplete:value.refundsComplete,purchases,refunds,uncertainRefundAsins,refundPurchaseYearsChecked,years:[...new Set(value.years)].sort((a,b)=>b-a),pagesRead:value.pagesRead,reason:text(value.reason??'',100)};
 }
 
+// A library-derived lock is weaker than dated acquisition evidence. Other
+// explicit expiries retain their existing protection against reclassification.
+export function audibleLibraryExpiry(item){
+  return item?.provider==='audible'&&item.ownership==='expired'&&item.metadata?.libraryAvailability==='unavailable'&&item.metadata.audibleOwnershipBasis==='audible-library-action';
+}
 // Historical facts enrich one existing source record; they never create a
 // transaction-shaped audiobook or change a manual ownership review.
 export function enrichAudibleRecords(database,profileId,incoming,raw,{full=false}={}){
@@ -72,7 +77,7 @@ export function enrichAudibleRecords(database,profileId,incoming,raw,{full=false
       const checkedReturn=history.scope==='full'||(refunds.get(item.providerItemId)??[]).some(day=>day===lastReturn&&history.years.includes(Number(day.slice(0,4))));
       const checkedPurchase=history.scope==='full'||byAsin.has(item.providerItemId);
       if(lastReturn&&checkedReturn&&history.ordersComplete&&(history.refundsComplete||scopedFull)&&(!lastPurchase||lastReturn>lastPurchase)){ownership='returned';metadata.audibleOwnershipBasis='audible-refund-history';}
-      else if(purchaseRefundsChecked&&lastPurchase&&checkedPurchase&&(!lastReturn||lastPurchase>lastReturn)&&(!['returned','revoked','expired'].includes(item.ownership)||item.metadata.audibleOwnershipBasis==='audible-refund-history'&&lastReturn&&lastPurchase>lastReturn)){ownership='owned';metadata.audibleOwnershipBasis='audible-purchase-history';}
+      else if(purchaseRefundsChecked&&lastPurchase&&checkedPurchase&&(!lastReturn||lastPurchase>lastReturn)&&(!['returned','revoked','expired'].includes(item.ownership)||audibleLibraryExpiry(item)||item.metadata.audibleOwnershipBasis==='audible-refund-history'&&lastReturn&&lastPurchase>lastReturn)){ownership='owned';metadata.audibleOwnershipBasis='audible-purchase-history';}
     }
     const next={...item,ownership,acquiredAt,metadata};
     const changed=JSON.stringify(next)!==JSON.stringify(item);

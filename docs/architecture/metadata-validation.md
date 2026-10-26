@@ -11,7 +11,7 @@ Common metadata fields are authors, contributors with name/role, series, ISBN/AS
 | Steam / Epic | Parent provider item ID |
 | GOG | None |
 | Amazon Games | Delivery label |
-| Audible | Narrators, library action |
+| Audible | Narrators, library action, unavailable label, dated purchase/refund/redemption evidence |
 | Kindle | Collections, origin/content type, item status, library category |
 | Amazon Video | Entity type, library view, ownership evidence |
 | Fandango at Home | Card type |

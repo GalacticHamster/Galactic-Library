@@ -35,9 +35,15 @@ async function fixture(){
 
 export const audibleRescanTests=[
  ...audibleOwnershipTests,
- ['Audible access evidence excludes favorites, wishlist, collections and ambiguous Remove controls',()=>{
-   for(const action of ['Remove','Remove from favorites','Remove from favourites','Remove from wishlist','Remove from collection','Listen now','Audible Plus available'])assert.equal(api.ownershipFromLibraryAction(action),'unknown',action);
-   for(const action of ['Remove from Plus Catalog','Included in your Audible Plus membership'])assert.equal(api.ownershipFromLibraryAction(action),'subscription',action);
+ ['Audible access evidence distinguishes standalone Remove from favorites, wishlist and collections',()=>{
+   for(const action of ['','Remove from favorites','Remove from favourites','Remove from wishlist','Remove from collection','Listen now','Audible Plus available','Please remove this title']){
+     assert.equal(api.ownershipFromLibraryAction(action),'unknown',action);
+     assert.equal(api.ownershipFromLibraryAction(action,'unavailable'),'unknown',action);
+   }
+   for(const action of ['Remove','Remove from Plus Catalog','Included in your Audible Plus membership']){
+     assert.equal(api.ownershipFromLibraryAction(action),'subscription',action);
+     assert.equal(api.ownershipFromLibraryAction(action,'unavailable'),'expired',action);
+   }
  }],
  ['Audible complete rescan preserves curated relationships, metadata, account scope and historical source records',async()=>{
    const {writer,profile,a,missing,before,items}=await fixture();

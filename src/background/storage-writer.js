@@ -1,5 +1,5 @@
 import {normalizePermanentClaimsDatabase} from '../lib/ownership.js';
-import {validateAudibleHistory,enrichAudibleRecords,audibleGiftHistory} from '../lib/audible-ownership.js';
+import {validateAudibleHistory,enrichAudibleRecords,audibleGiftHistory,audibleLibraryExpiry} from '../lib/audible-ownership.js';
 import {validateSteamApplicationImport,steamApplicationAccess} from '../lib/provider-state.js';
 import {identicalCapture} from '../lib/source-history.js';
 import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
@@ -885,9 +885,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if(incoming.provider==='audible'&&previous?.mediaType===incoming.mediaType){
       const metadata={...incoming.metadata};
-      for(const key of ['audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn','audibleOwnershipBasis'])if(previous.metadata?.[key]!==undefined)metadata[key]=previous.metadata[key];
+      for(const key of ['audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn'])if(previous.metadata?.[key]!==undefined)metadata[key]=previous.metadata[key];
+      const keepOwnership=['owned','returned','revoked','expired'].includes(previous.ownership)&&['unknown','subscription','expired'].includes(incoming.ownership)&&!(audibleLibraryExpiry(previous)&&incoming.ownership==='subscription');
+      if(keepOwnership){
+        if(previous.metadata?.audibleOwnershipBasis!==undefined)metadata.audibleOwnershipBasis=previous.metadata.audibleOwnershipBasis;
+        else delete metadata.audibleOwnershipBasis;
+      }else if(previous.metadata?.audibleOwnershipBasis&&previous.metadata.audibleOwnershipBasis!=='audible-library-action')metadata.audibleOwnershipBasis=previous.metadata.audibleOwnershipBasis;
+      if(audibleLibraryExpiry(previous)&&incoming.ownership==='unknown')metadata.libraryAvailability='unavailable';
       incoming={...incoming,metadata,acquiredAt:previous.acquiredAt??incoming.acquiredAt,
-        ...(['owned','returned','revoked','expired'].includes(previous.ownership)&&['unknown','subscription'].includes(incoming.ownership)?{ownership:previous.ownership}:{})};
+        ...(keepOwnership?{ownership:previous.ownership}:{})};
     }
     if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};

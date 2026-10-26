@@ -97,8 +97,13 @@ needed.
 Exact Audible identifiers and the selected account determine matches. Supported
 purchase dates retain their calendar day; saved reliable dates, purchase evidence
 and your corrections are preserved. Shared order totals are never assigned to
-individual books. Favorites, wishlist controls and a plain **Remove** action do
-not establish purchase or subscription access. Missing evidence remains unconfirmed.
+individual books. A standalone **Remove** button on a library title identifies
+subscription access. **Remove** together with **Unavailable** identifies expired
+temporary access, without inventing an expiration date or assuming a refund.
+This can happen when a title leaves the included catalog or membership access
+ends. Confirmed purchases, received gifts and your corrections take precedence.
+Favorites, wishlist and collection controls do not establish access rights.
+Absence of Remove does not prove ownership; missing evidence stays unconfirmed.
 
 Incomplete library discovery prevents replacement. If history alone is
 inaccessible or incomplete, discovered library titles and prior evidence are

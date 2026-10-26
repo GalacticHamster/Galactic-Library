@@ -5,6 +5,7 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {validateAudibleHistory} from '../src/lib/audible-ownership.js';
+import {validateMetadata} from '../src/lib/metadata-validation.js';
 import {acquisitionDate,formatDate} from '../src/ui/formatters.js';
 import {acquisitionHistory} from '../src/ui/library-acquisitions.js';
 const id=n=>'B'+String(n).padStart(9,'0');
@@ -14,7 +15,35 @@ const purchase=(n,method='cash',date='2025-12-07')=>({asin:id(n),date,method});
 const snapshot=items=>completeProviderSnapshot('audible',items,[completedScope('library',items.length,items.length,'pagination-end',1)]);
 const memory=()=>{const values={};let fail=false;return {values,fail:()=>{fail=true;},writer:createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async patch=>{if(fail)throw Error('Storage failed');Object.assign(values,structuredClone(patch));}})};};
 const rows=db=>Object.values(db.providerItems).filter(i=>i.provider==='audible');
+const temporary=(n,locked=false)=>({...item(n,locked?'expired':'subscription'),metadata:{...item(n).metadata,source:'audible-library-page',libraryAction:'Remove',...(locked?{libraryAvailability:'unavailable',audibleOwnershipBasis:'audible-library-action'}:{})}});
 export const audibleOwnershipTests=[
+ ['Audible temporary access is reversible, scoped, dateless and durable without manufacturing purchases',async()=>{
+   const {writer:w}=memory();let db=await w.mergeProviderItems('audible',[temporary(1),temporary(2,true),item(3)]);const refs=rows(db).map(r=>r.recordRef);
+   assert.deepEqual(rows(db).map(r=>r.ownership),['subscription','expired','unknown']);assert(rows(db).every(r=>!r.acquiredAt&&!r.metadata.audiblePurchaseEvidence));
+   db=await w.mergeProviderItems('audible',[temporary(1,true),temporary(2)]);
+   assert.deepEqual(rows(db).map(r=>r.ownership),['expired','subscription','unknown']);assert.deepEqual(rows(db).map(r=>r.recordRef),refs);assert.equal(Object.keys(db.providerHistory).length,0);
+   const restored=parseBackup(createBackup(db));await w.restoreDatabase(restored);db=await w.getDatabase();assert.equal(rows(db)[0].metadata.libraryAvailability,'unavailable');
+   db=await w.mergeProviderItems('audible',[item(1)]);assert.equal(rows(db)[0].ownership,'expired');assert.equal(rows(db)[0].metadata.audibleOwnershipBasis,'audible-library-action');
+   db=await w.mergeProviderItems('audible',[temporary(1)]);assert.equal(rows(db)[0].ownership,'subscription');assert.equal(rows(db)[0].metadata.libraryAvailability,undefined);
+ }],
+ ['Audible library expiry cannot revoke owned purchases, gifts, terminal states or user corrections',async()=>{
+   const {writer:w}=memory();let db=await w.mergeProviderItems('audible',[item(1),item(2),item(3,'returned'),item(4,'revoked'),item(5,'expired'),item(6,'owned'),item(7)]);
+   db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(1),purchase(2,'gift','2023-06-20')],{giftYears:[2023],giftsComplete:true,giftPagesRead:1})});
+   const record=rows(db).find(r=>r.providerItemId===id(7));db=await w.saveOwnershipCorrections([{recordRef:record.recordRef,provider:'audible',profileId:record.profileId,expectedReviewRef:null}],{ownership:'owned',note:'User choice'});const reviews=structuredClone(db.ownershipReviews),dates=rows(db).map(r=>r.acquiredAt);
+   db=await w.mergeProviderItems('audible',[1,2,3,4,5,6,7].map(n=>temporary(n,true)));
+   assert.deepEqual(rows(db).map(r=>r.ownership),['owned','owned','returned','revoked','expired','owned','expired']);assert.deepEqual(rows(db).map(r=>r.acquiredAt),dates);assert.deepEqual(db.ownershipReviews,reviews);assert.equal(effectiveOwnershipRecord(rows(db).find(r=>r.providerItemId===id(7)),db).ownership,'owned');
+   db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(5,'gift','2023-06-20')],{giftYears:[2023],giftsComplete:true,giftPagesRead:1})});assert.equal(rows(db).find(r=>r.providerItemId===id(5)).ownership,'expired','An explicit earlier expiry must not become a library-derived expiry on reimport');
+ }],
+ ['Audible current purchase or redeemed gift evidence supersedes temporary library expiry without erasing source labels',async()=>{
+   const {writer:w}=memory();await w.mergeProviderItems('audible',[temporary(1,true),temporary(2,true)]);
+   const db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(1),purchase(2,'gift','2023-06-20')],{giftYears:[2023],giftsComplete:true,giftPagesRead:1})});
+   assert(rows(db).every(r=>r.ownership==='owned'&&r.metadata.libraryAction==='Remove'&&r.metadata.libraryAvailability==='unavailable'&&r.metadata.audibleOwnershipBasis==='audible-purchase-history'));
+   assert.equal(rows(db)[0].acquiredAt,'2025-12-07T00:00:00.000Z');assert.equal(rows(db)[1].acquiredAt,'2023-06-20T00:00:00.000Z');
+ }],
+ ['Audible availability metadata validates fixed labels without accepting arbitrary source prose',()=>{
+   assert.equal(validateMetadata('audible',{libraryAvailability:'unavailable',audibleOwnershipBasis:'audible-library-action'}).libraryAvailability,'unavailable');
+   assert.throws(()=>validateMetadata('audible',{libraryAvailability:'Purchased'}),/availability/);
+ }],
  ['Audible actual worker commits scoped history atomically and exposes historical baseline without changing manual ownership',()=>withWorker(async({dispatch,pageA})=>{
    const sender={id:chrome.runtime.id,url:'https://www.audible.com/library',tab:{id:92}},items=[item(1)];
    const begin=mode=>dispatch({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:true,profileLabel:'Personal',confirmed:true,mode},sender);
