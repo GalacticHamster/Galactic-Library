@@ -188,7 +188,11 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         if(provider==='epic'){globalThis.GalacticSync.setProfiling(false);const profile=shadows.at(-1).querySelector('[data-profile-next]');profile.checked=true;profile.dispatchEvent(new Event('change'));}
         const shadow=shadows.at(-1);
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('[data-import-action]');
-        assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
+        assert(button,`${provider} missing ${mode} button`);if(provider==='kindle'){
+          await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);
+          assert([...shadow.querySelectorAll('h3')].some(h=>h.textContent==='Library import')&&shadow.querySelector('[data-book-contents-workflow] h3').textContent==='Book contents discovery','Kindle tasks are not separately labeled.');
+          assert(shadow.querySelector('[data-book-contents-workflow]').getClientRects().length&&shadow.querySelector('[data-contents-review]').href.endsWith('#contents'),'Contents feature or review destination hidden with diagnostics off.');
+        }shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
       }
       const shadow=shadows.at(-1);
       if(provider==='kindle'&&mode==='full'){

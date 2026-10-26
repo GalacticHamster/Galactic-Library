@@ -1,5 +1,12 @@
 # Kindle contents discovery
 
+The Kindle overlay separates **Library import** from **Book contents discovery**.
+The latter includes the mode selector and a link to review saved contents in GL;
+its action footer stays visible while the panel body scrolls. Contents discovery
+is available with provider diagnostics off. Technical timing tools appear only
+after enabling **Settings → Troubleshooting → Enable provider diagnostics** and
+reopening the provider page.
+
 Discovery, parsing, human verification and ownership are separate. Current source extraction is generation **5**, contents parsing version **13**, and filtering version **1**.
 
 ## Eligibility and priority

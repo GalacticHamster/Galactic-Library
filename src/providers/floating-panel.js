@@ -77,7 +77,7 @@
       for(const section of diagnosticSections)section.hidden=!enabled;
     });
     const names={steam:'Steam',gog:'GOG',epic:'Epic Games','amazon-games':'Amazon Games',audible:'Audible',kindle:'Kindle','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',kobo:'Kobo',fanatical:'Fanatical',humble:'Humble Bundle',xbox:'Xbox',playstation:'PlayStation',nintendo:'Nintendo'};
-    const oldHeading=panel.querySelector('h3')??panel.querySelector('p > strong:first-child');
+    const oldHeading=[...panel.querySelectorAll('h3, p > strong:first-child')].find(element=>/^(?:Galactic Library|Audible ownership check)/u.test(element.textContent));
     const heading=document.createElement('h2');heading.className='galactic-panel-heading';
     heading.textContent=provider?`Galactic Library · ${names[provider]??provider}`:oldHeading?.textContent??'Galactic Library';
     if(oldHeading){const next=oldHeading.nextSibling;if(next?.nodeName==='BR')next.remove();oldHeading.remove();}
