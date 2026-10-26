@@ -11,6 +11,17 @@
     return String(value ?? '').replace(/\s+/gu, ' ').trim();
   }
 
+  function hiddenLibraryElement(element){
+    // Keep off-screen virtualized cards; exclude only explicit hidden markup.
+    return Boolean(element?.closest?.('[hidden],[aria-hidden="true"],[style*="display:none" i],[style*="display: none" i]'));
+  }
+
+  function libraryPageFailure(document){
+    if(/\/sign(?:in|-in)|\/login/iu.test(global.location?.pathname??'')||[...document.querySelectorAll('input[type="password"]')].some(e=>!hiddenLibraryElement(e)))return 'sign-in';
+    if(/\/(?:error|500|503)(?:\/|$)/iu.test(global.location?.pathname??'')||[...document.querySelectorAll('h1,h2,[role="alert"]')].some(e=>!hiddenLibraryElement(e)&&/^(?:something went wrong|service unavailable|an unexpected error occurred)[.!]?$/iu.test(compactText(e.textContent))))return 'provider-error';
+    return null;
+  }
+
   function absoluteUrl(value) {
     if (!compactText(value)) return '';
     try {
@@ -129,6 +140,7 @@
     const links = [...document.querySelectorAll('a[href*="/content/browse/details/"]')];
     const itemsById = new Map();
     for (const link of links) {
+      if(hiddenLibraryElement(link))continue;
       const card = link.closest('[class*="item" i], article, li') ?? link.parentElement ?? link;
       const cardData = cardDataFromDetailLink(link);
       const positionedType = forcedMediaType || mediaTypeFromLibraryPosition(card, document);
@@ -145,7 +157,7 @@
   }
 
   function expectedFandangoCountsFromDocument(document) {
-    const headings = [...document.querySelectorAll('h1, h2, h3, [role="heading"]')].map((element) => compactText(element.textContent));
+    const headings = [...document.querySelectorAll('h1, h2, h3, [role="heading"]')].filter(element=>!hiddenLibraryElement(element)).map((element) => compactText(element.textContent));
     const countFor = (pattern) => Number(headings.find((heading) => pattern.test(heading))?.match(/\((\d+)\)/u)?.[1]);
     const movies = countFor(/^my movies\s*\(\d+\)$/iu);
     const tv = countFor(/^my tv shows\s*\(\d+\)$/iu);
@@ -191,7 +203,7 @@
   function loadMoreControl(document) {
     return [...document.querySelectorAll('button, a')].find((element) => {
       const text = compactText(element.getAttribute('aria-label') ?? element.textContent).toLocaleLowerCase();
-      return /^(load|show|view|see) more(?: titles| movies| shows)?$/u.test(text)
+      return !hiddenLibraryElement(element)&&/^(load|show|view|see) more(?: titles| movies| shows)?$/u.test(text)
         && !element.hasAttribute('disabled')
         && element.getAttribute('aria-disabled') !== 'true';
     }) ?? null;
@@ -218,7 +230,7 @@
   }
 
   function gridScrollTarget(document) {
-    const firstCard = document.querySelector('a[href*="/content/browse/details/"]');
+    const firstCard = [...document.querySelectorAll('a[href*="/content/browse/details/"]')].find(element=>!hiddenLibraryElement(element));
     for (let element = firstCard?.parentElement; element && element !== document.documentElement; element = element.parentElement) {
       const style = global.getComputedStyle?.(element);
       const overflowY = style?.overflowY ?? '';
@@ -270,6 +282,8 @@
     let previousSignature = '';
     let finished = false;
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 10; pass += 1) {
+      const pageFailure=libraryPageFailure(global.document);
+      if(pageFailure)throw new Error(pageFailure==='sign-in'?'Fandango needs you to sign in again. Your saved library is unchanged.':'Fandango returned an error page. Your saved library is unchanged.');
       const newlyRenderedItems = fandangoItemsFromDocument(global.document, mediaType)
         .filter((item) => !renderedItemIds.has(item.providerItemId));
       for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
@@ -279,7 +293,8 @@
       // The View All grids default to Recently Purchased. A fully known newly
       // rendered group means every later group is older than the local baseline.
       if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
-      if (expectedCount !== null && itemsById.size >= expectedCount) { finished = true; break; }
+      // Count agreement is necessary but is not an end-of-list signal. Finish
+      // the virtualized grid before authorizing a complete replacement.
       emptyPasses = itemsById.size === 0 ? emptyPasses + 1 : 0;
       if (emptyPasses >= 20) break;
       const signature = [...itemsById.keys()].sort().join('\u0000');
@@ -300,11 +315,21 @@
         ? global.innerHeight
         : settledTarget.clientHeight;
       const atBottom = currentTop + currentViewport >= settledTarget.scrollHeight - 4;
-      const hasSettled = itemsById.size > 0 && atBottom && !loadMore && signature === previousSignature && settledTarget === initialTarget && settledTarget.scrollHeight === beforeHeight;
+      const hasSettled = (itemsById.size > 0||expectedCount===0) && atBottom && !loadMore && signature === previousSignature && settledTarget === initialTarget && settledTarget.scrollHeight === beforeHeight;
       unchangedPasses = hasSettled ? unchangedPasses + 1 : 0;
       previousSignature = signature;
     }
     if (!finished && unchangedPasses < 10) throw new Error(`Fandango did not complete its ${mediaType} grid before the scan limit or loading timeout. No library changes were saved.`);
+    if(!incremental){
+      if(libraryPageFailure(global.document))throw new Error('Fandango could not finish checking your library. Your saved library is unchanged.');
+      const finalCount=expectedFandangoCountsFromDocument(global.document)[mediaType==='movie'?'movies':'tv'];
+      if(expectedCount!==null&&finalCount!==null&&finalCount!==expectedCount)throw new Error('Fandango changed its library count during the check. Your saved library is unchanged. Reload My Library and try again.');
+      const unreadable=[...global.document.querySelectorAll('a[href*="/content/browse/details/"]')].filter(link=>!hiddenLibraryElement(link)).some(link=>{
+        const data=cardDataFromDetailLink(link);
+        return !/\/content\/browse\/details\/[^/?#]+\/[a-z0-9_-]+\/?(?:[?#].*)?$/iu.test(data.detailUrl??'')||!compactText(data.title);
+      });
+      if(unreadable)throw new Error('Fandango could not finish reading every library card. Your saved library is unchanged.');
+    }
     if (!incremental && expectedCount !== null && itemsById.size !== expectedCount) throw new Error(`Fandango reported ${expectedCount} ${mediaType} titles but returned ${itemsById.size}. No library changes were saved.`);
     return [...itemsById.values()];
   }
@@ -346,5 +371,73 @@
     return { items: [...itemsById.values()], expected };
   }
 
-  global.GalacticFandangoAtHome = { contentIdFromValue, fandangoItemFromCardData, fandangoItemsFromDocument, newFandangoItems, expectedFandangoCountsFromDocument, viewAllLibraryLinksFromDocument, readFandangoGrid, fetchFandangoLibrary };
+  // Troubleshooting only. IDs/titles remain in memory to compare observations;
+  // the exported report contains fixed structural labels and aggregate counts.
+  // A stable bottom is diagnostic evidence, never an import-completeness proof.
+  async function inspectFandangoListing(reportProgress=()=>{},expected={movies:null,tv:null},{maxPasses=MAX_SCROLLS,pauseMs=SCROLL_PAUSE_MS}={}){
+    const reportedBefore=Object.fromEntries(['movies','tv'].map(k=>[k,Number.isInteger(expected?.[k])&&expected[k]>=0&&expected[k]<=50000?expected[k]:null]));
+    const report={format:1,provider:'fandango-at-home',readOnly:true,reportedBefore,reportedDuring:[],passes:[],groups:[],uniqueIdentities:0,productionExtractedIdentities:0,repeatedIdentities:0,maxLinksInOnePass:0,maxDuplicateLinksInOnePass:0,missingIdentities:0,unreadableTitles:0,nonNumericIdentities:0,recycledNodes:0,identityTitleChanges:0,sameTitleDifferentIdentities:0,attributeIdentityDisagreements:0,traversalFinished:false,libraryComplete:false,reason:'scan-limit'};
+    const identities=new Map(),productionIds=new Set(),titleIds=new Map(),groups=new Map(),nodes=new WeakMap(),missing=new WeakSet();
+    let stable=0,previous='',priorHeight=-1,priorTarget=null,previousCounts='';
+    function context(link){
+      const area=link.closest('[hidden],[aria-hidden="true"],[style*="display:none" i],[style*="display: none" i]')?'hidden':link.closest('nav,[role="navigation"]')?'navigation':link.closest('footer')?'footer':link.closest('aside')?'aside':link.closest('[role="dialog"]')?'dialog':link.closest('main,[role="main"]')?'main':'other';
+      let heading='none',container='other';
+      const card=link.closest('[class*="item" i],article,li')??link.parentElement;
+      for(let node=card?.parentElement,depth=0;node&&node!==global.document.body&&depth<8;node=node.parentElement,depth++){
+        const marker=String(node.className??'');
+        if(container==='other')container=/carousel|slider/iu.test(marker)?'carousel':/grid/iu.test(marker)?'grid':node.matches('ul,ol')?'list':'other';
+        const text=compactText(node.querySelector('h1,h2,h3,[role="heading"]')?.textContent);
+        if(heading==='none'&&text)heading=/^my movies\b/iu.test(text)?'movies':/^my tv shows\b/iu.test(text)?'tv':/recommend|you may|you might|more like/iu.test(text)?'recommendations':/continue watching/iu.test(text)?'continue-watching':/rental/iu.test(text)?'rentals':/bundle|collection/iu.test(text)?'collections':'other-heading';
+      }
+      const hint=typeTextFromCardContext(link.closest('[class*="item" i],article,li')??link.parentElement??link);
+      const mediaHint=/\b(tv|television|series|season|episode|show)\b/iu.test(hint)?'tv':/\b(movie|film|feature)\b/iu.test(hint)?'movie':'unknown';
+      return {area,heading,container,mediaHint};
+    }
+    try{
+      for(let pass=0;pass<Math.min(MAX_SCROLLS,maxPasses);pass++){
+        const doc=global.document,pageFailure=libraryPageFailure(doc);
+        if(pageFailure){report.reason=pageFailure;break;}
+        const counts=expectedFandangoCountsFromDocument(doc),countKey=JSON.stringify(counts);
+        if(countKey!==previousCounts){report.reportedDuring.push({pass:pass+1,...counts});previousCounts=countKey;}
+        for(const item of fandangoItemsFromDocument(doc,'movie'))productionIds.add(item.providerItemId);
+        const links=[...doc.querySelectorAll('a[href*="/content/browse/details/"]')],inPass=new Set();let readable=0,reliableLinks=0;
+        for(const link of links){
+          const data=cardDataFromDetailLink(link),url=absoluteUrl(data.detailUrl),id=url.match(/\/content\/browse\/details\/[^/]+\/([a-z0-9_-]+)\/?$/iu)?.[1]??'';
+          if(!id){if(!missing.has(link)){missing.add(link);report.missingIdentities++;}continue;}
+          reliableLinks++;
+          if(nodes.has(link)&&nodes.get(link)!==id)report.recycledNodes++;nodes.set(link,id);
+          const title=compactText(data.title),seen=identities.get(id);
+          if(seen){report.repeatedIdentities++;if(title&&!seen.titles.has(title))report.identityTitleChanges++;seen.titles.add(title);}
+          else {identities.set(id,{titles:new Set([title])});if(!/^\d{1,20}$/u.test(id))report.nonNumericIdentities++;}
+          if(title){readable++;const key=title.toLocaleLowerCase(),ids=titleIds.get(key)??new Set();ids.add(id);titleIds.set(key,ids);}
+          const card=link.closest('[data-content-id],[data-title-id],[data-program-id]');
+          const attribute=card?.getAttribute('data-content-id')??card?.getAttribute('data-title-id')??card?.getAttribute('data-program-id');
+          if(attribute&&attribute!==id)report.attributeIdentityDisagreements++;
+          inPass.add(id);
+          const labels=context(link),key=JSON.stringify(labels),group=groups.get(key)??{...labels,observations:0,ids:new Set()};group.observations++;group.ids.add(id);groups.set(key,group);
+        }
+        report.maxLinksInOnePass=Math.max(report.maxLinksInOnePass,links.length);
+        report.maxDuplicateLinksInOnePass=Math.max(report.maxDuplicateLinksInOnePass,reliableLinks-inPass.size);
+        report.unreadableTitles=Math.max(report.unreadableTitles,links.length-readable);
+        const target=gridScrollTarget(doc),isDocument=target===doc.scrollingElement||target===doc.documentElement||target===doc.body;
+        const top=isDocument?global.scrollY:target.scrollTop,viewport=isDocument?global.innerHeight:target.clientHeight;
+        const atBottom=top+viewport>=target.scrollHeight-4,more=loadMoreControl(doc),signature=[...inPass].sort().join('\u0000')+'|'+identities.size+'|'+countKey;
+        stable=links.length&&atBottom&&!more&&signature===previous&&target===priorTarget&&target.scrollHeight===priorHeight?stable+1:0;
+        report.passes.push({pass:pass+1,links:links.length,uniqueThisPass:inPass.size,uniqueSoFar:identities.size,atBottom,loadMore:Boolean(more)});
+        reportProgress({passes:pass+1,count:identities.size});
+        if(stable>=10){report.traversalFinished=true;report.reason='stable-bottom';break;}
+        previous=signature;priorHeight=target.scrollHeight;priorTarget=target;
+        if(more)more.click();else scrollGridForward(doc);
+        await wait(pauseMs);
+      }
+    }catch{report.reason='page-unreadable';}
+    report.uniqueIdentities=identities.size;
+    report.productionExtractedIdentities=productionIds.size;
+    report.sameTitleDifferentIdentities=[...titleIds.values()].filter(ids=>ids.size>1).length;
+    const memberships=new Map();for(const group of groups.values())for(const id of group.ids)memberships.set(id,(memberships.get(id)??0)+1);
+    report.groups=[...groups.values()].map(({ids,...group})=>({...group,uniqueIdentities:ids.size,exclusiveIdentities:[...ids].filter(id=>memberships.get(id)===1).length,productionCandidates:[...ids].filter(id=>productionIds.has(id)).length}));
+    return report;
+  }
+
+  global.GalacticFandangoAtHome = { contentIdFromValue, fandangoItemFromCardData, fandangoItemsFromDocument, newFandangoItems, expectedFandangoCountsFromDocument, viewAllLibraryLinksFromDocument, readFandangoGrid, fetchFandangoLibrary, inspectFandangoListing };
 }(globalThis));

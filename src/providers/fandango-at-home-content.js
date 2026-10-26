@@ -8,12 +8,17 @@
   const shadow = host.attachShadow({ mode: 'closed' });
   shadow.innerHTML = `
     <style>.panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }</style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Fandango's newest-first Recently Purchased View All grids until it reaches known titles. <strong>Full rescan</strong> checks every card against Fandango's reported movie and TV counts.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
-  const buttons = [...shadow.querySelectorAll('button')];
+    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Fandango's newest-first Recently Purchased View All grids until it reaches known titles. <strong>Full rescan</strong> checks every card against Fandango's reported movie and TV counts.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><details><summary>Scan diagnostics</summary><p>Check the movie listing without importing. From My Library, this opens Movies View All and scrolls through its cards. The report contains counts and page structure, with no titles, product IDs or account information.</p><button type="button" data-check-listing>Check movie listing (no import)</button> <button type="button" data-export-report disabled>Export scan report</button></details><p class="status" role="status"></p></div>`;
+  const buttons = [...shadow.querySelectorAll('button[data-mode]')];
+  const checkButton=shadow.querySelector('[data-check-listing]'),exportButton=shadow.querySelector('[data-export-report]');
+  const diagnosticKey='galactic-library-fandango-listing-check';
+  let diagnosticReport=null;
   const status = shadow.querySelector('.status');
 
   function busy(value) {
     buttons.forEach((button) => { button.disabled = value; });
+    checkButton.disabled=value;
+    exportButton.disabled=value||!diagnosticReport;
     if (value) status.dataset.busy = 'true';
     else delete status.dataset.busy;
   }
@@ -26,6 +31,41 @@
       return '';
     }
   }
+
+  async function checkListing(expected={movies:null,tv:null}){
+    busy(true);diagnosticReport=null;exportButton.disabled=true;
+    status.textContent='Checking Fandango movie listing. No library data will change...';
+    try{
+      diagnosticReport=await globalThis.GalacticFandangoAtHome.inspectFandangoListing(({count})=>{
+        status.textContent=`Checking Fandango movie listing: ${count} titles found. No library data will change...`;
+      },expected);
+      status.textContent=diagnosticReport.traversalFinished
+        ?'Listing check finished. No library data changed. Export the scan report so the movie-count difference can be investigated.'
+        :'The listing check could not finish. No library data changed. Export the scan report to share the result.';
+    }catch{status.textContent='The listing check could not start. No library data changed. Reload My Library and try the read-only check again.';}
+    finally{busy(false);}
+  }
+  checkButton.addEventListener('click',async()=>{
+    const api=globalThis.GalacticFandangoAtHome,expected=api.expectedFandangoCountsFromDocument(document);
+    const movie=api.viewAllLibraryLinksFromDocument(document).find(link=>link.mediaType==='movie');
+    if(/\/content\/browse\/mylibrary\b/iu.test(location.pathname)&&movie){
+      try{
+        const url=new URL(movie.url,location.origin);
+        if(url.origin!==location.origin||!url.pathname.startsWith('/content/browse/')||routeFor(url.href)===routeFor(location.href))throw Error('Invalid listing destination');
+        sessionStorage.setItem(diagnosticKey,JSON.stringify({expected,route:routeFor(url.href),startedAt:Date.now()}));
+        busy(true);status.textContent='Opening Movies View All for a read-only check. No library data will change...';
+        location.assign(url.href);
+      }catch{status.textContent='Could not open the read-only check. Open Movies View All and choose Check movie listing (no import). No library data changed.';busy(false);}
+      return;
+    }
+    await checkListing(expected);
+  });
+  exportButton.addEventListener('click',()=>{
+    if(!diagnosticReport)return;
+    const url=URL.createObjectURL(new Blob([JSON.stringify(diagnosticReport,null,2)],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='GL-fandango-listing-check.json';link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
 
   async function importState(action, state) {
     const response = await globalThis.GalacticSync.send({ type: 'FANDANGO_IMPORT_STATE', action, state });
@@ -157,6 +197,15 @@
 
   globalThis.GalacticFloatingPanel?.attach(shadow, 'fandango-at-home');
   document.documentElement.append(host);
+  // A troubleshooting navigation carries counts only, never import authority,
+  // items, account details or a scan token. Consume it before ordinary resume.
+  let diagnostic;
+  try{
+    const pending=JSON.parse(sessionStorage.getItem(diagnosticKey)??'null');
+    if(pending&&pending.route===routeFor(location.href)&&Number.isFinite(pending.startedAt)&&Date.now()-pending.startedAt>=0&&Date.now()-pending.startedAt<10*60*1000&&['movies','tv'].every(k=>pending.expected?.[k]===null||Number.isInteger(pending.expected?.[k])&&pending.expected[k]>=0&&pending.expected[k]<=50000))diagnostic=pending;
+    sessionStorage.removeItem(diagnosticKey);
+  }catch{}
+  if(diagnostic){shadow.querySelector('details').open=true;checkListing(diagnostic.expected);return;}
   importState('get').then((state) => {
     if (!state) return;
     if (state.phase === 'start' && /\/content\/browse\/mylibrary\b/iu.test(globalThis.location.pathname)) {

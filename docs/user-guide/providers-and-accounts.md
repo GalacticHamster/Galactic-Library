@@ -67,6 +67,18 @@ Full Rescan reconciles that account's complete inventory. Missing records can
 move to earlier imports. It preserves acquired contents and reviews and does
 not replace another remembered account.
 
+Fandango Full rescan finishes checking the movie and TV grids and requires the
+number of distinct eligible titles to agree with each reported total. Hidden
+page widgets are excluded; off-screen library cards remain included. Quick
+update still stops at the saved newest-first baseline.
+
+For a Fandango movie-count failure, open **My Library → GL panel → Scan
+diagnostics → Check movie listing (no import)**. This opens Movies View All and
+checks the rendered listing without saving library records. When finished,
+choose **Export scan report**. The report contains counts and page structure,
+not titles, product IDs or account details. This check does not certify that a
+Full rescan is safe; do not repeat a failed Full rescan just to collect a report.
+
 ## Audible updates
 
 **Full rescan** reads the complete Audible library and all available calendar
