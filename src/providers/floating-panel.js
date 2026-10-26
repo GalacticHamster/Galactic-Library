@@ -63,9 +63,80 @@
     const timing=profiling||once?global.GalacticContentsPerformance?.trace(`lookup-${profilePrefix}-${profileSequence++}`,'provider'):null;
     if(timing){timing.provider=provider;timing.providerPhase='scan';}return timing;
   }};
+
+  const names={steam:'Steam',gog:'GOG',epic:'Epic Games','amazon-games':'Amazon Games',audible:'Audible',kindle:'Kindle','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',kobo:'Kobo',fanatical:'Fanatical',humble:'Humble Bundle',xbox:'Xbox',playstation:'PlayStation',nintendo:'Nintendo'};
+  const introductions={
+    steam:'Import your Steam games and DLC, including applications Steam cannot currently identify.',
+    gog:'Import your GOG games, including hidden games.',
+    epic:'Import games and add-ons from your Epic Games library.',
+    'amazon-games':'Import games delivered to your Amazon Games library. Code claims and deliveries to other stores are excluded.',
+    audible:'Import your Audible audiobooks and supported ownership evidence. Owned, subscription, expired and unconfirmed access remain distinct.',
+    kindle:'Import your Kindle library. You can also discover the individual works included in your books.',
+    'amazon-video':'Import your Amazon Video movies and TV titles.',
+    'fandango-at-home':'Import your Fandango at Home movies and TV shows.',
+    kobo:'Import your Kobo books and audiobooks. Library presence alone does not confirm ownership.',
+    fanatical:'Import supported products from completed Fanatical orders.',
+    humble:'Import supported books, audiobooks, games and entitlements from Humble purchases.',
+    xbox:'Import your web-visible Xbox Owned catalog. This is not your complete console or lifetime purchase history.',
+    playstation:'Import your active PS4/PS5 Purchased web library. Older consoles and complete lifetime purchase history are not included.',
+    nintendo:'Import the loaded, non-hidden Switch Virtual Game Cards. Other Nintendo purchase history is not included.'
+  };
+  const importHelp={
+    steam:'Quick update checks newly added or previously unidentified applications. Full rescan checks the complete supported Steam library. Earlier saved titles stay if Steam cannot identify them.',
+    gog:'Quick update reads newest-first purchase pages until it reaches a page already saved in GL. Full rescan checks every available supported page, including the hidden-games pages.',
+    epic:'Sync Epic library checks the supported owned listing each time and refreshes saved games and add-ons. It does not stop at previously saved titles. Earlier saved titles stay if Epic cannot confirm a complete listing.',
+    'amazon-games':'Quick update checks the past three months of claims. Full rescan checks all available calendar years. Without a complete initial import, or when the last sync is over 70 days old, Quick update automatically checks all years to avoid gaps. Unclear delivery details stay unconfirmed; earlier confirmed access and your corrections are kept.',
+    audible:'Quick update stops at previously saved library titles and checks purchase, return and received-gift history for the current and previous calendar years. It requires an initial library import; use Full rescan once if needed. Full rescan reads the complete library and all available history years. Both enrich matching saved titles automatically and preserve earlier ownership evidence and acquisition dates. Incomplete history checks leave uncertain access unconfirmed.',
+    kindle:'Quick update reads the newest Kindle pages until it reaches a page already saved in your library. Full rescan checks the supported library again.',
+    'amazon-video':'Quick update checks recent additions until it reaches an already saved group. Full rescan checks the wider collection and refreshes purchase labels. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
+    'fandango-at-home':'Quick update reads newest-first Recently Purchased lists until it reaches known titles. Full rescan checks every available movie and TV card against Fandango’s reported counts. If those checks fail, no replacement library is saved.',
+    kobo:'Quick update reads newest-first My Books pages until it reaches a page already saved in GL. Full rescan also checks Archive and Audiobooks when Kobo exposes them. Without an initial full import, Quick update checks the wider library once. Your account ownership preference and manual corrections remain separate from Kobo’s source evidence.',
+    fanatical:'Quick update reads details for new completed orders and skips orders already checked. Full rescan checks all completed orders again and refreshes the saved account library.',
+    humble:'Quick update checks new purchases and refreshes pending key-status information. Full rescan checks all supported purchases again, including previously saved purchases. This can pick up information after an importer update. Redemption codes are removed before purchase details are read and are never saved.',
+    xbox:'Quick update and Full rescan both inspect the entire supported web list; Quick update does not traverse less data. Quick update saves additions and changes; Full rescan records a complete supported-list check. Both keep earlier saved items that are absent from this limited view.',
+    playstation:'Quick update and Full rescan both inspect the entire supported listing; Quick update does not traverse less data. Quick update saves additions and changes; Full rescan records a complete supported-list check. Both keep earlier saved items that are absent from this limited view.',
+    nintendo:'Let the available cards finish loading before selecting Import Nintendo cards. This single action checks the loaded list and adds or updates matching saved cards. Earlier saved cards stay if they are not in this view.'
+  };
+
+  const singleActions={epic:'Sync Epic library',nintendo:'Import Nintendo cards'};
+  function render(shadow,provider,{diagnostics='',specialized='',footer='',styles='',onImport}={}){
+    if(!Object.hasOwn(names,provider)||!Object.hasOwn(introductions,provider)||!Object.hasOwn(importHelp,provider))throw Error('Unknown provider overlay.');
+    shadow.host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483647;color:var(--gh-text);';
+    const baseStyle=document.createElement('style');
+    baseStyle.textContent=`
+      :host { font:14px/1.4 var(--gh-font,system-ui,sans-serif); color:var(--gh-text); }
+      .panel { background:var(--gh-surface); color:var(--gh-text); border:1px solid var(--gh-border); box-shadow:var(--gh-shadow); padding:14px; border-radius:8px; }
+      p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; }
+      button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; }
+      .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; }
+      @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
+    `+styles;
+    const panel=document.createElement('section');panel.className='panel';panel.dataset.providerOverlay=provider;
+    const body=document.createElement('div');body.className='panel-body';
+    if(specialized){const label=document.createElement('h3');label.textContent='Library import';body.append(label);}
+    const intro=document.createElement('p');intro.dataset.importDescription='';intro.textContent=introductions[provider];body.append(intro);
+    const actions=[];
+    for(const [mode,label] of singleActions[provider]?[[provider==='nintendo'?'full':null,singleActions[provider]]]:[['incremental','Quick update'],['full','Full rescan']]){
+      const button=document.createElement('button');button.type='button';button.textContent=label;
+      if(mode)button.dataset.mode=mode;else button.dataset.importAction='';
+      if(onImport)button.addEventListener('click',()=>onImport(mode));
+      body.append(button);actions.push(button);
+    }
+    const status=document.createElement('p');status.className='status';status.dataset.importStatus='';status.setAttribute('role','status');
+    status.textContent={xbox:'Let Xbox Library finish loading before importing.',playstation:'Let the Purchased library finish loading before importing.',nintendo:'Let Nintendo finish loading the card list before importing.'}[provider]??'';
+    const help=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');
+    help.dataset.importHelp='';summary.textContent='How importing works';text.textContent=importHelp[provider];help.append(summary,text);body.append(status,help);
+    // Slots accept only extension-authored markup. They never build common controls.
+    const append=(parent,markup)=>{if(markup){const template=document.createElement('template');template.innerHTML=markup;parent.append(template.content);}};
+    append(body,specialized);append(body,diagnostics);panel.append(body);append(panel,footer);
+    for(const section of body.querySelectorAll('details'))if(/diagnostic/iu.test(section.querySelector('summary')?.textContent??'')){section.dataset.providerDiagnostic='';section.hidden=true;}
+    shadow.replaceChildren(baseStyle,panel);
+    return {panel,body,actions,status};
+  }
   function attach(shadow,provider) {
     const panel = shadow?.querySelector?.('.panel');
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
+    if(provider&&panel.dataset.providerOverlay!==provider)throw Error('Use the shared provider overlay renderer before attaching account controls.');
     panel.dataset.providerDiagnostics='disabled';
     const diagnosticSections=[...panel.querySelectorAll('details')].filter(section=>/diagnostic/iu.test(section.querySelector('summary')?.textContent??''));
     const diagnosticControls=[...panel.querySelectorAll('[data-export-report], [data-export-scan], [data-export-evidence], [data-export-diagnostics], [data-export-timing], [data-export-sample]')];
@@ -76,50 +147,15 @@
       panel.dataset.providerDiagnostics=enabled?'enabled':'disabled';
       for(const section of diagnosticSections)section.hidden=!enabled;
     });
-    const names={steam:'Steam',gog:'GOG',epic:'Epic Games','amazon-games':'Amazon Games',audible:'Audible',kindle:'Kindle','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',kobo:'Kobo',fanatical:'Fanatical',humble:'Humble Bundle',xbox:'Xbox',playstation:'PlayStation',nintendo:'Nintendo'};
     const oldHeading=[...panel.querySelectorAll('h3, p > strong:first-child')].find(element=>/^(?:Galactic Library|Audible ownership check)/u.test(element.textContent));
     const heading=document.createElement('h2');heading.className='galactic-panel-heading';
     heading.textContent=provider?`Galactic Library · ${names[provider]??provider}`:oldHeading?.textContent??'Galactic Library';
     if(oldHeading){const next=oldHeading.nextSibling;if(next?.nodeName==='BR')next.remove();oldHeading.remove();}
     panel.prepend(heading);
-    const introductions={
-      steam:'Import your Steam games and DLC, including applications Steam cannot currently identify.',
-      gog:'Import your GOG games, including hidden games. Quick update checks recent additions; Full rescan checks every available page.',
-      epic:'Import games and add-ons from your Epic Games library.',
-      'amazon-games':'Import games delivered to your Amazon Games library. Games delivered to other stores and code claims are excluded. Quick update checks the past three months; Full rescan checks all available years. Older or first-time imports may require a Full rescan. Unclear delivery details stay unconfirmed.',
-      audible:'Import your Audible audiobooks and available ownership evidence. Quick update checks new titles and purchase, return and received-gift history for the current and previous calendar years. Full rescan checks the library and all available history years. Subscription, expired and unconfirmed access remain distinct.',
-      kindle:'Import your Kindle library. You can also discover the individual works included in your books.',
-      'amazon-video':'Import your Amazon Video movies and TV titles. Quick update checks recent additions; Full rescan refreshes the collection and purchase information. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
-      'fandango-at-home':'Import your Fandango movies and TV shows. Quick update checks recent purchases until it reaches known titles; Full rescan checks every card against Fandango’s reported movie and TV counts.',
-      kobo:'Import your Kobo books and audiobooks. Quick update checks recent additions; Full rescan also checks Archive and Audiobooks when available. Library presence alone does not confirm ownership.',
-      fanatical:'Import supported products from completed Fanatical orders. Quick update checks new completed orders; Full rescan checks all completed orders again.',
-      humble:'Import supported books, audiobooks and game entitlements from Humble purchases. Quick update checks new purchases and pending key information; Full rescan checks all supported purchases again.',
-      xbox:'Import the web-visible Xbox Owned catalog. Both actions check this entire list; Quick update adds changes. This is not your complete console or lifetime purchase history. Earlier saved items stay.',
-      playstation:'Import the active PS4/PS5 Purchased web library. Both actions check the supported list; Quick update saves additions and changes. Older consoles and lifetime purchase history are outside this scope. Earlier saved items stay.',
-      nintendo:'Import the non-hidden Switch Virtual Game Cards loaded on this page. Load all cards before importing. Other Nintendo purchase history is not included; earlier saved cards stay.'
-    };
-    // Optional help adds detail rather than copying the provider's introduction.
-    const importHelp={
-      steam:'Quick update checks newly added or previously unidentified applications. Full rescan checks the complete Steam library. Earlier saved titles stay if Steam cannot identify them.',
-      kindle:'Quick update reads the newest Kindle pages until it reaches a page already saved in your library. Full rescan checks the supported library again.',
-      fanatical:'Fanatical’s session token is used only inside this signed-in page for read-only order requests. It is never stored or sent to Galactic Library.',
-      humble:'A Full rescan can pick up information after an importer update. Redemption codes are removed before purchase details are read and are never saved.'
-    };
-    if(introductions[provider]){
-      const intro=panel.querySelector('p');
-      if(intro){
-        intro.textContent=introductions[provider];
-        if(importHelp[provider]){
-          const help=document.createElement('details'),label=document.createElement('summary'),description=document.createElement('p');
-          label.textContent='How importing works';description.textContent=importHelp[provider];help.append(label,description);help.dataset.importHelp='';
-          const contents=panel.querySelector('[data-book-contents-workflow]');
-          if(contents)contents.before(help);else panel.append(help);
-        }
-      }
-    }
     if(provider){
       const controls=document.createElement('div');
       controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>Using a different account on this site? Select Change account first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Editing it selects or adds an account; it does not rename one.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
+      controls.dataset.providerAccount='';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';
@@ -190,8 +226,11 @@
     }
     const body=panel.querySelector('.panel-body')??panel;
     const status=panel.querySelector('.status, [data-import-status]'),help=panel.querySelector('[data-import-help]');
-    if(status)body.append(status);
-    if(help&&!panel.querySelector('[data-book-contents-workflow]'))body.append(help);
+    const contents=panel.querySelector('[data-book-contents-workflow]');
+    // The same import order precedes any specialized workflow (Kindle).
+    for(const element of [status,help].filter(Boolean)){
+      if(contents)contents.before(element);else body.append(element);
+    }
     for(const section of diagnosticSections)body.append(section);
     const style = document.createElement('style');
     style.textContent = ':host { color-scheme:var(--gh-color-scheme); } .panel { position:relative; } button:hover:not(:disabled) { background:var(--gh-accent-hover); } button:active:not(:disabled) { background:var(--gh-accent-pressed); } button:disabled { background:var(--gh-disabled); color:var(--gh-disabled-text); cursor:default; } input,select,textarea { background:var(--gh-input); color:var(--gh-text); border:1px solid var(--gh-input-border); accent-color:var(--gh-accent); font:inherit; max-width:100%; } button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--gh-focus); outline-offset:3px; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid var(--gh-border); border-radius:7px; background:var(--gh-accent); box-shadow:var(--gh-shadow); color:var(--gh-on-accent); cursor:pointer; font:14px/1.4 var(--gh-font); padding:7px 10px; }';
@@ -200,7 +239,7 @@
       :host { width:360px!important; max-width:calc(100vw - 36px)!important; font:14px/1.4 var(--gh-font,system-ui,sans-serif)!important; }
       .panel { box-sizing:border-box; width:100%; max-width:100%; max-height:calc(100vh - 36px); overflow:auto; padding:14px; border-radius:8px; overflow-wrap:anywhere; }
       .panel:has(.panel-body) { display:flex; flex-direction:column; overflow:hidden; }
-      .panel-body { min-height:0; overflow:auto; }
+      .panel-body { min-height:0; overflow:auto; padding:5px; margin:-5px; }
       .galactic-panel-heading { flex-shrink:0; font:700 14px/1.4 var(--gh-font,system-ui,sans-serif); margin:0 0 10px; padding-right:76px; overflow-wrap:anywhere; }
       .panel p { margin:0 0 10px; } .panel button { font:inherit; border-radius:5px; padding:8px 10px; margin:3px 2px 3px 0; }
       .panel .galactic-panel-minimize { font-size:12px; padding:3px 7px; margin:0; }
@@ -233,5 +272,5 @@
     panel.append(minimize);
     shadow.append(style, restore);
   }
-  global.GalacticFloatingPanel = { attach,diagnosticsEnabled };
+  global.GalacticFloatingPanel = { render,attach,diagnosticsEnabled };
 }(globalThis));

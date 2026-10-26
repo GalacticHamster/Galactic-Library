@@ -2,9 +2,9 @@
 (function(){
   'use strict';
   if(location.origin!=='https://library.playstation.com'||document.getElementById('galactic-library-playstation-importer'))return;
-  const host=document.createElement('div');host.id='galactic-library-playstation-importer';host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(410px,95vw)';
+  const host=document.createElement('div');host.id='galactic-library-playstation-importer';
   const shadow=host.attachShadow({mode:'open'});
-  shadow.innerHTML='<style>:host{font:14px system-ui}.panel{background:var(--gh-surface,#fff);color:var(--gh-text,#111);border:1px solid var(--gh-border,#888);border-radius:10px;padding:16px;box-shadow:0 4px 20px #0003}button{font:inherit;padding:7px 12px;margin:4px;background:var(--gh-accent,#7c3aed);color:var(--gh-on-accent,#fff);border:0;border-radius:6px}p{margin:9px 0}</style><section class="panel"><h3>Galactic Library · PlayStation</h3><p>Import the PS4/PS5 titles in your active Purchased web library. Older consoles and complete lifetime purchase history are not included. Previously saved items are retained.</p><button type="button" data-mode="incremental">Quick update</button><button type="button" data-mode="full">Full rescan</button><p data-import-status role="status">Let the Purchased library finish loading before importing.</p></section>';
+  globalThis.GalacticFloatingPanel.render(shadow,'playstation',{});
   document.documentElement.append(host);globalThis.GalacticFloatingPanel?.attach?.(shadow,'playstation');
   const buttons=[...shadow.querySelectorAll('[data-mode]')],status=shadow.querySelector('[data-import-status]');
   function bridge(action){

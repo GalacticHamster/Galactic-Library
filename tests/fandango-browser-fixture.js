@@ -1,3 +1,6 @@
+import '../src/providers/floating-panel.js';
+// This acquisition/checker fixture isolates scan authority; DOM construction is real.
+globalThis.GalacticFloatingPanel.attach=()=>{};
 // Synthetic structural cases, not captures of the user's Fandango library.
 import '../src/providers/fandango-at-home.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
@@ -86,7 +89,7 @@ try{
  setup(page([1],346));let sends=0,failures=0;globalThis.GalacticSync={send:async request=>{sends++;if(request.type==='FANDANGO_IMPORT_STATE'&&request.action==='get')return {ok:true,state:null};throw Error('Unexpected diagnostic write');},failed:async()=>{failures++;}};
  let shadow;const attach=Element.prototype.attachShadow;Element.prototype.attachShadow=function(options){shadow=attach.call(this,options);return shadow;};await import('../src/providers/fandango-at-home-content.js');Element.prototype.attachShadow=attach;
  await new Promise(resolve=>nativeTimeout(resolve,0));const beforeSends=sends;
- assert(shadow.querySelector('details summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-report]').disabled,'Read-only troubleshooting is discoverable under Scan diagnostics; export is disabled before a check');
+ assert(shadow.querySelector('[data-scan-diagnostics] summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-report]').disabled,'Read-only troubleshooting is discoverable under Scan diagnostics; export is disabled before a check');
  shadow.querySelector('[data-check-listing]').click();assert(shadow.querySelector('.status').dataset.busy==='true'&&shadow.querySelector('[data-mode="full"]').disabled,'The read-only check shows immediate progress and prevents a conflicting import');
  for(let n=0;n<100&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,10));
  assert(!shadow.querySelector('[data-export-report]').disabled&&shadow.querySelector('.status').textContent.includes('No library data changed')&&sends===beforeSends&&failures===0,'Checking and export preparation send no GL import, failure-state or storage write messages');
@@ -98,7 +101,7 @@ try{
  sessionStorage.setItem('galactic-library-fandango-listing-check',JSON.stringify({expected:{movies:346,tv:0,unexpected:'PRIVATE_CREDENTIAL'},route:location.origin+location.pathname,startedAt:Date.now()}));
  const resumeSends=sends;Element.prototype.attachShadow=function(options){shadow=attach.call(this,options);return shadow;};await import('../src/providers/fandango-at-home-content.js?diagnostic-resume');Element.prototype.attachShadow=attach;
  for(let n=0;n<100&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,10));
- assert(sends===resumeSends&&!shadow.querySelector('[data-export-report]').disabled&&shadow.querySelector('details').open&&sessionStorage.getItem('galactic-library-fandango-listing-check')===null,'A read-only navigation resumes the check and consumes tab-local counts without requesting import authority or resuming an import');
+ assert(sends===resumeSends&&!shadow.querySelector('[data-export-report]').disabled&&shadow.querySelector('[data-scan-diagnostics]').open&&sessionStorage.getItem('galactic-library-fandango-listing-check')===null,'A read-only navigation resumes the check and consumes tab-local counts without requesting import authority or resuming an import');
  const projected=await api.inspectFandangoListing(()=>{},{movies:346,tv:0,unexpected:'PRIVATE_CREDENTIAL'},{maxPasses:1,pauseMs:0});assert(!JSON.stringify(projected).includes('PRIVATE_'),'Unexpected tab-state fields cannot enter the diagnostic export');
  setup(page([1],346));sessionStorage.setItem('galactic-library-fandango-listing-check',JSON.stringify({expected:{movies:346,tv:0},route:location.origin+location.pathname,startedAt:Date.now()-11*60*1000}));
  Element.prototype.attachShadow=function(options){shadow=attach.call(this,options);return shadow;};await import('../src/providers/fandango-at-home-content.js?stale-diagnostic');Element.prototype.attachShadow=attach;await new Promise(resolve=>nativeTimeout(resolve,0));

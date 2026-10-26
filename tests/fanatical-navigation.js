@@ -14,7 +14,7 @@ function fixture(start='/en/orders'){
  const calls=[];let getState=async()=>({ok:true,hasFullBaseline:true}),fetch=async()=>({ok:true,result:{items:[]}}),commit=async()=>({ok:true,gameCount:1,bookCount:0,audiobookCount:0});
  const c={console,location:{href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
   MutationObserver:class{constructor(fn){this.callback=fn;}observe(){}},addEventListener:(name,fn)=>{events[name]=fn;},setInterval:fn=>polls.push(fn),
-  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch():commit();},failed:async()=>{throw Error('Stale failure reporting');}}};
+  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch():commit();},failed:async()=>{throw Error('Stale failure reporting');}}};
  c.globalThis=c;vm.createContext(c);vm.runInContext(source,c);
  const navigate=(path,signal='poll')=>{c.location.pathname=path;c.location.href='https://www.fanatical.com'+path;if(signal==='poll')polls.forEach(fn=>fn());else events[signal]();};
  return {c,roots,calls,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};

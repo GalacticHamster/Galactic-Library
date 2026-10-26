@@ -5,14 +5,9 @@
 
   const host = document.createElement('div');
   host.id = 'galactic-library-audible-importer';
-  host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;max-width:340px;font:14px/1.4 system-ui,sans-serif;color:var(--gh-text);';
+
   const shadow = host.attachShadow({ mode: 'closed' });
-  shadow.innerHTML = `
-    <style>
-      .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; }
-      p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
-    </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> stops at previously saved titles and checks purchase, return and received-gift history for the current and previous calendar years. <strong>Full rescan</strong> reads the complete library and all available history years. Both update matching saved titles automatically.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
+  globalThis.GalacticFloatingPanel.render(shadow,'audible',{onImport:sync,diagnostics:"<details><summary>Scan diagnostics</summary><p>Purchase-history checks have aggregate reports and a separate private purchase-evidence export. Read each export warning before sharing.</p><a href=\"https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1\">Open purchase-history checks (no import)</a></details>"});
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
 
@@ -31,8 +26,9 @@
     }
   }catch{/* A blocked session store leaves the explicit URL opt-in available. */}}
   if(historyPage&&!skipHistoryDiagnostic&&(checkSession||new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'||await globalThis.GalacticFloatingPanel?.diagnosticsEnabled?.('audible'))){
-    const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check the visible page, including its page controls. Use Audible\'s View menu to check Your orders, Refund history or Gift received, and its date menu to check a year. Run a new check after each page loads. No books or access statuses will change. Diagnostic reports omit titles, transaction dates, prices, identifiers and account details.';
+    const panel=shadow.querySelector('.panel-body');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check the visible page, including its page controls. Use Audible\'s View menu to check Your orders, Refund history or Gift received, and its date menu to check a year. Run a new check after each page loads. No books or access statuses will change. Diagnostic reports omit titles, transaction dates, prices, identifiers and account details.';
     for(const button of buttons)button.remove();
+    panel.querySelector('[data-import-help]').remove();
     const check=document.createElement('button'),download=document.createElement('button'),end=document.createElement('button');check.type=download.type=end.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;end.textContent='End check';
     panel.insertBefore(check,status);panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(download,status);
     panel.insertBefore(document.createTextNode(' '),status);panel.insertBefore(end,status);
@@ -168,10 +164,8 @@
       delete status.dataset.busy;
     }
   }
-  buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
-  const troubleshooting=document.createElement('details');
-  troubleshooting.innerHTML='<summary>Scan diagnostics</summary><p>Purchase-history checks have aggregate reports and a separate private purchase-evidence export. Read each export warning before sharing.</p><a href="https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1">Open purchase-history checks (no import)</a>';
-  shadow.querySelector('.panel').append(troubleshooting);
+
+
   globalThis.GalacticFloatingPanel?.attach(shadow, 'audible');
   document.documentElement.append(host);
 }());

@@ -2,9 +2,9 @@
 (function(){
   'use strict';
   if(location.origin!=='https://accounts.nintendo.com'||!/^\/portal\/vgcs(?:\/|$)/u.test(location.pathname)||document.getElementById('galactic-library-nintendo-importer'))return;
-  const host=document.createElement('div');host.id='galactic-library-nintendo-importer';host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(410px,95vw)';
+  const host=document.createElement('div');host.id='galactic-library-nintendo-importer';
   const shadow=host.attachShadow({mode:'open'});
-  shadow.innerHTML='<style>:host{font:14px system-ui}.panel{background:var(--gh-surface,#fff);color:var(--gh-text,#111);border:1px solid var(--gh-border,#888);border-radius:10px;padding:16px;box-shadow:0 4px 20px #0003}button{font:inherit;padding:7px 12px;background:var(--gh-accent,#7c3aed);color:var(--gh-on-accent,#fff);border:0;border-radius:6px}p{margin:9px 0}</style><section class="panel"><h3>Galactic Library · Nintendo</h3><p>Switch Virtual Game Cards. Import the non-hidden cards loaded by this page. Other Nintendo purchases and older consoles are not included.</p><button type="button" data-mode="full">Import Nintendo cards</button><p data-import-status role="status">Let Nintendo finish loading the card list before importing.</p></section>';
+  globalThis.GalacticFloatingPanel.render(shadow,'nintendo',{});
   document.documentElement.append(host);
   globalThis.GalacticFloatingPanel?.attach?.(shadow,'nintendo');
   const button=shadow.querySelector('[data-mode]'),status=shadow.querySelector('[data-import-status]');

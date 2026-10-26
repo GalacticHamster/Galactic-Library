@@ -4,16 +4,10 @@
 
   const host = document.createElement('div');
   host.id = 'galactic-library-steam-store-importer';
-  host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;max-width:340px;font:14px/1.4 system-ui,sans-serif;color:var(--gh-text);';
+
   const shadow = host.attachShadow({ mode: 'closed' });
-  shadow.innerHTML = `
-    <style>
-      .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; }
-      p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
-    </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> checks for newly added or previously unidentified applications. <strong>Full rescan</strong> checks your complete Steam library. Earlier saved titles are kept if their information is unavailable.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p><details><summary>Steam diagnostics</summary><p><label><input type="checkbox" data-profile-next> Profile the next Quick Update</label></p><p data-profile-timing-status role="status">Detailed timing is off.</p><p><a data-open-timing target="_blank" rel="noopener">Export timing in GL Settings > Performance diagnostics</a>. Export promptly: worker timings are held in memory and lost when the worker restarts. Reloading this page clears an unused profiling request.</p><p><label><input type="checkbox" data-sample-ids> Sample unresolved App IDs on the next update</label></p><p>App IDs may reveal part of your Steam library. Samples stay in this page, exclude titles and accounts, and are never included in timing exports.</p><button type="button" data-export-sample disabled>Export sampled App IDs</button></details></div>`;
+  globalThis.GalacticFloatingPanel.render(shadow,'steam',{onImport:sync,diagnostics:"<details><summary>Steam diagnostics</summary><p><label><input type=\"checkbox\" data-profile-next> Profile the next Quick Update</label></p><p data-profile-timing-status role=\"status\">Detailed timing is off.</p><p><a data-open-timing target=\"_blank\" rel=\"noopener\">Export timing in GL Settings > Performance diagnostics</a>. Export promptly: worker timings are held in memory and lost when the worker restarts. Reloading this page clears an unused profiling request.</p><p><label><input type=\"checkbox\" data-sample-ids> Sample unresolved App IDs on the next update</label></p><p>App IDs may reveal part of your Steam library. Samples stay in this page, exclude titles and accounts, and are never included in timing exports.</p><button type=\"button\" data-export-sample disabled>Export sampled App IDs</button></details>"});
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
-  shadow.querySelector('details').hidden=new URLSearchParams(location.search).get('gl-steam-diagnostics')!=='1';
   const status = shadow.querySelector('.status');
   const sampleCheckbox=shadow.querySelector('[data-sample-ids]'),sampleButton=shadow.querySelector('[data-export-sample]');
   const refreshSampleButton=()=>{const sample=globalThis.GalacticSteamStore.getDiagnosticSample();sampleButton.disabled=!sampleCheckbox.checked||!sample||!Object.values(sample.groups).some(rows=>rows.length);};
@@ -86,7 +80,7 @@
       buttons.forEach((button) => { button.disabled = false; });
     }
   }
-  buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+
   globalThis.GalacticFloatingPanel?.attach(shadow, 'steam');
   document.documentElement.append(host);
 }());

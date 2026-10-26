@@ -4,16 +4,10 @@
 
   const host = document.createElement('div');
   host.id = 'galactic-library-kobo-importer';
-  host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;max-width:350px;font:14px/1.4 system-ui,sans-serif;color:var(--gh-text);';
+
   const shadow = host.attachShadow({ mode: 'closed' });
-  shadow.innerHTML = `
-    <style>
-      .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
-    </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> reads Kobo's newest-first My Books pages until it reaches a page already in your local baseline. <strong>Full rescan</strong> also checks Archive and Audiobooks when Kobo exposes them.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button><p class="status" role="status"></p></div>`;
-  const diagnostics = document.createElement('details');
-  diagnostics.innerHTML = '<summary>Scan diagnostics</summary><p>Inspect this My Books page and, if linked here, the first purchase-history page. No books or access states will change. Reports contain counts only, not titles, dates, identifiers or account details.</p><button type="button" data-check-evidence>Check ownership evidence (no import)</button> <button type="button" data-export-evidence hidden>Export check report</button>';
-  shadow.querySelector('.panel').insertBefore(diagnostics, shadow.querySelector('.status'));
+  globalThis.GalacticFloatingPanel.render(shadow,'kobo',{onImport:sync,diagnostics:"<details><summary>Scan diagnostics</summary><p>Inspect this My Books page and, if linked here, the first purchase-history page. No books or access states will change. Reports contain counts only, not titles, dates, identifiers or account details.</p><button type=\"button\" data-check-evidence>Check ownership evidence (no import)</button> <button type=\"button\" data-export-evidence hidden>Export check report</button></details>"});
+
   const buttons = [...shadow.querySelectorAll('button[data-mode], [data-check-evidence]')];
   const exportButton = shadow.querySelector('[data-export-evidence]');
   let evidenceReport = null;
@@ -95,7 +89,7 @@
     const link = document.createElement('a'); link.href = url; link.download = 'GL-kobo-evidence-check.json'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
-  shadow.querySelectorAll('button[data-mode]').forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+
   globalThis.GalacticFloatingPanel?.attach(shadow, 'kobo');
   document.documentElement.append(host);
 }());

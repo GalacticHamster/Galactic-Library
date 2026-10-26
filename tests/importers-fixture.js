@@ -189,6 +189,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         if(provider==='steam')globalThis.GalacticSync.setProfiling(true);
         if(provider==='epic'){globalThis.GalacticSync.setProfiling(false);const profile=shadows.at(-1).querySelector('[data-profile-next]');profile.checked=true;profile.dispatchEvent(new Event('change'));}
         const shadow=shadows.at(-1);
+        assert(shadow.querySelector('[data-import-help] summary')?.getClientRects().length,provider+' import help was hidden by its content controller');
         const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('[data-import-action]');
         assert(button,`${provider} missing ${mode} button`);if(provider==='kindle'){
           await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);

@@ -19,21 +19,31 @@ globalThis.chrome = {runtime: {sendMessage: async request => {
 async function mount(provider, mode='full') {
   const host = document.createElement('div');document.body.append(host);
   const root = host.attachShadow({mode:'open'});
-  root.innerHTML = `<div class="panel"><p>Fixture provider</p><button data-mode="${mode}">Import</button><button data-diagnostic>Export diagnostic</button><p role="status"></p></div>`;
+  globalThis.GalacticFloatingPanel.render(root,provider);
+  const diagnostic=document.createElement('button');diagnostic.dataset.diagnostic='';diagnostic.textContent='Export diagnostic';root.querySelector('.panel-body').append(diagnostic);
   globalThis.GalacticFloatingPanel.attach(root,provider);
   await new Promise(resolve=>setTimeout(resolve,0));
   return {host,root,input:root.querySelector('[data-profile-label]'),confirm:root.querySelector('[data-profile-confirm]'),
-    confirmLabel:root.querySelector('[data-profile-confirm-label]'),switcher:root.querySelector('[data-profile-switch]'),action:root.querySelector('[data-mode]')};
+    confirmLabel:root.querySelector('[data-profile-confirm-label]'),switcher:root.querySelector('[data-profile-switch]'),action:root.querySelector('[data-mode],[data-import-action]')};
 }
 const edit=(ui,value)=>{ui.input.value=value;ui.input.dispatchEvent(new Event('input'));};
 const start=async(provider,ui)=>{ui.action.click();return globalThis.GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider});};
 async function rejects(run, pattern) {let message='';try{await run();}catch(error){message=error.message;}assert(pattern.test(message),'Expected account safeguard: '+pattern);}
 try {
+  // The common builder's contract is authored once; the native fixture separately
+  // checks each provider's configuration and specialized slots against it.
+  const host=document.createElement('div'),root=host.attachShadow({mode:'open'}),calls=[];
+  globalThis.GalacticFloatingPanel.render(root,'gog',{onImport:mode=>calls.push(mode)});
+  for(const action of root.querySelectorAll('[data-mode]'))action.click();
+  assert(calls.join('|')==='incremental|full','Shared action callbacks lost standard ordering or mode');
+  assert(root.querySelector('[data-import-help]')&&!root.querySelector('[data-import-help]').open,'Shared help can be omitted or starts expanded');
+  for(const provider of ['unknown-provider','toString']){let rejected=false;try{globalThis.GalacticFloatingPanel.render(root,provider);}catch{rejected=true;}assert(rejected,'Unknown provider rendered without a complete definition');}
+  checks.push('One shared structural builder requires a provider definition, always adds collapsed help and dispatches standard ordered action callbacks');
   for (const provider of providers) {
     profiles=[];active=null;requests=[];
     let ui=await mount(provider,provider==='epic'||provider==='nintendo'?'full':'incremental');
     const help=ui.root.querySelector('[data-import-help]');
-    assert(Boolean(help)===['steam','kindle','fanatical','humble'].includes(provider),provider+': incorrect optional help');
+    assert(Boolean(help),provider+': incorrect optional help');
     assert(!help||!help.open,provider+': import help should start collapsed');
     assert(ui.root.querySelector('[data-profile-summary] p').textContent==='Using a different account on this site? Select Change account first.','Account reminder changed meaning');
     const before=starts;

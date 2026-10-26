@@ -2,7 +2,7 @@
 // Acquisition controllers are not run here: importer suites cover those paths.
 import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
-import {access,mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {access,mkdtemp,mkdir,writeFile,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname,resolve,sep} from 'node:path';
 import {setTimeout as pause} from 'node:timers/promises';
@@ -12,17 +12,29 @@ import {createRelease,runtimeZip} from '../scripts/release.mjs';
 import {outputPath} from '../scripts/audit-artifacts.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
 const providers=['steam-store','gog','epic','amazon-games','audible','kindle','amazon-video','fandango-at-home','kobo','fanatical','humble','xbox','playstation','nintendo'];
-const templates={},extras={};
-for(const file of providers){const source=files.get('src/providers/'+file+'-content.js').toString();const literal=source.match(/shadow\.innerHTML\s*=\s*(`[^`]*`|'(?:\\.|[^'\\])*')/u)?.[1];assert(literal,'Missing overlay template '+file);const key=file==='steam-store'?'steam':file;const diag=source.match(/const diagnosticsMarkup = SHOW_SCAN_DIAGNOSTICS \? (`[^`]*`)/u)?.[1];templates[key]=vm.runInNewContext(literal,{diagnosticsMarkup:diag?vm.runInNewContext(diag):''});const extra=source.match(/(?:diagnostics|troubleshooting)\.innerHTML\s*=\s*('(?:\\.|[^'\\])*')/u)?.[1];if(extra)extras[key]=vm.runInNewContext(extra);}
+const templates={},extras={},configs={};
+for(const file of providers){
+ const source=files.get('src/providers/'+file+'-content.js').toString(),key=file==='steam-store'?'steam':file;
+ if(process.argv.includes('--representative')&&!['gog','epic','kindle'].includes(key))continue;
+ const config=source.match(/GalacticFloatingPanel.render\(shadow,'[^']+',([\s\S]*?)\);/u)?.[1];
+ assert(config,'Provider bypassed shared renderer: '+file);
+ assert(!/shadow\.innerHTML\s*=/u.test(source),'Provider still constructs its own shell: '+file);
+ const diag=source.match(/const diagnosticsMarkup = SHOW_SCAN_DIAGNOSTICS \? (`[^`]*`)/u)?.[1];
+ configs[key]=vm.runInNewContext('('+config+')',{sync(){},diagnosticsMarkup:diag?vm.runInNewContext(diag):''});templates[key]='';
+ const extra=source.match(/(?:diagnostics|troubleshooting)\.innerHTML\s*=\s*('(?:\\.|[^'\\])*')/u)?.[1];if(extra)extras[key]=vm.runInNewContext(extra);
+}
+files.set('overlay-configs.json',Buffer.from(JSON.stringify(configs)));
+files.set('provider-overlay-structure.js',await readFile(new URL('./provider-overlay-structure.js',import.meta.url)));
 files.set('overlay-templates.json',Buffer.from(JSON.stringify(templates)));files.set('overlay-extras.json',Buffer.from(JSON.stringify(extras)));
 files.set('overlay-inner.html',Buffer.from('<!doctype html><html><head><link rel="stylesheet" href="shared/theme.css"></head><body><script type="module" src="overlay-audit.js"></script></body></html>'));
 files.set('overlay-audit.html',Buffer.from('<!doctype html><html><body style="margin:0"><iframe id="viewport" src="overlay-inner.html" style="display:block;border:0;width:420px;height:700px"></iframe><script src="overlay-frame.js"></script></body></html>'));
-files.set('overlay-frame.js',Buffer.from("const frame=document.querySelector('iframe');globalThis.renderOverlay=async(...args)=>{for(let i=0;i<200;i++){if(typeof frame.contentWindow.renderOverlay==='function')return frame.contentWindow.renderOverlay(...args);await new Promise(r=>setTimeout(r,25));}throw Error('Inner overlay fixture not loaded');};globalThis.measureOverlay=()=>frame.contentWindow.measureOverlay();globalThis.checkOverlayFocus=()=>frame.contentWindow.checkOverlayFocus();globalThis.startKeyboardCheck=()=>frame.contentWindow.startKeyboardCheck();globalThis.finishKeyboardCheck=()=>frame.contentWindow.finishKeyboardCheck();globalThis.waitOverlayFrame=async()=>{for(let i=0;i<200;i++){if(typeof frame.contentWindow.readProviderDiagnostics==='function')return;await new Promise(r=>setTimeout(r,25));}throw Error('Inner diagnostics fixture not loaded');};globalThis.setProviderDiagnostics=async v=>{await waitOverlayFrame();return frame.contentWindow.setProviderDiagnostics(v);};globalThis.readProviderDiagnostics=async()=>{await waitOverlayFrame();return frame.contentWindow.readProviderDiagnostics();};globalThis.profileExistedBeforeSeed=async()=>{await waitOverlayFrame();return frame.contentWindow.fixtureProfileExisted;};setInterval(()=>{if(typeof frame.contentWindow.renderOverlay==='function')document.documentElement.dataset.ready='true';},25);"));
+files.set('overlay-frame.js',Buffer.from("const frame=document.querySelector('iframe');globalThis.renderOverlay=async(...args)=>{for(let i=0;i<200;i++){if(typeof frame.contentWindow.renderOverlay==='function')return frame.contentWindow.renderOverlay(...args);await new Promise(r=>setTimeout(r,25));}throw Error('Inner overlay fixture not loaded');};globalThis.measureOverlay=()=>frame.contentWindow.measureOverlay();globalThis.showOverlayHelp=()=>frame.contentWindow.showOverlayHelp();globalThis.checkOverlayFocus=()=>frame.contentWindow.checkOverlayFocus();globalThis.startKeyboardCheck=()=>frame.contentWindow.startKeyboardCheck();globalThis.finishKeyboardCheck=()=>frame.contentWindow.finishKeyboardCheck();globalThis.waitOverlayFrame=async()=>{for(let i=0;i<200;i++){if(typeof frame.contentWindow.readProviderDiagnostics==='function')return;await new Promise(r=>setTimeout(r,25));}throw Error('Inner diagnostics fixture not loaded');};globalThis.setProviderDiagnostics=async v=>{await waitOverlayFrame();return frame.contentWindow.setProviderDiagnostics(v);};globalThis.readProviderDiagnostics=async()=>{await waitOverlayFrame();return frame.contentWindow.readProviderDiagnostics();};globalThis.profileExistedBeforeSeed=async()=>{await waitOverlayFrame();return frame.contentWindow.fixtureProfileExisted;};setInterval(()=>{if(typeof frame.contentWindow.renderOverlay==='function')document.documentElement.dataset.ready='true';},25);"));
 // Suppress only the disposable test build's installation-time options tab.
 files.set('src/background/service-worker.js',Buffer.from(files.get('src/background/service-worker.js').toString().replace('chrome.runtime.openOptionsPage().catch(() => {});','Promise.resolve();')));
 files.set('overlay-audit.js',Buffer.from(`
 import './src/providers/floating-panel.js';
-const templates=await (await fetch('overlay-templates.json')).json();const extras=await(await fetch('overlay-extras.json')).json();
+import {checkProviderOverlayStructure} from './provider-overlay-structure.js';
+const configs=await(await fetch('overlay-configs.json')).json();const templates=await (await fetch('overlay-templates.json')).json();const extras=await(await fetch('overlay-extras.json')).json();
 const original=chrome.runtime.sendMessage.bind(chrome.runtime);
 let state='returning',host,root;
 chrome.runtime.sendMessage=async r=>{
@@ -35,19 +47,13 @@ globalThis.fixtureProfileExisted=Boolean((await chrome.storage.local.get('overla
 globalThis.setProviderDiagnostics=async value=>original({type:'LIBRARY_STORAGE_OPERATION',operation:'saveProviderDiagnosticsEnabled',args:[value]});globalThis.readProviderDiagnostics=async()=>original({type:'LIBRARY_STORAGE_OPERATION',operation:'getProviderDiagnosticsEnabled',args:[]});
 globalThis.renderOverlay=async(provider,nextState='returning',theme='light')=>{
  await globalThis.setProviderDiagnostics(nextState==='diagnostics');
- state=nextState;host?.remove();host=document.createElement('div');host.id='galactic-library-'+provider+'-importer';host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:10;color:var(--gh-text);';host.setAttribute('data-gh-theme',theme);root=host.attachShadow({mode:'open'});root.innerHTML=templates[provider];if(extras[provider]){const d=document.createElement('details');d.innerHTML=extras[provider];root.querySelector('.panel').append(d);}document.body.append(host);globalThis.GalacticFloatingPanel.attach(root,provider);await new Promise(r=>setTimeout(r,30));
- const help=root.querySelector('[data-import-help]'),expectedHelp=['steam','kindle','fanatical','humble'].includes(provider);
- if(Boolean(help)!==expectedHelp)throw Error(provider+': unexpected import help');
- if(help&&(help.open||help.textContent.includes(root.querySelector('.panel p').textContent)))throw Error(provider+': repeated or expanded import help');
- if(root.querySelector('[data-profile-summary] p').textContent!=='Using a different account on this site? Select Change account first.')throw Error('Account reminder mismatch');
- if(provider==='kindle'){
-  const contents=root.querySelector('[data-book-contents-workflow]');
-  if(help.parentNode!==contents.parentNode||!(help.compareDocumentPosition(contents)&Node.DOCUMENT_POSITION_FOLLOWING)||contents.contains(help))throw Error('Kindle import help is outside Library import');
-  if(![...contents.querySelectorAll('summary')].some(s=>s.textContent==='How contents discovery works')||!root.querySelector('.contents-controls [data-action="comic-contents"]'))throw Error('Kindle contents workflow missing');
- }
- const status=root.querySelector('.status,[data-import-status]');if(status)status.textContent='A deliberately long provider message that wraps without hiding account controls or actions. Earlier saved records and manual corrections were kept. '.repeat(3);
+ state=nextState;host?.remove();host=document.createElement('div');host.id='galactic-library-'+provider+'-importer';host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:10;color:var(--gh-text);';host.setAttribute('data-gh-theme',theme);root=host.attachShadow({mode:'open'});globalThis.GalacticFloatingPanel.render(root,provider,configs[provider]);if(extras[provider]){const d=document.createElement('details');d.innerHTML=extras[provider];root.querySelector('.panel').append(d);}document.body.append(host);globalThis.GalacticFloatingPanel.attach(root,provider);await new Promise(r=>setTimeout(r,30));
+ checkProviderOverlayStructure(root,provider);
+ const status=root.querySelector('.status,[data-import-status]');if(status)status.textContent='Fixture status: ready to check this library. Earlier saved records are kept until a successful import.';
+ if(nextState.startsWith('help')){root.querySelector('[data-import-help]').open=true;root.querySelector('[data-import-help]').scrollIntoView({block:'nearest'});}
  return true;
 };
+globalThis.showOverlayHelp=()=>{root.querySelector('[data-import-help]').scrollIntoView({block:'end'});return true;};
 globalThis.measureOverlay=()=>{const p=root.querySelector('.panel'),h=root.querySelector('.galactic-panel-heading'),m=root.querySelector('[data-galactic-floating-panel-control="minimize"]'),r=p.getBoundingClientRect(),b=m.getBoundingClientRect();const range=document.createRange();range.selectNodeContents(h);const a=range.getBoundingClientRect();return {width:innerWidth,height:innerHeight,left:r.left,right:r.right,top:r.top,bottom:r.bottom,headingOverlap:a.right>b.left&&a.top<b.bottom&&a.bottom>b.top,heading:h.textContent,scroll:p.scrollHeight>p.clientHeight,visibleDiagnostics:[...root.querySelectorAll('[data-provider-diagnostic]')].filter(e=>e.getClientRects().length).length,profile:root.querySelector('[data-profile-label]').value};};
 let keyboardStart;globalThis.startKeyboardCheck=()=>{keyboardStart=[...root.querySelectorAll('[data-profile-change], [data-profile-label]')].find(e=>e.getClientRects().length);keyboardStart.focus();return true;};globalThis.finishKeyboardCheck=()=>Boolean(root.activeElement&&root.activeElement!==keyboardStart&&parseFloat(getComputedStyle(root.activeElement).outlineWidth)>0);
 globalThis.checkOverlayFocus=()=>{const m=root.querySelector('[data-galactic-floating-panel-control="minimize"]'),r=root.querySelector('[data-galactic-floating-panel-control="restore"]');m.click();const minimized=r===root.activeElement&&root.querySelector('.panel').hidden;r.click();return minimized&&root.activeElement===m&&!root.querySelector('.panel').hidden;};
@@ -67,15 +73,17 @@ try{
  for(let i=0;i<100;i++){if(await evaluate('return document.documentElement?.dataset.ready && typeof renderOverlay==="function";'))return;await pause(50);}throw Error('Fixture did not load');}
  async function evaluate(code){if(firefox){await driver.send('WebDriver:SwitchToWindow',{handle:windowHandle});const r=await driver.send('WebDriver:ExecuteAsyncScript',{script:'(async()=>{'+code+'})().then(arguments[arguments.length-1],e=>arguments[arguments.length-1]({error:String(e)}));',args:[],newSandbox:false});const value=r.value??r;assert(!value?.error,value?.error);return value;}const r=await driver.send('Runtime.evaluate',{expression:'(async()=>{'+code+'})()',awaitPromise:true,returnByValue:true},session);assert(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;}
  await start();let count=0;
- for(const [width,height,theme,state]of [[420,700,'light','initial'],[420,700,'light','returning'],[320,480,'dark','returning'],[420,700,'light','diagnostics']]){
-  if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false},session);
+ for(const [width,height,theme,state]of [[420,700,'light','initial'],[420,700,'light','returning'],[320,480,'dark','returning'],[420,700,'light','diagnostics'],[420,700,'light','help'],[320,480,'dark','help-short']]){
+  // Keep the whole CSS-pixel iframe visible below Firefox's browser chrome.
+  if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height:height+120});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false},session);
   await evaluate('const f=document.querySelector("iframe");f.style.width="'+width+'px";f.style.height="'+height+'px";return true;');
   for(const key of Object.keys(templates)){await evaluate('return renderOverlay('+JSON.stringify(key)+','+JSON.stringify(state)+','+JSON.stringify(theme)+');');const m=await evaluate('return measureOverlay();');assert(m.left>=-1&&m.right<=m.width+1&&m.top>=-1&&m.bottom<=m.height+1,'Viewport overflow '+key+' '+JSON.stringify(m));assert(!m.headingOverlap,'Heading overlap '+key);const supported=['steam','epic','amazon-games','audible','kindle','amazon-video','fandango-at-home','kobo'].includes(key);assert(state==='diagnostics'&&supported?m.visibleDiagnostics>0:m.visibleDiagnostics===0,'Diagnostic visibility '+key+' '+state);assert(await evaluate('return checkOverlayFocus();'),'Focus lost '+key);await evaluate('return startKeyboardCheck();');if(firefox)await driver.send('WebDriver:PerformActions',{actions:[{type:'key',id:'overlay-keyboard',actions:[{type:'keyDown',value:'\uE004'},{type:'keyUp',value:'\uE004'}]}]});else{await driver.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9},session);await driver.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9},session);}assert(await evaluate('return finishKeyboardCheck();'),'Keyboard/focus indicator '+key);
+   if(state.startsWith('help'))await evaluate('return showOverlayHelp();');
    await pause(100);if(!firefox)await driver.send('Page.bringToFront',{},session);const image=firefox?await driver.send('WebDriver:TakeScreenshot',{id:null,highlights:[],full:false,hash:false}):await driver.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false},session);await writeFile(await outputPath('audit-artifacts/provider-overlays/'+(firefox?'firefox':'chrome')+'-'+key+'-'+width+'-'+state+'.png'),Buffer.from(image.data??image.value??image,'base64'));count++;
   }
  }
  await evaluate('return setProviderDiagnostics(true);');
  if(firefox)await driver.send('Marionette:Quit',{flags:['eForceQuit']});else await driver.send('Browser.close');await exited;driver.close?.();await start();assert.equal(await evaluate('return profileExistedBeforeSeed();'),true,'Native restart lost profile storage before fixture initialization');assert.equal((await evaluate('return readProviderDiagnostics();')).result,true,'Diagnostics preference lost at native restart');
  for(const key of Object.keys(templates)){await evaluate('return renderOverlay('+JSON.stringify(key)+');');assert((await evaluate('return measureOverlay();')).profile.includes('Personal account'),'Native restart lost profile '+key);}
- console.log('PASS '+(firefox?'Firefox':'Chrome')+': '+count+' source-template screenshots; all 14 viewport bounds/headings/focus; installed extension/browser restart and profile rehydration. No provider requests or imports.');
+ console.log('PASS '+(firefox?'Firefox':'Chrome')+': '+count+' configured shared-renderer screenshots; '+Object.keys(templates).length+' providers pass structure/copy/viewport/headings/focus; installed extension/browser restart and profile rehydration. No provider requests or imports.');
 }finally{if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;const target=resolve(temporary),base=resolve(tmpdir());if(target.startsWith(base+sep)&&target.slice(base.length+1).startsWith('gl-overlay-native-'))await rm(target,{recursive:true,force:true,maxRetries:5,retryDelay:200});}

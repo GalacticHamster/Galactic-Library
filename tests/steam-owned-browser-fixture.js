@@ -1,3 +1,4 @@
+import '../src/providers/floating-panel.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 const checks=[],assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
@@ -7,7 +8,7 @@ const ids=Array.from({length:161},(_,i)=>i+1),rows=new Map(ids.map(id=>[id,id===
 let owned={rgOwnedApps:ids,rgMasterSubApps:[],rgAutoGrantApps:[]},shadow,mode='full',scan,imports=0;
 const stored={},area={get:async defaults=>structuredClone({...defaults,...stored}),set:async patch=>Object.assign(stored,structuredClone(patch)),remove:async keys=>{for(const key of Array.isArray(keys)?keys:[keys])delete stored[key];}};
 let writer=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,observationCompletions:true});
-globalThis.chrome={runtime:{getURL:path=>location.origin+'/'+path}};
+globalThis.chrome={runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async r=>r.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:false}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false}}};
 globalThis.fetch=async url=>{
  if(String(url).startsWith('/dynamicstore'))return {ok:true,status:200,json:async()=>structuredClone(owned)};
  if(String(url).startsWith('https://api.steampowered.com/')){const requested=JSON.parse(new URL(url).searchParams.get('input_json')).ids.map(i=>i.appid);return {ok:true,status:200,json:async()=>({response:{store_items:requested.flatMap(id=>rows.has(id)?[rows.get(id)]:[])}})};}
@@ -30,7 +31,8 @@ const mount=()=>{document.querySelector('#galactic-library-steam-store-importer'
 async function sync(nextMode){mode=nextMode;shadow.querySelector('[data-mode="'+mode+'"]').click();for(let i=0;i<1000&&shadow.querySelector('.status').dataset.busy;i++)await new Promise(resolve=>setTimeout(resolve,10));assert(!shadow.querySelector('.status').dataset.busy,'Steam '+mode+' completes without a stalled panel');}
 try{
  (0,eval)(code[0]);(0,eval)(code[1]);mount();
- assert(shadow.querySelector('details').hidden,'Developer diagnostics are absent from the ordinary Steam panel');
+ assert(!shadow.querySelector('[data-import-help]').hidden,'Ordinary Steam import help remains visible while diagnostics are disabled');
+ assert(shadow.querySelector('[data-provider-diagnostic]').hidden,'Developer diagnostics are absent from the ordinary Steam panel');
  await sync('full');let db=await writer.getDatabase();const first=Object.values(db.providerItems).find(i=>i.providerItemId==='1'),originalRef=first.recordRef;
  assert(Object.keys(db.providerItems).length===2&&db.providers.steam.syncState.applications.appIds.length===161&&db.providers.steam.syncState.applications.issues.length===159,'Full UI saves readable game/DLC plus all 143 unavailable and 16 other application identities separately');
  assert(shadow.querySelector('.status').textContent.includes('Steam import complete')&&shadow.querySelector('.status').textContent.includes('143 applications still need title or type information')&&!/App IDs|parser|HTTP|incomplete/u.test(shadow.querySelector('.status').textContent),'Normal completion explains unidentified metadata without claiming the owned enumeration failed');
@@ -48,8 +50,8 @@ try{
  assert(imports===commits&&JSON.stringify((await writer.getDatabase()).providerItems)===before&&shadow.querySelector('.status').textContent.includes('Steam import failed'),'An explicitly incomplete owned list fails before saving and preserves the existing library');delete owned.complete;
  await writer.restoreDatabase(parseBackup(createBackup(db)));writer=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,observationCompletions:true});
  assert(Object.keys((await writer.getDatabase()).providerItems).length===4&&(await writer.getDatabase()).providers.steam.syncState.applications.appIds.length===163,'Account-scoped ID evidence and named records survive actual writer restart and backup restore');
- history.replaceState({},'',location.pathname+'?gl-steam-diagnostics=1');mount();
- assert(!shadow.querySelector('details').hidden&&shadow.querySelector('[data-profile-next]')&&shadow.querySelector('[data-sample-ids]'),'Explicit troubleshooting mode retains timing and private App-ID sampling controls without DevTools');
+ history.replaceState({},'',location.pathname+'?gl-steam-diagnostics=1');mount();await new Promise(resolve=>setTimeout(resolve,0));
+ assert(!shadow.querySelector('[data-provider-diagnostic]').hidden&&shadow.querySelector('[data-profile-next]')&&shadow.querySelector('[data-sample-ids]'),'Explicit troubleshooting mode retains timing and private App-ID sampling controls without DevTools');
  await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{globalThis.fetch=originalFetch;Element.prototype.attachShadow=originalAttach;}

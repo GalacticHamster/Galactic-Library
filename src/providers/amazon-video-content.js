@@ -7,15 +7,13 @@
 
   const host = document.createElement('div');
   host.id = 'galactic-library-amazon-video-importer';
-  host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;max-width:350px;font:14px/1.4 system-ui,sans-serif;color:var(--gh-text);';
+
   const shadow = host.attachShadow({ mode: 'closed' });
   const diagnosticsMarkup = SHOW_SCAN_DIAGNOSTICS ? `<details><summary>Scan diagnostics</summary><p>Check the listing without importing or changing your library, then export the scan checks. Reading purchase labels hovers each unconfirmed card once, waiting up to 0.6 seconds per title; 343 titles may add about 3.5 minutes. Check without importing first.</p><button type="button" data-mode="inspect">Check listing (no import)</button> <button type="button" data-mode="ownership">Check purchase labels (no import)</button> <button type="button" data-export-diagnostics disabled>Export scan diagnostics</button></details>` : '';
-  shadow.innerHTML = `
-    <style>
-      .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; } p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
-    </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br><strong>Quick update</strong> checks recent additions and stops at an already saved group. <strong>Full rescan</strong> checks your collection and refreshes purchase information. Earlier saved titles are kept when Amazon does not confirm a complete listing.</p><button type="button" data-mode="incremental">Quick update</button> <button type="button" data-mode="full">Full rescan</button>${diagnosticsMarkup}<p class="status" role="status"></p></div>`;
+  globalThis.GalacticFloatingPanel.render(shadow,'amazon-video',{onImport:sync,diagnostics:diagnosticsMarkup});
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
+  // These are provider-specific read-only tools, not shared import actions.
+  shadow.querySelectorAll('[data-mode="inspect"], [data-mode="ownership"]').forEach(button=>button.addEventListener('click',()=>sync(button.dataset.mode)));
   const exportButton = shadow.querySelector('[data-export-diagnostics]');
   const status = shadow.querySelector('.status');
   let exportContext = null;
@@ -93,7 +91,7 @@
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
-  buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+
   globalThis.GalacticFloatingPanel?.attach(shadow, 'amazon-video');
   document.documentElement.append(host);
 }());

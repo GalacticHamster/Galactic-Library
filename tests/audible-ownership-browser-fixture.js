@@ -1,3 +1,6 @@
+import '../src/providers/floating-panel.js';
+// This acquisition/checker fixture isolates scan authority; DOM construction is real.
+globalThis.GalacticFloatingPanel.attach=()=>{};
 // Synthetic purchase-page structure only. No private orders, accounts or payment data.
 import '../src/providers/audible.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';

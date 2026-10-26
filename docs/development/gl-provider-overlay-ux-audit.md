@@ -6,7 +6,135 @@ of defects and old presentation are historical. Phase A changed no production
 behavior. The implementation status below supersedes the original pending-review
 language and proposed UI descriptions. No live user libraries were used for tests.
 
-## Post-B6 explanatory text cleanup
+## Final shared provider renderer and information hierarchy
+
+October 26, 2026. This implementation supersedes the optional four-provider-help
+policy from `152a2f0` below. Every ordinary import overlay now has exactly one
+collapsed **How importing works** section. The description answers WHAT; help
+answers HOW. Account controls, actions and status precede help; specialized
+workflows and enabled diagnostics follow it.
+
+### Architecture assessment and implementation gates
+
+Before this refactor, heading, minimize/restore, account authority, diagnostics
+visibility, focus and viewport adjustments were already shared. All 14 provider
+scripts still independently constructed their shell, introduction, import buttons,
+status and base styles. The shared helper repaired that markup afterward.
+
+The smallest safe improvement is `GalacticFloatingPanel.render(shadow, provider,
+options)`, extending the existing helper rather than adding a framework. The
+shared provider registry supplies display names, WHAT/HOW copy and supported
+standard/single actions. Options supply `onImport` and only genuinely unique
+`diagnostics`, `specialized`, `footer` and `styles` slots. The existing `attach`
+phase retains its timing and authority logic, and rejects named panels that did
+not use the shared renderer. Providers can no longer omit help or construct a
+reversed ordinary action row. Host positioning and base styles also live in the
+shared renderer. Details are in [the architecture contract](../architecture/provider-overlays.md).
+
+Gates executed sequentially: inventory/shared builder, then GOG/Epic/Kindle as
+ordinary/single-action/specialized representatives (18 Chrome native captures
+and 123 importer checks), then the remaining 11, then full regression. No
+parallel provider rewrites, new dependencies, acquisition algorithms, matching,
+ownership rules, permissions or storage changes were introduced.
+
+### Fourteen-provider final inventory
+
+| Provider | Final introduction | Help contents summary | Structural validation |
+| --- | --- | --- | --- |
+| Steam | Import your Steam games and DLC, including applications Steam cannot currently identify. | New/unidentified applications versus complete supported scan; keep unavailable saved titles. | Shared renderer; Chrome/Firefox pass |
+| GOG | Import your GOG games, including hidden games. | Newest-first known-page stopping versus all supported pages, including hidden games. | Shared renderer; Chrome/Firefox pass |
+| Epic Games | Import games and add-ons from your Epic Games library. | One Sync action traverses the supported owned listing each time; no invented incremental action. | Shared renderer; Chrome/Firefox pass |
+| Amazon Games | Import games delivered to your Amazon Games library. Code claims and deliveries to other stores are excluded. | Three-month claims versus all years; automatic all-year check without baseline or after 70 days; preserve uncertain evidence. | Shared renderer; Chrome/Firefox pass |
+| Audible | Import your Audible audiobooks and supported ownership evidence. Owned, subscription, expired and unconfirmed access remain distinct. | Current/previous-year purchases, returns and received gifts versus all available years; initial library import required; preserve evidence/dates. | Shared renderer; Chrome/Firefox pass |
+| Kindle | Import your Kindle library. You can also discover the individual works included in your books. | Newest-page stopping versus complete supported check; separate contents workflow. | Shared renderer; Chrome/Firefox pass |
+| Amazon Video | Import your Amazon Video movies and TV titles. | Known-group stopping versus wider collection/purchase labels; retain earlier titles if completeness is uncertain. | Shared renderer; Chrome/Firefox pass |
+| Fandango at Home | Import your Fandango at Home movies and TV shows. | Recently Purchased stopping versus all movie/TV cards reconciled to provider counts. | Shared renderer; Chrome/Firefox pass |
+| Kobo | Import your Kobo books and audiobooks. Library presence alone does not confirm ownership. | My Books stopping versus exposed Archive/Audiobooks; wider initial import; ownership preference remains separate from source evidence. | Shared renderer; Chrome/Firefox pass |
+| Fanatical | Import supported products from completed Fanatical orders. | New completed orders versus all completed orders; no session-token jargon in normal help. | Shared renderer; Chrome/Firefox pass |
+| Humble Bundle | Import supported books, audiobooks, games and entitlements from Humble purchases. | New purchases and pending key refreshes versus all supported purchases; redaction and importer-update guidance. | Shared renderer; Chrome/Firefox pass |
+| Xbox | Import your web-visible Xbox Owned catalog. This is not your complete console or lifetime purchase history. | Both traverse the whole supported list; Quick adds/updates, Full records a complete check; both retain omissions. | Shared renderer; Chrome/Firefox pass |
+| PlayStation | Import your active PS4/PS5 Purchased web library. Older consoles and complete lifetime purchase history are not included. | Both traverse the supported listing; Quick adds/updates, Full records a complete check; both retain omissions. | Shared renderer; Chrome/Firefox pass |
+| Nintendo | Import the loaded, non-hidden Switch Virtual Game Cards. Other Nintendo purchase history is not included. | One loaded-card import; wait for loading; add/update matching cards and retain earlier cards. | Shared renderer; Chrome/Firefox pass |
+
+Ten providers gained import help: GOG, Epic, Amazon Games, Audible, Amazon Video,
+Fandango, Kobo, Xbox, PlayStation and Nintendo. Steam, Fanatical and Humble's
+existing help was revised; Kindle's existing process copy remains, now preceded
+by import status. Eleven introductions changed; Steam, Epic and Kindle retained
+their concise WHAT descriptions. All 14 were reviewed, not just new help entries.
+
+Kindle order is Library import heading ? introduction ? account ? Quick/Full ?
+import status ? import help ? Book contents discovery ? its review/mode/help,
+with the persistent contents-action footer retained. Its existing status element
+continues to display contents progress as before; no queue behavior changed.
+Diagnostic tools stay at the end and remain hidden by default. The specialized
+Audible read-only history checker is not an import panel and retains its own
+check/export/end actions and opt-in behavior.
+
+### Validation and limits
+
+- `node tests/run.js`: **1,768 passed**; `node tests/run-contents.mjs`: **485/485**.
+- Chrome and Firefox packaged suites each: **123 importer checks off + 123 on**,
+  **17 shared renderer/account/flag**, **16 Settings/provider UX**, **68 main UI**,
+  **21 Steam**, **11 Kobo**, **53 Fandango**, **58 Amazon Games**, **89 Amazon Video**,
+  **171 Audible ownership**.
+- `node tests/provider-overlay-native.mjs [--firefox]`: **84 captures per browser**
+  from actual provider configurations and the shared renderer, covering all 14
+  in initial, returning, diagnostics, expanded-help and short/narrow dark states.
+  DOM ordering, provider-specific meaning, near-duplicate copy, supported actions,
+  native disclosure toggles, keyboard focus, bounds, diagnostics visibility,
+  minimize/restore and installed-extension/browser restart pass. The fixture
+  rejects any provider still building a `shadow.innerHTML` shell.
+- Epic, Xbox, PlayStation and Nintendo native suites pass in each browser:
+  real source orchestration with synthetic websites, save/account guards,
+  navigation/recovery, additive reimports, source identities and backup roundtrips.
+- All 14 were visually reviewed in collapsed/expanded light and 320?480 dark
+  contact sheets for both browsers (16 sheets). Steam and GOG have matching
+  hierarchy; text wraps, long help scrolls, Kindle stays separated with its
+  footer, diagnostics are absent in normal views. Screenshots are synthetic,
+  not live signed-in imports; generated captures remain ignored.
+
+During migration, existing tests caught the changed body insertion point in
+Audible's checker and Amazon Video's separate read-only diagnostic callbacks.
+Both were corrected without changing acquisition/history behavior. The staged
+review also caught Steam's old first-disclosure selector hiding ordinary help.
+Provider-local diagnostic toggles were removed; the shared renderer hides tools
+immediately and the shared setting/URL logic alone reveals them. Actual
+controller checks now assert that ordinary help remains visible. Amazon Games
+fixtures use the real diagnostics preference rather than source-string patches. Legacy
+fixtures were updated to use actual supported single actions and named diagnostic
+selectors rather than a fabricated two-action shell or the first disclosure.
+The isolated acquisition/checker fixtures use the real renderer while keeping
+account admission mocked; the shared and native suites separately exercise it.
+No unresolved test failures remain. No personal profiles, live imports or original
+backups were used. Xbox/PlayStation use additive saves for both actions; wording
+explicitly avoids promising faster Quick traversal or removal on Full rescan.
+
+Repository-layout validation and `git diff --check` pass. Chrome and Firefox
+archives both validate 225 runtime files, with no version change; the unpacked
+Firefox dist folder is refreshed. The source and tests contain no generated
+screenshots, personal library records or scan reports.
+
+Files changed in this milestone:
+
+- Production: `src/providers/floating-panel.js` and the 14 `*-content.js` callers
+  (`steam-store`, `gog`, `epic`, `amazon-games`, `audible`, `kindle`, `amazon-video`,
+  `fandango-at-home`, `kobo`, `fanatical`, `humble`, `xbox`, `playstation`, `nintendo`).
+- Tests: `provider-overlay-structure.js`, `provider-overlay-native.mjs`,
+  `overlay-account-audit-fixture.js`, `provider-panel-restart-fixture.js`, `importers-fixture.js`,
+  `fanatical-navigation.js`, `steam-owned-browser-fixture.js`,
+  `amazon-games-browser-fixture.js`, `audible-ownership-browser-fixture.js` and
+  `fandango-browser-fixture.js`, all under `tests/`.
+- Documentation: this audit, `1.0-release-checklist.md` and the new
+  `docs/architecture/provider-overlays.md` contract.
+
+Approximate production-code reduction against `152a2f0`: provider scripts shrink
+by **about 15 KB**; shared implementation grows by **about 5 KB**, leaving a net **about 10 KB**
+reduction. Fourteen copies of the shell/base styles/host placement are gone;
+provider diagnostic tools, Kindle contents markup and the CSP/navigation/checker
+exceptions are deliberate retained UI. The common layout now changes in one
+implementation.
+
+## Post-B6 explanatory text cleanup (historical, superseded)
 
 October 26, 2026. The shared renderer previously cloned every original provider
 introduction into **How importing works** before replacing the introduction.

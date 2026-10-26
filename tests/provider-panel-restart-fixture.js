@@ -54,7 +54,7 @@ async function harness(provider){
    scoped.GalacticFandangoAtHome={expectedFandangoCountsFromDocument:()=>({movies:1,tv:0}),viewAllLibraryLinksFromDocument:()=>[{mediaType:'movie',url:loc.origin+'/content/browse/movies'},{mediaType:'tv',url:loc.origin+'/content/browse/tv'}],readFandangoGrid:async(section,expected,progress,known)=>section==='movie'&&!Array.isArray(known)?[F.providerSyncValue(provider)]:[]};
    evaluate(contentSource);
   }else{
-   const host=doc.createElement('div');doc.body.append(host);shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<div class="panel"><button data-mode="incremental">Quick update</button><button data-mode="full">Full rescan</button></div>';
+   const host=doc.createElement('div');doc.body.append(host);shadow=host.attachShadow({mode:'open'});scoped.GalacticFloatingPanel.render(shadow,provider);
    scoped.GalacticFloatingPanel.attach(shadow,provider);
   }
   await wait(()=>!shadow.querySelector('[data-profile-status]').textContent.includes('Loading'));
@@ -72,7 +72,7 @@ export async function checkProviderRememberedRestarts(){
    for(const mode of F.providerSyncModes(provider)){
     assert(shadow.querySelector('[data-profile-confirm-label]').hidden&&!shadow.querySelector('[data-profile-confirm]').checked,'Saved-account checkbox should be hidden and unchecked for '+provider);
     // Click the actual control to exercise the shared capture-time context reset.
-    shadow.querySelector(`[data-mode="${mode}"]`).click();
+    (shadow.querySelector(`[data-mode="${mode}"]`)??shadow.querySelector('[data-import-action]')).click();
     const scan=await scoped.GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider,...(F.consoleProvider(provider)?{sourceAccountFingerprint:F.fingerprint}:{})});
     assert(scan.ok,'Remembered '+provider+' '+mode+' start failed: '+scan.error);
     const start=h.messages.filter(r=>r.type==='GET_PROVIDER_SYNC_STATE').at(-1);assert(start.rememberedProfile===true&&start.confirmed===false&&start.profileId,'Remembered admission was falsely marked as fresh confirmation for '+provider);

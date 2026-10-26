@@ -11,6 +11,7 @@ import {createLibraryBrowseProjection,libraryBrowseResults} from '../src/ui/libr
 const checks=[];
 const assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
 const codes=await Promise.all(['provider-snapshot','amazon-games','amazon-games-content','amazon-games-identity'].map(async name=>(await fetch(`/src/providers/${name}.js`)).text()));
+const sharedPanelCode=await(await fetch('/src/providers/floating-panel.js')).text();
 const nativeTimeout=setTimeout;
 let frame;
 async function setup(windows,{churn=false,reverse=false}={}){
@@ -47,6 +48,8 @@ async function setup(windows,{churn=false,reverse=false}={}){
  win.setTimeout=(callback,ms)=>nativeTimeout(()=>{if(ms===150)for(const p of pending)if(--p.left===0)p.body.textContent=p.text;callback();},0);
  win.scrollTo=()=>{};
  Object.defineProperty(doc.documentElement,'scrollHeight',{get:()=>500});Object.defineProperty(win,'innerHeight',{value:500});
+ win.chrome={runtime:{sendMessage:async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:false}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false}}};
+ win.eval(sharedPanelCode);
  win.eval(codes[0]);win.eval(codes[3]);win.eval(codes[1]);
  return {win,doc,api:win.GalacticAmazonGames,selected,redemptions:()=>redemptions,expansions:()=>expansions};
 }
@@ -74,7 +77,8 @@ try{
  const dateAttach=datesPage.win.Element.prototype.attachShadow;
  datesPage.win.Element.prototype.attachShadow=function(options){dateShadow=dateAttach.call(this,options);return dateShadow;};
  datesPage.win.GalacticSync={send:async()=>{sends++;throw Error('Read-only date check must not contact persistence');}};
- datesPage.win.eval(codes[2].replace('if (!isCollectionPage','if (false').replace("new URLSearchParams(location.search).get('gl-date-check') !== '1'",'false'));
+ datesPage.win.chrome.runtime.sendMessage=async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:true}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false};
+ datesPage.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));await new Promise(resolve=>nativeTimeout(resolve,0));
  assert(!dateShadow.querySelector('[data-check-dates]').closest('details').hidden,'The explicit troubleshooting entry exposes the read-only date check');
  dateShadow.querySelector('[data-check-dates]').click();
  assert(dateShadow.querySelector('[data-mode="full"]').disabled&&dateShadow.querySelector('.status').textContent.includes('No library data will change'),'Date preparation immediately shows read-only progress and prevents conflicting scans');
@@ -145,7 +149,9 @@ try{
  page.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));
  assert(shadow.querySelector('[data-export-report]').hidden&&shadow.querySelector('[data-check-dates]').closest('details').hidden,'The normal importer has no permanent diagnostics panel or visible export control');
  shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
- assert(imports===0&&JSON.stringify(await writer.getDatabase())===before&&!shadow.querySelector('[data-export-report]').hidden,'Failed full import preserves stored records and offers a report without requiring another scan');
+ assert(imports===0&&JSON.stringify(await writer.getDatabase())===before&&!shadow.querySelector('[data-export-report]').getClientRects().length&&shadow.querySelector('.status').textContent.includes('enable provider diagnostics in GL Settings'),'Failed full import preserves stored records and explains how to enable hidden diagnostic exports');
+ page.win.chrome.runtime.sendMessage=async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:true}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false};
+ page.doc.querySelector('#galactic-library-amazon-games-importer').remove();page.win.eval(codes[2].replace('if (!isCollectionPage','if (false'));await new Promise(resolve=>nativeTimeout(resolve,0));
  page.win.GalacticAmazonGames.fetchAmazonGames=async()=>{const failure=new Error('Claim information unavailable. No library changes were saved.');failure.amazonGamesEntryTitle='Synthetic failing title';throw failure;};
  shadow.querySelector('[data-mode="full"]').click();for(let n=0;n<500&&shadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
  assert(shadow.querySelector('.status').textContent.includes('Synthetic failing title')&&(shadow.querySelector('.status').textContent.match(/Export the scan report/g)||[]).length===1,'Failure UI identifies the affected title locally and gives the export instruction exactly once');
