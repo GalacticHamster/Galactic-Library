@@ -24,7 +24,10 @@
     }
     if(request.type==='IMPORT_PROVIDER_ITEMS'){
       if(!session?.context?.scanToken)throw new Error('Start a fresh confirmed profile scan.');
-      return chrome.runtime.sendMessage({...request,type:'COMMIT_PROVIDER_SCAN',scanToken:session.context.scanToken,...(request.diagnosticLookupId?{diagnosticSentEpochMs:global.GalacticContentsPerformance?.now()}: {})});
+      const generation=session.generation;
+      const result=await chrome.runtime.sendMessage({...request,type:'COMMIT_PROVIDER_SCAN',scanToken:session.context.scanToken,...(request.diagnosticLookupId?{diagnosticSentEpochMs:global.GalacticContentsPerformance?.now()}: {})});
+      if(result?.ok&&generation===session.generation)await session.refresh?.(generation);
+      return result;
     }
     if(request.type==='FANDANGO_IMPORT_STATE'&&session){
       if(request.action==='set'){
@@ -66,18 +69,42 @@
     panel.prepend(heading);
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>A name you choose for the account signed in on this site. GL does not sign you in or verify your login. If you sign in to another store account, choose a different nickname and confirm switching before updating.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
+      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>If you signed into another website account, change this selection first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Editing it selects or adds an account; it does not rename one.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';
       const input=controls.querySelector('[data-profile-label]');
-      let remembered=null,edited=false,hintValue='',resolved=false;
+      let remembered=null,edited=false,hintValue='',resolved=false,lastProfileReply=null;
+      const editor=controls.querySelector('[data-profile-editor]'),summary=controls.querySelector('[data-profile-summary]'),choice=controls.querySelector('[data-profile-choice]');
+      controls.querySelector('[data-profile-manage]').href=(chrome.runtime.getURL?.('options.html')??'')+'#providers';
       const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
         ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:true}:{})})};
       session.generation=0;
       const invalidate=()=>{session.generation++;session.context=null;session.resume=null;};
-      input.addEventListener('input',()=>{edited=true;remembered=null;invalidate();controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
+      input.addEventListener('input',()=>{edited=true;remembered=null;invalidate();editor.hidden=false;summary.hidden=true;controls.querySelector('[data-profile-cancel]').hidden=!lastProfileReply?.profileId;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
       controls.querySelector('[data-profile-switch]').addEventListener('change',invalidate);
+      controls.querySelector('[data-profile-change]').addEventListener('click',()=>{invalidate();remembered=null;edited=true;editor.hidden=false;summary.hidden=true;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-cancel]').hidden=false;choice.focus();});
+      controls.querySelector('[data-profile-cancel]').addEventListener('click',()=>{invalidate();edited=false;applyProfile(lastProfileReply);if(summary.hidden)input.focus();else controls.querySelector('[data-profile-change]').focus();});
+      choice.addEventListener('change',()=>{input.value=choice.value==='__add__'?'':lastProfileReply?.profiles?.find(p=>p.profileId===choice.value)?.nickname??'';input.readOnly=choice.value!=='__add__';controls.querySelector('[data-profile-new-help]').hidden=choice.value!=='__add__';input.dispatchEvent(new Event('input'));if(!input.readOnly)input.focus();});
+      function applyProfile(result){
+        if(!result?.ok)throw Error(result?.error??'Could not read saved accounts.');
+        lastProfileReply=result;
+        const profiles=(result.profiles??[]).filter(profile=>profile.nickname);
+        controls.querySelector('datalist').replaceChildren();choice.replaceChildren();
+        for(const profile of profiles){const suggestion=document.createElement('option');suggestion.value=profile.nickname;controls.querySelector('datalist').append(suggestion);const option=document.createElement('option');option.value=profile.profileId;option.textContent=profile.nickname;choice.append(option);}
+        const add=document.createElement('option');add.value='__add__';add.textContent='Add account';choice.append(add);
+        controls.querySelector('[data-profile-choice-label]').hidden=!profiles.length;
+        if(!edited){input.value=result.profileLabel??'';choice.value=profiles.find(p=>p.nickname===input.value)?.profileId??'__add__';input.readOnly=choice.value!=='__add__';controls.querySelector('[data-profile-switch]').checked=false;controls.querySelector('[data-profile-confirm]').checked=false;}
+        if(!edited&&result.reuseAllowed&&result.profileId){
+          remembered={profileId:result.profileId,profileLabel:result.profileLabel??''};editor.hidden=true;summary.hidden=false;
+          controls.querySelector('[data-profile-confirm-label]').hidden=true;
+          controls.querySelector('[data-profile-status]').textContent=`Selected GL account: ${result.profileLabel||'Default account'}`;
+        }else if(!edited){remembered=null;editor.hidden=false;summary.hidden=true;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Select and confirm the signed-in account.';}
+      }
+      session.refresh=async generation=>{
+        try{const result=await chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider});if(generation!==session.generation||sessions.get(provider)!==session)return;edited=false;applyProfile(result);}
+        catch{controls.querySelector('[data-profile-status]').textContent='Library saved. Reload this page to refresh the account controls.';}
+      };
       sessions.set(provider,session);
       shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&(['full','incremental'].includes(button.dataset.mode)||button.hasAttribute('data-import-action'))){mode=button.dataset.mode??'full';invalidate();}},true);
       const performanceApi=provider==='kobo'?global.GalacticContentsPerformance:null;
@@ -103,14 +130,7 @@
       session.ready=chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider,...diagnostic()}).then(result=>{
         profileEnd?.();performanceApi?.merge(accountTiming,result.performance);
         resolved=true;
-        if(!result.ok)throw Error(result.error??'Could not read saved accounts.');
-        if(!edited&&(!input.value||input.value===hintValue))input.value=result.profileLabel??'';
-        for(const profile of result.profiles??[]){if(!profile.nickname)continue;const option=document.createElement('option');option.value=profile.nickname;controls.querySelector('datalist').append(option);}
-        if(!edited&&result.reuseAllowed&&result.profileId){
-          remembered={profileId:result.profileId,profileLabel:result.profileLabel??''};
-          controls.querySelector('[data-profile-confirm-label]').hidden=true;
-          controls.querySelector('[data-profile-status]').textContent=`Using saved account: ${result.profileLabel||'Default account'}.`;
-        }else controls.querySelector('[data-profile-status]').textContent='Select and confirm the signed-in account.';
+        applyProfile(result);
         accountTiming?.begin('provider_verified_display')();
       }).catch(error=>{profileFailed=true;profileEnd?.();controls.querySelector('[data-profile-status]').textContent='Could not load saved accounts. Reload this page before updating.';throw error;})
         .finally(()=>{profileFinished=true;reportAccountTiming();});

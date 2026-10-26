@@ -72,7 +72,7 @@ try{
   async function wait(script,message){for(let i=0;i<250;i++){const v=await evaluate(script);if(v)return v;await pause(100);}const state=await evaluate('return {url:location.href,ready:document.readyState,status:document.querySelector("#galactic-library-epic-importer")?.shadowRoot?.querySelector(".status")?.textContent};');throw Error(message+' '+JSON.stringify(state));}
   const root='document.querySelector("#galactic-library-epic-importer").shadowRoot';
   const ready=()=>wait('return !!document.querySelector("#galactic-library-epic-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Epic panel unavailable');
-  const sync=async()=>{await evaluate(`const s=${root};s.querySelector('button').click();return true;`);await wait(`const s=${root};return !s.querySelector('.status').dataset.busy;`,'Epic sync did not finish');};
+  const sync=async()=>{await evaluate(`const s=${root};s.querySelector('[data-import-action]').click();return true;`);await wait(`const s=${root};return !s.querySelector('.status').dataset.busy;`,'Epic sync did not finish');};
   const read=async(url)=>{await navigate(url);return JSON.parse(await wait('return document.documentElement?.dataset.result;','Database report unavailable'));};
   await navigate(origin+'/en-US/u/Synthetic/achievements');await ready();
   await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);await sync();

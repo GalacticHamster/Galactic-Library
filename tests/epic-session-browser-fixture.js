@@ -5,7 +5,7 @@ const page=cursor=>({data:{Library:{libraryItems:{records:[{catalogItemId:'fixtu
 export async function checkEpicSession({shadow,writer,checks,wait,assert,commits,reloadDiagnostics}){
  await import('../src/providers/provider-snapshot.js');await import('../src/providers/epic.js');
  const originalFetch=globalThis.fetch;let responses=[],requests=0;
- const button=shadow.querySelector('button'),status=shadow.querySelector('.status');
+ const button=shadow.querySelector('[data-import-action]'),status=shadow.querySelector('.status');
  const sync=async()=>{button.click();await wait(()=>!status.dataset.busy);};
  globalThis.fetch=async url=>{assert(url==='/graphql','Unexpected Epic request');requests++;const r=responses.shift();assert(r,'Unauthorized retry or overlapping request');return {status:r.status,ok:r.status<400,json:async()=>r.body};};
  try{

@@ -6,14 +6,14 @@ import '../src/providers/floating-panel.js';
 const checks = [], originalFetch = globalThis.fetch;
 const assert = (value, message) => { if (!value) throw Error(message); };
 const providers = ['steam','gog','epic','amazon-games','audible','kindle','amazon-video','fandango-at-home','kobo','fanatical','humble','xbox','playstation','nintendo'];
-let profiles = [], active = null, requests = [], starts = 0;
+let profiles = [], active = null, requests = [], starts = 0,commitHold=null;
 globalThis.chrome = {runtime: {sendMessage: async request => {
   requests.push(structuredClone(request));
   if (request.type === 'GET_PROVIDER_PROFILE_HINT') return {ok:true,hint:null};
   if (request.type === 'GET_PROVIDER_PROFILE') return {ok:true, profileLabel:active?.nickname ?? '',profileId:active?.profileId,
     profiles, reuseAllowed:profiles.length === 1 && Boolean(active?.synced)};
   if (request.type === 'GET_PROVIDER_SYNC_STATE') { starts++; return {ok:true,scanToken:crypto.randomUUID(),profileId:active?.profileId}; }
-  if (request.type === 'COMMIT_PROVIDER_SCAN') return {ok:true};
+  if (request.type === 'COMMIT_PROVIDER_SCAN') {if(commitHold)await commitHold;return {ok:true};}
   return {ok:true};
 }}};
 async function mount(provider, mode='full') {
@@ -39,6 +39,17 @@ try {
     edit(ui,'  Personal  ');ui.confirm.checked=true;await start(provider,ui);
     assert(requests.at(-1).profileLabel==='Personal'&&requests.at(-1).confirmed===true,'Initial declared consent not sent.');
     assert(!ui.confirmLabel.hidden,'Unexpected same-page disappearance of initial confirmation.');
+    active={profileId:crypto.randomUUID(),nickname:'Personal',synced:true};profiles=[active];
+    await globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]});
+    assert(ui.root.querySelector('[data-profile-editor]').hidden&&!ui.root.querySelector('[data-profile-summary]').hidden,'Acknowledged setup did not refresh to authoritative compact state.');
+    ui.root.querySelector('[data-profile-change]').click();
+    assert(!ui.root.querySelector('[data-profile-editor]').hidden,'Change account did not reveal selection.');
+    ui.root.querySelector('[data-profile-cancel]').click();
+    assert(ui.root.querySelector('[data-profile-editor]').hidden&&ui.input.value==='Personal','Cancelling account change lost the saved target.');
+    await start(provider,ui);let releaseCommit;commitHold=new Promise(resolve=>{releaseCommit=resolve;});
+    const pendingSave=globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]});
+    edit(ui,'Unsubmitted edit');releaseCommit();await pendingSave;commitHold=null;
+    assert(ui.input.value==='Unsubmitted edit'&&!ui.confirm.checked&&!ui.root.querySelector('[data-profile-editor]').hidden,'Save acknowledgement overwrote a newer account edit.');
     ui.host.remove();
     active={profileId:crypto.randomUUID(),nickname:'Personal',synced:true};profiles=[active];
     ui=await mount(provider);
@@ -53,7 +64,7 @@ try {
     // account edits must still discard it rather than reuse stale authority.
     ui.root.querySelector('[data-diagnostic]').click();
     await globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]});
-    assert(requests.at(-1).type==='COMMIT_PROVIDER_SCAN','Diagnostic cleared an admitted save.');
+    assert(requests.some(r=>r.type==='COMMIT_PROVIDER_SCAN'),'Diagnostic cleared an admitted save.');
     ui.action.click();
     await rejects(()=>globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]}),/Start a fresh/);
     edit(ui,'Personal');await rejects(()=>start(provider,ui),/confirm/);
@@ -63,7 +74,7 @@ try {
     ui=await mount(provider);
     assert(!ui.confirmLabel.hidden&&ui.input.value==='Personal','Multiple profiles unexpectedly reused consent.');
     assert(ui.root.querySelectorAll('datalist option').length===2,'Alternate account suggestions missing.');
-    edit(ui,'Alternate');ui.confirm.checked=true;ui.switcher.checked=true;await start(provider,ui);
+    ui.root.querySelector('[data-profile-choice]').value=alternate.profileId;ui.root.querySelector('[data-profile-choice]').dispatchEvent(new Event('change'));ui.confirm.checked=true;ui.switcher.checked=true;await start(provider,ui);
     assert(requests.at(-1).switchProfile&&requests.at(-1).profileLabel==='Alternate'&&!requests.at(-1).rememberedProfile,'Switch gesture lost explicit consent.');
     const count=starts;edit(ui,'New account');ui.switcher.checked=false;
     await rejects(()=>start(provider,ui),/confirm/);assert(starts===count,'Cancelled/unconfirmed switch started.');

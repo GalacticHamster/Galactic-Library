@@ -109,6 +109,7 @@ try{
   const account=view.element.querySelector('[data-account="'+profileId+'"]');account.closest('details').open=true;account.querySelector('details').open=true;
   [...account.querySelectorAll('button')].find(b=>b.textContent==='Ownership preference').click();const dialog=view.element.querySelector('dialog'),checkbox=dialog.querySelector('[data-kobo-assume-owned]');assert(!checkbox.checked,'Ownership assumption defaulted to true.');checkbox.checked=true;[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Save preference').click();await wait(()=>db.providerProfiles[profileId].assumeUnconfirmedOwned);
   const record=Object.values(db.providerItems).find(r=>r.profileId===profileId);assert(record.ownership==='unknown'&&effectiveOwnershipRecord(record,db).ownership==='owned','Preference overwrote source evidence or failed to affect display.');
+  await wait(()=>!shadow.querySelector('.status').dataset.busy);shadow.querySelector('[data-profile-confirm]').checked=true;
   shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>completed===4);
   assert(shadow.querySelector('.status').textContent.includes('Ownership preference applied')&&!shadow.querySelector('.status').textContent.includes('need ownership review'),'Covered items were incorrectly reported as needing review.');
   checks.push('Kobo account ownership preference is explicitly opt-in and changes effective access without rewriting source evidence');

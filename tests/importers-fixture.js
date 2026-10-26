@@ -159,7 +159,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
       if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
-      if(request.type==='GET_PROVIDER_PROFILE')return {ok:true,profileLabel:'fixture'};
+      if(request.type==='GET_PROVIDER_PROFILE'){const d=await writer.getDatabase(),p=d.providerProfiles[d.providers[provider]?.activeProfileId],profiles=Object.values(d.providerProfiles).filter(p=>p.provider===provider);return {ok:true,profileLabel:p?.nickname??'fixture',profileId:p?.profileId,profiles,reuseAllowed:profiles.length===1&&p?.state.connected===true&&Boolean(p?.state.lastSync)};}
       if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
       if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
       if(request.type==='FETCH_FANATICAL_ORDERS')return {ok:true,result:{items:[{sourceItemId:'fixture-123',title:items[0].title,mediaType}],snapshot,orderFingerprints:[]}};
@@ -187,8 +187,8 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         if(provider==='steam')globalThis.GalacticSync.setProfiling(true);
         if(provider==='epic'){globalThis.GalacticSync.setProfiling(false);const profile=shadows.at(-1).querySelector('[data-profile-next]');profile.checked=true;profile.dispatchEvent(new Event('change'));}
         const shadow=shadows.at(-1);
-        const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('button');
-        assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
+        const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('[data-import-action]');
+        assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
       }
       const shadow=shadows.at(-1);
       if(provider==='kindle'&&mode==='full'){
