@@ -13,13 +13,18 @@ export function audibleHistoryFailures(values=[]){
   if(!Array.isArray(values)||values.length>5)throw Error('Invalid Audible history failures.');
   return values.map(value=>{
     object(value,'Audible history failure');
-    if(!['initial','orders','refund-history'].includes(value.view)||value.year!==null&&(!Number.isInteger(value.year)||value.year<1900||value.year>2100)||!/^history-[a-z-]{1,80}$/u.test(value.reason)||typeof value.limited!=='boolean')throw Error('Invalid Audible history failure.');
+    if(!['initial','orders','refund-history','gift-received'].includes(value.view)||value.year!==null&&(!Number.isInteger(value.year)||value.year<1900||value.year>2100)||!/^history-[a-z-]{1,80}$/u.test(value.reason)||typeof value.limited!=='boolean')throw Error('Invalid Audible history failure.');
     return {view:value.view,year:value.year,reason:value.reason,limited:value.limited,...Object.fromEntries(['pagesRead','rows','unboundRows','conflictingGroups','multipleIdentities'].map(k=>[k,count(value[k],k,100000)]))};
   });
 }
 export function audibleHistoryYears(values=[]){
   if(!Array.isArray(values)||values.length>200||values.some(y=>!Number.isInteger(y)||y<1900||y>2100))throw Error('Invalid Audible history years.');
   return [...new Set(values)].sort((a,b)=>b-a);
+}
+export function audibleGiftHistory(value){
+  if(value.giftsComplete===undefined){if(value.giftYears!==undefined||value.giftPagesRead!==undefined)throw Error('Invalid Audible gift history.');return {};}
+  if(typeof value.giftsComplete!=='boolean')throw Error('Invalid Audible gift completion.');
+  return {giftsComplete:value.giftsComplete,giftYears:audibleHistoryYears(value.giftYears),giftPagesRead:count(value.giftPagesRead,'Audible gift pages',10000)};
 }
 export function validateAudibleHistory(value){
   object(value,'Audible history');
@@ -33,7 +38,7 @@ export function validateAudibleHistory(value){
   if(!Array.isArray(value.years)||value.years.length>200||value.years.some(y=>!Number.isInteger(y)||y<1900||y>2100)||!Number.isSafeInteger(value.pagesRead)||value.pagesRead<0||value.pagesRead>10000)throw Error('Invalid Audible history traversal.');
   const refundPurchaseYearsChecked=audibleHistoryYears(value.refundPurchaseYearsChecked);
   if(refundPurchaseYearsChecked.some(y=>!value.years.includes(y)))throw Error('Invalid Audible refund year scope.');
-  return {format:1,scope,failures:audibleHistoryFailures(value.failures),ordersComplete:value.ordersComplete,refundsComplete:value.refundsComplete,purchases,refunds,uncertainRefundAsins,refundPurchaseYearsChecked,years:[...new Set(value.years)].sort((a,b)=>b-a),pagesRead:value.pagesRead,reason:text(value.reason??'',100)};
+  return {format:1,scope,...audibleGiftHistory(value),failures:audibleHistoryFailures(value.failures),ordersComplete:value.ordersComplete,refundsComplete:value.refundsComplete,purchases,refunds,uncertainRefundAsins,refundPurchaseYearsChecked,years:[...new Set(value.years)].sort((a,b)=>b-a),pagesRead:value.pagesRead,reason:text(value.reason??'',100)};
 }
 
 // Historical facts enrich one existing source record; they never create a
@@ -58,7 +63,11 @@ export function enrichAudibleRecords(database,profileId,incoming,raw,{full=false
     // not block unrelated purchases, but only a complete orders traversal can
     // establish all known purchase-year links for this narrow Full-scan case.
     const scopedFull=history.scope==='full'&&history.ordersComplete;
-    const purchaseRefundsChecked=history.refundsComplete||scopedFull&&dates.length>0&&dates.every(day=>history.refundPurchaseYearsChecked.includes(Number(day.slice(0,4))));
+    // A directly observed redemption in this recipient's Gift received view is
+    // positive acquisition evidence, independent of the sender's purchase year.
+    // It never overrides a later explicit return, revocation or manual review.
+    const receivedGift=(byAsin.get(item.providerItemId)??[]).some(e=>e.method==='gift'&&e.date===lastPurchase&&history.giftYears?.includes(Number(e.date.slice(0,4))));
+    const purchaseRefundsChecked=receivedGift||history.refundsComplete||scopedFull&&dates.length>0&&dates.every(day=>history.refundPurchaseYearsChecked.includes(Number(day.slice(0,4))));
     if(!uncertain.has(item.providerItemId)){
       const checkedReturn=history.scope==='full'||(refunds.get(item.providerItemId)??[]).some(day=>day===lastReturn&&history.years.includes(Number(day.slice(0,4))));
       const checkedPurchase=history.scope==='full'||byAsin.has(item.providerItemId);

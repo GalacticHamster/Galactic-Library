@@ -24,7 +24,7 @@ has no reported refunds; populated-refund behavior is not live established.
 ## Deliberately different update guarantees
 
 - Full rescan reads the complete library and every available history year in
-  both Your orders and Refund history. It is the historical reconciliation path.
+  Your orders, Refund history and Gift received. It is the historical reconciliation path.
 - Quick update retains Date added incremental library discovery and checks only
   offered current and previous calendar years. Audible's observed last-365-days
   view spans both years, so the bounded two-year window avoids a year-boundary
@@ -50,7 +50,7 @@ agree with the selected purchase year.
 
 Repeated pages, unsupported load-more controls, ambiguous empty tables,
 authentication challenges, inaccessible frames and safety limits cannot claim
-completion. Recognized empty-year wording is required. Refund and order work
+completion. Recognized empty-year wording or an explicit native zero count is required. Refund, order and gift work
 have separate completion flags; a bounded fresh frame can recover the other
 view after one view fails. Source errors do not become proof of no refunds.
 
@@ -270,3 +270,49 @@ Validation: 1,728 unit and 485 contents tests pass. Packaged Chrome and Firefox
 each pass 152 ownership, 87 Audible library, 105 importer and 68 main-UI checks.
 Both rebuilt ZIPs validate 221 runtime files; repository layout and diff checks
 pass. All browser reconciliation fixtures use disposable synthetic libraries.
+
+## Received gifts
+
+The user identified seven original single-narrator editions as gifts received
+in 2022/2023, while the separately purchased full-cast edition already matched.
+Their own /account/gift-history page exposes a native Gift received view with
+Title, Redeemed date and Received from columns, a selected calendar year, and
+an Orders count. This is recipient evidence; the sender's order history is not
+needed. The existing scanner previously read only purchase/refund history.
+
+Automatic updates now reuse the native history walker for a separate,
+path-restricted gift frame. It selects Gift received using the real dropdown,
+then discovers that view's own years and follows only its actual same-site
+pagination. Full reads all offered years; Quick reads only current/previous
+years. Counts and page-number checks prevent declaring missing pages complete.
+Explicit empty statements or a zero Orders count beside the Gift history
+heading can establish an empty received year; uncertain empties stay incomplete.
+
+Each gift needs an exact book identifier and a valid Redeemed date. A short year
+is resolved only against the selected calendar year; blank, conflicting,
+impossible or future dates do not qualify. Artwork-only product links beside
+plain titles are supported. The Received from cell is not read. Sender names,
+addresses, gift codes, prices and raw order identifiers are not retained.
+
+Gift facts use the existing date/method evidence with method gift. A directly
+observed recipient redemption is positive acquisition evidence independent of
+the sender's purchase year and unrelated failed refund years. Explicit later
+returns, revocations, expiry and manual decisions remain protected. The
+redemption day can fill a missing acquisition date; a reliable saved date is
+preserved. No title-only matching, extra library identities or transaction rows
+are created. Partial gift checks keep valid independent facts and preserve
+purchase results, with a visible received-gift failure and no new complete
+Full-history baseline. Optional gift completion/year/page fields round-trip in
+backups; older backups and evidence remain valid.
+
+The existing optional read-only checker now recognizes Gift history and hides
+purchase-only preview/probe controls there. This is diagnostic support, not a
+new normal workflow. The ordinary Quick update and Full rescan buttons perform
+enrichment automatically. Live gifted-book recovery remains to be verified.
+
+Validation: 1,731 unit tests and 485 contents tests pass. Packaged Chrome and
+Firefox each pass 169 ownership/gift, 88 Audible library, 105 importer and 68
+main-UI checks. Both rebuilt packages validate 221 runtime files. Three frozen
+legacy backups validate and round-trip in memory without changing their source
+files, identities or reviews. Repository layout and diff checks pass. Live
+recovery counts are not inferred from the synthetic fixtures.

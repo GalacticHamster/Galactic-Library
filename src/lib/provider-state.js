@@ -1,6 +1,6 @@
 import { PROVIDERS } from './constants.js';
 import { object, text, strings, date, count } from './validation.js';
-import {audibleHistoryFailures,audibleHistoryYears} from './audible-ownership.js';
+import {audibleHistoryFailures,audibleHistoryYears,audibleGiftHistory} from './audible-ownership.js';
 import {validateSyncHealth} from './sync-health.js';
 
 const STEAM_METADATA_ISSUES=['unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','http','authentication','malformed','classification','network','other'];
@@ -65,7 +65,7 @@ export function validateProviderStates(value = {}) {
         const h=object(state.syncState.audibleHistory,'Audible history checkpoint');
         if(h.version!==1||!['full','recent'].includes(h.scope??'full')||typeof h.ordersComplete!=='boolean'||typeof h.refundsComplete!=='boolean'||!Array.isArray(h.years)||h.years.length>200||h.years.some(y=>!Number.isInteger(y)||y<1900||y>2100))throw Error('Invalid Audible history checkpoint.');
         if(audibleHistoryYears(h.refundPurchaseYearsChecked).some(y=>!h.years.includes(y)))throw Error('Invalid Audible refund year scope.');
-        result.syncState.audibleHistory={version:1,scope:h.scope??'full',...(h.failures?{failures:audibleHistoryFailures(h.failures)}:{}),...(h.uncertainRefunds!==undefined?{uncertainRefunds:count(h.uncertainRefunds,'Uncertain Audible refunds',50000)}:{}),ordersComplete:h.ordersComplete,refundsComplete:h.refundsComplete,...(h.refundPurchaseYearsChecked?{refundPurchaseYearsChecked:audibleHistoryYears(h.refundPurchaseYearsChecked)}:{}),years:[...new Set(h.years)],pagesRead:count(h.pagesRead,'Audible pages',10000),checkedAt:date(h.checkedAt),...(h.fullCheckedAt?{fullCheckedAt:date(h.fullCheckedAt)}:{}),reason:text(h.reason??'',100)};
+        result.syncState.audibleHistory={version:1,scope:h.scope??'full',...audibleGiftHistory(h),...(h.failures?{failures:audibleHistoryFailures(h.failures)}:{}),...(h.uncertainRefunds!==undefined?{uncertainRefunds:count(h.uncertainRefunds,'Uncertain Audible refunds',50000)}:{}),ordersComplete:h.ordersComplete,refundsComplete:h.refundsComplete,...(h.refundPurchaseYearsChecked?{refundPurchaseYearsChecked:audibleHistoryYears(h.refundPurchaseYearsChecked)}:{}),years:[...new Set(h.years)],pagesRead:count(h.pagesRead,'Audible pages',10000),checkedAt:date(h.checkedAt),...(h.fullCheckedAt?{fullCheckedAt:date(h.fullCheckedAt)}:{}),reason:text(h.reason??'',100)};
       }
       if(provider==='humble')result.syncState.knownPurchaseIds=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
       if(provider==='fanatical'){

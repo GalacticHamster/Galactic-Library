@@ -70,13 +70,13 @@ not replace another remembered account.
 ## Audible updates
 
 **Full rescan** reads the complete Audible library and all available calendar
-purchase/refund-history years. It refreshes source metadata and reconciles
+**Your orders**, **Refund history**, and **Gift received** years. It refreshes source metadata and reconciles
 supported ownership and acquisition dates. Missing library records move to
 **Earlier imports**; transaction history never creates extra audiobook records.
 
 **Quick update** uses the existing Date added discovery and stops at a page of
 already saved titles. It checks only the current and previous calendar years of
-purchase/refund history, including matches to previously unconfirmed saved
+purchase, refund and received-gift history, including matches to previously unconfirmed saved
 books. It intentionally does not reconcile older transactions. Use Full rescan
 for older purchases, historical corrections or recovery. Both buttons perform
 ownership enrichment automatically; no evidence file or separate action is needed.
@@ -86,6 +86,13 @@ for Full rescan and stops, rather than silently performing a full import. An
 older library without a completed all-year purchase-history check can still use
 Quick update, with an explicit notice that historical reconciliation is missing.
 There are no scheduled full-history rescans.
+
+Redeemed gifts are Owned even when they do not appear in Your orders. GL reads
+your own Gift received list, matches exact Audible identifiers, and uses the
+Redeemed date as the acquisition date when no reliable date is already saved.
+Gifts you sent and unredeemed gifts do not establish ownership. Sender names,
+email addresses and gift codes are not saved. No separate gift-import action is
+needed.
 
 Exact Audible identifiers and the selected account determine matches. Supported
 purchase dates retain their calendar day; saved reliable dates, purchase evidence

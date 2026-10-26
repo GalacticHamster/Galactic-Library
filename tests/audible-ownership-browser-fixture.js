@@ -8,7 +8,7 @@ const checks=[],assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(me
 const originalFetch=globalThis.fetch.bind(globalThis),inspect=globalThis.GalacticAudible.inspectPurchaseHistory;
 const preview=globalThis.GalacticAudible.previewPurchaseHistory;
 const probe=globalThis.GalacticAudible.probePurchaseHistoryAccess;
-const scanHistory=globalThis.GalacticAudible.scanPurchaseHistory;
+const scanHistory=options=>globalThis.GalacticAudible.scanPurchaseHistory({...options,includeGifts:false});
 const url='https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1',id=n=>'B'+String(n).padStart(9,'0');
 const holder=document.createElement('main');document.body.append(holder);
 const filters='<select><option>Your orders</option><option>Pre-orders</option><option>Membership charges</option><option>Refund history</option></select><select><option>Last 90 days</option><option>Last 180 days</option><option selected>Last 365 days</option>'+Array.from({length:14},(_,i)=>'<option>'+(2026-i)+'</option>').join('')+'</select>';
@@ -204,6 +204,49 @@ try{
      if(delayedEmpty&&view==='refund-history')setTimeout(()=>{if(!closed){const p=next.createElement('p');p.textContent="Looks like you don't have any refunds in your purchase history.";next.body.append(p);}},5);
    };build();return {visits,get closed(){return closed;},read(){if(view==='refund-history'&&year===providerErrorYear)throw Error('history-provider-error');if(permanentDocument&&view==='refund-history'||unverifiedReads-->0)throw Error('history-access-not-verified');if(challenge||failRefund&&view==='refund-history')return new DOMParser().parseFromString('<form>Security challenge</form>','text/html');return doc;},choose(select,option){if(/^\d{4}$/u.test(option.textContent))year=Number(option.textContent);else view=/^Refund history$/u.test(option.textContent)?'refund-history':'orders';page=1;build();if(transientDocument)unverifiedReads=2;},follow(control){page=repeat?1:wrongNumberedPage?3:Number(control.getAttribute('data-page'));build();},close(){closed++;}};
  };
+ const giftHistoryDriver=({badDate=false,conflicting=false,missing=false,blocked=false,unknownEmpty=false,foreignNext=false,sentFirst=false,missingPager=false,malformed=false}={})=>{
+   const years=[2026,2025,2023,2022];let year=years[0],page=1,view=sentFirst?'Gift given':'Gift received',doc,closed=0;const visits=[];
+   const build=()=>{
+     const controls='<select>'+['Gift given','Gift received'].map(v=>'<option'+(v===view?' selected':'')+'>'+v+'</option>').join('')+'</select><select>'+years.map(y=>'<option'+(y===year?' selected':'')+'>'+y+'</option>').join('')+'</select>';
+     const numbers=year===2022?[83,84,85,86,87]:year===2023?[page===1?81:82]:year===2026?[80]:[];
+     const rows=numbers.map(n=>'<tr><td><a href="/pd/'+id(n)+'"><img alt="PRIVATE_COVER"></a></td><td>Synthetic gift '+n+(conflicting&&n===83?'<a href="/pd/'+id(999)+'">Conflicting edition</a>':'')+'</td><td>'+(missing&&n===83?'':badDate&&n===83?'02-30-22':'01-02-'+String(year).slice(-2))+'</td><td>PRIVATE_SENDER@example.invalid <span>PRIVATE_GIFT_CODE</span></td></tr>').join('');
+     let html=controls+'<h2>Gift history</h2><div>'+(year===2023?2:numbers.length)+' Orders</div><table><thead><tr><th></th><th>Title</th><th>Redeemed date</th><th>Received from</th></tr></thead><tbody>'+rows+'</tbody></table>';
+     if(malformed&&year===2022)html=html.replace('<td>Synthetic gift 83</td>','');
+     if(!numbers.length)html+='<p>'+(unknownEmpty?'Unrecognized empty page':'You have not received any gifts.')+'</p>';
+     if(year===2023&&!missingPager)html+='<div class="history-paging"><span>'+page+'</span>'+(page===1?'<a href="'+(foreignNext?'https://example.invalid':'https://www.audible.com')+'/account/gift-history?CURSOR_SECRET=next" data-page="2">2</a>':'<a href="/account/gift-history?CURSOR_SECRET=previous" data-page="1">1</a>')+'</div>';
+     doc=new DOMParser().parseFromString(blocked?'<form>Sign in</form>':html,'text/html');Object.defineProperty(doc,'readyState',{value:'complete'});visits.push([view,year,page]);
+   };build();return {visits,get closed(){return closed;},read:()=>doc,choose(select,option){if(/^\d{4}$/u.test(option.textContent))year=Number(option.textContent);else view=option.textContent;page=1;build();},follow(control){page=Number(control.getAttribute('data-page'));build();},close(){closed++;}};
+ };
+ const runGifts=async(options={},mode='full')=>{
+   const opened=[];const result=await globalThis.GalacticAudible.scanPurchaseHistory({mode,now:new Date('2026-10-25T12:00:00Z'),timeoutMs:20,pollMs:1,driverFactory:kind=>{const d=kind==='gifts'?giftHistoryDriver(options):fullHistoryDriver({years:[2026,2025,2023,2022]});opened.push({kind,driver:d});return d;}});return {result,opened};
+ };
+ let giftRun=await runGifts({sentFirst:true}),giftEvidence=giftRun.result;
+ assert(giftEvidence.giftsComplete&&giftEvidence.giftYears.join(',')==='2026,2025,2023,2022'&&giftEvidence.purchases.filter(p=>p.method==='gift'&&Number(p.asin.slice(1))>=80).length===8&&giftEvidence.giftPagesRead===5,'Integrated Full rescan switches to Gift received, reads every offered year and real gift-page links, and accepts short redemption dates from the selected year');
+ assert(giftRun.opened.length===2&&giftRun.opened.every(x=>x.driver.closed===1)&&!JSON.stringify(giftEvidence).includes('PRIVATE_')&&giftEvidence.purchases.some(p=>p.asin===id(83)&&p.date==='2022-01-02'&&p.method==='gift'),'Separate native frames close after gifts and purchases; only exact book IDs and redemption dates survive, never senders or gift codes');
+ const giftMemory={},giftWriter=createStorageWriter({get:async defaults=>structuredClone({...defaults,...giftMemory}),set:async patch=>Object.assign(giftMemory,structuredClone(patch))});
+ const giftBooks=[80,81,82,83,84,85,86,87,999].map(n=>({providerItemId:id(n),title:'Synthetic recording '+n,mediaType:'audiobook',ownership:'unknown',metadata:{asin:id(n)}})),giftSnapshot=completeProviderSnapshot('audible',giftBooks,[completedScope('library',9,9,'pagination-end',1)]);
+ let giftDb=await giftWriter.replaceProviderItems('audible',giftBooks,{audibleHistory:giftEvidence},giftSnapshot);
+ assert(Object.values(giftDb.providerItems).filter(r=>r.ownership==='owned').length===8&&Object.values(giftDb.providerItems).find(r=>r.providerItemId===id(999)).ownership==='unknown'&&Object.values(giftDb.providerItems).find(r=>r.providerItemId===id(83)).acquiredAt==='2022-01-02T00:00:00.000Z','Received gifts enrich existing exact editions and redemption-day acquisition dates without fabricating ownership for another edition');
+ giftDb=await giftWriter.replaceProviderItems('audible',giftBooks,{audibleHistory:giftEvidence},giftSnapshot);
+ assert(giftDb.providers.audible.syncHealth.differences.updated===0&&parseBackup(createBackup(giftDb)).providers.audible.syncState.audibleHistory.giftsComplete,'Gift evidence, completion and dates survive reload/backup and repeated scans create no duplicate acquisition events');
+ giftRun=await runGifts({},'incremental');
+ assert(giftRun.result.giftsComplete&&giftRun.result.giftYears.join(',')==='2026,2025'&&giftRun.opened.filter(x=>x.kind==='gifts').every(x=>x.driver.visits.every(v=>v[1]>=2025)),'Quick gift enrichment checks only current/previous years and never backfills old redemptions');
+ giftDb=await giftWriter.mergeProviderItems('audible',[],{audibleHistory:giftRun.result});
+ assert(Object.values(giftDb.providerItems).find(r=>r.providerItemId===id(83)).acquiredAt==='2022-01-02T00:00:00.000Z'&&Object.values(giftDb.providerItems).filter(r=>r.ownership==='owned').length===8,'Recent-only zero-item Quick updates retain older gift ownership and redemption dates');
+ giftRun=await runGifts({unknownEmpty:true});
+ assert(giftRun.result.giftsComplete,'An explicit zero Orders count beside Gift history verifies an empty received-gift year without guessing empty-page prose');
+ giftRun=await runGifts({missingPager:true});
+ assert(!giftRun.result.giftsComplete&&giftRun.result.failures.some(f=>f.reason==='history-count-mismatch'),'A received-gift count exceeding the read rows prevents false completion if pagination is missed');
+ for(const issue of ['badDate','missing','conflicting','malformed']){
+   giftRun=await runGifts({[issue]:true});assert(!giftRun.result.giftsComplete&&giftRun.result.failures.some(f=>f.view==='gift-received')&&!giftRun.result.purchases.some(p=>p.asin===id(83))&&giftRun.result.ordersComplete,'Gift '+issue+' remains incomplete without changing valid purchase results or inventing a redemption');
+ }
+ giftRun=await runGifts({blocked:true});
+ assert(!giftRun.result.giftsComplete&&giftRun.result.ordersComplete&&giftRun.opened.every(x=>x.driver.closed===1),'A blocked gift history cannot claim no gifts or discard successful purchase history');
+ giftRun=await runGifts({foreignNext:true});
+ assert(!giftRun.result.giftsComplete&&giftRun.result.failures.some(f=>f.view==='gift-received'&&f.reason==='history-next-unverified'),'Gift pagination rejects a foreign destination while retaining earlier readable redemptions');
+ const sentDoc=new DOMParser().parseFromString('<select><option selected>Gift given</option><option>Gift received</option></select><select><option selected>2022</option></select><table><tr><th>Title</th><th>Redeemed date</th><th>Received from</th></tr><tr><td><a href="/pd/'+id(83)+'">Synthetic gift</a></td><td>01-02-22</td><td>PRIVATE_SENDER</td></tr></table>','text/html'),sentEvents=[];
+ globalThis.GalacticAudible.inspectReceivedGifts(sentDoc,{now:new Date('2026-10-25')},e=>sentEvents.push(e));
+ assert(!sentEvents.length,'A sent-gift view cannot establish recipient ownership even when it contains a book and a date');
  driver=fullHistoryDriver();let h=await scanHistory({driverFactory:()=>driver,timeoutMs:100,pollMs:1});
  assert(h.ordersComplete&&h.refundsComplete&&h.years.join(',')==='2032,2031'&&h.pagesRead===5&&driver.closed===1,'Automatic history traverses both native views, every discovered year and actual Next links, then removes the background driver: '+JSON.stringify({orders:h.ordersComplete,refunds:h.refundsComplete,reason:h.reason,pages:h.pagesRead,visits:driver.visits}));
  assert(h.purchases.length===8&&['cash','credit','purchase','free','gift','promotion'].every(method=>h.purchases.some(p=>p.method===method))&&!h.purchases.some(p=>[id(5),id(6),id(7)].includes(p.asin)),'Cash, credit, unfamiliar totals and explicit free purchases qualify while pending, outbound gifts and borrowed rows do not');
@@ -373,6 +416,11 @@ try{
  assert(!sessionStorage.getItem(sessionKey)&&!shadow.textContent.includes('Check this page'),'Expired opt-ins are cleared instead of leaving troubleshooting enabled indefinitely');
  document.querySelector('#galactic-library-audible-importer').remove();sessionStorage.setItem(sessionKey,'PRIVATE_INVALID_VALUE');(0,eval)(code);
  assert(!sessionStorage.getItem(sessionKey)&&shadow.querySelectorAll('[data-mode]').length===2,'Malformed session opt-ins are discarded without touching saved library records');
+ document.querySelector('#galactic-library-audible-importer').remove();sessionStorage.removeItem(sessionKey);history.replaceState(null,'','/account/gift-history?gl-audible-ownership-check=1');
+ const visibleGift=giftHistoryDriver();set(visibleGift.read().body.innerHTML);(0,eval)(code);
+ const giftCheck=[...shadow.querySelectorAll('button')].find(b=>b.textContent==='Check this page (no import)');giftCheck.click();await new Promise(r=>setTimeout(r,10));
+ assert(shadow.querySelector('[role="status"]').textContent.includes('Gift page checked')&&shadow.querySelector('[role="status"]').textContent.includes('readable redemption dates')&&!shadow.querySelector('[role="status"]').textContent.includes('undefined'),'The optional gift-page checker describes redemption evidence without purchase-column assumptions');
+ assert([...shadow.querySelectorAll('button')].filter(b=>/Preview purchase|Test automatic/.test(b.textContent)).every(b=>b.hidden),'Gift diagnostics hide purchase-only preview and access-probe controls');
  await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{globalThis.fetch=originalFetch;Element.prototype.attachShadow=oldAttach;HTMLAnchorElement.prototype.click=oldClick;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;}

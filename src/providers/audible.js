@@ -557,7 +557,53 @@
     report.preview={entries:entries.length,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
     return {state:blocked?'blocked':entries.length?'ready':'empty',report,entries,unmatched,missingTitles,titlesFromSavedLibrary,excludedReturned:returned.size};
   }
-  function historyFrame(){
+  function readReceivedGifts(document,{knownItemIds=null,forImport=false,now=new Date()}={},onEvidence=null){
+    const visible=e=>!e.closest('[hidden],[aria-hidden="true"]')&&(!document.defaultView||e.getClientRects().length>0);
+    const label=e=>String(e?.textContent??'').replace(/\s+/gu,' ').trim();
+    const known=new Set(knownItemIds??[]),selected=new Set(),years=new Set();let selectedTime=null;
+    for(const select of [...document.querySelectorAll('select')].filter(visible))for(const option of select.options){
+      const value=label(option);
+      if(/^gift(?:s)? received$/iu.test(value)&&option.selected)selected.add('gift-received');
+      else if(/gift/iu.test(value)&&option.selected)selected.add('gift-other');
+      if(/^\d{4}$/u.test(value)){years.add(Number(value));if(option.selected)selectedTime=Number(value);}
+    }
+    const report={format:1,provider:'audible',purpose:'gift-redemption-feasibility',boundReached:false,libraryComparison:Array.isArray(knownItemIds)?'active-saved-profile-not-account-verified':'unavailable',readOnly:true,historyComplete:false,accountVerified:false,state:'structure-unrecognized',selectedView:selected.size===1?[...selected][0]:'unknown',selectedTime,timeOptions:[...years].sort((a,b)=>b-a),rows:0,rowsWithOneAsin:0,rowsWithMultipleAsins:0,rowsMatchingSavedAsin:0,validRedemptions:0,unresolvedPurchaseRows:0,recognizedHeaders:0,purchaseDateYears:{},grouping:{conflictingOrderGroups:0},limits:{purchaseRowScan:false}};
+    if(report.selectedView!=='gift-received'){if(report.selectedView==='gift-other'&&years.size)report.state='gift-view-observed';return report;}
+    report.orderCount=null;for(const heading of document.querySelectorAll('h1,h2,h3'))if(/^gift history$/iu.test(label(heading))){let e=heading.nextElementSibling;for(let i=0;e&&i<2;i++,e=e.nextElementSibling){const m=e.tagName!=='TABLE'&&!e.querySelector('table,[role="table"]')?/^(\d{1,5}) orders?$/iu.exec(label(e)):null;if(m)report.orderCount=Number(m[1]);}}
+    const limit=forImport?10000:100;
+    for(const table of document.querySelectorAll('table,[role="table"]')){
+      const header=[...table.querySelectorAll('tr,[role="row"]')].find(r=>['title','redeemed date','received from'].every(name=>[...r.children].some(c=>label(c).toLowerCase()===name)));
+      if(!header||!visible(header))continue;
+      report.recognizedHeaders++;report.state='checked';const names=[...header.children].map(c=>label(c).toLowerCase());
+      for(const row of table.querySelectorAll('tr,[role="row"]')){
+        if(row===header||!visible(row)||[...row.children].every(c=>c.tagName==='TH'))continue;
+        if(report.rows>=limit){report.limits.purchaseRowScan=true;break;}
+        const cells=[...row.children],title=cells[names.indexOf('title')];
+        if(!title||cells.length!==names.length){if(row.querySelector('a[href*="/pd/"],[data-asin]')){report.rows++;report.unresolvedPurchaseRows++;}continue;}
+        // Sender cells are intentionally never read. A received gift needs its
+        // own exact book identity and a valid redemption date in this year.
+        const bookCells=cells.filter((_,i)=>i!==names.indexOf('received from'));
+        const ids=new Set();for(const a of bookCells.flatMap(c=>[...c.querySelectorAll('a[href]')])){try{const u=new URL(a.getAttribute('href'),'https://www.audible.com');if(u.origin==='https://www.audible.com'&&u.pathname.startsWith('/pd/')){const id=audibleItemIdFromUrl(u.href);if(/^[A-Z0-9]{10}$/u.test(id))ids.add(id);}}catch{}}
+        for(const e of [row,...bookCells.flatMap(c=>[...c.querySelectorAll('[data-asin]')])])if(/^[A-Z0-9]{10}$/iu.test(e.getAttribute('data-asin')??''))ids.add(e.getAttribute('data-asin').toUpperCase());
+        if(!ids.size&&!label(title))continue;
+        report.rows++;
+        if(ids.size!==1){if(ids.size>1)report.rowsWithMultipleAsins++;report.unresolvedPurchaseRows++;continue;}
+        const asin=[...ids][0];report.rowsWithOneAsin++;if(known.has(asin))report.rowsMatchingSavedAsin++;
+        const raw=label(cells[names.indexOf('redeemed date')]),match=/^(\d{2})-(\d{2})-(\d{4}|\d{2})$/u.exec(raw);
+        let day=null;if(match&&Number.isInteger(selectedTime)){
+          const [,m,d,y]=match,year=y.length===2?selectedTime:Number(y),value=`${year}-${m}-${d}`,check=new Date(value+'T00:00:00Z');
+          if(year===selectedTime&&year%100===Number(y.slice(-2))&&Number.isFinite(check.getTime())&&check.toISOString().slice(0,10)===value&&value<=now.toISOString().slice(0,10))day=value;
+        }
+        if(!day){report.unresolvedPurchaseRows++;continue;}
+        report.validRedemptions++;report.purchaseDateYears[String(selectedTime)]=(report.purchaseDateYears[String(selectedTime)]??0)+1;
+        onEvidence?.({kind:'purchase',asin,acquiredAt:day,method:'gift'});
+      }
+    }
+    report.boundReached=report.limits.purchaseRowScan;
+    return report;
+  }
+  function historyFrame(kind='purchases'){
+    const path=kind==='gifts'?'/account/gift-history':'/account/purchase-history';
     if(global.location?.origin!=='https://www.audible.com')throw Error('unsupported-origin');
     const frame=global.document.createElement('iframe');
     frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms');
@@ -565,12 +611,12 @@
     // Keep a real layout so provider-rendered tables can be inspected. Do not
     // hide with display:none or relax the provider's framing/security policies.
     frame.style.cssText='position:fixed;left:-12000px;top:0;width:1000px;height:800px;border:0;pointer-events:none;';
-    frame.src=new URL('/account/purchase-history',global.location.origin).href;global.document.documentElement.append(frame);
+    frame.src=new URL(path,global.location.origin).href;global.document.documentElement.append(frame);
     return {
       read(){
         const doc=frame.contentDocument;if(!doc)return null;
         const url=new URL(doc.URL);if(url.protocol==='about:')return null;
-        if(url.origin!==global.location.origin||!/^\/account\/purchase-history\/?$/u.test(url.pathname)){
+        if(url.origin!==global.location.origin||url.pathname.replace(/\/$/u,'')!==path){
           if(doc.readyState!=='complete')return null;
           if(url.origin===global.location.origin&&url.pathname==='/500')throw Error('history-provider-error');
           throw Error('history-access-not-verified');
@@ -583,7 +629,7 @@
       },
       follow(control){
         if(control.ownerDocument!==frame.contentDocument)throw Error('history-control-unavailable');
-        if(control.hasAttribute('href')){const url=new URL(control.getAttribute('href'),frame.contentDocument.URL);if(url.origin!==global.location.origin||!/^\/account\/purchase-history\/?$/u.test(url.pathname))throw Error('history-control-unavailable');frame.contentWindow.location.href=url.href;}
+        if(control.hasAttribute('href')){const url=new URL(control.getAttribute('href'),frame.contentDocument.URL);if(url.origin!==global.location.origin||url.pathname.replace(/\/$/u,'')!==path)throw Error('history-control-unavailable');frame.contentWindow.location.href=url.href;}
         else control.click();
       },
       close(){frame.remove();}
@@ -641,7 +687,9 @@
     }finally{driver?.close();}
     return result;
   }
-  async function scanPurchaseHistory({mode='full',now=new Date(),driverFactory=historyFrame,timeoutMs=15000,pollMs=150,progress=()=>{}}={}){
+  async function scanHistoryPart({mode='full',now=new Date(),driverFactory=historyFrame,timeoutMs=15000,pollMs=150,progress=()=>{},kind='purchases'}={}){
+    const gift=kind==='gifts',historyPath=gift?'/account/gift-history':'/account/purchase-history';
+    const openDriver=()=>driverFactory(kind);
     const scope=mode==='incremental'?'recent':'full';
     const history={format:1,scope,failures:[],ordersComplete:false,refundsComplete:false,purchases:[],refunds:[],uncertainRefundAsins:[],refundPurchaseYearsChecked:[],years:[],pagesRead:0,reason:null};
     let driver,current;const purchases=new Map(),refunds=new Map(),purchaseCounts=new Map(),refundCounts=new Map(),uncertain=new Set(),started=Date.now();
@@ -657,7 +705,7 @@
     };
     const yearSelect=doc=>{const matches=[...doc.querySelectorAll('select')].filter(s=>visible(s)&&[...s.options].some(o=>/^\d{4}$/u.test(textOf(o))));if(matches.length!==1)throw Error('history-controls');return matches[0];};
     const read=doc=>{
-      const events=[],report=readPurchaseHistory(doc,{url:'https://www.audible.com/account/purchase-history',forImport:true,now},e=>events.push(e));
+      const events=[],report=gift?readReceivedGifts(doc,{forImport:true,now},e=>events.push(e)):readPurchaseHistory(doc,{url:'https://www.audible.com/account/purchase-history',forImport:true,now},e=>events.push(e));
       return {doc,report,events};
     };
     const ready=async(previous,view,year)=>{
@@ -674,11 +722,11 @@
         }
         if(doc&&doc!==previous&&doc.readyState==='complete'&&!doc.querySelector('[aria-busy="true"]')){
           const data=read(doc),r=data.report;
-          if(['checked','refund-structure-observed'].includes(r.state)&&(!view||r.selectedView===view)&&(year===undefined||r.selectedTime===year&&(view!=='orders'||Object.keys(r.purchaseDateYears).every(y=>Number(y)===year)))){
+          if((['checked','refund-structure-observed'].includes(r.state)||gift&&!view&&r.state==='gift-view-observed')&&(!view||r.selectedView===view)&&(year===undefined||r.selectedTime===year&&(view!=='orders'&&!gift||Object.keys(r.purchaseDateYears).every(y=>Number(y)===year)))){
             // Headers and a selected year can precede asynchronous empty-state
             // rendering. Wait for entries or an explicit empty-list message;
             // document.readyState alone does not establish no refunds.
-            if(view&&!r.rows&&!r.refundHistory.bookRows&&!emptyHistory(doc,view))emptyCandidate=true;
+            if(view&&(!gift||year!==undefined)&&!r.rows&&!(r.refundHistory?.bookRows)&&!emptyHistory(doc,view))emptyCandidate=true;
             else return data;
           }
         }
@@ -688,12 +736,13 @@
     };
     const change=async(view,year)=>{
       if(current.report.selectedView!==view){
-        const selects=[...current.doc.querySelectorAll('select')].filter(s=>[...s.options].some(o=>/^your orders$/iu.test(textOf(o)))&&[...s.options].some(o=>/^refund history$/iu.test(textOf(o))));
+        const selects=[...current.doc.querySelectorAll('select')].filter(s=>[...s.options].some(o=>(gift?/^gifts? received$/iu:/^your orders$/iu).test(textOf(o)))&&(gift||[...s.options].some(o=>/^refund history$/iu.test(textOf(o)))));
         if(selects.length!==1)throw Error('history-controls');
-        const option=[...selects[0].options].find(o=>(view==='orders'?/^your orders$/iu:/^refund history$/iu).test(textOf(o)));
+        const option=[...selects[0].options].find(o=>(gift?/^gifts? received$/iu:view==='orders'?/^your orders$/iu:/^refund history$/iu).test(textOf(o)));
         driver.choose(selects[0],option);current=await ready(current.doc,view);
       }
-      if(current.report.selectedTime!==year){const select=yearSelect(current.doc),option=[...select.options].find(o=>textOf(o)===String(year)&&!o.disabled);if(!option)throw Error('history-year-unavailable');driver.choose(select,option);current=await ready(current.doc,view,year);}
+      if(year!==undefined&&current.report.selectedTime!==year){const select=yearSelect(current.doc),option=[...select.options].find(o=>textOf(o)===String(year)&&!o.disabled);if(!option)throw Error('history-year-unavailable');driver.choose(select,option);current=await ready(current.doc,view,year);}
+      if(gift&&year!==undefined)current=await ready(null,view,year);
     };
     const continuation=doc=>{
       const links=new Map();let terminal=false,unresolvedNumbers=false,unverifiedControl=false;
@@ -702,17 +751,17 @@
       const declared=roots.flatMap(p=>[...p.querySelectorAll('[aria-current="page"]')]).filter(visible);
       // The live history pager marks its current number with a plain span,
       // rather than aria-current. Never infer current page from linked numbers.
-      const currentElements=declared.length?declared:roots.flatMap(p=>[p,...p.querySelectorAll('span')]).filter(e=>/^\d{1,4}$/u.test(textOf(e))&&!e.closest('a,button,[role="button"],[role="link"]'));
+      const currentElements=declared.length?declared:roots.flatMap(p=>[p,...p.querySelectorAll('span')]).filter(e=>e.tagName==='SPAN'&&!e.querySelector('span,a,button,[role="button"],[role="link"]')&&/^\d{1,4}$/u.test(textOf(e))&&!e.closest('a,button,[role="button"],[role="link"]'));
       const currentPages=currentElements.filter(visible).map(e=>Number(textOf(e))).filter(n=>Number.isSafeInteger(n)&&n>0);
       const numberedDestinations=new Set();
       for(const a of doc.querySelectorAll('a[href]'))if(visible(a)&&a.closest(pagers)&&/^\d{1,4}$/u.test(textOf(a))){
-        try{const u=new URL(a.getAttribute('href'),'https://www.audible.com/account/purchase-history');if(u.origin==='https://www.audible.com'&&/^\/account\/purchase-history\/?$/u.test(u.pathname))numberedDestinations.add(u.href);}catch{}
+        try{const u=new URL(a.getAttribute('href'),'https://www.audible.com'+historyPath);if(u.origin==='https://www.audible.com'&&u.pathname.replace(/\/$/u,'')===historyPath)numberedDestinations.add(u.href);}catch{}
       }
       const currentPage=currentPages.length&&new Set(currentPages).size===1?currentPages[0]:null;
       for(const e of [...doc.querySelectorAll('a,button,[role="button"]')].filter(visible)){
         const label=textOf(e),pager=e.closest(pagers),rel=e.getAttribute('rel')??'';
-        let url;try{if(e.getAttribute('href'))url=new URL(e.getAttribute('href'),'https://www.audible.com/account/purchase-history');}catch{}
-        const same=url?.origin==='https://www.audible.com'&&/^\/account\/purchase-history\/?$/u.test(url.pathname);
+        let url;try{if(e.getAttribute('href'))url=new URL(e.getAttribute('href'),'https://www.audible.com'+historyPath);}catch{}
+        const same=url?.origin==='https://www.audible.com'&&url.pathname.replace(/\/$/u,'')===historyPath;
         const next=/\bnext\b/iu.test(rel)||/^(?:next|next page|go to next page)[\s›»→]*$/iu.test(label)||/^(?:next|next page)$/iu.test(e.getAttribute('aria-label')??'');
         const disabled=e.hasAttribute('disabled')||e.getAttribute('aria-disabled')==='true'||Boolean(e.closest('[class*="disabled" i]'));
         if(/^(?:load|show|see)\s+(?:\d+\s+)?more\b/iu.test(label)&&!disabled)throw Error('history-lazy-loading-unverified');
@@ -738,6 +787,12 @@
       // The live empty-refund panel is outside/after the table. Its explicit
       // fixed sentence is valid only in the selected refund view with no books;
       // generic page prose or a merely empty table never establishes completion.
+      if(view==='gift-received'){
+        if(readReceivedGifts(doc,{forImport:true,now}).orderCount===0)return true;
+        const message=/^(?:you (?:have not|haven['\u2019]t) received any gifts|no gifts received)[.!]?$/iu;
+        if([...doc.querySelectorAll('p,div,span')].filter(e=>visible(e)&&!e.closest('table,[role="table"]')&&!e.querySelector('table,[role="table"]')).some(e=>message.test(textOf(e))))return true;
+        return false;
+      }
       if(view==='refund-history'){
         const message=/^looks like you (?:don['\u2019]t|do not) have any refunds in your purchase history[.!]?$/iu;
         const matches=e=>[...e.childNodes].some(n=>n.nodeType===3&&message.test((n.textContent??'').replace(/\s+/gu,' ').trim()))||message.test(textOf(e))&&[...e.querySelectorAll('*')].every(visible);
@@ -781,23 +836,24 @@
       }return result;
     };
     try{
-      driver=driverFactory();current=await ready(null);
+      driver=openDriver();current=await ready(null);
+      if(gift&&current.report.selectedView!=='gift-received')await change('gift-received');
       history.years=[...new Set([...yearSelect(current.doc).options].map(o=>textOf(o)).filter(v=>/^\d{4}$/u.test(v)).map(Number).filter(y=>y>=1900&&y<=2100))].sort((a,b)=>b-a);
       // Audible exposes calendar-year filters; its live last-365-days view
       // spans current and previous years. Quick intentionally checks only those
       // two offered years, never a historical checkpoint or backfill sweep.
       if(scope==='recent'){const year=now.getFullYear();history.years=history.years.filter(y=>y===year||y===year-1);}
       if(!history.years.length)throw Error('history-year-unavailable');
-      for(const view of ['refund-history','orders']){
+      for(const view of gift?['gift-received']:['refund-history','orders']){
         let attemptedYear=null,viewPages=0,completedYears=0;
         try{
-          if(!driver){driver=driverFactory();current=await ready(null);}
+          if(!driver){driver=openDriver();current=await ready(null);}
           for(const [index,year]of history.years.entries()){
             attemptedYear=year;
             try{
-              if(!driver){driver=driverFactory();current=await ready(null);await change('orders',year);}
-              progress(`${view==='orders'?'Checking purchase history':'Checking return history'}: ${year} (${index+1} of ${history.years.length})...`);
-              await change(view,year);const seen=new Set();let yearReadable=true,purchaseYearScope=true;
+              if(!driver){driver=openDriver();current=await ready(null);await change(gift?'gift-received':'orders',year);}
+              progress(`${gift?'Checking received gifts':view==='orders'?'Checking purchase history':'Checking return history'}: ${year} (${index+1} of ${history.years.length})...`);
+              await change(view,year);const seen=new Set();let yearReadable=true,purchaseYearScope=true,giftRowsRead=0,giftExpected=null;
               while(true){
                 if(Date.now()-started>600000||history.pagesRead>=10000||purchases.size+refunds.size>50000)throw Error('history-safety-limit');
                 const {doc,report,events}=current;
@@ -809,17 +865,18 @@
                 // only their own identities; missing/conflicting identities still
                 // prevent the refund scope from being declared complete.
                 const negative=view==='refund-history'?refundRows(doc,year):[];
+                if(gift){giftRowsRead+=report.rows;if(report.orderCount!==null){if(giftExpected!==null&&giftExpected!==report.orderCount)throw Error('history-count-changed');giftExpected=report.orderCount;}}
                 if(view==='refund-history'){
                   const dates=Object.keys(report.purchaseDateYears);
                   // Only the native Purchased-date layout establishes which
                   // original purchase year a partial refund check covers.
                   if(!report.recognizedHeaders||dates.some(y=>Number(y)!==year)||negative.length&&!dates.length)purchaseYearScope=false;
                 }
-                const unreadable=view==='orders'&&(report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||report.unresolvedPurchaseRows);
+                const unreadable=(view==='orders'||gift)&&(report.limits.purchaseRowScan||report.grouping.conflictingOrderGroups||report.rowsWithMultipleAsins||report.unresolvedPurchaseRows);
                 const fingerprint=JSON.stringify([events,negative,[...doc.querySelectorAll('[data-order-id]')].map(e=>e.getAttribute('data-order-id'))]);
                 if(seen.has(fingerprint))throw Error('history-repeated-page');seen.add(fingerprint);history.pagesRead++;viewPages++;
                 if(unreadable){yearReadable=false;recordFailure(view,year,'history-unreadable-entries',viewPages,report);}
-                if(view==='orders')for(const event of events){if(event.kind==='returned'){
+                if(view==='orders'||gift)for(const event of events){if(event.kind==='returned'){
                   if(event.date){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}
                   else uncertain.add(event.asin);
                 }else if(event.kind==='purchase'){
@@ -828,7 +885,7 @@
                   purchases.set(key,{asin:event.asin,date:event.acquiredAt,method:event.method});
                 }}
                 else for(const event of negative){if(event.notReturned)continue;if(event.confirmed){const key=event.asin+':'+event.date;if(!refunds.has(key)){if(refunds.size>=50000||(refundCounts.get(event.asin)??0)>=100)throw Error('history-safety-limit');refundCounts.set(event.asin,(refundCounts.get(event.asin)??0)+1);}refunds.set(key,{asin:event.asin,date:event.date});}else uncertain.add(event.asin);}
-                const books=view==='orders'?report.rowsWithOneAsin:negative.length;
+                const books=view==='orders'||gift?report.rowsWithOneAsin:negative.length;
                 if(!books){
                   if(!emptyHistory(doc,view))throw Error('history-empty-unconfirmed');
                 }
@@ -836,19 +893,20 @@
                 if(typeof driver.follow!=='function')throw Error('history-next-unverified');driver.follow(page.next);current=await ready(doc,view,year);
                 if(page.expectedPage!==null&&continuation(current.doc).currentPage!==page.expectedPage)throw Error('history-pagination-unverified');
               }
+              if(gift&&giftExpected!==null&&giftRowsRead!==giftExpected)throw Error('history-count-mismatch');
               if(yearReadable)completedYears++;
               if(view==='refund-history'&&purchaseYearScope)history.refundPurchaseYearsChecked.push(year);
             }catch(error){
               // Audible can fail one historical year on its own /500 page.
               // Never parse that page or mark the year checked. Reopen verified
               // native history before continuing the remaining offered years.
-              if(error.message!=='history-provider-error')throw error;
+              if(error.message!=='history-provider-error'&&!(gift&&error.message==='history-empty-unconfirmed'))throw error;
               recordFailure(view,year,error.message,viewPages,null);
               driver?.close();driver=null;
             }
           }
           const complete=completedYears===history.years.length;
-          if(view==='orders')history.ordersComplete=complete;else history.refundsComplete=complete;
+          if(view==='orders'||gift)history.ordersComplete=complete;else history.refundsComplete=complete;
         }catch(error){
           const reason=/^history-[a-z-]{1,80}$/u.test(error.message)?error.message:'history-incomplete';
           const r=current?.report?.selectedView===view&&current.report.selectedTime===attemptedYear?current.report:null;
@@ -859,8 +917,23 @@
     }catch{history.reason='history-inaccessible';}
     finally{driver?.close();}
     history.purchases=[...purchases.values()];history.refunds=[...refunds.values()];history.uncertainRefundAsins=[...uncertain].sort();
-    if(lastDiagnostics)lastDiagnostics.ownershipHistory={scope,failures:history.failures,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,purchaseObservations:history.purchases.length,refundObservations:history.refunds.length,uncertainRefunds:uncertain.size,reason:history.reason};
+    if(lastDiagnostics&&!gift)lastDiagnostics.ownershipHistory={scope,failures:history.failures,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,years:history.years,pagesRead:history.pagesRead,purchaseObservations:history.purchases.length,refundObservations:history.refunds.length,uncertainRefunds:uncertain.size,reason:history.reason};
     return history;
   }
-  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory,probePurchaseHistoryAccess,scanPurchaseHistory };
+  async function scanPurchaseHistory(options={}){
+    const history=await scanHistoryPart(options);
+    if(options.includeGifts===false)return history;
+    const gifts=await scanHistoryPart({...options,kind:'gifts'});
+    history.purchases.push(...gifts.purchases);
+    history.giftsComplete=gifts.ordersComplete;history.giftYears=gifts.years;history.giftPagesRead=gifts.pagesRead;
+    history.pagesRead+=gifts.pagesRead;
+    history.failures.push(...gifts.failures.map(f=>({...f,view:'gift-received'})));
+    if(!gifts.ordersComplete&&!gifts.failures.length)history.failures.push({view:'gift-received',year:null,reason:gifts.reason??'history-inaccessible',pagesRead:gifts.pagesRead,rows:0,unboundRows:0,conflictingGroups:0,multipleIdentities:0,limited:false});
+    history.failures=history.failures.slice(0,5);
+    if(gifts.reason&&!history.reason)history.reason=gifts.reason;
+    if(history.purchases.length>50000||history.pagesRead>10000){history.purchases=history.purchases.slice(0,50000);history.pagesRead=Math.min(10000,history.pagesRead);history.giftsComplete=false;history.reason='history-safety-limit';}
+    if(lastDiagnostics?.ownershipHistory)Object.assign(lastDiagnostics.ownershipHistory,{giftsComplete:history.giftsComplete,giftYears:history.giftYears,giftPagesRead:history.giftPagesRead,pagesRead:history.pagesRead,failures:history.failures,reason:history.reason,purchaseObservations:history.purchases.length});
+    return history;
+  }
+  global.GalacticAudible = { audibleItemIdFromUrl, audibleItemFromLibraryEntry, ownershipFromLibraryAction, newAudibleItems, fetchAudibleAudiobooks, inspectPagination, getDiagnostics,recordSaveState,inspectPurchaseHistory,previewPurchaseHistory,probePurchaseHistoryAccess,scanPurchaseHistory,inspectReceivedGifts:readReceivedGifts };
 }(globalThis));

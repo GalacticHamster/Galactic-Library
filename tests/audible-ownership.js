@@ -77,6 +77,28 @@ export const audibleOwnershipTests=[
    assert.throws(()=>validateAudibleHistory(history([],{refundPurchaseYearsChecked:[2015]})),/scope/);
    assert.throws(()=>validateAudibleHistory(history([],{refundPurchaseYearsChecked:['2025']})),/years/);
  }],
+ ['Audible recipient redemption establishes exact-account gift ownership even when unrelated historical checks are incomplete',async()=>{
+   const {writer:w}=memory();let db=await w.mergeProviderItems('audible',[item(1)],{profileLabel:'Recipient'});const profile=db.providers.audible.activeProfileId;
+   await w.mergeProviderItems('audible',[item(1)],{profileLabel:'Other account'});
+   const gifts=history([purchase(1,'gift','2022-12-30')],{ordersComplete:false,refundsComplete:false,giftsComplete:false,giftYears:[2023,2022],giftPagesRead:1,years:[2026,2025],reason:'history-provider-error'});
+   db=await w.mergeProviderItems('audible',[],{profileId:profile,audibleHistory:gifts});
+   const received=rows(db).find(r=>r.profileId===profile),other=rows(db).find(r=>r.profileId!==profile);
+   assert.equal(received.ownership,'owned');assert.equal(received.acquiredAt,'2022-12-30T00:00:00.000Z');assert.equal(other.ownership,'unknown');assert(!db.providers.audible.syncState.audibleHistory.fullCheckedAt);
+   assert.deepEqual(parseBackup(createBackup(db)).providers.audible.syncState.audibleHistory.giftYears,[2023,2022]);
+ }],
+ ['Audible gifts preserve manual corrections, explicit revocation and expiry, and do not invent a purchase date',async()=>{
+   const {writer:w}=memory();let db=await w.mergeProviderItems('audible',[item(1),item(2,'revoked'),item(3,'expired')]);const record=rows(db).find(r=>r.providerItemId===id(1));
+   db=await w.saveOwnershipCorrections([{recordRef:record.recordRef,provider:'audible',profileId:record.profileId,expectedReviewRef:null}],{ownership:'returned',note:'User correction'});const reviews=structuredClone(db.ownershipReviews);
+   db=await w.replaceProviderItems('audible',[item(1),item(2),item(3)],{audibleHistory:history([1,2,3].map(n=>purchase(n,'gift','2023-06-20')),{refundsComplete:false,giftsComplete:true,giftYears:[2023],giftPagesRead:1})},snapshot([item(1),item(2),item(3)]));
+   assert.deepEqual(db.ownershipReviews,reviews);assert.equal(effectiveOwnershipRecord(rows(db).find(r=>r.providerItemId===id(1)),db).ownership,'returned');
+   assert.equal(rows(db).find(r=>r.providerItemId===id(2)).ownership,'revoked');assert.equal(rows(db).find(r=>r.providerItemId===id(3)).ownership,'expired');assert(rows(db).every(r=>r.acquiredAt==='2023-06-20T00:00:00.000Z'));
+ }],
+ ['Audible gift scope is optional for legacy backups but requires valid completion and bounded years when present',()=>{
+   assert.equal(validateAudibleHistory(history()).giftsComplete,undefined);
+   assert.throws(()=>validateAudibleHistory(history([],{giftsComplete:'yes',giftYears:[2023],giftPagesRead:1})),/gift/);
+   assert.throws(()=>validateAudibleHistory(history([],{giftYears:[2023]})),/gift/);
+   assert.throws(()=>validateAudibleHistory(history([],{giftsComplete:true,giftYears:['2023'],giftPagesRead:1})),/years/);
+ }],
  ['Audible partial orders with a complete refund check can contribute safe positive purchases without declaring historical completeness',async()=>{
    const {writer:w}=memory();await w.mergeProviderItems('audible',[item(1)]);
    const db=await w.mergeProviderItems('audible',[],{audibleHistory:history([purchase(1)],{ordersComplete:false})});assert.equal(rows(db)[0].ownership,'owned');assert.equal(db.providers.audible.syncState.audibleHistory.ordersComplete,false);
