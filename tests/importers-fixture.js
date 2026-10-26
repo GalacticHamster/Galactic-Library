@@ -1,3 +1,4 @@
+import {checkEpicSession} from './epic-session-browser-fixture.js';
 import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
 import '../src/lib/contents-performance.js';
 import '../src/lib/kindle-contents-scan.js';
@@ -197,6 +198,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
     }
+    if(provider==='epic')await checkEpicSession({shadow:shadows.at(-1),writer,checks,wait,assert,commits:()=>imported});
     if(provider==='steam'){
       const before=JSON.stringify(values.galacticLibraryDatabase.providerItems),timingBefore=providerTimings.length;
       globalThis.GalacticSteamStore.fetchOwnedSteamGames=async(report,known,options)=>{

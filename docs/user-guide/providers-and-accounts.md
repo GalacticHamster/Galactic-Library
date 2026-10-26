@@ -167,6 +167,29 @@ has been live-validated; disposable Chrome/Firefox reimport tests pass. Remove
 the separate research helper to avoid overlapping diagnostic panels. Firefox
 may require granting GL access to the PlayStation Library site.
 
+## Epic session recovery
+
+Epic currently offers **Sync Epic library**, a complete library check. It does
+not have a separate Quick update. Choose the correct saved account and use that
+button after signing in normally on Epic.
+
+If Epic cannot authorize the library request, GL stops and keeps your saved
+library. Finish signing in or verifying your session on Epic, complete any
+security check Epic actually shows, and retry **Sync Epic library**. GL does
+not automatically repeat unauthorized requests or navigate to your profile.
+Visiting a profile has helped in reported cases, but its effect on Epic's
+session has not been established; it is not a routine prerequisite.
+The Store can appear signed in without authorizing a library request. A user
+also recovered by opening **My Achievements** from Epic's profile menu and
+retrying there, with no visible security check. This is an observed manual
+workaround, not proof that another sign-in or CAPTCHA is required.
+
+For a recurring failure, open the panel's **Scan diagnostics → Export scan
+report** before reloading or leaving the page. The report contains request
+counts, response status categories, page-readiness flags and whether a save was requested or confirmed. It excludes titles, account identifiers, cookies and credentials.
+The report describes the last attempt in this tab and is lost on reload.
+These flags do not prove that Epic's library session is authenticated.
+
 ## Xbox Web Library
 
 Open **Providers → Xbox — Web Library**, open its website and sign in. The link

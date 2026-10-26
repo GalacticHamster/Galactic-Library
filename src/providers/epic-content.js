@@ -11,9 +11,15 @@
       .panel { background:var(--gh-surface); border:1px solid var(--gh-border); border-radius:8px; box-shadow:var(--gh-shadow); padding:14px; }
       p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; } button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; } .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     </style>
-    <div class="panel"><p><strong>Galactic Library</strong><br>Import games Epic Games Store reports as owned by this signed-in account. Only game IDs, titles, platforms, and add-on links are saved locally.</p><button type="button">Sync Epic library</button><p class="status" role="status"></p><details><summary>Performance diagnostics</summary><p><label><input type="checkbox" data-profile-next> Profile the next Epic sync</label></p><p data-profile-timing-status role="status">Detailed timing is off.</p><p><a data-open-timing target="_blank" rel="noopener">Export timing in GL Settings > Performance diagnostics</a>. Export promptly: worker timings are in memory and are lost when the worker restarts. Arm this option again for a second scan.</p></details></div>`;
+    <div class="panel"><p><strong>Galactic Library</strong><br>Import games Epic Games Store reports as owned by this signed-in account. Only game IDs, titles, platforms, and add-on links are saved locally.</p><button type="button">Sync Epic library</button><p class="status" role="status"></p><details><summary>Scan diagnostics</summary><p>Export the last scan report for troubleshooting. It contains request outcomes and page-readiness flags, with no titles, account identifiers, cookies or credentials.</p><button type="button" data-export-scan disabled>Export scan report</button></details><details><summary>Performance diagnostics</summary><p><label><input type="checkbox" data-profile-next> Profile the next Epic sync</label></p><p data-profile-timing-status role="status">Detailed timing is off.</p><p><a data-open-timing target="_blank" rel="noopener">Export timing in GL Settings > Performance diagnostics</a>. Export promptly: worker timings are in memory and are lost when the worker restarts. Arm this option again for a second scan.</p></details></div>`;
   const button = shadow.querySelector('button');
   const status = shadow.querySelector('.status');
+  const exportScan=shadow.querySelector('[data-export-scan]');
+  exportScan.addEventListener('click',()=>{
+    const report=globalThis.GalacticEpic.getDiagnostics?.();if(!report)return;
+    const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='GL-epic-scan.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
   const profileNext=shadow.querySelector('[data-profile-next]'),profileStatus=shadow.querySelector('[data-profile-timing-status]');
   shadow.querySelector('[data-open-timing]').href=chrome.runtime.getURL('options.html')+'#settings';
   profileNext.addEventListener('change',()=>{profileStatus.textContent=profileNext.checked?'Armed for the next Epic sync in this tab.':'Detailed timing is off.';});
@@ -23,7 +29,7 @@
     const profileThisScan=profileNext.checked;if(profileThisScan){profileNext.checked=false;profileStatus.textContent='Profiling this Epic sync…';}profileNext.disabled=true;
     const timing=globalThis.GalacticSync.trace?.('epic',{once:profileThisScan}),P=globalThis.GalacticContentsPerformance;let completed=false,uiEnd,fetchEnd,finishEnd;
     const startEnd=timing?.begin('request_dispatch');
-    button.disabled = true;
+    button.disabled = true;exportScan.disabled=true;globalThis.GalacticEpic.resetDiagnostics?.();
     status.dataset.busy = 'true';
     try {
       const scan = await globalThis.GalacticSync.send({type:'GET_PROVIDER_SYNC_STATE',provider:'epic',diagnosticLookupId:timing?.id});
@@ -37,10 +43,11 @@
       if(timing)Object.assign(timing,{providerCaptured:items.length,providerUnsupported:skippedCount});
       status.textContent = 'Saving Epic games and add-ons locally...';
       finishEnd=timing?.begin('save_message');
+      globalThis.GalacticEpic.recordSaveState?.('requested');
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot,diagnosticLookupId:timing?.id });
       finishEnd?.();P?.merge(timing,response?.performance);
-      if (!response?.ok) throw new Error(response?.error ?? 'Epic import did not complete.');
-      completed=true;
+      if (!response?.ok){globalThis.GalacticEpic.recordSaveState?.('save-rejected');throw new Error(response?.error ?? 'Epic import did not complete.');}
+      completed=true;globalThis.GalacticEpic.recordSaveState?.('saved');
       uiEnd=timing?.begin('page_ui');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       const c=response.changes;
@@ -51,7 +58,7 @@
     } finally {
       startEnd?.();fetchEnd?.();finishEnd?.();uiEnd??=timing?.begin('page_ui');
       button.disabled = false;
-      delete status.dataset.busy;
+      delete status.dataset.busy;exportScan.disabled=!globalThis.GalacticEpic.getDiagnostics?.();
       profileNext.disabled=false;
       if(timing){await new Promise(resolve=>requestAnimationFrame(resolve));uiEnd?.();try{const reply=await globalThis.GalacticSync.send({type:'GL_PROVIDER_UI_TIMING',provider:'epic',timing:P.clean(timing.finish(completed?'prepared':'failed'))});if(profileThisScan)profileStatus.textContent=reply?.ok?'Timing captured. Export promptly from GL Settings > Performance diagnostics.':'Timing could not be delivered. Arm profiling and try again.';}catch{if(profileThisScan)profileStatus.textContent='Timing could not be delivered. Arm profiling and try again.';}}
       if(profileThisScan&&!timing)profileStatus.textContent='Timing tools are unavailable. Reload this page before profiling again.';
