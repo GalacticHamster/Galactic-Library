@@ -58,6 +58,12 @@
   function attach(shadow,provider) {
     const panel = shadow?.querySelector?.('.panel');
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
+    const names={steam:'Steam',gog:'GOG',epic:'Epic Games','amazon-games':'Amazon Games',audible:'Audible',kindle:'Kindle','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',kobo:'Kobo',fanatical:'Fanatical',humble:'Humble Bundle',xbox:'Xbox',playstation:'PlayStation',nintendo:'Nintendo'};
+    const oldHeading=panel.querySelector('h3')??panel.querySelector('p > strong:first-child');
+    const heading=document.createElement('h2');heading.className='galactic-panel-heading';
+    heading.textContent=provider?`Galactic Library · ${names[provider]??provider}`:oldHeading?.textContent??'Galactic Library';
+    if(oldHeading){const next=oldHeading.nextSibling;if(next?.nodeName==='BR')next.remove();oldHeading.remove();}
+    panel.prepend(heading);
     if(provider){
       const controls=document.createElement('div');
       controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>A name you choose for the account signed in on this site. GL does not sign you in or verify your login. If you sign in to another store account, choose a different nickname and confirm switching before updating.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label>';
@@ -115,6 +121,18 @@
     const style = document.createElement('style');
     style.textContent = ':host { color-scheme:var(--gh-color-scheme); } .panel { position:relative; } button:hover:not(:disabled) { background:var(--gh-accent-hover); } button:active:not(:disabled) { background:var(--gh-accent-pressed); } button:disabled { background:var(--gh-disabled); color:var(--gh-disabled-text); cursor:default; } input,select,textarea { background:var(--gh-input); color:var(--gh-text); border:1px solid var(--gh-input-border); accent-color:var(--gh-accent); font:inherit; max-width:100%; } button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--gh-focus); outline-offset:3px; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid var(--gh-border); border-radius:7px; background:var(--gh-accent); box-shadow:var(--gh-shadow); color:var(--gh-on-accent); cursor:pointer; font:14px/1.4 var(--gh-font); padding:7px 10px; }';
     const minimize = document.createElement('button');
+    style.textContent += `
+      :host { width:360px!important; max-width:calc(100vw - 36px)!important; font:14px/1.4 var(--gh-font,system-ui,sans-serif)!important; }
+      .panel { box-sizing:border-box; width:100%; max-width:100%; max-height:calc(100vh - 36px); overflow:auto; padding:14px; border-radius:8px; overflow-wrap:anywhere; }
+      .panel:has(.panel-body) { display:flex; flex-direction:column; overflow:hidden; }
+      .panel-body { min-height:0; overflow:auto; }
+      .galactic-panel-heading { flex-shrink:0; font:700 14px/1.4 var(--gh-font,system-ui,sans-serif); margin:0 0 10px; padding-right:76px; overflow-wrap:anywhere; }
+      .panel p { margin:0 0 10px; } .panel button { font:inherit; border-radius:5px; padding:8px 10px; margin:3px 2px 3px 0; }
+      .panel .galactic-panel-minimize { font-size:12px; padding:3px 7px; margin:0; }
+      .panel label { overflow-wrap:anywhere; } .panel input:not([type=checkbox]),.panel select { box-sizing:border-box; max-width:100%; }
+      .panel details { margin-top:10px; } .panel summary { cursor:pointer; } .panel .status { margin-top:10px; }
+      .contents-controls { flex-shrink:0; } .panel[hidden] { display:none; }
+    `;
     minimize.type = 'button';
     minimize.className = 'galactic-panel-minimize';
     minimize.dataset.galacticFloatingPanelControl = 'minimize';

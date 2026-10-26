@@ -1,0 +1,67 @@
+// Installed extension, actual provider markup/styles and shared controller.
+// Acquisition controllers are not run here: importer suites cover those paths.
+import assert from 'node:assert/strict';
+import {spawn,execFileSync} from 'node:child_process';
+import {access,mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,dirname,resolve,sep} from 'node:path';
+import {setTimeout as pause} from 'node:timers/promises';
+import vm from 'node:vm';
+import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
+import {createRelease,runtimeZip} from '../scripts/release.mjs';
+import {outputPath} from '../scripts/audit-artifacts.mjs';
+const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
+const providers=['steam-store','gog','epic','amazon-games','audible','kindle','amazon-video','fandango-at-home','kobo','fanatical','humble','xbox','playstation','nintendo'];
+const templates={};
+for(const file of providers){const source=files.get('src/providers/'+file+'-content.js').toString();const literal=source.match(/shadow\.innerHTML\s*=\s*(`[^`]*`|'(?:\\.|[^'\\])*')/u)?.[1];assert(literal,'Missing overlay template '+file);templates[file==='steam-store'?'steam':file]=vm.runInNewContext(literal,{diagnosticsMarkup:''});}
+files.set('overlay-templates.json',Buffer.from(JSON.stringify(templates)));
+files.set('overlay-inner.html',Buffer.from('<!doctype html><html><head><link rel="stylesheet" href="shared/theme.css"></head><body><script type="module" src="overlay-audit.js"></script></body></html>'));
+files.set('overlay-audit.html',Buffer.from('<!doctype html><html><body style="margin:0"><iframe id="viewport" src="overlay-inner.html" style="display:block;border:0;width:420px;height:700px"></iframe><script src="overlay-frame.js"></script></body></html>'));
+files.set('overlay-frame.js',Buffer.from("const frame=document.querySelector('iframe');globalThis.renderOverlay=async(...args)=>{for(let i=0;i<200;i++){if(typeof frame.contentWindow.renderOverlay==='function')return frame.contentWindow.renderOverlay(...args);await new Promise(r=>setTimeout(r,25));}throw Error('Inner overlay fixture not loaded');};globalThis.measureOverlay=()=>frame.contentWindow.measureOverlay();globalThis.checkOverlayFocus=()=>frame.contentWindow.checkOverlayFocus();setInterval(()=>{if(typeof frame.contentWindow.renderOverlay==='function')document.documentElement.dataset.ready='true';},25);"));
+// Suppress only the disposable test build's installation-time options tab.
+files.set('src/background/service-worker.js',Buffer.from(files.get('src/background/service-worker.js').toString().replace('chrome.runtime.openOptionsPage().catch(() => {});','Promise.resolve();')));
+files.set('overlay-audit.js',Buffer.from(`
+import './src/providers/floating-panel.js';
+const templates=await (await fetch('overlay-templates.json')).json();
+const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+let state='returning',host,root;
+chrome.runtime.sendMessage=async r=>{
+ if(r.type==='GET_PROVIDER_PROFILE_HINT')return {ok:true,hint:null};
+ if(r.type==='GET_PROVIDER_PROFILE'){const p=(await chrome.storage.local.get({overlayFixtureProfile:null})).overlayFixtureProfile;return {ok:true,profileLabel:state==='initial'?'':p.nickname,profileId:p.profileId,profiles:state==='initial'?[]:[p],reuseAllowed:state!=='initial'};}
+ return original(r);
+};
+if(!(await chrome.storage.local.get('overlayFixtureProfile')).overlayFixtureProfile)await chrome.storage.local.set({overlayFixtureProfile:{profileId:'11111111-1111-4111-8111-111111111111',nickname:'Personal account with a deliberately long nickname for narrow windows'}});
+globalThis.renderOverlay=async(provider,nextState='returning',theme='light')=>{
+ state=nextState;host?.remove();host=document.createElement('div');host.id='galactic-library-'+provider+'-importer';host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:10;color:var(--gh-text);';host.setAttribute('data-gh-theme',theme);root=host.attachShadow({mode:'open'});root.innerHTML=templates[provider];document.body.append(host);globalThis.GalacticFloatingPanel.attach(root,provider);await new Promise(r=>setTimeout(r,30));
+ const status=root.querySelector('.status,[data-import-status]');if(status)status.textContent='A deliberately long provider message that wraps without hiding account controls or actions. Earlier saved records and manual corrections were kept. '.repeat(3);
+ return true;
+};
+globalThis.measureOverlay=()=>{const p=root.querySelector('.panel'),h=root.querySelector('.galactic-panel-heading'),m=root.querySelector('[data-galactic-floating-panel-control="minimize"]'),r=p.getBoundingClientRect(),b=m.getBoundingClientRect();const range=document.createRange();range.selectNodeContents(h);const a=range.getBoundingClientRect();return {width:innerWidth,height:innerHeight,left:r.left,right:r.right,top:r.top,bottom:r.bottom,headingOverlap:a.right>b.left&&a.top<b.bottom&&a.bottom>b.top,heading:h.textContent,scroll:p.scrollHeight>p.clientHeight,profile:root.querySelector('[data-profile-label]').value};};
+globalThis.checkOverlayFocus=()=>{const m=root.querySelector('[data-galactic-floating-panel-control="minimize"]'),r=root.querySelector('[data-galactic-floating-panel-control="restore"]');m.click();const minimized=r===root.activeElement&&root.querySelector('.panel').hidden;r.click();return minimized&&root.activeElement===m&&!root.querySelector('.panel').hidden;};
+document.documentElement.dataset.ready='true';
+`));
+const temporary=await mkdtemp(join(tmpdir(),'gl-overlay-native-'));let child,driver,session,exited,url,windowHandle;
+try{
+ const profile=join(temporary,'profile'),stage=join(temporary,'extension');await mkdir(profile);await mkdir(stage);
+ for(const [name,bytes]of files){const target=join(stage,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);}
+ const candidates=firefox?[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe']:[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe'];
+ if(firefox&&process.platform==='win32'){const path=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{encoding:'utf8',windowsHide:true}).trim();if(path)candidates.push(join(path,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}
+ let binary;for(const path of candidates.filter(Boolean))try{await access(path);binary=path;break;}catch{}assert(binary,'Browser unavailable');
+ async function start(){const port=firefox?await freePort():0;if(firefox)await writeFile(join(profile,'user.js'),'user_pref("marionette.port",'+port+');\nuser_pref("extensions.update.enabled",false);\n');
+ child=spawn(binary,firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});exited=new Promise(r=>child.once('exit',r));driver=firefox?await firefoxMarionette(port):chromePipe(child);
+ if(firefox){await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox'}}});const handle=await driver.send('WebDriver:GetWindowHandle');windowHandle=handle.value??handle;const archive=join(temporary,'extension.zip');await writeFile(archive,runtimeZip(files));await driver.send('Addon:Install',{path:archive,temporary:true});await driver.send('Marionette:SetContext',{value:'chrome'});const result=await driver.send('WebDriver:ExecuteScript',{script:'return WebExtensionPolicy.getByID("galactic-library@galactichamster.com").getURL("overlay-audit.html");',args:[],newSandbox:true});url=result.value??result;await driver.send('Marionette:SetContext',{value:'content'});}else{const result=await driver.send('Extensions.loadUnpacked',{path:stage});url='chrome-extension://'+result.id+'/overlay-audit.html';}
+ if(firefox){await pause(750);await driver.send('WebDriver:SwitchToWindow',{handle:windowHandle});await driver.send('WebDriver:Navigate',{url});}else{const t=await driver.send('Target.createTarget',{url});session=(await driver.send('Target.attachToTarget',{targetId:t.targetId,flatten:true})).sessionId;await driver.send('Page.enable',{},session);await driver.send('Page.bringToFront',{},session);}
+ for(let i=0;i<100;i++){if(await evaluate('return document.documentElement?.dataset.ready && typeof renderOverlay==="function";'))return;await pause(50);}throw Error('Fixture did not load');}
+ async function evaluate(code){if(firefox){await driver.send('WebDriver:SwitchToWindow',{handle:windowHandle});const r=await driver.send('WebDriver:ExecuteAsyncScript',{script:'(async()=>{'+code+'})().then(arguments[arguments.length-1],e=>arguments[arguments.length-1]({error:String(e)}));',args:[],newSandbox:false});const value=r.value??r;assert(!value?.error,value?.error);return value;}const r=await driver.send('Runtime.evaluate',{expression:'(async()=>{'+code+'})()',awaitPromise:true,returnByValue:true},session);assert(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;}
+ await start();let count=0;
+ for(const [width,height,theme,state]of [[420,700,'light','initial'],[420,700,'light','returning'],[320,480,'dark','returning']]){
+  if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false},session);
+  await evaluate('const f=document.querySelector("iframe");f.style.width="'+width+'px";f.style.height="'+height+'px";return true;');
+  for(const key of Object.keys(templates)){await evaluate('return renderOverlay('+JSON.stringify(key)+','+JSON.stringify(state)+','+JSON.stringify(theme)+');');const m=await evaluate('return measureOverlay();');assert(m.left>=-1&&m.right<=m.width+1&&m.top>=-1&&m.bottom<=m.height+1,'Viewport overflow '+key+' '+JSON.stringify(m));assert(!m.headingOverlap,'Heading overlap '+key);assert(await evaluate('return checkOverlayFocus();'),'Focus lost '+key);
+   await pause(100);if(!firefox)await driver.send('Page.bringToFront',{},session);const image=firefox?await driver.send('WebDriver:TakeScreenshot',{id:null,highlights:[],full:false,hash:false}):await driver.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false},session);await writeFile(await outputPath('audit-artifacts/provider-overlays/'+(firefox?'firefox':'chrome')+'-'+key+'-'+width+'-'+state+'.png'),Buffer.from(image.data??image.value??image,'base64'));count++;
+  }
+ }
+ if(firefox)await driver.send('Marionette:Quit',{flags:['eForceQuit']});else await driver.send('Browser.close');await exited;driver.close?.();await start();
+ for(const key of Object.keys(templates)){await evaluate('return renderOverlay('+JSON.stringify(key)+');');assert((await evaluate('return measureOverlay();')).profile.includes('Personal account'),'Native restart lost profile '+key);}
+ console.log('PASS '+(firefox?'Firefox':'Chrome')+': '+count+' source-template screenshots; all 14 viewport bounds/headings/focus; installed extension/browser restart and profile rehydration. No provider requests or imports.');
+}finally{if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;const target=resolve(temporary),base=resolve(tmpdir());if(target.startsWith(base+sep)&&target.slice(base.length+1).startsWith('gl-overlay-native-'))await rm(target,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
