@@ -51,3 +51,15 @@ releaseTests.push(['extension and toolbar icons are genuine size-matched local a
 }]);
 
 releaseTests.push(['Firefox packages use stable IDs and module event pages with identical validated runtime',async()=>{const chrome=await createRelease(),first=await createRelease(undefined,undefined,'firefox'),second=await createRelease(undefined,undefined,'firefox');assert.deepEqual(first.zip,second.zip);assert.deepEqual([...first.files.keys()],[...chrome.files.keys()]);const manifest=JSON.parse(first.files.get('manifest.json'));assert.deepEqual(manifest.permissions,['storage','unlimitedStorage','scripting','alarms']);assert.deepEqual(manifest.optional_permissions,['notifications']);const chromeManifest=JSON.parse(chrome.files.get('manifest.json'));assert.deepEqual(chromeManifest.optional_permissions,['notifications']);assert(chromeManifest.permissions.includes('alarms'));for(const [installed,expected]of [[chromeManifest,['notifications']],[manifest,['notifications']]]){const granted=await requestReminderPermissions({runtime:{getManifest:()=>installed},permissions:{request:async request=>{assert.deepEqual(request.permissions,expected);return false;}}});assert.equal(granted,false);}const invalid=new Map(first.files);invalid.set('manifest.json',Buffer.from(JSON.stringify({...manifest,optional_permissions:['alarms','notifications']})));assert.throws(()=>validateRuntime(invalid),/Firefox alarms/);assert.equal(manifest.background.service_worker,undefined);assert.deepEqual(manifest.background.scripts,['src/background/service-worker.js']);assert.equal(manifest.background.type,'module');assert.equal(manifest.browser_specific_settings.gecko.id,'galactic-library@galactichamster.com');for(const [name,bytes]of first.files)if(name!=='manifest.json')assert.deepEqual(bytes,chrome.files.get(name));const missing=new Map(first.files);missing.delete('src/background/service-worker.js');assert.throws(()=>validateRuntime(missing),/Missing manifest runtime dependency/);await assert.rejects(createRelease(undefined,undefined,'invalid'),/Unknown release target/);}]);
+
+releaseTests.push(['both packaged extension pages explicitly reuse the approved 16px manifest favicon',async()=>{
+ for(const target of ['chrome','firefox']){
+  const release=await createRelease(undefined,undefined,target),files=readRuntimeZip(release.zip),manifest=JSON.parse(files.get('manifest.json'));
+  for(const page of [manifest.options_page,manifest.action.default_popup]){
+   const links=[...files.get(page).toString().matchAll(/<link\b[^>]*rel="icon"[^>]*>/gu)];assert.equal(links.length,1);
+   const link=links[0][0],href=link.match(/href="([^"]+)"/u)[1],asset=new URL(href,'https://package.invalid/'+page).pathname.slice(1);
+   assert.equal(asset,manifest.icons['16']);assert(link.includes('image/png')&&link.includes('16x16'));assert(files.has(asset));
+   const bytes=files.get(asset);assert.equal(bytes.readUInt32BE(16),16);assert.equal(bytes.readUInt32BE(20),16);
+  }
+ }
+}]);

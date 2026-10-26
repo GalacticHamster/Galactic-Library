@@ -17,6 +17,8 @@
     "test:firefox": "node tests/firefox.mjs",
     "test:firefox:companions": "node tests/firefox.mjs --companions",
     "test:browser:firefox": "node tests/browser.js --release --firefox",
-    "test:importers:firefox": "node tests/browser.js --release --importers --firefox"
+    "test:importers:firefox": "node tests/browser.js --release --importers --firefox",
+    "test:tab-icons": "node tests/tab-icons.mjs",
+    "test:tab-icons:firefox": "node tests/tab-icons.mjs --firefox"
   }
 }
