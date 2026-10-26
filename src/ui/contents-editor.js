@@ -134,7 +134,7 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
     details.append(element('p','Full means the selected source manifest was parsed without unresolved text; it does not establish complete book contents or ownership. Windows linked to one explicit collection clause are interpreted using their parent source statement. Other independent clauses remain separate and unverified.'));
     const interpreted=manifestReviewProposal(evidence,record.title);
     if(interpreted.manifestEvidence){
-      details.append(element('p','Source manifest used for proposals (unverified):'),element('blockquote',interpreted.manifestEvidence));
+      details.append(element('p','Source description used for suggestions (not reviewed):'),element('blockquote',interpreted.manifestEvidence));
       if(interpreted.manifestEvidence!==evidence.statement)details.append(button(interpreted.manifestCoverage==='whole-clause'?'Use complete captured collection statement':'Use captured contents statement',()=>{statement.value=interpreted.manifestEvidence;status.textContent='Captured text loaded for review. Parse and check its unresolved evidence before saving; your saved review has not changed.';}));
     }
     for(const index of [evidence.manifest.selected,...evidence.manifest.secondary]){
@@ -164,7 +164,7 @@ export function createContentsEditor(record, review, actions, {expanded=false,fo
   if(!review&&initialProposal?.entries.length)manual.append(button('Accept all suggestions',()=>persist(()=>actions.save(record.id,{entries:validateContents(initialProposal.entries),statement:initialProposal.manifestEvidence||discovered,sourceUrl:source.value,source:'manual-review'}))));
   (currentEntries.length||review?root:manual).append(button('Reject suggested contents',()=>persist(()=>actions.save(record.id,{status:'rejected',entries:[],statement:discovered,sourceUrl:source.value,source:'manual-review'}))));
   if(review)root.append(button('Undo contents review',()=>persist(()=>actions.remove(record.id))));
-  root.append(element('p','Accept all confirms the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave unverified to keep inferred coverage without saving.'));
+  root.append(element('p','Accept all confirms the original suggestions. Edit the rows and Save to confirm corrections. Reject excludes this book’s suggestions from coverage, including after reparsing. Undo restores inferred coverage from the source; it does not remove captured evidence. Leave contents unreviewed to keep inferred coverage without saving.'));
   };
   root.addEventListener('toggle',()=>{if(root.open&&!populated){populated=true;populate();}});
   if(expanded){root.open=true;populated=true;populate();if(Number.isInteger(focusEntry))queueMicrotask(()=>{const row=root.querySelector('tbody')?.children[focusEntry];row?.setAttribute('data-coverage-selected','true');row?.querySelector('input,select')?.focus();row?.scrollIntoView?.({block:'nearest'});});}

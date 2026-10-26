@@ -46,7 +46,7 @@ export async function checkContentsReviewUsability(assert){
   editor.remove();
  }
  const queue=createEnrichmentWorkbench({inspect(){}});document.body.append(queue.element);queue.update(coverageDatabase(book,ready));queue.showCategory('unparsed');
- const choice=queue.element.querySelector('[aria-label="Enrichment queue"]');
+ const choice=queue.element.querySelector('[aria-label="Review category"]');
  choice.value='contents-information';choice.dispatchEvent(new Event('change'));
  assert(queue.element.querySelectorAll('.review-items > li').length===1&&queue.element.querySelector('.review-items').textContent.includes('collects 6 issues'),'Queue information filter agrees with the individual zero-suggestion explanation');
  choice.value='contents-suggestions';choice.dispatchEvent(new Event('change'));

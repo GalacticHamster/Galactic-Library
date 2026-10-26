@@ -8,7 +8,7 @@ All books missing Google Books edition metadata can enter discovery, including r
 
 Open Library selections are work evidence. Newly confirmed work authors and publishers can improve subsequent searches. Its aggregate work ISBN list never identifies the owned edition. Legacy selections without an explicit approval remain visible but do not silently supply authoritative authors; review and apply them again to confirm.
 
-Genre hints, work identity, edition metadata, creators and verified contents have separate completion states. A genre hint cannot exclude a book from edition enrichment. Lookup success does not prove ownership or complete collected contents.
+Genre hints, work identity, edition metadata, creators and reviewed contents have separate completion states. A genre hint cannot exclude a book from edition enrichment. Lookup success does not prove ownership or complete collected contents.
 
 Each source selection records its source identity/URL, retrieval date, match basis and human-approval state. The evidence table associates every stored field with that source and displays differing provider values. Undo restores the previous source selection without altering provider fields. An older selection cannot undo a newer one. Record references prevent a delayed selection from applying to another account's record with a reused provider ID.
 

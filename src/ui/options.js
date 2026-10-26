@@ -547,35 +547,35 @@ function createReviewRow(candidate, reviewed = false) {
     actions.append(textElement('span', candidate.decision === 'different' ? 'Marked as different works.' : candidate.decision==='same-edition'?'Marked as the same edition.':'Marked as the same work; editions stay separate.'));
     actions.append(reviewButton('Undo decision', 'undo', async () => {
       try {
-        database = await performAction({status:feedback,name:'Removing duplicate decision...',task:()=>removeManualMatchDecision(candidate.id)});
+        database = await performAction({status:feedback,name:'Removing edition relationship...',task:()=>removeManualMatchDecision(candidate.id)});
         render();
       } catch (error) {
-        feedback.textContent = `Could not undo duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not undo edition relationship: ${error.message}`;
       }
     }));
   } else {
     actions.append(reviewButton('Same work', 'same', async () => {
       try {
-        database = await performAction({status:feedback,name:'Saving same-work decision...',task:()=>saveManualMatchDecision(candidate, 'same-work')});
+        database = await performAction({status:feedback,name:'Saving edition relationship...',task:()=>saveManualMatchDecision(candidate, 'same-work')});
         render();
       } catch (error) {
-        feedback.textContent = `Could not save duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not save edition relationship: ${error.message}`;
       }
     }));
     actions.append(reviewButton('Same edition', 'same-edition', async () => {
       try {
-        database = await performAction({status:feedback,name:'Saving same-edition decision...',task:()=>saveManualMatchDecision(candidate, 'same-edition')});
+        database = await performAction({status:feedback,name:'Saving edition relationship...',task:()=>saveManualMatchDecision(candidate, 'same-edition')});
         render();
       } catch (error) {
-        feedback.textContent = `Could not save edition decision: ${error.message}`;
+        feedback.textContent = `Could not save edition relationship: ${error.message}`;
       }
     }));
     actions.append(reviewButton('Different works', 'different', async () => {
       try {
-        database = await performAction({status:feedback,name:'Saving different-works decision...',task:()=>saveManualMatchDecision(candidate, 'different')});
+        database = await performAction({status:feedback,name:'Saving edition relationship...',task:()=>saveManualMatchDecision(candidate, 'different')});
         render();
       } catch (error) {
-        feedback.textContent = `Could not save duplicate decision: ${error.message}`;
+        feedback.textContent = `Could not save edition relationship: ${error.message}`;
       }
     }));
   }
@@ -668,7 +668,7 @@ async function renderGoogleBooksEnrichment() {
   renderGoogleBooksDiagnostics(job);
   renderActiveBookJob(job);
   if (googleBooksRunning) return;
-  if(otherRun){googleBooksEnrichmentStatus.textContent='Another options page is running enrichment. Pause it or wait for its lease to expire.';} else if (!key) {
+  if(otherRun){googleBooksEnrichmentStatus.textContent='Another Galactic Library tab is looking up book information. Pause the lookup there, or wait until it finishes. If that tab was closed, wait briefly and retry.';} else if (!key) {
     googleBooksEnrichmentStatus.textContent = 'Save a private Google Books API key to enable automated enrichment.';
   } else if (job?.lastError) {
     googleBooksEnrichmentStatus.textContent = `Google Books stopped: ${job.lastError} Progress is saved. If this is a quota limit, wait for Google to reset it, then Resume book lookup.`;
@@ -907,7 +907,7 @@ function render(timing = null) {
   const bookCounts=bookReviewCounts(database),receiptCounts=receiptReviewCounts(database);
   const openBookQueue=value=>{if(workspace.select('books'))enrichmentWorkbench.showCategory(value);};
   if(bookCounts.attention)alerts.append(actionButton(bookCounts.attention+' book suggestions needing a decision',()=>openBookQueue('attention')));
-  if(bookCounts.lookups)alerts.append(actionButton(bookCounts.lookups+' lookup failures / no results',()=>openBookQueue('failed')));
+  if(bookCounts.lookups)alerts.append(actionButton(countLabel(bookCounts.lookups,'lookup failure / no results','lookup failures / no results'),()=>openBookQueue('failed')));
   if(receiptCounts.attention)alerts.append(actionButton(receiptCounts.attention+' receipts ready to match',()=>{if(workspace.select('ownership')){const panel=document.querySelector('#purchase-evidence-workbench');panel.open=true;panel.dispatchEvent(new Event('toggle'));const filter=panel.querySelector('[aria-label="Receipt status"]');filter.value='ready';filter.dispatchEvent(new Event('change'));panel.querySelector('summary').focus();panel.scrollIntoView({block:'start'});}}));
   alerts.hidden=!alerts.children.length;
   } finally {endSegment?.();}

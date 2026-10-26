@@ -25,7 +25,7 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
     if(canonical.mediaType!=='book')continue;
     const current=canonical.providerItemIds.map(id=>database.providerItems[id]);if(scope&&current.some(item=>!records.has(item.recordRef)))continue;const stages=enrichmentStages(current,database);
     const missing=['genre','work','edition','creators'].filter(stage=>!stages[stage]);
-    if(missing.length)rows.push({id:`missing:${canonical.id}`,category:'missing',title:canonical.title,recordRefs:current.map(item=>item.recordRef),reason:`Missing: ${missing.join(', ')}`});
+    if(missing.length)rows.push({id:`missing:${canonical.id}`,category:'missing',title:canonical.title,recordRefs:current.map(item=>item.recordRef),reason:`Missing: ${missing.map(stage=>({genre:'genre',work:'work information',edition:'edition details',creators:'creators'})[stage]).join(', ')}`});
   }
   for(const record of records.values()){
     const statement=contentsStatement(record);
@@ -42,9 +42,9 @@ export function enrichmentWorkbenchRows(database,{recordRefs=null,includeContent
       if(entry.selectionRef&&database.enrichmentHistory[entry.selectionRef])rows.push({id:entry.selectionRef,category:'undo',title:record.title,recordRefs:[record.recordRef],history:{kind,previous:database.enrichmentHistory[entry.selectionRef].previous!==null,selectedAt:entry.retrievedAt||entry.checkedAt||'',technical:entry},reason:'A saved source choice can be undone. Purchases and saved contents reviews are kept; source-derived suggestions and inferred coverage may change.'});
       if(!['googleBooks','localMetadata'].includes(kind))continue;
       const conflicts=candidateConflicts([{...record,metadata:{...record.metadata,enrichment:{}}}],kind,entry);
-      if(conflicts.length)rows.push({id:`conflict:${record.recordRef}:${kind}`,category:'conflicts',title:record.title,recordRefs:[record.recordRef],reason:`Selected ${kind} differs from provider evidence: ${conflicts.join(', ')}. Inspect the sources or undo the selection.`});
+      if(conflicts.length)rows.push({id:`conflict:${record.recordRef}:${kind}`,category:'conflicts',title:record.title,recordRefs:[record.recordRef],reason:`Selected ${kind==='googleBooks'?'Google Books':'Local metadata'} differs from provider evidence: ${conflicts.join(', ')}. Inspect the sources or undo the selection.`});
     }
-    if(record.metadata.enrichment?.kindleProductComicContents?.availability==='temporary-failure')rows.push({id:`kindle-failure:${record.recordRef}`,category:'failed',title:record.title,recordRefs:[record.recordRef],reason:'Temporary Kindle contents failure. Retry from the Kindle library sync panel.'});
+    if(record.metadata.enrichment?.kindleProductComicContents?.availability==='temporary-failure')rows.push({id:`kindle-failure:${record.recordRef}`,category:'failed',title:record.title,recordRefs:[record.recordRef],reason:'Temporary Kindle contents failure. Retry from the Galactic Library panel on the Kindle library page.'});
   }
   return rows;
 }

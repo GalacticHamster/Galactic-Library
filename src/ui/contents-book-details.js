@@ -17,7 +17,7 @@ export function createCollectionComparison(record,database) {
     root.append(text('p','Compare extracted or reviewed contents with other effectively owned collections. Inferred coverage is unverified; incomplete issue identities are only possible overlap. Included material is not a separate purchase.'));
     const result=collectionComparison(record,database);
     if(!result){root.append(text('p','No usable contents are available for this collection. A saved rejection excludes its suggestions until you undo it.'));return;}
-    root.append(text('p',`${result.owned} of ${result.total} entries also appear in other owned collections (${result.verified} verified, ${result.inferred} inferred, ${result.direct} standalone). ${result.missing.length} have no sufficiently identified match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
+    root.append(text('p',`${result.owned} of ${result.total} entries also appear in other owned collections (${result.verified} reviewed, ${result.inferred} inferred, ${result.direct} standalone). ${result.missing.length} have no sufficiently identified match in those collections; ${result.possibleCovered.length} of these may overlap but need more detail.`));
     if(result.scopeUncertain)root.append(text('p','Series context or a related match needs checking before a complete comparison can be made.'));
     const sources=[...new Set(result.covered.flatMap(entry=>entry.evidence.map(({item})=>`${item.title} — ${accountLabel(item,database)}`)))];
     if(sources.length)root.append(text('p','Covered through: '+sources.join('; ')));

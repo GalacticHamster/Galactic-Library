@@ -92,9 +92,9 @@ Adding appends editable rows without replacing existing corrections or duplicati
 | --- | --- |
 | Contents reviewed | Human-reviewed entries are saved for this record. This does not assert that every part of the book has been enumerated. |
 | Contents rejected | You excluded this record's suggestions from coverage. Undo the review to use inferred contents again, or save corrected entries. |
-| Contents found · Not reviewed | The saved interpretation accounted for the selected source text. Entries remain suggestions; a parsed description does not prove complete book contents. |
-| Some contents found · Not reviewed | Saved interpretation left unresolved text, or the captured description may be incomplete. |
-| Contents need review | A statement exists but its interpretation is uncertain, unsuccessful, filtered, or not recorded. |
+| Inferred contents available | The saved interpretation accounted for the selected source text. Entries remain suggestions; a parsed description does not prove complete book contents. |
+| Contents description to check | Saved interpretation left unresolved text, or the captured description may be incomplete. |
+| Contents description needs interpretation | A statement exists but its interpretation is uncertain, unsuccessful, filtered, or not recorded. |
 | Contents not extracted | The saved check has no usable contents interpretation. This does not mean the book contains no works. |
 | Not checked yet | No acquired contents source is recorded. Automated acquisition currently supports eligible Kindle books only; manual review is available for other books. |
 | Couldn't retrieve description | Acquisition did not produce usable source evidence. Retry/recovery belongs on the signed-in Kindle page. |

@@ -115,8 +115,8 @@ export function createEvidenceInspector(canonical, records, database, actions, {
     }
     const status=element('p','');status.setAttribute('role','status');
     const comparison=element('div','');comparison.className='relationship-review';
-    comparison.append(element('p','Same Work: Different editions or versions of the same underlying work. Does not establish identical products. Same work keeps editions separate and can show a Possible match.'));
-    comparison.append(element('p','Same Edition: Two records represent the same specific edition/product, even if their source titles differ. Consolidates their display and acquisition history; it does not add purchase evidence. Known edition conflicts still prevent this choice.'));
+    comparison.append(element('p','Same work: Different editions or versions of the same underlying work. Does not establish identical products. Same work keeps editions separate and can show a Possible match.'));
+    comparison.append(element('p','Same edition: Two records represent the same specific edition/product, even if their source titles differ. Consolidates their display and acquisition history; it does not add purchase evidence. Known edition conflicts still prevent this choice.'));
     comparison.append(element('p','Different works keeps the records separate and blocks indirect grouping. Original titles and purchases are preserved for every choice.'));
     const left=element('select','');left.setAttribute('aria-label','First relationship record');
     for(const record of records){const option=element('option',`${record.title} \u2014 ${accountLabel(record,database)}`);option.value=record.id;left.append(option);}
@@ -139,7 +139,7 @@ export function createEvidenceInspector(canonical, records, database, actions, {
     };
     const picker=createRelationshipPicker(database,()=>left.value,compare);
     left.addEventListener('change',picker.update);
-    comparison.append(labeledControl('This account copy',left),picker.root,conflicts,labeledControl('Display title if confirmed as Same Edition',preferred));picker.update();
+    comparison.append(labeledControl('This account copy',left),picker.root,conflicts,labeledControl('Display title if confirmed as Same edition',preferred));picker.update();
     comparison.append(element('p','Choose the title to show in the library. Both original source titles remain available below, and you can change this choice later.'));
     for(const value of ['same-work','same-edition','different']){
       const button=element('button',decisionLabel(value));button.type='button';button.addEventListener('click',async()=>{

@@ -1,3 +1,4 @@
+import {reviewWorkflowSummary} from '../src/ui/review-workflow.js';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {providerLabel,accountLabel,accessLabel,readingAccessLabel,countLabel,rangeLabel,formatDate} from '../src/ui/formatters.js';
@@ -33,3 +34,10 @@ export const uiFormattingTests=[
  ['timestamps and invalid/missing dates have readable distinct captions',()=>{assert.equal(formatDate(null),'Not recorded');assert.equal(formatDate('invalid'),'Not recorded');assert.equal(formatDate('2026-02-31'),'Invalid date');assert.match(formatDate('2026-10-08T17:00:00Z',{locale:'en-US'}),/2026/);}],
  ['authored publisher, progress and Kindle timing examples have no corrupted punctuation',async()=>{for(const file of ['src/ui/local-metadata-tools.js','src/ui/options.js','src/ui/pagination.js','src/providers/kindle-content.js','src/ui/provider-accounts.js']){const source=await readFile(new URL('../'+file,import.meta.url),'utf8');assert(!/PlayStation \?|Copy \?Collects|Looking up \?|20\?50|\uFFFD|â€”/u.test(source),file+' has malformed authored text');}const options=await readFile(new URL('../src/ui/options.js',import.meta.url),'utf8');assert(options.includes('Looking up “'));const pagination=await readFile(new URL('../src/ui/pagination.js',import.meta.url),'utf8');assert(pagination.includes('\\u2013'));}],
 ];
+
+uiFormattingTests.push(['Review summary grammar preserves each existing count and separate category',()=>{
+ const one={readyBooks:1,metadataSuggestions:1,decisions:1,optionalGaps:1,failedLookups:1,history:1};const before=JSON.stringify(one),text=reviewWorkflowSummary(one);
+ for(const phrase of ['1 book list ready to confirm','1 book information suggestion /','1 record needing a closer decision','1 optional information gap /','1 lookup failure / no results','1 history record'])assert(text.includes(phrase));
+ assert.equal(JSON.stringify(one),before);
+ for(const n of [0,2]){const summary=reviewWorkflowSummary(Object.fromEntries(Object.keys(one).map(k=>[k,n])));assert(summary.includes(n+' history records')&&summary.includes(n+' lookup failures / no results'));}
+}]);

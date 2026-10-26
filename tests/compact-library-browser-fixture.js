@@ -64,7 +64,7 @@ try{
   const expected=sessionStorage.getItem('layout-reload-stage')||'compact';
   assert(layout.value===expected,expected+' preference survives a real document reload');
   assert(rows().length>0&&rows().length<=20&&rows().every(row=>expected==='compact'?row.querySelector('.library-compact-entry'):row.querySelector('.library-result-summary')&&!row.querySelector('.library-compact-entry')),'Reload keeps the selected layout bounded and honors existing record navigation');
-  assert(!document.querySelector('#library-alerts').textContent.includes('lookup failures / no results'),'Dismissed failure indicator stays gone after reload');
+  assert(!document.querySelector('#library-alerts').textContent.includes('lookup failure'),'Dismissed failure indicator stays gone after reload');
   if(expected==='compact'){
    change(layout,'detailed');await wait(()=>values[UI_PREFERENCES_KEY]?.libraryLayout==='detailed','Detailed preference did not persist');
    sessionStorage.setItem('compact-fixture',JSON.stringify(values));sessionStorage.setItem('compact-checks',JSON.stringify([...JSON.parse(sessionStorage.getItem('compact-checks')),...checks]));sessionStorage.setItem('layout-reload-stage','detailed');location.reload();
@@ -94,19 +94,19 @@ try{
   assert(!owned.querySelector('.library-compact-entry').open,'Expanded rows collapse using their native disclosure');
   change(layout,'detailed');assert(document.querySelector('input[data-select-access]').checked,'Selection persists when switching to Detailed');
   change(layout,'compact');
-  click(document.querySelector('#library-alerts'),'1 lookup failures / no results');
-  await wait(()=>document.querySelector('#enrichment-workbench [aria-label="Select enrichment review"]'),'Failed lookup did not appear');
+  click(document.querySelector('#library-alerts'),'1 lookup failure / no results');
+  await wait(()=>document.querySelector('#enrichment-workbench [aria-label="Select book information review"]'),'Failed lookup did not appear');
   click(document.querySelector('#enrichment-workbench'),'Review library item');
   await wait(()=>document.querySelector('#library-items .library-compact-entry[open] .item-details[open]'),'Contextual review link did not expand the compact item');
   assert(true,'Existing record links open the compact row and its full Details');
-  click(document.querySelector('#library-alerts'),'1 lookup failures / no results');
+  click(document.querySelector('#library-alerts'),'1 lookup failure / no results');
   // Keep the displayed review, then simulate a worker restarting after idle.
   const sources=JSON.stringify(values.galacticLibraryDatabase.providerItems);
   values[OBSERVATION_KEY]=activeObservationEnvelope(await providerCheckDigest(values.galacticLibraryDatabase));values[OBSERVATION_HEAD_KEY]=OBSERVATION_REGISTRATION;
   writer=createStorageWriter(area);
-  const failure=document.querySelector('#enrichment-workbench [aria-label="Select enrichment review"]');failure.checked=true;failure.dispatchEvent(new Event('change'));
+  const failure=document.querySelector('#enrichment-workbench [aria-label="Select book information review"]');failure.checked=true;failure.dispatchEvent(new Event('change'));
   click(document.querySelector('#enrichment-workbench'),'Dismiss selected reviews');
-  await wait(()=>!document.querySelector('#library-alerts').textContent.includes('lookup failures / no results'),'Failure alert did not disappear');
+  await wait(()=>!document.querySelector('#library-alerts').textContent.includes('lookup failure'),'Failure alert did not disappear');
   assert(Object.keys(values.galacticLibraryDatabase.enrichmentReviews).length===0,'Cold-worker UI dismissal commits the selected lookup');
   assert(JSON.stringify(values.galacticLibraryDatabase.providerItems)===sources,'Lookup dismissal preserves provider source records');
   click(document.querySelector('#workspace-navigation'),'Library');

@@ -1,11 +1,11 @@
 import {labeledControl} from './form-presentation.js';
 import {performAction} from './operation-feedback.js';
 import {presentAction} from './form-presentation.js';
-import {formatDate} from './formatters.js';
+import {formatDate,countLabel} from './formatters.js';
 import {bookToolHelp,metadataPreview,sourceLabel} from './book-tool-help.js';
 import {enrichmentWorkbenchRows} from '../lib/enrichment-workbench.js';
 import {accountLabel} from './item-presentation.js';
-import {REVIEW_LABELS as labels,REVIEW_TASKS,reviewCategory,reviewTaskForCategory,matchesReviewCategory,reviewWorkflowCounts} from './review-workflow.js';
+import {REVIEW_LABELS as labels,REVIEW_TASKS,reviewCategory,reviewTaskForCategory,matchesReviewCategory,reviewWorkflowCounts,reviewWorkflowSummary} from './review-workflow.js';
 import {groupContents} from './contents-display.js';
 import {contentsConfirmationToken} from '../lib/contents-confirmation.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
@@ -19,11 +19,11 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
   const task=document.createElement('select');task.setAttribute('aria-label','Review task');
   for(const [value,group]of Object.entries(REVIEW_TASKS))task.append(Object.assign(text('option',group.label),{value}));
   task.value=item?'all':'ready';
-  const category=document.createElement('select');category.setAttribute('aria-label','Enrichment queue');
+  const category=document.createElement('select');category.setAttribute('aria-label','Review category');
   for(const [key,label]of Object.entries(labels))if(!item||!['missing','unparsed'].includes(key))category.append(Object.assign(text('option',label),{value:key}));
   category.value=item?'all':'contents-suggestions';
   const configureCategories=()=>{for(const option of category.options)option.hidden=!REVIEW_TASKS[task.value].categories.includes(option.value);};configureCategories();
-  const search=document.createElement('input');search.type='search';search.placeholder='Filter enrichment titles';search.setAttribute('aria-label','Filter enrichment titles');
+  const search=document.createElement('input');search.type='search';search.placeholder='Find a title';search.setAttribute('aria-label','Find a title');
   const status=text('p','');status.setAttribute('role','status');const counter=text('p',''),totals=text('p','');totals.className='muted';
   const list=document.createElement('ol');list.className='review-items';const empty=text('p','');empty.className='review-empty';empty.hidden=true;
   const controls=document.createElement('p');controls.className='actions';const taskLabel=labeledControl('Review task',task),categoryLabel=labeledControl('Show',category),searchLabel=labeledControl('Find a title',search);body.append(totals,taskLabel,categoryLabel,searchLabel,controls,status,counter,empty,list);
@@ -82,8 +82,8 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
       const current=new Set(rows.map(row=>row.id));for(const id of selected)if(!current.has(id))selected.delete(id);for(const id of choices.keys())if(!current.has(id))choices.delete(id);
       const counts=reviewWorkflowCounts(rows);
       for(const [id,{record}]of selectedContents){const row=rows.find(r=>r.id===id);if(!row?.contentsConfirmation?.eligible||!currentRecords.has(record.recordRef)||strictDatabaseSerialization(currentRecords.get(record.recordRef))!==strictDatabaseSerialization(record))selectedContents.delete(id);}
-      totals.textContent=`${counts.readyBooks} book lists ready to confirm / ${counts.metadataSuggestions} book information suggestions / ${counts.decisions} records needing a closer decision / ${counts.optionalGaps} optional information gaps / ${counts.failedLookups} failed lookups / ${counts.history} history records. Confirming contents is optional; eligible inferred issues may already contribute to coverage.`;
-      heading.textContent=`${item?'Review suggestions for this item':'Review book suggestions'} - ${counts.readyBooks} book lists ready / ${counts.metadataSuggestions} information suggestions`;
+      totals.textContent=reviewWorkflowSummary(counts)+'. Confirming contents is optional; eligible inferred issues may already contribute to coverage.';
+      heading.textContent=`${item?'Review suggestions for this item':'Review book suggestions'} - ${countLabel(counts.readyBooks,'book list ready','book lists ready')} / ${countLabel(counts.metadataSuggestions,'information suggestion')}`;
       heading.title='Book lists, metadata suggestions, optional gaps and history are separate kinds of records.';dirty=false;
     }
     if(autoCategory&&task.value==='ready'){category.value=rows.some(r=>reviewCategory(r)==='contents-suggestions')?'contents-suggestions':'candidates';autoCategory=false;}
@@ -95,7 +95,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
     confirmSelected.textContent=selectedContents.size?'Confirm selected ('+selectedContents.size+')':'Confirm selected';
     controls.hidden=item||!selected.size&&!filtered.some(row=>row.review||row.category==='undo');
     for(const node of [apply,dismiss,undo])node.disabled=busy||!selected.size||selected.size>50;
-    counter.textContent=item?filtered.length?`${filtered.length} saved suggestions and source selections. Check a candidate before accepting it. Dismiss removes a pending suggestion, not provider data.`:'No pending book suggestions for this item. Request a lookup above or use a file or publisher page.':`${filtered.length} entries; page ${page+1} of ${Math.max(1,Math.ceil(filtered.length/50))}; ${[selectedContents.size?selectedContents.size+' book lists selected':'',selected.size?selected.size+' information/source records selected':''].filter(Boolean).join(' / ')||'Nothing selected'} (maximum 50 per action). Nothing changes until you confirm or apply.`;
+    counter.textContent=item?filtered.length?`${countLabel(filtered.length,'saved suggestion or source selection','saved suggestions and source selections')}. Check a candidate before accepting it. Dismiss removes a pending suggestion, not provider data.`:'No pending book suggestions for this item. Request a lookup above or use a file or publisher page.':`${countLabel(filtered.length,'entry','entries')}; page ${page+1} of ${Math.max(1,Math.ceil(filtered.length/50))}; ${[selectedContents.size?selectedContents.size+' book lists selected':'',selected.size?selected.size+' information/source records selected':''].filter(Boolean).join(' / ')||'Nothing selected'} (maximum 50 per action). Nothing changes until you confirm or apply.`;
     if(item)paging.hidden=filtered.length<=50;
     apply.hidden=category.value==='undo'||category.value==='review-history';dismiss.hidden=apply.hidden;undo.hidden=!selected.size&&!filtered.some(row=>row.category==='undo');
     list.replaceChildren();
@@ -115,7 +115,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
       if(item)node.append(text('p','Applies to: '+row.recordRefs.map(ref=>currentRecords.get(ref)).filter(Boolean).map(record=>accountLabel(record,database)).join('; ')));
       let selectable=row.category==='undo'||Boolean(row.review);let choice;
       if(row.review?.candidates.length){
-        choice=document.createElement('select');choice.setAttribute('aria-label','Choose enrichment candidate');choice.append(Object.assign(text('option','Choose a source candidate'),{value:''}));
+        choice=document.createElement('select');choice.setAttribute('aria-label','Choose book information candidate');choice.append(Object.assign(text('option','Choose a source candidate'),{value:''}));
         row.review.candidates.forEach((candidate,index)=>choice.append(Object.assign(text('option',[candidate.title,candidate.subtitle,candidate.authors?.join(', '),candidate.publisher,candidate.language,candidate.isbn?.join(', ')].filter(Boolean).join(' · ')),{value:String(index)})));
         choice.value=choices.has(row.id)?String(choices.get(row.id)):'';
         choice.addEventListener('change',()=>{choices.delete(row.id);if(choice.value!=='')choices.set(row.id,Number(choice.value));selected.delete(row.id);refresh();});node.append(choice);
@@ -129,7 +129,7 @@ export function createEnrichmentWorkbench(actions,{recordRefs=null,item=false}={
         }
       }
       if(selectable){
-        const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.setAttribute('aria-label','Select enrichment review');check.checked=selected.has(row.id);check.disabled=busy;
+        const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.setAttribute('aria-label','Select book information review');check.checked=selected.has(row.id);check.disabled=busy;
         const index=choices.get(row.id),dismissOnly=choice&&(index===undefined||row.conflicts[index]?.length);
         check.addEventListener('change',()=>{if(check.checked)selected.add(row.id);else selected.delete(row.id);refresh();});label.append(check,row.category==='undo'?' Undo this source selection':dismissOnly?' Select review for dismissal':choice?` I checked the source and it describes this ${row.review.source==='openLibrary'?'work':'edition'}.`:' Dismiss this lookup result');node.append(label);
       }

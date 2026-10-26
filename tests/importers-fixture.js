@@ -435,7 +435,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
   assert(!contentsMessages.some(request=>request.diagnosticLookupId),'Disabled diagnostics sent timing requests.');
   kindleShadow.querySelector('[data-contents-diagnostics]').checked=true;
   const workbench=createEnrichmentWorkbench({inspect(){},refresh(){}});document.body.append(workbench.element);workbench.update(db);workbench.element.open=true;await pause();
-  const queue=workbench.element.querySelector('[aria-label="Enrichment queue"]');queue.value='unparsed';queue.dispatchEvent(new Event('change'));
+  const queue=workbench.element.querySelector('[aria-label="Review category"]');queue.value='unparsed';queue.dispatchEvent(new Event('change'));
   assert(workbench.element.querySelectorAll('li').length===2,'Fully parsed statements are hidden from Contents to review.');
   const record=providerRecord(db,'kindle','B000000002');let savedReview;
   const editor=createContentsEditor(record,null,{save:async(id,value)=>{savedReview=value;await writer.saveContentReview(id,value);},refresh(){}});document.body.append(editor);editor.open=true;await pause();

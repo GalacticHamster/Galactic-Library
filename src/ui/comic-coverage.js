@@ -18,7 +18,7 @@ const button=(label,run)=>{const node=el('button',label);node.type='button';node
 export function createComicCoverageView(database,{starts={},transitions={},names={},saveName=async()=>{throw Error('Series names cannot be saved here.');},saveTransitions=async()=>{throw Error("Numbering transitions cannot be saved here.");},merges={},saveMerge=async()=>{throw Error('Series merges cannot be saved here.');},undoMerge=async()=>{throw Error('Series merges cannot be saved here.');},saveStart=async()=>{throw Error('Starting numbers cannot be saved here.');},openRecord,resolutionActions={},state={}}={}){
   state=coverageBrowseState(state);const generation=state.generation=(state.generation??0)+1;
   starts={...starts};transitions={...transitions};const root=el('div');root.className='comic-coverage';
-  const intro=el('p','See comic issues covered by your owned books and standalone purchases. Partial coverage means some material from an issue; it still needs complete coverage. Inferred contents are included automatically; verified contents were reviewed. Multiple copies counts complete issue copies supported by distinct acquisitions, not repeated imports. Missing ranges run from the starting number through your highest represented issue, not the end of the published series.');
+  const intro=el('p','See comic issues covered by your owned books and standalone purchases. Partial coverage means some material from an issue; it still needs complete coverage. Inferred contents are included automatically; reviewed contents were checked by you. Multiple copies counts complete issue copies supported by distinct acquisitions, not repeated imports. Missing ranges run from the starting number through your highest represented issue, not the end of the published series.');
   const controls=el('div');controls.className='library-controls';
   const search=el('input');search.type='search';search.placeholder='Search comic series';search.setAttribute('aria-label','Search comic coverage');
   const sortLabel=el('label','Sort '),sort=el('select');sort.setAttribute('aria-label','Sort comic coverage');
@@ -134,7 +134,7 @@ export function createComicCoverageView(database,{starts={},transitions={},names
       detailState.issue=issue.number;sourcePanel.hidden=false;
       sourcePanel.replaceChildren(el('h4','#'+issue.number+' · '+issueLabel(issue)));
       if(issue.missing){sourcePanel.append(el('p','No comparable full coverage in your saved library.'));return;}
-      sourcePanel.append(el('p',issue.confidence==='direct'?'Standalone issue':issue.confidence==='verified'?'Verified contents':'Inferred from saved collection contents'));
+      sourcePanel.append(el('p',issue.confidence==='direct'?'Standalone issue':issue.confidence==='verified'?'Reviewed contents':'Inferred from saved collection contents'));
       if(issue.partial)sourcePanel.append(el('p','You own some material from this issue. Complete coverage is still missing.'));
       const sources=el('ul');
       for(const source of issue.sources)appendSource(sources,source);

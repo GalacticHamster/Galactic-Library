@@ -9,7 +9,7 @@ const button=(label,run)=>{const node=el('button',label);node.type='button';node
 export function createCollectionOverlapView(database,{openRecord,state={}}={}){
   const generation=state.generation=(state.generation??0)+1;
   const root=el('div');root.className='collection-overlap';
-  root.append(el('p','Find issues shared by your owned collections. Inferred contents are included; verified means both collections’ contents were reviewed. Viewing overlaps does not change your library.'));
+  root.append(el('p','Find issues shared by your owned collections. Inferred contents are included; reviewed means both collections’ contents were reviewed. Viewing overlaps does not change your library.'));
   const controls=el('div');controls.className='library-controls';
   const search=el('input');search.type='search';search.placeholder='Search collection titles';search.setAttribute('aria-label','Search overlapping collections');
   const sortLabel=el('label','Sort '),sort=el('select');sort.setAttribute('aria-label','Sort collection overlaps');
@@ -45,7 +45,7 @@ export function createCollectionOverlapView(database,{openRecord,state={}}={}){
     row.append(detail);toggle.textContent="Collapse overlap";toggle.setAttribute("aria-expanded","true");
     selected=pair;state.selected=pair.id;detail.hidden=false;detail.replaceChildren();
     const heading=el('h3',pair.left.title+' ↔ '+pair.right.title);heading.tabIndex=-1;
-    detail.append(heading,el('p',pair.shared.length+' shared issues · '+(pair.verified===pair.shared.length?'Verified':pair.verified?'Mixed inferred and verified':'Inferred')));
+    detail.append(heading,el('p',pair.shared.length+' shared issues · '+(pair.verified===pair.shared.length?'Reviewed contents':pair.verified?'Mixed inferred and reviewed':'Inferred')));
     for(const collection of [pair.left,pair.right]){
       const links=el('p');links.append(collection.title+': ');
       for(const record of collection.records.values()){links.append(linkRecord(record),document.createTextNode(' '));}detail.append(links);
@@ -66,7 +66,7 @@ export function createCollectionOverlapView(database,{openRecord,state={}}={}){
     status.textContent=`${matches.length} overlapping collection pairs${query?' matching your search':''}.`;status.setAttribute('aria-busy','false');
     for(const pair of matches.slice(page*size,(page+1)*size)){
       const row=el('article'),toggle=button('Inspect overlap',()=>select(pair,row,toggle));toggle.setAttribute('aria-expanded',String(selected===pair&&!detail.hidden));if(selected===pair&&!detail.hidden)toggle.textContent='Collapse overlap';row.className='tool-card';row.dataset.overlapPair=pair.id;
-      row.append(el('h3',pair.left.title+' ↔ '+pair.right.title),el('p',`${pair.shared.length} shared issues · ${pair.verified===pair.shared.length?'Verified':pair.verified?'Mixed inferred and verified':'Inferred'}`),toggle);if(selected===pair&&!detail.hidden)row.append(detail);list.append(row);
+      row.append(el('h3',pair.left.title+' ↔ '+pair.right.title),el('p',`${pair.shared.length} shared issues · ${pair.verified===pair.shared.length?'Reviewed contents':pair.verified?'Mixed inferred and reviewed':'Inferred'}`),toggle);if(selected===pair&&!detail.hidden)row.append(detail);list.append(row);
     }
     if(!matches.length)list.append(el('p',query?'No overlapping collections match these titles.':'No comparable issue overlaps found. Owned collections with full, sufficiently identified contents contribute automatically; manual review is optional.'));
     if(selected&&!matches.includes(selected)){state.selected=null;selected=null;detail.hidden=true;detail.replaceChildren();}

@@ -33,7 +33,7 @@ export function createItemDetailsBody(canonical,records,database,tools,state={se
     if(state.sections.has(key)||defaultOpen&&!state.initialized){node.open=true;state.sections.add(key);populate();}root.append(node);return node;
   }
   section('library','Your library',node=>{
-    const help=text('details','');help.className='context-help';help.append(text('summary','How account access works'),text('p','Access belongs to each account separately. Grouping copies does not grant access to another account. Ownership preferences and human reviews are labeled; the original observation remains available.'));node.append(help);
+    const help=text('details','');help.className='context-help';help.append(text('summary','How account access works'),text('p','Access belongs to each account separately. Grouping copies does not grant access to another account. Ownership preferences and human reviews are labeled; the original provider information remains available.'));node.append(help);
     for(const entry of presentation.records){const record=text('div','');record.className='item-account';record.dataset.itemRecord=entry.record.recordRef;
       record.append(text('strong',entry.label),text('p',entry.access+(entry.override?' — user ownership preference':entry.reviewed?' — human ownership review':'')));
       if(entry.inferred)record.append(text('small','Ownership recognized from saved Kindle / Comixology provider context.'));
