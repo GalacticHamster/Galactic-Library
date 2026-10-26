@@ -6,6 +6,72 @@ of defects and old presentation are historical. Phase A changed no production
 behavior. The implementation status below supersedes the original pending-review
 language and proposed UI descriptions. No live user libraries were used for tests.
 
+## Post-B6 explanatory text cleanup
+
+October 26, 2026. The shared renderer previously cloned every original provider
+introduction into **How importing works** before replacing the introduction.
+This caused repeated explanations, including optional help even when there was
+nothing useful to add. It also appended Kindle import help after its contents
+workflow. The renderer now creates optional help only for four providers, with
+purpose-written additional information. Existing diagnostics and recovery text
+are unchanged.
+
+| Provider | Default description changed? | Import help retained or removed? | Reason |
+| --- | --- | --- | --- |
+| Steam | Yes: concise games/DLC and unidentified applications | Retained, rewritten | Adds Quick versus Full scope and retention when Steam cannot identify a title. |
+| GOG | No | Removed | Recent additions, all pages and hidden games are already explained. |
+| Epic Games | Yes: concise library import | Removed | Repeated import scope; session recovery and diagnostics stay in their existing locations. |
+| Amazon Games | Yes: exact three-month window and unclear-delivery caveat | Removed | Recent versus all years, excluded stores/codes and uncertainty are visible once. |
+| Audible | Yes: exact current/previous-year and received-gift scope | Removed | Essential recent versus all-year history and access distinctions remain visible. |
+| Kindle | Yes: brief import scope and contents capability | Retained, rewritten | Adds newest-page stopping versus Full scope, before Book contents discovery. |
+| Amazon Video | No | Removed | Refresh scope and uncertain completeness retention are already visible. |
+| Fandango at Home | Yes: stopping at known titles and provider-count checks | Removed | Useful completeness detail is now in the default description. |
+| Kobo | Yes: Archive/Audiobooks when exposed | Removed | Scope and uncertain ownership evidence are already visible. |
+| Fanatical | No | Retained, rewritten | Explains page-local session-token use without repeating scan scope. |
+| Humble Bundle | No | Retained, rewritten | Explains rescan after importer updates and redemption-code redaction. Pending-key checks remain visible. |
+| Xbox | No; removed repetition from initial status | Removed | Both-action full-list traversal and web/lifetime limits remain visible. |
+| PlayStation | No; removed repetition from initial status | Removed | Both-action traversal, supported consoles and historical limits remain visible. |
+| Nintendo | No; removed repetition from initial status | Removed | Loaded, non-hidden card scope and retention remain visible. |
+
+Kindle order is **Library import ? description ? account ? Quick/Full ? optional
+import help ? Book contents discovery ? review link/mode/contents help**, with the
+existing stable contents-action footer. Import help is a sibling before the
+contents section; contents help remains inside it. Diagnostic tools stay in the
+common tail and remain hidden by default.
+
+The returning-account reminder is now: **Using a different account on this site?
+Select Change account first.** No account admission, token invalidation, save,
+acquisition, ownership or diagnostic-setting behavior changed.
+
+Validation: complete unit **1,768 passed** and contents **485/485**. Packaged
+Chrome and Firefox each passed **16 shared account/flag checks** and **123 importer
+checks with diagnostics off plus 123 on**. Native installed-extension render
+checks passed **56 captures per browser**, covering all 14 templates, initial,
+returning and diagnostic states, narrow/short dark viewports, keyboard focus,
+minimize/restore, and preference/profile rehydration after restart. New assertions
+check the four-provider help inventory, collapsed defaults, exact account
+reminder, Kindle section ordering and retained contents controls. Representative
+Epic, Steam and Kindle captures in both browsers were visually inspected: no
+clipping, redundant help or empty separators; Kindle keeps scrolling and its
+footer. Captures are synthetic, include a deliberately long status and remain in
+ignored `audit-artifacts/provider-overlays/`; no live provider requests or personal
+libraries were used.
+
+Additional packaged suites pass in each browser: Steam **20**, Kobo **11**,
+Fandango **53**, Amazon Games **58**, Amazon Video **89**, Audible ownership
+**171**. Both release archives validate **225 runtime files**; unpacked Firefox
+was refreshed. Repository layout and `git diff --check` pass. No remaining
+failures were observed in the final runs. During development, an unnecessary
+selector change in the isolated Steam fixture failed because that fixture does
+not load the shared renderer; restoring its original selector resolved it without
+changing production behavior. The layout checker required subprocess permission
+in this environment and passed when rerun with that permission.
+
+Remaining limitations are unchanged: native visual fixtures use production
+markup/shared controls with synthetic profile replies, not signed-in acquisition;
+provider importer fixtures separately exercise those controllers. No live
+provider imports, personal browser profiles, or library-data edits were used.
+
 ## Phase B implementation results
 
 | Package | Local checkpoint | Result |

@@ -32,6 +32,10 @@ try {
   for (const provider of providers) {
     profiles=[];active=null;requests=[];
     let ui=await mount(provider,provider==='epic'||provider==='nintendo'?'full':'incremental');
+    const help=ui.root.querySelector('[data-import-help]');
+    assert(Boolean(help)===['steam','kindle','fanatical','humble'].includes(provider),provider+': incorrect optional help');
+    assert(!help||!help.open,provider+': import help should start collapsed');
+    assert(ui.root.querySelector('[data-profile-summary] p').textContent==='Using a different account on this site? Select Change account first.','Account reminder changed meaning');
     const before=starts;
     await rejects(()=>start(provider,ui),/confirm/);
     edit(ui,'   ');ui.confirm.checked=true;await rejects(()=>start(provider,ui),/confirm/);
@@ -62,6 +66,7 @@ try {
     assert(!ui.root.querySelector('.panel').hidden&&ui.input.value==='Personal','Restore lost account state.');
     // Unrelated actions preserve the admitted token. Explicit new imports and
     // account edits must still discard it rather than reuse stale authority.
+    ui.root.querySelector('[data-import-help] summary')?.click();
     ui.root.querySelector('[data-diagnostic]').click();
     await globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]});
     assert(requests.some(r=>r.type==='COMMIT_PROVIDER_SCAN'),'Diagnostic cleared an admitted save.');

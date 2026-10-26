@@ -83,28 +83,43 @@
     if(oldHeading){const next=oldHeading.nextSibling;if(next?.nodeName==='BR')next.remove();oldHeading.remove();}
     panel.prepend(heading);
     const introductions={
-      steam:'Import your Steam games and DLC. Quick update checks new or unidentified applications; Full rescan checks the library again. Saved titles stay when Steam cannot identify them.',
+      steam:'Import your Steam games and DLC, including applications Steam cannot currently identify.',
       gog:'Import your GOG games, including hidden games. Quick update checks recent additions; Full rescan checks every available page.',
-      epic:'Import the games and add-ons Epic reports as owned by the signed-in account. Sync checks the supported library each time.',
-      'amazon-games':'Import games delivered to your Amazon Games library. Games delivered to other stores and code claims are excluded. Quick update checks recent claims; Full rescan checks all available years. Older or first-time imports may require a Full rescan.',
-      audible:'Import your Audible audiobooks and available ownership evidence. Quick update checks new titles and recent purchase, return and gift history. Full rescan checks the library and all available history years. Subscription, expired and unconfirmed access remain distinct.',
-      kindle:'Import your Kindle library. Quick update checks recent additions; Full rescan checks the supported library again. Use Book contents discovery below to find included works for review.',
+      epic:'Import games and add-ons from your Epic Games library.',
+      'amazon-games':'Import games delivered to your Amazon Games library. Games delivered to other stores and code claims are excluded. Quick update checks the past three months; Full rescan checks all available years. Older or first-time imports may require a Full rescan. Unclear delivery details stay unconfirmed.',
+      audible:'Import your Audible audiobooks and available ownership evidence. Quick update checks new titles and purchase, return and received-gift history for the current and previous calendar years. Full rescan checks the library and all available history years. Subscription, expired and unconfirmed access remain distinct.',
+      kindle:'Import your Kindle library. You can also discover the individual works included in your books.',
       'amazon-video':'Import your Amazon Video movies and TV titles. Quick update checks recent additions; Full rescan refreshes the collection and purchase information. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
-      'fandango-at-home':'Import your Fandango movies and TV shows. Quick update checks recent purchases; Full rescan checks the whole available collection.',
-      kobo:'Import your Kobo books and audiobooks. Quick update checks recent additions; Full rescan checks all available library sections. Library presence alone does not confirm ownership.',
+      'fandango-at-home':'Import your Fandango movies and TV shows. Quick update checks recent purchases until it reaches known titles; Full rescan checks every card against Fandango’s reported movie and TV counts.',
+      kobo:'Import your Kobo books and audiobooks. Quick update checks recent additions; Full rescan also checks Archive and Audiobooks when available. Library presence alone does not confirm ownership.',
       fanatical:'Import supported products from completed Fanatical orders. Quick update checks new completed orders; Full rescan checks all completed orders again.',
       humble:'Import supported books, audiobooks and game entitlements from Humble purchases. Quick update checks new purchases and pending key information; Full rescan checks all supported purchases again.',
       xbox:'Import the web-visible Xbox Owned catalog. Both actions check this entire list; Quick update adds changes. This is not your complete console or lifetime purchase history. Earlier saved items stay.',
       playstation:'Import the active PS4/PS5 Purchased web library. Both actions check the supported list; Quick update saves additions and changes. Older consoles and lifetime purchase history are outside this scope. Earlier saved items stay.',
       nintendo:'Import the non-hidden Switch Virtual Game Cards loaded on this page. Load all cards before importing. Other Nintendo purchase history is not included; earlier saved cards stay.'
     };
+    // Optional help adds detail rather than copying the provider's introduction.
+    const importHelp={
+      steam:'Quick update checks newly added or previously unidentified applications. Full rescan checks the complete Steam library. Earlier saved titles stay if Steam cannot identify them.',
+      kindle:'Quick update reads the newest Kindle pages until it reaches a page already saved in your library. Full rescan checks the supported library again.',
+      fanatical:'Fanatical’s session token is used only inside this signed-in page for read-only order requests. It is never stored or sent to Galactic Library.',
+      humble:'A Full rescan can pick up information after an importer update. Redemption codes are removed before purchase details are read and are never saved.'
+    };
     if(introductions[provider]){
       const intro=panel.querySelector('p');
-      if(intro){const help=document.createElement('details'),label=document.createElement('summary');label.textContent='How importing works';help.append(label,intro.cloneNode(true));intro.textContent=introductions[provider];help.dataset.importHelp='';(panel.querySelector('.panel-body')??panel).append(help);}
+      if(intro){
+        intro.textContent=introductions[provider];
+        if(importHelp[provider]){
+          const help=document.createElement('details'),label=document.createElement('summary'),description=document.createElement('p');
+          label.textContent='How importing works';description.textContent=importHelp[provider];help.append(label,description);help.dataset.importHelp='';
+          const contents=panel.querySelector('[data-book-contents-workflow]');
+          if(contents)contents.before(help);else panel.append(help);
+        }
+      }
     }
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>If you signed into another website account, change this selection first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Editing it selects or adds an account; it does not rename one.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
+      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>Using a different account on this site? Select Change account first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Editing it selects or adds an account; it does not rename one.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
       let mode='full';
@@ -176,7 +191,7 @@
     const body=panel.querySelector('.panel-body')??panel;
     const status=panel.querySelector('.status, [data-import-status]'),help=panel.querySelector('[data-import-help]');
     if(status)body.append(status);
-    if(help)body.append(help);
+    if(help&&!panel.querySelector('[data-book-contents-workflow]'))body.append(help);
     for(const section of diagnosticSections)body.append(section);
     const style = document.createElement('style');
     style.textContent = ':host { color-scheme:var(--gh-color-scheme); } .panel { position:relative; } button:hover:not(:disabled) { background:var(--gh-accent-hover); } button:active:not(:disabled) { background:var(--gh-accent-pressed); } button:disabled { background:var(--gh-disabled); color:var(--gh-disabled-text); cursor:default; } input,select,textarea { background:var(--gh-input); color:var(--gh-text); border:1px solid var(--gh-input-border); accent-color:var(--gh-accent); font:inherit; max-width:100%; } button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--gh-focus); outline-offset:3px; } .galactic-panel-minimize { position:absolute; right:9px; top:9px; padding:3px 7px; font-size:12px; } .galactic-panel-restore { border:1px solid var(--gh-border); border-radius:7px; background:var(--gh-accent); box-shadow:var(--gh-shadow); color:var(--gh-on-accent); cursor:pointer; font:14px/1.4 var(--gh-font); padding:7px 10px; }';

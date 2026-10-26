@@ -36,6 +36,15 @@ globalThis.setProviderDiagnostics=async value=>original({type:'LIBRARY_STORAGE_O
 globalThis.renderOverlay=async(provider,nextState='returning',theme='light')=>{
  await globalThis.setProviderDiagnostics(nextState==='diagnostics');
  state=nextState;host?.remove();host=document.createElement('div');host.id='galactic-library-'+provider+'-importer';host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:10;color:var(--gh-text);';host.setAttribute('data-gh-theme',theme);root=host.attachShadow({mode:'open'});root.innerHTML=templates[provider];if(extras[provider]){const d=document.createElement('details');d.innerHTML=extras[provider];root.querySelector('.panel').append(d);}document.body.append(host);globalThis.GalacticFloatingPanel.attach(root,provider);await new Promise(r=>setTimeout(r,30));
+ const help=root.querySelector('[data-import-help]'),expectedHelp=['steam','kindle','fanatical','humble'].includes(provider);
+ if(Boolean(help)!==expectedHelp)throw Error(provider+': unexpected import help');
+ if(help&&(help.open||help.textContent.includes(root.querySelector('.panel p').textContent)))throw Error(provider+': repeated or expanded import help');
+ if(root.querySelector('[data-profile-summary] p').textContent!=='Using a different account on this site? Select Change account first.')throw Error('Account reminder mismatch');
+ if(provider==='kindle'){
+  const contents=root.querySelector('[data-book-contents-workflow]');
+  if(help.parentNode!==contents.parentNode||!(help.compareDocumentPosition(contents)&Node.DOCUMENT_POSITION_FOLLOWING)||contents.contains(help))throw Error('Kindle import help is outside Library import');
+  if(![...contents.querySelectorAll('summary')].some(s=>s.textContent==='How contents discovery works')||!root.querySelector('.contents-controls [data-action="comic-contents"]'))throw Error('Kindle contents workflow missing');
+ }
  const status=root.querySelector('.status,[data-import-status]');if(status)status.textContent='A deliberately long provider message that wraps without hiding account controls or actions. Earlier saved records and manual corrections were kept. '.repeat(3);
  return true;
 };
