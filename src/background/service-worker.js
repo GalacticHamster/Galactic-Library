@@ -439,6 +439,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const timing=providerTiming(request);
     storageWriter.getProviderProfileHint('kobo',timing).then(hint=>providerResponse(timing,sendResponse,{ok:true,hint})).catch(()=>providerResponse(timing,sendResponse,{ok:false}));return true;
   }
+  if(request?.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'){
+    if(sender.id!==chrome.runtime.id||!isKnownProvider(request.provider)||!isProviderImportPage(request.provider,sender.url)){sendResponse({ok:false});return undefined;}
+    storageWriter.getProviderDiagnosticsEnabled().then(enabled=>sendResponse({ok:true,enabled})).catch(()=>sendResponse({ok:false}));return true;
+  }
   if (['GET_PROVIDER_SYNC_STATE','GET_PROVIDER_PROFILE'].includes(request?.type)) {
     if (!isKnownProvider(request.provider) || !isProviderImportPage(request.provider, sender.url)) {
       sendResponse({ ok: false, error: 'Sync state is available only from the matching signed-in provider site.' });

@@ -86,5 +86,11 @@ try {
     checks.push(provider+': shared setup, empty rejection, saved-profile rehydration, editing, alternate selection, switch gesture and minimize/restore');
   }
   checks.push('All 14 shared renderers preserve scan authority across diagnostics and minimize/restore while new imports and edits reject stale context');
+  const path=location.href;
+  for(const [provider,flag]of [['steam','gl-steam-diagnostics'],['amazon-games','gl-date-check'],['audible','gl-audible-ownership-check']]){
+    history.replaceState(null,'','?'+flag+'=1');assert(await globalThis.GalacticFloatingPanel.diagnosticsEnabled(provider),'Explicit support override stopped working.');
+  }
+  history.replaceState(null,'',path);
+  checks.push('Steam, Amazon Games and Audible explicit support flags still enable their diagnostic interface without changing account authority');
 } catch(error) { await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});throw error; }
 await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});

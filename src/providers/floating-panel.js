@@ -4,6 +4,11 @@
   const sessions=new Map();
   let profiling=false,profileSequence=100;
   let profilePrefix;
+  async function diagnosticsEnabled(provider){
+    const flag={steam:'gl-steam-diagnostics','amazon-games':'gl-date-check',audible:'gl-audible-ownership-check'}[provider];
+    if(flag&&new URLSearchParams(global.location?.search??'').get(flag)==='1')return true;
+    try{const result=await chrome.runtime.sendMessage({type:'GET_PROVIDER_DIAGNOSTICS_SETTING',provider});return result?.ok===true&&result.enabled===true;}catch{return false;}
+  }
   async function send(request) {
     const provider=request.provider??(request.type==='FANDANGO_IMPORT_STATE'?'fandango-at-home':null);
     const session=sessions.get(provider);
@@ -61,6 +66,16 @@
   function attach(shadow,provider) {
     const panel = shadow?.querySelector?.('.panel');
     if (!panel || shadow.querySelector('[data-galactic-floating-panel-control]')) return;
+    panel.dataset.providerDiagnostics='disabled';
+    const diagnosticSections=[...panel.querySelectorAll('details')].filter(section=>/diagnostic/iu.test(section.querySelector('summary')?.textContent??''));
+    const diagnosticControls=[...panel.querySelectorAll('[data-export-report], [data-export-scan], [data-export-evidence], [data-export-diagnostics], [data-export-timing], [data-export-sample]')];
+    for(const element of [...diagnosticSections,...diagnosticControls])element.dataset.providerDiagnostic='';
+    for(const control of diagnosticControls)if(!control.closest('details')&&diagnosticSections[0])diagnosticSections[0].append(control);
+    for(const section of diagnosticSections)section.hidden=true;
+    if(provider)diagnosticsEnabled(provider).then(enabled=>{
+      panel.dataset.providerDiagnostics=enabled?'enabled':'disabled';
+      for(const section of diagnosticSections)section.hidden=!enabled;
+    });
     const names={steam:'Steam',gog:'GOG',epic:'Epic Games','amazon-games':'Amazon Games',audible:'Audible',kindle:'Kindle','amazon-video':'Amazon Video','fandango-at-home':'Fandango at Home',kobo:'Kobo',fanatical:'Fanatical',humble:'Humble Bundle',xbox:'Xbox',playstation:'PlayStation',nintendo:'Nintendo'};
     const oldHeading=panel.querySelector('h3')??panel.querySelector('p > strong:first-child');
     const heading=document.createElement('h2');heading.className='galactic-panel-heading';
@@ -172,6 +187,7 @@
       .panel label { overflow-wrap:anywhere; } .panel input:not([type=checkbox]),.panel select { box-sizing:border-box; max-width:100%; }
       .panel details { margin-top:10px; } .panel summary { cursor:pointer; } .panel .status { margin-top:10px; }
       .contents-controls { flex-shrink:0; } .panel[hidden] { display:none; }
+      .panel:not([data-provider-diagnostics="enabled"]) [data-provider-diagnostic] { display:none!important; }
     `;
     minimize.type = 'button';
     minimize.className = 'galactic-panel-minimize';
@@ -197,5 +213,5 @@
     panel.append(minimize);
     shadow.append(style, restore);
   }
-  global.GalacticFloatingPanel = { attach };
+  global.GalacticFloatingPanel = { attach,diagnosticsEnabled };
 }(globalThis));

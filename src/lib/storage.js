@@ -21,6 +21,7 @@ const client = createStorageClient((message) => chrome.runtime.sendMessage(messa
 export const {
   getDatabase, getCommittedLibraryView, restoreDatabase, replaceProviderItems, mergeProviderItems, clearDatabase, saveOwnershipPolicy,
   saveKoboOwnershipAssumption,
+  getProviderDiagnosticsEnabled,saveProviderDiagnosticsEnabled,
   saveReadingState,removeReadingState,saveReadingOrder,removeReadingOrder,
   removeCompanionFeed,
   getProviderProfiles,previewProviderProfileRemoval,removeProviderProfile,resetProviderProfileBaseline,selectProviderProfile,renameProviderProfile,cancelProviderScan,saveReminderReview,getReminderNotificationSettings,saveReminderNotificationSettings,

@@ -282,6 +282,24 @@ In Firefox, allow GL access to the Nintendo site if the browser withholds site
 permissions, then reload the page. The temporary research helper may be removed;
 the production importer does not depend on it.
 
+## Provider diagnostics
+
+Provider troubleshooting tools are hidden by default. To show them, open
+**Settings → Troubleshooting → Enable provider diagnostics**, then reopen or
+reload the provider page. Changing the setting does not interrupt an active
+import. It controls the tools you see, not existing local diagnostic collection
+or retention (including Epic's passive failure history).
+
+Only supported tools appear; providers without them get no empty section.
+Existing support links/flags remain compatible, including Steam's
+`gl-steam-diagnostics=1`, Amazon Games' `gl-date-check=1`, and Audible's
+`gl-audible-ownership-check=1`. With diagnostics enabled, Audible's panel links to
+its separate purchase-history checker. Aggregate reports and private Audible
+purchase-evidence downloads have different privacy rules: read the warning
+before sharing an export. The setting is local to this browser, excluded from
+library backups, and survives browser/extension restarts. Clearing all local GL
+data resets it.
+
 ## Kobo metadata and ownership
 
 Kobo quick updates check the newest-first pages up to the first known page. The

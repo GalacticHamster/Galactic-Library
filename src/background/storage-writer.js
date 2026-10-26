@@ -1151,7 +1151,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function clearDatabase() {
-    await storageArea.remove([PROVIDER_CHECKS_KEY,'galacticPurchaseSync',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
+    await storageArea.remove([PROVIDER_CHECKS_KEY,'galacticPurchaseSync','galacticLibraryProviderDiagnostics',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
   }
 
   function normaliseGoogleBooksApiKey(value) {
@@ -1830,6 +1830,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return stored[SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY] !== false;
   }
 
+  async function getProviderDiagnosticsEnabled(){
+    return (await storageArea.get({galacticLibraryProviderDiagnostics:false})).galacticLibraryProviderDiagnostics===true;
+  }
+  async function saveProviderDiagnosticsEnabled(value){
+    if(typeof value!=='boolean')throw Error('Choose whether to enable provider diagnostics.');
+    await storageArea.set({galacticLibraryProviderDiagnostics:value});return value;
+  }
+
   async function saveShowEnrichmentActions(value) {
     const checked = value !== false;
     await storageArea.set({ [SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY]: checked });
@@ -1939,7 +1947,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     getKindleContentsRefresh,beginKindleContentsRefresh,checkKindleContentsRefreshItem,commitKindleContentsRefresh,finishKindleContentsRefresh,interruptKindleContentsRefresh,
     saveContentReview, confirmContentsSuggestions, removeContentReview,saveCoverageResolutions,saveCoverageReferenceDecision,
     separateEdition, undoEditionSeparation, saveTitleAliases,saveOwnershipReview,removeOwnershipReview,saveOwnershipCorrections,importPurchaseEvidence,refreshPurchaseEvidence,applyPurchaseEvidence,dismissPurchaseEvidence,
-    getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
+    getProviderDiagnosticsEnabled,saveProviderDiagnosticsEnabled,getShowEnrichmentActions, saveShowEnrichmentActions, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge
   };
   let tail = Promise.resolve();
   let replacementPending=false;

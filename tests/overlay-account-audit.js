@@ -4,6 +4,7 @@ import {memory} from './final-gl-features.js';
 import {snapshotFixture} from './storage.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {withWorker} from './storage.js';
 const providers=['steam','gog','epic','amazon-games','audible','kindle','amazon-video','fandango-at-home','kobo','fanatical','humble','xbox','playstation','nintendo'];
 export const overlayAccountAuditTests=providers.map(provider=>['Overlay audit: '+provider+' persisted setup, nickname normalization, interruption and independent accounts',async()=>{
   const bound=['xbox','playstation','nintendo'].includes(provider),fp='a'.repeat(64),otherFp='b'.repeat(64);
@@ -47,4 +48,22 @@ export const overlayAccountAuditTests=providers.map(provider=>['Overlay audit: '
   if(bound)await assert.rejects(begin(restarted.writer,'personal account','full',true),/already saved/);
   else {const caseScan=await begin(restarted.writer,'personal account','full',true);assert.notEqual(caseScan.profileId,a);await cancel(restarted.writer,restarted.stored);}
   db=await restarted.writer.getDatabase();assert.deepEqual(parseBackup(createBackup(db)).providerItems,db.providerItems);
+}]);
+
+overlayAccountAuditTests.push(['Provider diagnostics defaults off, persists outside library/backups and rejects provider-tab writes',async()=>{
+  const {writer,stored}=memory();const before=await writer.getDatabase();
+  assert.equal(await writer.getProviderDiagnosticsEnabled(),false);
+  await writer.saveProviderDiagnosticsEnabled(true);
+  const restarted=memory();Object.assign(restarted.stored,structuredClone(stored));
+  assert.equal(await restarted.writer.getProviderDiagnosticsEnabled(),true);
+  assert.deepEqual(await restarted.writer.getDatabase(),before);
+  assert.deepEqual(parseBackup(createBackup(before)),before);
+  await assert.rejects(writer.saveProviderDiagnosticsEnabled('true'),/Choose/);
+  await restarted.writer.clearDatabase();assert.equal(await restarted.writer.getProviderDiagnosticsEnabled(),false);
+  await withWorker(async({dispatch})=>{
+    const sender={id:chrome.runtime.id,url:'https://www.kobo.com/us/en/library/books',tab:{id:1}};
+    assert.equal((await dispatch({type:'GET_PROVIDER_DIAGNOSTICS_SETTING',provider:'kobo'},sender)).enabled,false);
+    assert.equal((await dispatch({type:'GET_PROVIDER_DIAGNOSTICS_SETTING',provider:'kobo'},{...sender,url:'https://example.com'})).ok,false);
+    assert.equal((await dispatch({type:'LIBRARY_STORAGE_OPERATION',operation:'saveProviderDiagnosticsEnabled',args:[true]},sender)).ok,false);
+  });
 }]);

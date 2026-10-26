@@ -27,6 +27,7 @@ import '../lib/contents-performance.js';
 import {bookToolHelp} from './book-tool-help.js';
 import { createWorkspaceNavigation } from './workspaces.js';
 import { getCommittedLibraryView, getUiPreferences, saveUiPreferences, saveComicCoverageMerge, removeComicCoverageMerge, saveOwnershipPolicy } from '../lib/storage.js';
+import {getProviderDiagnosticsEnabled,saveProviderDiagnosticsEnabled} from '../lib/storage.js';
 import {acquireEnrichmentRun,commitEnrichmentBatch,finishEnrichmentRun} from '../lib/storage.js';
 import {saveEnrichmentReview,dismissEnrichmentReview,undoEnrichmentSelection} from '../lib/storage.js';
 import {enrichmentQuery,enrichmentStages} from '../lib/enrichment.js';
@@ -1097,3 +1098,8 @@ loadLibrary();
 document.querySelector('#copy-galactic-extension-id').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(chrome.runtime.id);companionExtensionLinkStatus.textContent='Galactic Library ID copied.';}catch{companionExtensionLinkStatus.textContent='Copy the Galactic Library ID shown above into the companion settings.';}});
 
 document.addEventListener('gh-purchase-open',event=>{if(['humble','fanatical'].includes(event.detail?.provider))workspace.select('providers');});
+
+const providerDiagnosticsCheckbox=document.querySelector('#enable-provider-diagnostics');
+const providerDiagnosticsStatus=document.querySelector('#provider-diagnostics-setting-status');
+getProviderDiagnosticsEnabled().then(enabled=>{providerDiagnosticsCheckbox.checked=enabled;providerDiagnosticsCheckbox.disabled=false;}).catch(()=>{providerDiagnosticsStatus.textContent='Could not load the troubleshooting setting. Reload GL to try again.';});
+providerDiagnosticsCheckbox.addEventListener('change',async()=>{const enabled=providerDiagnosticsCheckbox.checked;providerDiagnosticsCheckbox.disabled=true;try{await saveProviderDiagnosticsEnabled(enabled);providerDiagnosticsStatus.textContent='Saved. Reopen or reload provider pages to apply this setting.';}catch{providerDiagnosticsCheckbox.checked=!enabled;providerDiagnosticsStatus.textContent='Could not save the setting. Your previous choice was kept.';}finally{providerDiagnosticsCheckbox.disabled=false;}});

@@ -1,5 +1,6 @@
-(function attachAudibleSync() {
+(async function attachAudibleSync(options) {
   'use strict';
+  const skipHistoryDiagnostic=options?.skipHistoryDiagnostic===true;
   if (document.querySelector('#galactic-library-audible-importer') || !globalThis.GalacticAudible) return;
 
   const host = document.createElement('div');
@@ -29,7 +30,7 @@
       sessionStorage.setItem(checkSessionKey,String(Date.now()+2*60*60*1000));checkSession=true;
     }
   }catch{/* A blocked session store leaves the explicit URL opt-in available. */}}
-  if(historyPage&&(checkSession||new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1')){
+  if(historyPage&&!skipHistoryDiagnostic&&(checkSession||new URLSearchParams(location.search).get('gl-audible-ownership-check')==='1'||await globalThis.GalacticFloatingPanel?.diagnosticsEnabled?.('audible'))){
     const panel=shadow.querySelector('.panel');panel.querySelector('p').innerHTML='<strong>Audible ownership check</strong><br>Check the visible page, including its page controls. Use Audible\'s View menu to check Your orders, Refund history or Gift received, and its date menu to check a year. Run a new check after each page loads. No books or access statuses will change. Diagnostic reports omit titles, transaction dates, prices, identifiers and account details.';
     for(const button of buttons)button.remove();
     const check=document.createElement('button'),download=document.createElement('button'),end=document.createElement('button');check.type=download.type=end.type='button';check.textContent='Check this page (no import)';download.textContent='Export check report';download.disabled=true;end.textContent='End check';
@@ -103,7 +104,7 @@
       if(check.disabled)return;
       try{sessionStorage.removeItem(checkSessionKey);}catch{}
       const url=new URL(location.href);url.searchParams.delete('gl-audible-ownership-check');history.replaceState(history.state,'',url.href);
-      host.remove();attachAudibleSync();
+      host.remove();attachAudibleSync({skipHistoryDiagnostic:true});
     });
     let report=null;
     check.addEventListener('click',async()=>{
@@ -168,6 +169,9 @@
     }
   }
   buttons.forEach((button) => button.addEventListener('click', () => sync(button.dataset.mode)));
+  const troubleshooting=document.createElement('details');
+  troubleshooting.innerHTML='<summary>Scan diagnostics</summary><p>Purchase-history checks have aggregate reports and a separate private purchase-evidence export. Read each export warning before sharing.</p><a href="https://www.audible.com/account/purchase-history?gl-audible-ownership-check=1">Open purchase-history checks (no import)</a>';
+  shadow.querySelector('.panel').append(troubleshooting);
   globalThis.GalacticFloatingPanel?.attach(shadow, 'audible');
   document.documentElement.append(host);
 }());

@@ -1,7 +1,8 @@
 (function attachAmazonVideoSync() {
   'use strict';
   // Troubleshooting builds only; see the release checklist. No saved setting.
-  const SHOW_SCAN_DIAGNOSTICS = false;
+  // Shared setting controls visibility; constructing tools does not run them.
+  const SHOW_SCAN_DIAGNOSTICS = true;
   if (!location.pathname.includes('/gp/video/') || document.querySelector('#galactic-library-amazon-video-importer') || !globalThis.GalacticAmazonVideo) return;
 
   const host = document.createElement('div');

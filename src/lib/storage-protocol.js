@@ -88,4 +88,6 @@ export const STORAGE_OPERATIONS = Object.freeze([
   'removeComicCoverageMerge',
   'getShowEnrichmentActions',
   'saveShowEnrichmentActions',
+  'getProviderDiagnosticsEnabled',
+  'saveProviderDiagnosticsEnabled',
 ]);

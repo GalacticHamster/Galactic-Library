@@ -33,6 +33,16 @@ try{
  await import('../shared/purchase-handoff-ui.js');await import('../shared/purchase-sync-ui.js');
  await import('../src/ui/options.js');
  await wait(()=>!document.querySelector('#empty-library').hidden,'Empty Library onboarding did not load.');
+ const diagnosticToggle=document.querySelector('#enable-provider-diagnostics');
+ await wait(()=>!diagnosticToggle.disabled,'Troubleshooting preference did not load.');
+ assert(!diagnosticToggle.checked,'Provider diagnostics should default off.');
+ const beforeDiagnostic=JSON.stringify(await writer.getDatabase());
+ diagnosticToggle.checked=true;diagnosticToggle.dispatchEvent(new Event('change'));
+ await wait(()=>!diagnosticToggle.disabled&&state.galacticLibraryProviderDiagnostics===true,'Diagnostic preference not saved.');
+ const reopened=createStorageWriter({get:async defaults=>structuredClone({...defaults,...state}),set:async changes=>Object.assign(state,structuredClone(changes))});
+ assert(await reopened.getProviderDiagnosticsEnabled()&&JSON.stringify(await writer.getDatabase())===beforeDiagnostic,'Diagnostic preference changed library records or failed after reopening storage.');
+ diagnosticToggle.checked=false;diagnosticToggle.dispatchEvent(new Event('change'));await wait(()=>!diagnosticToggle.disabled&&state.galacticLibraryProviderDiagnostics===false,'Diagnostic preference did not turn off.');
+ checks.push('Settings provider diagnostics defaults off, persists independently, can be disabled and leaves all library records unchanged');
  assert([...document.querySelectorAll('#workspace-navigation button')].map(b=>b.textContent).join('|')==='Library|Providers|Books & Contents|Settings','Wrong main navigation.');
  button(document.querySelector('#empty-library'),'Add a library').click();assert(!document.querySelector('#providers-workspace').hidden,'Add library did not open Providers.');
  assert(document.querySelectorAll('.provider-card').length===PROVIDERS.length,'Supported provider choices missing.');
