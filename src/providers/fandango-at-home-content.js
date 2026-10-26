@@ -175,14 +175,17 @@
   async function sync(mode) {
     busy(true);
     try {
+      // View All is where a completed scan leaves the user. Validate the saved
+      // account through the normal admission path before persisting navigation;
+      // an unchecked (hidden) confirmation control is valid for remembered use.
+      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fandango-at-home' });
+      if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Fandango at Home sync state.');
       if (!/\/content\/browse\/mylibrary\b/iu.test(globalThis.location.pathname)) {
         await importState('set', { phase: 'start', mode });
         status.textContent = 'Returning to Fandango My Library to start the sync...';
         globalThis.location.assign('/content/browse/mylibrary');
         return;
       }
-      const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fandango-at-home' });
-      if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Fandango at Home sync state.');
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Fandango at Home baseline yet; reading every title once…';
       await importState('clear');

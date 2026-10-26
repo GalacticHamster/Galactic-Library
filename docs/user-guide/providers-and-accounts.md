@@ -54,6 +54,14 @@ and a link to its signed-in provider page. Confirm the actual account and start
 the update on that page. Opening the page, selecting an account and navigating
 GL do not automatically start an import.
 
+After an import finishes, use the same overlay to start another supported Quick
+update or Full rescan. The importer returns to its required listing or resets
+its traversal as needed, keeping the selected account. Fandango returns from
+Movies/TV View All to My Library automatically. A reusable saved account does
+not require checking a hidden confirmation box again; changing accounts still
+requires confirmation. Providers without Quick update retain their Full-only
+workflow.
+
 Quick Update uses the selected account's saved import history and reads the
 provider's incremental scope. It is unavailable until a full import exists,
 while an update is running, or until an unnamed account is named. Epic supports

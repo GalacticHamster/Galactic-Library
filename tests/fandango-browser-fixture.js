@@ -103,6 +103,7 @@ try{
  setup(page([1],346));sessionStorage.setItem('galactic-library-fandango-listing-check',JSON.stringify({expected:{movies:346,tv:0},route:location.origin+location.pathname,startedAt:Date.now()-11*60*1000}));
  Element.prototype.attachShadow=function(options){shadow=attach.call(this,options);return shadow;};await import('../src/providers/fandango-at-home-content.js?stale-diagnostic');Element.prototype.attachShadow=attach;await new Promise(resolve=>nativeTimeout(resolve,0));
  assert(shadow.querySelector('[data-export-report]').disabled&&sends===resumeSends+1&&sessionStorage.getItem('galactic-library-fandango-listing-check')===null,'An expired diagnostic navigation is discarded without starting a check or granting write permission');
+ checks.push(...await (await import('./provider-panel-restart-fixture.js')).checkFandangoRestartNavigation());
  await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{globalThis.setTimeout=nativeTimeout;globalThis.scrollTo=nativeScroll;}

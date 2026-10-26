@@ -71,6 +71,7 @@ const fixtures=[
   ['fandango-at-home','fandango-at-home','GalacticFandangoAtHome','readFandangoGrid','/content/browse/mylibrary']
 ];
 try{
+checks.push(...await (await import('./provider-panel-restart-fixture.js')).checkProviderRememberedRestarts());
 // The same shared start path runs in both packaged browsers for all providers.
 {
  const {PROVIDERS}=await import('../src/lib/constants.js');
