@@ -22,7 +22,7 @@ export function validateActiveEnvelope(value,base,digest){
 }
 // Metadata affected by a catalog commit. Full DB values are never duplicated in
 // this journal; existing validators bound these operation-specific values.
-const metadataKeys=new Set(['galacticLibraryProviderProfileHints','galacticLibraryProviderScans','galacticLibraryProviderChecks','galacticPurchaseSync','galacticLibraryReminderNotifications','galacticLibraryCompanionFeedUploads','galacticLibraryUiPreferences','galacticLibraryKindleContentsRefresh','galacticLibraryKindleContentsRefreshArchives','googleBooksApiKey','googleBooksEnrichmentJob','galacticLibraryShowEnrichmentActions','galacticLibraryAllowedExternalClientIds']);
+const metadataKeys=new Set(['galacticLibraryProviderProfileHints','galacticLibraryProviderScans','galacticLibraryProviderChecks','galacticPurchaseSync','galacticLibraryReminderNotifications','galacticLibraryCompanionFeedUploads','galacticLibraryUiPreferences','galacticLibraryKindleContentsRefresh','galacticLibraryKindleContentsRefreshArchives','googleBooksApiKey','googleBooksEnrichmentJob','galacticLibraryShowEnrichmentActions','galacticLibraryProviderDiagnostics','galacticLibraryAllowedExternalClientIds']);
 export function validateObservationJournal(value){
  exact(value,['format','kind','before','afterDigest','afterEpoch','reset','completion','updates','removals','previous']);
  if(value.format!==2||value.kind!=='saving'||typeof value.reset!=='boolean'||value.before?.format!==2||value.before.kind!=='active'||!uuid.test(value.afterEpoch)||value.afterDigest!==null&&!hash.test(value.afterDigest))observationCorruption();
