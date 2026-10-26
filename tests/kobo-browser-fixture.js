@@ -53,7 +53,8 @@ try{
   let releaseProfile,profilePending=true,started=0,completed=0;const uiTimings=[];
   const profileGate=new Promise(resolve=>{releaseProfile=resolve;});
   const scanUrls=[];
-  globalThis.fetch=async url=>{scanUrls.push(new URL(url));return {ok:true,text:async()=>html};};
+  let delayFetch=false,releaseFetch,fetchWaiting=false;
+  globalThis.fetch=async url=>{scanUrls.push(new URL(url));if(delayFetch){fetchWaiting=true;await new Promise(resolve=>{releaseFetch=resolve;});delayFetch=false;}return {ok:true,text:async()=>html};};
   globalThis.chrome={runtime:{sendMessage:async request=>{
     if(request.type==='GET_PROVIDER_PROFILE_HINT')return {ok:true,hint:await writer.getProviderProfileHint('kobo')};
     if(request.type==='GL_PROVIDER_UI_TIMING'){uiTimings.push(request.timing);return {ok:true};}
@@ -88,7 +89,13 @@ try{
   assert(shadow.querySelector('.status').textContent.includes('24 checked · 0 new · 0 updated'),'Observed cards were reported as changed books.');
   checks.push('A click during delayed account loading waits, then reuses the single saved profile without nickname entry or repeat confirmation');
   history.replaceState(null,'','/library?pageNumber=9&sort=TitleAsc');
-  button.click();await wait(()=>completed===2);assert(shadow.querySelector('.status').textContent.includes('0 updated')&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
+  delayFetch=true;button.click();await wait(()=>fetchWaiting);
+  shadow.querySelector('[data-export-evidence]').click();
+  shadow.querySelector('summary').click();
+  shadow.querySelector('[data-galactic-floating-panel-control="minimize"]').click();
+  shadow.querySelector('[data-galactic-floating-panel-control="restore"]').click();
+  releaseFetch();await wait(()=>completed===2);assert(shadow.querySelector('.status').textContent.includes('0 updated')&&Object.keys(db.providerItems).length===137&&Object.values(db.providerItems).map(r=>r.recordRef).sort().join()===refs,'Second unchanged quick scan changed records or lost baseline.');
+  checks.push('Actual delayed Kobo import commits after evidence export, help and minimize/restore without losing its account-bound scan token');
   assert(scanUrls.at(-1).searchParams.get('pageNumber')==='1'&&scanUrls.at(-1).searchParams.get('sort')==='DateAddedDesc','Repeated scan failed to reset My Books paging and ordering.');
   assert(JSON.stringify(parseBackup(createBackup(db)))===JSON.stringify(db),'Author/genre backup roundtrip changed metadata.');
   checks.push('Two actual unchanged quick scans report zero new/updated, retain all 137 UUIDs and preserve metadata through backup restore');

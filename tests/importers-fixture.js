@@ -146,7 +146,8 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     const scopes=provider==='kindle'?[completedScope('books',1,1,'reported-count'),completedScope('personal-documents',0,0,'reported-count')].map(scope=>({...scope,duplicateCount:0})):provider==='fandango-at-home'?[completedScope('movie',1,1,'reported-count'),completedScope('tv',0,0,'reported-count')]:[completedScope('library',1,1,'reported-count')];
     const snapshot=completeProviderSnapshot(provider,items,scopes);
     const result={items,snapshot,unresolvedApps:[],newAppCount:1,skippedCount:0,failures:[],knownPurchaseIds:['fixture-purchase'],purchasesRead:1,skippedKnown:0,diagnostics:{windowsRead:1,categoryCounts:{'personal-documents':0}}};
-    if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>method==='readFandangoGrid'?items:result};
+    let releaseDelayedFetch,delayedFetchWaiting=false;
+    if(method)globalThis[globalName]={...globalThis[globalName],[method]:async()=>{if(provider==='kindle'&&releaseDelayedFetch!==false){delayedFetchWaiting=true;await new Promise(resolve=>{releaseDelayedFetch=resolve;});}return method==='readFandangoGrid'?items:result;}};
     if(provider==='audible')Object.assign(globalThis[globalName],{getDiagnostics:()=>null,recordSaveState(){}});
     const denied=()=>{throw new Error('Content-script storage access denied.');};
     let imported=0; let mode='full',rejectCommit=false;
@@ -190,6 +191,14 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         assert(button,`${provider} missing ${mode} button`);if(provider==='kindle')await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);shadow.querySelector('[data-profile-label]').value='fixture';shadow.querySelector('[data-profile-confirm]').checked=true;button.click();
       }
       const shadow=shadows.at(-1);
+      if(provider==='kindle'&&mode==='full'){
+        await wait(()=>delayedFetchWaiting);
+        shadow.querySelector('[data-export-timing]').click();
+        shadow.querySelector('summary').click();
+        shadow.querySelector('[data-galactic-floating-panel-control="minimize"]').click();
+        shadow.querySelector('[data-galactic-floating-panel-control="restore"]').click();
+        releaseDelayedFetch();releaseDelayedFetch=false;
+      }
       await wait(()=>!shadow.querySelector('.status').dataset.busy&&(imported>before||/failed:/iu.test(shadow.querySelector('.status').textContent)));
       assert(!/failed:/iu.test(shadow.querySelector('.status').textContent),shadow.querySelector('.status').textContent);
       if(['steam','epic'].includes(provider)){
@@ -203,6 +212,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         if(provider==='epic')assert(!shadow.querySelector('[data-profile-next]').checked&&shadow.querySelector('[data-profile-timing-status]').textContent.includes('Timing captured'),'Epic one-shot profiling was not consumed and delivered');
       }
       checks.push(`${provider} ${mode} controls work with direct storage denied`);
+      if(provider==='kindle'&&mode==='full')checks.push('Actual delayed Kindle import commits after timing export, help and minimize/restore without losing its account-bound scan token');
       providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
     }

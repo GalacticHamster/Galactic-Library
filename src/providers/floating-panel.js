@@ -14,8 +14,10 @@
       await session.ready;
       waitEnd?.();
       const context=session.resume??session.read();session.resume=null;
+      const generation=session.generation;
       if(!context.rememberedProfile&&(!context.confirmed||!context.profileLabel))throw new Error('Enter a profile label and confirm the signed-in account.');
       const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true,...(timing?{diagnosticSentEpochMs:global.GalacticContentsPerformance.now()}: {})});
+      if(generation!==session.generation)throw new Error('Account selection changed. Confirm the account and start a fresh import.');
       if(result.ok)session.context={...context,confirmed:true,scanToken:result.scanToken,profileId:result.profileId};
       if(timing){global.GalacticContentsPerformance.merge(timing,result.performance);result.performance=global.GalacticContentsPerformance.clean(timing.finish(result.ok?'prepared':'failed'));}
       return result;
@@ -66,9 +68,12 @@
       let remembered=null,edited=false,hintValue='',resolved=false;
       const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
         ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:true}:{})})};
-      input.addEventListener('input',()=>{edited=true;remembered=null;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
+      session.generation=0;
+      const invalidate=()=>{session.generation++;session.context=null;session.resume=null;};
+      input.addEventListener('input',()=>{edited=true;remembered=null;invalidate();controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
+      controls.querySelector('[data-profile-switch]').addEventListener('change',invalidate);
       sessions.set(provider,session);
-      shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&!button.dataset.galacticFloatingPanelControl){mode=button.dataset.mode??'full';session.context=null;session.resume=null;}},true);
+      shadow.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&(['full','incremental'].includes(button.dataset.mode)||button.hasAttribute('data-import-action'))){mode=button.dataset.mode??'full';invalidate();}},true);
       const performanceApi=provider==='kobo'?global.GalacticContentsPerformance:null;
       const accountTiming=performanceApi?.trace(`lookup-${crypto.randomUUID().replace(/-/gu,'').slice(0,12)}-100`,'provider');
       if(accountTiming)accountTiming.providerPhase='account';

@@ -49,9 +49,12 @@ try {
     assert(ui.root.querySelector('.panel').hidden,'Minimize failed.');
     ui.root.querySelector('[data-galactic-floating-panel-control="restore"]').click();
     assert(!ui.root.querySelector('.panel').hidden&&ui.input.value==='Personal','Restore lost account state.');
-    // Reproduces a real shared-handler hazard: any non-minimize button clears
-    // the in-flight context, even an otherwise harmless diagnostic action.
+    // Unrelated actions preserve the admitted token. Explicit new imports and
+    // account edits must still discard it rather than reuse stale authority.
     ui.root.querySelector('[data-diagnostic]').click();
+    await globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]});
+    assert(requests.at(-1).type==='COMMIT_PROVIDER_SCAN','Diagnostic cleared an admitted save.');
+    ui.action.click();
     await rejects(()=>globalThis.GalacticSync.send({type:'IMPORT_PROVIDER_ITEMS',provider,items:[]}),/Start a fresh/);
     edit(ui,'Personal');await rejects(()=>start(provider,ui),/confirm/);
     ui.confirm.checked=true;await start(provider,ui);
@@ -71,6 +74,6 @@ try {
     assert(ui.confirmLabel.hidden&&ui.input.value==='Alternate','Remount failed to restore a single saved profile.');ui.host.remove();
     checks.push(provider+': shared setup, empty rejection, saved-profile rehydration, editing, alternate selection, switch gesture and minimize/restore');
   }
-  checks.push('All 14 shared renderers reproduce diagnostic-click loss of in-flight scan context; production behavior intentionally unchanged');
+  checks.push('All 14 shared renderers preserve scan authority across diagnostics and minimize/restore while new imports and edits reject stale context');
 } catch(error) { await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});throw error; }
 await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
