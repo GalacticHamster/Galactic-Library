@@ -1,5 +1,7 @@
 [
   "manifest.json",
+  "LICENSE",
+  "NOTICE",
   "src/providers/kobo-diagnostics.js",
   "src/background/epic-auth-diagnostics.js",
   "src/background/xbox-navigation.js",

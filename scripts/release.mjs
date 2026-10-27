@@ -7,7 +7,7 @@ export const projectRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function crc32(bytes){let crc=0xffffffff;for(const byte of bytes){crc^=byte;for(let bit=0;bit<8;bit++)crc=crc&1?0xedb88320^(crc>>>1):crc>>>1;}return (crc^0xffffffff)>>>0;}
 function validPath(path){return typeof path==='string'&&path.length<240&&!path.includes('\\')&&!path.startsWith('/')&&path===posix.normalize(path)&&!path.split('/').some(part=>part==='..'||part==='.'||!part)&&/^[a-zA-Z0-9_./-]+$/u.test(path);}
-function runtimePath(path){return /^icons\/icon(?:16|32|48|128)\.png$/u.test(path)||/^icons\/provider-icons\/[a-z-]+-64\.png$/u.test(path)||['manifest.json','options.html','popup.html','shared/theme.js','shared/theme.css','shared/theme-app.css','shared/theme-overlays.css','shared/purchase-snapshot.js','shared/purchase-transfer.js','shared/purchase-adapters.js','shared/purchase-handoff-ui.js','shared/purchase-sync.js','shared/purchase-sync-ui.js','shared/natural-title-sort.js'].includes(path)||path.startsWith('src/')&&['.js','.css','.png'].includes(extname(path));}
+function runtimePath(path){return /^icons\/icon(?:16|32|48|128)\.png$/u.test(path)||/^icons\/provider-icons\/[a-z-]+-64\.png$/u.test(path)||['LICENSE','NOTICE','manifest.json','options.html','popup.html','shared/theme.js','shared/theme.css','shared/theme-app.css','shared/theme-overlays.css','shared/purchase-snapshot.js','shared/purchase-transfer.js','shared/purchase-adapters.js','shared/purchase-handoff-ui.js','shared/purchase-sync.js','shared/purchase-sync-ui.js','shared/natural-title-sort.js'].includes(path)||path.startsWith('src/')&&['.js','.css','.png'].includes(extname(path));}
 function dependency(files,owner,path,root=false){
   if(path==='')return;
   if(root){if(!validPath(path)||!files.has(path))throw new Error(`Missing ${owner==='manifest.json'?'manifest runtime':'runtime'} dependency: ${owner} -> ${path}`);return;}
@@ -84,7 +84,7 @@ export async function createRelease(root=projectRoot,allowlist,target="chrome"){
   for(const path of [...paths].sort()){
     const target=await realpath(resolve(base,path)),location=relative(base,target);if(isAbsolute(location)||location==='..'||location.startsWith('..'+sep)||resolve(base,location)!==target)throw new Error(`Runtime file leaves project: ${path}`);
     if(!(await stat(target)).isFile())throw new Error(`Runtime entry is not a file: ${path}`);let bytes=await readFile(target);if(bytes.length>5*1024*1024)throw new Error(`Runtime file exceeds bound: ${path}`);
-    if(['.js','.css','.html','.json'].includes(extname(path)))bytes=Buffer.from(bytes.toString('utf8').replace(/\r\n?/gu,'\n'));
+    if(['.js','.css','.html','.json'].includes(extname(path))||['LICENSE','NOTICE'].includes(path))bytes=Buffer.from(bytes.toString('utf8').replace(/\r\n?/gu,'\n'));
     files.set(path,bytes);total+=bytes.length;if(total>40*1024*1024)throw new Error('Runtime package exceeds bound.');
   }
   if(target==='firefox'){const overlay=JSON.parse(await readFile(resolve(base,'manifests/firefox.json'),'utf8')),manifest={...JSON.parse(files.get('manifest.json')),...overlay};delete manifest.minimum_chrome_version;files.set('manifest.json',Buffer.from(JSON.stringify(manifest,null,2)+'\n'));}
