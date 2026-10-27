@@ -1,5 +1,6 @@
 Galactic Library
-Copyright (C) 2026 Galactic Hamster / Galactic Hamster LLC
+Copyright (C) 2026 Galactic Hamster
+Published and distributed by Galactic Hamster LLC.
 
 ========================================================================
 1. Software License
@@ -23,16 +24,22 @@ license granted for the software does not grant rights under trademark law
 for use of trade names, trademarks, or service marks.
 
 The names "Galactic Library", "Galactic Hamster", the Galactic Hamster logo,
-the original extension icons (icons/icon*.png), and original promotional
-artwork (store-assets/) are proprietary branding assets of Galactic Hamster
-and Galactic Hamster LLC. All rights in these marks and visual identities
-are reserved.
+and project visual identities are trademarks and branding assets of Galactic
+Hamster and Galactic Hamster LLC. All rights in these marks and visual
+identities are reserved.
 
-Redistributors of the software under the GPLv3 must not use the project's
-original trademarks or branding in a manner that falsely implies endorsement,
-sponsorship, or official affiliation with Galactic Hamster LLC. Ordinary
-redistribution of the unaltered packaged extension containing these assets
-is permitted solely for software functionality.
+Original runtime icons (icons/icon*.png) designed by Galactic Hamster are
+licensed under the GNU General Public License version 3 or later (GPL-3.0-or-later).
+However, trademark rights in the project name, logos, and trade dress remain
+reserved pursuant to Section 7(e). Redistributors of the software under the
+GPLv3 must not use the project's trademarks or branding in a manner that
+falsely implies endorsement, sponsorship, or official affiliation with
+Galactic Hamster LLC.
+
+Original promotional artwork and screenshots in store-assets/ are published
+for project promotion. To the extent promotional graphics depict third-party web
+storefronts, provider logos, or cover art, neither Galactic Hamster nor Galactic
+Hamster LLC claims any ownership over those embedded third-party materials.
 
 ========================================================================
 3. Third-Party Provider Logos (icons/provider-icons/)
@@ -42,9 +49,9 @@ Galactic Library includes graphic icons in icons/provider-icons/ to
 identify supported third-party digital storefronts and account connections
 in the user interface.
 
-These icons are NOT original works of Galactic Hamster LLC, are NOT owned
-by Galactic Hamster LLC, and are NOT licensed under the GNU General Public
-License.
+These icons are NOT original works of Galactic Hamster or Galactic Hamster LLC,
+are NOT owned by Galactic Hamster or Galactic Hamster LLC, and are NOT licensed
+under the GNU General Public License.
 
 All trademarks, service marks, logos, and trade names referenced or
 displayed are the property of their respective owners:
@@ -64,17 +71,21 @@ displayed are the property of their respective owners:
 - Sony Interactive Entertainment Inc.: PlayStation (playstation-*.png)
 - Nintendo Co., Ltd. / Nintendo of America Inc.: Nintendo (nintendo-*.png)
 
-Use and Disclaimer:
-The display of these provider marks constitutes nominative use solely to
-identify the external commercial services from which digital goods or
-library items were acquired. Their display does not imply endorsement,
-affiliation, sponsorship, or partnership with Galactic Hamster LLC.
+Service Identification and Non-Affiliation:
+These provider marks and logos are displayed within the user interface
+solely for service identification—to inform users which external digital
+storefront or account is associated with specific library items and connections.
+Their display does not imply endorsement, affiliation, sponsorship, or
+partnership by the respective trademark owners with Galactic Hamster or
+Galactic Hamster LLC.
 
-Redistribution notice:
-Specific redistribution permissions or copyright licenses for these
-third-party graphical marks have not been independently verified. They are
-preserved in this repository solely to maintain existing functionality
-and visual identification for supported provider accounts.
+Redistribution and Rights Notice:
+Precise redistribution rights and copyright permissions for these third-party
+graphical assets have not been established or verified. Inclusion of these
+assets represents an accepted project release risk to preserve established
+user interface functionality. Neither this notice nor the extension's software
+license claims to grant copyright permission or clearance for the redistribution
+of these third-party marks.
 
 ========================================================================
 4. Bibliographic Reference Data (Grand Comics Database Attribution)
@@ -85,21 +96,49 @@ data in src/lib/publication-reference-data.js to support comic publication
 resolution and coverage analysis (documented in
 docs/architecture/publication-resolution.md).
 
-Reference issue boundaries and numbering were verified against public
-bibliographic records from the Grand Comics Database (GCD,
-https://www.comics.org).
+Source Attribution and License:
+Reference publication boundaries, numbering sequences, and issue counts
+were verified against and derived in part from public bibliographic records
+hosted by the Grand Comics Database (GCD, https://www.comics.org).
 
 The Grand Comics Database makes its content available under the Creative
-Commons Attribution-ShareAlike 4.0 International License (CC-BY-SA 4.0).
+Commons Attribution-ShareAlike 4.0 International License (CC-BY-SA 4.0),
+available at: https://creativecommons.org/licenses/by-sa/4.0/
 
-Under applicable copyright law, purely factual historical publication
-data (such as issue numbers, publication dates, and issue counts)
-constitutes uncopyrightable factual information. To the extent that any
-selection or arrangement of this reference data constitutes protectable
-database content or creative expression, it is attributed to the Grand
-Comics Database under CC-BY-SA 4.0. Creative Commons CC-BY-SA 4.0 is
-formally recognized by Creative Commons as one-way compatible with the
-GNU General Public License version 3.
+Derived Data and Modifications:
+The bibliographic reference data in src/lib/publication-reference-data.js
+reflects specific comic publication runs, including:
+- IDW Publishing Teenage Mutant Ninja Turtles (ongoing runs, miniseries,
+  micro-series installments, macro-series installments, and one-shots).
+- DC Comics Elseworlds and related standalone one-shot publications.
+- Marvel and Mirage/Image reference entries.
+
+These records have undergone transcription, normalization, and adaptation
+for automated collection matching:
+- Verification of historical publication dates against collected reprint collections.
+- Normalization of issue numbers and standardization of finite issue arrays.
+- Grouping of individual micro-series and macro-series installments under parent
+  continuities.
+- Selection and mapping of publisher and title aliases to match varying metadata
+  conventions encountered across local user library records.
+
+Copyright Separation:
+Under applicable copyright law, purely factual historical publication data
+(such as issue numbers, publication dates, and issue counts) constitutes
+uncopyrightable factual information. To the extent that any selection,
+coordination, or arrangement of this reference data constitutes protectable
+database content or creative expression, it is attributed to the Grand Comics
+Database under the CC-BY-SA 4.0 license.
+
+The software code, algorithms, matching heuristics, and validation logic in
+Galactic Library are original works licensed under the GNU General Public
+License version 3 or later (GPL-3.0-or-later). While Creative Commons
+recognizes CC-BY-SA 4.0 as one-way compatible for adaptations into GPLv3
+software, this does not imply that CC-BY-SA material is automatically licensed
+under every future GPL version, nor does it convert third-party CC-BY-SA
+reference data into GPL-licensed code. The underlying factual reference data
+remains attributed under CC-BY-SA 4.0 and is not claimed as original GPL-licensed
+software.
 
 ========================================================================
 5. Companion Extensions and Architecture
@@ -109,7 +148,10 @@ Galactic Library provides documented message-passing protocols for
 independent companion browser extensions (such as Humble Library and
 Fanatical Library).
 
-Communication with Galactic Library across browser messaging boundaries
-according to documented protocols does not, in itself, constitute a
-derivative work of Galactic Library under copyright law. Independent
-companion extensions are governed by their own licensing terms.
+Galactic Library and its companion extensions are independently developed
+and maintained. While communication between independent extensions across
+browser messaging boundaries does not normally create a derivative work under
+copyright law, each extension is distributed under its own license terms.
+Shared implementation code copied or synchronized across the companion
+repositories is original software licensed under the GNU General Public
+License version 3 or later (GPL-3.0-or-later).
