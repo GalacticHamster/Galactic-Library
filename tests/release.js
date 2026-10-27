@@ -23,7 +23,11 @@ export const releaseTests=[['release ZIP contains only the explicit runtime, val
     const differentCheckout=await createRelease(root,[...first.files.keys()]);assert.deepEqual(differentCheckout.zip,first.zip);assert(!differentCheckout.zip.includes(Buffer.from('SYNTHETIC PRIVATE')));
     await assert.rejects(createRelease(root,[...first.files.keys(),'../private.js']),/allowlist/);await assert.rejects(createRelease(root,[...first.files.keys(),'start.txt']),/allowlist/);await assert.rejects(createRelease(root,[...first.files.keys(),'options.html']),/allowlist/);
     await assert.rejects(createRelease(root,[...first.files.keys()].filter(path=>path!=='src/lib/reading.js')),/Missing runtime dependency/);await assert.rejects(createRelease(root,[...first.files.keys()].filter(path=>path!=='src/providers/humble-content.js')),/Missing manifest runtime dependency/);
+    await assert.rejects(createRelease(root,[...first.files.keys()].filter(path=>path!=='LICENSE')),/Missing required runtime file: LICENSE/);
+    await assert.rejects(createRelease(root,[...first.files.keys()].filter(path=>path!=='NOTICE')),/Missing required runtime file: NOTICE/);
     const files=new Map(first.files);files.delete('src/ui/library-icon.png');assert.throws(()=>validateRuntime(files),/Missing runtime dependency/);
+    const noLicense=new Map(first.files);noLicense.delete('LICENSE');assert.throws(()=>validateRuntime(noLicense),/Missing required runtime file: LICENSE/);
+    const noNotice=new Map(first.files);noNotice.delete('NOTICE');assert.throws(()=>validateRuntime(noNotice),/Missing required runtime file: NOTICE/);
     const tampered=Buffer.from(first.zip);tampered[50]^=1;assert.throws(()=>readRuntimeZip(tampered),/ZIP/);
     for(const path of first.files.keys())if(path.endsWith('.js'))execFileSync(process.execPath,['--check',join(root,path)],{windowsHide:true,stdio:'pipe'});
   }finally{
