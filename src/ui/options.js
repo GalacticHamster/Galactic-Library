@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Galactic Hamster / Galactic Hamster LLC
 import {openProviderPage} from './provider-launch.js';
 import {builtinCompanions,companionBrowser} from '../lib/companion-identities.js';
 import {createConfirmation} from './confirmation.js';

@@ -152,3 +152,12 @@ See [release validation](docs/development/release-packaging.md),
 ## Support development
 
 Enjoying Galactic Hamster's free, open-source tools? If you'd like to support continued development, you can [buy us a coffee on Ko-fi](https://ko-fi.com/galactichamster). Donations are entirely optional.
+
+## License and attribution
+
+Galactic Library is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (GPL-3.0-or-later). See [LICENSE](LICENSE) for the full license text.
+
+Copyright (C) 2026 Galactic Hamster / Galactic Hamster LLC.
+
+Original project branding, extension icons, and promotional artwork are reserved pursuant to GPLv3 Section 7(e). Third-party storefront logos in `icons/provider-icons/` are the property of their respective owners and are displayed strictly for nominative service identification. Bibliographic issue reference data is attributed to the Grand Comics Database (CC-BY-SA 4.0). Detailed asset provenance and attribution terms are documented in [NOTICE](NOTICE).
+

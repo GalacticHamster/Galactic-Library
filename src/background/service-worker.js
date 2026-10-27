@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Galactic Hamster / Galactic Hamster LLC
 import {createXboxNavigationHandler,currentXboxSender} from './xbox-navigation.js';
 import {createEpicAuthDiagnostics} from './epic-auth-diagnostics.js';
 import {purchaseAccounts} from './purchase-handoff.js';
