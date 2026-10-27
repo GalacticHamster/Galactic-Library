@@ -43,3 +43,7 @@ try {
   details.append(summaryEl, message);
   summary.after(details);
 } finally {summary.setAttribute('aria-busy','false');}
+document.querySelector('a[href="options.html"]')?.addEventListener('click', (event) => {
+  event.preventDefault();
+  chrome.runtime.openOptionsPage();
+});
