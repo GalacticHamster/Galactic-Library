@@ -45,3 +45,9 @@ Older HB direct-download purchases may lack native product IDs. GL can enrich an
 Source staging expires after ten minutes or a source worker/browser restart. Failed validation never partially imports. Refresh choices and retry if staging expires. Closing Options does not cancel an already confirmed background import; if it committed, repeating remains safe. A missing/disabled companion and an incorrect ID may be indistinguishable to the browser and are reported together.
 
 Advanced sharing remains manual: opening its controls only discovers accounts. The separately enabled automatic relationship operates independently; no storefront scan or cloud service starts. Authentication/session/redemption values and signed download links are excluded. GL shares provider purchase records, not its canonical catalog, enrichment or settings.
+
+## Saved account identity
+
+Saved Humble and Fanatical accounts carry a stable local account ID with their purchase data. Existing valid IDs migrate automatically without changing purchases or a working purchase-sync relationship. Names and purchase updates do not change this ID. Older accounts without recoverable identity receive a new ID and may need connection repair; names and common purchases never establish identity.
+
+Backups may retain account lineage, but restoring them resets automatic purchase-sync permission. Restored IDs do not grant permission to resume sharing. Private incremental scan authority remains separate. Conflicting or duplicate account identities are rejected rather than merging accounts.
