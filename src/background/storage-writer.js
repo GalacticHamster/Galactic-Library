@@ -505,15 +505,20 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
   async function beginProviderScan(provider,nickname,mode='full',switchProfile=false,tabId=null,requestedProfileId=null,rememberedProfile=false,sourceAccountFingerprint=null) {
     if(!PROVIDERS.includes(provider)||!['full','incremental'].includes(mode))throw new Error('Invalid provider scan.');
-    const profileLabel=text(nickname,100,'Account/profile label');if(!profileLabel&&!requestedProfileId)throw new Error('Enter an account/profile label and confirm the signed-in account before scanning.');
+    let profileLabel=text(nickname,100,'Account/profile label');
     const database=await readDatabase(true),active=database.providers[provider]?.activeProfileId;
-    const existing=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.nickname===profileLabel);
+    const profiles=Object.values(database.providerProfiles).filter(p=>p.provider===provider);
+    if(!profileLabel&&!requestedProfileId&&switchProfile){let n=profiles.length+1;do{profileLabel='Account '+n++;}while(profiles.some(p=>p.nickname===profileLabel));}
+    if(!profileLabel&&!requestedProfileId&&profiles.length>1)throw Error('Choose the saved account to update in Change account.');
+    let existing=requestedProfileId?profiles.find(p=>p.profileId===requestedProfileId):profileLabel?profiles.find(p=>p.nickname===profileLabel):profiles.length===1?profiles[0]:null;
+    if(requestedProfileId&&!existing)throw Error('Scan profile changed. Start a fresh confirmed scan.');
+    if(existing)profileLabel=existing.nickname;
     let bindingUnchanged=true;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(provider==='nintendo'&&mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
       const bound=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.sourceAccountFingerprint===sourceAccountFingerprint);
-      if(bound&&bound.profileId!==existing?.profileId)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');
+      if(bound&&bound.profileId!==existing?.profileId){if(requestedProfileId||profileLabel)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');existing=bound;profileLabel=bound.nickname;}
       if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This saved account belongs to a different '+label+' account. Choose another saved account and confirm switching.');
       if(existing&&!existing.sourceAccountFingerprint&&Object.values(database.providerItems).some(i=>i.profileId===existing.profileId))throw Error('This saved account has no verified '+label+' identity. Use a new account profile.');
       bindingUnchanged=existing?.sourceAccountFingerprint===sourceAccountFingerprint;
@@ -524,7 +529,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     if(changing&&!existing&&mode!=='full')throw Error('A different account without a baseline requires a complete full scan.');
-    const profile=importProfile(database,provider,profileLabel,requestedProfileId),forceFull=!profile.state.fullSyncAt;
+    const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId),forceFull=!profile.state.fullSyncAt;
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();

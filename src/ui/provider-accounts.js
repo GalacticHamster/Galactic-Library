@@ -28,7 +28,7 @@ export function providerAccounts(database){
  return PROVIDER_SITES.map(site=>({...site,accounts:profiles.filter(p=>p.provider===site.provider)}));
 }
 export function updateEligibility(profile,state={},now=Date.now()){
- const fullReason=!profile.active?'Select this account for updates first.':!profile.nickname?'Name this saved account before updating it.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
+ const fullReason=!profile.active?'Select this account for updates first.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
  let quickReason=fullReason;
  if(!quickReason&&profile.provider==='epic')quickReason='Use Sync Epic library to check the supported listing.';
  if(!quickReason&&profile.provider==='nintendo')quickReason='Use Import Nintendo cards to check the loaded card list.';

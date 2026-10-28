@@ -15,7 +15,12 @@ export const overlayAccountAuditTests=providers.map(provider=>['Overlay audit: '
   const item={provider,providerItemId:provider==='xbox'?'X00000000001':'audit-item',title:'Synthetic audit title',mediaType,ownership:'owned',metadata:provider==='xbox'?{source:'xbox-web-library',productId:'X00000000001',accessBasis:'personal-owned-web-catalog',accessTypes:[1]}:{}};
   const snapshot=items=>bound?completeProviderSnapshot(provider,items,[completedScope(provider==='xbox'?'owned-web-library':provider==='playstation'?'ps4-ps5-purchased':'non-hidden-virtual-cards',items.length,provider==='playstation'?null:items.length,provider==='playstation'?'pagination-end':'reported-count')]):snapshotFixture(provider,items);
   const save=(w,scan,items,fingerprint=fp)=>w.commitProviderScan(provider,items,{syncMode:'full',fullSyncAt:'2026-10-26'},snapshot(items),scan.scanToken,1,false,bound?fingerprint:null);
-  for(const label of ['', '   '])await assert.rejects(begin(writer,label),/Enter/);
+  for(const label of ['', '   ']){
+    const fresh=memory();let unnamed=await begin(fresh.writer,label);const first=unnamed.profileId;
+    await save(fresh.writer,unnamed,[item]);unnamed=await begin(fresh.writer,'',provider==='nintendo'?'full':'incremental');
+    assert.equal(unnamed.profileId,first);assert.equal(unnamed.forceFull,false);
+    assert.equal((await fresh.writer.getDatabase()).providerProfiles[first].nickname,'');await cancel(fresh.writer,fresh.stored);
+  }
   assert.equal(Object.keys((await writer.getDatabase()).providerProfiles).length,0);
   let scan=await begin(writer,'  Personal   Account  ');
   let db=await writer.getDatabase();const a=scan.profileId;

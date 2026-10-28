@@ -108,7 +108,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
      const accountHost=companion?accountTools:body;if(site.scope)accountHost.append(node('p',site.scope));
      accountHost.append(node('p',selected?`Selected for updates: ${nickname(selected)}.`:'No account selected for updates.'));
      const link=node('a',site.accounts.length?'Open provider website':'Open '+site.name+' to import');link.href=site.url;link.target='_blank';link.rel='noreferrer';if(site.provider==='xbox')link.addEventListener('click',async event=>{event.preventDefault();try{await openProvider(site.url);}catch(error){status.textContent=error.message;}});accountHost.append(link);
-     if(!site.accounts.length)accountHost.append(node('p','Sign in, enter an account nickname on the Galactic Library panel, confirm the signed-in account, then choose '+site.fullLabel+'.'));
+     if(!site.accounts.length)accountHost.append(node('p','Sign in on the provider website, then choose '+site.fullLabel+'.'));
      else accountHost.append(node('p',`To import another account, open the website, sign in to that account, enter a new nickname and explicitly confirm switching on the Galactic Library panel. Choose ${site.fullLabel}; these remembered accounts remain saved.`));
      for(const p of site.accounts){
        const account=node('article');account.className='saved-account';account.dataset.account=p.profileId;

@@ -57,7 +57,7 @@
         chrome.runtime.sendMessage({type:'GET_PROVIDER_SYNC_STATE',provider:'audible',beginScan:false,includePurchaseTitles:true}),
         chrome.runtime.sendMessage({type:'GET_PROVIDER_PROFILE',provider:'audible',beginScan:false})
       ]).catch(()=>{throw Error('The saved Audible account could not be read. Reload GL and preview again. No library changes were made.');});
-      if(!saved?.ok||!profile?.ok||!saved.profileId||saved.profileId!==profile.profileId||!profile.profileLabel)throw Error('Choose your saved Audible account in Providers, then preview again. No library changes were made.');
+      if(!saved?.ok||!profile?.ok||!saved.profileId||saved.profileId!==profile.profileId )throw Error('Choose your saved Audible account in Providers, then preview again. No library changes were made.');
       return {profileId:profile.profileId,profileLabel:profile.profileLabel,knownItemIds:saved.syncState?.knownProviderItemIds??[],knownItemTitles:saved.syncState?.knownItemTitles??{}};
     }
     previewButton.addEventListener('click',async()=>{

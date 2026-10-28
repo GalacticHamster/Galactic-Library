@@ -47,9 +47,9 @@ try {
     assert(!help||!help.open,provider+': import help should start collapsed');
     assert(ui.root.querySelector('[data-profile-summary] p').textContent==='Using a different account on this site? Select Change account first.','Account reminder changed meaning');
     const before=starts;
-    await rejects(()=>start(provider,ui),/confirm/);
-    edit(ui,'   ');ui.confirm.checked=true;await rejects(()=>start(provider,ui),/confirm/);
-    assert(starts===before,'Empty setup reached scan start.');
+    await start(provider,ui);
+    assert(starts===before+1&&requests.at(-1).profileLabel===''&&requests.at(-1).confirmed===true,'Fresh default import required a nickname or checkbox.');
+    assert(ui.root.querySelector('[data-profile-editor]').hidden,'Fresh single-account setup exposed account management.');
     edit(ui,'  Personal  ');ui.confirm.checked=true;await start(provider,ui);
     assert(requests.at(-1).profileLabel==='Personal'&&requests.at(-1).confirmed===true,'Initial declared consent not sent.');
     assert(!ui.confirmLabel.hidden,'Unexpected same-page disappearance of initial confirmation.');
@@ -98,7 +98,7 @@ try {
     // renderer rehydration, not an actual browser/extension process restart.
     active=alternate;profiles=[active];ui=await mount(provider);
     assert(ui.confirmLabel.hidden&&ui.input.value==='Alternate','Remount failed to restore a single saved profile.');ui.host.remove();
-    checks.push(provider+': shared setup, empty rejection, saved-profile rehydration, editing, alternate selection, switch gesture and minimize/restore');
+    checks.push(provider+': optional-name setup, saved-profile rehydration, editing, alternate selection, switch gesture and minimize/restore');
   }
   checks.push('All 14 shared renderers preserve scan authority across diagnostics and minimize/restore while new imports and edits reject stale context');
   const path=location.href;
