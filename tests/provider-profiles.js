@@ -332,3 +332,10 @@ providerProfileTests.push(['R4 restore keeps GL namespace lineage but revokes au
  const events=[],{writer,stored}=memory({onPurchaseSyncInvalidated:e=>events.push(...e)});await writer.ensurePurchaseAccount('humble');const db=await writer.getDatabase(),id=db.providers.humble.activeProfileId;stored.galacticPurchaseSync={humble:{id:'old',peerId:'hb',localId:id,confirmed:true,remoteConfirmed:true}};
  await writer.restoreDatabase(db);await Promise.resolve();assert.deepEqual(stored.galacticPurchaseSync,{});assert.equal((await writer.getDatabase()).providers.humble.activeProfileId,id);assert(events.some(e=>e.id==='old'));
 }]);
+
+providerProfileTests.push(['R3 an unnamed companion-created GL account accepts its first website scan without a new namespace',async()=>{
+ const {writer}=memory();await writer.ensurePurchaseAccount('humble');let db=await writer.getDatabase();const id=db.providers.humble.activeProfileId,{purchaseAccounts}=await import('../src/background/purchase-handoff.js'),target=(await purchaseAccounts(db,'humble'))[0];
+ const record={providerItemId:'synthetic-order:product:book',title:'Synthetic companion purchase',mediaType:'book',metadata:{purchaseId:'synthetic-order'},purchasedAt:null,origins:[]};
+ await writer.importPurchaseSnapshot({protocolVersion:1,provider:'humble',snapshotId:'synthetic',accountRef:'source',accountLabel:'',capturedAt:new Date().toISOString(),scope:'historical',completeness:'partial',limitations:[],records:[record]},target);
+ const before=await writer.getDatabase(),scan=await writer.beginProviderScan('humble','','full',false,1,id,true);assert.equal(scan.profileId,id);assert.equal(scan.forceFull,true);assert.equal(Object.values((await writer.getDatabase()).providerProfiles).filter(p=>p.provider==='humble').length,1);assert.equal(before.providerProfiles[id].keySpace,(await writer.getDatabase()).providerProfiles[id].keySpace);
+}]);

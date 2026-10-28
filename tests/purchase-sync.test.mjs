@@ -90,3 +90,5 @@ for(const provider of ['humble','fanatical'])test('R4 '+provider+': diagnostic r
  const saved=f.nodes.gl.saved[Y.KEY][provider];f.nodes.gl.saved[Y.KEY]={};await f.nodes.gl.coordinator.notifyInvalidated([{provider,id:saved.id,peerId:saved.peerId}]);assert.equal(f.nodes.companion.saved[Y.KEY][provider],null);f.nodes.companion.records.push(row(2,provider));await f.nodes.companion.coordinator.mark(provider);await f.drain();assert.equal(f.nodes.gl.records.length,1);
  }finally{f.dispose();}
 });
+
+test('manual Sync now persists a missing-account repair state instead of only returning an error',async()=>{const f=fixture();try{await f.connect();await f.drain();f.nodes.companion.accountId='replacement';await assert.rejects(f.nodes.gl.coordinator.local({action:'syncNow',provider:'humble'}),/Mapped account/);assert.equal(f.nodes.gl.saved[Y.KEY].humble.errorCode,'missing-account');assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');}finally{f.dispose();}});

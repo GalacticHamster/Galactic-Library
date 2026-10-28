@@ -163,7 +163,7 @@
       let remembered=null,automatic=false,edited=false,hintValue='',resolved=false,lastProfileReply=null;
       const editor=controls.querySelector('[data-profile-editor]'),summary=controls.querySelector('[data-profile-summary]'),choice=controls.querySelector('[data-profile-choice]');
       controls.querySelector('[data-profile-manage]').href=(chrome.runtime.getURL?.('options.html')??'')+'#providers';
-      const session={read:()=>({profileLabel:input.value.trim(),confirmed:automatic||controls.querySelector('[data-profile-confirm]').checked,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
+      const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked||automatic&&lastProfileReply?.reuseAllowed!==true,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
         ...(choice.value!=='__add__'&&lastProfileReply?.profiles?.some(p=>p.profileId===choice.value)?{profileId:choice.value}:{}),
         ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:lastProfileReply?.reuseAllowed===true}:{})})};
       session.generation=0;
