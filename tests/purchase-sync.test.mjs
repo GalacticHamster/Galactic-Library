@@ -52,3 +52,28 @@ test('an old inert proposal can be completed by one confirmation without opening
 
 test('a lost setup acceptance response resumes after restart without another local approval',async()=>{const f=fixture('humble',{gl:[],companion:[row(1)]});try{let lost=false;f.nodes.gl.afterResponse=async m=>{if(m.type===Y.PREFIX+'ACCEPT'&&!lost){lost=true;throw Error('Response lost');}};await assert.rejects(f.nodes.gl.coordinator.local({action:'syncConnect',provider:'humble',confirmed:true}),/Response lost/);assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');f.nodes.gl.afterResponse=null;f.start('gl');await f.nodes.gl.coordinator.startup();assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);assert.equal(f.nodes.gl.saved[Y.KEY].humble.setup,null);}finally{f.dispose();}});
 test('a setup source change invalidates the reverse-verified ticket before any import',async()=>{const f=fixture('humble',{gl:[],companion:[row(1)]});try{f.nodes.gl.intercept=async(_,m)=>{if(m.type===Y.PREFIX+'ACCEPT')f.nodes.gl.records.push(row(3));};await assert.rejects(f.nodes.gl.coordinator.local({action:'syncConnect',provider:'humble',confirmed:true}),/changed during setup/);assert.equal(f.commits.length,0);assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');assert.equal(f.nodes.companion.saved[Y.KEY],undefined);}finally{f.dispose();}});
+
+
+for(const provider of ['humble','fanatical'])test('R1 '+provider+': missing mapped account suspends once without historical proposals on startup',async()=>{
+ const f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});try{
+  await f.connect();await f.drain();delete f.nodes.companion.saved[Y.KEY];f.nodes.companion.accountId='replacement';
+  await f.nodes.gl.coordinator.startup();const state=structuredClone(f.nodes.gl.saved[Y.KEY][provider]),calls=f.calls.length;
+  assert.equal(state.status,'attention');assert.equal(state.errorCode,'missing-account');assert.equal(state.remoteConfirmed,false);assert.equal(state.peerVerified,false);
+  for(let i=0;i<10;i++)await f.nodes.gl.coordinator.startup();
+  assert.equal(f.calls.length,calls);assert.equal(f.nodes.gl.saved[Y.KEY][provider].attempts,state.attempts);assert(!f.calls.some(c=>c.type===Y.PREFIX+'PROPOSE'));assert.equal(f.nodes.gl.records.length,1);
+ }finally{f.dispose();}
+});
+for(const provider of ['humble','fanatical'])test('R1 '+provider+': a committed companion change wakes a transport-exhausted GL relationship',async()=>{
+ const f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});try{
+  await f.connect();await f.drain();f.nodes.companion.online=false;await f.nodes.gl.coordinator.mark(provider);
+  for(let i=0;i<6;i++)await f.nodes.gl.coordinator.run(provider);
+  assert.equal(f.nodes.gl.saved[Y.KEY][provider].errorCode,'transport-exhausted');
+  f.nodes.companion.online=true;f.nodes.companion.records.push(row(2,provider));
+  const listeners=[];Y.observeCompanion({storage:{onChanged:{addListener:fn=>listeners.push(fn)},local:{get:async d=>d}}},f.nodes.companion.coordinator,provider,['items'],'control');
+  listeners[0]({items:{oldValue:[row(1,provider)],newValue:f.nodes.companion.records}},'local');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,2);
+ }finally{f.dispose();}
+});
+test('R1 missing remote consent is permanent and cannot be revived by a dirty event',async()=>{
+ const f=fixture('humble',{gl:[row(1)],companion:[row(1)]});try{await f.connect();await f.drain();delete f.nodes.companion.saved[Y.KEY];await f.nodes.gl.coordinator.startup();const state=f.nodes.gl.saved[Y.KEY].humble;assert.equal(state.errorCode,'consent-required');assert.equal(state.remoteConfirmed,false);const before=f.commits.length;await f.nodes.gl.coordinator.mark('humble');await f.drain();assert.equal(f.commits.length,before);assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');}finally{f.dispose();}
+});
