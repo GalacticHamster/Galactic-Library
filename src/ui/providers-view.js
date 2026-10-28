@@ -86,6 +86,7 @@ export function createProvidersView({select,rename,preview,remove,reset,saveKobo
      deps.append(node('li',`${plan.canonicalGroups} Library groups affected; shared groups retain other accounts’ records.`));
      if(plan.jobs.kindle)deps.append(node('li',`Kindle contents progress will be removed: ${plan.jobs.kindle.cursor}/${plan.jobs.kindle.total} completed.`));
      if(plan.jobs.googleAffectedTargets)deps.append(node('li',`${plan.jobs.googleAffectedTargets} book lookup targets affected.`));
+     if(plan.jobs.purchaseSync)deps.append(node('li','Automatic purchase sync for this account will be disconnected. Other accounts remain unchanged.'));
      if(plan.jobs.scan)deps.append(node('li','A dependent in-progress import will lose permission to save.'));
      if(plan.jobs.fandangoNavigationContexts||plan.jobs.pendingCompanionUploads)deps.append(node('li','Related pending provider/companion work will be cancelled.'));
      d.root.insertBefore(deps,d.feedback);d.root.insertBefore(node('p','This deletes the account’s acquired source evidence and reviews listed above. Export a backup in Settings first if you may need them. Changes since this preview require a fresh preview.'),d.feedback);

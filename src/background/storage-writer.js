@@ -62,7 +62,7 @@ import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerChec
  * exact whole-value snapshot comparison or protected session proof. They return
  * a separate mutable value; incoming data and saves still require validation.
  */
-export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null,observationCompletions=false} = {}) {
+export function createStorageWriter(storageArea, ready = Promise.resolve(), {cacheRefreshPreflight=false,cacheQuerySnapshots=false,diagnostics=null,certificateArea=null,importSessionArea=null,observationCompletions=false,onPurchaseSyncInvalidated=()=>{}} = {}) {
   const PROFILE_HINTS='galacticLibraryProviderProfileHints';
   const profileHints=database=>Object.fromEntries(['kobo'].map(provider=>{
     const profiles=Object.values(database.providerProfiles).filter(p=>p.provider===provider),profile=database.providerProfiles[database.providers[provider]?.activeProfileId];
@@ -693,7 +693,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return persistDatabase(database,null,extra);
   }
   async function removalPlan(database,profileId){
-    const plan=profileDependencies(database,profileId),stored=await storageArea.get({[SCANS]:{},[KINDLE_REFRESH_KEY]:null,[KINDLE_REFRESH_ARCHIVES_KEY]:{},[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null,[FEED_UPLOAD_KEY]:{}});
+    const plan=profileDependencies(database,profileId),stored=await storageArea.get({galacticPurchaseSync:{},[SCANS]:{},[KINDLE_REFRESH_KEY]:null,[KINDLE_REFRESH_ARCHIVES_KEY]:{},[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]:null,[FEED_UPLOAD_KEY]:{}});
     const session=importSessionArea?await importSessionArea.get(null):{},sessionKeys=Object.keys(session).filter(key=>key.startsWith('fandango-import-')&&session[key]?.scanContext?.profileId===profileId);
     const current=stored[KINDLE_REFRESH_KEY],archived=stored[KINDLE_REFRESH_ARCHIVES_KEY]?.[profileId];
     let currentOwner=current?.profileId;
@@ -703,7 +703,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const scan=stored[SCANS][plan.profile.provider],scanAffected=scan&&(scan.profileId===profileId||scan.activeAtStartId===profileId);
     const uploads=Object.fromEntries(Object.entries(stored[FEED_UPLOAD_KEY]).filter(([,u])=>u.profileId===profileId));
     plan.summary.jobs={kindle:kindleJob?{status:kindleJob.status,cursor:kindleJob.cursor,total:kindleJob.queue?.length??0}:null,googleAffectedTargets:googleTargets.length,scan:scanAffected?{attemptRef:scan.attemptRef,mode:scan.mode}:null,fandangoNavigationContexts:sessionKeys.length,pendingCompanionUploads:Object.keys(uploads).length};
-    const payload={profile:plan.profile,current:plan.current,history:plan.history,dependents:plan.dependents,canonicalItems:plan.canonicalItems,kindleJob:kindleJob??null,googleTargets,scan:scanAffected?scan:null,uploads,session:Object.fromEntries(sessionKeys.map(key=>[key,session[key]]))};
+    const relationship=stored.galacticPurchaseSync[plan.profile.provider],mappedRelationship=relationship?.localId===profileId?{id:relationship.id,peerId:relationship.peerId,localId:relationship.localId,remoteId:relationship.remoteId,confirmed:relationship.confirmed}:null;plan.summary.jobs.purchaseSync=Boolean(mappedRelationship);
+    const payload={purchaseSync:mappedRelationship,profile:plan.profile,current:plan.current,history:plan.history,dependents:plan.dependents,canonicalItems:plan.canonicalItems,kindleJob:kindleJob??null,googleTargets,scan:scanAffected?scan:null,uploads,session:Object.fromEntries(sessionKeys.map(key=>[key,session[key]]))};
     const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(strictDatabaseSerialization(payload)));
     plan.summary.dependencyStamp=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
     return {...plan,stored,currentOwner,sessionKeys,scanAffected};
@@ -723,8 +724,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       for(const [id,refs]of Object.entries(google.targets??{})){const next=refs.filter(ref=>!plan.refs.has(ref));if(next.length!==refs.length){changed=true;pendingChanged||=google.queue.indexOf(id)>=google.cursor;google.targets[id]=next;}}
       if(changed){if(pendingChanged){google.runId=null;google.leaseUntil=0;}updates[GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY]=normaliseGoogleBooksJob(google);}
     }
+    const retirement=await GalacticPurchaseSync.retirementPatch(storageArea,{provider:plan.profile.provider,localId:profileId});Object.assign(updates,retirement.patch);
     removeProfileData(database,plan);
     const result=await persistDatabase(database,null,updates);
+    Promise.resolve().then(()=>onPurchaseSyncInvalidated(retirement.retired)).catch(()=>{});
     // Tokens are already invalidated atomically. Session cleanup is secondary;
     // its failure must not misreport a committed library removal as a failure.
     if(plan.sessionKeys.length)try{await importSessionArea.remove(plan.sessionKeys);}catch{}
@@ -760,14 +763,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic','audible'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
-    const restored=validateDatabase(database),extra={galacticPurchaseSync:{},[PROVIDER_CHECKS_KEY]:null};
+    const restored=validateDatabase(database),retirement=await GalacticPurchaseSync.retirementPatch(storageArea),extra={...retirement.patch,[PROVIDER_CHECKS_KEY]:null};
     if(preferences!==undefined){
       if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
       extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),...preferences});
     }
     // Explicit replacement must not revive a receipt when restoring an exactly
     // identical old value. Failure here aborts replacement, before its DB set.
-    for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};return persistDatabase(restored,'all',extra);
+    for(const provider of Object.keys(restored.providers))cancelProfileAttempt(restored,provider);for(const state of Object.values(restored.providers))if(state.syncHealth?.status==='running')state.syncHealth={...state.syncHealth,status:'cancelled',finishedAt:new Date().toISOString(),retryable:true};const result=await persistDatabase(restored,'all',extra);Promise.resolve().then(()=>onPurchaseSyncInvalidated(retirement.retired)).catch(()=>{});return result;
   }
   async function importUnscopedProviderItems(provider,values,details,snapshot){
     if(['nintendo','playstation','xbox'].includes(provider))throw Error('Console imports require a confirmed account-bound scan.');
@@ -1156,7 +1159,9 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function clearDatabase() {
+    const retirement=await GalacticPurchaseSync.retirementPatch(storageArea);
     await storageArea.remove([PROVIDER_CHECKS_KEY,'galacticPurchaseSync','galacticLibraryProviderDiagnostics',DATABASE_STORAGE_KEY, EXTERNAL_CLIENT_IDS_STORAGE_KEY, GOOGLE_BOOKS_API_KEY_STORAGE_KEY, GOOGLE_BOOKS_ENRICHMENT_JOB_STORAGE_KEY, SHOW_ENRICHMENT_ACTIONS_STORAGE_KEY, SCANS, NOTIFICATIONS, FEED_UPLOAD_KEY, UI_PREFERENCES_KEY,KINDLE_REFRESH_KEY,KINDLE_REFRESH_ARCHIVES_KEY]);
+    Promise.resolve().then(()=>onPurchaseSyncInvalidated(retirement.retired)).catch(()=>{});
   }
 
   function normaliseGoogleBooksApiKey(value) {

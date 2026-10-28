@@ -48,7 +48,7 @@ const epicAuthDiagnostics=createEpicAuthDiagnostics({area:privateArea,ready:stor
 chrome.runtime.onMessage.addListener(epicAuthDiagnostics.handle);
 workerLifecycle=createWorkerLifecycleDiagnostics({area:chrome.storage.session,ready:storageReady,worker:queryDiagnostics.worker,startedEpochMs:queryDiagnostics.startedEpochMs});
 const observesPrivateChanges=chrome.runtime.getURL('').startsWith('moz-extension://')||typeof chrome.storage.onChanged?.addListener==='function';
-const storageWriter = createStorageWriter(privateArea, storageReady,{cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,observationCompletions:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
+const storageWriter = createStorageWriter(privateArea, storageReady,{onPurchaseSyncInvalidated:events=>purchaseSync?.notifyInvalidated(events),cacheRefreshPreflight:observesPrivateChanges,cacheQuerySnapshots:observesPrivateChanges,observationCompletions:observesPrivateChanges,diagnostics:queryDiagnostics,certificateArea:chrome.storage.session,importSessionArea:chrome.storage.session});
 const appearanceService=createAppearanceService(privateArea,storageWriter,chrome.runtime,storageReady);
 globalThis.GalacticHamsterTheme.register(appearanceService,chrome.runtime);
 const purchaseHandoff=createPurchaseHandoff({runtime:chrome.runtime,area:privateArea,writer:storageWriter});purchaseHandoff.register();

@@ -316,3 +316,19 @@ providerProfileTests.push(
    assert.equal(d.providerItems[a.id].recordRef,a.recordRef);assert(d.contentReviews[a.id]);assert.equal(stored[KINDLE_REFRESH_KEY].queue[0].id,a.id);assert.equal(stored[KINDLE_REFRESH_KEY].cursor,before.cursor);assert.equal(stored[KINDLE_REFRESH_KEY].runRef,before.runRef);assert.equal((await writer.getKindleContentsRefresh()).checkpoint.status,'paused');
  }]
 );
+
+providerProfileTests.push(['R4 mapped account deletion retires only its sync permission atomically, even if peer notification fails',async()=>{
+ const events=[],{writer,stored,writes}=memory({onPurchaseSyncInvalidated:retired=>{events.push(...retired);throw Error('Offline peer');}});
+ await writer.ensurePurchaseAccount('humble');let db=await writer.getDatabase();const first=db.providers.humble.activeProfileId;
+ const {newProviderProfile}=await import('../src/lib/provider-profiles.js');const other=newProviderProfile('humble','Other');db.providerProfiles[other.profileId]=other;await writer.restoreDatabase(db);
+ const relation={id:'relationship',peerId:'hb',localId:first,remoteId:'source',confirmed:true,remoteConfirmed:true};stored.galacticPurchaseSync={humble:relation,fanatical:{id:'unrelated',confirmed:true}};
+ let plan=await writer.previewProviderProfileRemoval(other.profileId);await writer.removeProviderProfile(other.profileId,plan.dependencyStamp,true);assert.deepEqual(stored.galacticPurchaseSync.humble,relation);
+ plan=await writer.previewProviderProfileRemoval(first);assert.equal(plan.jobs.purchaseSync,true);await writer.removeProviderProfile(first,plan.dependencyStamp,true);await Promise.resolve();
+ assert.equal(stored.galacticPurchaseSync.humble,undefined);assert.equal(stored.galacticPurchaseSync.fanatical.id,'unrelated');assert(!Object.values((await writer.getDatabase()).providerProfiles).some(p=>p.profileId===first));
+ assert(events.some(e=>e.id==='relationship'));assert(writes.some(w=>w.galacticLibraryDatabase&&!w.galacticLibraryDatabase.providerProfiles[first]&&w.galacticPurchaseSync&&!w.galacticPurchaseSync.humble));
+ await assert.rejects(writer.importPurchaseSnapshot({provider:'humble',records:[]},{accountRef:first,autoSync:{id:'relationship',peerId:'hb',localId:first}}),/consent/);
+}]);
+providerProfileTests.push(['R4 restore keeps GL namespace lineage but revokes automatic sharing and reports the retired relationship',async()=>{
+ const events=[],{writer,stored}=memory({onPurchaseSyncInvalidated:e=>events.push(...e)});await writer.ensurePurchaseAccount('humble');const db=await writer.getDatabase(),id=db.providers.humble.activeProfileId;stored.galacticPurchaseSync={humble:{id:'old',peerId:'hb',localId:id,confirmed:true,remoteConfirmed:true}};
+ await writer.restoreDatabase(db);await Promise.resolve();assert.deepEqual(stored.galacticPurchaseSync,{});assert.equal((await writer.getDatabase()).providers.humble.activeProfileId,id);assert(events.some(e=>e.id==='old'));
+}]);
