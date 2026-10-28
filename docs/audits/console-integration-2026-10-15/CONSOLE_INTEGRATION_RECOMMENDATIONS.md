@@ -1,6 +1,6 @@
 # Console integration recommendations
 
-**Current release scope:** The user has deferred Xbox until after 1.0 and authorized PlayStation first, then Nintendo, subject to authenticated web-source validation. See the [current implementation gate](PLAYSTATION_NINTENDO_WEB_VALIDATION.md). Rankings and estimates below are historical and do not describe current release commitments.
+**Historical investigation scope (2026-10-15):** The user has deferred Xbox until after 1.0 and authorized PlayStation first, then Nintendo, subject to authenticated web-source validation. See the [investigation implementation gate](PLAYSTATION_NINTENDO_WEB_VALIDATION.md). Rankings and estimates below are historical and do not describe current release commitments.
 
 **Latest Xbox direction:** [Beyond-cloud ownership research](XBOX_OWNERSHIP_BEYOND_CLOUD.md) supersedes the web-CAS-first approach. Consumer Collections and order history are the broad-library candidates; own-client authorization and legacy coverage remain release gates. A cloud-only import does not meet the user's target. Other providers' findings are unchanged.
 
