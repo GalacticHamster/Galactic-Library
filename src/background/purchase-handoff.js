@@ -10,6 +10,18 @@ import {normalizeProviderItem,providerItemKey,rebuildCanonicalItems} from '../li
 import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 const S=globalThis.GalacticPurchaseSnapshot,A=globalThis.GalacticPurchaseAdapters;
+export function existingHumbleEntitlementId(database,profile,row){
+ const native=row.providerItemId,meta=row.metadata;
+ if(!native||meta?.entitlement!=='third-party-key'||database.providerItems[providerItemKey('humble',native,profile.keySpace)])return native;
+ const alias=A.humbleEntitlementAlias(native,meta.purchaseId),prior=alias?database.providerItems[providerItemKey('humble',alias,profile.keySpace)]:null;
+ return prior?.metadata.entitlement==='third-party-key'&&prior.metadata.purchaseId===meta.purchaseId?alias:native;
+}
+export function preserveHumbleEntitlementReference(database,profile,row){
+ const native=existingHumbleEntitlementId(database,profile,row);
+ if(native===row.providerItemId)return row;
+ const prior=database.providerItems[providerItemKey('humble',native,profile.keySpace)];
+ return {...row,providerItemId:native,mediaType:prior.mediaType};
+}
 async function accountStamp(database,profile){return S.hash(strictDatabaseSerialization({profile,items:Object.values(database.providerItems).filter(i=>i.profileId===profile.profileId).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)}));}
 export async function purchaseAccounts(database,provider){if(!['humble','fanatical'].includes(provider))throw Error('Unsupported purchase provider.');const grouped=new Map();for(const item of Object.values(database.providerItems)){const rows=grouped.get(item.profileId)??[];rows.push(item);grouped.set(item.profileId,rows);}return Promise.all(Object.values(database.providerProfiles).filter(p=>p.provider===provider).map(async p=>{const rows=grouped.get(p.profileId)??[],eligible=rows.filter(item=>transferableItem(item,database)&&!(provider==='humble'&&!item.metadata.purchaseId));return {accountRef:p.profileId,label:p.nickname,active:database.providers[provider]?.activeProfileId===p.profileId,count:rows.length,eligibleCount:eligible.length,limitations:eligible.length<rows.length?[(rows.length-eligible.length)+' saved items cannot be shared because their purchase information or item type is not supported.']:[],stamp:await accountStamp(database,p)};}));}
 function transferableItem(item,database){return ['book','audiobook','game','software'].includes(item.mediaType)&&((item.ownership==='owned'&&effectiveOwnershipRecord(item,database,Date.now(),{ignoreOverride:true}).ownership==='owned')||(item.provider==='humble'&&item.metadata.entitlement==='third-party-key'&&item.metadata.purchaseId));}
@@ -35,10 +47,14 @@ export async function applyPurchaseSnapshot(database,raw,target){const data=S.va
  if(target?.newLabel){const label=String(target.newLabel).trim();if(!label||label.length>100||Object.values(database.providerProfiles).some(p=>p.provider===provider&&p.nickname===label)||target.expectedActiveId!==(database.providers[provider]?.activeProfileId??null))throw Error('Invalid or stale new account choice.');profile=newProviderProfile(provider,label);database.providerProfiles[profile.profileId]=profile;}
  else if(!profile||profile.provider!==provider||target.stamp!==await accountStamp(database,profile))throw Error('Destination account changed. Refresh and confirm again.');
  const now=new Date().toISOString(),oldRecords=Object.values(database.providerItems).filter(i=>i.profileId===profile.profileId);
+ const historical=new Map();if(provider==='humble')for(const entry of Object.values(database.providerHistory))if(entry.item.profileId===profile.profileId){const rows=historical.get(entry.item.id)??[];rows.push(entry.item);historical.set(entry.item.id,rows);}
  const fallback=new Map();for(const item of oldRecords){const key=JSON.stringify([item.metadata.purchaseId,item.mediaType,item.title.normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase()]);const rows=fallback.get(key)??[];rows.push(item);fallback.set(key,rows);}
  for(const row of data.records){if(!['book','audiobook','game','software'].includes(row.mediaType)){stats.skipped++;continue;}let native=row.providerItemId;
  if(!native){const candidates=fallback.get(JSON.stringify([row.metadata.purchaseId,row.mediaType,row.title.normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase()]))??[];if(candidates.length!==1){stats.skipped++;continue;}native=candidates[0].providerItemId;}
- const id=providerItemKey(provider,native,profile.keySpace),previous=database.providerItems[id];if(previous&&(previous.mediaType!==row.mediaType||target?.autoSync&&previous.metadata.purchaseId&&row.metadata.purchaseId&&previous.metadata.purchaseId!==row.metadata.purchaseId)){stats.skipped++;continue;}
+ if(provider==='humble')native=existingHumbleEntitlementId(database,profile,{...row,providerItemId:native});
+ const id=providerItemKey(provider,native,profile.keySpace),active=database.providerItems[id],earlier=historical.get(id)??[];
+ if(!active&&earlier.length>1){stats.skipped++;continue;}
+ const previous=active??earlier[0],reactivated=!active&&Boolean(previous);if(previous&&(previous.mediaType!==row.mediaType||(reactivated||target?.autoSync)&&previous.metadata.purchaseId&&row.metadata.purchaseId&&previous.metadata.purchaseId!==row.metadata.purchaseId)){stats.skipped++;continue;}
  const metadata=S.richer(previous?.metadata??{},row.metadata);delete metadata.platforms;for(const field of ['editionId','seriesId','runId'])delete metadata[field];
  if(Array.isArray(metadata.isbn)){metadata.isbns=metadata.isbn;metadata.isbn=metadata.isbn[0]??'';}metadata.source=PROVIDER_SOURCES[provider];
  if(provider==='fanatical'){
@@ -47,7 +63,7 @@ export async function applyPurchaseSnapshot(database,raw,target){const data=S.va
  for(let index=0;index<origin.quantity;index++)incoming.push({occurrenceRef:typeof refs[index]==='string'?refs[index]:await S.hash(JSON.stringify(['handoff',origin.orderRef,origin.bundleId,native,index])),...(typeof refs[index]==='string'?{}:{basis:'order-bundle-count'}),orderRef:origin.orderRef,bundleId:origin.bundleId,bundleTitle:origin.bundleTitle,purchasedAt:origin.purchasedAt,observedAt:prior.find(p=>p.occurrenceRef===refs[index])?.observedAt??now});}
  metadata.purchaseOrigins=mergePurchaseOrigins(prior,incoming.map(entry=>({...entry,observedAt:prior.find(p=>p.occurrenceRef===entry.occurrenceRef)?.observedAt??entry.observedAt})));}
  const item=normalizeProviderItem({...(previous??{}),provider,providerItemId:native,title:previous?.title??row.title,mediaType:row.mediaType,ownership:previous?.ownership??'owned',profileId:profile.profileId,metadata,platform:previous?.platform?.length?previous.platform:row.metadata.platforms??[],acquiredAt:previous?.acquiredAt??row.purchasedAt,observedAt:previous?.observedAt??now},previous?.updatedAt??now,{allowEnrichment:true,profileKeySpace:profile.keySpace});
- if(previous&&JSON.stringify(item)===JSON.stringify(previous))stats.unchanged++;else{database.providerItems[id]=item;if(previous)stats.updated++;else stats.added++;}}
+ if(previous&&!reactivated&&JSON.stringify(item)===JSON.stringify(previous))stats.unchanged++;else{database.providerItems[id]=item;if(reactivated)delete database.providerHistory[previous.recordRef];if(previous)stats.updated++;else stats.added++;}}
  if(data.records.length&&stats.skipped===data.records.length)throw Error(provider==='humble'?'No compatible records can be imported. Older Humble records need a retained native product ID or an unambiguous existing GL purchase/title. Run a separate fresh HB scan if necessary.':'No compatible Fanatical records can be imported. GL currently supports books, audiobooks, games and software; incompatible media are skipped.');
  if(stats.added||stats.updated||target?.newLabel){
  database.canonicalItems=rebuildCanonicalItems(database.providerItems,database.manualMatchDecisions,database.canonicalItems,database.editionSeparations);

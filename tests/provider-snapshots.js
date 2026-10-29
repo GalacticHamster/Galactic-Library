@@ -308,6 +308,34 @@ export const providerSnapshotTests = [
     assert.equal(quick.failures.length, 1);
     assert.equal(quick.snapshot, undefined);
   }],
+  ['Humble accepts an explicit empty non-content placeholder without inventing an item or losing its named key', async () => {
+    // Synthetic values reproduce only the anonymous live field shape observed
+    // on 2026-10-29. No purchase IDs, titles, key values or raw order were saved.
+    const detail=JSON.parse(readFileSync(new URL('./fixtures/humble/empty-download-placeholder.json',import.meta.url),'utf8'));
+    const context=providerContext('humble',async url=>url.startsWith('/api/v1/user/')?json([{gamekey:'order-1'}]):{ok:true,text:async()=>JSON.stringify(detail)});
+    const result=await context.GalacticHumble.fetchHumblePurchases();
+    assert.equal(result.items.length,1);
+    assert.equal(result.items[0].providerItemId,'order-1:entitlement:synthetic-game:0');
+    assert.equal(result.items[0].title,'Synthetic game');
+    assert.equal(result.items[0].metadata.entitlement,'third-party-key');
+    assert.equal(result.snapshot.complete,true);assert.equal(result.snapshot.itemCount,1);
+    assert.deepEqual(plain(result.failures),[]);
+    const quick=await context.GalacticHumble.fetchHumblePurchases(()=>{},result.knownPurchaseIds);
+    assert.equal(quick.items.length,0);assert.equal(quick.skippedKnown,1);assert.deepEqual(plain(quick.failures),[]);
+  }],
+  ['Humble still rejects unnamed supported content, ambiguous delivery, missing identities and malformed product/key records', async () => {
+    for(const product of [null,[],{}, {machine_name:'placeholder'}, {machine_name:'placeholder',downloads:null},
+      {machine_name:'placeholder',downloads:{}}, {downloads:[]}, {machine_name:{},downloads:[]},
+      {machine_name:'game',downloads:[],platform:'steam'}, {machine_name:'software',downloads:[],category:'software'},
+      {machine_name:'book',downloads:[{url:'https://example.test/book.epub'}]}]){
+      const context=providerContext('humble',async url=>url.startsWith('/api/v1/user/')?json([{gamekey:'order-1'}]):{ok:true,text:async()=>JSON.stringify({subproducts:[product]})});
+      await assert.rejects(context.GalacticHumble.fetchHumblePurchases(),/1 Humble purchase could not be read; no library changes/);
+      const quick=await context.GalacticHumble.fetchHumblePurchases(()=>{},[]);
+      assert.equal(quick.items.length,0);assert.deepEqual(plain(quick.failures),['order-1']);assert.equal(quick.snapshot,undefined);
+    }
+    const context=providerContext('humble',async url=>url.startsWith('/api/v1/user/')?json([{gamekey:'order-1'}]):{ok:true,text:async()=>JSON.stringify({subproducts:[{machine_name:'placeholder',downloads:[]}],tpkd_dict:{all_tpks:[{machine_name:'unnamed-key'}]}})});
+    await assert.rejects(context.GalacticHumble.fetchHumblePurchases(),/no library changes/);
+  }],
   ['Fanatical malformed MAIN-world order cannot produce an accepted full projection', () => withWorker(async (worker) => {
     const before = await seed(worker);
     globalThis.chrome.scripting = { executeScript: async ({ func, args }) => {

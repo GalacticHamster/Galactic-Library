@@ -178,6 +178,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     }}};
     let providerPass=0;
     for(mode of provider==='epic'?['full','full']:['full','incremental']){
+      if(provider==='humble'&&mode==='incremental'){result.purchasesRead=27;result.skippedKnown=207;}
       const before=imported;
       const timingBefore=providerTimings.length;
       if(provider==='fandango-at-home'){
@@ -208,6 +209,10 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       }
       await wait(()=>!shadow.querySelector('.status').dataset.busy&&(imported>before||/failed:/iu.test(shadow.querySelector('.status').textContent)));
       assert(!/failed:/iu.test(shadow.querySelector('.status').textContent),shadow.querySelector('.status').textContent);
+      if(provider==='humble'&&mode==='incremental'){
+        assert(shadow.querySelector('.status').textContent.includes('Quick update read 27 purchases and skipped 207 already checked'),'Humble rechecks were incorrectly labeled as new purchases');
+        checks.push('Humble Quick update does not label rechecked existing purchases as new');
+      }
       if(['steam','epic'].includes(provider)){
         const text=shadow.querySelector('.status').textContent;
         assert(!/undefined|new apps/iu.test(text),provider+' reported misleading counts');

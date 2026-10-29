@@ -6,7 +6,7 @@ import {prepareAmazonGamesImport} from '../lib/amazon-games-reconciliation.js';
 import {addSeriesMerge,mergeCoverageGroups,continuityProblem} from '../lib/comic-series-merges.js';
 import {comicCoverageNameKey} from '../lib/comic-series-names.js';
 import {comicCoverage} from '../lib/comic-coverage.js';
-import {applyPurchaseSnapshot} from './purchase-handoff.js';
+import {applyPurchaseSnapshot,preserveHumbleEntitlementReference} from './purchase-handoff.js';
 import {mergeProductDetailsEvidence} from '../lib/kindle-product-details.js';
 import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/companion-identities.js';
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
@@ -1026,6 +1026,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const historicalById=historicalRecords(database,profile.profileId);
     if(activeTiming)activeTiming.recordsNormalized=(activeTiming.recordsNormalized??0)+values.length;
     let incoming = timed('entry_validation',()=>values.map((value) => {
+      if(provider==='humble')value=preserveHumbleEntitlementReference(database,profile,value);
       const item = normalizeProviderItem({ ...value, provider, profileId:profile.profileId, recordRef:undefined, observedAt:now }, now, {allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source = PROVIDER_SOURCES[provider];
       return preserveEnrichment(item, database.providerItems[item.id]??historicalById.get(item.id));
@@ -1082,6 +1083,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const historicalById=historicalRecords(database,profile.profileId),now=new Date().toISOString();
     if(activeTiming)activeTiming.recordsNormalized=(activeTiming.recordsNormalized??0)+values.length;
     return values.map(value=>{
+      if(provider==='humble')value=preserveHumbleEntitlementReference(database,profile,value);
       const item=normalizeProviderItem({...value,provider,profileId:profile.profileId,recordRef:undefined,observedAt:now},now,{allowEnrichment:false,profileKeySpace:profile.keySpace});
       item.metadata.source=PROVIDER_SOURCES[provider];
       return preserveEnrichment(item,database.providerItems[item.id]??historicalById.get(item.id),true);

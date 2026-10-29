@@ -52,7 +52,8 @@
     // redemption value. Redaction must happen before JSON parsing.
     const detail = JSON.parse(redactRedemptionValues(await response.text()));
     if (!detail || typeof detail !== 'object' || Array.isArray(detail) || !Array.isArray(detail.subproducts ?? detail.products)) throw new Error('Humble returned a malformed purchase detail.');
-    if ((detail.subproducts ?? detail.products).some((product) => !product || typeof product !== 'object' || !compactText(product.human_name ?? product.product_name ?? product.title ?? product.name))) throw new Error('Humble returned an unreadable purchase product.');
+    if ((detail.subproducts ?? detail.products).some((product) => !product || typeof product !== 'object' || Array.isArray(product)
+      || !compactText(product.human_name ?? product.product_name ?? product.title ?? product.name) && !emptyNonContentProduct(product))) throw new Error('Humble returned an unreadable purchase product.');
     for (const value of [detail?.tpkd_dict?.all_tpks, detail?.tpkd_dict?.all_tpkds, detail?.all_tpks, detail?.all_tpkds]) {
       if (value !== undefined && (!Array.isArray(value) || value.some((record) => !record || !compactText(record.human_name ?? record.product_name ?? record.name)))) throw new Error('Humble returned malformed third-party entitlements.');
     }
@@ -101,6 +102,15 @@
     if (/\.(?:pdf|epub|cbz|cbr|mobi)(?:["?\\]|$)/iu.test(serialized)
       || /"(?:format|filetype|extension)"\s*:\s*"(?:pdf|epub|cbz|cbr|mobi)"/iu.test(serialized)) return 'book';
     return null;
+  }
+
+  function emptyNonContentProduct(product) {
+    // Live orders can include a nameless, non-deliverable placeholder beside
+    // named key entitlements. It cannot create an item. Keep rejecting missing
+    // titles when any supported media/delivery evidence exists or this explicit
+    // empty-download shape is absent.
+    return typeof product.machine_name === 'string' && Boolean(compactText(product.machine_name))
+      && Array.isArray(product.downloads) && product.downloads.length === 0 && productKind(product) === null;
   }
 
   function directProductIdentity(product, index) {

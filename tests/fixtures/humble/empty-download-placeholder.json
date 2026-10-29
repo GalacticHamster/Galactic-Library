@@ -1,0 +1,12 @@
+{
+  "product": { "human_name": "Synthetic key purchase", "machine_name": "synthetic-purchase" },
+  "subproducts": [
+    { "human_name": "Synthetic game", "machine_name": "synthetic-game", "downloads": [] },
+    { "human_name": "", "machine_name": "synthetic-placeholder", "downloads": [] }
+  ],
+  "tpkd_dict": {
+    "all_tpks": [
+      { "human_name": "Synthetic game", "machine_name": "synthetic-game", "key_type": "steam", "keyindex": 0 }
+    ]
+  }
+}

@@ -32,8 +32,8 @@
       if (!response?.ok) throw new Error(response?.error ?? 'Humble import did not complete.');
       const scope = fullRescan
         ? `Full rescan read ${result.purchasesRead} purchase${result.purchasesRead === 1 ? '' : 's'}`
-        : `Quick update read ${result.purchasesRead} new purchase${result.purchasesRead === 1 ? '' : 's'} and skipped ${result.skippedKnown} already checked`;
-      status.textContent = `${scope}. Saved ${response.gameCount} Humble game${response.gameCount === 1 ? '' : 's'}, ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'}, and ${response.bookCount} book${response.bookCount === 1 ? '' : 's'} locally.${result.failures.length ? ` ${result.failures.length} new purchase${result.failures.length === 1 ? ' will' : 's will'} be retried next quick update.` : ''}`;
+        : `Quick update read ${result.purchasesRead} purchase${result.purchasesRead === 1 ? '' : 's'} and skipped ${result.skippedKnown} already checked`;
+      status.textContent = `${scope}. Saved ${response.gameCount} Humble game${response.gameCount === 1 ? '' : 's'}, ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'}, and ${response.bookCount} book${response.bookCount === 1 ? '' : 's'} locally.${result.failures.length ? ` ${result.failures.length} purchase${result.failures.length === 1 ? ' will' : 's will'} be retried next quick update.` : ''}`;
     } catch (error) {
       await globalThis.GalacticSync.failed('humble',error);
       status.textContent = `Humble import failed: ${error.message}`;
