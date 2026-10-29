@@ -65,10 +65,14 @@ export async function checkWholeManifest(fixture,{ui=false}={}){
  checks.push('legacy child reparse preserves source/history/reviews/ownership and backup while yielding Partial 52');
  if(ui){
   let verified=0;const editor=createContentsEditor(after.providerItems[item.id],after.contentReviews[item.id],{save:async()=>{verified++;},refresh(){}});
-  document.body.append(editor);editor.open=true;await new Promise(resolve=>setTimeout(resolve,0));
-  assert(editor.querySelector('textarea').value==='Verified prior evidence','Prior reviewed statement was replaced');
+  document.body.append(editor);editor.open=true;
+  // Firefox can deliver the lazy details toggle after a zero-delay timer.
+  // Wait for the actual statement control, without changing editor behavior.
+  for(let n=0;n<100&&!editor.querySelector('[aria-label="Contents statement draft"]');n++)await new Promise(resolve=>setTimeout(resolve,10));
+  const statement=editor.querySelector('[aria-label="Contents statement draft"]');assert(statement,'Contents editor did not populate after opening');
+  assert(statement.value==='Verified prior evidence','Prior reviewed statement was replaced');
   const button=label=>[...editor.querySelectorAll('button')].find(b=>b.textContent===label);
-  button('Use complete captured collection statement').click();assert(editor.querySelector('textarea').value===whole.raw,'Whole source evidence not exposed for review');
+  button('Use complete captured collection statement').click();assert(statement.value===whole.raw,'Whole source evidence not exposed for review');
   button('Parse statement for review').click();assert(editor.querySelectorAll('tbody tr').length===52,'Review UI did not show whole-manifest proposals');
   assert(editor.textContent.includes('Still to check:')&&editor.textContent.includes('Handbook')&&editor.textContent.includes('does not establish complete book contents'),'UI concealed unresolved or completeness scope');
   assert(verified===0,'Review proposal automatically became verification');editor.remove();
