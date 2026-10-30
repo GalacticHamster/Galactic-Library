@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Galactic Hamster
 import {createXboxNavigationHandler,currentXboxSender} from './xbox-navigation.js';
+import {requireMetadataConsent} from '../lib/metadata-consent.js';
 import {createEpicAuthDiagnostics} from './epic-auth-diagnostics.js';
 import {purchaseAccounts} from './purchase-handoff.js';
 import {createPurchaseHandoff} from './purchase-handoff.js';
@@ -249,6 +250,7 @@ let enrichmentRequests=Promise.resolve();let lastEnrichmentRequest=0;
 function enrichmentJson(url,label){
   const result=enrichmentRequests.then(async()=>{
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,1200-(Date.now()-lastEnrichmentRequest))));lastEnrichmentRequest=Date.now();
+    await requireMetadataConsent(label);
     const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
     try{const response=await fetch(url,{cache:'no-store',signal:controller.signal});if(!response.ok)throw new Error(`${label} returned ${response.status}.`);return await response.json();}
     catch(error){if(controller.signal.aborted)throw new Error(`${label} lookup timed out. Try again later.`);throw error;}

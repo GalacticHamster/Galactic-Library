@@ -1,6 +1,6 @@
 # Privacy Policy for Galactic Library
 
-Last updated: October 24, 2026
+Last updated: October 30, 2026
 
 Galactic Library (GL) is an unofficial personal library manager. It is not affiliated with the providers whose libraries it imports.
 
@@ -29,7 +29,7 @@ Optional Kindle contents/enrichment scans visit product pages and retain support
 
 Saved data supports library search, matching, account imports, reading/reminders, metadata and contents review, and coverage. GL does not send library data to a Galactic Hamster-operated server and has no analytics or advertising service. Provider requests, optional metadata lookups, companion exchanges and exports are distinct from developer-server collection. Opening provider, help or optional support links visits those destinations under their own policies.
 
-When the user requests **Open Library** enrichment, GL sends the selected book's title and available author to Open Library, or its ISBN for an edition lookup; edition lookups can also retrieve the credited author records. When the user configures their own **Google Books API key** and starts enrichment, GL sends eligible books' ISBNs or title/author search terms and available publisher context to Google's Books API. The key is saved privately in this browser profile, sent to Google Books, and excluded from library backups. Returned supported metadata and enrichment progress are stored locally. These optional services receive the requests; GL does not operate those services.
+When the user requests **Open Library** enrichment, GL sends the selected book's title and available author to Open Library, or its ISBN for an edition lookup; edition lookups can also retrieve the credited author records. When the user configures their own **Google Books API key** and starts enrichment, GL sends eligible books' ISBNs or title/author search terms and available publisher context to Google's Books API. The key is saved privately in this browser profile, sent to Google Books, and excluded from library backups. Returned supported metadata and enrichment progress are stored locally. These optional services receive the requests; GL does not operate those services. In Firefox, online book lookups additionally require optional data permissions granted from Settings > Book lookup setup. Open Library uses the website-content category for bibliographic fields. Google Books also uses the authentication-information category for the API key you supplied to GL. These permissions cover subsequent requests and bulk lookup queues until revoked in Firefox's Add-ons Manager. Without permission, no metadata request is sent; core library functions and saved evidence remain available. Revocation stops later queued requests, but cannot recall a request already sent. Firefox stores these grants separately from GL library backups. Chrome retains the existing user-started lookup controls.
 
 Official HB and FAN companions are recognized through fixed browser-specific identities; additional IDs can be authorized in Advanced settings. Matching queries exchange requested titles and available identity/contents metadata, with bounded results containing provider, effective access and identity evidence and opaque references. These comparison responses exclude raw purchase IDs, account labels and API keys. They are not library backups.
 

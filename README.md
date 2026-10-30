@@ -165,3 +165,11 @@ Published and distributed by Galactic Hamster LLC.
 Original runtime icons (`icons/icon*.png`) are licensed under GPL-3.0-or-later. Trademarks, project names, and logos are reserved pursuant to GPLv3 Section 7(e). Third-party storefront logos in `icons/provider-icons/` are the property of their respective owners and are displayed strictly for service identification without affiliation. Bibliographic issue reference data is attributed to the Grand Comics Database (CC-BY-SA 4.0). Detailed asset provenance and attribution terms are documented in [NOTICE](NOTICE).
 
 
+
+## 1.0 release candidate
+
+See [release notes](CHANGELOG.md). In Firefox, allow the desired online book
+service in **Settings > Book lookup setup** before using it. Open Library needs
+bibliographic-content permission; Google Books also needs permission to send
+your configured API key. These permissions are optional and can be revoked in
+Firefox Add-ons Manager. Local library use and provider imports remain available.

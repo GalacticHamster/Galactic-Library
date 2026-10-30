@@ -7,6 +7,7 @@ import {providerLabel,formatDate,countLabel} from './formatters.js';
 import {bindBackupRestore,BACKUP_SCOPE_HELP,RESTORE_LOCAL_HELP,CLEAR_LIBRARY_HELP,CLEAR_LIBRARY_WARNING} from './backup-restore.js';
 import {createLibraryLoader} from './library-loading.js';
 import {createBackupExporter,handoffDownload} from './backup-export.js';
+import {bindMetadataConsent} from './metadata-consent.js';
 import {createOperation,afterFeedbackPaint,performAction,bindOperationSummary} from './operation-feedback.js';
 import {accountLabel} from './item-presentation.js';
 import {createDraftGuard} from './draft-guard.js';
@@ -127,6 +128,7 @@ const reviewedDuplicatesSummary = document.querySelector('#reviewed-duplicates-s
 const reviewedDuplicateItems = document.querySelector('#reviewed-duplicate-items');
 const backupStatus = document.querySelector('#backup-status');
 const googleBooksApiKey = document.querySelector('#google-books-api-key');
+bindMetadataConsent(document.querySelector('#metadata-data-permissions'));
 const saveGoogleBooksApiKeyButton = document.querySelector('#save-google-books-api-key');
 const clearGoogleBooksApiKeyButton = document.querySelector('#clear-google-books-api-key');
 const startGoogleBooksEnrichmentButton = document.querySelector('#start-google-books-enrichment');

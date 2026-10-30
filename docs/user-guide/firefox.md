@@ -21,3 +21,12 @@ On 2026-10-02, the 141 core checks, 34 packaged Firefox dashboard checks, 22 pac
 Run `npm run test:browser:firefox`, `npm run test:importers:firefox`, and `npm run test:firefox:companions`. The last command requires the adjacent HB and Fanatical repos for tests only. It also serializes the real GL/FAN purchase functions using Firefox's MAIN-world script injection: 200 purchases across ten pages, a quick scan across eleven pages fetching only the new purchase, and broken-pagination rejection. Those requests go only to a local synthetic server; localhost permission is granted only inside the disposable test profile. Shipping sender/origin guards remain unchanged.
 
 Tests do not certify live signed-in providers, an unseen large Fanatical account, AMO signing or OS notification delivery. Signed release distribution remains separate from these temporary unsigned development installs.
+
+## Optional online book lookups
+
+In **Settings > Book lookup setup**, Firefox lets you allow bibliographic sharing
+for Open Library and Google Books. Google Books also needs permission to send
+your configured API key to Google. Firefox stores these optional grants; they
+are not included in a GL backup. You can revoke them in Firefox Add-ons Manager.
+Without permission, provider imports and local library work remain available.
+A revoked bulk lookup pauses before its next request and keeps its progress.
