@@ -306,6 +306,21 @@ before sharing an export. The setting is local to this browser, excluded from
 library backups, and survives browser/extension restarts. Clearing all local GL
 data resets it.
 
+Amazon Video applies this setting immediately, including during a scan. Its
+Scan diagnostics section shows the current traversal phase, visibility and
+movement checks, with a bounded timeline and Export scan diagnostics. Enabling
+it starts capturing subsequent events; disabling stops detailed capture and
+clears that timeline. Reports contain structural counts and timings, not titles,
+product IDs or account details. These details stay in page memory until the
+next scan, reload or disabling; only an explicit export downloads them.
+
+Keep the Amazon Video tab visible during imports. Its virtualized listing may
+stop updating in a background tab even though the page continues scrolling.
+GL pauses traversal while hidden and resumes when you return within a minute.
+If that pause expires, your saved library is kept; return to the tab and retry.
+This pause also applies when diagnostics are off. A timeout never confirms a
+complete listing, and the independent membership check remains required.
+
 ## Kobo metadata and ownership
 
 Kobo quick updates check the newest-first pages up to the first known page. The

@@ -8,6 +8,44 @@
   const SCROLL_PAUSE_MS = 700;
   const CARD_SELECTOR = '[data-card-entity-type], [data-entity-type], [data-testid="card"]';
   let diagnostics = null;
+  let detailed = false, activeTrace = null, traceObserver = null;
+  const TRACE_LIMIT = 128;
+  const now = () => global.performance.now();
+  function traceEvent(event) {
+    if (!detailed || !activeTrace) return;
+    const events = activeTrace.events;
+    if (events.length === TRACE_LIMIT) { events.shift(); activeTrace.droppedEvents += 1; }
+    events.push({ elapsedMs: Math.round(now() - activeTrace.started), ...event });
+  }
+  function setDiagnosticsEnabled(enabled) {
+    const wasEnabled = detailed;
+    detailed = enabled === true;
+    traceObserver?.disconnect(); traceObserver = null;
+    if (!detailed) {
+      activeTrace = null;
+      if (diagnostics) { delete diagnostics.traversal; diagnostics.passes = []; }
+      return;
+    }
+    if (diagnostics?.state !== 'scanning') {
+      if (!wasEnabled && diagnostics?.state !== 'checking-purchase-labels') diagnostics = null;
+      return;
+    }
+    if (!activeTrace) {
+      activeTrace = { scanId: global.crypto.randomUUID(), mode: diagnostics.scanMode,
+        started: now(), events: [], droppedEvents: 0, mutations: 0, outcome: 'running' };
+      diagnostics.traversal = activeTrace;
+      traceEvent({ category: 'capture-start', visibility: global.document.visibilityState });
+    }
+    traceObserver = new global.MutationObserver(records => {
+      activeTrace.mutations = Math.min(1000000, activeTrace.mutations + records.length);
+    });
+    traceObserver.observe(global.document.body, { childList: true, subtree: true, attributes: true });
+  }
+  global.document?.addEventListener?.('visibilitychange', () => traceEvent({ category: 'visibility', visibility: global.document.visibilityState }));
+  global.addEventListener?.('pagehide', () => {
+    traceEvent({ category: 'interruption', reason: 'page-hidden-or-navigation' });
+    if (activeTrace) activeTrace.outcome = 'interrupted';
+  });
 
   function compactText(value) {
     return String(value ?? '').replace(/\s+/gu, ' ').trim();
@@ -169,8 +207,10 @@
     // A gesture on the outer card never reaches handlers on its children.
     // Target the artwork, letting over/move events bubble through its links.
     const target = card.querySelector('img') || card.querySelector('a[href*="/detail/"]') || card;
-    diagnostics.hoverChecks.targetKinds ??= {};
-    diagnostics.hoverChecks.targetKinds[target.tagName] = (diagnostics.hoverChecks.targetKinds[target.tagName] ?? 0) + 1;
+    if (detailed) {
+      diagnostics.hoverChecks.targetKinds ??= {};
+      diagnostics.hoverChecks.targetKinds[target.tagName] = (diagnostics.hoverChecks.targetKinds[target.tagName] ?? 0) + 1;
+    }
     const rect = target.getBoundingClientRect();
     const gesture = entering => {
       const position = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
@@ -217,8 +257,10 @@
   // A small, user-operated check establishes where this page variant exposes
   // hover labels before considering any automated per-card hover requests.
   async function checkPurchaseLabels(report = () => {}) {
+    activeTrace = null;
     const observed = new Map(), physicalHovers = new Map(), observedPhysicalPurchases = new Set();
     const physicalHover = event => {
+      if (!detailed) return;
       if (!event.isTrusted) return;
       const card = event.target.closest?.(CARD_SELECTOR);
       const item = card && amazonVideoItemFromCardData(cardDataFromElement(card));
@@ -230,6 +272,7 @@
       diagnostics.manualHover.events += 1;
     };
     const collect = () => {
+      if (!detailed) return;
       for (const item of amazonVideoItemsFromDocument(global.document)) retainObservation(observed, item);
       diagnostics.ownership = ownershipCounts(observed);
       diagnostics.purchaseLabels = { movie: 0, season: 0, unscopedTv: 0 };
@@ -276,6 +319,39 @@
 
   function wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  // Amazon's virtualized cards can stop refreshing while scrollTop still moves
+  // in a hidden tab. Do not consume or certify those stale rendered windows.
+  async function waitForVisible(reportProgress, deadline = Date.now() + 60000) {
+    if (global.document.visibilityState !== 'hidden') return;
+    reportProgress({ movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv, phase: 'paused-hidden' });
+    traceEvent({ category: 'pause', reason: 'hidden-document' });
+    await new Promise((resolve, reject) => {
+      let timer;
+      const finish = error => {
+        clearTimeout(timer);
+        global.document.removeEventListener('visibilitychange', changed);
+        global.removeEventListener('pagehide', interrupted);
+        if (error) reject(error); else resolve();
+      };
+      const changed = () => { if (global.document.visibilityState !== 'hidden') finish(); };
+      const interrupted = () => {
+        diagnostics.reason = 'navigation-interrupted';
+        finish(new Error('Amazon Video scan was interrupted. Your saved library was kept. Reopen the Purchases page and retry.'));
+      };
+      global.document.addEventListener('visibilitychange', changed);
+      global.addEventListener('pagehide', interrupted);
+      timer = setTimeout(() => {
+        diagnostics.reason = 'visibility-timeout';
+        finish(new Error('Amazon Video scan paused for a minute because its tab was hidden. Your saved library was kept. Keep the Amazon Video tab visible and retry.'));
+      }, Math.max(0, deadline - Date.now()));
+      changed();
+    });
+    traceEvent({ category: 'resume', reason: 'document-visible' });
+    await wait(SCROLL_PAUSE_MS);
+    // A second switch during stabilization must not authorize hidden traversal.
+    if (global.document.visibilityState === 'hidden') await waitForVisible(reportProgress, deadline);
   }
 
   // Scope continuation controls to the content region, never the page chrome.
@@ -411,6 +487,9 @@
       completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
       discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
     diagnostics.hoverChecks = { enabled: readPurchaseLabels, attempted: 0, recognized: 0, unavailable: 0, maximumWaitMs: 600 };
+    diagnostics.scanMode = Array.isArray(knownItemIds) ? 'quick' : 'full';
+    activeTrace = null;
+    setDiagnosticsEnabled(detailed);
     const observations = new Map();
     const observer = global.MutationObserver ? new global.MutationObserver(() => {
       for (const item of amazonVideoItemsFromDocument(global.document)) {
@@ -429,6 +508,12 @@
       throw error;
     } finally {
       observer?.disconnect();
+      traceObserver?.disconnect(); traceObserver = null;
+      if (activeTrace) {
+        activeTrace.outcome = diagnostics.state;
+        traceEvent({ category: 'finish', outcome: diagnostics.state, reason: diagnostics.reason,
+          verification: diagnostics.verification, boundary: diagnostics.boundaryProbe });
+      }
     }
   }
 
@@ -457,10 +542,12 @@
     let sweepSeen = new Set();
     diagnostics.completionStatus = 'uncertain';
     diagnostics.verification = { attempts: 0, completed: false, revisitedItems: 0, missingItems: 0 };
+    await waitForVisible(reportProgress);
     resetTraversal(listingContext(global.document));
     await wait(SCROLL_PAUSE_MS);
     for (let pass = 0; pass < MAX_SCROLLS; pass += 1) {
       passesRead = pass + 1;
+      await waitForVisible(reportProgress);
       const context = listingContext(global.document), before = geometry(context);
       for (const card of context.cards) observedCards.add(card);
       let rendered = amazonVideoItemsFromDocument(global.document);
@@ -484,13 +571,16 @@
       diagnostics.ownership = ownershipCounts(itemsById);
       diagnostics.itemCount = itemsById.size; diagnostics.discoveredItems = discovered.size;
       observeTotal(context);
-      if (candidate && fresh.length) { candidate = null; phase = 'discovery'; quiet = 0; }
+      if (candidate && fresh.length) {
+        traceEvent({ category: 'retry', reason: 'new-membership-after-boundary', pass: passesRead, phase });
+        candidate = null; phase = 'discovery'; quiet = 0;
+      }
       if (phase === 'verification') for (const item of rendered) sweepSeen.add(item.providerItemId);
       reportProgress({ passes: pass, movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv,
         phase: phase === 'verification' ? 'verification' : phase.startsWith('probe') ? 'boundary-probe' : 'reading' });
       if (incremental && fresh.length && !save.length) {
         diagnostics.state = 'bounded'; diagnostics.reason = 'known-newest-group'; diagnostics.completionStatus = 'bounded';
-        diagnostics.passes.push({ pass: passesRead, phase, newlyDiscoveredItems: fresh.length, distinctItems: discovered.size,
+        if (detailed) diagnostics.passes.push({ pass: passesRead, phase, newlyDiscoveredItems: fresh.length, distinctItems: discovered.size,
           ...before, completionConfirmed: false, stop: 'known-newest-group' });
         break;
       }
@@ -498,9 +588,12 @@
       const target = action === 'probe-back' ? Math.max(0, before.top - before.height)
         : action === 'probe-forward' ? before.extent + before.height
         : Math.min(before.extent, before.top + Math.max(1, before.height * 0.8));
+      await waitForVisible(reportProgress);
+      const waitStarted = detailed ? now() : 0, mutationsBefore = activeTrace?.mutations ?? 0;
       scrollListing(context, target);
       if (!controlsBefore.loading.length) controlsBefore.more[0]?.click();
       await wait(SCROLL_PAUSE_MS);
+      await waitForVisible(reportProgress);
       const afterContext = listingContext(global.document), after = geometry(afterContext);
       const currentExpected = observeTotal(afterContext);
       const controls = continuationControls(global.document, afterContext.root);
@@ -521,7 +614,25 @@
         rangeChange: after.extent - before.extent, atEnd, loading: controls.loading.length, loadMore: controls.more.length,
         ignoredLoading: controls.ignoredLoading, ignoredLoadMore: controls.ignoredMore, unchangedPasses: quiet,
         expectedCount: diagnostics.expectedCount, currentReportedCount: currentExpected, completionConfirmed: false };
-      diagnostics.passes.push(row);
+      if (detailed) {
+        diagnostics.passes.push(row);
+        activeTrace.noProgressStreak = !row.movement && sameCards ? (activeTrace.noProgressStreak ?? 0) + 1 : 0;
+        const viewport = afterContext.nested ? afterContext.scroller.getBoundingClientRect()
+          : { top: 0, bottom: global.innerHeight };
+        const visibleItems = afterContext.cards.filter(card => {
+          const rect = card.getBoundingClientRect();
+          return visible(card) && rect.bottom > Math.max(0, viewport.top)
+            && rect.top < Math.min(global.innerHeight, viewport.bottom);
+        }).length;
+        traceEvent({ category: !sameCards || row.rangeChange ? 'dom-change' : row.movement ? 'movement' : atEnd ? 'boundary-candidate' : 'temporary-stall',
+          phase: action, pass: passesRead, uniqueItems: discovered.size, visibleItems,
+          visibility: global.document.visibilityState, requestedTop: target, beforeTop: before.top, actualTop: after.top,
+          movement: row.movement, waitMs: waitStarted ? Math.round(now() - waitStarted) : null,
+          mutations: (activeTrace?.mutations ?? 0) - mutationsBefore, layoutChanged: before.height !== after.height || row.rangeChange !== 0,
+          scrollerChanged: context.scroller !== afterContext.scroller, membershipChanged: !sameCards,
+          noProgressStreak: activeTrace.noProgressStreak, stableBoundaryPasses: quiet,
+          atEnd, loading: controls.loading.length, more: controls.more.length });
+      }
       if (quiet >= 3 && clear && currentExpected !== null && currentExpected === discovered.size
           && !inspectListing().remainingOtherScrollers) {
         diagnostics.completionStatus = 'confirmed'; diagnostics.completionConfirmed = true;
@@ -539,6 +650,8 @@
         const returnedTail = candidate.tail.length === afterRendered.length
           && candidate.tail.every((id, index) => id === afterRendered[index].providerItemId);
         if (!returnedTail || !atEnd || diagnostics.boundaryProbe.rangeExtended) {
+          traceEvent({ category: 'retry', reason: 'boundary-changed', pass: passesRead, returnedTail, atEnd,
+            rangeExtended: diagnostics.boundaryProbe.rangeExtended });
           candidate = null; phase = 'discovery'; quiet = 0; continue;
         }
         if (diagnostics.boundaryProbe.backPossible && !diagnostics.boundaryProbe.backMoved) {
@@ -546,7 +659,9 @@
         }
         sweepSeen = new Set(); phase = 'verification'; quiet = 0;
         diagnostics.verification.startedAtPass = passesRead + 1;
-        resetTraversal(afterContext); await wait(SCROLL_PAUSE_MS); continue;
+        resetTraversal(afterContext);
+        traceEvent({ category: 'reset', phase, pass: passesRead, requestedTop: 0, ...geometry(listingContext(global.document)) });
+        await wait(SCROLL_PAUSE_MS); continue;
       }
       if (quiet < 3) continue;
       if (!rendered.length) { diagnostics.reason = 'no-readable-listing'; break; }
@@ -600,7 +715,8 @@
   }
 
   global.GalacticAmazonVideo = {
-    getDiagnostics: () => diagnostics ? { ...JSON.parse(JSON.stringify(diagnostics)), currentPage: inspectListing() } : null,
+    setDiagnosticsEnabled,
+    getDiagnostics: () => detailed && diagnostics ? { ...JSON.parse(JSON.stringify(diagnostics)), currentPage: inspectListing() } : null,
     amazonVideoItemFromCardData,
     amazonVideoItemsFromDocument,
     newAmazonVideoItems,

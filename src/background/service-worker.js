@@ -36,11 +36,19 @@ const queryDiagnostics=createQueryDiagnostics({onActivity:(stage,details)=>worke
 const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   // Only key names cross this channel. Library records/API keys never do.
   chrome.runtime.sendMessage({type:PRIVATE_STORAGE_CHANGED,keys}).catch(()=>{});
+  if(keys.includes('galacticLibraryProviderDiagnostics'))notifyVideoDiagnostics();
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
   if(keys.includes('galacticLibraryDatabase')){storageWriter.invalidateQuerySnapshot(undefined,'private-observer');observePurchaseSync().catch(()=>{});}
   if(keys.includes(OBSERVATION_KEY)||keys.includes(OBSERVATION_HEAD_KEY))storageWriter.invalidateObservationSnapshot();
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
+async function notifyVideoDiagnostics(){
+  if(!chrome.tabs?.query||!chrome.tabs?.sendMessage)return;
+  try{
+    const tabs=await chrome.tabs.query({url:'https://www.amazon.com/gp/video/*'});
+    await Promise.allSettled(tabs.map(tab=>chrome.tabs.sendMessage(tab.id,{type:'GL_VIDEO_DIAGNOSTICS_CHANGED'})));
+  }catch{/* Closed provider pages do not make a saved preference fail. */}
+}
 const storageReady = restrictStorageAccess(chrome.storage,chrome.runtime,privateArea);
 // Operations report initialization errors through their normal response channel.
 storageReady.catch(() => {});
@@ -112,6 +120,7 @@ registerReminderEvents();
 chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==='local'&&Object.hasOwn(changes,'galacticLibraryProviderDiagnostics'))notifyVideoDiagnostics();
   if(area==='local'&&(Object.hasOwn(changes,OBSERVATION_KEY)||Object.hasOwn(changes,OBSERVATION_HEAD_KEY)))storageWriter.invalidateObservationSnapshot();
   if(area==='local')for(const key of Object.keys(changes).slice(0,16))queryDiagnostics.event('storage_change',{key:diagnosticStorageKey(key),source:'observer'});
   if(area==='local'&&(changes.galacticLibraryDatabase||changes.galacticLibraryKindleContentsRefresh))storageWriter.invalidateRefreshPreflight();

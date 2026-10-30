@@ -72,3 +72,13 @@ overlayAccountAuditTests.push(['Provider diagnostics defaults off, persists outs
     assert.equal((await dispatch({type:'LIBRARY_STORAGE_OPERATION',operation:'saveProviderDiagnosticsEnabled',args:[true]},sender)).ok,false);
   });
 }]);
+
+overlayAccountAuditTests.push(['Provider diagnostic changes notify only open Amazon Video pages without exposing setting or library data',()=>withWorker(async({pageA})=>{
+  const sent=[];
+  chrome.tabs={query:async query=>{assert.deepEqual(query,{url:'https://www.amazon.com/gp/video/*'});return [{id:77}];},sendMessage:async(id,message)=>{sent.push({id,message});}};
+  await pageA.saveProviderDiagnosticsEnabled(true);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(sent,[{id:77,message:{type:'GL_VIDEO_DIAGNOSTICS_CHANGED'}}]);
+  await pageA.saveShowEnrichmentActions(false);
+  assert.equal(sent.length,1);
+},{storageEvents:true})]);

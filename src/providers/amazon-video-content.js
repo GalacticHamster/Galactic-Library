@@ -1,7 +1,6 @@
 (function attachAmazonVideoSync() {
   'use strict';
-  // Troubleshooting builds only; see the release checklist. No saved setting.
-  // Shared setting controls visibility; constructing tools does not run them.
+  // Use the existing Provider Diagnostics setting; no separate debug switch.
   const SHOW_SCAN_DIAGNOSTICS = true;
   if (!location.pathname.includes('/gp/video/') || document.querySelector('#galactic-library-amazon-video-importer') || !globalThis.GalacticAmazonVideo) return;
 
@@ -17,8 +16,47 @@
   const exportButton = shadow.querySelector('[data-export-diagnostics]');
   const status = shadow.querySelector('.status');
   let exportContext = null;
+  let diagnosticsEnabled = false, settingGeneration = 0;
+  const diagnosticSection = exportButton.closest('details');
+  const traceSummary = document.createElement('p'), traceDetails = document.createElement('details'), traceText = document.createElement('pre');
+  traceSummary.setAttribute('role', 'status');
+  traceDetails.innerHTML = '<summary>Traversal timeline</summary>';
+  traceText.style.cssText = 'white-space:pre-wrap;max-height:180px;overflow:auto;font-size:11px';
+  traceDetails.append(traceText); diagnosticSection.append(traceSummary, traceDetails);
+  function refreshTrace() {
+    if (!diagnosticsEnabled) return;
+    const report = globalThis.GalacticAmazonVideo.getDiagnostics(), trace = report?.traversal;
+    if (!trace) return;
+    const last = [...trace.events].reverse().find(event => event.pass);
+    traceSummary.textContent = `${trace.mode === 'full' ? 'Full' : 'Quick'} scan ${trace.scanId.slice(0, 8)} · ${trace.outcome}${last ? ` · ${last.phase} · ${last.uniqueItems} titles · pass ${last.pass} · ${last.visibility}` : ''}. ${report.reason ?? ''}`;
+    traceText.textContent = trace.events.map(event => JSON.stringify(event)).join('\n');
+  }
+  function applyDiagnostics(enabled) {
+    diagnosticsEnabled = enabled === true;
+    globalThis.GalacticAmazonVideo.setDiagnosticsEnabled(diagnosticsEnabled);
+    shadow.querySelector('.panel').dataset.providerDiagnostics = diagnosticsEnabled ? 'enabled' : 'disabled';
+    diagnosticSection.hidden = !diagnosticsEnabled;
+    if (!diagnosticsEnabled) { traceSummary.textContent = ''; traceText.textContent = ''; exportButton.disabled = true; }
+    else exportButton.disabled = !globalThis.GalacticAmazonVideo.getDiagnostics();
+  }
+  const initialGeneration = settingGeneration;
+  globalThis.GalacticFloatingPanel.diagnosticsEnabled('amazon-video').then(enabled => {
+    if (initialGeneration === settingGeneration) applyDiagnostics(enabled);
+  });
+  chrome.storage?.onChanged?.addListener((changes, area) => {
+    if (area !== 'local' || !Object.hasOwn(changes, 'galacticLibraryProviderDiagnostics')) return;
+    settingGeneration += 1; applyDiagnostics(changes.galacticLibraryProviderDiagnostics.newValue);
+  });
+  chrome.runtime.onMessage?.addListener((message, sender) => {
+    if (sender.id !== chrome.runtime.id || message?.type !== 'GL_VIDEO_DIAGNOSTICS_CHANGED') return;
+    const generation = ++settingGeneration;
+    globalThis.GalacticFloatingPanel.diagnosticsEnabled('amazon-video').then(enabled => {
+      if (generation === settingGeneration) applyDiagnostics(enabled);
+    });
+  });
 
   async function sync(mode) {
+    if (['inspect', 'ownership'].includes(mode) && !diagnosticsEnabled) return;
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     if (exportButton) exportButton.disabled = true;
@@ -37,8 +75,14 @@
       if (mode === 'inspect') {
         scanStarted = true;
         await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ movies, tv, phase }) => {
+          refreshTrace();
           status.textContent = `Checking listing: ${movies} movies and ${tv} TV titles found.${phase === 'verification' ? ' Confirming the listing.' : phase === 'boundary-probe' ? ' Confirming the listing.' : phase === 'purchase-labels' ? ' Checking purchase information.' : ''} No library records will be changed.`;
         }, null, { readOnly: true, readPurchaseLabels: true });
+        if (!diagnosticsEnabled) {
+          exportContext.outcome = 'checked-without-diagnostics';
+          status.textContent = 'Listing check finished. No library records were changed. Detailed diagnostics were cleared when you disabled them.';
+          return;
+        }
         const checked = globalThis.GalacticAmazonVideo.getDiagnostics();
         exportContext.outcome = checked.completionStatus + '-without-import';
         status.textContent = `Listing check ended: ${checked.itemCount} titles found (${checked.mediaTypes.movie} movies and ${checked.mediaTypes.tv} TV titles). ${checked.completionStatus === 'confirmed' ? 'Completion confirmed by a whole-list total.' : checked.completionStatus === 'inferred' ? 'End inferred from boundary checks and a verification sweep; Amazon did not confirm a total.' : 'Completion uncertain; the traversal checks did not agree.'} No library records were changed. ${checked.ownership ? `${checked.ownership.owned} titles have purchase labels; ${checked.ownership.unknown} remain unconfirmed in this scan.` : ''} Export the scan diagnostics for investigation.`;
@@ -50,6 +94,11 @@
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No complete Amazon Video import yet; checking the full library…';
       scanStarted = true;
       const { items, snapshot, completionStatus } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv, phase }) => {
+        refreshTrace();
+        if (phase === 'paused-hidden') {
+          status.textContent = 'Scan paused. Return to this Amazon Video tab within a minute to continue. Your saved library is unchanged.';
+          return;
+        }
         status.textContent = `Reading Amazon Video library: ${movies} movies and ${tv} TV titles found.${phase === 'verification' ? ' Confirming the listing.' : phase === 'boundary-probe' ? ' Confirming the listing.' : phase === 'purchase-labels' ? ' Checking purchase information.' : ''}`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [], { readPurchaseLabels: true });
       if (fullRescan) {
@@ -78,10 +127,12 @@
         exportButton.disabled = !scanStarted || !globalThis.GalacticAmazonVideo.getDiagnostics?.();
         if (!exportButton.disabled) exportButton.closest('details').open = true;
       }
+      refreshTrace();
       delete status.dataset.busy;
     }
   }
   exportButton?.addEventListener('click', () => {
+    if (!diagnosticsEnabled) return;
     const diagnostics = globalThis.GalacticAmazonVideo.getDiagnostics?.();
     if (!diagnostics) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify({ ...diagnostics, operation: exportContext }, null, 2)], { type: 'application/json' }));

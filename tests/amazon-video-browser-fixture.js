@@ -20,6 +20,7 @@ async function setup({nested=false,ids=[1,2,3,4],outside='',inside='',total=ids.
  const originalScroll=win.scrollTo.bind(win);win.scrollTo=options=>{scrolls++;originalScroll(options);onScroll(scrolls);};
  const originalListScroll=list.scrollTo.bind(list);list.scrollTo=options=>{scrolls++;originalListScroll(options);onScroll(scrolls);};
  win.eval(snapshotCode);win.eval(importerCode);
+ win.GalacticAmazonVideo.setDiagnosticsEnabled(true);
  return {win,doc,list,api:win.GalacticAmazonVideo,add:(...ids)=>list.insertAdjacentHTML('beforeend',ids.map(n=>card(n)).join('')),onPause:fn=>{onPause=fn;},onScroll:fn=>{onScroll=fn;},pauses:()=>pauses,scrolls:()=>scrolls};
 }
 async function rejects(page,pattern,message){let error;try{await page.api.fetchAmazonVideoLibrary();}catch(value){error=value;}assert(error&&pattern.test(error.message),message+(error?": "+error.message:": unexpectedly returned"));return error;}
@@ -56,6 +57,45 @@ async function virtualLibrary({plateau=false}={}){
  });return page;
 }
 try{
+ for (const hidePhase of ['reading','verification']) {
+  const page=await virtualLibrary();let hidden=false,switched=false,hiddenMoves=0;
+  Object.defineProperty(page.doc,'visibilityState',{configurable:true,get:()=>hidden?'hidden':'visible'});
+  const move=page.win.scrollTo.bind(page.win),nestedMove=page.list.scrollTo.bind(page.list);
+  page.win.scrollTo=options=>{if(hidden)hiddenMoves++;move(options);};
+  page.list.scrollTo=options=>{if(hidden)hiddenMoves++;nestedMove(options);};
+  const result=await page.api.fetchAmazonVideoLibrary(progress=>{
+   if (!switched&&progress.phase===hidePhase) {
+    switched=true;hidden=true;page.doc.dispatchEvent(new page.win.Event('visibilitychange'));
+    nativeTimeout(()=>{hidden=false;page.doc.dispatchEvent(new page.win.Event('visibilitychange'));},20);
+   }
+  },null,{readPurchaseLabels:false});
+  assert(switched&&hiddenMoves===0&&result.items.length===343&&page.api.getDiagnostics().verification.missingItems===0,`Background ${hidePhase} pauses movement and resumes complete independent membership verification`);
+  assert(page.api.getDiagnostics().traversal.events.some(e=>e.category==='pause')&&page.api.getDiagnostics().traversal.events.some(e=>e.category==='resume'),`Background ${hidePhase} pause and recovery are visible in Provider Diagnostics`);
+ }
+ for (const interruption of ['timeout','navigation']) {
+  const page=await setup();let hidden=true;
+  Object.defineProperty(page.doc,'visibilityState',{get:()=>hidden?'hidden':'visible'});
+  const timer=page.win.setTimeout;
+  page.win.setTimeout=(fn,ms,...args)=>ms===60000?nativeTimeout(fn,interruption==='timeout'?0:100):timer(fn,ms,...args);
+  if(interruption==='navigation')nativeTimeout(()=>page.win.dispatchEvent(new page.win.Event('pagehide')),0);
+  await rejects(page,/saved library was kept/,`Hidden ${interruption} refuses the scan with a safe retry instruction`);
+  assert(page.api.getDiagnostics().reason===(interruption==='timeout'?'visibility-timeout':'navigation-interrupted'),`Hidden ${interruption} has a distinct diagnostic reason and never certifies completion`);
+ }
+ let toggled=await setup({total:null});
+ toggled.api.setDiagnosticsEnabled(false);
+ await toggled.api.fetchAmazonVideoLibrary(()=>{},null,{readPurchaseLabels:false});
+ assert(toggled.api.getDiagnostics()===null,'Diagnostics disabled collects no detailed trace or export while normal traversal still completes');
+ let captured;
+ toggled.onPause(n=>{
+  if(n===toggled.enableAt){toggled.api.setDiagnosticsEnabled(true);for(let i=0;i<150;i++)toggled.doc.dispatchEvent(new toggled.win.Event('visibilitychange'));}
+  if(n===toggled.enableAt+2){captured=toggled.api.getDiagnostics();toggled.api.setDiagnosticsEnabled(false);}
+ });
+ toggled.enableAt=toggled.pauses()+2;
+ await toggled.api.fetchAmazonVideoLibrary(()=>{},null,{readPurchaseLabels:false});
+ assert(captured.traversal.events.length<=128&&captured.traversal.droppedEvents>0,'Mid-scan enable starts subsequent bounded capture and evicts the oldest events');
+ assert(captured.traversal.events.some(e=>e.category==='visibility')&&captured.traversal.events.some(e=>e.waitMs!==undefined),'Visibility transitions and observed movement waits are captured without a new traversal delay');
+ assert(toggled.api.getDiagnostics()===null,'Mid-scan disable clears the captured timeline and stops subsequent detailed collection');
+ assert(!/PRIVATE_TITLE|amzn1|fixture-|https?:|cookie|token|account/i.test(JSON.stringify(captured))&&JSON.stringify(captured).length<100000,'Bounded traversal export excludes private data and remains below 100 KB');
  let labels=await setup({ids:[1,2,3,4],outside:'<aside>You purchased this</aside>'});
  labels.list.innerHTML=card(1,{ownership:'<span hidden>You purchased this.</span>'})+card(2,{ownership:'<span>You purchased this</span>'})+card(3,{ownership:'<button>Buy</button><p>Purchase this movie</p>'})+card(4,{ownership:'<span>Rental expires in 2 days</span>'});
  let extracted=labels.api.amazonVideoItemsFromDocument(labels.doc);
@@ -251,11 +291,14 @@ try{
  const writer=createStorageWriter(storage);
  await writer.mergeProviderItems('amazon-video',[{providerItemId:'old-video',title:'Preserved video',mediaType:'movie',ownership:'owned'}]);
  await writer.mergeProviderItems('gog',[{providerItemId:'old-game',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);
- const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow,knownIds=[],messages=[];
+ const before=JSON.stringify(await writer.getDatabase());let imports=0,failures=0,shadow,knownIds=[],messages=[],diagnosticsChanged,privateDiagnosticsChanged;
  page=await setup({inside:'<div role="progressbar"></div>'});
  const floatingPanelCode=await(await fetch('/src/providers/floating-panel.js')).text();
  const renderPanel=async(diagnostics=false)=>{
   page.win.chrome={runtime:{sendMessage:async request=>request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:diagnostics}:{ok:true,profiles:[],profileLabel:'Fixture'}}};page.win.eval(floatingPanelCode);
+  page.win.chrome.runtime.id='fixture-runtime';
+  page.win.chrome.runtime.onMessage={addListener:listener=>{privateDiagnosticsChanged=(enabled,sender='fixture-runtime')=>{diagnostics=enabled;listener({type:'GL_VIDEO_DIAGNOSTICS_CHANGED'},{id:sender});};}};
+  page.win.chrome.storage={onChanged:{addListener:listener=>{diagnosticsChanged=enabled=>listener({galacticLibraryProviderDiagnostics:{newValue:enabled}},'local');}}};
   const original=page.win.Element.prototype.attachShadow;page.win.Element.prototype.attachShadow=function(options){shadow=original.call(this,options);return shadow;};
   page.win.GalacticSync={send:async request=>{
    messages.push(request.type);
@@ -269,7 +312,7 @@ try{
  await renderPanel();
  assert(shadow.querySelectorAll('[data-mode="full"], [data-mode="incremental"]').length===2&&[...shadow.querySelectorAll('[data-provider-diagnostic]')].every(e=>!e.getClientRects().length),'The ordinary Amazon Video panel hides diagnostics while preserving its two import actions and declared-account controls');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
- assert(page.api.getDiagnostics().hoverChecks.enabled&&imports===0&&JSON.stringify(await writer.getDatabase())===before,'Normal Full rescan enables purchase detection automatically and keeps internal sanitized diagnostics on failure');
+ assert(page.api.getDiagnostics()===null&&imports===0&&JSON.stringify(await writer.getDatabase())===before,'Normal Full rescan keeps purchase detection and safe refusal while detailed diagnostics are disabled');
  page.doc.querySelector('#galactic-library-amazon-video-importer').remove();failures=0;messages=[];
  await renderPanel(true);assert(shadow.querySelector('details[data-provider-diagnostic] summary').textContent==='Scan diagnostics'&&shadow.querySelector('[data-export-diagnostics]').disabled,'A troubleshooting build retains the existing read-only checks and sanitized export');
  shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>failures===1&&!shadow.querySelector('.status').dataset.busy);
@@ -312,6 +355,27 @@ try{
  const panelTimer=page.win.setTimeout;page.win.setTimeout=(callback,ms,...args)=>ms===15000?nativeTimeout(callback,0):panelTimer(callback,ms,...args);
  shadow.querySelector('[data-mode="ownership"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
  assert(messages.length===0&&page.api.getDiagnostics().state==='purchase-label-check-complete'&&shadow.querySelector('.status').textContent.includes('No library records changed'),'The manual-hover diagnostic is accessible through the panel and cannot begin an import or scan lease');
+ diagnosticsChanged(false);
+ assert(shadow.querySelector('details[data-provider-diagnostic]').hidden&&page.api.getDiagnostics()===null,'The existing setting immediately hides Video diagnostics and clears its exportable trace');
+ messages=[];shadow.querySelector('[data-mode="inspect"]').click();
+ assert(messages.length===0&&!shadow.querySelector('.status').dataset.busy,'Disabled read-only diagnostics cannot be invoked through a hidden control');
+ page.doc.querySelector('main p').textContent='All items (4)';
+ const toggleAt=page.pauses()+2,importsBefore=imports;let capturedMidScan;
+ page.onPause(n=>{if(n===toggleAt)diagnosticsChanged(true);if(n===toggleAt+1){capturedMidScan=page.api.getDiagnostics();diagnosticsChanged(false);}});
+ shadow.querySelector('[data-mode="full"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(capturedMidScan?.traversal&&imports===importsBefore+1&&page.api.getDiagnostics()===null,'Live setting changes capture only subsequent events and clearing diagnostics does not interrupt a valid import');
+ assert(shadow.querySelector('details[data-provider-diagnostic]').hidden&&shadow.querySelector('[data-export-diagnostics]').disabled,'Disabling during an import keeps the trace and export hidden after completion');
+ diagnosticsChanged(true);const stopAt=page.pauses()+2;
+ page.onPause(n=>{if(n===stopAt)diagnosticsChanged(false);});
+ const beforeDisabledCheck=JSON.stringify(await writer.getDatabase());
+ shadow.querySelector('[data-mode="inspect"]').click();await waitFor(()=>!shadow.querySelector('.status').dataset.busy);
+ assert(shadow.querySelector('.status').textContent.includes('Detailed diagnostics were cleared')&&JSON.stringify(await writer.getDatabase())===beforeDisabledCheck,'Disabling diagnostics during a read-only check finishes cleanly without retaining details or changing records');
+ privateDiagnosticsChanged(true);await waitFor(()=>!shadow.querySelector('details[data-provider-diagnostic]').hidden);
+ assert(!shadow.querySelector('details[data-provider-diagnostic]').hidden,'Firefox private-setting notification refreshes the existing diagnostics UI without a storage.local event');
+ privateDiagnosticsChanged(false,'another-extension');await new Promise(resolve=>nativeTimeout(resolve,0));
+ assert(!shadow.querySelector('details[data-provider-diagnostic]').hidden,'A foreign sender cannot change Video diagnostic capture');
+ privateDiagnosticsChanged(false);await waitFor(()=>shadow.querySelector('details[data-provider-diagnostic]').hidden);
+ assert(page.api.getDiagnostics()===null,'Verified private-setting disable clears capture and hides the tools');
  await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await nativeFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{frame?.remove();}
