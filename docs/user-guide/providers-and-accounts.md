@@ -8,9 +8,10 @@ or change their ownership.
 ## Add your first library
 
 Choose **Add a library** from an empty Library or the toolbar popup. In Providers,
-expand a provider and open its website. For a first store scan, sign in, enter a recognizable **Account
-nickname** on the Galactic Library panel, and confirm that it describes the
-signed-in account. Choose **Sync Epic library** on Epic, **Import Nintendo cards** on Nintendo, or **Full rescan** on other providers. Keep the provider tab open until the import finishes. Return to Library
+expand a provider and open its website. Sign in to the account you want to
+import. The Galactic Library panel can use an unnamed **Default account** for
+your first import; naming is optional. Confirm the signed-in account when
+requested. Choose **Sync Epic library** on Epic, **Import Nintendo cards** on Nintendo, or **Full rescan** on other providers. Keep the provider tab open until the import finishes. Return to Library
 to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
@@ -41,8 +42,10 @@ require a full rescan merely because another account was selected.
 
 On returning to a provider website, the importer remembers a single connected
 saved account. Ordinary updates do not require reentering its nickname or
-reconfirming the same account. GL does not verify the website login: if you sign
-in to another store account, choose a different nickname and confirm switching.
+reconfirming the same account. For ordinary provider pages, GL does not verify the website login: if you sign
+in to another store account, use **Change account** and select or add its saved
+account before importing. Console imports also verify the signed-in source
+account.
 Multiple saved accounts still require explicit selection and confirmation. An
 update clicked while saved accounts are loading waits for that lookup.
 

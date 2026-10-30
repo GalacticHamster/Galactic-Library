@@ -41,14 +41,16 @@ scope and return context. A saved workspace can reopen instead of All items.
 
 Open **Providers**, choose the provider, and open its signed-in website. Actual
 store scans run from the Galactic Library panel there; opening a website or
-selecting an account does not start a scan. First-time store scans require an
-account nickname and confirmation. An unambiguous remembered account is reused
-on later visits; a different store login requires deliberate account switching.
+selecting an account does not start a scan. A first import can use an unnamed
+Default account; account naming is optional. An unambiguous remembered account
+is reused on later visits. Use Change account before importing another store
+login, and confirm the account when requested. Console imports also verify the
+signed-in source account before saving.
 Every saved account remains in the combined Library.
 
 Supported providers are Steam, GOG, Epic Games, Amazon Games, Audible, Kindle,
 Amazon Video, Fandango at Home, Kobo, Humble Bundle, Fanatical, Xbox Web Library, PlayStation and Nintendo
-Switch Virtual Game Cards. Nintendo uses **Import loaded cards** on its signed-in
+Switch Virtual Game Cards. Nintendo uses **Import Nintendo cards** on its signed-in
 portal and keeps earlier cards absent from the current non-hidden view. It does
 not request or store Nintendo credentials. PlayStation supports the active PS4/PS5
 Purchased web library using the existing signed-in session. Its full and quick
