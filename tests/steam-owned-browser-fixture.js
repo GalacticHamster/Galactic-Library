@@ -52,6 +52,10 @@ try{
  assert(Object.keys((await writer.getDatabase()).providerItems).length===4&&(await writer.getDatabase()).providers.steam.syncState.applications.appIds.length===163,'Account-scoped ID evidence and named records survive actual writer restart and backup restore');
  history.replaceState({},'',location.pathname+'?gl-steam-diagnostics=1');mount();await new Promise(resolve=>setTimeout(resolve,0));
  assert(!shadow.querySelector('[data-provider-diagnostic]').hidden&&shadow.querySelector('[data-profile-next]')&&shadow.querySelector('[data-sample-ids]'),'Explicit troubleshooting mode retains timing and private App-ID sampling controls without DevTools');
+ ids.push(164,165);rows.set(164,{appid:164,type:4,name:'Related synthetic DLC',related_items:{parent_appid:2}});rows.set(165,{appid:165,type:4,name:'Unlinked synthetic DLC',related_items:{parent_appid:999999}});
+ await sync('full');db=await writer.getDatabase();
+ assert(db.providers.steam.addOnCount===3&&db.providers.steam.linkedAddOnCount===2&&Object.values(db.providerItems).some(i=>i.providerItemId==='164'&&i.metadata.parentProviderItemId==='2'),'Steam preserves a legitimate DLC-to-DLC parent relationship without rewriting it into a base-game identity');
+ assert(shadow.querySelector('.status').textContent.includes('1 DLC have no saved parent title.')&&!shadow.querySelector('.status').textContent.includes('no saved parent game'),'Steam warning describes missing parent titles accurately when another DLC is the supplied parent');
  await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks})});
 }catch(error){await originalFetch('/test-result',{method:'POST',body:JSON.stringify({checks,error:error.stack})});}
 finally{globalThis.fetch=originalFetch;Element.prototype.attachShadow=originalAttach;}

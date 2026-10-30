@@ -64,7 +64,7 @@
       const details=[];
       if(unresolvedApps.length)details.push(`${unresolvedApps.length} applications still need title or type information. Their access evidence is saved for later identification.`);
       if(result.unsupportedAppCount)details.push(`${result.unsupportedAppCount} other ${result.unsupportedAppCount===1?'application is':'applications are'} saved separately from games and DLC.`);
-      status.textContent = `${fullRescan?'Steam import':'Quick update'} complete. ${changed} ${response.gameCount} games and ${response.addOnCount??0} DLC currently recorded. ${details.join(' ')} Earlier saved titles were kept.${unlinkedAddOnCount?` ${unlinkedAddOnCount} DLC have no saved parent game.`:''}`;
+      status.textContent = `${fullRescan?'Steam import':'Quick update'} complete. ${changed} ${response.gameCount} games and ${response.addOnCount??0} DLC currently recorded. ${details.join(' ')} Earlier saved titles were kept.${unlinkedAddOnCount?` ${unlinkedAddOnCount} DLC have no saved parent title.`:''}`;
     } catch (error) {
       if(timing&&error.steamDiagnostics)timing.steamDiagnostics=error.steamDiagnostics;
       if(timing?.steamDiagnostics?.saveState==='pending'){timing.steamDiagnostics.saveState='unconfirmed';timing.steamDiagnostics.firstFailure??={stage:'save',kind:'other'};}
