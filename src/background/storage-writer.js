@@ -341,11 +341,35 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const view=await getQueryDatabase();prior={...effectiveTokens.get(view),base:committedCatalogSnapshot(view),view};
     }
     const afterEpoch=crypto.randomUUID();
+    const afterDigest=database?await providerCheckDigest(database):null;
+    if(database&&activeOperation!=='restoreDatabase'&&activeOperation!=='clearDatabase'){
+      // Network scans carry no old catalog write-set. Commit reads/merges the
+      // current catalog in the writer queue. Rebase only an intact admission
+      // whose complete provider/account/source scope did not change; never
+      // revive a stale observation or bless a replacement/restore generation.
+      const scans=updates[SCANS]??(await committedArea.get({[SCANS]:{}}))[SCANS];
+      const beforeView=await providerCheckView(prior.view,prior.base);
+      const scope=(db,provider)=>({state:db.providers[provider],
+        profiles:Object.fromEntries(Object.entries(db.providerProfiles).filter(([,p])=>p.provider===provider)),
+        items:Object.fromEntries(Object.entries(db.providerItems).filter(([,p])=>p.provider===provider)),
+        history:Object.fromEntries(Object.entries(db.providerHistory??{}).filter(([,p])=>p.item.provider===provider))});
+      let rebased;
+      for(const [provider,scan]of Object.entries(scans)){
+        const intact=scan.observationProviderToken?scan.observationProviderToken===providerObservationToken(prior.envelope,prior.packet,provider):(scan.observationToken??'none')===(prior.token??'none');
+        if(!intact||scan.readOnlyStart&&scan.mode==='full'&&scan.fullStartDigest!==await checkDigest(prior.base)
+          ||!equalDatabaseData(scope(beforeView,provider),scope(database,provider)))continue;
+        rebased??={...scans};rebased[provider]={...scan,observationToken:`${afterEpoch}:none`,observationProviderToken:`${afterEpoch}:none`,
+          ...(scan.readOnlyStart&&scan.mode==='full'?{fullStartDigest:afterDigest}:{})};
+      }
+      // The existing journal replays/undoes these leases with the exact catalog
+      // they describe, including interruption before envelope publication.
+      if(rebased)updates[SCANS]=rebased;
+    }
     if(pendingAdmission&&updates[SCANS]?.[pendingAdmission.provider]?.attemptRef===pendingAdmission.attemptRef){
       const provider=pendingAdmission.provider;updates[SCANS]={...updates[SCANS],[provider]:{...updates[SCANS][provider],observationToken:`${afterEpoch}:none`,observationProviderToken:`${afterEpoch}:none`}};
     }
     const extra=Object.fromEntries(Object.entries(updates).filter(([k])=>k!==DATABASE_STORAGE_KEY)),keys=[...Object.keys(extra),...removals.filter(k=>k!==DATABASE_STORAGE_KEY)],old=await committedArea.get(keys);
-    const journal={format:2,kind:'saving',before,afterDigest:database?await providerCheckDigest(database):null,afterEpoch,reset:activeOperation==='restoreDatabase'||activeOperation==='clearDatabase',completion:pendingScanCompletion,updates:extra,removals:removals.filter(k=>k!==DATABASE_STORAGE_KEY),previous:Object.fromEntries(keys.map(k=>[k,Object.hasOwn(old,k)?{present:true,value:old[k]}:{present:false}]))};
+    const journal={format:2,kind:'saving',before,afterDigest,afterEpoch,reset:activeOperation==='restoreDatabase'||activeOperation==='clearDatabase',completion:pendingScanCompletion,updates:extra,removals:removals.filter(k=>k!==DATABASE_STORAGE_KEY),previous:Object.fromEntries(keys.map(k=>[k,Object.hasOwn(old,k)?{present:true,value:old[k]}:{present:false}]))};
     validateObservationJournal(journal);
     retiringObservation=prior;
     try{await committedArea.set({[OBSERVATION_KEY]:journal});}

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {scanConcurrencyTests} from './scan-concurrency.js';
 import {PROVIDERS} from '../src/lib/constants.js';
 import {OBSERVATION_KEY as KEY} from '../src/lib/observation-overlays.js';
 import {completionWriter,completionBaseline,admitCompletion,finishCompletion} from './observation-completion-fixture.js';
@@ -16,6 +17,7 @@ async function oracle(provider,mode,base,values,details={}){
  });
 }
 export const observationCompletionTests=[
+ ...scanConcurrencyTests,
  ...PROVIDERS.map(provider=>['observation completion: '+provider+' full result equals validated full-save oracle',async()=>{
   const base=await completionBaseline(provider),{h}=await oracle(provider,'full',base,[value(provider)]);
   if(!consoleProvider(provider)){assert.equal(h.counts.databaseWrites,0);assert.equal(h.counts.receiptWrites,1);assert(!h.stages.includes('persist_validation'));}
