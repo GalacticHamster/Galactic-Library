@@ -23,8 +23,7 @@
           "none"
         ],
         "optional": [
-          "websiteContent",
-          "authenticationInfo"
+          "websiteContent"
         ]
       }
     }

@@ -7,7 +7,7 @@ export function metadataConsentRequired(runtime = globalThis.chrome?.runtime) {
 
 export function metadataDataTypes(service) {
   if (service === 'Open Library') return ['websiteContent'];
-  if (service === 'Google Books') return ['websiteContent', 'authenticationInfo'];
+  if (service === 'Google Books') return ['websiteContent'];
   throw new Error('Unknown book lookup service.');
 }
 

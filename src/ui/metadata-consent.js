@@ -8,7 +8,7 @@ export function bindMetadataConsent(root, options = {}) {
   const refresh = async () => {
     const allowed = await Promise.all(buttons.map(button => hasMetadataConsent(button.dataset.allowMetadata, options)));
     buttons.forEach((button, index) => { button.disabled = allowed[index]; });
-    status.textContent = buttons.map((button, index) => `${button.dataset.allowMetadata}: ${allowed[index] ? 'allowed' : 'not allowed'}`).join(' · ');
+    status.textContent = `Online book lookups: ${allowed.every(Boolean) ? 'allowed' : 'not allowed'}`;
   };
   for (const button of buttons) button.addEventListener('click', () => {
     // Preserve the native user gesture required by Firefox's permission API.

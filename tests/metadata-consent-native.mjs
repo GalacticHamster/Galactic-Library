@@ -16,7 +16,7 @@ try{
   // Keep the real worker/permission gate; replace only HTTP acquisition in this disposable copy.
   const worker='src/background/service-worker.js';
   files.set(worker,Buffer.from(files.get(worker).toString()+`
-globalThis.fetch=async()=>{const saved=await chrome.storage.session.get({rcMetadataRequests:0});await chrome.storage.session.set({rcMetadataRequests:saved.rcMetadataRequests+1});return {ok:true,json:async()=>({docs:[],items:[]})};};
+globalThis.fetch=async url=>{const saved=await chrome.storage.session.get({rcMetadataRequests:0});await chrome.storage.session.set({rcMetadataRequests:saved.rcMetadataRequests+1,rcMetadataKeySeen:new URL(url).searchParams.get('key')==='SyntheticPrivateApiKey'});return {ok:true,json:async()=>({docs:[],items:[]})};};
 `));
   const archive=join(temporary,'GL.zip'),profile=join(temporary,'profile');await writeFile(archive,runtimeZip(files));await mkdir(profile);
   const port=await freePort();await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("extensions.update.enabled",false);\n`);
@@ -34,7 +34,9 @@ globalThis.fetch=async()=>{const saved=await chrome.storage.session.get({rcMetad
   assert.equal(await evaluate("return (await browser.permissions.getAll()).data_collection.length;"),0);
   assert.equal(await evaluate("return (await chrome.runtime.sendMessage({type:'SEARCH_OPEN_LIBRARY',query:{title:'Synthetic book'}})).ok;"),false);
   assert.equal(await evaluate("return (await chrome.storage.session.get({rcMetadataRequests:0})).rcMetadataRequests;"),0);
-  checks.push('fresh Firefox denies outbound metadata before consent');
+  assert.deepEqual(await evaluate("const {required,optional}=chrome.runtime.getManifest().browser_specific_settings.gecko.data_collection_permissions;return {required,optional};"),{required:['none'],optional:['websiteContent']});
+  assert.equal(await evaluate("return document.querySelectorAll('[data-allow-metadata]').length;"),1);
+  checks.push('fresh Firefox declares only website content and denies metadata before consent');
 
   async function decide(service,allow){
     await evaluate("document.querySelector('#book-service-setup').open=true;return true;");
@@ -57,16 +59,16 @@ globalThis.fetch=async()=>{const saved=await chrome.storage.session.get({rcMetad
   await decide('Open Library',true);
   await wait("return document.querySelector('[data-allow-metadata=\"Open Library\"]').disabled;");
   assert.equal(await evaluate("return await browser.permissions.contains({data_collection:['websiteContent']});"),true);
-  assert.equal(await evaluate("return await browser.permissions.contains({data_collection:['authenticationInfo']});"),false);
+  assert.deepEqual(await evaluate("return (await browser.permissions.getAll()).data_collection;"),['websiteContent']);
   assert.equal(await evaluate("return (await chrome.runtime.sendMessage({type:'SEARCH_OPEN_LIBRARY',query:{title:'Synthetic book'}})).ok;"),true);
-  checks.push('real Firefox grant authorizes bibliographic content but not Google credentials');
+  checks.push('real Firefox grant requests and grants website content only');
   await driver.send('WebDriver:Navigate',{url});
   await wait("return document.querySelector('[data-allow-metadata=\"Open Library\"]')?.disabled===true;");
   checks.push('native permission and settings state survive reload');
-  await decide('Google Books',true);
-  assert.equal(await evaluate("return await browser.permissions.contains({data_collection:['websiteContent','authenticationInfo']});"),true);
+  assert.equal(await evaluate("return (await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query:{title:'Synthetic book'}})).error;").then(error=>error.includes('Save your Google Books API key')),true);
   assert.equal(await evaluate("const S=await import('./src/lib/storage.js');await S.saveGoogleBooksApiKey('SyntheticPrivateApiKey');return (await chrome.runtime.sendMessage({type:'SEARCH_GOOGLE_BOOKS',query:{title:'Synthetic book'}})).ok;"),true);
-  checks.push('Google Books explicitly grants both categories and permits its request');
+  assert.equal(await evaluate("return (await chrome.storage.session.get({rcMetadataKeySeen:false})).rcMetadataKeySeen;"),true);
+  checks.push('Google Books keeps its no-key guard and sends the configured key using the same website-content grant');
   await evaluate("await browser.permissions.remove({data_collection:['websiteContent']});return true;");
   assert.equal(await evaluate("return (await chrome.runtime.sendMessage({type:'SEARCH_OPEN_LIBRARY_EDITION',isbn:'9780306406157'})).ok;"),false);
   assert.equal(await evaluate("return (await chrome.storage.session.get({rcMetadataRequests:0})).rcMetadataRequests;"),2);
@@ -80,6 +82,18 @@ globalThis.fetch=async()=>{const saved=await chrome.storage.session.get({rcMetad
   assert.equal(await evaluate("return (await chrome.storage.session.get({rcMetadataRequests:0})).rcMetadataRequests;"),2);
   assert.equal(await evaluate("const S=await import('./src/lib/storage.js'),db=await S.getDatabase();return Object.values(S.parseBackup(S.createBackup(db)).providerItems).filter(i=>i.title==='Synthetic queued book'&&i.ownership==='owned').length;"),1);
   checks.push('revoked bulk lookup pauses at its existing cursor and preserves library/backup');
+  const pausedJobId=await evaluate("const S=await import('./src/lib/storage.js');return (await S.getGoogleBooksEnrichmentJob()).jobId;");
+  await driver.send('WebDriver:Navigate',{url});await wait("return document.querySelector('[data-allow-metadata=\"Open Library\"]')?.disabled===false;");
+  await decide('Open Library',true);
+  await driver.send('WebDriver:Navigate',{url:url.split('#')[0]+'#books'});
+  await wait("return document.querySelector('#start-google-books-enrichment')?.disabled===false;");
+  await evaluate("document.querySelector('#start-google-books-enrichment').click();return true;");
+  await wait("const S=await import('./src/lib/storage.js');return (await S.getGoogleBooksEnrichmentJob()).cursor===1 && document.querySelector('#google-books-enrichment-status').getAttribute('aria-busy')==='false';");
+  assert.equal(await evaluate("const S=await import('./src/lib/storage.js');return (await S.getGoogleBooksEnrichmentJob()).jobId;"),pausedJobId);
+  assert.equal(await evaluate("return (await chrome.storage.session.get({rcMetadataRequests:0})).rcMetadataRequests;"),3);
+  assert.deepEqual(await evaluate("return (await browser.permissions.getAll()).data_collection;"),['websiteContent']);
+  assert.equal(await evaluate("const S=await import('./src/lib/storage.js'),db=await S.getDatabase();return Object.values(S.parseBackup(S.createBackup(db)).providerItems).filter(i=>i.title==='Synthetic queued book'&&i.ownership==='owned').length;"),1);
+  checks.push('restored consent resumes the same paused job without changing saved ownership');
   checks.forEach(value=>console.log('PASS installed Firefox metadata consent: '+value));
   console.log(checks.length+' installed Firefox metadata consent checks passed.');
 }finally{

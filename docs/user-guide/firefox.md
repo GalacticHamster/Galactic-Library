@@ -25,8 +25,8 @@ Tests do not certify live signed-in providers, an unseen large Fanatical account
 ## Optional online book lookups
 
 In **Settings > Book lookup setup**, Firefox lets you allow bibliographic sharing
-for Open Library and Google Books. Google Books also needs permission to send
-your configured API key to Google. Firefox stores these optional grants; they
-are not included in a GL backup. You can revoke them in Firefox Add-ons Manager.
+for both Open Library and Google Books with one optional permission. Your configured
+Google API key continues to be sent only to Google. Firefox stores the grant; it
+is not included in a GL backup. You can revoke it in Firefox Add-ons Manager.
 Without permission, provider imports and local library work remain available.
 A revoked bulk lookup pauses before its next request and keeps its progress.

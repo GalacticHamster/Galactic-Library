@@ -16,6 +16,6 @@ test('release manifests, package metadata and runtime handshake agree without ch
     const packaged=JSON.parse(files.get('manifest.json'));
     assert.equal(packaged.version,metadata.version);
     if(browser==='chrome')assert.equal(packaged.browser_specific_settings,undefined);
-    else assert.deepEqual(packaged.browser_specific_settings.gecko.data_collection_permissions.optional,['websiteContent','authenticationInfo']);
+    else assert.deepEqual(packaged.browser_specific_settings.gecko.data_collection_permissions.optional,['websiteContent']);
   }
 });
