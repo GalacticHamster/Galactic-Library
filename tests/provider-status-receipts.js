@@ -8,7 +8,7 @@ import {handleExternalApiRequestAsync} from '../src/lib/external-api.js';
 
 function library(provider){
   const db=createEmptyDatabase(),profile=newProviderProfile(provider,'Personal');
-  profile.state={connected:true,lastSync:'2026-01-01',fullSyncAt:'2026-01-01',quickSyncAt:'2026-01-02'};
+  profile.state={connected:true,lastSync:'2026-01-01',fullSyncAt:'2026-01-01',quickSyncAt:'2026-01-02',...(provider==='humble'?{syncState:{knownPurchaseIds:[]}}:{})};
   if(['nintendo','playstation','xbox'].includes(provider))profile.sourceAccountFingerprint='a'.repeat(64);
   db.providerProfiles[profile.profileId]=profile;db.providers[provider]={...profile.state,activeProfileId:profile.profileId};
   const item=normalizeProviderItem({provider,profileId:profile.profileId,providerItemId:'saved',title:'Private fixture',mediaType:provider==='kobo'?'book':'game',ownership:'owned'},'2026-01-01');

@@ -1,3 +1,4 @@
+import {providerScanMode} from '../lib/provider-scan-mode.js';
 import {normalizePermanentClaimsDatabase} from '../lib/ownership.js';
 import {validateAudibleHistory,enrichAudibleRecords,audibleGiftHistory,audibleLibraryExpiry} from '../lib/audible-ownership.js';
 import {validateSteamApplicationImport,steamApplicationAccess} from '../lib/provider-state.js';
@@ -552,8 +553,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       ||!requestedProfileId||existing?.profileId!==active||existing?.state.connected!==true||!existing?.state.lastSync))throw Error('Saved accounts changed. Select and confirm the signed-in account before scanning.');
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
-    if(changing&&!existing&&mode!=='full')throw Error('A different account without a baseline requires a complete full scan.');
-    const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId),forceFull=!profile.state.fullSyncAt;
+    const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId);
+    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||!profile.state.fullSyncAt;
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -575,13 +576,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         if(base!==querySnapshot)throw Error('The library changed while starting this scan. Start a fresh scan.');
       }
       await storageArea.set({[SCANS]:scans});
-      return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
+      return {scanToken,forceFull,scanReason:plan.scanReason,profileLabel,profileId:profile.profileId,database};
     }
     profile.state.syncHealth=validateSyncHealth({attemptRef:scans[provider].attemptRef,status:'running',mode:scans[provider].mode,attemptedProfileLabel:profileLabel,startedAt:scans[provider].startedAt,finishedAt:null,retryable:false});
     if(activeAtStartId===profile.profileId)profileState(database,profile,profile.state);
     pendingAdmission={provider,attemptRef:scans[provider].attemptRef};
     await storageArea.set({[SCANS]:scans,[DATABASE_STORAGE_KEY]:timed('persist_validation',()=>validateDatabase(database))});
-    return {scanToken,forceFull,profileLabel,profileId:profile.profileId,database};
+    return {scanToken,forceFull,scanReason:plan.scanReason,profileLabel,profileId:profile.profileId,database};
   }
   async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false,sourceAccountFingerprint=null) {
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(true);

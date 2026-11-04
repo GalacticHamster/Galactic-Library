@@ -1,3 +1,4 @@
+import {providerScanModeTests} from './provider-scan-mode.js';
 import {steamOwnedApplicationTests} from './steam-owned-applications.js';
 import {permanentClaimTests} from './permanent-claims.js';
 import {amazonGamesClaimTests} from './amazon-games-claims.js';
@@ -140,6 +141,7 @@ const tests = [
   ...providersUxTests,
   ...onboardingUxTests,
   ...providerProfileTests,
+  ...providerScanModeTests,
   ...overlayAccountAuditTests,
   ...consoleLibraryTests,
   ...nintendoImportTests,

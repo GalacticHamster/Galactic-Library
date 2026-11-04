@@ -67,11 +67,16 @@ export function validateProviderStates(value = {}) {
         if(audibleHistoryYears(h.refundPurchaseYearsChecked).some(y=>!h.years.includes(y)))throw Error('Invalid Audible refund year scope.');
         result.syncState.audibleHistory={version:1,scope:h.scope??'full',...audibleGiftHistory(h),...(h.failures?{failures:audibleHistoryFailures(h.failures)}:{}),...(h.uncertainRefunds!==undefined?{uncertainRefunds:count(h.uncertainRefunds,'Uncertain Audible refunds',50000)}:{}),ordersComplete:h.ordersComplete,refundsComplete:h.refundsComplete,...(h.refundPurchaseYearsChecked?{refundPurchaseYearsChecked:audibleHistoryYears(h.refundPurchaseYearsChecked)}:{}),years:[...new Set(h.years)],pagesRead:count(h.pagesRead,'Audible pages',10000),checkedAt:date(h.checkedAt),...(h.fullCheckedAt?{fullCheckedAt:date(h.fullCheckedAt)}:{}),reason:text(h.reason??'',100)};
       }
-      if(provider==='humble')result.syncState.knownPurchaseIds=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
+      // Missing/non-array acquisition checkpoints are not completed empty scans.
+      // Keep validation of supplied values, but let admission request a full scan.
+      if(provider==='humble'){
+        const ids=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
+        if(Array.isArray(state.syncState.knownPurchaseIds))result.syncState.knownPurchaseIds=ids;
+      }
       if(provider==='fanatical'){
         const fingerprints=strings(state.syncState.knownOrderFingerprints,50000,64,'Order fingerprints');
         if(fingerprints.some(entry=>!/^[a-f0-9]{64}$/iu.test(entry)))throw new Error('Invalid order fingerprint.');
-        result.syncState.knownOrderFingerprints=fingerprints.map(entry=>entry.toLowerCase());
+        if(Array.isArray(state.syncState.knownOrderFingerprints))result.syncState.knownOrderFingerprints=fingerprints.map(entry=>entry.toLowerCase());
       }
     }
     if(state.snapshotValidation!==undefined){

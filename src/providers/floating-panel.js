@@ -23,7 +23,13 @@
       if(!context.rememberedProfile&&!context.confirmed)throw new Error('Enter a profile label and confirm the signed-in account.');
       const result=await chrome.runtime.sendMessage({...request,...context,beginScan:true,...(timing?{diagnosticSentEpochMs:global.GalacticContentsPerformance.now()}: {})});
       if(generation!==session.generation)throw new Error('Account selection changed. Confirm the account and start a fresh import.');
-      if(result.ok)session.context={...context,confirmed:true,scanToken:result.scanToken,profileId:result.profileId};
+      if(result.ok){
+        session.context={...context,confirmed:true,mode:result.forceFull?'full':context.mode,scanToken:result.scanToken,profileId:result.profileId};
+        if(context.mode==='incremental'&&result.forceFull){
+          const status=session.status;
+          if(status)status.textContent=result.scanReason==='first-import'?'First import: scanning your library...':'Incremental history unavailable: performing a full scan...';
+        }
+      }
       if(timing){global.GalacticContentsPerformance.merge(timing,result.performance);result.performance=global.GalacticContentsPerformance.clean(timing.finish(result.ok?'prepared':'failed'));}
       return result;
     }
@@ -86,7 +92,7 @@
     gog:'Quick update reads newest-first purchase pages until it reaches a page already saved in GL. Full rescan checks every available supported page, including the hidden-games pages.',
     epic:'Sync Epic library checks the supported owned listing each time and refreshes saved games and add-ons. It does not stop at previously saved titles. Earlier saved titles stay if Epic cannot confirm a complete listing.',
     'amazon-games':'Quick update checks the past three months of claims. Full rescan checks all available calendar years. Without a complete initial import, or when the last sync is over 70 days old, Quick update automatically checks all years to avoid gaps. Unclear delivery details stay unconfirmed; earlier confirmed access and your corrections are kept.',
-    audible:'Quick update stops at previously saved library titles and checks purchase, return and received-gift history for the current and previous calendar years. It requires an initial library import; use Full rescan once if needed. Full rescan reads the complete library and all available history years. Both enrich matching saved titles automatically and preserve earlier ownership evidence and acquisition dates. Incomplete history checks leave uncertain access unconfirmed.',
+    audible:'Quick update stops at previously saved library titles and checks purchase, return and received-gift history for the current and previous calendar years. Without an initial library import, Quick update automatically reads the complete library and all available history years once. Full rescan reads the complete library and all available history years. Both enrich matching saved titles automatically and preserve earlier ownership evidence and acquisition dates. Incomplete history checks leave uncertain access unconfirmed.',
     kindle:'Quick update reads the newest Kindle pages until it reaches a page already saved in your library. Full rescan checks the supported library again.',
     'amazon-video':'Quick update checks recent additions until it reaches an already saved group. Full rescan checks the wider collection and refreshes purchase labels. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
     'fandango-at-home':'Quick update reads newest-first Recently Purchased lists until it reaches known titles. Full rescan checks every available movie and TV card against Fandango’s reported counts. If those checks fail, no replacement library is saved.',
@@ -154,7 +160,7 @@
     panel.prepend(heading);
     if(provider){
       const controls=document.createElement('div');
-      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>Using a different account on this site? Select Change account first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Use Add account for another account. Rename saved accounts in GL Providers; editing this field does not rename them.</p><p data-profile-new-help hidden>Use Full rescan to start a new alternate account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
+      controls.innerHTML='<p data-profile-status role="status">Loading saved account...</p><div data-profile-summary hidden><button type="button" data-profile-change>Change account</button><p>Using a different account on this site? Select Change account first.</p></div><div data-profile-editor><label data-profile-choice-label hidden>Use saved account <select data-profile-choice></select></label><label>Account nickname <input data-profile-label maxlength="100" placeholder="e.g. Personal" list="galactic-profile-names"></label><datalist id="galactic-profile-names"></datalist><p>This nickname is your label for the website account. GL does not sign you in or verify your login. Use Add account for another account. Rename saved accounts in GL Providers; editing this field does not rename them.</p><p data-profile-new-help hidden>Quick update automatically scans the full library for a new account.</p><label data-profile-confirm-label><input type="checkbox" data-profile-confirm> I checked that the signed-in account matches this nickname</label><br><label><input type="checkbox" data-profile-switch> Confirm switching to this account</label><p><a data-profile-manage target="_blank" rel="noopener">Rename or manage accounts in GL Providers</a></p><button type="button" data-profile-cancel hidden>Cancel account change</button></div>';
       controls.dataset.providerAccount='';
       controls.style.cssText='font-size:12px;margin:10px 0';
       panel.querySelector('button').before(controls);
@@ -166,7 +172,7 @@
       const session={read:()=>({profileLabel:input.value.trim(),confirmed:controls.querySelector('[data-profile-confirm]').checked||automatic&&lastProfileReply?.reuseAllowed!==true,switchProfile:controls.querySelector('[data-profile-switch]').checked,mode,
         ...(choice.value!=='__add__'&&lastProfileReply?.profiles?.some(p=>p.profileId===choice.value)?{profileId:choice.value}:{}),
         ...(remembered&&input.value.trim()===remembered.profileLabel&&!controls.querySelector('[data-profile-switch]').checked?{profileId:remembered.profileId,rememberedProfile:lastProfileReply?.reuseAllowed===true}:{})})};
-      session.generation=0;
+      session.generation=0;session.status=panel.querySelector('[data-import-status]');
       const invalidate=()=>{session.generation++;session.context=null;session.resume=null;};
       input.addEventListener('input',()=>{edited=true;automatic=false;remembered=null;invalidate();editor.hidden=false;summary.hidden=true;controls.querySelector('[data-profile-cancel]').hidden=!lastProfileReply?.profileId;controls.querySelector('[data-profile-confirm]').checked=false;controls.querySelector('[data-profile-confirm-label]').hidden=false;controls.querySelector('[data-profile-status]').textContent='Confirm the account you want to update.';});
       controls.querySelector('[data-profile-switch]').addEventListener('change',invalidate);

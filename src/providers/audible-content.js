@@ -129,8 +129,8 @@
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'audible' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Audible sync state.');
-      const fullRescan = mode === 'full';
-      if(!fullRescan&&!state.hasFullBaseline)throw Error('Quick update needs an initial library baseline. Choose Full rescan once. No library changes were saved; Quick update was not converted to a full scan.');
+      const fullRescan = mode === 'full' || !state.hasFullBaseline;
+      if(fullRescan&&mode!=='full')status.textContent=state.scanReason==='baseline-unavailable'?'Incremental history unavailable: checking your complete library and history...':'First import: scanning your library and available history...';
       const { items, snapshot, checkedCount } = await globalThis.GalacticAudible.fetchAudibleAudiobooks(({ pagesRead, audiobooks }) => {
         status.textContent = `Reading Audible library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${audiobooks} audiobooks found.`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);

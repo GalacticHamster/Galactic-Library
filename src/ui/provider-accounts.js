@@ -32,11 +32,8 @@ export function updateEligibility(profile,state={},now=Date.now()){
  let quickReason=fullReason;
  if(!quickReason&&profile.provider==='epic')quickReason='Use Sync Epic library to check the supported listing.';
  if(!quickReason&&profile.provider==='nintendo')quickReason='Use Import Nintendo cards to check the loaded card list.';
- if(!quickReason&&!state.fullSyncAt)quickReason='Run a first Full rescan to establish this account’s import history.';
- if(!quickReason&&profile.provider==='amazon-games'){
-   const age=now-Date.parse(state.quickSyncAt??state.fullSyncAt??'');
-   if(!Number.isFinite(age)||age>70*24*60*60*1000)quickReason='Amazon Games needs a Full rescan after more than 70 days without an update.';
- }
+ // Baseline and freshness select acquisition mode on the provider page; they
+ // do not prevent starting an update. Account and running-scan guards still apply.
  return {quick:!quickReason,full:!fullReason,quickReason,fullReason};
 }
 export function createProfileManagementActions({read,preview,remove,reset}){

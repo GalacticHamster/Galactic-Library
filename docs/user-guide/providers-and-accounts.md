@@ -1,5 +1,14 @@
 # Providers and saved accounts
 
+**Quick update** automatically performs the initial full import for a new account,
+then uses that provider's supported incremental method. If its incremental
+history is unavailable, GL uses the existing full importer when safe. **Full
+rescan** always requests a full check. Epic and Nintendo retain their existing
+single import action; Xbox and PlayStation read their complete supported web
+view with either action. Authentication and incomplete-list errors still stop
+the scan and preserve saved data; GL does not retry a failed scan as a replacement.
+
+
 Galactic Library has four main sections: **Library, Providers, Books & Contents and
 Settings**. Library combines every remembered account. Selecting an account in
 Providers chooses where future updates go; it does not hide the other accounts
@@ -110,8 +119,9 @@ books. It intentionally does not reconcile older transactions. Use Full rescan
 for older purchases, historical corrections or recovery. Both buttons perform
 ownership enrichment automatically; no evidence file or separate action is needed.
 
-Quick update requires an initial complete library import. Without one it asks
-for Full rescan and stops, rather than silently performing a full import. An
+Quick update automatically performs the initial complete library and all-year
+history import when no library baseline exists. Later Quick updates use recent
+history only. An
 older library without a completed all-year purchase-history check can still use
 Quick update, with an explicit notice that historical reconciliation is missing.
 There are no scheduled full-history rescans.

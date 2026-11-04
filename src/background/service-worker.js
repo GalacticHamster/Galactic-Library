@@ -468,7 +468,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? storageWriter.execute('beginProviderScan',[request.provider,request.profileLabel,request.mode,request.switchProfile,sender.tab.id,request.profileId,request.confirmed!==true&&request.rememberedProfile===true,request.sourceAccountFingerprint],timing)
         : Promise.reject(new Error('Confirm that the signed-in account matches the profile label.')))
       : (request.type==='GET_PROVIDER_PROFILE'||request.provider==='kobo'?storageWriter.getProviderDatabase(request.provider,{beginSpan:stage=>timing?.begin(stage)}):getDatabase()).then(database=>({database}));
-    read.then(({database,scanToken,forceFull,profileLabel,profileId}) => {
+    read.then(({database,scanToken,forceFull,scanReason,profileLabel,profileId}) => {
         const activeId=profileId??database.providers?.[request.provider]?.activeProfileId;
         const state = database.providerProfiles?.[activeId]?.state ?? {};
         if(request.type==='GET_PROVIDER_PROFILE'){
@@ -498,7 +498,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         reply({
           ok: true,
-          scanToken,profileLabel,profileId:activeId,
+          scanToken,forceFull:forceFull===true,scanReason,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'

@@ -275,7 +275,7 @@ providerProfileTests.push(
    const {writer}=memory();
    for(const provider of PROVIDERS.filter(p=>!['nintendo','playstation','xbox'].includes(p))){
      const mediaType=provider==='kindle'?'book':provider==='fandango-at-home'?'movie':'game',items=[{providerItemId:'x',title:'Synthetic',mediaType}];
-     let d=await writer.replaceProviderItems(provider,items,{profileLabel:'A',fullSyncAt:'2026-10-01'},snapshotFixture(provider,items)),a=d.providers[provider].activeProfileId;
+     let d=await writer.replaceProviderItems(provider,items,{profileLabel:'A',fullSyncAt:'2026-10-01',...(provider==='humble'?{syncState:{knownPurchaseIds:[]}}:provider==='fanatical'?{syncState:{knownOrderFingerprints:[]}}:{})},snapshotFixture(provider,items)),a=d.providers[provider].activeProfileId;
      d=await writer.replaceProviderItems(provider,items,{profileLabel:'B',fullSyncAt:'2026-10-02'},snapshotFixture(provider,items));const b=d.providers[provider].activeProfileId;
      d=await writer.selectProviderProfile(a,b,true);assert.equal(d.providers[provider].fullSyncAt,'2026-10-01T00:00:00.000Z');assert.equal(Object.values(d.providerItems).filter(i=>i.provider===provider).length,2);
      const scan=await writer.beginProviderScan(provider,'A','incremental',false,1);assert.equal(scan.forceFull,false);assert.equal(scan.profileId,a);await writer.selectProviderProfile(b,a,true);

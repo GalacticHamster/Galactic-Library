@@ -24,12 +24,12 @@ export const providersUxTests=[
  }]
 ];
 providersUxTests.push(
- ['Provider update eligibility respects selected accounts with optional names, missing history, Epic and Amazon age restrictions',()=>{
+ ['Provider update eligibility respects selected accounts with optional names, automatic initial/recovery scans and single-action providers',()=>{
    const p={provider:'kindle',active:true,nickname:'A'},state={fullSyncAt:'2026-10-01'};
    assert(updateEligibility(p,state).quick);assert(!updateEligibility({...p,active:false},state).full);assert(updateEligibility({...p,nickname:''},state).quick);
-   assert(!updateEligibility(p,{}).quick);assert(updateEligibility(p,{}).full);
+   assert(updateEligibility(p,{}).quick);assert(updateEligibility(p,{}).full);
    assert(!updateEligibility({...p,provider:'epic'},state).quick);assert(updateEligibility({...p,provider:'epic'},state).full);
-   const now=Date.parse('2026-10-07');assert(!updateEligibility({...p,provider:'amazon-games'},{fullSyncAt:'2026-01-01'},now).quick);
+   const now=Date.parse('2026-10-07');assert(updateEligibility({...p,provider:'amazon-games'},{fullSyncAt:'2026-01-01'},now).quick);
    assert(updateEligibility({...p,provider:'amazon-games'},{fullSyncAt:'2026-01-01',quickSyncAt:'2026-10-01'},now).quick);
    assert(!updateEligibility({...p,syncHealth:{status:'running'}},state).full);
  }],

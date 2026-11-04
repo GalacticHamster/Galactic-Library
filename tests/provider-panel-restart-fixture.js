@@ -22,7 +22,7 @@ async function harness(provider){
    }
    if(request.type==='GET_PROVIDER_SYNC_STATE'){
     const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,77,request.profileId,request.confirmed!==true&&request.rememberedProfile===true,request.sourceAccountFingerprint);
-    return {ok:true,scanToken:scan.scanToken,profileId:scan.profileId,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:Object.values(scan.database.providerItems).filter(r=>r.profileId===scan.profileId).map(r=>r.providerItemId)}};
+    return {ok:true,scanToken:scan.scanToken,profileId:scan.profileId,forceFull:scan.forceFull,scanReason:scan.scanReason,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:Object.values(scan.database.providerItems).filter(r=>r.profileId===scan.profileId).map(r=>r.providerItemId)}};
    }
    if(request.type==='FANDANGO_IMPORT_STATE'){
     if(request.action==='get')return {ok:true,state:structuredClone(state)};
@@ -39,10 +39,10 @@ async function harness(provider){
    throw Error('Unexpected account message '+request.type);
   }catch(error){return {ok:false,error:error.message};}
  }}};
- async function page(path,{content=false}={}){
+ async function page(path,{content=false,noGrids=false,missingCounts=false,fullError=false}={}){
   const frame=document.createElement('iframe');frame.hidden=true;document.body.append(frame);frames.push(frame);
   const doc=frame.contentDocument,loc=new URL('https://athome.fandango.com'+path);loc.assign=url=>visits.push(new URL(url,loc.href).pathname);
-  const scoped={location:loc,document:doc},evaluate=source=>new Function('globalThis','document','location','chrome','sessionStorage',source)(scoped,doc,loc,chrome,frame.contentWindow.sessionStorage);
+  const scoped={location:loc,document:doc},evaluate=source=>new Function('globalThis','document','location','chrome','sessionStorage','setTimeout',source)(scoped,doc,loc,chrome,frame.contentWindow.sessionStorage,(fn,ms,...args)=>setTimeout(fn,ms===500?0:ms,...args));
   evaluate(sharedSource);let shadow;
   const attach=frame.contentWindow.Element.prototype.attachShadow;
   frame.contentWindow.Element.prototype.attachShadow=function(options){shadow=attach.call(this,options);return shadow;};
@@ -51,7 +51,7 @@ async function harness(provider){
    // Use the real snapshot constructor; account/navigate tests mock only website
    // discovery, while all admission, tab state and commits use real mechanisms.
    const snapshot=await import('../src/lib/provider-snapshot.js');scoped.GalacticProviderSnapshot=snapshot;
-   scoped.GalacticFandangoAtHome={expectedFandangoCountsFromDocument:()=>({movies:1,tv:0}),viewAllLibraryLinksFromDocument:()=>[{mediaType:'movie',url:loc.origin+'/content/browse/movies'},{mediaType:'tv',url:loc.origin+'/content/browse/tv'}],readFandangoGrid:async(section,expected,progress,known)=>section==='movie'&&!Array.isArray(known)?[F.providerSyncValue(provider)]:[]};
+   scoped.GalacticFandangoAtHome={expectedFandangoCountsFromDocument:()=>({movies:missingCounts?null:1,tv:0}),fetchFandangoLibrary:async()=>{if(fullError)throw Error('Synthetic network failure');return {items:[F.providerSyncValue(provider)]};},viewAllLibraryLinksFromDocument:()=>noGrids?[]:[{mediaType:'movie',url:loc.origin+'/content/browse/movies'},{mediaType:'tv',url:loc.origin+'/content/browse/tv'}],readFandangoGrid:async(section,expected,progress,known)=>section==='movie'&&!Array.isArray(known)?[F.providerSyncValue(provider)]:[]};
    evaluate(contentSource);
   }else{
    const host=doc.createElement('div');doc.body.append(host);shadow=host.attachShadow({mode:'open'});scoped.GalacticFloatingPanel.render(shadow,provider);
@@ -126,5 +126,22 @@ export async function checkFandangoRestartNavigation(){
   assert(!edited.visits.length&&!edited.state&&!edited.messages.some(r=>r.type==='GET_PROVIDER_SYNC_STATE'),'Editing an account without confirmation navigated or admitted a scan');
   checks.push('Edited/unconfirmed Fandango accounts still require explicit confirmation and cannot queue navigation or save data');
  }finally{edited.dispose();}
+ const fallback=await harness('fandango-at-home');
+ try{
+  const p=await fallback.page('/content/browse/mylibrary',{content:true,noGrids:true});
+  p.shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>p.shadow.querySelector('.status').textContent.startsWith('Saved '));
+  const saved=fallback.messages.findLast(m=>m.type==='COMMIT_PROVIDER_SCAN');
+  assert(saved.mode==='full'&&saved.snapshot.complete===true&&!fallback.visits.length,'Missing incremental grids did not select the existing full reader with validated coverage');
+  checks.push('Fandango Quick with no incremental grids uses the normal complete reader and full snapshot without a manual retry');
+  const before=await fallback.writer.getDatabase();
+  for(const options of [{missingCounts:true},{fullError:true}]){
+   const failed=await fallback.page('/content/browse/mylibrary',{content:true,noGrids:true,...options});
+   const commits=fallback.messages.filter(m=>m.type==='COMMIT_PROVIDER_SCAN').length;
+   failed.shadow.querySelector('[data-mode="incremental"]').click();await wait(()=>failed.shadow.querySelector('.status').textContent.includes('failed:'));
+   assert(fallback.messages.filter(m=>m.type==='COMMIT_PROVIDER_SCAN').length===commits,'Failed or unverified fallback reached persistence');
+   const after=await fallback.writer.getDatabase();assert(JSON.stringify(after.providerItems)===JSON.stringify(before.providerItems),'Fandango fallback failure changed saved records');
+  }
+  checks.push('Missing Fandango totals and full-reader network failures remain errors and preserve the saved library without replacement or retries');
+ }finally{fallback.dispose();}
  return checks;
 }

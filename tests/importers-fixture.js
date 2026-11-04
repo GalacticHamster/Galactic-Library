@@ -163,13 +163,13 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE'){const d=await writer.getDatabase(),p=d.providerProfiles[d.providers[provider]?.activeProfileId],profiles=Object.values(d.providerProfiles).filter(p=>p.provider===provider);return {ok:true,profileLabel:p?.nickname??'fixture',profileId:p?.profileId,profiles,reuseAllowed:profiles.length===1&&p?.state.connected===true&&Boolean(p?.state.lastSync)};}
       if(request.type==='REPORT_PROVIDER_SCAN_FAILURE')return {ok:true,recorded:await writer.failProviderScan(provider,request.scanToken,1,request.failure)};
-      if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:!scan.forceFull,syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
+      if(request.type==='GET_PROVIDER_SYNC_STATE'){const scan=await writer.beginProviderScan(provider,request.profileLabel,request.mode,request.switchProfile,1);return {ok:true,scanToken:scan.scanToken,forceFull:scan.forceFull,scanReason:scan.scanReason,hasFullBaseline:!scan.forceFull,lastSuccessfulSyncAt:scan.database.providerProfiles[scan.profileId]?.state.quickSyncAt??scan.database.providerProfiles[scan.profileId]?.state.fullSyncAt??'',syncState:{knownProviderItemIds:[],knownPurchaseIds:[],knownOrderFingerprints:[]}};}
       if(request.type==='FETCH_FANATICAL_ORDERS')return {ok:true,result:{items:[{sourceItemId:'fixture-123',title:items[0].title,mediaType}],snapshot,orderFingerprints:[]}};
       if(request.type==='FANDANGO_IMPORT_STATE'&&request.action==='get'){const scan=await writer.beginProviderScan(provider,'fixture',mode,false,1);return {ok:true,state:{phase:'tv',fullRescan:scan.forceFull||mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[],scanContext:{profileLabel:'fixture',confirmed:true,mode,scanToken:scan.scanToken}}};}
       if(request.type==='FANDANGO_IMPORT_STATE')return {ok:true,state:request.action==='get'?{phase:'tv',fullRescan:mode==='full',expected:{movies:1,tv:0},urls:{tv:location.href},items:mode==='full'?items:[],knownItemIds:[]}:null};
       if(request.type==='COMMIT_PROVIDER_SCAN'){
         if(rejectCommit)return {ok:false,error:'Synthetic save rejection'};
-        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics,...(provider==='steam'&&request.syncState?.applications?{syncState:request.syncState}:{})},request.snapshot,request.scanToken,1);
+        const database=await writer.commitProviderScan(provider,request.items,{syncMode:request.mode==='incremental'?'incremental':'full',fullSyncAt:new Date().toISOString(),scanDiagnostics:request.scanDiagnostics,...(['humble','fanatical'].includes(provider)||provider==='steam'&&request.syncState?.applications?{syncState:request.syncState}:{})},request.snapshot,request.scanToken,1);
         if(provider==='epic')await epicAuth.committed(request,epicSender(),'full');
         imported++;const state=database.providers[provider];return {ok:true,gameCount:state.itemCount,...state,changes:state.syncHealth?.differences};
       }
@@ -191,7 +191,8 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         if(provider==='epic'){globalThis.GalacticSync.setProfiling(false);const profile=shadows.at(-1).querySelector('[data-profile-next]');profile.checked=true;profile.dispatchEvent(new Event('change'));}
         const shadow=shadows.at(-1);
         assert(shadow.querySelector('[data-import-help] summary')?.getClientRects().length,provider+' import help was hidden by its content controller');
-        const button=shadow.querySelector(`button[data-mode="${mode}"]`)||shadow.querySelector('[data-import-action]');
+        const requestedMode=providerPass===0?'incremental':mode;
+        const button=shadow.querySelector(`button[data-mode="${requestedMode}"]`)||shadow.querySelector('[data-import-action]');
         assert(button,`${provider} missing ${mode} button`);if(provider==='kindle'){
           await wait(()=>!shadow.querySelector('[data-contents-mode]').disabled);
           assert([...shadow.querySelectorAll('h3')].some(h=>h.textContent==='Library import')&&shadow.querySelector('[data-book-contents-workflow] h3').textContent==='Book contents discovery','Kindle tasks are not separately labeled.');
@@ -223,10 +224,23 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
         assert(timing.events.some(event=>event.stage==='save_message'),provider+' save timing absent');
         if(provider==='epic')assert(!shadow.querySelector('[data-profile-next]').checked&&shadow.querySelector('[data-profile-timing-status]').textContent.includes('Timing captured'),'Epic one-shot profiling was not consumed and delivered');
       }
-      checks.push(`${provider} ${mode} controls work with direct storage denied`);
+      checks.push(`${provider} ${provider==='epic'?'Sync Epic library':provider==='fandango-at-home'&&providerPass===0?'initial full traversal resume':providerPass===0?'first Quick update uses the existing full importer':mode} controls work with direct storage denied`);
       if(provider==='kindle'&&mode==='full')checks.push('Actual delayed Kindle import commits after timing export, help and minimize/restore without losing its account-bound scan token');
       providerPass++;
       if(provider==='fandango-at-home')document.querySelector('#galactic-library-fandango-at-home-importer').remove();
+    }
+    if(provider==='amazon-games'){
+      const send=chrome.runtime.sendMessage,read=globalThis.GalacticAmazonGames.fetchAmazonGames;
+      const scopes=[],modes=[];let hasBaseline=true,stamp=new Date().toISOString();
+      chrome.runtime.sendMessage=async request=>{const reply=await send(request);if(request.type==='GET_PROVIDER_SYNC_STATE')return {...reply,hasFullBaseline:hasBaseline,lastSuccessfulSyncAt:stamp};if(request.type==='COMMIT_PROVIDER_SCAN')modes.push(request.mode);return reply;};
+      globalThis.GalacticAmazonGames.fetchAmazonGames=async(progress,incremental)=>{scopes.push(incremental);return {items,snapshot,diagnostics:{}};};
+      try{
+        for(const [baseline,date,incremental]of [[false,stamp,false],[true,stamp,true],[true,'2020-01-01',false],[true,'invalid',false]]){
+          hasBaseline=baseline;stamp=date;const before=imported;shadows.at(-1).querySelector('[data-mode="incremental"]').click();await wait(()=>imported>before&&!shadows.at(-1).querySelector('.status').dataset.busy);
+          assert(scopes.at(-1)===incremental&&modes.at(-1)===(incremental?'incremental':'full'),'Amazon Games selected the wrong recent/all-year acquisition or commit mode');
+        }
+        checks.push('Amazon Games Quick selects all years for first/missing/old history and recent claims for a valid baseline, using the existing importer and full/incremental commits');
+      }finally{chrome.runtime.sendMessage=send;globalThis.GalacticAmazonGames.fetchAmazonGames=read;}
     }
     if(provider==='epic')await checkEpicSession({shadow:shadows.at(-1),writer,checks,wait,assert,commits:()=>imported,reloadDiagnostics:reloadEpicDiagnostics});
     if(provider==='steam'){

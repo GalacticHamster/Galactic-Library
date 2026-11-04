@@ -127,7 +127,10 @@
       globalThis.location.assign(movieUrl);
       return;
     }
-    if (!fullRescan) throw new Error('Quick update requires Fandango View All grids. Choose Full rescan on My Library.');
+    if (!fullRescan) {
+      if (expected.movies === null || expected.tv === null) throw new Error('Fandango did not expose its Recently Purchased grids or both library totals. Reload My Library and let it finish loading, then retry. No library changes were saved.');
+      status.textContent = 'Recently Purchased grids unavailable: checking your complete Fandango library...';
+    }
     const { items } = await globalThis.GalacticFandangoAtHome.fetchFandangoLibrary(({ phase, passes, movies, tv, expected: reported }) => {
       if (phase === 'reset') {
         status.textContent = `Returning Fandango carousels to their first titles: ${passes} passes checked.`;

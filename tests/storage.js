@@ -24,7 +24,8 @@ async function profileSafetyFixture(){
   const old=await begin();const newer=await begin();
   await assert.rejects(commit(old),/superseded/);
   writer=createStorageWriter(memory.area);await commit(newer);
-  await assert.rejects(writer.beginProviderScan('steam','other','incremental',true,1),/different account/);
+  const initialQuick=await writer.beginProviderScan('steam','other','incremental',true,1);assert(initialQuick.forceFull);
+  await assert.rejects(writer.commitProviderScan('steam',items,{syncMode:'incremental'},null,initialQuick.scanToken,1),/requires.*full/);
   await assert.rejects(writer.beginProviderScan('steam','other','full',false,1),/different account/);
   const stale=await begin();await writer.clearDatabase();await assert.rejects(commit(stale),/superseded/);
   const staleRestore=await begin();await writer.restoreDatabase(createEmptyDatabase());await assert.rejects(commit(staleRestore),/superseded/);
