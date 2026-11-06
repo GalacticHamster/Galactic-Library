@@ -7,12 +7,14 @@ import { validateProviderSnapshot, completedScope, completeProviderSnapshot } fr
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {audibleRescanTests} from './audible-rescan.js';
+import {steamTitleStatuses} from '../src/lib/provider-state.js';
 
 // Exercise the actual classic importers in isolated signed-in page contexts.
 // Timers resolve immediately; no network, credentials, or real account is used.
 export function providerContext(provider, fetch, overrides = {}) {
   const context = vm.createContext({
     URL, URLSearchParams, console, fetch,
+    chrome:{runtime:{sendMessage:async r=>({ok:true,statuses:steamTitleStatuses(r.titles)})}},
     setTimeout: (callback) => { callback(); return 0; },
     location: { origin: 'https://www.amazon.com', href: 'https://www.amazon.com/hz/mycd/', pathname: '/hz/mycd/' },
     document: {

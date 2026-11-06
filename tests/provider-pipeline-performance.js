@@ -14,10 +14,11 @@ import {steamOutcomeTests} from './steam-outcomes.js';
 import {providerStatusReceiptTests} from './provider-status-receipts.js';
 import {providerColdReadTests} from './provider-cold-reads.js';
 import {providerFullStartTests} from './provider-full-starts.js';
+import {steamTitleStatuses} from '../src/lib/provider-state.js';
 
 function steamFixture(responses){
   let queries=0;
-  const c=vm.createContext({setTimeout:callback=>callback(),fetch:async url=>({ok:true,json:async()=>String(url).startsWith('/dynamicstore')?{rgOwnedApps:[1,2,3]}:responses[queries++]})});
+  const c=vm.createContext({chrome:{runtime:{sendMessage:async r=>({ok:true,statuses:steamTitleStatuses(r.titles)})}},setTimeout:callback=>callback(),fetch:async url=>({ok:true,json:async()=>String(url).startsWith('/dynamicstore')?{rgOwnedApps:[1,2,3]}:responses[queries++]})});
   for(const file of ['provider-snapshot','steam-store'])vm.runInContext(readFileSync(new URL('../src/providers/'+file+'.js',import.meta.url),'utf8'),c);
   return {S:c.GalacticSteamStore,queries:()=>queries};
 }

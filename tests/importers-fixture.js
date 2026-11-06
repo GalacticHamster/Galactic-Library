@@ -10,6 +10,7 @@ import { completeProviderSnapshot, completedScope } from '../src/lib/provider-sn
 import '../src/providers/metadata.js';
 import '../src/providers/fanatical.js';
 import '../src/providers/steam-store.js';
+import {steamTitleStatuses} from '../src/lib/provider-state.js';
 import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
 import {createEnrichmentWorkbench} from '../src/ui/enrichment-workbench.js';
@@ -158,6 +159,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
     const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+      if(request.type==='VALIDATE_STEAM_TITLES')return {ok:true,statuses:steamTitleStatuses(request.titles)};
       if(request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING')return {ok:true,enabled:providerDiagnosticsEnabled};
       if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};

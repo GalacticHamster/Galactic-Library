@@ -19,7 +19,7 @@
   function getDiagnosticSample(){return sampling&&lastSample?JSON.parse(JSON.stringify(lastSample)):null;}
   function sampleOutcome(sample,id,outcome,item,returnedEntry){
     if(!sample||['games','dlc'].includes(outcome))return;
-    const type=appType(item?.type),row={appId:id,outcome,...(typeof returnedEntry==='boolean'?{returnedEntry}:{}),...(returnedEntry&&item?{hasUsableName:Boolean(titleText(item.name)),...(type!==null?{returnedType:type}:{})}:{})};
+    const type=appType(item?.type),row={appId:id,outcome,...(typeof returnedEntry==='boolean'?{returnedEntry}:{}),...(returnedEntry&&item?{hasUsableName:outcome!=='invalidTitle'&&Boolean(titleText(item.name)),...(type!==null?{returnedType:type}:{})}:{})};
     if(outcome==='unavailable')Object.assign(row,{resultCode:item.success,...(typeof item.visible==='boolean'?{visible:item.visible}:{})});
     const rows=sample.groups[outcome]??=[];const existing=rows.findIndex(row=>row.appId===id);if(existing>=0)rows.splice(existing,1);
     rows.push(row);rows.sort((a,b)=>Number(a.appId)-Number(b.appId));if(rows.length>SAMPLE_LIMIT)rows.pop();
@@ -122,7 +122,7 @@
     const appIdsToResolve = incremental ? newOwnedAppIds(appIds, knownAppIds) : appIds;
 
     const itemsById = new Map();
-    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),issueEvidence=new Map(),types={},httpStatuses={},requests=[],placeholderResultCodes={},placeholderVisibility={};let failedRequestCount=0,titleRequests=0,malformedRows=0,firstFailure=null;
+    const unresolvedById = new Map(),unsupportedIds=new Set(),outcomes=new Map(),issueEvidence=new Map(),types={},httpStatuses={},requests=[],placeholderResultCodes={},placeholderVisibility={};let failedRequestCount=0,titleRequests=0,malformedRows=0,canonicalTitleRejected=0,firstFailure=null;
     const countCode=(counts,code)=>{let key=Number.isSafeInteger(code)&&Math.abs(code)<=100000?String(code):'other';if(!Object.hasOwn(counts,key)&&Object.keys(counts).length>=31)key='other';counts[key]=(counts[key]??0)+1;};
     const observeFailure=value=>{firstFailure??={stage:'titles',kind:value.kind,...(value.httpStatus?{httpStatus:value.httpStatus}:{})};};
     const outcome=(id,kind,item,returnedEntry)=>{
@@ -131,12 +131,12 @@
       else{
         const entry={appId:id,kind},type=appType(item?.type),name=titleText(item?.name);
         if(type!==null&&Math.abs(type)<=100000)entry.reportedType=type;
-        if(name&&name.length<=500)entry.title=name;
+        if(name&&name.length<=500&&kind!=='invalidTitle')entry.title=name;
         issueEvidence.set(id,entry);
       }
     };
     const unresolved=(id,kind,status,item,returnedEntry)=>{outcome(id,kind,item,returnedEntry);unresolvedById.set(id,{appId:id,status:failureLabel({kind,httpStatus:status})});observeFailure({kind,httpStatus:status});};
-    const aggregate=()=>({outcomeVersion:3,ownedListRead:true,ownedIdCount:appIds.length,candidateCount:appIdsToResolve.length,attemptedCount:outcomes.size,titleRequests,failedRequests:failedRequestCount,unresolvedCount:unresolvedById.size,malformedRows,
+    const aggregate=()=>({outcomeVersion:3,ownedListRead:true,ownedIdCount:appIds.length,candidateCount:appIdsToResolve.length,attemptedCount:outcomes.size,titleRequests,failedRequests:failedRequestCount,unresolvedCount:unresolvedById.size,malformedRows,canonicalTitleRejected,
       outcomes:Object.fromEntries(OUTCOMES.map(kind=>[kind,[...outcomes.values()].filter(value=>value===kind).length])),httpStatuses,unsupportedTypes:types,placeholderResultCodes,placeholderVisibility,requests,requestSamplesDropped:Math.max(0,titleRequests-requests.length),...(firstFailure?{firstFailure}:{})});
     for (let offset = 0; offset < appIdsToResolve.length; offset += STORE_ITEMS_BATCH_SIZE) {
       const batch = appIdsToResolve.slice(offset, offset + STORE_ITEMS_BATCH_SIZE);
@@ -206,6 +206,24 @@
         if(error.httpStatus)requestCounts.httpStatus=error.httpStatus;
         if(diagnostics&&error.httpStatus)httpStatuses[error.httpStatus]=(httpStatuses[error.httpStatus]??0)+1;
         for(const appId of batch)if(!outcomes.has(appId))unresolved(appId,kind,error.httpStatus);
+      }
+      // One bounded local worker message per readable batch, no provider request.
+      // Keep this outside the transport/parser catch: unavailable validation is
+      // fatal, never invented unresolved ownership or a successful partial save.
+      const candidates=batch.map(id=>itemsById.get(id)).filter(Boolean),bounded=candidates.filter(item=>item.title.length<=500);
+      let statuses=[];
+      if(bounded.length){
+        const reply=await global.chrome.runtime.sendMessage({type:'VALIDATE_STEAM_TITLES',titles:bounded.map(item=>item.title)});
+        if(!reply?.ok||!Array.isArray(reply.statuses)||reply.statuses.length!==bounded.length||reply.statuses.some(status=>!['valid','invalidTitle','emptyCanonicalTitle'].includes(status)))throw Error('Steam title validation could not finish. Your saved library was kept. Retry the update.');
+        statuses=reply.statuses;
+      }
+      const decisions=new Map(bounded.map((item,index)=>[item.providerItemId,statuses[index]]));
+      for(const item of candidates){
+        const status=decisions.get(item.providerItemId);
+        if(status==='valid')continue;
+        if(status==='emptyCanonicalTitle')canonicalTitleRejected++;
+        itemsById.delete(item.providerItemId);
+        unresolved(item.providerItemId,'invalidTitle',undefined,{name:item.title,type:item.mediaType==='game'?0:4},true);
       }
       if(diagnostics&&requests.length<32)requests.push(requestCounts);
       reportProgress({ completed: offset + batch.length, total: appIdsToResolve.length, ownedApps: appIds.length, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });

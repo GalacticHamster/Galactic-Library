@@ -1,6 +1,7 @@
 import '../src/providers/floating-panel.js';
 import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
+import {steamTitleStatuses} from '../src/lib/provider-state.js';
 const checks=[],assert=(ok,message)=>{if(!ok)throw Error(message);checks.push(message);};
 const originalFetch=globalThis.fetch.bind(globalThis),originalAttach=Element.prototype.attachShadow;
 const code=await Promise.all(['provider-snapshot','steam-store','steam-store-content'].map(async name=>(await originalFetch('/src/providers/'+name+'.js')).text()));
@@ -8,7 +9,7 @@ const ids=Array.from({length:161},(_,i)=>i+1),rows=new Map(ids.map(id=>[id,id===
 let owned={rgOwnedApps:ids,rgMasterSubApps:[],rgAutoGrantApps:[]},shadow,mode='full',scan,imports=0;
 const stored={},area={get:async defaults=>structuredClone({...defaults,...stored}),set:async patch=>Object.assign(stored,structuredClone(patch)),remove:async keys=>{for(const key of Array.isArray(keys)?keys:[keys])delete stored[key];}};
 let writer=createStorageWriter(area,Promise.resolve(),{cacheQuerySnapshots:true,observationCompletions:true});
-globalThis.chrome={runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async r=>r.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:false}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false}}};
+globalThis.chrome={runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async r=>r.type==='VALIDATE_STEAM_TITLES'?{ok:true,statuses:steamTitleStatuses(r.titles)}:r.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'?{ok:true,enabled:false}:{ok:true,profileLabel:'Disposable',profiles:[],reuseAllowed:false}}};
 globalThis.fetch=async url=>{
  if(String(url).startsWith('/dynamicstore'))return {ok:true,status:200,json:async()=>structuredClone(owned)};
  if(String(url).startsWith('https://api.steampowered.com/')){const requested=JSON.parse(new URL(url).searchParams.get('input_json')).ids.map(i=>i.appid);return {ok:true,status:200,json:async()=>({response:{store_items:requested.flatMap(id=>rows.has(id)?[rows.get(id)]:[])}})};}

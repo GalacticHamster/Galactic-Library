@@ -2,6 +2,17 @@ import { PROVIDERS } from './constants.js';
 import { object, text, strings, date, count } from './validation.js';
 import {audibleHistoryFailures,audibleHistoryYears,audibleGiftHistory} from './audible-ownership.js';
 import {validateSyncHealth} from './sync-health.js';
+import {normalizeGameTitle} from './normalization.js';
+
+// Steam's classic collector delegates to the model's existing text/key rules.
+// This is metadata admission only: it grants no account or ownership authority.
+export function steamTitleStatuses(titles){
+  if(!Array.isArray(titles)||titles.length>100||titles.some(title=>typeof title!=='string'||title.length>500))throw Error('Invalid Steam title validation batch.');
+  return titles.map(title=>{
+    let bounded;try{bounded=text(title,500,'Steam title');}catch{return 'invalidTitle';}
+    return !bounded?'invalidTitle':normalizeGameTitle(bounded).normalizedTitle?'valid':'emptyCanonicalTitle';
+  });
+}
 
 const STEAM_METADATA_ISSUES=['unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','http','authentication','malformed','classification','network','other'];
 export function validateSteamApplications(value){

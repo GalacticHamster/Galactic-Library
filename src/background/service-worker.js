@@ -11,6 +11,7 @@ import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import { matchItems } from '../lib/matcher.js';
+import {steamTitleStatuses} from '../lib/provider-state.js';
 import { handleExternalApiRequestAsync } from '../lib/external-api.js';
 import '../providers/metadata.js';
 import { googleBooksCandidatesFromSearch, googleBooksSearchUrl } from '../lib/google-books.js';
@@ -342,6 +343,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })().then(candidate=>sendResponse({ok:true,candidate})).catch(error=>sendResponse({ok:false,error:error.message}));return true;
   }
 
+  if(request?.type==='VALIDATE_STEAM_TITLES'){
+    if(!isProviderImportPage('steam',sender.url)||!sender.tab?.id){sendResponse({ok:false,error:'Steam title validation is available only from the Steam Store tab.'});return undefined;}
+    try{sendResponse({ok:true,statuses:steamTitleStatuses(request.titles)});}catch(error){sendResponse({ok:false,error:error.message});}
+    return undefined;
+  }
   if (request?.type === 'FETCH_FANATICAL_ORDERS') {
     if (!isProviderImportPage('fanatical', sender.url) || !sender.tab?.id) {
       sendResponse({ ok: false, error: 'Fanatical orders can be read only from a signed-in Fanatical tab.' });

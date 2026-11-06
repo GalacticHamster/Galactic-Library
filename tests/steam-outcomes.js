@@ -1,18 +1,19 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {steamTitleStatuses} from '../src/lib/provider-state.js';
 import '../src/lib/contents-performance.js';
 
-function fixture(ids,requests,{owned={ok:true,status:200,body:{rgOwnedApps:ids}},onTitleRequest=()=>{}}={}){
-  let calls=0;
-  const context=vm.createContext({setTimeout:callback=>callback(),fetch:async url=>{
+function fixture(ids,requests,{owned={ok:true,status:200,body:{rgOwnedApps:ids}},onTitleRequest=()=>{},validate=async request=>({ok:true,statuses:steamTitleStatuses(request.titles)})}={}){
+  let calls=0,validationCalls=0;
+  const context=vm.createContext({chrome:{runtime:{sendMessage:async request=>{validationCalls++;return validate(request);}}},setTimeout:callback=>callback(),fetch:async url=>{
     const ownedRequest=String(url).startsWith('/dynamicstore');if(!ownedRequest)onTitleRequest(url);
     const r=ownedRequest?owned:requests[calls++];
     if(r?.networkError)throw Error('PRIVATE URL / token');
     return {ok:r?.ok??true,status:r?.status??200,json:async()=>{if(r?.jsonError)throw Error('PRIVATE invalid response');return r?.body;}};
   }});
   for(const file of ['provider-snapshot','steam-store'])vm.runInContext(readFileSync(new URL('../src/providers/'+file+'.js',import.meta.url),'utf8'),context);
-  return {S:context.GalacticSteamStore,calls:()=>calls};
+  return {S:context.GalacticSteamStore,calls:()=>calls,validationCalls:()=>validationCalls};
 }
 export {fixture as steamOutcomeFixture};
 const response=rows=>({body:{response:{store_items:rows}}});

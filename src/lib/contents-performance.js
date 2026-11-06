@@ -20,7 +20,7 @@
   function cleanSteam(value){
     if(!value||typeof value!=='object')return null;
     const bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=10000000;
-    const fields=['ownedIdCount','candidateCount','attemptedCount','titleRequests','failedRequests','unresolvedCount','malformedRows','savedCount','saveRejectedCount','requestSamplesDropped'];
+    const fields=['ownedIdCount','candidateCount','attemptedCount','titleRequests','failedRequests','unresolvedCount','malformedRows','canonicalTitleRejected','savedCount','saveRejectedCount','requestSamplesDropped'];
     const result=Object.fromEntries(fields.filter(key=>bounded(value[key])).map(key=>[key,value[key]]));
     const kinds=['games','dlc','unsupported','unavailable','absent','missingTitle','invalidTitle','invalidType','conflictingDuplicate','missing','http','authentication','malformed','classification','network','other'];
     result.outcomes=Object.fromEntries(kinds.map(key=>[key,bounded(value.outcomes?.[key])?value.outcomes[key]:0]));
