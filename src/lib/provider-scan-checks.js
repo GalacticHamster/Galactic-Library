@@ -2,6 +2,7 @@ import {strictDatabaseSerialization} from './validation-certificate.js';
 import {validateProviderStates} from './provider-state.js';
 import {equalDatabaseData} from './data-equality.js';
 import {PROVIDERS} from './constants.js';
+import {providerScanMode} from './provider-scan-mode.js';
 
 // Status-only scans, never item observations or ownership.
 export const PROVIDER_CHECKS_KEY='galacticLibraryProviderChecks';
@@ -25,7 +26,8 @@ export function providerCheckPatch(provider,state){
   const health=validated.syncHealth,success=health?.status==='succeeded';
   if(!health||!['succeeded','partial','failed','cancelled'].includes(health.status)||!health.attemptRef||!health.finishedAt
     ||Object.entries(health.differences??{}).some(([key,value])=>!['observed','unchanged'].includes(key)&&value!==0)
-    ||success&&(validated.syncMode!=='incremental'||!validated.lastSync||validated.lastError!==null||health.mode!=='incremental'||health.failedRequestCount||health.coverageLimit)
+    ||success&&(validated.syncMode!=='incremental'||!validated.lastSync||validated.lastError!==null||health.mode!=='incremental'||health.failedRequestCount
+      ||health.coverageLimit&&!(provider==='fanatical'&&health.coverageLimit==='array-only-index-without-total'))
     ||!success&&Object.keys(patch).some(key=>key!=='syncHealth'))throw Error('Invalid provider status check.');
   return validated;
 }
@@ -40,7 +42,8 @@ export function applyProviderChecks(database,value,digest){
     try{
       if(!entry||Object.keys(entry).some(key=>!['profileId','patch','baseline'].includes(key)))continue;
       const profile=database.providerProfiles[entry.profileId];
-      if(profile?.provider!==provider||database.providers[provider]?.activeProfileId!==profile.profileId||!profile.state.connected||!profile.state.fullSyncAt)continue;
+      if(profile?.provider!==provider||database.providers[provider]?.activeProfileId!==profile.profileId||!profile.state.connected
+        ||(provider==='fanatical'?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt))continue;
       const patch=providerCheckPatch(provider,entry.patch);
       if(!equalDatabaseData(patch,entry.patch))continue;
       const baseline=providerCheckBaseline(provider,entry);

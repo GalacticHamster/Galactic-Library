@@ -6,6 +6,18 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    // Fanatical can finish acquiring a headerless order array without proving
+    // that the array enumerates the account. This receipt grants additive
+    // persistence only; it must never be treated as a complete snapshot.
+    if (provider === 'fanatical' && snapshot?.complete === false) {
+      const scope = snapshot.scopes?.[0];
+      if (snapshot.version !== 1 || snapshot.provider !== provider || !Array.isArray(items)
+        || !count(snapshot.itemCount) || snapshot.itemCount !== new Set(items.map(item=>String(item?.providerItemId??'').trim())).size
+        || !Array.isArray(snapshot.scopes) || snapshot.scopes.length !== 1 || scope?.id !== 'orders'
+        || scope.complete !== false || scope.limitReached !== false || scope.end !== 'acquisition-end'
+        || scope.expectedCount !== null || !count(scope.readCount) || scope.pagesRead !== 1) fail('Invalid Fanatical acquisition receipt.');
+      return snapshot;
+    }
     if (!snapshot || snapshot.version !== 1 || snapshot.provider !== provider || snapshot.complete !== true) fail('A validated complete snapshot is required.');
     if (!Array.isArray(items) || !count(snapshot.itemCount) || snapshot.itemCount !== new Set(items.map((item) => String(item?.providerItemId ?? '').trim())).size) fail('The snapshot item count does not match the import.');
     if (!Array.isArray(snapshot.scopes) || !snapshot.scopes.length) fail('No completed library sections were reported.');

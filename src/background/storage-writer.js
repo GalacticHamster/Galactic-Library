@@ -228,7 +228,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(base&&Object.isFrozen(base)&&base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
     return cacheQuerySnapshots&&base&&base===querySnapshot&&scan.profileId===profile.profileId
       &&scan.activeAtStartId===profile.profileId&&database.providers[provider]?.activeProfileId===profile.profileId
-      &&profile.state.connected===true&&Boolean(profile.state.fullSyncAt);
+      &&profile.state.connected===true&&(provider==='fanatical'?!providerScanMode(provider,profile.state,'incremental').forceFull:Boolean(profile.state.fullSyncAt));
   }
   async function persistProviderCheck(database,provider,profile,scan,patch,storedScans){
     patch=providerCheckPatch(provider,patch);
@@ -554,7 +554,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId);
-    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||!profile.state.fullSyncAt;
+    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(provider==='fanatical'?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -587,7 +587,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function commitProviderScan(provider,values,syncDetails,snapshot,scanToken,tabId=null,includeResult=false,sourceAccountFingerprint=null) {
     const stored=await storageArea.get({[SCANS]:{}}),scan=stored[SCANS]?.[provider],database=await readDatabase(true);
     if(!Array.isArray(values)||values.length>50000)throw Error('Import needs a bounded item list.');
-    const requestDigest=()=>{const {quickSyncAt,fullSyncAt,...details}=syncDetails;return providerCheckDigest(JSON.parse(JSON.stringify({provider,values,snapshot:snapshot??null,details})));};
+    const receivedDetails=syncDetails;
+    const requestDigest=()=>{const {quickSyncAt,fullSyncAt,...details}=receivedDetails;return providerCheckDigest(JSON.parse(JSON.stringify({provider,values,snapshot:snapshot??null,details})));};
     const done=activeEnvelope?.completions.find(c=>c.provider===provider&&c.scanToken===scanToken&&c.tabId===tabId&&c.mode===syncDetails.syncMode&&c.sourceAccountFingerprint===(sourceAccountFingerprint??null));
     if(done&&database.providers[provider]?.activeProfileId===done.profileId&&database.providerProfiles[done.profileId]?.state.syncHealth?.attemptRef===done.attemptRef){
       if(done.requestDigest!==await requestDigest())throw Error('This scan already completed with different results. Start a fresh scan.');
@@ -596,7 +597,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(!scan||scan.scanToken!==scanToken||scan.tabId!==tabId||!scan.profileId||database.providers[provider]?.activeProfileId!==scan.activeAtStartId||!database.providerProfiles[scan.profileId])throw new Error('This scan was superseded by another scan, clear, restore, or profile change. Start a fresh scan.');
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
-    const profile=database.providerProfiles[scan.profileId],details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname,
+    const profile=database.providerProfiles[scan.profileId];
+    if(provider==='fanatical'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      syncDetails=fanaticalAcquisitionDetails(profile,syncDetails);
+    }
+    const details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname,
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
     const checkedBase=checkBases.get(database);
     if(checkedBase&&Object.isFrozen(checkedBase)&&checkedBase!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
@@ -784,7 +790,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function successfulSyncHealth(database,provider,records,full,details){
     const diagnostics=details.scanDiagnostics??{};const profile=Object.values(database.providerProfiles).find(p=>p.provider===provider&&(p.profileId===details.profileId||p.nickname===(details.profileLabel??database.providers[provider]?.profileLabel??'')));const prior=details.scanAttempt??profile?.state.syncHealth;
     const failedRequestCount=diagnostics.failedRequestCount??0;
-    const incomplete=failedRequestCount>0||diagnostics.incomplete===true||Boolean(diagnostics.coverageLimit);
+    const informationalCoverage=provider==='fanatical'&&diagnostics.coverageLimit==='array-only-index-without-total';
+    const incomplete=failedRequestCount>0||diagnostics.incomplete===true||Boolean(diagnostics.coverageLimit)&&!informationalCoverage;
     return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic','audible'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
@@ -1007,6 +1014,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     next.scanDiagnostics={...details.scanDiagnostics,incomplete:!complete,failedRequestCount:0};
     return {details:next,history};
   }
+  // Validated orders are useful skip evidence, independently of enumeration.
+  // Retain prior successes when a headerless response omits them. A Full
+  // acquisition refreshes returned details but grants no absence authority.
+  function fanaticalAcquisitionDetails(profile,details){
+    const {fullSyncAt,...safe}=details;
+    const prior=profile.state.syncState??{};
+    return {...safe,syncState:{...details.syncState,
+      knownOrderFingerprints:[...new Set([...(prior.knownOrderFingerprints??[]),...(details.syncState?.knownOrderFingerprints??[])])],
+      acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}};
+  }
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
@@ -1014,6 +1031,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    if(provider==='fanatical'&&snapshot.complete===false){
+      const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+      return mergeIntoDatabase(provider,values,fanaticalAcquisitionDetails(profile,syncDetails),database,null,beforeSave,completion);
+    }
     if(provider==='steam'&&syncDetails.syncState?.applications){
       const applications=validateSteamApplicationImport(values,syncDetails.syncState.applications,[],true);
       const scope=snapshot.scopes[0];
@@ -1145,7 +1166,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

@@ -1,7 +1,8 @@
 /** Acquisition choice only. Persisted database integrity is validated separately. */
 export function providerScanMode(provider,state={},requestedMode='incremental') {
   if(requestedMode==='full')return {mode:'full',forceFull:false,scanReason:'requested'};
-  if(!state.fullSyncAt||!Number.isFinite(Date.parse(state.fullSyncAt)))return {mode:'full',forceFull:true,scanReason:state.lastSync?'baseline-unavailable':'first-import'};
+  const acquisitionAt=provider==='fanatical'?state.syncState?.acquisitionCheckedAt:null;
+  if(!Number.isFinite(Date.parse(state.fullSyncAt??''))&&!Number.isFinite(Date.parse(acquisitionAt??'')))return {mode:'full',forceFull:true,scanReason:state.lastSync?'baseline-unavailable':'first-import'};
   const checkpoint=provider==='humble'?'knownPurchaseIds':provider==='fanatical'?'knownOrderFingerprints':null;
   if(checkpoint){
     const ids=state.syncState?.[checkpoint];

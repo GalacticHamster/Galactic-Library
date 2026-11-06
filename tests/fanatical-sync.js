@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { readFanaticalOrdersInPage } from '../src/providers/fanatical-scan.js';
+import {fanaticalCoverageTests} from './fanatical-coverage.js';
 
 const order=n=>({_id:`order-${String(n).padStart(6,'0')}`,status:'COMPLETE',items:[{_id:'bundle-123456',name:'Bundle',bundles:[{games:[{_id:`game-${String(n).padStart(6,'0')}`,name:`Game ${n}`,type:'game'}]}]}]});
 function harness(reply) {
@@ -17,6 +18,7 @@ function harness(reply) {
   return {scan,paths,get maxActive(){return maxActive;}};
 }
 export const fanaticalSyncTests=[
+  ...fanaticalCoverageTests,
   ['Fanatical serialized scanner retains separate opaque occurrences for repeated product purchases',async()=>{
     const orders=[order(1),order(2)];for(const [index,entry]of orders.entries()){entry.date=`2026-09-${index?'20':'10'}T00:00:00Z`;entry.items[0].name=`Bundle ${index}`;entry.items[0].bundles[0].games[0]={_id:'shared-product',name:'Repeated book',type:'book'};}
     const run=harness(path=>({status:200,data:path==='/api/user/orders'?orders:orders.find(entry=>path.endsWith(entry._id))}));const result=await run.scan({fullScan:true});assert.equal(result.items.length,1);assert.equal(result.items[0].purchaseOrigins.length,2);assert.equal(new Set(result.items[0].purchaseOrigins.map(entry=>entry.occurrenceRef)).size,2);
@@ -40,3 +42,16 @@ export const fanaticalSyncTests=[
     ])await assert.rejects(harness(reply).scan({fullScan:true}),/incomplete|unreadable/);
   }]
 ];
+fanaticalSyncTests.push(['Fanatical count/range/link acquisition receipts distinguish real completion from contradictory last-page claims',async()=>{
+  const a=order(1),b=order(2);
+  for(const evidence of ['count','range','link']){
+    const run=harness(path=>{
+      if(path==='/api/user/orders')return {status:200,data:[a],headers:{link:'</api/user/orders?page=2>; rel="next", </api/user/orders?page=2>; rel="last"',...(evidence==='count'?{'x-total-count':'2'}:evidence==='range'?{'content-range':'orders 0-0/2'}:{})}};
+      if(path==='/api/user/orders?page=2')return {status:200,data:[b],headers:evidence==='range'?{'content-range':'orders 1-1/2'}:{}};
+      return {status:200,data:path.endsWith(a._id)?a:b};
+    });
+    const result=await run.scan({fullScan:true});assert.equal(result.coverage.complete,true);assert(result.acquisitionComplete);assert.equal(result.coverage.paginationEvidence,evidence);assert.equal(result.items.length,2);
+  }
+  const early=harness(path=>path==='/api/user/orders'?{status:200,data:[a],headers:{link:'</api/user/orders?page=2>; rel="next", </api/user/orders?page=3>; rel="last"'}}:{status:200,data:[b]});
+  await assert.rejects(early.scan({fullScan:true}),/only part/);
+}]);

@@ -152,7 +152,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     return links;
   };
   const summaries = []; const visitedPages = new Set(); const pageOrderIds = new Set();
-  let path = '/api/user/orders'; let expectedTotal = null; let ranged = false; let linked = false;
+  let path = '/api/user/orders'; let expectedTotal = null; let ranged = false; let linked = false; let declaredLast = null;
   const acceptTotal = (value) => {
     if (!Number.isSafeInteger(value) || value < 0 || value > maxOrders || (expectedTotal !== null && value !== expectedTotal)) throw incomplete('Pagination totals changed or were unreadable.');
     expectedTotal = value;
@@ -188,10 +188,14 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     }
     if (summaries.length > maxOrders || (expectedTotal !== null && summaries.length > expectedTotal)) throw incomplete('Pagination exceeded its total or the 100,000-order safety limit.');
     const links = paginationLinks(headers?.get('link'), path);
+    if (links.last) {
+      if (declaredLast && declaredLast !== links.last) throw incomplete('Pagination changed its last-page link.');
+      declaredLast = links.last;
+    }
     if (links.next) {
-      if (!data.length || (expectedTotal !== null && summaries.length >= expectedTotal)) throw incomplete('Pagination supplied a next page after an empty or final page.');
+      if (!data.length || declaredLast === path || (expectedTotal !== null && summaries.length >= expectedTotal)) throw incomplete('Pagination supplied a next page after an empty or final page.');
       linked = true;
-    } else if ((expectedTotal !== null && summaries.length !== expectedTotal) || (links.last && links.last !== path)) {
+    } else if ((expectedTotal !== null && summaries.length !== expectedTotal) || (declaredLast && declaredLast !== path)) {
       throw incomplete('Fanatical returned only part of the history without a usable next-page link.');
     }
     path = links.next || null;
@@ -243,7 +247,11 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   const completeWithFingerprints = await boundedMap(complete, async (order) => ({ order, fingerprint: await fingerprintOrderInPage(order._id) }));
   const known = new Set((Array.isArray(knownOrderFingerprints) ? knownOrderFingerprints : []).filter((fingerprint) => /^[a-f0-9]{64}$/iu.test(String(fingerprint))).map((fingerprint) => String(fingerprint).toLowerCase()));
   const listedFingerprints = new Set(await boundedMap([...listed], fingerprintOrderInPage));
-  if ([...known].some((fingerprint) => !listedFingerprints.has(fingerprint))) {
+  const coverageVerified = ranged || expectedTotal !== null || linked;
+  if (!coverageVerified && known.size && listedFingerprints.size && ![...known].some(fingerprint=>listedFingerprints.has(fingerprint))) {
+    throw new Error('Fanatical purchases do not match this saved account. Check the signed-in account and retry. Your library was not changed.');
+  }
+  if (coverageVerified && [...known].some((fingerprint) => !listedFingerprints.has(fingerprint))) {
     throw new Error('Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.');
   }
   const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ fingerprint }) => !known.has(fingerprint));
@@ -281,7 +289,8 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   // `token`, summaries, details, and raw leaves remain in this execution world.
   return {
     schemaVersion: 1,
-    coverage: { complete: true, listedOrders: summaries.length, validatedOrders: details.length, emptyAccount: summaries.length === 0,
+    acquisitionComplete: true,
+    coverage: { complete: coverageVerified, listedOrders: summaries.length, validatedOrders: details.length, emptyAccount: summaries.length === 0,
       pagesFetched: visitedPages.size, expectedTotal, paginationEvidence: ranged ? 'range' : expectedTotal !== null ? 'count' : linked ? 'link' : 'array-only', retries, concurrency },
     ordersScanned: toInspect.length,
     ordersAvailable: complete.length,

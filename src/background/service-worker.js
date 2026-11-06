@@ -19,6 +19,7 @@ import {kindleContentsPlan} from '../lib/kindle-contents.js';
 import { createStorageWriter } from './storage-writer.js';
 import { createStorageMessageHandler } from './storage-messages.js';
 import { completeProviderSnapshot, completedScope } from '../lib/provider-snapshot.js';
+import {providerScanMode} from '../lib/provider-scan-mode.js';
 import { restrictStorageAccess } from './storage-access.js';
 import { validateFandangoState } from './import-state.js';
 import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
@@ -197,7 +198,8 @@ function fanaticalSyncState(value) {
 function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprints:known=[]}={}) {
   const input = value && typeof value === 'object' ? value : {};
   const coverage=input.coverage;const count=value=>Number.isSafeInteger(value)&&value>=0;
-  if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||coverage?.complete!==true
+  if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||input.acquisitionComplete!==true
+    ||typeof coverage?.complete!=='boolean'||coverage.complete!==(coverage.paginationEvidence!=='array-only')
     ||!count(input.ordersScanned)||!count(input.ordersAvailable)||!count(coverage.listedOrders)||coverage.listedOrders>100000
     ||coverage.listedOrders<input.ordersAvailable||coverage.validatedOrders!==input.ordersScanned
     ||coverage.emptyAccount!==(coverage.listedOrders===0)||!count(coverage.pagesFetched)||coverage.pagesFetched<1||coverage.pagesFetched>1000
@@ -234,9 +236,12 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
     orderFingerprints: knownOrderFingerprints,
-    coverage:{complete:true,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
+    acquisitionComplete:true,
+    coverage:{complete:coverage.complete,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
     items: [...items.reduce((map,item)=>{const prior=map.get(item.sourceItemId);map.set(item.sourceItemId,{...item,...(item.purchaseOrigins||prior?.purchaseOrigins?{purchaseOrigins:mergePurchaseOrigins(prior?.purchaseOrigins??[],item.purchaseOrigins??[])}:{})});return map;},new Map()).values()],
-    snapshot: fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined
+    snapshot: !coverage.complete ? {version:1,provider:'fanatical',complete:false,itemCount:new Set(items.map(item=>item.sourceItemId)).size,
+      scopes:[{id:'orders',readCount:input.ordersScanned,expectedCount:null,end:'acquisition-end',pagesRead:1,complete:false,limitReached:false}]}
+      : fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined
   };
 }
 
@@ -500,6 +505,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ok: true,
           scanToken,forceFull:forceFull===true,scanReason,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
+          ...(request.provider==='fanatical'?{hasAcquisitionBaseline:!forceFull&&!providerScanMode('fanatical',state,'incremental').forceFull}:{}),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set(Object.values(database.providerItems)
