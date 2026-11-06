@@ -89,14 +89,21 @@
     return uniqueItems;
   }
 
-  async function saveItems(items, expected, fullRescan) {
-    const snapshot = fullRescan ? globalThis.GalacticProviderSnapshot.completeProviderSnapshot('fandango-at-home', items, [
+  async function saveItems(items, expected, fullRescan, sections = []) {
+    const incomplete = sections.some(section=>section.incomplete);
+    if(incomplete&&!items.length)throw Error('No readable Fandango titles could be saved. Earlier records were kept. Run Full rescan to retry.');
+    const snapshot = incomplete ? {version:1,provider:'fandango-at-home',complete:false,itemCount:items.length,scopes:sections.map(section=>({id:section.id,readCount:items.filter(item=>item.mediaType===section.id).length,expectedCount:expected[section.id==='movie'?'movies':'tv'],pagesRead:section.passes,failedItems:section.failedItems,complete:false,limitReached:section.limitReached===true,end:'partial-acquisition',incomplete:section.incomplete,...(section.unavailable?{unavailable:true}:{})}))} : fullRescan ? globalThis.GalacticProviderSnapshot.completeProviderSnapshot('fandango-at-home', items, [
       globalThis.GalacticProviderSnapshot.completedScope('movie', items.filter((item) => item.mediaType === 'movie').length, expected.movies, 'reported-count'),
       globalThis.GalacticProviderSnapshot.completedScope('tv', items.filter((item) => item.mediaType === 'tv').length, expected.tv, 'reported-count')
     ]) : undefined;
     status.textContent = items.length ? `Saving ${items.length} Fandango at Home title${items.length === 1 ? '' : 's'} locally...` : 'No new Fandango at Home titles; recording the completed check...';
     const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
     if (!response?.ok) throw new Error(response?.error ?? 'Fandango at Home import did not complete.');
+    if(incomplete){
+      const counts=countsFor(items),names=sections.filter(section=>section.incomplete).map(section=>section.id==='movie'?'Movies':'TV Shows').join(' and ');
+      status.textContent=`Saved ${counts.movies} readable movies and ${counts.tv} TV shows. ${names} could not be fully checked. Earlier records were kept. Run Full rescan to retry the unchecked titles.`;
+      return;
+    }
     if (fullRescan) {
       status.textContent = `Saved ${response.movieCount} Fandango at Home movies and ${response.tvCount} TV shows locally. Fandango reported ${expected.movies ?? 'unknown'} movies and ${expected.tv ?? 'unknown'} TV shows.`;
       return;
@@ -121,10 +128,11 @@
     const movieUrl = grids.find((grid) => grid.mediaType === 'movie')?.url;
     const tvUrl = grids.find((grid) => grid.mediaType === 'tv')?.url;
     if (fullRescan && (expected.movies === null || expected.tv === null)) throw new Error('Fandango did not expose both library totals. No full replacement was saved.');
-    if (movieUrl && tvUrl) {
-      await importState('set', { phase: 'movie', expected, urls: { movie: movieUrl, tv: tvUrl }, items: [], fullRescan, knownItemIds: fullRescan ? [] : knownItemIds });
-      status.textContent = 'Opening Fandango Movies View All grid...';
-      globalThis.location.assign(movieUrl);
+    if (movieUrl || tvUrl) {
+      const missingSections=['movie','tv'].filter(section=>section==='movie'?!movieUrl:!tvUrl);
+      await importState('set', { phase: movieUrl?'movie':'tv', expected, urls: { movie: movieUrl??location.href, tv: tvUrl??location.href }, items: [], fullRescan, knownItemIds: fullRescan ? [] : knownItemIds,missingSections,...(!movieUrl?{sections:[{id:'movie',incomplete:true,failedItems:0,passes:0,unavailable:true}]}:{}) });
+      status.textContent = `Opening Fandango ${movieUrl?'Movies':'TV Shows'} View All grid...`;
+      globalThis.location.assign(movieUrl??tvUrl);
       return;
     }
     if (!fullRescan) {
@@ -148,21 +156,24 @@
     const expectedCount = fullRescan ? (section === 'movie' ? state.expected.movies : state.expected.tv) : null;
     busy(true);
     try {
-      const gridItems = await globalThis.GalacticFandangoAtHome.readFandangoGrid(section, expectedCount, ({ passes, count }) => {
+      const result = await globalThis.GalacticFandangoAtHome.readFandangoGrid(section, expectedCount, ({ passes, count }) => {
         status.textContent = `Reading Fandango ${section === 'movie' ? 'Movies' : 'TV Shows'} View All grid: ${count}${expectedCount === null ? '' : ` / ${expectedCount}`} titles found (${passes} passes).`;
-      }, fullRescan ? null : state.knownItemIds ?? []);
-      if (expectedCount !== null && gridItems.length !== expectedCount) {
+      }, fullRescan ? null : state.knownItemIds ?? [], {recover:true});
+      const gridItems=Array.isArray(result)?result:result.items;
+      const sections=[...(state.sections??[]),{id:section,incomplete:result.incomplete===true,failedItems:result.failedItems??0,passes:result.passes??1,limitReached:result.limitReached===true}];
+      if (!result.incomplete && expectedCount !== null && gridItems.length !== expectedCount) {
         throw new Error(`Fandango reported ${expectedCount} ${section === 'movie' ? 'movies' : 'TV shows'}, but its View All grid yielded ${gridItems.length}. No library changes were saved.`);
       }
       const items = [...(state.items ?? []), ...gridItems];
-      if (section === 'movie') {
-        await importState('set', { ...state, phase: 'tv', items });
+      if (section === 'movie'&&!state.missingSections?.includes('tv')) {
+        await importState('set', { ...state, phase: 'tv', items, sections });
         status.textContent = 'Opening Fandango TV Shows View All grid...';
         globalThis.location.assign(state.urls.tv);
         return;
       }
-      const completeItems = fullRescan ? validatedItems(items, state.expected) : validatedItems(items, { movies: null, tv: null });
-      await saveItems(completeItems, state.expected, fullRescan);
+      if(section==='movie')sections.push({id:'tv',incomplete:true,failedItems:0,passes:0,unavailable:true});
+      const completeItems = fullRescan&&!sections.some(section=>section.incomplete) ? validatedItems(items, state.expected) : validatedItems(items, { movies: null, tv: null });
+      await saveItems(completeItems, state.expected, fullRescan, sections);
       await importState('clear');
     } catch (error) {
       await globalThis.GalacticSync.failed('fandango-at-home',error);
@@ -187,7 +198,8 @@
         globalThis.location.assign('/content/browse/mylibrary');
         return;
       }
-      const fullRescan = mode === 'full' || !state.hasFullBaseline;
+      const fullRescan = mode === 'full' || !state.hasFullBaseline || state.syncState?.listingIncomplete===true;
+      if(state.syncState?.listingIncomplete&&mode!=='full')status.textContent='Earlier titles remain unchecked; running a Full rescan to recover them...';
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Fandango at Home baseline yet; reading every title once…';
       await importState('clear');
       await startFromMyLibrary(fullRescan, state.syncState?.knownProviderItemIds ?? []);

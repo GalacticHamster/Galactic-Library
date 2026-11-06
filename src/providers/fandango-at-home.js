@@ -18,6 +18,7 @@
 
   function libraryPageFailure(document){
     if(/\/sign(?:in|-in)|\/login/iu.test(global.location?.pathname??'')||[...document.querySelectorAll('input[type="password"]')].some(e=>!hiddenLibraryElement(e)))return 'sign-in';
+    if([...document.querySelectorAll('h1,h2,[role="alert"]')].some(e=>!hiddenLibraryElement(e)&&/^(?:access denied|unauthorized|forbidden|session expired|please sign in|verify your identity)[.!]?$/iu.test(compactText(e.textContent))))return 'sign-in';
     if(/\/(?:error|500|503)(?:\/|$)/iu.test(global.location?.pathname??'')||[...document.querySelectorAll('h1,h2,[role="alert"]')].some(e=>!hiddenLibraryElement(e)&&/^(?:something went wrong|service unavailable|an unexpected error occurred)[.!]?$/iu.test(compactText(e.textContent))))return 'provider-error';
     return null;
   }
@@ -273,8 +274,10 @@
     }
   }
 
-  async function readFandangoGrid(mediaType, expectedCount = null, reportProgress = () => {}, knownItemIds = null) {
+  async function readFandangoGrid(mediaType, expectedCount = null, reportProgress = () => {}, knownItemIds = null, { recover = false } = {}) {
     const itemsById = new Map();
+    const rejected = new Set(), observed = new Map(), unreadable = new WeakSet();
+    let failedItems = 0, passes = 0, interrupted = false;
     const incremental = Array.isArray(knownItemIds);
     const renderedItemIds = new Set();
     let unchangedPasses = 0;
@@ -282,9 +285,44 @@
     let previousSignature = '';
     let finished = false;
     for (let pass = 0; pass < MAX_SCROLLS && unchangedPasses < 10; pass += 1) {
+      passes = pass + 1;
       const pageFailure=libraryPageFailure(global.document);
+      if(recover&&pageFailure==='provider-error'){interrupted=true;break;}
       if(pageFailure)throw new Error(pageFailure==='sign-in'?'Fandango needs you to sign in again. Your saved library is unchanged.':'Fandango returned an error page. Your saved library is unchanged.');
-      const newlyRenderedItems = fandangoItemsFromDocument(global.document, mediaType)
+      let candidates = fandangoItemsFromDocument(global.document, mediaType);
+      if(recover){
+        candidates=[];
+        for(const link of global.document.querySelectorAll('a[href*="/content/browse/details/"]')){
+          if(hiddenLibraryElement(link))continue;
+          // Recovery cannot turn recommendations or navigation links into
+          // purchases merely because a count mismatch is now recoverable.
+          if(link.closest('aside,nav,footer,[role="navigation"],[role="dialog"]'))continue;
+          const data=cardDataFromDetailLink(link),card=link.closest('[class*="item" i], article, li')??link.parentElement;
+          let unrelated=false;
+          for(let node=card?.parentElement,depth=0;node&&depth<5;node=node.parentElement,depth++){
+            const heading=compactText(node.querySelector('h1,h2,h3,[role="heading"]')?.textContent);
+            if(/^(?:recommended|recommendations|you may|you might|more like|continue watching|collections)\b/iu.test(heading)){unrelated=true;break;}
+            if(/^my (?:movies|tv shows)\s*\(/iu.test(heading)){
+              if(mediaTypeFromLibraryLabel(heading)!==mediaType)unrelated=true;
+              break;
+            }
+          }
+          if(unrelated)continue;
+          const explicit=compactText(card?.getAttribute('data-content-type')??card?.getAttribute('data-type'));
+          const validType=!explicit||/^(?:movie|film|feature|tv|television|series|season|episode|show)$/iu.test(explicit)&&mediaTypeFromValue(explicit)===mediaType;
+          const valid=/\/content\/browse\/details\/[^/?#]+\/[a-z0-9_-]+\/?(?:[?#].*)?$/iu.test(data.detailUrl??'')&&typeof data.title==='string'&&/[\p{L}\p{N}]/u.test(data.title)&&data.title.length<=500&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(data.title)&&validType;
+          if(!valid){if(!unreadable.has(link)){failedItems++;unreadable.add(link);}continue;}
+          const item=fandangoItemFromCardData({...data,typeText:mediaType}),id=item?.providerItemId;
+          if(!id){if(!unreadable.has(link)){failedItems++;unreadable.add(link);}continue;}
+          const prior=observed.get(id);
+          if(prior&&(prior.title!==item.title||prior.ownership!==item.ownership||prior.mediaType!==item.mediaType)){
+            if(!rejected.has(id)){failedItems++;rejected.add(id);}itemsById.delete(id);continue;
+          }
+          observed.set(id,item);
+          if(!rejected.has(id))candidates.push(item);
+        }
+      }
+      const newlyRenderedItems = candidates.filter(item=>!rejected.has(item.providerItemId))
         .filter((item) => !renderedItemIds.has(item.providerItemId));
       for (const item of newlyRenderedItems) renderedItemIds.add(item.providerItemId);
       const itemsToSave = incremental ? newFandangoItems(newlyRenderedItems, knownItemIds) : newlyRenderedItems;
@@ -292,7 +330,7 @@
       reportProgress({ phase: 'grid', section: mediaType, passes: pass + 1, count: itemsById.size, expectedCount });
       // The View All grids default to Recently Purchased. A fully known newly
       // rendered group means every later group is older than the local baseline.
-      if (incremental && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
+      if (incremental && !failedItems && newlyRenderedItems.length && !itemsToSave.length) { finished = true; break; }
       // Count agreement is necessary but is not an end-of-list signal. Finish
       // the virtualized grid before authorizing a complete replacement.
       emptyPasses = itemsById.size === 0 ? emptyPasses + 1 : 0;
@@ -301,10 +339,12 @@
       const loadMore = loadMoreControl(global.document);
       const initialTarget = gridScrollTarget(global.document);
       const beforeHeight = initialTarget.scrollHeight;
-      if (loadMore) {
-        loadMore.click();
-      } else {
-        scrollGridForward(global.document);
+      try {
+        if (loadMore) loadMore.click();
+        else scrollGridForward(global.document);
+      } catch(error) {
+        if(!recover)throw error;
+        interrupted=true;break;
       }
       await wait(SCROLL_PAUSE_MS);
       const settledTarget = gridScrollTarget(global.document);
@@ -318,6 +358,13 @@
       const hasSettled = (itemsById.size > 0||expectedCount===0) && atBottom && !loadMore && signature === previousSignature && settledTarget === initialTarget && settledTarget.scrollHeight === beforeHeight;
       unchangedPasses = hasSettled ? unchangedPasses + 1 : 0;
       previousSignature = signature;
+    }
+    if(recover){
+      if(libraryPageFailure(global.document)==='sign-in')throw Error('Fandango needs you to sign in again. Your saved library is unchanged.');
+      const finalCount=expectedFandangoCountsFromDocument(global.document)[mediaType==='movie'?'movies':'tv'];
+      if(!interrupted&&!itemsById.size&&!failedItems&&finalCount===null)throw Error('Fandango did not expose a recognizable library section. Your saved library is unchanged. Reload My Library and retry.');
+      if(expectedCount!==null&&finalCount!==null&&finalCount!==expectedCount)throw Error('Fandango changed its library count during the check. Your saved library is unchanged. Reload My Library and try again.');
+      return {items:[...itemsById.values()],incomplete:interrupted||failedItems>0||!finished&&unchangedPasses<10||!incremental&&expectedCount!==null&&itemsById.size!==expectedCount,failedItems,passes,limitReached:!interrupted&&!finished&&passes===MAX_SCROLLS&&unchangedPasses<10};
     }
     if (!finished && unchangedPasses < 10) throw new Error(`Fandango did not complete its ${mediaType} grid before the scan limit or loading timeout. No library changes were saved.`);
     if(!incremental){

@@ -80,7 +80,7 @@ export function validateProviderStates(value = {}) {
           if(pending.length)result.syncState.pendingWindows=pending;
         }
       }
-      if(['amazon-video','kindle'].includes(provider)&&state.syncState.listingIncomplete!==undefined){
+      if(['amazon-video','kindle','fandango-at-home'].includes(provider)&&state.syncState.listingIncomplete!==undefined){
         if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Amazon Video recovery status.');
         if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;
       }

@@ -6,6 +6,20 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if(provider==='fandango-at-home'&&snapshot?.complete===false){
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length
+        ||new Set(items.map(item=>item?.providerItemId)).size!==items.length
+        ||items.some(item=>typeof item?.providerItemId!=='string'||!/^[a-z0-9_-]{1,500}$/iu.test(item.providerItemId)||typeof item.title!=='string'||!item.title.trim()||item.title.length>500||!['movie','tv'].includes(item.mediaType)||!['owned','rental'].includes(item.ownership)||item.metadata?.source!=='fandango-at-home-library')
+        ||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==2||!snapshot.scopes.some(scope=>scope?.incomplete===true))fail('Invalid Fandango partial acquisition.');
+      const names=new Set();
+      for(const scope of snapshot.scopes){
+        if(!['movie','tv'].includes(scope?.id)||names.has(scope.id)||scope.complete!==false||typeof scope.limitReached!=='boolean'||scope.limitReached&&(!scope.incomplete||scope.pagesRead!==300)||scope.end!=='partial-acquisition'||typeof scope.incomplete!=='boolean'
+          ||scope.unavailable!==undefined&&scope.unavailable!==true||!count(scope.pagesRead)||scope.pagesRead>300||(scope.unavailable?!scope.incomplete||scope.pagesRead!==0||scope.readCount!==0||scope.failedItems!==0:scope.pagesRead<1)||!count(scope.failedItems)||scope.failedItems>50000||!scope.incomplete&&scope.failedItems!==0
+          ||scope.expectedCount!==null&&(!count(scope.expectedCount)||scope.expectedCount>50000)||scope.readCount!==items.filter(item=>item.mediaType===scope.id).length)fail('Invalid Fandango section evidence.');
+        names.add(scope.id);
+      }
+      return snapshot;
+    }
     if(provider==='kindle'&&snapshot?.complete===false){
       const recovery=snapshot.recovery,names=new Set();
       if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(i=>i?.providerItemId)).size!==items.length

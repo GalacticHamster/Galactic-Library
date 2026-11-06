@@ -120,6 +120,10 @@ number of distinct eligible titles to agree with each reported total. Hidden
 page widgets are excluded; off-screen library cards remain included. Quick
 update still stops at the saved newest-first baseline.
 
+If a Fandango grid stops loading or contains unreadable cards, GL saves independently readable movies and TV shows and keeps earlier records. A failed TV grid does not discard readable movies, and vice versa. The result identifies the unchecked section; it does not guess how many titles are missing. Sign-in errors, changed counts, account changes and local save failures remain protected.
+
+Run **Full rescan** to recover unchecked Fandango titles. **Quick update** performs that Full traversal while recovery is pending, because stopping at known titles could miss older unchecked cards. After successful recovery, Quick returns to its normal newest-first early stop. Only a completed, count-validated Full rescan can move omitted records to Earlier imports.
+
 For a Fandango movie-count failure, open **My Library → GL panel → Scan
 diagnostics → Check movie listing (no import)**. This opens Movies View All and
 checks the rendered listing without saving library records. When finished,

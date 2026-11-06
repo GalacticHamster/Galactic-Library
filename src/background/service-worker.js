@@ -549,7 +549,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games','kindle'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games','kindle','fandango-at-home'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));

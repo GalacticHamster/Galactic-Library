@@ -24,5 +24,18 @@ export function validateFandangoState(value) {
     if(!['movie','tv'].includes(item.mediaType))throw new Error('Invalid Fandango media type.');
     return {providerItemId:item.providerItemId,title:item.title,mediaType:item.mediaType,ownership:item.ownership,metadata:item.metadata,platform:item.platform,acquiredAt:item.acquiredAt};
   });
-  return {phase:value.phase,fullRescan:value.fullRescan,expected,urls,items,knownItemIds:strings(value.knownItemIds,50000,500,'Known Fandango IDs'),scanContext};
+  let sections;
+  if(value.sections!==undefined){
+    if(!Array.isArray(value.sections)||value.sections.length!==1||value.phase!=='tv')throw Error('Invalid Fandango section progress.');
+    sections=value.sections.map(section=>{
+      if(section?.id!=='movie'||typeof section.incomplete!=='boolean')throw Error('Invalid Fandango section progress.');
+      if(section.limitReached!==undefined&&(typeof section.limitReached!=='boolean'||section.limitReached&&(!section.incomplete||section.passes!==300)))throw Error('Invalid Fandango scan limit.');
+      if(section.unavailable!==undefined&&section.unavailable!==true)throw Error('Invalid Fandango unavailable section.');
+      return {id:section.id,incomplete:section.incomplete,failedItems:count(section.failedItems,'Unreadable Fandango cards',50000),passes:count(section.passes,'Fandango passes',300),...(section.limitReached?{limitReached:true}:{}),...(section.unavailable?{unavailable:true}:{})};
+    });
+    if(sections.some(section=>section.unavailable?!section.incomplete||section.passes!==0||section.failedItems!==0:section.passes<1))throw Error('Invalid Fandango section progress.');
+  }
+  const missingSections=strings(value.missingSections,2,5,'Unavailable Fandango sections');
+  if(missingSections.some(id=>!['movie','tv'].includes(id))||missingSections.length>1)throw Error('Invalid unavailable Fandango sections.');
+  return {phase:value.phase,fullRescan:value.fullRescan,expected,urls,items,knownItemIds:strings(value.knownItemIds,50000,500,'Known Fandango IDs'),scanContext,...(missingSections.length?{missingSections}:{}),...(sections?{sections}:{})};
 }

@@ -598,6 +598,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
+    if(provider==='fandango-at-home'){
+      const partial=snapshot?.complete===false, pending=profile.state.syncState?.listingIncomplete;
+      if(partial||pending&&syncDetails.syncMode==='full')validateProviderSnapshot(provider,values,snapshot);
+      if(partial||pending){
+        const incomplete=partial||snapshot?.complete!==true;
+        const {fullSyncAt,...safe}=syncDetails;
+        syncDetails={...(incomplete?safe:syncDetails),syncState:{...(incomplete?{listingIncomplete:true}:{})},...(incomplete?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
+      }
+    }
     if(provider==='kindle'){
       if(snapshot?.complete===false)validateProviderSnapshot(provider,values,snapshot);
       syncDetails=kindleAcquisitionDetails(profile,syncDetails,snapshot);
@@ -983,6 +992,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if(incoming.provider==='kindle'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt};
+    if(incoming.provider==='fandango-at-home'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if(incoming.provider==='kindle'&&previous?.ownership==='owned'&&incoming.ownership==='unknown'&&!incoming.metadata.ownershipBasis){
       incoming={...incoming,ownership:previous.ownership,metadata:{...incoming.metadata,originType:previous.metadata.originType,...(previous.metadata.ownershipBasis?{ownershipBasis:previous.metadata.ownershipBasis}:{})}};
     }
@@ -1099,6 +1109,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
+    if(provider==='fandango-at-home'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      const {fullSyncAt,...safe}=syncDetails;
+      return mergeIntoDatabase(provider,values,{...safe,syncState:{listingIncomplete:true},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},authoritativeDatabase,null,beforeSave,completion);
+    }
     if(provider==='kindle'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
@@ -1242,9 +1257,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    if(['gog','epic','amazon-video','kindle'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
+    if(['gog','epic','amazon-video','kindle','fandango-at-home'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
+    }
+    if(provider==='fandango-at-home'&&syncDetails.scanDiagnostics?.incomplete){
+      values=values.filter(value=>{const prior=database.providerItems[providerItemKey(provider,value.providerItemId,profile.keySpace)];return !prior||prior.mediaType===value.mediaType&&!(prior.ownership==='owned'&&value.ownership==='rental');});preparedIncoming=null;
     }
     if(provider==='fanatical'&&syncDetails.syncState&&(profile.state.syncState?.acquisitionCheckedAt||syncDetails.syncState.acquisitionCheckedAt)){
       if(syncDetails.scanDiagnostics?.incomplete||profile.state.syncState?.failedOrderFingerprints?.length||profile.state.syncState?.listingIncomplete){
@@ -1289,7 +1307,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam','fanatical','humble'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical','humble','fandango-at-home'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];
