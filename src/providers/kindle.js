@@ -376,10 +376,10 @@
       credentials: 'include',
       cache: 'no-store'
     });
-    if (!response.ok) throw new Error(`Amazon returned ${response.status} while loading your Kindle library. Confirm that you are signed in.`);
+    if (!response.ok) throw Object.assign(new Error(`Amazon returned ${response.status} while loading your Kindle library. Confirm that you are signed in.`),{fatal:[401,403].includes(response.status)});
     const payload = await response.json().catch(() => null);
     if (payload?.success !== true || !payload?.GetContentOwnershipData || !Array.isArray(payload.GetContentOwnershipData.items)) {
-      throw new Error('Amazon returned an unreadable Kindle library response. Open Manage Your Content and Devices, then try again.');
+      throw Object.assign(new Error('Amazon returned an unreadable Kindle library response. Open Manage Your Content and Devices, then try again.'),{fatal:true});
     }
     return payload;
   }
@@ -391,63 +391,88 @@
   async function fetchKindleBooks(reportProgress = () => {}, knownItemIds = null) {
     const csrfToken = csrfTokenFromDocument(global.document);
     if (!csrfToken) throw new Error('Amazon did not expose the library page token. Open Manage Your Content and Devices, wait for it to finish loading, then try again.');
-    const booksById = new Map();
-    const incremental = Array.isArray(knownItemIds);
-    const categoryCounts = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, 0]));
-    const diagnostics = Object.fromEntries(LIBRARY_CATEGORIES.map((category) => [category.id, {
-      reportedCount: null, rawCount: 0, readableCount: 0, duplicateCount: 0, pagesRead: 0
-    }]));
-    let pagesRead = 0;
-    for (const category of LIBRARY_CATEGORIES) {
-      let finished = false;
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        reportProgress({ pagesRead, books: booksById.size, categoryCounts });
-        const payload = await fetchKindleLibraryPage(page * PAGE_SIZE, csrfToken, category);
-        const rawItems = ownershipItemsFromResponse(payload);
-        if (rawItems.some((item) => !item || typeof item.title !== 'string' || !['string', 'number'].includes(typeof (item.asin ?? item.contentId ?? item.id)))) throw new Error(`Amazon returned malformed ${category.id} entries. No library changes were saved.`);
-        const readableItems = kindleItemEntriesFromOwnershipItems(rawItems, global.location?.origin, category.id);
-        const pageBooks = kindleItemsFromOwnershipResponse(payload, global.location?.origin, category.id);
-        const countValue = payload.GetContentOwnershipData.numberOfItems;
-        const reportedCount = countValue === undefined || countValue === null || countValue === '' ? null : Number(countValue);
-        if (reportedCount !== null && (!Number.isSafeInteger(reportedCount) || reportedCount < 0)) throw new Error(`Amazon returned an invalid ${category.id} item count. No library changes were saved.`);
-        const diagnostic = diagnostics[category.id];
-        if (page > 0 && reportedCount !== diagnostic.reportedCount) throw new Error(`Amazon changed the ${category.id} total during the scan. Please retry; no library changes were saved.`);
-        diagnostic.reportedCount = reportedCount;
-        diagnostic.pagesRead += 1;
-        if (readableItems.length !== rawItems.length) throw new Error(`Amazon returned unreadable ${category.id} entries. No library changes were saved.`);
-        diagnostic.rawCount += rawItems.length;
-        diagnostic.readableCount += readableItems.length;
-        diagnostic.duplicateCount += readableItems.length - pageBooks.length;
-        const booksToSave = incremental ? newKindleItems(pageBooks, knownItemIds) : pageBooks;
-        for (const book of booksToSave) {
-          if (!booksById.has(book.providerItemId)) {
-            categoryCounts[category.id] += 1;
-          }
-          else diagnostic.duplicateCount += 1;
-          booksById.set(book.providerItemId, book);
+    const booksById=new Map(),seen=new Map(),conflicts=new Set();
+    const incremental=Array.isArray(knownItemIds);
+    const categoryCounts=Object.fromEntries(LIBRARY_CATEGORIES.map(category=>[category.id,0]));
+    const diagnostics=Object.fromEntries(LIBRARY_CATEGORIES.map(category=>[category.id,{reportedCount:null,rawCount:0,readableCount:0,duplicateCount:0,pagesRead:0,failedItems:0,failedPages:0,limitReached:false,complete:false}]));
+    let pagesRead=0,incomplete=false,coverageUnverified=false;
+    const tokenCurrent=()=>csrfTokenFromDocument(global.document)===csrfToken;
+    for(const category of LIBRARY_CATEGORIES){
+      const diagnostic=diagnostics[category.id],pageSignatures=new Set();let finished=false;
+      for(let page=0;page<MAX_PAGES;page++){
+        reportProgress({pagesRead,books:booksById.size,categoryCounts});
+        if(!tokenCurrent())throw Error('The Kindle session changed during the scan. Reload the page and confirm the account before retrying. No library changes were saved.');
+        let payload;
+        try{payload=await fetchKindleLibraryPage(page*PAGE_SIZE,csrfToken,category);}
+        catch(error){
+          if(error?.fatal||!booksById.size)throw error;
+          diagnostic.failedPages++;incomplete=true;break;
         }
-        pagesRead += 1;
-        reportProgress({ pagesRead, books: booksById.size, categoryCounts });
-        // Amazon returns this endpoint newest first. Once a whole page is
-        // already in the local full baseline, older pages cannot add a new
-        // entitlement. Full rescan remains available for reconciliation.
-        if (incremental && pageBooks.length > 0 && booksToSave.length === 0) { finished = true; break; }
-        const reachedReportedEnd = reportedCount !== null && (page + 1) * PAGE_SIZE >= reportedCount;
-        const reachedUnreportedEnd = reportedCount === null && rawItems.length < PAGE_SIZE;
-        if (rawItems.length === 0 || reachedReportedEnd || reachedUnreportedEnd) {
-          if (!incremental && reportedCount !== null && diagnostic.rawCount !== reportedCount) throw new Error(`Amazon reported ${reportedCount} ${category.id} items but returned ${diagnostic.rawCount}. No library changes were saved.`);
-          finished = true;
-          break;
+        const rawItems=ownershipItemsFromResponse(payload),countValue=payload.GetContentOwnershipData.numberOfItems;
+        const reportedCount=countValue===undefined||countValue===null||countValue===''?null:Number(countValue);
+        if(reportedCount!==null&&(!Number.isSafeInteger(reportedCount)||reportedCount<0))throw Error('Amazon returned an invalid Kindle item count. No library changes were saved.');
+        if(page>0&&reportedCount!==diagnostic.reportedCount)throw Error('Amazon changed the Kindle total during the scan. Retry after checking the signed-in account. No library changes were saved.');
+        const signature=JSON.stringify(rawItems.map(item=>item?.asin??item?.contentId??item?.id??null));
+        if(rawItems.length&&pageSignatures.has(signature)){diagnostic.failedPages++;incomplete=true;break;}
+        pageSignatures.add(signature);
+        diagnostic.reportedCount=reportedCount;diagnostic.pagesRead++;diagnostic.rawCount+=rawItems.length;pagesRead++;
+        const candidates=[];
+        for(const raw of rawItems){
+          let item=null;
+          try{
+            if(!raw||typeof raw!=='object'||Array.isArray(raw)||typeof raw.title!=='string'||!['string','number'].includes(typeof(raw.asin??raw.contentId??raw.id)))throw Error();
+            const id=compactText(raw.asin??raw.contentId??raw.id).toUpperCase();
+            if(!/^[A-Z0-9_-]{1,128}$/u.test(id))throw Error();
+            for(const key of ['originType','ownershipType','sourceType','contentType','contentTypeName','type','itemStatus','status'])if(raw[key]!==undefined&&typeof raw[key]!=='string')throw Error();
+            if(/^(?:audiobook|audio|video|movie|game|music)$/iu.test(raw.contentType??raw.contentTypeName??raw.type??''))throw Error();
+            const date=raw.acquiredDate??raw.acquisitionDate??raw.dateAcquired??raw.purchaseDate;
+            if(date!==undefined&&date!==null&&date!==''&&!acquiredAtFromValue(date))throw Error();
+            item=kindleItemFromOwnershipItem(raw,global.location?.origin,category.id);
+            if(!item)throw Error();
+            if(item.ownership==='owned'&&(category.id==='personal-documents'||[raw.ownershipType,raw.sourceType,raw.contentType].some(value=>{
+              const state=global.GalacticKindleOwnership.fromOriginType(value);
+              return ['subscription','borrowed','rental'].includes(state)||/^(?:sample|kindlepdoc|pdoc|personaldocument)$/iu.test(value??'');
+            })))throw Error();
+          }catch{diagnostic.failedItems++;incomplete=true;continue;}
+          candidates.push(item);
+        }
+        const validation=await global.chrome.runtime.sendMessage({type:'VALIDATE_KINDLE_ITEMS',items:candidates});
+        if(!validation?.ok||!Array.isArray(validation.statuses)||validation.statuses.length!==candidates.length||validation.statuses.some(v=>typeof v!=='boolean'))throw Error('Kindle page validation was unavailable. Reload the page and retry. No library changes were saved.');
+        const pageBooks=[];
+        for(const [index,item]of candidates.entries()){
+          if(!validation.statuses[index]){diagnostic.failedItems++;incomplete=true;continue;}
+          diagnostic.readableCount++;
+          const key=item.providerItemId,prior=seen.get(key);
+          if(prior){
+            diagnostic.duplicateCount++;
+            if(JSON.stringify(prior)!==JSON.stringify(item)){conflicts.add(key);booksById.delete(key);diagnostic.failedItems++;incomplete=true;}
+            continue;
+          }
+          seen.set(key,item);pageBooks.push(item);
+          if(!conflicts.has(key)&&(!incremental||!knownItemIds.includes(key))){booksById.set(key,item);categoryCounts[category.id]++;}
+        }
+        reportProgress({pagesRead,books:booksById.size,categoryCounts});
+        if(incremental&&!incomplete&&pageBooks.length>0&&pageBooks.every(item=>knownItemIds.includes(item.providerItemId))){finished=true;break;}
+        const reachedReportedEnd=reportedCount!==null&&(page+1)*PAGE_SIZE>=reportedCount;
+        const reachedUnreportedEnd=reportedCount===null&&rawItems.length<PAGE_SIZE;
+        if(rawItems.length===0||reachedReportedEnd||reachedUnreportedEnd){
+          if(reportedCount!==null&&diagnostic.rawCount!==reportedCount){diagnostic.failedPages++;incomplete=true;}else diagnostic.complete=true;
+          finished=true;break;
         }
         await wait(BETWEEN_PAGES_MS);
       }
-      if (!finished) throw new Error(`Kindle reached its ${MAX_PAGES}-page limit in ${category.id} before completing the scan. No library changes were saved.`);
+      if(!finished&&!diagnostic.failedPages){diagnostic.failedPages++;diagnostic.limitReached=true;incomplete=true;}
     }
-    if (!booksById.size && !incremental) throw new Error('Amazon returned no readable Kindle books. Please try again later.');
-    const items = [...booksById.values()];
-    const snapshot = incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('kindle', items,
-      Object.entries(diagnostics).map(([id, detail]) => ({ ...global.GalacticProviderSnapshot.completedScope(id, detail.rawCount, detail.reportedCount, detail.reportedCount === null ? 'pagination-end' : 'reported-count', detail.pagesRead), duplicateCount: detail.duplicateCount })));
-    return { items, diagnostics, snapshot };
+    if(!tokenCurrent())throw Error('The Kindle session changed before saving. Reload the page and retry. No library changes were saved.');
+    const items=[...booksById.values()];
+    coverageUnverified=!incremental&&Object.values(diagnostics).some(d=>d.reportedCount===null);
+    if(!items.length&&!incremental)throw Error('Amazon returned no readable Kindle books. Please try again later.');
+    if(incomplete&&!items.length)throw Error('No independently readable Kindle items could be saved. Run Full rescan to retry; earlier records were kept.');
+    const snapshot=incomplete||coverageUnverified?{version:1,provider:'kindle',complete:false,itemCount:items.length,
+      recovery:{coverageUnverified,failedItems:Object.values(diagnostics).reduce((n,d)=>n+d.failedItems,0),failedPages:Object.values(diagnostics).reduce((n,d)=>n+d.failedPages,0)},
+      scopes:Object.entries(diagnostics).map(([id,d])=>({id,readCount:d.rawCount,expectedCount:d.reportedCount,pagesRead:d.pagesRead,complete:false,limitReached:d.limitReached,end:'partial-acquisition'}))}
+      :incremental?undefined:global.GalacticProviderSnapshot.completeProviderSnapshot('kindle',items,Object.entries(diagnostics).map(([id,d])=>({...global.GalacticProviderSnapshot.completedScope(id,d.rawCount,d.reportedCount,d.reportedCount===null?'pagination-end':'reported-count',d.pagesRead),duplicateCount:d.duplicateCount})));
+    return {items,diagnostics,snapshot,incomplete,coverageUnverified};
   }
 
   global.GalacticKindle = { kindleItemsFromOwnershipResponse, kindleItemFromOwnershipItem, ownershipFromOriginType, newKindleItems, explicitCollectsStatement, kindleCollectsStatementFromDocument, explicitContentsStatement, kindleContentsStatementFromDocument, kindleDescriptionBlocks, kindleCategoryPaths, kindleProductDetails, contentsExtractorVersion, fetchKindleProductComicContents, fetchKindleBooks };

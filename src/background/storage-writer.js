@@ -228,7 +228,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(base&&Object.isFrozen(base)&&base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
     return cacheQuerySnapshots&&base&&base===querySnapshot&&scan.profileId===profile.profileId
       &&scan.activeAtStartId===profile.profileId&&database.providers[provider]?.activeProfileId===profile.profileId
-      &&profile.state.connected===true&&(['fanatical','gog'].includes(provider)?!providerScanMode(provider,profile.state,'incremental').forceFull:Boolean(profile.state.fullSyncAt));
+      &&profile.state.connected===true&&(['fanatical','gog','kindle'].includes(provider)?!providerScanMode(provider,profile.state,'incremental').forceFull:Boolean(profile.state.fullSyncAt));
   }
   async function persistProviderCheck(database,provider,profile,scan,patch,storedScans){
     patch=providerCheckPatch(provider,patch);
@@ -554,7 +554,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId);
-    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(['fanatical','humble','gog'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
+    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(['fanatical','humble','gog','kindle'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -598,6 +598,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
+    if(provider==='kindle'){
+      if(snapshot?.complete===false)validateProviderSnapshot(provider,values,snapshot);
+      syncDetails=kindleAcquisitionDetails(profile,syncDetails,snapshot);
+    }
     if(provider==='amazon-games'){
       const partial=snapshot?.complete===false;
       if(partial||profile.state.syncState?.listingIncomplete&&syncDetails.syncMode==='full')validateProviderSnapshot(provider,values,snapshot);
@@ -978,6 +982,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         ...(keepOwnership?{ownership:previous.ownership}:{})};
     }
     if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
+    if(incoming.provider==='kindle'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt};
+    if(incoming.provider==='kindle'&&previous?.ownership==='owned'&&incoming.ownership==='unknown'&&!incoming.metadata.ownershipBasis){
+      incoming={...incoming,ownership:previous.ownership,metadata:{...incoming.metadata,originType:previous.metadata.originType,...(previous.metadata.ownershipBasis?{ownershipBasis:previous.metadata.ownershipBasis}:{})}};
+    }
     if (previous?.recordRef) incoming = {...incoming, recordRef: previous.recordRef};
     incoming=preserveKoboObservation(incoming,previous);
     if(incoming.provider==='amazon-games'&&previous){
@@ -1077,12 +1085,25 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const acquisitionCheckedAt=prior.acquisitionCheckedAt??incoming.acquisitionCheckedAt??(partialFull?new Date().toISOString():null);
     return {...safe,syncState:{knownPurchaseIds,...(failed.size?{failedPurchaseIds:[...failed]}:{}),...(acquisitionCheckedAt?{acquisitionCheckedAt}:{})}};
   }
+  function kindleAcquisitionDetails(profile,details,snapshot){
+    const prior=profile.state.syncState??{},partial=snapshot?.complete===false;
+    const pending=partial?Boolean(snapshot.recovery.failedItems||snapshot.recovery.failedPages):prior.listingIncomplete&&snapshot?.complete!==true;
+    if(!partial&&!prior.listingIncomplete&&!prior.acquisitionCheckedAt)return details;
+    const {fullSyncAt,...safe}=details;
+    const state={...(prior.acquisitionCheckedAt||partial?{acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}:{}),...(pending?{listingIncomplete:true}:{})};
+    return {...(partial||pending?safe:details),syncState:state,...(pending?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
+  }
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
+    if(provider==='kindle'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+      return mergeIntoDatabase(provider,values,kindleAcquisitionDetails(profile,syncDetails,snapshot),database,null,beforeSave,completion);
+    }
     if(provider==='amazon-games'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       const {fullSyncAt,...safe}=syncDetails;
@@ -1221,7 +1242,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    if(['gog','epic','amazon-video'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete){
+    if(['gog','epic','amazon-video','kindle'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
     }

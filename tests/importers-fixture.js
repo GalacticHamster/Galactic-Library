@@ -10,6 +10,7 @@ import { completeProviderSnapshot, completedScope } from '../src/lib/provider-sn
 import '../src/providers/metadata.js';
 import '../src/providers/fanatical.js';
 import '../src/providers/steam-store.js';
+import {kindleItemStatuses} from '../src/lib/kindle-import.js';
 import {steamTitleStatuses} from '../src/lib/provider-state.js';
 import {kindleContentsPlan} from '../src/lib/kindle-contents.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
@@ -159,6 +160,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
     const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+      if(request.type==='VALIDATE_KINDLE_ITEMS')return {ok:true,statuses:kindleItemStatuses(request.items)};
       if(request.type==='VALIDATE_STEAM_TITLES')return {ok:true,statuses:steamTitleStatuses(request.titles)};
       if(request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING')return {ok:true,enabled:providerDiagnosticsEnabled};
       if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
@@ -546,7 +548,7 @@ const {checkKindleCategoryCapture}=await import('./kindle-category-fixture.js');
   const captureFixtures=await (await originalFetch('/tests/fixtures/kindle/kindle-source-capture.json')).json();
   checks.push(...await checkKindleSourceCapture(captureFixtures,html=>new DOMParser().parseFromString(html,'text/html')));
   const {checkIndependentEvidence}=await import('./kindle-independent-evidence-fixture.js');
-  checks.push(...await checkIndependentEvidence(await (await originalFetch('/tests/fixtures/kindle/kindle-independent-evidence.json')).json(),{ui:true}));
+  checks.push(...await checkIndependentEvidence(await (await originalFetch('/tests/fixtures/kindle/kindle-independent-evidence.json')).json(),{ui:true,deferToggle:new URLSearchParams(location.search).has('defer-editor-toggle')}));
   const {checkWholeManifest}=await import('./kindle-whole-manifest-fixture.js');
   checks.push(...await checkWholeManifest(await (await originalFetch('/tests/fixtures/kindle/kindle-whole-manifest.json')).json(),{ui:true}));
   globalThis.fetch=originalFetch;

@@ -80,10 +80,11 @@ export function validateProviderStates(value = {}) {
           if(pending.length)result.syncState.pendingWindows=pending;
         }
       }
-      if(provider==='amazon-video'&&state.syncState.listingIncomplete!==undefined){
+      if(['amazon-video','kindle'].includes(provider)&&state.syncState.listingIncomplete!==undefined){
         if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Amazon Video recovery status.');
         if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;
       }
+      if(provider==='kindle'&&state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Kindle acquisition check');
       if(provider==='steam'&&state.syncState.applications!==undefined)result.syncState.applications=validateSteamApplications(state.syncState.applications);
       if(provider==='audible'&&state.syncState.audibleHistory!==undefined){
         const h=object(state.syncState.audibleHistory,'Audible history checkpoint');

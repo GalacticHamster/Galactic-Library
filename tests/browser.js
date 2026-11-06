@@ -23,6 +23,7 @@ const audibleMode=process.argv.includes('--audible');
 const fandangoMode=process.argv.includes('--fandango');
 const audibleOwnershipMode=process.argv.includes('--audible-ownership');
 const importerMode=process.argv.includes('--importers');
+const kindleEvidenceMode=process.argv.includes('--kindle-evidence');
 const koboMode=process.argv.includes('--kobo');
 const overlayAuditMode=process.argv.includes('--overlay-audit');
 const uxMode=process.argv.includes('--ux');
@@ -52,6 +53,9 @@ const fixtureFinished=new Promise(resolve=>{complete=resolve;});
 const server=createServer(async(request,response)=>{
   try{
     const pathname=new URL(request.url,'http://localhost').pathname;
+    if(pathname==='/tests/kindle-evidence.html'){
+      response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<html><body><script type="module" src="/tests/kindle-independent-browser-fixture.js"></script></body></html>');return;
+    }
     if(pathname==='/tests/overlay-account-audit.html'){
       response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<html><body><script type="module" src="/tests/overlay-account-audit-fixture.js"></script></body></html>');return;
     }
@@ -81,8 +85,8 @@ try{
   // can finish while an EPUB stream is still awaiting native completion.
   let child;
   const browseStartup=process.argv.includes('--review-origin')?'?review-origin':process.argv.includes('--saved-view')?'?saved-view':process.argv.includes('--exact-library-link')?'?exact-library-link':'';
-  const operationQuery=operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):process.argv.includes('--provider-diagnostics')?'?provider-diagnostics=1':'';
-  const url=`http://127.0.0.1:${server.address().port}/${overlayAuditMode?'tests/overlay-account-audit.html':koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
+  const operationQuery=process.argv.includes('--defer-editor-toggle')?'?defer-editor-toggle=1':operationMode?'?size='+Number(process.argv.find(value=>value.startsWith('--size='))?.split('=')[1]??1000)+(process.argv.includes('--exercise-feedback')?'&exercise=1':''):process.argv.includes('--provider-diagnostics')?'?provider-diagnostics=1':'';
+  const url=`http://127.0.0.1:${server.address().port}/${kindleEvidenceMode?'tests/kindle-evidence.html':overlayAuditMode?'tests/overlay-account-audit.html':koboMode?'tests/kobo.html':importerMode?'tests/importers.html':'options.html'}${libraryBrowseMode?browseStartup:operationQuery}`;
   const args=firefox?['--headless','--no-remote','--profile',profile,url]:['--headless=new',`--window-size=${width},${narrow||medium?900:1000}`,'--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,url];
   if(!firefox&&process.argv.includes('--reduced-motion'))args.push('--force-prefers-reduced-motion');
   const env={...process.env,...(firefox&&(narrow||medium||tiny)?{MOZ_HEADLESS_WIDTH:String(width),MOZ_HEADLESS_HEIGHT:'900'}:{})};

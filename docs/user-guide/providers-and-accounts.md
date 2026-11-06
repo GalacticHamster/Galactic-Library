@@ -47,6 +47,14 @@ A clean headerless order list remains a successful import. It does not authorize
 
 For troubleshooting, enable **Settings → Troubleshooting → Enable provider diagnostics**, reload Fanatical's Orders page and retry. Open **Scan diagnostics → Export scan report** before reloading again. The report contains only error categories, stages, aggregate counts and the confirmed save outcome, without titles, order identifiers or account details. An unavailable acquisition result has unknown counts; an unconfirmed save means GL did not receive a successful save acknowledgment. Ordinary error messages work with diagnostics turned off.
 
+## Kindle import recovery
+
+If an individual Kindle entry cannot be validated or a later page fails temporarily, GL saves independently readable items and keeps earlier records, purchase evidence, acquisition dates and your access corrections. The result reports a partial save, without guessing how many books are behind an unreadable page. Purchased, subscription, borrowed, sample and personal-document access remain distinct.
+
+Run **Full rescan** to recover unchecked Kindle history. **Quick update** also performs that Full traversal while recovery is pending; a known-page shortcut cannot recover arbitrary missing older pages. After a complete recovery, Quick returns to checking newest pages and stopping at already saved items. Sign-in errors, changed sessions, unrecognized response structures and local save failures keep their safety checks.
+
+When Amazon supplies no library total, finishing the readable listing does not prove complete coverage. GL saves those observations additively, keeps omitted records and reports that coverage is unconfirmed. A clean acquisition can still establish the baseline for normal Quick updates; it does not grant permission to retire omitted items. Only a complete, count-validated Full rescan can reconcile Kindle omissions into earlier-import history.
+
 ## Use remembered accounts
 
 On a provider website, a single connected account eligible for reuse appears as

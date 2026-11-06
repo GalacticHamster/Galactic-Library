@@ -11,6 +11,7 @@ import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import '../providers/fanatical.js';
+import {kindleItemStatuses} from '../lib/kindle-import.js';
 import { matchItems } from '../lib/matcher.js';
 import {steamTitleStatuses} from '../lib/provider-state.js';
 import { handleExternalApiRequestAsync } from '../lib/external-api.js';
@@ -349,6 +350,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try{sendResponse({ok:true,statuses:steamTitleStatuses(request.titles)});}catch(error){sendResponse({ok:false,error:error.message});}
     return undefined;
   }
+  if(request?.type==='VALIDATE_KINDLE_ITEMS'){
+    if(!isProviderImportPage('kindle',sender.url)||!sender.tab?.id){sendResponse({ok:false,error:'Kindle validation is available only from the Kindle library tab.'});return undefined;}
+    try{sendResponse({ok:true,statuses:kindleItemStatuses(request.items)});}catch{sendResponse({ok:false,error:'Kindle page validation was unavailable. Reload the library page and retry.'});}
+    return undefined;
+  }
   if (request?.type === 'FETCH_FANATICAL_ORDERS') {
     if (!isProviderImportPage('fanatical', sender.url) || !sender.tab?.id) {
       sendResponse({ ok: false, error: 'Fanatical orders can be read only from a signed-in Fanatical tab.' });
@@ -534,7 +540,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ok: true,
           scanToken,forceFull:forceFull===true,scanReason,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
-          ...(['fanatical','humble','gog'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
+          ...(['fanatical','humble','gog','kindle'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set([...(state.syncState?.failedPurchaseIds??[]),...Object.values(database.providerItems)
@@ -543,7 +549,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games','kindle'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));

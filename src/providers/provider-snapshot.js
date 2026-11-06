@@ -6,6 +6,20 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if(provider==='kindle'&&snapshot?.complete===false){
+      const recovery=snapshot.recovery,names=new Set();
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(i=>i?.providerItemId)).size!==items.length
+        ||items.some(i=>typeof i?.providerItemId!=='string'||!/^[A-Z0-9_-]{1,128}$/u.test(i.providerItemId)||typeof i.title!=='string'||!i.title.trim()||i.title.length>500||i.mediaType!=='book'||i.metadata?.source!=='amazon-kindle-content-library'||!['books','personal-documents'].includes(i.metadata.libraryCategory)||i.ownership!==global.GalacticKindleOwnership?.classify(i.metadata).ownership)
+        ||!count(recovery?.failedItems)||recovery.failedItems>50000||!count(recovery?.failedPages)||recovery.failedPages>1000||typeof recovery.coverageUnverified!=='boolean'||!recovery.failedItems&&!recovery.failedPages&&!recovery.coverageUnverified
+        ||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==2)fail('Invalid Kindle partial acquisition.');
+      for(const scope of snapshot.scopes){
+        if(!['books','personal-documents'].includes(scope?.id)||names.has(scope.id)||scope.complete!==false||typeof scope.limitReached!=='boolean'||scope.limitReached&&scope.pagesRead!==500||scope.end!=='partial-acquisition'||!count(scope.readCount)||!count(scope.pagesRead)||scope.pagesRead>500||scope.expectedCount!==null&&!count(scope.expectedCount))fail('Invalid Kindle partial section.');
+        names.add(scope.id);
+      }
+      if(snapshot.scopes.reduce((n,s)=>n+s.pagesRead,0)<1)fail('Kindle did not return any validated page.');
+      if(snapshot.scopes.reduce((n,s)=>n+s.readCount,0)<items.length)fail('Kindle returned unexplained partial items.');
+      return snapshot;
+    }
     if (provider === 'amazon-games' && snapshot?.complete === false) {
       const scope=snapshot.scopes?.[0], recovery=snapshot.recovery;
       if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(i=>i?.providerItemId)).size!==items.length

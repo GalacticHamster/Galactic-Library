@@ -8,13 +8,14 @@ import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {audibleRescanTests} from './audible-rescan.js';
 import {steamTitleStatuses} from '../src/lib/provider-state.js';
+import {kindleItemStatuses} from '../src/lib/kindle-import.js';
 
 // Exercise the actual classic importers in isolated signed-in page contexts.
 // Timers resolve immediately; no network, credentials, or real account is used.
 export function providerContext(provider, fetch, overrides = {}) {
   const context = vm.createContext({
     URL, URLSearchParams, console, fetch,
-    chrome:{runtime:{sendMessage:async r=>({ok:true,statuses:steamTitleStatuses(r.titles)})}},
+    chrome:{runtime:{sendMessage:async r=>({ok:true,statuses:r.type==='VALIDATE_KINDLE_ITEMS'?kindleItemStatuses(r.items):steamTitleStatuses(r.titles)})}},
     setTimeout: (callback) => { callback(); return 0; },
     location: { origin: 'https://www.amazon.com', href: 'https://www.amazon.com/hz/mycd/', pathname: '/hz/mycd/' },
     document: {
@@ -24,7 +25,7 @@ export function providerContext(provider, fetch, overrides = {}) {
     },
     ...overrides
   });
-  for (const file of ['provider-snapshot',...(provider==='kindle'?['kindle-ownership']:[]),provider]) {
+  for (const file of ['provider-snapshot',...(provider==='kindle'?['metadata','kindle-ownership']:[]),provider]) {
     vm.runInContext(readFileSync(new URL(`../src/providers/${file}.js`, import.meta.url), 'utf8'), context, { filename: `${file}.js` });
   }
   return context;
@@ -98,27 +99,28 @@ export const providerSnapshotTests = [
     await worker.importItems('kindle', oldBooks);
     assert.equal((await worker.pageA.getDatabase()).providers.kindle.snapshotValidation.complete, true);
   })],
-  ['Kindle empty later page with unexplained count mismatch retains old records', () => withWorker(async (worker) => {
+  ['Kindle empty later page saves readable prefix without retiring old records', () => withWorker(async (worker) => {
     const before = await seed(worker);
     let requests = 0;
     const context = providerContext('kindle', async () => json(kindlePayload(++requests === 1 ? [book('NEW1')] : [], 1000)));
-    await assert.rejects(scanAndImport(context, worker.dispatch), /reported 1000 books items but returned 1/u);
-    assert.equal(requests, 2);
-    assert.deepEqual(worker.memory.values, before);
+    const result=await context.GalacticKindle.fetchKindleBooks();assert(result.incomplete);const saved=await worker.dispatch({type:'IMPORT_PROVIDER_ITEMS',provider:'kindle',mode:'full',...plain(result)},kindleSender);assert(saved.ok,saved.error);
+    assert.equal(requests, 3);
+    const after=await worker.pageA.getDatabase();assert(after.providers.kindle.syncState.listingIncomplete);assert.equal(Object.keys(after.providerItems).length,4);assert.deepEqual(after.providerHistory,{});
+    for(const [key,item]of Object.entries(before.galacticLibraryDatabase.providerItems))assert.deepEqual(after.providerItems[key],item);
   })],
-  ['Kindle rejects changing totals and unreadable individual entries', async () => {
+  ['Kindle rejects changing totals but isolates unreadable individual entries', async () => {
     let requests = 0;
     const changed = providerContext('kindle', async () => json(kindlePayload([book(`NEW${++requests}`)], requests === 1 ? 1000 : 999)));
-    await assert.rejects(changed.GalacticKindle.fetchKindleBooks(), /changed the books total/u);
+    await assert.rejects(changed.GalacticKindle.fetchKindleBooks(), /changed the Kindle total/u);
     const malformed = providerContext('kindle', async () => json(kindlePayload([book('NEW1'), { asin: 'NO-TITLE' }], 2)));
-    await assert.rejects(malformed.GalacticKindle.fetchKindleBooks(), /(?:unreadable|malformed) books entries/u);
+    const partial=await malformed.GalacticKindle.fetchKindleBooks();assert(partial.incomplete);assert.equal(partial.items.length,1);assert.equal(partial.snapshot.complete,false);
   }],
   ['Kindle pagination-limit truncation never becomes a replacement', () => withWorker(async (worker) => {
     const before = await seed(worker);
     let requests = 0;
-    const context = providerContext('kindle', async () => json(kindlePayload([book(`NEW${++requests}`)], 100000)));
-    await assert.rejects(scanAndImport(context, worker.dispatch), /500-page limit/u);
-    assert.equal(requests, 500);
+    const context = providerContext('kindle', async (_url,request) => {requests++;return json(JSON.parse(request.body.get('activityInput')).contentType==='Ebook'?kindlePayload([book(`NEW${requests}`)],100000):kindlePayload([],0));});
+    const partial=await context.GalacticKindle.fetchKindleBooks();assert(partial.incomplete);assert.equal(partial.items.length,500);assert.equal(partial.snapshot.complete,false);
+    assert.equal(requests, 501);
     assert.deepEqual(worker.memory.values, before);
   })],
   ['complete Kindle snapshot reconciles duplicate IDs and documents before replacing', () => withWorker(async (worker) => {
@@ -127,7 +129,7 @@ export const providerSnapshotTests = [
       const input = JSON.parse(request.body.get('activityInput'));
       return json(input.contentType === 'Ebook'
         ? kindlePayload([book('OLD1'), book('OLD1'), book('NEW1')], 3)
-        : kindlePayload([book('DOC1')], 1));
+        : kindlePayload([{...book('DOC1'),originType:'PersonalDocument'}], 1));
     });
     const result = await context.GalacticKindle.fetchKindleBooks();
     assert.equal(result.items.length, 3);

@@ -1,10 +1,11 @@
 import {selectManifest,manifestReviewProposal} from '../src/lib/kindle-manifest.js';
 import {independentContentsClaims} from '../src/lib/kindle-evidence-review.js';
 import {createContentsEditor} from '../src/ui/contents-editor.js';
+import {openContentsEditor,deferContentsEditorToggle} from './contents-editor-ready.js';
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const equal=(a,b,message)=>assert(JSON.stringify(a)===JSON.stringify(b),message);
 const select=(text,title='Example collection')=>selectManifest([{selector:'#fixture',text}],title);
-export async function checkIndependentEvidence(fixtures,{ui=false}={}){
+export async function checkIndependentEvidence(fixtures,{ui=false,deferToggle=false}={}){
  const checks=[];
  for(const r of fixtures.rows){
   const saved=selectManifest(r.blocks,r.title),before=JSON.stringify(saved),p=manifestReviewProposal(saved,r.title),evidence=independentContentsClaims(saved,r.title);
@@ -37,9 +38,11 @@ export async function checkIndependentEvidence(fixtures,{ui=false}={}){
  equal(independentContentsClaims(forged,'Example collection'),independentContentsClaims(supported,'Example collection'),'Forged claim input accepted');
  checks.push('separate claims retain excerpt/prose boundaries, deterministic source provenance and validation without aggregation');
  if(ui){
+  const restore=deferToggle?deferContentsEditorToggle():()=>{};
+  try {
   for(const r of fixtures.rows.filter(r=>['sample-5-370','sample-5-629','pilot-4-42'].includes(r.id))){
    const saved=selectManifest(r.blocks,r.title),record={id:r.id,title:r.title,metadata:{detailUrl:r.url,enrichment:{kindleProductComicContents:{...saved,sourceUrl:r.url}}}},review={statement:'Verified prior statement',entries:[{series:'Prior Verified',unitType:'issue',number:'1',completeness:'full'}]};
-   let writes=0;const old=JSON.stringify(record),verified=JSON.stringify(review),editor=createContentsEditor(record,review,{save:async()=>{writes++;},refresh(){}});document.body.append(editor);editor.open=true;await new Promise(resolve=>setTimeout(resolve,0));
+    let writes=0;const old=JSON.stringify(record),verified=JSON.stringify(review),editor=createContentsEditor(record,review,{save:async()=>{writes++;},refresh(){}});document.body.append(editor);await openContentsEditor(editor);
    const panel=editor.querySelector('.contents-independent-evidence');assert(panel&&!panel.open,'Independent evidence panel absent or forced open');
    assert(panel.querySelector('summary').textContent.includes('(1)')&&panel.textContent.includes('parsing one statement does not account for the others'),'Secondary visibility/completeness warning missing');
    assert(panel.textContent.includes('Saving a different claim replaces that review'),'Single-review replacement behavior concealed');
@@ -51,12 +54,13 @@ export async function checkIndependentEvidence(fixtures,{ui=false}={}){
    assert(writes===0&&JSON.stringify(record)===old&&JSON.stringify(review)===verified,'Review UI mutated/saved verification or source');editor.remove();
   }
   checks.push('real review UI surfaces Code Breakers, Hellboy and JLA separately, loads exact claims and preserves saved verification');
-  const title='Example collection',record={id:'synthetic',title,metadata:{enrichment:{kindleProductComicContents:supported}}},editor=createContentsEditor(record,null,{save:async()=>{throw Error('Unexpected save');},refresh(){}});document.body.append(editor);editor.open=true;await new Promise(resolve=>setTimeout(resolve,0));
+  const title='Example collection',record={id:'synthetic',title,metadata:{enrichment:{kindleProductComicContents:supported}}},editor=createContentsEditor(record,null,{save:async()=>{throw Error('Unexpected save');},refresh(){}});document.body.append(editor);await openContentsEditor(editor);
   editor.querySelector('.contents-independent-evidence button').click();const parse=[...editor.querySelectorAll('button')].find(b=>b.textContent==='Parse statement for review');parse.click();
   assert(editor.querySelectorAll('tbody tr').length===1&&editor.querySelector('[data-contents-field="completeness"]').value==='excerpt','UI lost individual excerpt scope');
   editor.querySelector('textarea').value='Includes Gamma #1-2';parse.click();
   assert(editor.querySelectorAll('tbody tr').length===2&&[...editor.querySelectorAll('[data-contents-field="series"]')].every(i=>i.value==='Gamma'),'Edited claim reused captured excerpt/input');editor.remove();
   checks.push('actual UI parses only an explicitly loaded claim; edited text discards captured context and no entries are combined');
+  }finally{restore();}
  }
  return checks;
 }

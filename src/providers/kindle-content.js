@@ -106,21 +106,27 @@
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kindle sync state.');
-      const fullRescan = mode === 'full' || !state.hasFullBaseline;
-      if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Kindle baseline yet; reading every library page once…';
-      const { items, diagnostics, snapshot } = await globalThis.GalacticKindle.fetchKindleBooks(({ pagesRead, books, categoryCounts }) => {
+      const fullRescan = mode === 'full' || !(state.hasAcquisitionBaseline??state.hasFullBaseline) || state.syncState?.listingIncomplete===true;
+      if (!(state.hasAcquisitionBaseline??state.hasFullBaseline) && mode !== 'full') status.textContent = 'No Kindle acquisition baseline yet; reading every library page once…';
+      if(state.syncState?.listingIncomplete)status.textContent='Earlier Kindle history is still unchecked; running a Full rescan to recover it...';
+      const { items, diagnostics, snapshot, incomplete, coverageUnverified } = await globalThis.GalacticKindle.fetchKindleBooks(({ pagesRead, books, categoryCounts }) => {
         const documents = categoryCounts?.['personal-documents'] ?? 0;
         status.textContent = `Reading Kindle library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${books} items found (${documents} personal document${documents === 1 ? '' : 's'}).`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
       status.textContent = items.length ? `Saving ${items.length} Kindle item${items.length === 1 ? '' : 's'} locally...` : 'No new Kindle items; recording the completed check...';
-      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kindle', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kindle', mode: fullRescan ? 'full' : 'incremental', items, snapshot,scanDiagnostics:{incomplete:incomplete===true,failedRequestCount:Object.values(diagnostics).reduce((n,d)=>n+(d.failedItems??0)+(d.failedPages??0),0)} });
       if (!response?.ok) throw new Error(response?.error ?? 'Kindle import did not complete.');
+      if(incomplete){
+        const failedItems=Object.values(diagnostics).reduce((n,d)=>n+(d.failedItems??0),0),failedPages=Object.values(diagnostics).reduce((n,d)=>n+(d.failedPages??0),0);
+        status.textContent=`Saved ${items.length} readable Kindle item${items.length===1?'':'s'}. ${failedItems?`${failedItems} entries could not be validated. `:''}${failedPages?'Some library pages remain unchecked. ':''}Earlier records and access corrections were kept. Run Full rescan to recover unchecked history; Quick update will also run that Full rescan while recovery is pending.`;
+        return;
+      }
       const categoryDetails = Object.entries(diagnostics).map(([category, detail]) => {
         const name = category === 'books' ? 'Books' : 'Personal Documents';
         const reported = detail.reportedCount === null ? 'unknown' : detail.reportedCount;
         return `${name}: Amazon reported ${reported}, returned ${detail.rawCount}, usable ${detail.readableCount}, duplicate IDs ${detail.duplicateCount}`;
       }).join('; ');
-      const scope = fullRescan ? 'Full rescan complete' : `Quick update added ${items.length} Kindle item${items.length === 1 ? '' : 's'}`;
+      const scope = fullRescan ? coverageUnverified?'Library check finished; Amazon did not confirm complete coverage':'Full rescan complete' : `Quick update added ${items.length} Kindle item${items.length === 1 ? '' : 's'}`;
       status.textContent = `${scope}. ${response.bookCount} Kindle item${response.bookCount === 1 ? '' : 's'} stored locally. ${categoryDetails}.`;
     } catch (error) {
       await globalThis.GalacticSync.failed('kindle',error);
