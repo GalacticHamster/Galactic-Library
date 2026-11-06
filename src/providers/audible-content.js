@@ -129,11 +129,12 @@
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'audible' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Audible sync state.');
-      const fullRescan = mode === 'full' || !state.hasFullBaseline;
-      if(fullRescan&&mode!=='full')status.textContent=state.scanReason==='baseline-unavailable'?'Incremental history unavailable: checking your complete library and history...':'First import: scanning your library and available history...';
-      const { items, snapshot, checkedCount } = await globalThis.GalacticAudible.fetchAudibleAudiobooks(({ pagesRead, audiobooks }) => {
+      const fullRescan = mode === 'full' || !state.hasFullBaseline || state.syncState?.listingIncomplete===true;
+      if(state.syncState?.listingIncomplete&&mode!=='full')status.textContent='Earlier library pages remain unchecked; running Full rescan to recover them...';
+      else if(fullRescan&&mode!=='full')status.textContent=state.scanReason==='baseline-unavailable'?'Incremental history unavailable: checking your complete library and history...':'First import: scanning your library and available history...';
+      const { items, snapshot, checkedCount,incomplete,coverageUnverified } = await globalThis.GalacticAudible.fetchAudibleAudiobooks(({ pagesRead, audiobooks }) => {
         status.textContent = `Reading Audible library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${audiobooks} audiobooks found.`;
-      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
+      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [], {recover:true});
       // History failure must not discard a successfully discovered library.
       let audibleHistory;
       try{audibleHistory=await globalThis.GalacticAudible.scanPurchaseHistory({mode:fullRescan?'full':'incremental',progress:message=>{status.textContent=message;}});}
@@ -147,7 +148,8 @@
       const differences=changes&&['added','updated','missing'].every(key=>Number.isSafeInteger(changes[key])&&changes[key]>=0)
         ? `${changes.added} new · ${changes.updated} updated${fullRescan?` · ${changes.missing} moved to Earlier imports`:''}`:'';
       const historyIncomplete=!audibleHistory.ordersComplete||!audibleHistory.refundsComplete||audibleHistory.giftsComplete===false||audibleHistory.uncertainRefundAsins.length>0;
-      status.textContent = `${fullRescan?'Full rescan':'Quick update'} ${historyIncomplete?'saved; history checking was incomplete':'complete'}. ${[checked,differences].filter(Boolean).join(' · ')}${checked||differences?'. ':''}${response.audiobookCount} Audible audiobook${response.audiobookCount===1?'':'s'} stored locally.`;
+      status.textContent = `${fullRescan?'Full rescan':'Quick update'} ${coverageUnverified?'saved; library coverage was not verified':incomplete?'saved; library acquisition was incomplete':historyIncomplete?'saved; history checking was incomplete':'complete'}. ${[checked,differences].filter(Boolean).join(' · ')}${checked||differences?'. ':''}${response.audiobookCount} Audible audiobook${response.audiobookCount===1?'':'s'} stored locally.`;
+      if(incomplete)status.textContent+=' Readable titles were saved and earlier records were kept. Run Full rescan to recover unchecked pages; Quick update will also perform that recovery.';
       if(response.ownership)status.textContent+=` ${response.ownership.owned??0} owned; ${response.ownership.unknown??0} ownership unconfirmed${response.ownership.subscription?`; ${response.ownership.subscription} subscription access`:''}${response.ownership.expired?`; ${response.ownership.expired} expired access`:''}${response.ownership.returned?`; ${response.ownership.returned} returned/refunded`:''}.`;
       if(!fullRescan){status.textContent+=' Quick update checks only current and previous calendar-year history.';if(!state.syncState?.audibleHistory?.fullCheckedAt)status.textContent+=' No completed all-year purchase-history baseline is saved. Use Full rescan for older purchases or historical reconciliation.';}
       if(historyIncomplete){

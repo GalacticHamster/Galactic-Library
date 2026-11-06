@@ -1,3 +1,4 @@
+import {audibleItemStatuses} from '../src/lib/audible-import.js';
 import {createEpicAuthDiagnostics} from '../src/background/epic-auth-diagnostics.js';
 import {checkEpicSession} from './epic-session-browser-fixture.js';
 import {CONTENTS_PARSER_VERSION} from '../src/lib/contents.js';
@@ -160,6 +161,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
     const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
     globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+      if(request.type==='VALIDATE_AUDIBLE_ITEMS')return {ok:true,statuses:audibleItemStatuses(request.items)};
       if(request.type==='VALIDATE_KINDLE_ITEMS')return {ok:true,statuses:kindleItemStatuses(request.items)};
       if(request.type==='VALIDATE_STEAM_TITLES')return {ok:true,statuses:steamTitleStatuses(request.titles)};
       if(request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING')return {ok:true,enabled:providerDiagnosticsEnabled};

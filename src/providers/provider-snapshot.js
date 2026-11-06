@@ -6,6 +6,14 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if(provider==='audible'&&snapshot?.complete===false){
+      const scope=snapshot.scopes?.[0],recovery=snapshot.recovery;
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(item=>item?.providerItemId)).size!==items.length
+        ||items.some(item=>!global.GalacticAudible?.validLibraryItem(item))||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==1||scope?.id!=='library'||scope.complete!==false||typeof scope.limitReached!=='boolean'||scope.limitReached&&scope.pagesRead!==500
+        ||scope.end!=='partial-acquisition'||scope.readCount!==items.length||!count(scope.pagesRead)||scope.pagesRead<1||scope.pagesRead>500||scope.expectedCount!==null&&!count(scope.expectedCount)
+        ||!count(recovery?.failedItems)||recovery.failedItems>50000||!count(recovery?.failedPages)||recovery.failedPages>500||recovery.coverageUnverified!==undefined&&recovery.coverageUnverified!==true||!recovery.failedItems&&!recovery.failedPages&&!recovery.coverageUnverified)fail('Invalid Audible partial acquisition.');
+      return snapshot;
+    }
     if(provider==='fandango-at-home'&&snapshot?.complete===false){
       if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length
         ||new Set(items.map(item=>item?.providerItemId)).size!==items.length

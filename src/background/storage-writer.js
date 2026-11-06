@@ -598,13 +598,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
-    if(provider==='fandango-at-home'){
+    if(['fandango-at-home','audible'].includes(provider)){
       const partial=snapshot?.complete===false, pending=profile.state.syncState?.listingIncomplete;
       if(partial||pending&&syncDetails.syncMode==='full')validateProviderSnapshot(provider,values,snapshot);
       if(partial||pending){
         const incomplete=partial||snapshot?.complete!==true;
         const {fullSyncAt,...safe}=syncDetails;
-        syncDetails={...(incomplete?safe:syncDetails),syncState:{...(incomplete?{listingIncomplete:true}:{})},...(incomplete?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
+        syncDetails={...(incomplete?safe:syncDetails),syncState:{...(provider==='audible'?profile.state.syncState:{}),...(incomplete?{listingIncomplete:true}:{listingIncomplete:false})},...(incomplete?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
       }
     }
     if(provider==='kindle'){
@@ -684,6 +684,16 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       // A complete non-hidden view is still not a complete purchase history.
       // Reuse the additive importer; never archive omissions or revoke access.
       result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave,completion);
+    }
+    if(!result&&provider==='audible'&&!values.length&&snapshot?.complete!==false&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)&&details.audibleHistory!==undefined){
+      const audible=audibleHistoryDetails(provider,details,profile,new Date().toISOString());
+      // A recent-history check may change access or acquisition evidence even
+      // when no new library titles were returned. Skip the catalog write only
+      // after the real enrichment path proves there are no record changes.
+      if(!enrichAudibleRecords(database,profile.profileId,[],audible.history).length){
+        const health=successfulSyncHealth(database,provider,[],false,audible.details);changes=health.differences;
+        result=await persistProviderCheck(database,provider,profile,scan,{...profile.state,...audible.details,lastSync:new Date().toISOString(),lastError:null,syncHealth:health},stored[SCANS]);
+      }
     }
     if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
       &&(provider!=='amazon-games'||!values.length||!Object.values(database.providerItems).some(item=>item.profileId===profile.profileId&&!item.providerItemId.startsWith('claim-v1-')))
@@ -980,6 +990,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function preserveEnrichment(incoming, previous,stableSparse=false) {
     if(incoming.provider==='audible'&&previous?.mediaType===incoming.mediaType){
       const metadata={...incoming.metadata};
+      for(const key of ['authors','narrators','series','edition','language','publisher','isbn','volume','run'])if(!metadata[key]?.length&&previous.metadata?.[key]?.length)metadata[key]=previous.metadata[key];
       for(const key of ['audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn'])if(previous.metadata?.[key]!==undefined)metadata[key]=previous.metadata[key];
       const keepOwnership=['owned','returned','revoked','expired'].includes(previous.ownership)&&['unknown','subscription','expired'].includes(incoming.ownership)&&!(audibleLibraryExpiry(previous)&&incoming.ownership==='subscription');
       if(keepOwnership){
@@ -1070,8 +1081,8 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const history=validateAudibleHistory(details.audibleHistory),next={...details};delete next.audibleHistory;
     const complete=history.ordersComplete&&history.refundsComplete&&history.giftsComplete!==false&&!history.uncertainRefundAsins.length;
     const fullCheckedAt=history.scope==='full'&&complete?now:profile.state.syncState?.audibleHistory?.fullCheckedAt;
-    next.syncState={...profile.state.syncState,audibleHistory:{version:1,scope:history.scope,...audibleGiftHistory(history),failures:history.failures,uncertainRefunds:history.uncertainRefundAsins.length,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,refundPurchaseYearsChecked:history.refundPurchaseYearsChecked,years:history.years,pagesRead:history.pagesRead,checkedAt:now,...(fullCheckedAt?{fullCheckedAt}:{}),reason:history.reason}};
-    next.scanDiagnostics={...details.scanDiagnostics,incomplete:!complete,failedRequestCount:0};
+    next.syncState={...(details.syncState??profile.state.syncState),audibleHistory:{version:1,scope:history.scope,...audibleGiftHistory(history),failures:history.failures,uncertainRefunds:history.uncertainRefundAsins.length,ordersComplete:history.ordersComplete,refundsComplete:history.refundsComplete,refundPurchaseYearsChecked:history.refundPurchaseYearsChecked,years:history.years,pagesRead:history.pagesRead,checkedAt:now,...(fullCheckedAt?{fullCheckedAt}:{}),reason:history.reason}};
+    next.scanDiagnostics={...details.scanDiagnostics,incomplete:details.scanDiagnostics?.incomplete===true||!complete,failedRequestCount:0};
     return {details:next,history};
   }
   // Validated orders are useful skip evidence, independently of enumeration.
@@ -1109,10 +1120,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
-    if(provider==='fandango-at-home'&&snapshot?.complete===false){
+    if(['fandango-at-home','audible'].includes(provider)&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       const {fullSyncAt,...safe}=syncDetails;
-      return mergeIntoDatabase(provider,values,{...safe,syncState:{listingIncomplete:true},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},authoritativeDatabase,null,beforeSave,completion);
+      return mergeIntoDatabase(provider,values,{...safe,syncState:{...(provider==='audible'?syncDetails.syncState:{}),listingIncomplete:true},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},authoritativeDatabase,null,beforeSave,completion);
     }
     if(provider==='kindle'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
@@ -1257,7 +1268,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    if(['gog','epic','amazon-video','kindle','fandango-at-home'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
+    if(['gog','epic','amazon-video','kindle','fandango-at-home','audible'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
     }
@@ -1307,7 +1318,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam','fanatical','humble','fandango-at-home'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical','humble','fandango-at-home','audible'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

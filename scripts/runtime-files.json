@@ -69,6 +69,7 @@
   "src/lib/metadata-validation.js",
   "src/lib/audible-ownership.js",
   "src/lib/models.js",
+  "src/lib/audible-import.js",
   "src/lib/kindle-import.js",
   "src/lib/observation-overlays.js",
   "src/lib/observation-completion.js",

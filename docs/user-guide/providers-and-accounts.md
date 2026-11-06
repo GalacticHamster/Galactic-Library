@@ -498,3 +498,9 @@ For GOG, select **Quick update** to recover. After an interrupted scan, GL rerea
 Epic retains its single **Sync Epic library** action. Select it again to retry the cursor-based listing; there is no separate Quick mode or per-game metadata request. A completed Sync retains its existing reconciliation behavior.
 
 Explicit sign-in rejection or an unreadable overall response stops the import without publishing partial results. If no readable games are returned, earlier records are kept; an empty response does not clear the library. Neither provider requires a new account confirmation step for recovery.
+
+## Audible library recovery
+
+If a later Audible library page fails temporarily or individual entries cannot be read safely, GL saves independently validated titles and keeps earlier records. Library visibility alone does not prove permanent ownership: purchase, return and received-gift history continue to supply their existing evidence. Manual corrections, acquisition dates and history are preserved.
+
+Run **Full rescan** to recover unchecked library pages. **Quick update** also runs Full while library recovery is pending; it cannot safely skip an arbitrary older gap. Once recovery completes, Quick returns to its normal known-page stop and checks only current and previous calendar-year history. History-check failures remain distinct from library acquisition failures. A listing without count or usable terminal navigation is saved without granting complete-library authority.
