@@ -228,7 +228,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(base&&Object.isFrozen(base)&&base!==querySnapshot)throw Error('The library changed while completing this check. Start a fresh scan.');
     return cacheQuerySnapshots&&base&&base===querySnapshot&&scan.profileId===profile.profileId
       &&scan.activeAtStartId===profile.profileId&&database.providers[provider]?.activeProfileId===profile.profileId
-      &&profile.state.connected===true&&(provider==='fanatical'?!providerScanMode(provider,profile.state,'incremental').forceFull:Boolean(profile.state.fullSyncAt));
+      &&profile.state.connected===true&&(['fanatical','gog'].includes(provider)?!providerScanMode(provider,profile.state,'incremental').forceFull:Boolean(profile.state.fullSyncAt));
   }
   async function persistProviderCheck(database,provider,profile,scan,patch,storedScans){
     patch=providerCheckPatch(provider,patch);
@@ -554,7 +554,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId);
-    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(['fanatical','humble'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
+    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(['fanatical','humble','gog'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -598,6 +598,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
+    if(['gog','epic'].includes(provider)&&snapshot?.complete===false){validateProviderSnapshot(provider,values,snapshot);syncDetails={...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,incomplete:true}};}
+    if(provider==='gog'){
+      const partial=snapshot?.complete===false;
+      // Preserve a stable acquisition baseline; a failed prefix cannot authorize a known-page stop.
+      if(partial||profile.state.syncState?.acquisitionCheckedAt)syncDetails={...syncDetails,syncState:{acquisitionCheckedAt:profile.state.syncState?.acquisitionCheckedAt??new Date().toISOString(),...(partial?{listingIncomplete:true}:{})}};
+    }
     if(provider==='fanatical'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       if(snapshot.recovery){
@@ -1053,6 +1059,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    if(['gog','epic'].includes(provider)&&snapshot.complete===false){
+      const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId),historical=historicalRecords(database,profile.profileId);
+      values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});
+      const {fullSyncAt,...safe}=syncDetails;
+      return mergeIntoDatabase(provider,values,{...safe,scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},database,null,beforeSave,completion);
+    }
     if(provider==='humble'&&snapshot.complete===false){
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
       const historical=historicalRecords(database,profile.profileId);
@@ -1174,6 +1186,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(['gog','epic'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete){
+      const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
+      const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
+    }
     if(provider==='fanatical'&&syncDetails.syncState&&(profile.state.syncState?.acquisitionCheckedAt||syncDetails.syncState.acquisitionCheckedAt)){
       if(syncDetails.scanDiagnostics?.incomplete||profile.state.syncState?.failedOrderFingerprints?.length||profile.state.syncState?.listingIncomplete){
         const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;

@@ -44,7 +44,7 @@
       startEnd?.();P?.merge(timing,scan?.performance);
       if(!scan?.ok)throw new Error(scan?.error??'Could not start scan.');
       fetchEnd=timing?.begin('provider_fetch');
-      const { items, skippedCount, snapshot } = await globalThis.GalacticEpic.fetchEpicGames(({ pagesRead, games }) => {
+      const { items, skippedCount, snapshot, incomplete, failedItems } = await globalThis.GalacticEpic.fetchEpicGames(({ pagesRead, games }) => {
         status.textContent = `Reading Epic library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${games} games found.`;
       });
       fetchEnd?.();
@@ -53,14 +53,14 @@
       finishEnd=timing?.begin('save_message');
       globalThis.GalacticEpic.recordSaveState?.('requested');
       const d=globalThis.GalacticEpic.getDiagnostics?.();
-      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot,epicDiagnostic:d?{documentReady:d.documentReady,securityCheckVisible:d.securityCheckVisible}:undefined,diagnosticLookupId:timing?.id });
+      const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'epic', items, snapshot,scanDiagnostics:{incomplete:incomplete===true},epicDiagnostic:d?{documentReady:d.documentReady,securityCheckVisible:d.securityCheckVisible}:undefined,diagnosticLookupId:timing?.id });
       finishEnd?.();P?.merge(timing,response?.performance);
       if (!response?.ok){globalThis.GalacticEpic.recordSaveState?.('save-rejected');throw new Error(response?.error ?? 'Epic import did not complete.');}
       completed=true;globalThis.GalacticEpic.recordSaveState?.('saved');
       uiEnd=timing?.begin('page_ui');
       const unlinkedAddOnCount = response.addOnCount - response.linkedAddOnCount;
       const c=response.changes;
-      status.textContent = `Sync complete. ${!scan.hasFullBaseline?`Imported ${response.gameCount} games and ${response.addOnCount??0} add-ons.`:c?`${c.gamesAdded} new games, ${c.gamesUpdated} updated; ${c.addOnsAdded} new add-ons, ${c.addOnsUpdated} updated.`:'Library saved.'} ${response.gameCount} games and ${response.addOnCount??0} add-ons currently recorded.${unlinkedAddOnCount?` ${unlinkedAddOnCount} add-ons have no saved parent game.`:''}${skippedCount?` ${skippedCount} non-game account items excluded.`:''}`;
+      status.textContent = incomplete?`Saved ${response.gameCount} Epic games and ${response.addOnCount??0} add-ons. ${failedItems?`${failedItems} entries could not be read. `:''}Some library pages or entries could not be checked. Sync again to retry. Earlier games were kept.`:`Sync complete. ${!scan.hasFullBaseline?`Imported ${response.gameCount} games and ${response.addOnCount??0} add-ons.`:c?`${c.gamesAdded} new games, ${c.gamesUpdated} updated; ${c.addOnsAdded} new add-ons, ${c.addOnsUpdated} updated.`:'Library saved.'} ${response.gameCount} games and ${response.addOnCount??0} add-ons currently recorded.${unlinkedAddOnCount?` ${unlinkedAddOnCount} add-ons have no saved parent game.`:''}${skippedCount?` ${skippedCount} non-game account items excluded.`:''}`;
     } catch (error) {
       const d=globalThis.GalacticEpic.getDiagnostics?.();
       if(d?.firstFailure?.httpStatus===200&&d.firstFailure.upstreamStatus===401&&d.saveState==='not-requested'){

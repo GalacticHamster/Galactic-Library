@@ -518,7 +518,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ok: true,
           scanToken,forceFull:forceFull===true,scanReason,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
-          ...(['fanatical','humble'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
+          ...(['fanatical','humble','gog'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set([...(state.syncState?.failedPurchaseIds??[]),...Object.values(database.providerItems)
@@ -527,7 +527,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(request.provider==='gog'?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));

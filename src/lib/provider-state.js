@@ -69,6 +69,10 @@ export function validateProviderStates(value = {}) {
       }
       // Missing/non-array acquisition checkpoints are not completed empty scans.
       // Keep validation of supplied values, but let admission request a full scan.
+      if(provider==='gog'){
+        if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'GOG acquisition check');
+        if(state.syncState.listingIncomplete!==undefined){if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid GOG recovery status.');if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;}
+      }
       if(provider==='humble'){
         const ids=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
         if(Array.isArray(state.syncState.knownPurchaseIds))result.syncState.knownPurchaseIds=ids;

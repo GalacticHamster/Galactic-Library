@@ -43,7 +43,7 @@ export function applyProviderChecks(database,value,digest){
       if(!entry||Object.keys(entry).some(key=>!['profileId','patch','baseline'].includes(key)))continue;
       const profile=database.providerProfiles[entry.profileId];
       if(profile?.provider!==provider||database.providers[provider]?.activeProfileId!==profile.profileId||!profile.state.connected
-        ||(provider==='fanatical'?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt))continue;
+        ||(['fanatical','gog'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt))continue;
       const patch=providerCheckPatch(provider,entry.patch);
       if(!equalDatabaseData(patch,entry.patch))continue;
       const baseline=providerCheckBaseline(provider,entry);

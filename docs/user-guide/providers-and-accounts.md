@@ -474,3 +474,13 @@ On Fanatical, the import panel appears only on Orders. Navigating to a bundle
 removes it and shows Fanatical Library's bundle summary when that companion is
 installed. Returning to Orders restores the import panel. An import already
 submitted for saving can finish; a detached panel cannot start another save.
+
+### GOG and Epic interrupted imports
+
+If a page or individual entry cannot be read, GL saves the readable games and keeps earlier records and access corrections. The completion message explains what could not be checked. A partial scan does not move missing games into Earlier imports or restore games already there.
+
+For GOG, select **Quick update** to recover. After an interrupted scan, GL rereads the library pages, including hidden games where reported, before returning to its usual newest-first stopping behavior. No separate game-detail requests are needed. **Full rescan** remains available for complete reconciliation.
+
+Epic retains its single **Sync Epic library** action. Select it again to retry the cursor-based listing; there is no separate Quick mode or per-game metadata request. A completed Sync retains its existing reconciliation behavior.
+
+Explicit sign-in rejection or an unreadable overall response stops the import without publishing partial results. If no readable games are returned, earlier records are kept; an empty response does not clear the library. Neither provider requires a new account confirmation step for recovery.

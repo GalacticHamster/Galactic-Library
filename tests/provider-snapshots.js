@@ -10,7 +10,7 @@ import {audibleRescanTests} from './audible-rescan.js';
 
 // Exercise the actual classic importers in isolated signed-in page contexts.
 // Timers resolve immediately; no network, credentials, or real account is used.
-function providerContext(provider, fetch, overrides = {}) {
+export function providerContext(provider, fetch, overrides = {}) {
   const context = vm.createContext({
     URL, URLSearchParams, console, fetch,
     setTimeout: (callback) => { callback(); return 0; },
@@ -161,21 +161,21 @@ export const providerSnapshotTests = [
     assert.deepEqual(Object.keys((await worker.pageA.getDatabase()).providerItems), ['gog:10']);
     assert.throws(() => completeProviderSnapshot('gog', [], [completedScope('library', 0)]), /empty without an explicit zero count/u);
   })],
-  ['GOG rejects malformed later pages, count mismatches, and excessive pagination', async () => {
+  ['GOG rejects malformed top-level pages and excessive pagination but retains readable count-mismatch results', async () => {
     let requests = 0;
     const malformed = providerContext('gog', async () => json(++requests === 1
       ? { products: [{ id: 1, title: 'Game' }], totalPages: 2, totalProducts: 2 }
       : { products: {}, totalPages: 2, totalProducts: 2 }));
     await assert.rejects(malformed.GalacticGog.fetchGogGames(), /unreadable library response/u);
     const mismatch = providerContext('gog', async () => json({ products: [{ id: 1, title: 'Game' }], totalPages: 1, totalProducts: 2 }));
-    await assert.rejects(mismatch.GalacticGog.fetchGogGames(), /reported 2 items but returned 1/u);
+    assert.equal((await mismatch.GalacticGog.fetchGogGames()).snapshot.complete,false);
     const limit = providerContext('gog', async () => json({ products: [{ id: 1, title: 'Game' }], totalPages: 501 }));
     await assert.rejects(limit.GalacticGog.fetchGogGames(), /more than 500 pages/u);
     const complete = providerContext('gog', async () => json({ products: [{ id: 1, title: 'Game' }], totalPages: 1, totalProducts: 1 }));
     const result = await complete.GalacticGog.fetchGogGames();
     validateProviderSnapshot('gog', plain(result.items), plain(result.snapshot));
   }],
-  ['Epic rejects missing records/cursor, repeated cursors, and pagination-limit truncation', async () => {
+  ['Epic rejects missing records/cursor and withholds completeness after repeated cursors or pagination limits', async () => {
     const page = (id, cursor) => ({ data: { Library: { libraryItems: { records: [{ catalogItem: { id, title: `Game ${id}` } }], responseMetadata: { nextCursor: cursor } } } } });
     for (const invalid of [{ records: {}, responseMetadata: { nextCursor: null } }, { records: [] }]) {
       let requests = 0;
@@ -183,10 +183,10 @@ export const providerSnapshotTests = [
       await assert.rejects(context.GalacticEpic.fetchEpicGames(), /malformed library page/u);
     }
     const repeated = providerContext('epic', async () => json(page('1', 'same')));
-    await assert.rejects(repeated.GalacticEpic.fetchEpicGames(), /repeated a library page/u);
+    assert.equal((await repeated.GalacticEpic.fetchEpicGames()).snapshot.complete,false);
     let requests = 0;
     const limit = providerContext('epic', async () => json(page(String(++requests), String(requests))));
-    await assert.rejects(limit.GalacticEpic.fetchEpicGames(), /500-page limit/u);
+    assert.equal((await limit.GalacticEpic.fetchEpicGames()).snapshot.complete,false);
     assert.equal(requests, 500);
     const complete = providerContext('epic', async () => json(page('1', null)));
     const result = await complete.GalacticEpic.fetchEpicGames();

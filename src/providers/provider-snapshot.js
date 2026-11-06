@@ -6,6 +6,15 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    // GOG/Epic receipts authorize additive saves only, never absence-based reconciliation.
+    if(['gog','epic'].includes(provider)&&snapshot?.complete===false){
+      const scope=snapshot.scopes?.[0];
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||snapshot.itemCount!==items.length
+        ||new Set(items.map(item=>item.providerItemId)).size!==items.length||items.some(item=>typeof item.providerItemId!=='string'||!item.providerItemId.trim()||typeof item.title!=='string'||!item.title.trim()||item.ownership!=='owned'||!(provider==='gog'?['game']:['game','game-addon']).includes(item.mediaType))
+        ||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==1||scope?.id!=='library'||scope.complete!==false||scope.limitReached!==false||scope.end!=='partial-acquisition'||scope.expectedCount!==null||scope.readCount!==items.length||!count(scope.pagesRead)||scope.pagesRead<1||scope.pagesRead>1000
+        ||!snapshot.recovery||!count(snapshot.recovery.failedItems)||snapshot.recovery.failedItems>50000)fail('Invalid partial library acquisition.');
+      return snapshot;
+    }
     if(provider==='humble'&&snapshot?.complete===false){
       const scope=snapshot.scopes?.[0],successful=snapshot.successfulPurchaseIds,failed=snapshot.failedPurchaseIds;
       const verified=new Set(Array.isArray(successful)?successful:[]);

@@ -130,9 +130,8 @@
     }
     if (Array.isArray(body?.errors) && body.errors.length){const status=upstreamStatus(body.errors);throw failure(status===401?'authorization':status===403?'forbidden':'graphql',response.status,status);}
     const library = body?.data?.Library?.libraryItems;
-    if (!Array.isArray(library?.records) || !library.responseMetadata || !Object.hasOwn(library.responseMetadata, 'nextCursor')) throw new Error('Epic Games Store returned a malformed library page; no library changes were saved.');
+    if (!Array.isArray(library?.records) || !library.responseMetadata || !Object.hasOwn(library.responseMetadata, 'nextCursor')) throw Object.assign(new Error('Epic Games Store returned a malformed library page; no library changes were saved.'),{fatal:true});
     if (library.responseMetadata.nextCursor !== null && typeof library.responseMetadata.nextCursor !== 'string') throw new Error('Epic Games Store returned an invalid library cursor.');
-    if (library.records.some((record) => !record || typeof record !== 'object' || (!(record.namespace === 'ue' || record.sandboxType === 'PRIVATE') && (!String(record.catalogItem?.id ?? record.catalogItemId ?? '').trim() || typeof record.catalogItem?.title !== 'string' || !record.catalogItem.title.trim())))) throw new Error('Epic Games Store returned unreadable catalog entries; no library changes were saved.');
     return body;
   }
 
@@ -146,24 +145,30 @@
       const seenCursors = new Set();
       let cursor = null;
       let pagesRead = 0;
-      let recordsRead = 0;
-      do {
+      let recordsRead = 0,incomplete=false,failedItems=0;
+      try { do {
         if (pagesRead >= MAX_PAGES) throw new Error(`Epic Games Store reached the ${MAX_PAGES}-page limit before the end of the library.`);
         if (cursor && seenCursors.has(cursor)) throw new Error('Epic Games Store repeated a library page. Please try again later.');
         if (cursor) seenCursors.add(cursor);
         reportProgress({ pagesRead, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
         const page = await fetchLibraryPage(cursor);
         recordsRead += page.data.Library.libraryItems.records.length;
-        const { items, skipped } = epicItemsFromLibraryPage(page);
+        const records=page.data.Library.libraryItems.records;
+        const valid=records.filter(record=>{const ok=record&&typeof record==='object'&&((record.namespace==='ue'||record.sandboxType==='PRIVATE')||(String(record.catalogItem?.id??record.catalogItemId??'').trim()&&String(record.catalogItem?.id??record.catalogItemId??'').trim().length<=500&&typeof record.catalogItem?.title==='string'&&record.catalogItem.title.replace(/\s+/gu,' ').trim().length<=500&&record.catalogItem.title.trim()));if(!ok){incomplete=true;failedItems++;}return ok;});
+        const { items, skipped } = epicItemsFromLibraryPage({data:{Library:{libraryItems:{records:valid}}}});
+        if(items.some(item=>itemsById.has(item.providerItemId)))incomplete=true;
         for (const item of items) itemsById.set(item.providerItemId, item);
         for (const id of skipped) skippedIds.add(id);
         pagesRead += 1;diagnostics.pagesRead=pagesRead;
         reportProgress({ pagesRead, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
         cursor = nextCursorFromPage(page);
       } while (cursor);
-      if (![...itemsById.values()].some((item) => item.mediaType === 'game')) throw new Error('Epic Games Store returned no readable games. Confirm that this signed-in account has games in its library.');
+      }catch(error){if(error.fatal||['authorization','forbidden','library-session','unreadable'].includes(error.epicFailure))throw error;incomplete=true;}
+      if (![...itemsById.values()].some((item) => item.mediaType === 'game')&&(!incomplete||!itemsById.size)) throw new Error('Epic Games Store returned no readable games. Confirm that this signed-in account has games in its library.');
       const items = [...itemsById.values()];
-      return { items, skippedCount: skippedIds.size, snapshot: global.GalacticProviderSnapshot.completeProviderSnapshot('epic', items, [global.GalacticProviderSnapshot.completedScope('library', recordsRead, null, 'pagination-end', pagesRead)]) };
+      const snapshot=incomplete?{version:1,provider:'epic',complete:false,itemCount:items.length,scopes:[{id:'library',readCount:items.length,expectedCount:null,end:'partial-acquisition',pagesRead,complete:false,limitReached:false}],recovery:{failedItems}}:global.GalacticProviderSnapshot.completeProviderSnapshot('epic', items, [global.GalacticProviderSnapshot.completedScope('library', recordsRead, null, 'pagination-end', pagesRead)]);
+      if(incomplete)Object.assign(diagnostics,{incomplete:true,failedItems});
+      return { items, skippedCount: skippedIds.size, snapshot,incomplete,failedItems };
     }catch(error){if(!diagnostics.firstFailure)diagnostics.firstFailure={stage:'library-validation',kind:'validation',httpStatus:null,upstreamStatus:null,...pageState()};throw error;}
     finally{reading=false;}
   }

@@ -46,19 +46,19 @@
       sortBy: 'date_purchased'
     });
     const response = await fetch(`/account/getFilteredProducts?${parameters}`, { credentials: 'include', cache: 'no-store' });
-    if (!response.ok) throw new Error(`GOG returned ${response.status} while loading your library. Confirm that you are signed in to GOG.`);
+    if (!response.ok) throw Object.assign(new Error(`GOG returned ${response.status} while loading your library. Confirm that you are signed in to GOG.`),{fatal:response.status===401||response.status===403});
     try {
       const payload = await response.json();
       if (!Array.isArray(payload?.products) || !Number.isSafeInteger(Number(payload.totalPages)) || Number(payload.totalPages) < 0) throw new Error('Malformed GOG page.');
-      if (payload.products.some((product) => !product || typeof product !== 'object' || (!(product.isMovie || product.isGame === false) && (!/^\d+$/u.test(String(product.id ?? '')) || typeof product.title !== 'string' || !product.title.trim())))) throw new Error('Malformed GOG product.');
       return payload;
     } catch {
-      throw new Error('GOG returned an unreadable library response. Confirm that you are signed in to GOG.');
+      throw Object.assign(new Error('GOG returned an unreadable library response. Confirm that you are signed in to GOG.'),{fatal:true});
     }
   }
 
-  async function fetchGogGames(reportProgress = () => {}, knownItemIds = null) {
-    const itemsById = new Map();
+  async function fetchGogGames(reportProgress = () => {}, knownItemIds = null, recover = false) {
+    const itemsById = new Map(),allItems = new Map();
+    let incomplete=false,failedItems=0;
     const incremental = Array.isArray(knownItemIds);
     let pagesRead = 0;
     let pagesExpected = 0;
@@ -70,19 +70,23 @@
       let expectedCount = null;
       let readCount = 0;
       const seenPages = new Set();
-      do {
+      try { do {
         reportProgress({ pagesRead, pagesExpected: Math.max(pagesExpected, pagesRead + 1), games: itemsById.size, hidden: Boolean(hiddenFlag) });
         const response = await fetchLibraryPage(hiddenFlag, page);
+        pagesRead += 1;
         const reportedPages = Math.max(1, Number(response.totalPages));
         if (page > 1 && reportedPages !== totalPages) throw new Error('GOG changed its page count during the scan; no library changes were saved.');
         totalPages = reportedPages;
         if (!incremental && totalPages > MAX_PAGES) throw new Error(`GOG reported more than ${MAX_PAGES} pages; the full scan cannot be completed.`);
+        const validProducts=response.products.filter(product=>{const valid=product&&typeof product==='object'&&((product.isMovie||product.isGame===false)||(/^\d+$/u.test(String(product.id??''))&&String(product.id).length<=500&&typeof product.title==='string'&&product.title.replace(/\s+/gu,' ').trim().length<=500&&product.title.trim()));if(!valid){failedItems++;incomplete=true;}return valid;});
+        const pageItems = gogItemsFromProducts({products:validProducts});
+        for(const item of pageItems){if(allItems.has(item.providerItemId)){incomplete=true;}allItems.set(item.providerItemId,item);}
         const countValue = response.totalProducts;
         const count = countValue === undefined ? null : Number(countValue);
         if (count !== null && (!Number.isSafeInteger(count) || count < 0)) throw new Error('GOG returned an invalid product count.');
         if (page > 1 && count !== expectedCount) throw new Error('GOG changed its product count during the scan.');
         expectedCount = count;
-        const signature = response.products.map((product) => product.id).join('|');
+        const signature = response.products.map((product) => product?.id).join('|');
         if (response.products.length && seenPages.has(signature)) throw new Error('GOG repeated a library page before finishing the scan.');
         seenPages.add(signature);
         if (!response.products.length && page < totalPages) throw new Error('GOG returned an empty page before the reported last page.');
@@ -91,18 +95,18 @@
           pagesExpected += totalPages;
           hasHiddenProducts = Boolean(response?.hasHiddenProducts);
         }
-        const pageItems = gogItemsFromProducts(response);
         const itemsToSave = incremental ? newGogItems(pageItems, knownItemIds) : pageItems;
         for (const item of itemsToSave) itemsById.set(item.providerItemId, item);
-        pagesRead += 1;
         reportProgress({ pagesRead, pagesExpected, games: itemsById.size, hidden: Boolean(hiddenFlag) });
         // GOG's purchase-date order is newest first. Once an entire
         // readable page is known, older pages cannot add a new entitlement.
-        if (incremental && pageItems.length && !itemsToSave.length) break;
+        if (incremental && !recover && !incomplete && pageItems.length && !itemsToSave.length) break;
         page += 1;
         if (page > MAX_PAGES && page <= totalPages) throw new Error('GOG reached its pagination limit before completing the scan.');
       } while (page <= totalPages);
       if (!incremental) scopes.push(global.GalacticProviderSnapshot.completedScope(hiddenFlag ? 'hidden' : 'library', readCount, expectedCount, 'pagination-end', page - 1));
+      if(!incremental&&expectedCount!==null&&expectedCount!==readCount)incomplete=true;
+      }catch(error){if(error.fatal||!allItems.size)throw error;incomplete=true;}
       return { hasHiddenProducts };
     };
 
@@ -111,9 +115,10 @@
     // should be omitted from an ownership library.
     const normalLibrary = await fetchPageSet(0);
     if (normalLibrary.hasHiddenProducts) await fetchPageSet(1);
-    if (!itemsById.size && !incremental) throw new Error('GOG returned no readable games. Confirm that this signed-in account has games in its library.');
-    const items = [...itemsById.values()];
-    return { items, snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('gog', items, scopes) };
+    if (!allItems.size && (incomplete||!incremental)) throw new Error('GOG returned no readable games. Confirm that this signed-in account has games in its library.');
+    const items = [...(incomplete?allItems:itemsById).values()];
+    const snapshot=incomplete?{version:1,provider:'gog',complete:false,itemCount:items.length,scopes:[{id:'library',readCount:items.length,expectedCount:null,end:'partial-acquisition',pagesRead,complete:false,limitReached:false}],recovery:{failedItems}}:incremental?undefined:global.GalacticProviderSnapshot.completeProviderSnapshot('gog',items,scopes);
+    return {items,snapshot,incomplete,failedItems};
   }
 
   global.GalacticGog = { gogItemsFromProducts, newGogItems, pageCount, fetchGogGames };
