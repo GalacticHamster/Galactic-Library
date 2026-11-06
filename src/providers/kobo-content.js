@@ -26,14 +26,14 @@
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kobo',diagnosticLookupId:timing?.id });
       startEnd?.();performanceApi?.merge(timing,state?.performance);
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kobo sync state.');
-      const fullRescan = mode === 'full' || !state.hasFullBaseline;
+      const fullRescan = mode === 'full' || !state.hasFullBaseline || state.syncState?.listingIncomplete===true;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Kobo baseline yet; reading every library page once…';
       status.textContent='Reading Kobo newest-first My Books page...';
       const fetchEnd=timing?.begin('provider_fetch');
-      const { items, archivePagesRead, archiveAvailable, audiobookPagesRead, audiobookAvailable, snapshot } = await globalThis.GalacticKobo.fetchKoboLibrary(({ pagesRead, sectionPagesRead, books, audiobooks, section }) => {
+      const { items, incomplete, archivePagesRead, archiveAvailable, audiobookPagesRead, audiobookAvailable, snapshot } = await globalThis.GalacticKobo.fetchKoboLibrary(({ pagesRead, sectionPagesRead, books, audiobooks, section }) => {
         const scanText = pagesRead === null ? `${sectionPagesRead} page${sectionPagesRead === 1 ? '' : 's'} checked` : `${pagesRead} My Books scan pass${pagesRead === 1 ? '' : 'es'} checked`;
         status.textContent = `Reading Kobo ${section ?? 'library'}: ${scanText}; ${books} books and ${audiobooks} audiobooks found.`;
-      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [],timing);
+      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [],timing,{recover:true,requiredScopes:fullRescan?state.syncState?.requiredKoboScopes??state.syncState?.pendingKoboScopes??[]:[]});
       fetchEnd?.();
       status.textContent = items.length ? `Checking ${items.length} Kobo item${items.length === 1 ? '' : 's'} against saved books...` : 'No new Kobo titles; finishing the check...';
       const finishEnd=timing?.begin('save_message');
@@ -43,6 +43,11 @@
       completed=true;
       const ownership=response.ownership;
       const ownershipNote=ownership?`${ownership.covered?' Ownership preference applied.':''}${ownership.review?` ${ownership.review} need ownership review.`:''}${ownership.subscriptions?` ${ownership.subscriptions} subscription item(s).`:''}`:'';
+      if(incomplete){
+        const archiveIncomplete=snapshot.scopes.some(scope=>scope.id.includes('archive')&&!scope.complete);
+        status.textContent=`Saved readable Kobo titles; ${archiveIncomplete?'Archive checking':'library checking'} was incomplete. Earlier records and ownership evidence were kept. Run Full rescan to recover unchecked sections; Quick update will also perform that recovery.${ownershipNote}`;
+        return;
+      }
       if (!fullRescan) {
         const changes=response.changes;
         const summary=changes?`${items.length} checked · ${changes.added} new · ${changes.updated} updated.`:`${items.length} checked.`;

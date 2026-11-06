@@ -80,9 +80,14 @@ export function validateProviderStates(value = {}) {
           if(pending.length)result.syncState.pendingWindows=pending;
         }
       }
-      if(['amazon-video','kindle','fandango-at-home','audible'].includes(provider)&&state.syncState.listingIncomplete!==undefined){
-        if(typeof state.syncState.listingIncomplete!=='boolean')throw Error(provider==='audible'?'Invalid Audible recovery status.':'Invalid Amazon Video recovery status.');
+      if(['amazon-video','kindle','fandango-at-home','audible','kobo'].includes(provider)&&state.syncState.listingIncomplete!==undefined){
+        if(typeof state.syncState.listingIncomplete!=='boolean')throw Error(provider==='kobo'?'Invalid Kobo recovery status.':provider==='audible'?'Invalid Audible recovery status.':'Invalid Amazon Video recovery status.');
         if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;
+      }
+      if(provider==='kobo'&&state.syncState.pendingKoboScopes!==undefined){
+        const scopes=state.syncState.pendingKoboScopes;
+        if(!Array.isArray(scopes)||scopes.length>4||scopes.length&&!state.syncState.listingIncomplete||new Set(scopes).size!==scopes.length||scopes.some(id=>!['my-books','archive','audiobooks','audiobooks-archive'].includes(id)))throw Error('Invalid Kobo recovery sections.');
+        if(scopes.length)result.syncState.pendingKoboScopes=scopes;
       }
       if(provider==='kindle'&&state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Kindle acquisition check');
       if(provider==='steam'&&state.syncState.applications!==undefined)result.syncState.applications=validateSteamApplications(state.syncState.applications);

@@ -87,11 +87,20 @@ try{
   d=await read();assert.deepEqual(d.items,before.items);assert.deepEqual(d.reviews,before.reviews);assert.deepEqual(d.history,before.history);
   await open('both');result=await sync('incremental');assert(!result.status.includes('failed'),result.status);assert.equal(result.requests,1);d=await read();assert.equal(d.writes,0,'Unchanged empty-root Quick rewrote catalog');assert.deepEqual(d.items,before.items);
   console.log('PASS installed Kobo: browser restart retains records; unchanged empty-root Quick makes one request and zero catalog writes');
-  for(const scenario of ['all-empty','401','403','503','malformed','unreadable','invalid-link','count-mismatch','pagination']){
+  for(const scenario of ['401','403','503','malformed','unreadable','invalid-link']){
     const prior=d;await open(scenario);result=await sync();assert.match(result.status,/failed/);d=await read();assert.deepEqual(d.items,prior.items);assert.deepEqual(d.history,prior.history);assert.deepEqual(d.reviews,prior.reviews);assert.deepEqual(d.unrelated,prior.unrelated);assert.equal(d.fullAt,prior.fullAt);assert.equal(d.writes,prior.writes,'Failure rewrote catalog');
     console.log('PASS installed Kobo: '+scenario+' leaves prior library, history, corrections, other providers and Full checkpoint unchanged');
   }
+  for(const scenario of ['count-mismatch','pagination']){
+    const prior=d;await open(scenario);result=await sync();assert.match(result.status,/Saved readable/);d=await read();assert.equal(d.fullAt,prior.fullAt);assert.deepEqual(d.history,prior.history);assert.deepEqual(d.reviews,prior.reviews);assert.deepEqual(d.unrelated,prior.unrelated);
+    console.log('PASS installed Kobo: '+scenario+' now saves a validated additive Archive prefix without Full authority');
+  }
+  await open('all-empty');result=await sync();assert(!result.status.includes('failed'),result.status);d=await read();assert.equal(d.items.length,0);assert(d.fullAt);
+  console.log('PASS installed Kobo: explicit empty active, Archive and Audiobooks scopes authorize empty Full reconciliation');
   for(const [scenario,count]of [['audio',1],['archive',1],['ordinary',1]]){
+    // Each control starts after independently verified empty scopes; omission
+    // of a previously populated scope is now deliberately additive/unverified.
+    await open('all-empty');assert(!(await sync()).status.includes('failed'));
     await open(scenario);result=await sync();assert(!result.status.includes('failed'),result.status);assert.equal(result.requests,scenario==='ordinary'?1:2);d=await read();assert.equal(d.items.length,count);assert(d.roundTrip);assert.deepEqual(d.unrelated,seeded.unrelated);assert.deepEqual(d.reviews,seeded.reviews);
     console.log('PASS installed Kobo: '+scenario+' Full retains existing classification and request count');
   }

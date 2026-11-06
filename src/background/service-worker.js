@@ -13,6 +13,8 @@ import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
 import '../providers/fanatical.js';
 import {kindleItemStatuses} from '../lib/kindle-import.js';
 import {audibleItemStatuses} from '../lib/audible-import.js';
+import {koboItemStatuses} from '../lib/kobo-import.js';
+import {koboRequiredScopes} from '../lib/kobo-observations.js';
 import { matchItems } from '../lib/matcher.js';
 import {steamTitleStatuses} from '../lib/provider-state.js';
 import { handleExternalApiRequestAsync } from '../lib/external-api.js';
@@ -356,6 +358,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try{sendResponse({ok:true,statuses:kindleItemStatuses(request.items)});}catch{sendResponse({ok:false,error:'Kindle page validation was unavailable. Reload the library page and retry.'});}
     return undefined;
   }
+  if(request?.type==='VALIDATE_KOBO_ITEMS'){
+    if(!isProviderImportPage('kobo',sender.url)||!sender.tab?.id){sendResponse({ok:false,error:'Kobo validation is available only from the Kobo library tab.'});return undefined;}
+    try{sendResponse({ok:true,statuses:koboItemStatuses(request.items)});}catch{sendResponse({ok:false,error:'Kobo entries could not be validated. Reload My Books and retry.'});}
+    return undefined;
+  }
   if(request?.type==='VALIDATE_AUDIBLE_ITEMS'){
     if(!isProviderImportPage('audible',sender.url)||!sender.tab?.id){sendResponse({ok:false,error:'Audible validation is available only from the Audible library tab.'});return undefined;}
     try{sendResponse({ok:true,statuses:audibleItemStatuses(request.items)});}catch{sendResponse({ok:false,error:'Audible entries could not be validated. Reload the library page and retry.'});}
@@ -548,14 +555,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
           ...(['fanatical','humble','gog','kindle'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
-          syncState: forceFull ? {} : request.provider === 'humble'
+          syncState: forceFull && request.provider!=='kobo' ? {} : request.provider === 'humble'
             ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set([...(state.syncState?.failedPurchaseIds??[]),...Object.values(database.providerItems)
               .filter(item=>item.provider==='humble'&&item.profileId===activeId&&item.metadata?.entitlement==='third-party-key'
                 &&(item.metadata.keyStatus!=='revealed'||item.metadata.expiresAt&&Date.parse(item.metadata.expiresAt)<=Date.now()))
               .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games','kindle','fandango-at-home','audible'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(['gog','amazon-video','amazon-games','kindle','fandango-at-home','audible','kobo'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true,...(request.provider==='kobo'?{pendingKoboScopes:state.syncState?.pendingKoboScopes??[],requiredKoboScopes:koboRequiredScopes(database,activeId)}:{})}:{}),...(request.provider==='amazon-games'?{pendingWindows:state.syncState?.pendingWindows??[]}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));

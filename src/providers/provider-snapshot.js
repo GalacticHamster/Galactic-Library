@@ -6,6 +6,19 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if(provider==='kobo'&&snapshot?.complete===false){
+      const names=['my-books','archive','audiobooks','audiobooks-archive'],scopes=snapshot.scopes;
+      const perScope=new Map();if(Array.isArray(items))for(const item of items){const id=item?.metadata?.librarySection;perScope.set(id,(perScope.get(id)??0)+1);}
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(item=>item?.providerItemId)).size!==items.length
+        ||items.some(item=>!global.GalacticKobo?.validLibraryItem(item))||!Array.isArray(scopes)||!scopes.length||scopes.length>4||!scopes.some(scope=>scope.id==='my-books')||new Set(scopes.map(scope=>scope.id)).size!==scopes.length
+        ||!count(snapshot.recovery?.conflicts)||snapshot.recovery.conflicts>50000||!scopes.some(scope=>scope.complete===false)
+        ||scopes.some(scope=>!names.includes(scope.id)||typeof scope.complete!=='boolean'||typeof scope.limitReached!=='boolean'||!count(scope.readCount)||scope.readCount>50000||!count(scope.pagesRead)||scope.pagesRead>500||scope.limitReached&&scope.pagesRead!==500
+          ||scope.expectedCount!==null&&!count(scope.expectedCount)||!count(scope.failedItems)||scope.failedItems>50000
+          ||(scope.complete?(scope.end!=='pagination-end'||scope.reason!==''||scope.failedItems!==0||scope.limitReached||scope.pagesRead<1||scope.expectedCount!==null&&scope.readCount!==scope.expectedCount||scope.expectedCount===null&&scope.readCount===0)
+            :scope.end!=='partial-acquisition'||!['request-failed','page-limit','repeated-page','empty-unconfirmed','pagination-unverified','unreadable-items','count-mismatch','scope-unavailable','conflicting-items'].includes(scope.reason)))
+        ||items.some(item=>!scopes.some(scope=>scope.id===item.metadata.librarySection&&scope.readCount>=perScope.get(scope.id))))fail('Invalid Kobo partial acquisition.');
+      return snapshot;
+    }
     if(provider==='audible'&&snapshot?.complete===false){
       const scope=snapshot.scopes?.[0],recovery=snapshot.recovery;
       if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(item=>item?.providerItemId)).size!==items.length

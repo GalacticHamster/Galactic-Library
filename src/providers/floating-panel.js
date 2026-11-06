@@ -60,7 +60,7 @@
     const context=sessions.get(provider)?.context;if(!context?.scanToken)return;
     const message=String(error?.message??''),code=/login|sign.in|401|403|account changed/iu.test(message)?'authentication':/timeout|timed out|abort/iu.test(message)?'timeout':/incomplete|coverage|pagination|count|malformed|unreadable|invalid|limit|bounds/iu.test(message)?'coverage':/fetch|network|offline|connection/iu.test(message)?'network':'other';
     const page=/\bpage\s+([1-9]\d{0,4})\b/iu.exec(message);
-    try{await chrome.runtime.sendMessage({type:'REPORT_PROVIDER_SCAN_FAILURE',provider,scanToken:context.scanToken,failure:{code,failedRequestCount:1,failedPages:page?[Number(page[1])]:[]}});}catch{}
+    try{await chrome.runtime.sendMessage({type:'REPORT_PROVIDER_SCAN_FAILURE',provider,scanToken:context.scanToken,failure:{code,failedRequestCount:1,failedPages:page?[Number(page[1])]:[],...(provider==='kobo'&&Array.isArray(error?.koboScopes)?{koboScopes:error.koboScopes}:{})}});}catch{}
   }
   // A page-local UI may request one trace without enabling later scans. The
   // explicit console switch remains available for development only.
@@ -96,7 +96,7 @@
     kindle:'Quick update reads the newest Kindle pages until it reaches a page already saved in your library. Full rescan checks the supported library again.',
     'amazon-video':'Quick update checks recent additions until it reaches an already saved group. Full rescan checks the wider collection and refreshes purchase labels. Earlier saved titles stay when Amazon cannot confirm a complete listing.',
     'fandango-at-home':'Quick update reads newest-first Recently Purchased lists until it reaches known titles. Full rescan checks every available movie and TV card against Fandango’s reported counts. Readable titles from an unfinished scan are saved without removing earlier records. Run Full rescan to recover unchecked titles.',
-    kobo:'Quick update reads newest-first My Books pages until it reaches a page already saved in GL. Full rescan also checks Archive and Audiobooks when Kobo exposes them. Without an initial full import, Quick update checks the wider library once. Your account ownership preference and manual corrections remain separate from Kobo’s source evidence.',
+    kobo:'Quick update reads newest-first My Books pages until it reaches a page already saved in GL. Full rescan also checks Archive and Audiobooks when Kobo exposes them. Without an initial full import, or while library recovery is pending, Quick update checks the wider library. Readable books from unfinished scans are saved without removing earlier records. Your account ownership preference and manual corrections remain separate from Kobo’s source evidence.',
     fanatical:'Quick update reads details for new completed orders and skips orders already checked. Full rescan checks all completed orders again and refreshes the saved account library.',
     humble:'Quick update checks new purchases and refreshes pending key-status information. Full rescan checks all supported purchases again, including previously saved purchases. This can pick up information after an importer update. Redemption codes are removed before purchase details are read and are never saved.',
     xbox:'Quick update and Full rescan both inspect the entire supported web list; Quick update does not traverse less data. Quick update saves additions and changes; Full rescan records a complete supported-list check. Both keep earlier saved items that are absent from this limited view.',

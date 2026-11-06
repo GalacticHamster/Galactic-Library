@@ -4,6 +4,11 @@ const compact=value=>String(value??'').replace(/\s+/gu,' ').trim().toLocaleLower
 const nonempty=value=>Array.isArray(value)?value.length>0:value!==undefined&&value!==null&&value!=='';
 const reliable=new Set(['title-attribute','title-element']);
 const quality={'title-attribute':3,'title-element':2,'cover-alt':1,'action-label':0};
+// A missing link is not evidence that a previously observed section is empty.
+export function koboRequiredScopes(database,profileId){
+  const names=new Set(['my-books','archive','audiobooks','audiobooks-archive']);
+  return [...new Set([...(database.providerProfiles[profileId]?.state.syncState?.pendingKoboScopes??[]),...Object.values(database.providerItems).filter(item=>item.provider==='kobo'&&item.profileId===profileId).map(item=>item.metadata.librarySection)])].filter(id=>names.has(id));
+}
 export function preserveKoboObservation(incoming,previous){
   if(!previous||incoming.provider!=='kobo'||previous.provider!=='kobo'||incoming.id!==previous.id||incoming.mediaType!==previous.mediaType)return incoming;
   const metadata={...previous.metadata,...incoming.metadata};

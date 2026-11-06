@@ -71,6 +71,7 @@
   "src/lib/models.js",
   "src/lib/audible-import.js",
   "src/lib/kindle-import.js",
+  "src/lib/kobo-import.js",
   "src/lib/observation-overlays.js",
   "src/lib/observation-completion.js",
   "src/lib/observation-transactions.js",

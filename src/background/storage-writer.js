@@ -13,7 +13,7 @@ import {effectiveExternalClientIds,allowedCompanionOperation} from '../lib/compa
 import {enumerateProviderProfiles,profileDependencies,removeProfileData} from '../lib/profile-management.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
-import {preserveKoboObservation,koboObservationChanged} from '../lib/kobo-observations.js';
+import {preserveKoboObservation,koboObservationChanged,koboRequiredScopes} from '../lib/kobo-observations.js';
 import {equalDatabaseData} from '../lib/data-equality.js';
 import {createValidationCertificates} from '../lib/validation-certificate.js';
 import {registerCommittedSnapshot,committedSnapshotSequence,registerEffectiveSnapshot,isCommittedSnapshot,committedCatalogSnapshot,reuseCommittedIdentity} from '../lib/committed-snapshot.js';
@@ -598,13 +598,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
-    if(['fandango-at-home','audible'].includes(provider)){
+    if(provider==='kobo'&&snapshot?.complete===true&&koboRequiredScopes(database,profile.profileId).some(id=>!snapshot.scopes?.some(scope=>scope.id===id)))throw Error('Kobo did not check every previously observed library section. Run Full rescan again.');
+    if(['fandango-at-home','audible','kobo'].includes(provider)){
       const partial=snapshot?.complete===false, pending=profile.state.syncState?.listingIncomplete;
       if(partial||pending&&syncDetails.syncMode==='full')validateProviderSnapshot(provider,values,snapshot);
       if(partial||pending){
+        if(provider==='kobo'&&!partial&&snapshot?.complete===true&&(profile.state.syncState?.pendingKoboScopes??[]).some(id=>!snapshot.scopes.some(scope=>scope.id===id)))throw Error('Kobo did not check every unfinished library section. Run Full rescan again.');
         const incomplete=partial||snapshot?.complete!==true;
         const {fullSyncAt,...safe}=syncDetails;
-        syncDetails={...(incomplete?safe:syncDetails),syncState:{...(provider==='audible'?profile.state.syncState:{}),...(incomplete?{listingIncomplete:true}:{listingIncomplete:false})},...(incomplete?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
+        syncDetails={...(incomplete?safe:syncDetails),syncState:{...(['audible','kobo'].includes(provider)?profile.state.syncState:{}),...(incomplete?{listingIncomplete:true}:{listingIncomplete:false}),...(provider==='kobo'?{pendingKoboScopes:incomplete?[...new Set([...(profile.state.syncState?.pendingKoboScopes??[]),...(snapshot?.scopes??[]).filter(scope=>!scope.complete).map(scope=>scope.id)])]:[]}:{} )},...(incomplete?{scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}}:{})};
       }
     }
     if(provider==='kindle'){
@@ -838,8 +840,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const profile=database.providerProfiles[scan.profileId];if(!profile||database.providers[provider]?.activeProfileId!==scan.activeAtStartId)return false;
     if(scanCompleted(profile,scan))return false;
     const health=validateSyncHealth({attemptRef:scan.attemptRef,status:'failed',mode:scan.mode,attemptedProfileLabel:scan.profileLabel,startedAt:scan.startedAt,finishedAt:new Date().toISOString(),failureCode,retryable:true,failedRequestCount:failure.failedRequestCount??1,failedPages:failure.failedPages??[]});
-    if(canPersistProviderCheck(database,provider,profile,scan)){await persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);return true;}
-    profile.state={...profile.state,syncHealth:health};
+    const patch={syncHealth:health};
+    if(provider==='kobo'&&scan.mode==='full'){
+      const scopes=failure.koboScopes??[];
+      if(!Array.isArray(scopes)||scopes.length>4||scopes.some(id=>!['my-books','archive','audiobooks','audiobooks-archive'].includes(id)))throw Error('Invalid Kobo recovery sections.');
+      patch.syncState={...profile.state.syncState,listingIncomplete:true,pendingKoboScopes:[...new Set([...(profile.state.syncState?.pendingKoboScopes??[]),...scopes])]};
+    }
+    if(canPersistProviderCheck(database,provider,profile,scan)){await persistProviderCheck(database,provider,profile,scan,patch,stored[SCANS]);return true;}
+    profile.state={...profile.state,...patch};
     if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);
     await persistDatabase(database,provider);return true;
   }
@@ -1120,10 +1128,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
-    if(['fandango-at-home','audible'].includes(provider)&&snapshot?.complete===false){
+    if(['fandango-at-home','audible','kobo'].includes(provider)&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       const {fullSyncAt,...safe}=syncDetails;
-      return mergeIntoDatabase(provider,values,{...safe,syncState:{...(provider==='audible'?syncDetails.syncState:{}),listingIncomplete:true},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},authoritativeDatabase,null,beforeSave,completion);
+      return mergeIntoDatabase(provider,values,{...safe,syncState:{...(['audible','kobo'].includes(provider)?syncDetails.syncState:{}),listingIncomplete:true,...(provider==='kobo'?{pendingKoboScopes:[...new Set([...(syncDetails.syncState?.pendingKoboScopes??[]),...snapshot.scopes.filter(scope=>!scope.complete).map(scope=>scope.id)])]}:{})},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},authoritativeDatabase,null,beforeSave,completion);
     }
     if(provider==='kindle'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
@@ -1268,7 +1276,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    if(['gog','epic','amazon-video','kindle','fandango-at-home','audible'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
+    if(['gog','epic','amazon-video','kindle','fandango-at-home','audible','kobo'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
     }
@@ -1318,7 +1326,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam','fanatical','humble','fandango-at-home','audible'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical','humble','fandango-at-home','audible','kobo'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];
