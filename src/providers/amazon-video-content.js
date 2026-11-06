@@ -93,25 +93,35 @@
       const fullRescan = mode === 'full' || !state.hasFullBaseline;
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No complete Amazon Video import yet; checking the full library…';
       scanStarted = true;
-      const { items, snapshot, completionStatus } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv, phase }) => {
+      const recovering = state.syncState?.listingIncomplete === true;
+      const { items, snapshot, completionStatus, unreadableCards } = await globalThis.GalacticAmazonVideo.fetchAmazonVideoLibrary(({ passes, movies, tv, phase }) => {
         refreshTrace();
         if (phase === 'paused-hidden') {
           status.textContent = 'Scan paused. Return to this Amazon Video tab within a minute to continue. Your saved library is unchanged.';
           return;
         }
         status.textContent = `Reading Amazon Video library: ${movies} movies and ${tv} TV titles found.${phase === 'verification' ? ' Confirming the listing.' : phase === 'boundary-probe' ? ' Confirming the listing.' : phase === 'purchase-labels' ? ' Checking purchase information.' : ''}`;
-      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [], { readPurchaseLabels: true });
+      }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? [], { readPurchaseLabels: true, recoverIncomplete: recovering && !fullRescan });
       if (fullRescan) {
         const found = new Set(items.map(item => item.providerItemId));
         const known = new Set(state.syncState?.knownProviderItemIds ?? []);
         const missing = [...known].filter(id => !found.has(id)).length;
         exportContext.baselineComparison = { previousItems: known.size, foundItems: found.size, missingPreviousItems: missing };
-        if (missing && completionStatus !== 'inferred' && snapshot?.scopes?.[0]?.expectedCount === null) throw new Error(`The listing did not include ${missing} previously saved title${missing === 1 ? '' : 's'}, and Amazon did not provide a total to confirm completeness. No library changes were saved. Reload the Amazon library after it finishes loading, then retry Full rescan.`);
+        if (missing && !['inferred', 'partial'].includes(completionStatus) && snapshot?.scopes?.[0]?.expectedCount === null) throw new Error(`The listing did not include ${missing} previously saved title${missing === 1 ? '' : 's'}, and Amazon did not provide a total to confirm completeness. No library changes were saved. Reload the Amazon library after it finishes loading, then retry Full rescan.`);
       }
       status.textContent = items.length ? `Saving ${items.length} Amazon Video title${items.length === 1 ? '' : 's'} locally...` : 'No new Amazon Video titles; recording the completed check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-video', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Video import did not complete.');
       exportContext.outcome = 'saved';
+      if (completionStatus === 'partial') {
+        exportContext.outcome = 'saved-partial';
+        status.textContent = `Saved ${response.savedCount ?? items.length} readable Amazon Video titles. ${unreadableCards} observed card${unreadableCards === 1 ? '' : 's'} could not be read; the scan is incomplete. Earlier records were kept. Retry with Quick update to check the remaining listing.`;
+        return;
+      }
+      if (recovering && !fullRescan) {
+        status.textContent = `Amazon Video update complete. Checked ${items.length} readable titles while retrying the incomplete listing. Earlier saved titles were kept.`;
+        return;
+      }
       if (fullRescan && completionStatus === 'inferred') {
         status.textContent = `Full rescan finished. ${items.filter(item => item.mediaType === 'movie').length} movies and ${items.filter(item => item.mediaType === 'tv').length} TV titles found. Observed titles saved; earlier saved titles were kept because Amazon did not confirm a complete listing.`;
       } else {

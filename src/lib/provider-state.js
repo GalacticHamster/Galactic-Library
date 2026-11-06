@@ -60,6 +60,10 @@ export function validateProviderStates(value = {}) {
     if(state.syncHealth!==undefined)result.syncHealth=validateSyncHealth(state.syncHealth);
     if(state.syncState!==undefined){
       object(state.syncState,'Provider sync state');result.syncState={};
+      if(provider==='amazon-video'&&state.syncState.listingIncomplete!==undefined){
+        if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Amazon Video recovery status.');
+        if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;
+      }
       if(provider==='steam'&&state.syncState.applications!==undefined)result.syncState.applications=validateSteamApplications(state.syncState.applications);
       if(provider==='audible'&&state.syncState.audibleHistory!==undefined){
         const h=object(state.syncState.audibleHistory,'Audible history checkpoint');

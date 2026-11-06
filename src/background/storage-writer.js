@@ -598,6 +598,23 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
+    if(provider==='amazon-video'){
+      const partial=snapshot?.complete===false;
+      if(partial||profile.state.syncState?.listingIncomplete&&snapshot?.complete===true){
+        validateProviderSnapshot(provider,values,snapshot);
+        if(!partial){
+          const scope=snapshot.scopes[0];
+          if(snapshot.scopes.length!==1||scope.id!=='library'||scope.readCount!==values.length
+            ||!(scope.end==='reported-count'&&scope.expectedCount===values.length||scope.end==='scroll-end'&&scope.expectedCount===null))throw Error('Amazon Video recovery did not provide supported completion evidence. Previous records were kept.');
+        }
+      }
+      if(partial)syncDetails={...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,incomplete:true,coverageLimit:'unreadable-amazon-video-cards'}};
+      // A bounded Quick does not clear unresolved work. Only a validated
+      // whole traversal (count-confirmed or inferred) can clear this marker.
+      if(partial||profile.state.syncState?.listingIncomplete){
+        syncDetails={...syncDetails,syncState:{...(partial||snapshot?.complete!==true?{listingIncomplete:true}:{})}};
+      }
+    }
     if(['gog','epic'].includes(provider)&&snapshot?.complete===false){validateProviderSnapshot(provider,values,snapshot);syncDetails={...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,incomplete:true}};}
     if(provider==='gog'){
       const partial=snapshot?.complete===false;
@@ -1058,6 +1075,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
+    if(provider==='amazon-video'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      const {fullSyncAt,...safe}=syncDetails;
+      return mergeIntoDatabase(provider,values,{...safe,syncState:{listingIncomplete:true},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true,coverageLimit:'unreadable-amazon-video-cards'}},authoritativeDatabase,null,beforeSave,completion);
+    }
     validateProviderSnapshot(provider, values, snapshot);
     if(['gog','epic'].includes(provider)&&snapshot.complete===false){
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId),historical=historicalRecords(database,profile.profileId);
@@ -1186,7 +1208,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
-    if(['gog','epic'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete){
+    if(['gog','epic','amazon-video'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
     }

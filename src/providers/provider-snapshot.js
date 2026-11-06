@@ -6,6 +6,17 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if (provider === 'amazon-video' && snapshot?.complete === false) {
+      const scope = snapshot.scopes?.[0];
+      if (snapshot.version !== 1 || snapshot.provider !== provider || !Array.isArray(items) || !items.length || items.length > 50000
+          || snapshot.itemCount !== items.length || new Set(items.map(item => item?.providerItemId)).size !== items.length
+          || items.some(item => typeof item?.providerItemId !== 'string' || !item.providerItemId.trim() || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 500
+            || !['movie', 'tv'].includes(item.mediaType) || !['owned', 'rental', 'subscription', 'unknown'].includes(item.ownership))
+          || !Array.isArray(snapshot.scopes) || snapshot.scopes.length !== 1 || scope?.id !== 'library' || scope.complete !== false || scope.limitReached !== false
+          || scope.end !== 'partial-acquisition' || scope.expectedCount !== null || scope.readCount !== items.length || !count(scope.pagesRead) || scope.pagesRead < 1 || scope.pagesRead > 250
+          || !count(snapshot.recovery?.unreadableCards) || snapshot.recovery.unreadableCards < 1 || snapshot.recovery.unreadableCards > 50000) fail('Invalid Amazon Video partial acquisition.');
+      return snapshot;
+    }
     // GOG/Epic receipts authorize additive saves only, never absence-based reconciliation.
     if(['gog','epic'].includes(provider)&&snapshot?.complete===false){
       const scope=snapshot.scopes?.[0];

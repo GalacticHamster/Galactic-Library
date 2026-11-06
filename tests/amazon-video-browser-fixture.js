@@ -278,7 +278,8 @@ try{
  page=await setup({inside:'<button>Show more</button>'});await rejects(page,/could not establish/,'An unresponsive real library continuation control remains an incomplete scan');
  page=await setup({total:99});await rejects(page,/could not establish/,'An explicit library count mismatch cannot become a complete snapshot');
  page=await setup({ids:[]});await rejects(page,/no readable movie or TV cards/,'A missing or empty listing cannot erase the saved library');
- page=await setup();page.list.insertAdjacentHTML('beforeend',card(99,{bad:true}));await rejects(page,/unreadable library cards/,'Unreadable cards still prevent replacement');
+ page=await setup();page.list.insertAdjacentHTML('beforeend',card(99,{bad:true}));result=await page.api.fetchAmazonVideoLibrary();
+ assert(result.items.length===4&&result.snapshot.complete===false&&result.unreadableCards===1&&result.completionStatus==='partial','Unreadable cards preserve readable peers without authorizing replacement');
  page=await setup({ids:[1,2,3,4]});page.list.innerHTML=card(1,{ownership:'Rental'})+card(2,{ownership:'Purchased'})+card(3,{ownership:'Included with Prime'})+card(4,{ownership:'Watch now'});
  result=await page.api.fetchAmazonVideoLibrary();
  assert(result.items[0].ownership==='rental'&&result.items[1].ownership==='owned'&&result.items[2].ownership==='subscription'&&result.items[3].ownership==='unknown','Rental, purchase, explicit Prime access and unconfirmed access remain distinct');

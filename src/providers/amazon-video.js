@@ -482,12 +482,12 @@
     };
   }
 
-  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false, readPurchaseLabels = true } = {}) {
+  async function fetchAmazonVideoLibrary(reportProgress = () => {}, knownItemIds = null, { readOnly = false, readPurchaseLabels = true, recoverIncomplete = false } = {}) {
     diagnostics = { format: 4, provider: 'amazon-video', readOnly: true, state: 'scanning', itemCount: 0,
       completionConfirmed: false, expectedCount: null, countEvidence: 'unavailable',
       discoveredItems: 0, mediaTypes: { movie: 0, tv: 0 }, passes: [] };
     diagnostics.hoverChecks = { enabled: readPurchaseLabels, attempted: 0, recognized: 0, unavailable: 0, maximumWaitMs: 600 };
-    diagnostics.scanMode = Array.isArray(knownItemIds) ? 'quick' : 'full';
+    diagnostics.scanMode = Array.isArray(knownItemIds) && !recoverIncomplete ? 'quick' : 'full';
     activeTrace = null;
     setDiagnosticsEnabled(detailed);
     const observations = new Map();
@@ -498,7 +498,7 @@
     }) : null;
     observer?.observe(global.document.body, { subtree: true, childList: true, characterData: true });
     try {
-      return await scanLibrary(reportProgress, knownItemIds, readOnly, observations, readPurchaseLabels);
+      return await scanLibrary(reportProgress, knownItemIds, readOnly, observations, readPurchaseLabels, recoverIncomplete);
     } catch (error) {
       if (diagnostics.state === 'scanning') {
         diagnostics.state = 'failed'; diagnostics.completionStatus = 'failed'; diagnostics.completionConfirmed = false;
@@ -534,9 +534,9 @@
       && Math.abs(other.height - entry.height) <= 4 && Math.abs(other.extent - entry.extent) <= 4));
   }
 
-  async function scanLibrary(reportProgress, knownItemIds, readOnly, itemsById, readPurchaseLabels) {
+  async function scanLibrary(reportProgress, knownItemIds, readOnly, itemsById, readPurchaseLabels, recoverIncomplete) {
     const discovered = new Set(), observedCards = new Set(), hoverAttempted = new Set();
-    const incremental = Array.isArray(knownItemIds);
+    const incremental = Array.isArray(knownItemIds) && !recoverIncomplete;
     const known = new Set(knownItemIds ?? []);
     let phase = 'discovery', quiet = 0, candidate = null, passesRead = 0;
     let sweepSeen = new Set();
@@ -548,6 +548,9 @@
     for (let pass = 0; pass < MAX_SCROLLS; pass += 1) {
       passesRead = pass + 1;
       await waitForVisible(reportProgress);
+      if ([...global.document.querySelectorAll('input[type="password"], #ap_signin_form, form[name="signIn"]')].some(visible)) {
+        throw new Error('Amazon Video requires sign-in. Sign in and retry; your saved library was kept.');
+      }
       const context = listingContext(global.document), before = geometry(context);
       for (const card of context.cards) observedCards.add(card);
       let rendered = amazonVideoItemsFromDocument(global.document);
@@ -556,7 +559,7 @@
         for (const card of context.cards) {
           const item = amazonVideoItemFromCardData(cardDataFromElement(card));
           if (!item || !['unknown', 'subscription'].includes(item.ownership) || hoverAttempted.has(item.providerItemId)
-              || incremental && known.has(item.providerItemId) || itemsById.get(item.providerItemId)?.ownership === 'owned') continue;
+              || (incremental || recoverIncomplete) && known.has(item.providerItemId) || itemsById.get(item.providerItemId)?.ownership === 'owned') continue;
           hoverAttempted.add(item.providerItemId);
           reportProgress({ passes: pass, movies: diagnostics.mediaTypes.movie, tv: diagnostics.mediaTypes.tv, phase: 'purchase-labels' });
           const evidence = await readHoverLabel(card, item);
@@ -689,11 +692,32 @@
         diagnostics.completionStatus = 'inferred'; diagnostics.reason = 'verified-traversal-converged'; break;
       }
     }
+    if ([...global.document.querySelectorAll('input[type="password"], #ap_signin_form, form[name="signIn"]')].some(visible)) {
+      throw new Error('Amazon Video requires sign-in. Sign in and retry; your saved library was kept.');
+    }
+    const readable = [];
+    let unreadableCards = 0;
     for (const card of observedCards) {
-      if (!amazonVideoItemFromCardData(cardDataFromElement(card))) {
-        diagnostics.reason = 'unreadable-card';
-        throw new Error('Amazon Video showed unreadable library cards. No library changes were saved.');
+      const item = amazonVideoItemFromCardData(cardDataFromElement(card));
+      if (item) readable.push(item);
+      else unreadableCards += 1;
+    }
+    if (unreadableCards) {
+      if (!global.document.querySelector(CARD_SELECTOR)) {
+        throw new Error('Amazon Video no longer shows a readable library listing. Reload the library and retry; your saved records were kept.');
       }
+      // A card-local failure grants additive authority only, even if a count
+      // or the traversal boundary otherwise agreed. Never catch fatal errors.
+      for (const item of readable) retainObservation(itemsById, item);
+      const items = [...itemsById.values()];
+      if (!items.length) throw new Error('Amazon Video showed no readable movie or TV cards. No library changes were saved.');
+      const snapshot = { version: 1, provider: 'amazon-video', complete: false, itemCount: items.length,
+        scopes: [{ id: 'library', readCount: items.length, expectedCount: null, end: 'partial-acquisition', pagesRead: passesRead, complete: false, limitReached: false }],
+        recovery: { unreadableCards } };
+      global.GalacticProviderSnapshot.validateProviderSnapshot('amazon-video', items, snapshot);
+      Object.assign(diagnostics, { state: 'partial', reason: 'unreadable-card', completionStatus: 'partial', completionConfirmed: false, unreadableCards, itemCount: items.length });
+      diagnostics.ownership = ownershipCounts(itemsById);
+      return { items, snapshot, completionConfirmed: false, completionStatus: 'partial', unreadableCards };
     }
     const items = [...itemsById.values()];
     diagnostics.ownership = ownershipCounts(itemsById);

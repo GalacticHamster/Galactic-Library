@@ -527,7 +527,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
-            : { knownProviderItemIds,...(request.provider==='gog'?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
+            : { knownProviderItemIds,...(['gog','amazon-video'].includes(request.provider)?{listingIncomplete:state.syncState?.listingIncomplete===true}:{}),...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
         });
       })
       .catch((error) => reply({ ok: false, error: error.message }));
@@ -616,6 +616,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       bookCount: database.providers[request.provider].bookCount ?? 0,
       movieCount: database.providers[request.provider].movieCount ?? 0,
       tvCount: database.providers[request.provider].tvCount ?? 0,
+      ...(request.provider==='amazon-video'?{savedCount:database.providers[request.provider].syncHealth?.differences?.observed}:{}),
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
       ...(['steam','epic','playstation','xbox','audible'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
