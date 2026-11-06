@@ -7,6 +7,7 @@ import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snaps
 import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {createProvidersView} from '../src/ui/providers-view.js';
 import {effectiveOwnershipRecord} from '../src/lib/ownership.js';
+import {checkKoboEmptyRoot} from './kobo-empty-root-fixture.js';
 const checks=[],stored={},writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async changes=>Object.assign(stored,structuredClone(changes))});
 const assert=(value,message)=>{if(!value)throw Error(message);};
 const pause=()=>new Promise(resolve=>setTimeout(resolve,10));
@@ -16,6 +17,7 @@ const originalFetch=globalThis.fetch;
 const shadows=[],attach=Element.prototype.attachShadow;
 Element.prototype.attachShadow=function(options){const root=attach.call(this,options);shadows.push(root);return root;};
 try{
+  checks.push(...await checkKoboEmptyRoot());
   const html='<div class="filter-btn">All Items (137)</div><ul>'+Array.from({length:24},(_,n)=>`<li class="book-card"><div class="book-info"><h3 class="book-title">Example Book ${n}</h3><span class="book-author">Writer ${n}</span><span class="book-genre">Comics &amp; Graphic Novels</span></div><div class="book-actions"><span class="action-title">Read Now: Example Book ${n}</span><a data-book-title="Example Book ${n}" aria-label="Read Now: Example Book ${n}" href="https://readnow.kobo.com/${uuid(n)}">Read Now</a></div></li>`).join('')+'</ul>';
   const doc=new DOMParser().parseFromString(html,'text/html'),cards=globalThis.GalacticKobo.koboItemsFromDocument(doc);
   assert(cards.length===24&&cards.every((r,n)=>r.title==='Example Book '+n&&r.metadata.authors[0]==='Writer '+n&&r.metadata.genres[0]==='Comics & Graphic Novels'&&r.providerItemId===uuid(n)),'Read Now wrapper polluted title or lost adjacent metadata.');

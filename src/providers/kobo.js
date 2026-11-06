@@ -307,10 +307,6 @@
       // known page is therefore a safe quick-update stopping point.
       if (incremental && itemsToSave.length === 0) break;
     }
-    if (!itemsById.size) {
-      if (incremental) return { items: [], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
-      throw new Error('Kobo showed no readable book or audiobook cards. Open My Books, wait for the library to load, then try again.');
-    }
     if (incremental) return { items: [...itemsById.values()], archivePagesRead: 0, archiveAvailable: false, audiobookPagesRead: 0, audiobookAvailable: false, quick: true };
     const scopes = [global.GalacticProviderSnapshot.completedScope('my-books', itemsById.size, expectedCount, 'pagination-end', totalPages)];
     const myBooksArchive = await fetchKoboLinkedSection(itemsById, reportProgress, firstDocument, 'Archive', 'archive',timing);
@@ -318,6 +314,11 @@
     const audiobookArchive = audiobooks.document
       ? await fetchKoboLinkedSection(itemsById, reportProgress, audiobooks.document, 'Archive', 'audiobooks-archive',timing)
       : { pagesRead: 0, available: false };
+    // An empty My Books section does not imply an empty linked library.
+    // Keep the conservative Full-scan guard after all applicable sections.
+    if (!itemsById.size) {
+      throw new Error('Kobo showed no readable book or audiobook cards. Open My Books, wait for the library to load, then try again.');
+    }
     return {
       items: [...itemsById.values()],
       archivePagesRead: myBooksArchive.pagesRead + audiobookArchive.pagesRead,
