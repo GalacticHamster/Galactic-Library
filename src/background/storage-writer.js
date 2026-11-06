@@ -554,7 +554,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const changing=Boolean(active)&&existing?.profileId!==active;
     if(changing&&switchProfile!==true)throw Error('A different account/profile is active. Explicitly confirm switching to the target account.');
     const profile=importProfile(database,provider,profileLabel,existing?.profileId??requestedProfileId);
-    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(provider==='fanatical'?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
+    const plan=providerScanMode(provider,profile.state,mode),forceFull=plan.forceFull||(['fanatical','humble'].includes(provider)?providerScanMode(provider,profile.state,'incremental').forceFull:!profile.state.fullSyncAt);
     if(!active){profile.lastSelectedAt=new Date().toISOString();profileState(database,profile,profile.state);}
     const activeAtStartId=database.providers[provider].activeProfileId;
     const stored=await storageArea.get({[SCANS]:{}}),scans=stored[SCANS]??{},scanToken=crypto.randomUUID();
@@ -601,6 +601,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='fanatical'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       syncDetails=fanaticalAcquisitionDetails(profile,syncDetails);
+    }
+    if(provider==='humble'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      const known=syncDetails.syncState?.knownPurchaseIds??[],failed=syncDetails.syncState?.failedPurchaseIds??[];
+      if(known.length!==snapshot.successfulPurchaseIds.length||known.some(id=>!snapshot.successfulPurchaseIds.includes(id))
+        ||failed.length!==snapshot.failedPurchaseIds.length||failed.some(id=>!snapshot.failedPurchaseIds.includes(id)))throw Error('Humble partial purchase state does not match its validated results.');
+      syncDetails=humbleAcquisitionDetails(profile,syncDetails,true);
     }
     const details={...syncDetails,profileId:profile.profileId,profileLabel:profile.nickname,
       scanAttempt:{attemptRef:scan.attemptRef,startedAt:scan.startedAt}};
@@ -1024,6 +1031,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       knownOrderFingerprints:[...new Set([...(prior.knownOrderFingerprints??[]),...(details.syncState?.knownOrderFingerprints??[])])],
       acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}};
   }
+  function humbleAcquisitionDetails(profile,details,partialFull=false){
+    const {fullSyncAt,...safe}=details,prior=profile.state.syncState??{};
+    const incoming=details.syncState??{},failed=new Set([...(prior.failedPurchaseIds??[]),...(incoming.failedPurchaseIds??[])]);
+    for(const id of incoming.knownPurchaseIds??[])failed.delete(id);
+    const knownPurchaseIds=[...new Set([...(prior.knownPurchaseIds??[]),...(incoming.knownPurchaseIds??[])])].filter(id=>!failed.has(id));
+    const acquisitionCheckedAt=prior.acquisitionCheckedAt??incoming.acquisitionCheckedAt??(partialFull?new Date().toISOString():null);
+    return {...safe,syncState:{knownPurchaseIds,...(failed.size?{failedPurchaseIds:[...failed]}:{}),...(acquisitionCheckedAt?{acquisitionCheckedAt}:{})}};
+  }
   async function replaceProviderItems(provider, values, syncDetails = {}, snapshot) {
     return replaceIntoDatabase(provider,values,syncDetails,snapshot);
   }
@@ -1031,6 +1046,13 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
     validateProviderSnapshot(provider, values, snapshot);
+    if(provider==='humble'&&snapshot.complete===false){
+      const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+      const historical=historicalRecords(database,profile.profileId);
+      // A partial acquisition does not undo a prior historical transition.
+      values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});
+      return mergeIntoDatabase(provider,values,humbleAcquisitionDetails(profile,syncDetails,true),database,null,beforeSave,completion);
+    }
     if(provider==='fanatical'&&snapshot.complete===false){
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
       return mergeIntoDatabase(provider,values,fanaticalAcquisitionDetails(profile,syncDetails),database,null,beforeSave,completion);
@@ -1144,6 +1166,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='humble'&&syncDetails.syncState){
+      if(syncDetails.scanDiagnostics?.incomplete||profile.state.syncState?.failedPurchaseIds?.length){
+        const historical=historicalRecords(database,profile.profileId);
+        values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});
+        preparedIncoming=null;
+      }
+      syncDetails=humbleAcquisitionDetails(profile,syncDetails);
+    }
     if(provider==='steam'&&syncDetails.syncState?.applications){
       const applications=validateSteamApplicationImport(values,syncDetails.syncState.applications,Object.values(database.providerItems).filter(item=>item.profileId===profile.profileId),syncDetails.syncMode==='full');
       const latest=new Set(applications.appIds),prior=profile.state.syncState?.applications;
@@ -1166,7 +1196,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam','fanatical'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical','humble'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

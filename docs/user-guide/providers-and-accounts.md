@@ -33,6 +33,12 @@ default accounts and one confirmation for both verified extensions. If both
 sides contain purchases, confirm they are the same store account. See
 [purchase sync](purchase-sharing.md).
 
+## Humble purchase recovery
+
+If an individual Humble purchase cannot be loaded, GL saves the other validated purchases, including during your first Full rescan. Earlier purchases and history stay intact. **Quick update** retries unresolved purchases without repeating already checked details, except for existing key-status rechecks. A partial Full does not establish a complete Full checkpoint or move omitted purchases into earlier-import history.
+
+Sign-in errors stop the import and keep saved purchases unchanged. A valid empty purchase list can complete a Full rescan; as with other clean Humble Full scans, missing active records move to earlier-import history.
+
 ## Use remembered accounts
 
 On a provider website, a single connected account eligible for reuse appears as
@@ -41,7 +47,7 @@ saved account or **Add account**. Changing the input does not rename an account;
 the panel links to GL Providers for renaming. **Cancel account change** restores
 the prior selection without starting an import. With multiple saved accounts,
 confirm the signed-in account as requested; switching needs explicit consent.
-A new alternate account needs its first complete supported-list import (Sync Epic library on Epic; Import Nintendo cards on Nintendo; Full rescan elsewhere). Completing initial setup refreshes
+A new alternate account starts with its first supported-list import (Sync Epic library on Epic; Import Nintendo cards on Nintendo; Full rescan elsewhere). Completing initial setup refreshes
 the account display automatically without overwriting edits made during a save.
 
 Provider cards show accounts, imported counts, update dates, complete-scan

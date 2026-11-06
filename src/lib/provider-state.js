@@ -72,6 +72,8 @@ export function validateProviderStates(value = {}) {
       if(provider==='humble'){
         const ids=strings(state.syncState.knownPurchaseIds,50000,256,'Purchase IDs');
         if(Array.isArray(state.syncState.knownPurchaseIds))result.syncState.knownPurchaseIds=ids;
+        if(state.syncState.failedPurchaseIds!==undefined)result.syncState.failedPurchaseIds=strings(state.syncState.failedPurchaseIds,50000,256,'Unresolved Humble purchases');
+        if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Humble acquisition check');
       }
       if(provider==='fanatical'){
         if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Fanatical acquisition check');

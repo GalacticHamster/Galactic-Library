@@ -295,14 +295,16 @@ export const providerSnapshotTests = [
     });
     await assert.rejects(context.GalacticAudible.fetchAudibleAudiobooks(), /without its library structure/u);
   }],
-  ['Humble aborts a full scan when one purchase detail is malformed', async () => {
+  ['Humble preserves validated full-scan purchases when another detail is malformed', async () => {
     const context = providerContext('humble', async (url) => {
       if (url.startsWith('/api/v1/user/')) return json([{ gamekey: 'order-1' }, { gamekey: 'order-2' }]);
       return { ok: true, text: async () => JSON.stringify(url.includes('order-1')
         ? { subproducts: [{ human_name: 'Game One', platform: 'steam', id: 'game-one' }] }
         : { unexpected: 'response' }) };
     });
-    await assert.rejects(context.GalacticHumble.fetchHumblePurchases(), /1 Humble purchase could not be read; no library changes/u);
+    const full=await context.GalacticHumble.fetchHumblePurchases();
+    assert.equal(full.items.length,1);assert.equal(full.snapshot.complete,false);
+    assert.deepEqual(plain(full.failures),['order-2']);
     const quick = await context.GalacticHumble.fetchHumblePurchases(() => {}, []);
     assert.equal(quick.items.length, 1);
     assert.equal(quick.failures.length, 1);

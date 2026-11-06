@@ -35,7 +35,7 @@
       cache: 'no-store',
       headers: { Accept: 'application/json' }
     });
-    if (response.status === 401 || response.status === 403) throw new Error('Your Humble login has expired. Sign in and try again.');
+    if (response.status === 401 || response.status === 403) throw Object.assign(new Error('Your Humble login has expired. Sign in and try again.'),{code:'HUMBLE_AUTH_REQUIRED'});
     if (!response.ok) throw new Error(`Humble returned ${response.status}.`);
     return response.json();
   }
@@ -46,11 +46,12 @@
       cache: 'no-store',
       headers: { Accept: 'application/json' }
     });
-    if (response.status === 401 || response.status === 403) throw new Error('Your Humble login has expired. Sign in and try again.');
+    if (response.status === 401 || response.status === 403) throw Object.assign(new Error('Your Humble login has expired. Sign in and try again.'),{code:'HUMBLE_AUTH_REQUIRED'});
     if (!response.ok) throw new Error(`Humble returned ${response.status} while loading a purchase.`);
     // Do not call response.json(): a Humble detail can contain a third-party
     // redemption value. Redaction must happen before JSON parsing.
     const detail = JSON.parse(redactRedemptionValues(await response.text()));
+    if(Object.hasOwn(detail??{},'gamekey')&&detail.gamekey!==purchaseId)throw new Error('Humble returned a different purchase identity.');
     if (!detail || typeof detail !== 'object' || Array.isArray(detail) || !Array.isArray(detail.subproducts ?? detail.products)) throw new Error('Humble returned a malformed purchase detail.');
     if ((detail.subproducts ?? detail.products).some((product) => !product || typeof product !== 'object' || Array.isArray(product)
       || !compactText(product.human_name ?? product.product_name ?? product.title ?? product.name) && !emptyNonContentProduct(product))) throw new Error('Humble returned an unreadable purchase product.');
@@ -181,7 +182,6 @@
     if (!Array.isArray(orders)) throw new Error('Humble returned an unexpected purchase list. Please report this page format.');
     const keyedOrders = orders.map((order) => ({ order, purchaseId: orderKey(order) })).filter(({ purchaseId }) => purchaseId);
     if (keyedOrders.length !== orders.length) throw new Error('Humble returned purchases without readable IDs. No library changes were saved.');
-    if (!keyedOrders.length) throw new Error('Humble returned no readable purchases. Confirm that you are signed in to an account with purchases.');
     const sync = purchaseIdsForSync(orders, knownPurchaseIds ?? []);
     const incremental = Array.isArray(knownPurchaseIds);
     const selectedPurchaseIds = incremental ? new Set([...sync.newPurchaseIds,...refreshPurchaseIds]) : new Set(sync.purchaseIds);
@@ -189,6 +189,7 @@
     const itemsById = new Map();
     const failures = [];
     const completedPurchaseIds = new Set(incremental ? sync.knownPurchaseIds : []);
+    const successfulPurchaseIds=[];
     for (let index = 0; index < selectedOrders.length; index += 1) {
       const { order, purchaseId } = selectedOrders[index];
       reportProgress({ purchasesRead: index, purchasesTotal: selectedOrders.length, items: itemsById.size, skippedKnown: keyedOrders.length - selectedOrders.length });
@@ -196,24 +197,28 @@
         const detail = await fetchOrderDetail(purchaseId);
         for (const item of humbleItemsFromOrder(detail, order, purchaseId)) itemsById.set(item.providerItemId, item);
         completedPurchaseIds.add(purchaseId);
-      } catch {
+        successfulPurchaseIds.push(purchaseId);
+      } catch (error) {
+        if(error?.code==='HUMBLE_AUTH_REQUIRED')throw error;
+        completedPurchaseIds.delete(purchaseId);
         failures.push(purchaseId);
       }
       reportProgress({ purchasesRead: index + 1, purchasesTotal: selectedOrders.length, items: itemsById.size, skippedKnown: keyedOrders.length - selectedOrders.length });
       if (index + 1 < selectedOrders.length) await wait(BETWEEN_PURCHASES_MS);
     }
-    // A partial replacement would silently discard previously imported items.
-    // Leave the existing Humble provider records intact until a whole scan is
-    // readable and can replace them atomically.
-    if (failures.length && !incremental) throw new Error(`${failures.length} Humble purchase${failures.length === 1 ? '' : 's'} could not be read; no library changes were saved. Please try again.`);
-    if (!itemsById.size && !incremental) throw new Error('Humble purchases contained no supported game, audiobook, or book entitlements.');
+    if (failures.length && !successfulPurchaseIds.length && !incremental) throw new Error(`${failures.length} Humble purchase${failures.length === 1 ? '' : 's'} could not be read; no library changes were saved. Please try again.`);
+    if (!itemsById.size && !incremental && keyedOrders.length && !failures.length) throw new Error('Humble purchases contained no supported game, audiobook, or book entitlements.');
     return {
       items: [...itemsById.values()],
       purchasesRead: selectedOrders.length,
       skippedKnown: keyedOrders.length - selectedOrders.length,
       failures,
+      successfulPurchaseIds,
       knownPurchaseIds: [...completedPurchaseIds],
-      snapshot: incremental ? undefined : global.GalacticProviderSnapshot.completeProviderSnapshot('humble', [...itemsById.values()], [global.GalacticProviderSnapshot.completedScope('purchases', completedPurchaseIds.size, sync.purchaseIds.length, 'index-complete', Math.max(1, selectedOrders.length))])
+      snapshot: incremental ? undefined : failures.length ? {
+        version:1,provider:'humble',complete:false,itemCount:itemsById.size,successfulPurchaseIds,failedPurchaseIds:failures,
+        scopes:[{id:'purchases',complete:false,limitReached:false,end:'partial-acquisition',readCount:successfulPurchaseIds.length,expectedCount:sync.purchaseIds.length,pagesRead:Math.max(1,selectedOrders.length)}]
+      } : global.GalacticProviderSnapshot.completeProviderSnapshot('humble', [...itemsById.values()], [global.GalacticProviderSnapshot.completedScope('purchases', completedPurchaseIds.size, sync.purchaseIds.length, 'index-complete', Math.max(1, selectedOrders.length))])
     };
   }
 

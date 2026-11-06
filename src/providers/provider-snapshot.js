@@ -6,6 +6,17 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if(provider==='humble'&&snapshot?.complete===false){
+      const scope=snapshot.scopes?.[0],successful=snapshot.successfulPurchaseIds,failed=snapshot.failedPurchaseIds;
+      const verified=new Set(Array.isArray(successful)?successful:[]);
+      const keys=value=>Array.isArray(value)&&value.length>0&&value.length<=50000&&value.every(id=>typeof id==='string'&&id.trim()===id&&id.length>0&&id.length<=256)&&new Set(value).size===value.length;
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!keys(successful)||!keys(failed)
+        ||failed.some(id=>verified.has(id))||snapshot.itemCount!==new Set(items.map(i=>i.providerItemId)).size
+        ||items.some(i=>!verified.has(i.metadata?.purchaseId)||typeof i.providerItemId!=='string'||!i.providerItemId.startsWith(i.metadata.purchaseId+':'))
+        ||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==1||scope?.id!=='purchases'||scope.complete!==false||scope.limitReached!==false||scope.end!=='partial-acquisition'
+        ||scope.readCount!==successful.length||scope.expectedCount!==successful.length+failed.length||scope.pagesRead!==scope.expectedCount)fail('Invalid Humble partial acquisition.');
+      return snapshot;
+    }
     // Fanatical can finish acquiring a headerless order array without proving
     // that the array enumerates the account. This receipt grants additive
     // persistence only; it must never be treated as a complete snapshot.

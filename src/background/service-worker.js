@@ -182,7 +182,8 @@ function humbleSyncState(value) {
   const knownPurchaseIds = [...new Set((Array.isArray(value?.knownPurchaseIds) ? value.knownPurchaseIds : [])
     .map((id) => String(id ?? '').trim())
     .filter((id) => id.length > 0 && id.length <= 256))].slice(0, 50000);
-  return { knownPurchaseIds };
+  const failedPurchaseIds=[...new Set((Array.isArray(value?.failedPurchaseIds)?value.failedPurchaseIds:[]).filter(id=>typeof id==='string'&&id.trim()===id&&id.length>0&&id.length<=256))].slice(0,50000);
+  return { knownPurchaseIds,...(failedPurchaseIds.length?{failedPurchaseIds}:{}) };
 }
 
 function fanaticalSyncState(value) {
@@ -505,13 +506,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ok: true,
           scanToken,forceFull:forceFull===true,scanReason,profileLabel,profileId:activeId,
           hasFullBaseline: Boolean(state.fullSyncAt)&&!forceFull,
-          ...(request.provider==='fanatical'?{hasAcquisitionBaseline:!forceFull&&!providerScanMode('fanatical',state,'incremental').forceFull}:{}),
+          ...(['fanatical','humble'].includes(request.provider)?{hasAcquisitionBaseline:!forceFull&&!providerScanMode(request.provider,state,'incremental').forceFull}:{}),
           lastSuccessfulSyncAt: String(state.quickSyncAt ?? state.fullSyncAt ?? ''),
           syncState: forceFull ? {} : request.provider === 'humble'
-            ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set(Object.values(database.providerItems)
+            ? {...humbleSyncState(state.syncState),refreshPurchaseIds:[...new Set([...(state.syncState?.failedPurchaseIds??[]),...Object.values(database.providerItems)
               .filter(item=>item.provider==='humble'&&item.profileId===activeId&&item.metadata?.entitlement==='third-party-key'
                 &&(item.metadata.keyStatus!=='revealed'||item.metadata.expiresAt&&Date.parse(item.metadata.expiresAt)<=Date.now()))
-              .map(item=>item.metadata.purchaseId).filter(Boolean))].slice(0,50000)}
+              .map(item=>item.metadata.purchaseId).filter(Boolean)])].slice(0,50000)}
             : request.provider === 'fanatical'
               ? fanaticalSyncState(state.syncState)
             : { knownProviderItemIds,...(request.provider==='audible'&&state.syncState?.audibleHistory?{audibleHistory:state.syncState.audibleHistory}:{}),...(knownItemTitles?{knownItemTitles}:{}) }
