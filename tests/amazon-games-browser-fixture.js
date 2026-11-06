@@ -83,7 +83,34 @@ try{
  dateShadow.querySelector('[data-check-dates]').click();
  assert(dateShadow.querySelector('[data-mode="full"]').disabled&&dateShadow.querySelector('.status').textContent.includes('No library data will change'),'Date preparation immediately shows read-only progress and prevents conflicting scans');
  for(let n=0;n<500&&dateShadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
- assert(sends===0&&dateShadow.querySelector('.status').textContent.includes('1 of 3')&&!dateShadow.querySelector('[data-export-report]').hidden&&!dateShadow.querySelector('[data-mode="full"]').disabled,'The ordinary panel date check completes with counts and an export without accessing or changing stored library data');
+  assert(sends===0&&dateShadow.querySelector('.status').textContent.includes('1 of 3')&&!dateShadow.querySelector('[data-export-report]').hidden&&!dateShadow.querySelector('[data-mode="full"]').disabled,'The ordinary panel date check completes with counts and an export without accessing or changing stored library data');
+ const progressText=[];
+ datesPage.win.GalacticSync.send=async request=>request.type==='GET_PROVIDER_SYNC_STATE'?{ok:true,hasFullBaseline:true,lastSuccessfulSyncAt:new Date().toISOString()}:{ok:true,gameCount:1};
+ datesPage.win.GalacticAmazonGames.fetchAmazonGames=async report=>{
+  for(const totalGames of [1,20]){report({timeWindow:'2026',windowsRead:1,windowsTotal:2,totalGames});progressText.push(dateShadow.querySelector('.status').textContent);}
+  return {items:hydratedDate.items,diagnostics:{}};
+ };
+ dateShadow.querySelector('[data-mode="full"]').click();
+ for(let n=0;n<500&&dateShadow.querySelector('.status').dataset.busy;n++)await new Promise(resolve=>nativeTimeout(resolve,5));
+ assert(progressText.length===2&&progressText[0]!==progressText[1]&&progressText[0].includes('2026 (1 of 2 windows): 1 readable')&&progressText[1].includes('20 readable')&&dateShadow.querySelector('.status').textContent.includes('Full import complete'),'Changing acquisition callbacks update visible window/count progress and retain final success text');
+ const recoveryValid=Array.from({length:20},(_,n)=>({...direct,id:'recovery-'+n,title:'Synthetic recovery '+n,delayed:false}));
+ const recoveryBad={id:'unreadable',title:'Unreadable claim',label:'Unrecognized',body:'Unsupported collection entry'};
+ for(const [name,ranges]of [['claim',{'2026':[...recoveryValid,recoveryBad]}],['older-year',{'2025':recoveryValid,'2026':[recoveryBad]}],['identity',{'2026':[...recoveryValid,{...recoveryBad,title:''}]}]]){
+  const partialPage=await setup(ranges),partial=await partialPage.api.fetchAmazonGames();
+  assert(partial.items.length===20&&partial.items.every(i=>i.ownership==='owned'&&i.acquiredAt==='2026-01-01T00:00:00.000Z')&&partial.incomplete&&partial.snapshot.complete===false&&partial.snapshot.recovery.failedClaims===1,`${name}: 20 direct deliveries and dates survive an unreadable claim without Full authority`);
+  assert(partialPage.redemptions()===0,`${name}: partial acquisition never activates code actions`);
+ }
+ const stalled=await setup({'2025':recoveryValid,'2026':[]});
+ const laterButton=stalled.doc.querySelector('[data-type="2026"]'),selectLater=laterButton.onclick;
+ laterButton.onclick=()=>{selectLater();stalled.doc.querySelector('#rows').textContent=' No games collected ';const more=stalled.doc.createElement('button');more.textContent='See 10 more';stalled.doc.querySelector('main').append(more);};
+ const stalledResult=await stalled.api.fetchAmazonGames();
+ assert(stalledResult.items.length===20&&stalledResult.incomplete&&stalledResult.snapshot.recovery.failedWindows===1&&stalledResult.snapshot.scopes[0].limitReached,'A bounded later-year continuation failure preserves 20 earlier deliveries and reports unresolved scope');
+ for(const [kind,html]of [['auth','<input type="password">'],['structure','Unrecognized collection response']]){
+  const fatal=await setup({'2025':recoveryValid,'2026':[]}),button=fatal.doc.querySelector('[data-type="2026"]'),select=button.onclick;
+  button.onclick=()=>{select();fatal.doc.querySelector('#rows').innerHTML=html;};let failed;
+  try{await fatal.api.fetchAmazonGames();}catch(error){failed=error;}
+  assert(failed&&fatal.api.getDiagnostics().state==='failed',`Later ${kind} failure remains fatal despite earlier valid deliveries`);
+ }
  const windows={'2026':[direct,code,external,mystery,pending,unavailable,offered],'2025':[{...direct,delayed:false},{...direct,id:'direct-b',delayed:false,body:direct.body.replaceAll('2026-01-01','2025-01-01')}],'past-3-months':[direct,code,external]};
  let page=await setup(windows),result=await page.api.fetchAmazonGames();
  assert(result.items.length===5&&result.items.filter(item=>item.ownership==='owned').length===2,'Mixed full import retains direct deliveries and valid unconfirmed claims while excluding code and external-store entries');

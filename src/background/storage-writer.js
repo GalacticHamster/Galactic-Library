@@ -598,6 +598,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(scan.observationProviderToken?scan.observationProviderToken!==providerObservationToken(activeObservationRead?.envelope,activeObservationRead?.packet,provider):(scan.observationToken??'none')!==(activeObservationRead?.token??'none'))throw Error('Observations changed during this scan. Start a fresh scan.');
     if(!['full','incremental'].includes(syncDetails.syncMode)||scan.mode==='full'&&syncDetails.syncMode!=='full')throw new Error('This account/profile requires a complete full scan.');
     const profile=database.providerProfiles[scan.profileId];
+    if(provider==='amazon-games'){
+      const partial=snapshot?.complete===false;
+      if(partial||profile.state.syncState?.listingIncomplete&&syncDetails.syncMode==='full')validateProviderSnapshot(provider,values,snapshot);
+      if(!partial&&profile.state.syncState?.listingIncomplete&&syncDetails.syncMode==='full'
+        &&(profile.state.syncState.pendingWindows??[]).some(id=>!snapshot.scopes.some(scope=>scope.id===id)))throw Error('Amazon Games did not check every unfinished date range. Earlier records were kept.');
+      if(partial||profile.state.syncState?.listingIncomplete&&syncDetails.syncMode!=='full')syncDetails={...syncDetails,scanDiagnostics:{...syncDetails.scanDiagnostics,incomplete:true,coverageLimit:'incomplete-amazon-games-claims'}};
+      if(partial||profile.state.syncState?.listingIncomplete)syncDetails={...syncDetails,syncState:{...(partial||syncDetails.syncMode!=='full'?{listingIncomplete:true,pendingWindows:[...new Set([...(profile.state.syncState?.pendingWindows??[]),...(snapshot?.recovery?.pendingWindows??[])])]}:{})}};
+    }
     if(provider==='amazon-video'){
       const partial=snapshot?.complete===false;
       if(partial||profile.state.syncState?.listingIncomplete&&snapshot?.complete===true){
@@ -1075,6 +1083,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function replaceIntoDatabase(provider, values, syncDetails = {}, snapshot,authoritativeDatabase=null,beforeSave=null,completion=null) {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid provider.');
     if (!Array.isArray(values) || values.length>50000) throw new Error('Import needs a bounded item list.');
+    if(provider==='amazon-games'&&snapshot?.complete===false){
+      validateProviderSnapshot(provider,values,snapshot);
+      const {fullSyncAt,...safe}=syncDetails;
+      return mergeIntoDatabase(provider,values,{...safe,syncState:{listingIncomplete:true,pendingWindows:snapshot.recovery.pendingWindows},scanDiagnostics:{...safe.scanDiagnostics,incomplete:true,coverageLimit:'incomplete-amazon-games-claims'}},authoritativeDatabase,null,beforeSave,completion);
+    }
     if(provider==='amazon-video'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
       const {fullSyncAt,...safe}=syncDetails;
@@ -1242,7 +1255,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(accessUpdates.length){values=[...values,...accessUpdates];preparedIncoming=null;}
     }
     const now = new Date().toISOString();
-    if(provider==='amazon-games'){values=await prepareAmazonGamesImport(database,profile.profileId,values);preparedIncoming=null;}
+    if(provider==='amazon-games'){
+      values=await prepareAmazonGamesImport(database,profile.profileId,values);preparedIncoming=null;
+      if(syncDetails.scanDiagnostics?.incomplete){
+        const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});
+        const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;
+        syncDetails={...syncDetails,syncState:{listingIncomplete:true,pendingWindows:[...new Set([...(profile.state.syncState?.pendingWindows??[]),...(syncDetails.syncState?.pendingWindows??[])])]}};
+      }
+    }
     const audible=audibleHistoryDetails(provider,syncDetails,profile,now);syncDetails=audible.details;
     let incoming = preparedIncoming??timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);

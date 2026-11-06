@@ -28,16 +28,22 @@
       const fullRescan = mode === 'full' || !state.hasFullBaseline || !Number.isFinite(ageMs) || ageMs > 70 * 24 * 60 * 60 * 1000;
       if (fullRescan && mode !== 'full') status.textContent = state.hasFullBaseline ? 'Your last Amazon Games sync is over 70 days old; scanning all years to avoid a gap…' : 'No complete Amazon Games import yet; checking all years…';
       scanStarted = true;
-      const { items, diagnostics, snapshot } = await globalThis.GalacticAmazonGames.fetchAmazonGames(() => {
-        status.textContent = 'Checking your Amazon Games collection...';
-      }, !fullRescan);
+      const { items, diagnostics, snapshot, incomplete } = await globalThis.GalacticAmazonGames.fetchAmazonGames(progress => {
+        status.textContent = `Checking Amazon Games${progress.timeWindow ? ` ${progress.timeWindow}` : ''}${progress.windowsTotal ? ` (${progress.windowsRead} of ${progress.windowsTotal} windows)` : ''}: ${progress.totalGames ?? progress.games ?? 0} readable entries found.`;
+      }, !fullRescan, { retryWindows: fullRescan ? state.syncState?.pendingWindows ?? [] : [] });
       if (!items.length && fullRescan) throw new Error('No Amazon Games library entries were found. Code claims and deliveries to other stores are excluded. Select Games in My Collection and wait for it to load before retrying. No library records were replaced.');
       status.textContent = items.length ? `Saving ${items.length} Amazon Games claim${items.length === 1 ? '' : 's'} locally...` : 'Recording the completed Amazon Games check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'amazon-games', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
       if (!response?.ok) throw new Error(response?.error ?? 'Amazon Games import did not complete.');
+      if (incomplete) {
+        status.textContent = `Saved ${response.savedCount ?? items.length} readable Amazon Games entries; the scan is incomplete. ${diagnostics.failedClaims} observed claim${diagnostics.failedClaims === 1 ? '' : 's'} could not be read; ${diagnostics.failedWindows} window${diagnostics.failedWindows === 1 ? '' : 's'} did not finish. Earlier records were kept. Retry with Full rescan to check all years.`;
+        exportButton.hidden = !globalThis.GalacticAmazonGames.getDiagnostics?.();
+        return;
+      }
       const scope = fullRescan ? `Full import complete. ${new Set(items.map(item=>item.title)).size} games found. ${response.gameCount} library entries saved.`
         : `Recent claims checked. ${items.length} Amazon Games entries refreshed; earlier entries were kept.`;
       status.textContent = `${scope}${diagnostics.otherLibraryClaims || diagnostics.productKeyClaims ? ' Code claims and deliveries to other stores were not added.' : ''}${diagnostics.unreadableCards ? ` ${diagnostics.unreadableCards} entries lacked clear delivery details; earlier confirmed access and your corrections were kept.` : ''}`;
+      if (!fullRescan && (response.listingIncomplete ?? state.syncState?.listingIncomplete)) status.textContent += ' An earlier scan is still incomplete. Use Full rescan to retry older years.';
     } catch (error) {
       await globalThis.GalacticSync.failed('amazon-games',error);
       exportButton.hidden = !(scanStarted && globalThis.GalacticAmazonGames.getDiagnostics?.());

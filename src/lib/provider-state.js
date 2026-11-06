@@ -60,6 +60,15 @@ export function validateProviderStates(value = {}) {
     if(state.syncHealth!==undefined)result.syncHealth=validateSyncHealth(state.syncHealth);
     if(state.syncState!==undefined){
       object(state.syncState,'Provider sync state');result.syncState={};
+      if(provider==='amazon-games'&&(state.syncState.listingIncomplete!==undefined||state.syncState.pendingWindows!==undefined)){
+        if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Amazon Games recovery status.');
+        if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;
+        if(state.syncState.pendingWindows!==undefined){
+          const pending=strings(state.syncState.pendingWindows,200,20,'Amazon Games pending windows');
+          if(pending.some(id=>!/^(?:\d{4}|past-3-months)$/u.test(id))||pending.length&&!state.syncState.listingIncomplete)throw Error('Invalid Amazon Games pending windows.');
+          if(pending.length)result.syncState.pendingWindows=pending;
+        }
+      }
       if(provider==='amazon-video'&&state.syncState.listingIncomplete!==undefined){
         if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Amazon Video recovery status.');
         if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;

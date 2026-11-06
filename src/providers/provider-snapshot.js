@@ -6,6 +6,15 @@
 
   function validateProviderSnapshot(provider, items, snapshot) {
     const fail = (message) => { throw new Error(`${provider} full scan is incomplete: ${message} Previous library records were kept.`); };
+    if (provider === 'amazon-games' && snapshot?.complete === false) {
+      const scope=snapshot.scopes?.[0], recovery=snapshot.recovery;
+      if(snapshot.version!==1||snapshot.provider!==provider||!Array.isArray(items)||!items.length||items.length>50000||snapshot.itemCount!==items.length||new Set(items.map(i=>i?.providerItemId)).size!==items.length
+        ||items.some(i=>typeof i?.providerItemId!=='string'||!/^claim-v1-[a-f0-9]{64}$/u.test(i.providerItemId)||i.metadata?.claimKey!==i.providerItemId.slice(9)||typeof i.title!=='string'||!i.title.trim()||i.title.length>500||i.mediaType!=='game'||!['owned','unknown'].includes(i.ownership))
+        ||!Array.isArray(snapshot.scopes)||snapshot.scopes.length!==1||scope?.id!=='collection'||scope.complete!==false||scope.limitReached!==(recovery?.failedWindows>0)||scope.end!=='partial-acquisition'||scope.expectedCount!==null||scope.readCount!==items.length||!count(scope.pagesRead)||scope.pagesRead<1||scope.pagesRead>36000
+        ||!count(recovery?.failedClaims)||!count(recovery?.failedWindows)||recovery.failedClaims>50000||recovery.failedWindows>200||!count(recovery?.windowsChecked)||recovery.windowsChecked<1||recovery.windowsChecked>200||recovery.failedWindows>recovery.windowsChecked||!recovery.failedClaims&&!recovery.failedWindows
+        ||!Array.isArray(recovery?.pendingWindows)||!recovery.pendingWindows.length||recovery.pendingWindows.length>recovery.windowsChecked||new Set(recovery.pendingWindows).size!==recovery.pendingWindows.length||recovery.pendingWindows.some(id=>typeof id!=='string'||!/^(?:\d{4}|past-3-months)$/u.test(id)))fail('Invalid Amazon Games partial acquisition.');
+      return snapshot;
+    }
     if (provider === 'amazon-video' && snapshot?.complete === false) {
       const scope = snapshot.scopes?.[0];
       if (snapshot.version !== 1 || snapshot.provider !== provider || !Array.isArray(items) || !items.length || items.length > 50000

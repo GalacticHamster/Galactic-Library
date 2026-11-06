@@ -293,13 +293,21 @@
     let sawCards = false;
     let loadMoreActivations = 0;
     let passesRead = 0;
+    let failedClaims = 0, firstFailure = null;
+    const failedHeaders = new Set();
     for (let pass = 0; pass < MAX_SCROLL_PASSES && unchangedPasses < 4; pass += 1) {
       passesRead = pass + 1;
+      requireCollectionSession();
       const scan = claimCardsFromDocument(global.document);
       sawCards ||= scan.diagnostics.cardsRead > 0;
       for (const { header, card } of scan.cards) {
         const cardId = claimEntryId(card.providerItemId);
-        if (!cardId || !compactText(card.title)) throw new Error('Amazon Games showed a claim without a readable ID or title. No library changes were saved.');
+        if (failedHeaders.has(header)) continue;
+        if (!cardId || !compactText(card.title)) {
+          failedHeaders.add(header); failedClaims++;
+          firstFailure ??= new Error('Amazon Games showed a claim without a readable ID or title. No library changes were saved.');
+          continue;
+        }
         if (processedCardIds.has(cardId)) continue;
         processedCardIds.add(cardId);
         const result = await amazonGamesItemFromClaimHeader(header, card);
@@ -323,7 +331,8 @@
           const error = new Error('An Amazon Games entry did not expose enough claim information. No library changes were saved.');
           // Page-local context only. Never include titles in exported reports.
           error.amazonGamesEntryTitle = card.title;
-          throw error;
+          failedHeaders.add(header); failedClaims++;
+          firstFailure ??= error;
         }
       }
       const cardsRead = processedCardIds.size;
@@ -347,20 +356,46 @@
       global.scrollTo({ top: Math.min(maximum, global.scrollY + Math.max(360, Math.floor(global.innerHeight * 0.82))), behavior: 'auto' });
       await wait(SCROLL_PAUSE_MS);
     }
-    if (unchangedPasses < 4 || loadMoreControl(global.document)) throw new Error(`Amazon Games reached its ${MAX_SCROLL_PASSES}-pass limit before finishing ${timeWindow}.`);
+    requireCollectionSession();
+    const failedWindows = unchangedPasses < 4 || loadMoreControl(global.document) ? 1 : 0;
+    // Only a still-recognizable collection in the confirmed date window may
+    // retain a prefix. Authentication, unknown layouts and thrown errors stay fatal.
+    const currentCards = claimCardsFromDocument(global.document).cards.length;
+    const explicitEmpty = /\b(?:no (?:games|items|claims|collected)|haven['’]?t collected|have not collected|nothing (?:collected|claimed)|no content)\b/iu.test(collectionRoot(global.document).textContent ?? '');
+    if (!currentCards && !explicitEmpty) {
+      if (failedWindows) throw new Error(`Amazon Games reached its ${MAX_SCROLL_PASSES}-pass limit before finishing ${timeWindow}.`);
+      throw new Error(`Amazon Games did not expose claim cards or an explicit empty state for ${timeWindow}.`);
+    }
     if (!sawCards && !/\b(?:no (?:games|items|claims|collected)|haven['’]?t collected|have not collected|nothing (?:collected|claimed)|no content)\b/iu.test(collectionRoot(global.document).textContent ?? global.document.body?.textContent ?? '')) throw new Error(`Amazon Games did not expose claim cards or an explicit empty state for ${timeWindow}.`);
-    return { items: [...itemsById.values()], scope: global.GalacticProviderSnapshot.completedScope(timeWindow || 'collection', processedCardIds.size, sawCards ? null : 0, 'scroll-end', passesRead), diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, unclaimedOffers, loadMoreActivations } };
+    return { items: [...itemsById.values()], passesRead, firstFailure,
+      incomplete: failedClaims > 0 || failedWindows > 0,
+      scope: failedClaims || failedWindows ? null : global.GalacticProviderSnapshot.completedScope(timeWindow || 'collection', processedCardIds.size, sawCards ? null : 0, 'scroll-end', passesRead),
+      diagnostics: { sawCards, cardsRead: processedCardIds.size, otherLibraryClaims, productKeyClaims, duplicateAmazonClaims, unreadableCards, unclaimedOffers, loadMoreActivations, failedClaims, failedWindows } };
   }
 
-  async function scanAmazonGames(reportProgress = () => {}, quickUpdate = false) {
-    const windows = await openTimeWindowMenu(global.document, quickUpdate);
+  function requireCollectionSession() {
+    const visible = element => !element.closest('[hidden], [aria-hidden="true"]')
+      && global.getComputedStyle(element).display !== 'none' && global.getComputedStyle(element).visibility !== 'hidden' && element.getClientRects().length > 0;
+    const denied = [...global.document.querySelectorAll('[role="alert"]')].some(element => visible(element)
+      && !element.closest('[data-a-target="accordion-header"]') && /\b(?:401|403|unauthorized|access denied)\b/iu.test(compactText(element.textContent)));
+    if (denied || [...global.document.querySelectorAll('input[type="password"], #ap_signin_form, form[name="signIn"]')].some(visible)) {
+      throw new Error('Amazon Games requires sign-in. Sign in and retry; your saved library was kept.');
+    }
+  }
+
+  async function scanAmazonGames(reportProgress = () => {}, quickUpdate = false, retryWindows = []) {
+    const windows = await openTimeWindowMenu(global.document, quickUpdate || retryWindows.length > 0);
     if (!quickUpdate && !windows.some((window) => /^\d{4}$/u.test(window.id))) throw new Error('Amazon Games did not expose the complete collection year list. No full replacement was saved.');
+    if (!quickUpdate && retryWindows.some(id => !windows.some(window => window.id === id))) throw new Error('Amazon Games did not expose a previously unfinished date range. Reload My Collection and retry Full rescan; earlier records were kept.');
     const recentWindow = windows.find((window) => window.id === 'past-3-months');
-    const selectedWindows = quickUpdate && recentWindow ? [recentWindow] : windows.length ? windows : [{ id: '', label: 'current selection' }];
+    const fullWindows = windows.filter(window => /^\d{4}$/u.test(window.id) || retryWindows.includes(window.id));
+    const selectedWindows = quickUpdate && recentWindow ? [recentWindow] : !quickUpdate ? fullWindows : windows.length ? windows : [{ id: '', label: 'current selection' }];
     const itemsById = new Map();
-    const totals = { cardsRead: 0, otherLibraryClaims: 0, productKeyClaims: 0, duplicateAmazonClaims: 0, unreadableCards: 0, unclaimedOffers: 0, loadMoreActivations: 0, crossWindowDuplicates: 0 };
+    const totals = { cardsRead: 0, otherLibraryClaims: 0, productKeyClaims: 0, duplicateAmazonClaims: 0, unreadableCards: 0, unclaimedOffers: 0, loadMoreActivations: 0, crossWindowDuplicates: 0, failedClaims: 0, failedWindows: 0 };
     let rangesWithClaims = 0;
+    let pagesRead = 0, firstFailure = null;
     const scopes = [];
+    const pendingWindows = [];
     for (let index = 0; index < selectedWindows.length; index += 1) {
       const timeWindow = selectedWindows[index];
       if (timeWindow.id) await selectTimeWindow(global.document, timeWindow);
@@ -372,35 +407,49 @@
         totalGames: itemsById.size + progress.games
       }), timeWindow.label);
       if (result.diagnostics.sawCards) rangesWithClaims += 1;
-      scopes.push({ ...result.scope, id: timeWindow.id || result.scope.id });
+      if (result.scope) scopes.push({ ...result.scope, id: timeWindow.id || result.scope.id });
+      pagesRead += result.passesRead;
+      firstFailure ??= result.firstFailure;
+      if (result.incomplete) {
+        if (!/^(?:\d{4}|past-3-months)$/u.test(timeWindow.id)) throw new Error('Amazon Games could not identify the unfinished date range. No library changes were saved.');
+        pendingWindows.push(timeWindow.id);
+      }
       for (const item of result.items) {
         if (itemsById.has(item.providerItemId)) totals.crossWindowDuplicates += 1;
         if (!itemsById.has(item.providerItemId) || item.ownership === 'owned') itemsById.set(item.providerItemId, item);
       }
-      for (const key of ['cardsRead', 'otherLibraryClaims', 'productKeyClaims', 'duplicateAmazonClaims', 'unreadableCards', 'unclaimedOffers', 'loadMoreActivations']) {
+      for (const key of ['cardsRead', 'otherLibraryClaims', 'productKeyClaims', 'duplicateAmazonClaims', 'unreadableCards', 'unclaimedOffers', 'loadMoreActivations', 'failedClaims', 'failedWindows']) {
         totals[key] += result.diagnostics[key];
       }
     }
     if (!rangesWithClaims) throw new Error('No readable claim cards were found in any selected date range. Open My Collection, select Games, and wait for it to load.');
+    const items = await global.GalacticAmazonGamesIdentity.consolidate([...itemsById.values()]);
+    const incomplete = totals.failedClaims > 0 || totals.failedWindows > 0;
+    if (incomplete && !items.length) throw firstFailure ?? new Error('Amazon Games could not finish the collection window. No library changes were saved.');
     return {
-      items: await global.GalacticAmazonGamesIdentity.consolidate([...itemsById.values()]),
+      items, incomplete, pagesRead, pendingWindows,
       diagnostics: { ...totals, windowsRead: selectedWindows.length, windowsTotal: selectedWindows.length, rangesWithClaims, emptyRanges: selectedWindows.length - rangesWithClaims, timeWindows: selectedWindows.map((window) => window.label) },
       snapshot: undefined,
       completedScopes: scopes
     };
   }
 
-  async function fetchAmazonGames(reportProgress = () => {}, quickUpdate = false) {
+  async function fetchAmazonGames(reportProgress = () => {}, quickUpdate = false, { retryWindows = [] } = {}) {
     diagnostics = { format: 1, provider: 'amazon-games', state: 'scanning', mode: quickUpdate ? 'quick' : 'full', counters: {} };
     try {
       const result = await scanAmazonGames(progress => {
         diagnostics.counters = Object.fromEntries(Object.entries(progress).filter(([, value]) => typeof value === 'number'));
         reportProgress(progress);
-      }, quickUpdate);
-      if(!quickUpdate)result.snapshot=global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-games',result.items,result.completedScopes);
+      }, quickUpdate, retryWindows);
+      if (result.incomplete) {
+        result.snapshot = { version: 1, provider: 'amazon-games', complete: false, itemCount: result.items.length,
+          scopes: [{ id: 'collection', readCount: result.items.length, expectedCount: null, end: 'partial-acquisition', pagesRead: result.pagesRead, complete: false, limitReached: result.diagnostics.failedWindows > 0 }],
+          recovery: { failedClaims: result.diagnostics.failedClaims, failedWindows: result.diagnostics.failedWindows, windowsChecked: result.diagnostics.windowsRead, pendingWindows: result.pendingWindows } };
+        global.GalacticProviderSnapshot.validateProviderSnapshot('amazon-games', result.items, result.snapshot);
+      } else if(!quickUpdate)result.snapshot=global.GalacticProviderSnapshot.completeProviderSnapshot('amazon-games',result.items,result.completedScopes);
       delete result.completedScopes;
       const {timeWindows, ...counts} = result.diagnostics;
-      diagnostics = { ...diagnostics, state: 'complete', counters: {...counts,evidenceGroups:result.items.length,missingAcquisitionDates:result.items.filter(item=>!item.acquiredAt).length},
+      diagnostics = { ...diagnostics, state: result.incomplete ? 'partial' : 'complete', counters: {...counts,evidenceGroups:result.items.length,missingAcquisitionDates:result.items.filter(item=>!item.acquiredAt).length},
         access: { direct: result.items.filter(item => item.ownership === 'owned').length,
           unconfirmed: result.items.filter(item => item.ownership === 'unknown').length } };
       return result;
