@@ -29,7 +29,7 @@ export function providerContext(provider, fetch, overrides = {}) {
   }
   return context;
 }
-const json = (payload) => ({ ok: true, json: async () => payload });
+const json = (payload) => ({ ok: true, status:200, json: async () => payload });
 const kindlePayload = (items, numberOfItems) => ({ success: true, GetContentOwnershipData: { items, numberOfItems } });
 const book = (asin, title = `Book ${asin}`) => ({ asin, title, originType: 'Purchase' });
 const oldBooks = ['OLD1', 'OLD2'].map((id) => ({ providerItemId: id, title: `Old ${id}`, mediaType: 'book', ownership: 'owned' }));
@@ -359,7 +359,8 @@ export const providerSnapshotTests = [
       id: kindleSender.id, url: 'https://www.fanatical.com/en/orders', tab: { id: 1 }
     });
     assert.equal(response.ok, false);
-    assert.match(response.error, /unreadable or incomplete/u);
+    assert.match(response.error, /purchase could not be read safely/u);
+    assert.equal(response.diagnostic.category,'summary');
     assert.deepEqual(worker.memory.values, before);
   })],
   ['Kobo rejects missing library structure and excessive reported page counts', async () => {

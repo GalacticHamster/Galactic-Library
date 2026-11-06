@@ -1,5 +1,10 @@
 // Bounded, read-only Fanatical MAIN-world scanner. No credentials leave this function.
-export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [] } = {}) {
+export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], diagnostics = false } = {}) {
+  // Diagnostic evidence only: never a receipt or permission to persist purchases.
+  const diagnostic = {version:1,countsAvailable:true,category:'none',stage:'initial-listing',pagesAttempted:0,pagesParsed:0,ordersDiscovered:0,ordersValidated:0,ordersUnresolved:0,detailsAttempted:0,detailsParsed:0,continuationPending:false,acquisitionFinished:false};
+  let contextCategory='listing',failureStage=null;
+  const note=(error,fallback=contextCategory,stage=diagnostic.stage)=>{diagnostic.category=({FANATICAL_AUTH:'authentication',FANATICAL_LIST:'shape',FANATICAL_SCOPE:'scope',FANATICAL_LIMIT:'limit',FANATICAL_SUMMARY:'summary'})[error?.code]??fallback;failureStage=stage;};
+  try {
   const safeTextInPage = (value, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
   const safeIdInPage = (value) => /^[a-zA-Z0-9_-]{6,128}$/u.test(String(value ?? '')) ? String(value) : '';
   const safeDateInPage = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null;
@@ -43,9 +48,9 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   };
   let token = '';
   try { token = String(JSON.parse(localStorage.getItem('bsauth') || '{}')?.token || ''); } catch { /* no signed-in token */ }
-  if (!token) throw new Error('Sign in to Fanatical before importing purchases.');
-  const unreadable = () => new Error('Fanatical returned unreadable or incomplete order data. Your library and scan history were not changed.');
-  const incomplete = (reason) => new Error(`Fanatical scan incomplete; order-history coverage could not be confirmed: ${reason} Your library and scan history were not changed.`);
+  if (!token) throw Object.assign(new Error('Sign in to Fanatical before importing purchases.'),{code:'FANATICAL_AUTH'});
+  const unreadable = () => Object.assign(new Error('Fanatical returned unreadable or incomplete order data. Your library and scan history were not changed.'),{code:'FANATICAL_EXPECTED'});
+  const incomplete = (reason) => Object.assign(new Error(`Fanatical scan incomplete; order-history coverage could not be confirmed: ${reason} Your library and scan history were not changed.`),{code:'FANATICAL_EXPECTED'});
   const scanController = new AbortController();
   const concurrency = 3; const maxAttempts = 3; const maxPages = 1000; const maxOrders = 100000;
   let retries = 0; let cooldownUntil = 0;
@@ -160,20 +165,23 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   };
   while (path) {
     try {
+    diagnostic.stage=pagesFetched?'pagination':'initial-listing';contextCategory='continuation';
     if (visitedPages.has(path)) throw incomplete('Pagination repeated a page.');
-    if (visitedPages.size >= maxPages) throw incomplete('The 1,000-page safety limit was reached.');
+    if (visitedPages.size >= maxPages) throw Object.assign(incomplete('The 1,000-page safety limit was reached.'),{code:'FANATICAL_LIMIT'});
     visitedPages.add(path);
+    diagnostic.stage=pagesFetched?'pagination':'initial-listing';contextCategory='listing';diagnostic.continuationPending=true;diagnostic.pagesAttempted++;
     const { data, headers } = await request(path);
     // Envelopes/query conventions are not guessed from a fabricated contract.
     if (!Array.isArray(data)) throw Object.assign(unreadable(),{code:'FANATICAL_LIST'});
     const pageStart=rawOrders;
-    if(rawOrders+data.length>maxOrders)throw incomplete('The 100,000-order safety limit was reached.');
-    rawOrders+=data.length;pagesFetched++;
+    if(rawOrders+data.length>maxOrders)throw Object.assign(incomplete('The 100,000-order safety limit was reached.'),{code:'FANATICAL_LIMIT'});
+    rawOrders+=data.length;pagesFetched++;diagnostic.pagesParsed=pagesFetched;
     for(const order of data){
-      if(!order||typeof order._id!=='string'||!safeIdInPage(order._id))throw incomplete('Pagination returned an unreadable order.');
-      if(pageOrderIds.has(order._id)){listingIncomplete=true;continue;}
-      pageOrderIds.add(order._id);summaries.push(order);
+      if(!order||typeof order._id!=='string'||!safeIdInPage(order._id))throw Object.assign(incomplete('Pagination returned an unreadable order.'),{code:'FANATICAL_SUMMARY'});
+      if(pageOrderIds.has(order._id)){diagnostic.category='continuation';failureStage=diagnostic.stage;listingIncomplete=true;continue;}
+      pageOrderIds.add(order._id);summaries.push(order);diagnostic.ordersDiscovered=summaries.length;
     }
+    contextCategory='continuation';
     const total = headers?.get('x-total-count');
     if (total !== null && total !== undefined) {
       if (!/^\d+$/u.test(total)) throw unreadable();
@@ -202,12 +210,14 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     } else if ((expectedTotal !== null && summaries.length !== expectedTotal) || (declaredLast && declaredLast !== path)) {
       throw incomplete('Fanatical returned only part of the history without a usable next-page link.');
     }
-    path = links.next || null;
+    path = links.next || null;diagnostic.continuationPending=!!path;
     }catch(error){
+      note(error);
       if(['FANATICAL_AUTH','FANATICAL_LIST'].includes(error?.code)||!summaries.length)throw error;
       listingIncomplete=true;break;
     }
   }
+  diagnostic.stage='summaries';contextCategory='summary';
   const listed = new Set();
   const expectedProducts = new Map();
   const productCounts = (parents) => {
@@ -232,7 +242,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     if (!order || typeof order._id !== 'string' || !safeIdInPage(order._id) || typeof order.status !== 'string' || !/^[A-Z][A-Z_]*$/u.test(order.status) || listed.has(order._id)) throw unreadable();
     listed.add(order._id);
     if (order.status === 'COMPLETE') expectedProducts.set(order._id, productCounts(order.items));
-    }catch{listed.add(order._id);invalidOrders.add(order._id);}
+    }catch{diagnostic.category='summary';failureStage=diagnostic.stage;listed.add(order._id);invalidOrders.add(order._id);diagnostic.ordersUnresolved=invalidOrders.size;}
   }
   const complete = summaries.filter((order) => order.status === 'COMPLETE'||invalidOrders.has(order._id));
   // Only opaque SHA-256 fingerprints leave the page world. This lets a quick
@@ -260,16 +270,18 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   const listedFingerprints = new Set(await boundedMap([...listed], fingerprintOrderInPage));
   const coverageVerified = !listingIncomplete&&(ranged || expectedTotal !== null || linked);
   if (!listingIncomplete && !coverageVerified && known.size && listedFingerprints.size && ![...known].some(fingerprint=>listedFingerprints.has(fingerprint))) {
-    throw new Error('Fanatical purchases do not match this saved account. Check the signed-in account and retry. Your library was not changed.');
+    throw Object.assign(new Error('Fanatical purchases do not match this saved account. Check the signed-in account and retry. Your library was not changed.'),{code:'FANATICAL_SCOPE'});
   }
   if (coverageVerified && [...known].some((fingerprint) => !listedFingerprints.has(fingerprint))) {
-    throw new Error('Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.');
+    throw Object.assign(new Error('Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.'),{code:'FANATICAL_SCOPE'});
   }
   const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ order,fingerprint }) => invalidOrders.has(order._id)||!known.has(fingerprint));
+  diagnostic.stage='details';contextCategory='detail';
   const failedFingerprints=new Set();
   const details = await boundedMap(toInspect, async ({ order: listedOrder, fingerprint }) => {
     try {
     if(invalidOrders.has(listedOrder._id))throw unreadable();
+    diagnostic.detailsAttempted++;
     const { data: order } = await request(`/api/user/orders/${encodeURIComponent(listedOrder._id)}`);
     const projectedItems = [];
     if (!order || order._id !== listedOrder._id || order.status !== 'COMPLETE' || !Array.isArray(order.items) || !order.items.length) throw unreadable();
@@ -290,25 +302,31 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
         }
       }
     }
+    diagnostic.detailsParsed++;diagnostic.ordersValidated++;
     return projectedItems;
     }catch(error){
+      note(error,invalidOrders.has(listedOrder._id)?'summary':'detail',invalidOrders.has(listedOrder._id)?'summaries':diagnostic.stage);
       if(error?.code==='FANATICAL_AUTH')throw error;
-      failedFingerprints.add(fingerprint);return null;
+      failedFingerprints.add(fingerprint);diagnostic.ordersUnresolved=failedFingerprints.size;return null;
     }
   });
+  diagnostic.stage='projection';contextCategory='unknown';
   const items = new Map();
   for (const products of details.filter(Boolean)) for (const product of products){
     const prior=items.get(product.sourceItemId),purchaseOrigins=[...(prior?.purchaseOrigins??[]),...product.purchaseOrigins];
-    if(purchaseOrigins.length>500)throw incomplete('A product exceeded the 500-purchase occurrence limit.');
+    if(purchaseOrigins.length>500)throw Object.assign(incomplete('A product exceeded the 500-purchase occurrence limit.'),{code:'FANATICAL_LIMIT'});
     items.set(product.sourceItemId,{...product,purchaseOrigins});
   }
   let currentToken='';try{currentToken=String(JSON.parse(localStorage.getItem('bsauth')||'{}')?.token||'');}catch{}
-  if(currentToken!==token)throw incomplete('The signed-in account changed during the scan.');
+  if(currentToken!==token)throw Object.assign(incomplete('The signed-in account changed during the scan.'),{code:'FANATICAL_SCOPE'});
   const partial=listingIncomplete||failedFingerprints.size>0;
   const orderFingerprints=completeWithFingerprints.filter(({fingerprint})=>!failedFingerprints.has(fingerprint)).map(({fingerprint})=>fingerprint);
-  if(partial&&!orderFingerprints.length)throw incomplete('No independently validated purchases were available. Try again later.');
+  if(partial&&!orderFingerprints.length){diagnostic.stage=failureStage??diagnostic.stage;contextCategory=diagnostic.category==='none'?'unknown':diagnostic.category;throw incomplete('No independently validated purchases were available. Try again later.');}
+  diagnostic.acquisitionFinished=!partial;
+  if(failureStage)diagnostic.stage=failureStage;
   // `token`, summaries, details, and raw leaves remain in this execution world.
   return {
+    ...(diagnostics?{diagnostic}:{}),
     schemaVersion: 1,
     acquisitionComplete: !partial,
     ...(partial?{recovery:{failedOrderFingerprints:[...failedFingerprints],failedOrders:failedFingerprints.size,listingIncomplete,ordersSkipped:completeWithFingerprints.length-toInspect.length}}:{}),
@@ -319,4 +337,9 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     orderFingerprints,
     items: [...items.values()]
   };
+  } catch(error) {
+    if(!diagnostics)throw error;
+    note(error,error?.code?contextCategory:'unknown');
+    return {fanaticalFailure:1,diagnostic};
+  }
 }

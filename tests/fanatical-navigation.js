@@ -2,22 +2,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../src/providers/fanatical-content.js',import.meta.url),'utf8');
-function fixture(start='/en/orders'){
- const roots=[],events={},polls=[];
+export function fixture(start='/en/orders'){
+ const roots=[],events={},polls=[],reports=[],failures=[];
  class Element{
   constructor(){this.id='';this.dataset={};this.style={};this.listeners={};}
   get isConnected(){return roots.includes(this);}
-  attachShadow(){const buttons=[new Element(),new Element()];buttons[0].dataset.mode='incremental';buttons[1].dataset.mode='full';const status=new Element();this.shadow={buttons,status,querySelectorAll:()=>buttons,querySelector:()=>status};return this.shadow;}
+  attachShadow(){const buttons=[new Element(),new Element()];buttons[0].dataset.mode='incremental';buttons[1].dataset.mode='full';const status=new Element(),exportButton=new Element();this.shadow={buttons,status,exportButton,querySelectorAll:()=>buttons,querySelector:selector=>selector==='[data-export-scan]'?exportButton:status};return this.shadow;}
   addEventListener(name,fn){this.listeners[name]=fn;}
+  click(){return this.listeners.click?.();}
   remove(){const index=roots.indexOf(this);if(index>=0)roots.splice(index,1);}
  }
  const calls=[];let getState=async()=>({ok:true,hasFullBaseline:true}),fetch=async()=>({ok:true,result:{items:[]}}),commit=async()=>({ok:true,gameCount:1,bookCount:0,audiobookCount:0});
- const c={console,location:{href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
+ const c={console,Blob,URL:{createObjectURL:blob=>{reports.push(blob.text());return 'blob:synthetic';},revokeObjectURL(){}},setTimeout:fn=>fn(),location:{href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
   MutationObserver:class{constructor(fn){this.callback=fn;}observe(){}},addEventListener:(name,fn)=>{events[name]=fn;},setInterval:fn=>polls.push(fn),
-  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch():commit();},failed:async()=>{throw Error('Stale failure reporting');}}};
- c.globalThis=c;vm.createContext(c);vm.runInContext(source,c);
+  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch():commit();},failed:async(_,error)=>{failures.push(error.message);}}};
+ c.globalThis=c;vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),c);vm.runInContext(source,c);
  const navigate=(path,signal='poll')=>{c.location.pathname=path;c.location.href='https://www.fanatical.com'+path;if(signal==='poll')polls.forEach(fn=>fn());else events[signal]();};
- return {c,roots,calls,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};
+ return {c,roots,calls,reports,failures,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};
 }
 export const fanaticalNavigationTests=[
  ['Fanatical route controller is loaded for SPA entry pages without adding host permissions',()=>{
@@ -43,7 +44,7 @@ export const fanaticalNavigationTests=[
   f.navigate('/en/bundle/fixture');assert.equal(f.roots.length,0);
   f.navigate('/en/orders');const fresh=f.roots[0];assert.notEqual(fresh,old);
   finish(stage==='state'?{ok:true,hasFullBaseline:true}:stage==='fetch'?{ok:true,result:{items:[]}}:{ok:true,gameCount:1});await pending;
-  assert.equal(fresh.shadow.status.textContent,undefined);
+  assert.equal(fresh.shadow.status.textContent,undefined);assert.equal(f.failures.length,0);
   assert.equal(f.calls.filter(x=>x==='IMPORT_PROVIDER_ITEMS').length,stage==='commit'?1:0);
   assert.equal(f.calls.filter(x=>x==='FETCH_FANATICAL_ORDERS').length,stage==='state'?0:1);
  }])

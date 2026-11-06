@@ -54,5 +54,25 @@
     return [...itemsById.values()];
   }
 
-  global.GalacticFanatical = { fanaticalMediaType, fanaticalItemsFromProjection };
+  const categories=['none','authentication','shape','listing','continuation','summary','detail','limit','scope','unknown','unavailable','validation','storage'];
+  const stages=['initial-listing','pagination','summaries','details','projection','execution','validation','save'];
+  const counters=['pagesAttempted','pagesParsed','ordersDiscovered','ordersValidated','ordersUnresolved','detailsAttempted','detailsParsed'];
+  // Copy only allowlisted fields. Neither this report nor a failure grants save authority.
+  function scanReport(value) {
+    if(value?.version!==1||!categories.includes(value.category)||!stages.includes(value.stage))return null;
+    if(typeof value.countsAvailable!=='boolean')return null;
+    const report={version:1,countsAvailable:value.countsAvailable,category:value.category,stage:value.stage};
+    for(const key of counters){if(!value.countsAvailable&&value[key]===null){report[key]=null;continue;}if(!value.countsAvailable||!Number.isSafeInteger(value[key])||value[key]<0||value[key]>100000)return null;report[key]=value[key];}
+    if(report.pagesParsed>report.pagesAttempted||report.detailsParsed>report.detailsAttempted||report.ordersValidated>report.ordersDiscovered||report.ordersUnresolved>report.ordersDiscovered)return null;
+    for(const key of ['continuationPending','acquisitionFinished']){if(typeof value[key]!=='boolean')return null;report[key]=value[key];}
+    return report;
+  }
+  function failureReport(category='unavailable',stage='execution') {
+    return {version:1,countsAvailable:false,category,stage,...Object.fromEntries(counters.map(key=>[key,null])),continuationPending:false,acquisitionFinished:false};
+  }
+  function failureMessage(category) {
+    const reason={authentication:'Fanatical could not authorize the request. Sign in to Fanatical, then retry.',shape:'Fanatical returned an unrecognized purchase list. Retry later; export the scan report if this continues.',listing:'The purchase list could not be loaded. Retry the import.',continuation:'The next purchase page could not be verified. Retry the import.',summary:'A purchase could not be read safely. Retry later; export the scan report if this continues.',detail:'Purchase details could not be read. Retry the import.',limit:'The scan reached a safety limit. Export the scan report for support.',scope:'The signed-in account or purchase history changed. Check the selected account before retrying.',validation:'The purchase information could not be validated. Retry later; export the scan report if this continues.',storage:'The purchases could not be saved locally. Check available browser storage, then retry.',unknown:'The purchase check stopped unexpectedly. Retry later; export the scan report if this continues.',unavailable:'The purchase check returned no usable result. Reload the Fanatical page, then retry.'};
+    return `${reason[category]??reason.unavailable} No purchases were saved by this attempt; earlier records were kept.`;
+  }
+  global.GalacticFanatical = { fanaticalMediaType, fanaticalItemsFromProjection, scanReport, failureReport, failureMessage };
 }(globalThis));

@@ -10,6 +10,7 @@ import {createAppearanceService} from './appearance.js';
 import '../lib/kindle-contents-scan.js';
 import {reconcileReminderNotifications,REMINDER_ALARM} from './reminder-notifier.js';
 import { readFanaticalOrdersInPage } from '../providers/fanatical-scan.js';
+import '../providers/fanatical.js';
 import { matchItems } from '../lib/matcher.js';
 import {steamTitleStatuses} from '../lib/provider-state.js';
 import { handleExternalApiRequestAsync } from '../lib/external-api.js';
@@ -357,10 +358,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       target: { tabId: sender.tab.id },
       world: 'MAIN',
       func: readFanaticalOrdersInPage,
-      args: [{ fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
+      args: [{ diagnostics:true, fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
     })
-      .then((results) => {if(results?.length!==1)throw new Error('Fanatical scan did not return one complete result.');return sendResponse({ ok: true, result: sanitizeFanaticalProjection(results[0]?.result,{fullScan:request.fullScan===true,knownOrderFingerprints:fanaticalSyncState({knownOrderFingerprints:request.knownOrderFingerprints}).knownOrderFingerprints}) });})
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+      .then((results) => {
+        const tools=globalThis.GalacticFanatical,value=results?.length===1?results[0]?.result:null;
+        const fail=diagnostic=>sendResponse({ok:false,error:tools.failureMessage(diagnostic.category),diagnostic});
+        if(!value)return fail(tools.failureReport());
+        if(value.fanaticalFailure!==undefined)return fail(value.fanaticalFailure===1&&tools.scanReport(value.diagnostic)&&value.diagnostic.category!=='none'&&!value.diagnostic.acquisitionFinished?tools.scanReport(value.diagnostic):tools.failureReport('validation','validation'));
+        try {
+          const result=sanitizeFanaticalProjection(value,{fullScan:request.fullScan===true,knownOrderFingerprints:fanaticalSyncState({knownOrderFingerprints:request.knownOrderFingerprints}).knownOrderFingerprints});
+          return sendResponse({ok:true,result,diagnostic:tools.scanReport(value.diagnostic)});
+        }catch{return fail(tools.failureReport('validation','validation'));}
+      })
+      .catch(() => {const tools=globalThis.GalacticFanatical,diagnostic=tools.failureReport();sendResponse({ok:false,error:tools.failureMessage(diagnostic.category),diagnostic});});
     return true;
   }
 

@@ -45,6 +45,8 @@ If a Fanatical page or individual order cannot be loaded, GL saves independently
 
 A clean headerless order list remains a successful import. It does not authorize moving omitted purchases into earlier-import history. A partial import also leaves the complete Full checkpoint unchanged; only a later complete Full rescan can reconcile omissions. Sign-in failures stop the import and preserve saved purchases.
 
+For troubleshooting, enable **Settings → Troubleshooting → Enable provider diagnostics**, reload Fanatical's Orders page and retry. Open **Scan diagnostics → Export scan report** before reloading again. The report contains only error categories, stages, aggregate counts and the confirmed save outcome, without titles, order identifiers or account details. An unavailable acquisition result has unknown counts; an unconfirmed save means GL did not receive a successful save acknowledgment. Ordinary error messages work with diagnostics turned off.
+
 ## Use remembered accounts
 
 On a provider website, a single connected account eligible for reuse appears as

@@ -11,14 +11,14 @@ import {setTimeout as pause} from 'node:timers/promises';
 import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,runtimeZip} from '../scripts/release.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
-let orders=[fanaticalOrder()],total=null,status=200,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[];
+let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[];
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/api/user/orders')){
   const listing=/^\/api\/user\/orders(?:\?|$)/u.test(req.url),second=req.url.includes('?page=2');if(listing)listRequests++;else detailRequests++;
   res.statusCode=status===200&&(listing&&second&&failPage||!listing&&failedOrders.some(id=>req.url.endsWith(id)))?404:status;
   res.setHeader('Content-Type','application/json');if(listing&&total!==null)res.setHeader('x-total-count',String(total));
   if(listing&&pageSize&&!second)res.setHeader('link','</api/user/orders?page=2>; rel="next"');
-  res.end(JSON.stringify(listing?(pageSize?second?orders.slice(pageSize):orders.slice(0,pageSize):orders):orders.find(o=>req.url.endsWith(o._id))));return;
+  res.end(JSON.stringify(listing&&invalidListing?{unexpected:true}:listing?(pageSize?second?orders.slice(pageSize):orders.slice(0,pageSize):orders):orders.find(o=>req.url.endsWith(o._id))));return;
  }
  res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body><main>Synthetic orders</main><script>localStorage.setItem("bsauth",JSON.stringify({token:"SYNTHETIC-ONLY"}));</script></body></html>');
 });
@@ -26,18 +26,23 @@ await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin='http://
 // Test-only origin substitution, never shipping permissions or application guards.
 const manifest=JSON.parse(files.get('manifest.json'));for(const entry of manifest.content_scripts)entry.matches=entry.matches.map(p=>p==='https://www.fanatical.com/*'?'http://127.0.0.1/*':p);
 manifest.host_permissions.push('http://127.0.0.1/*');files.set('manifest.json',Buffer.from(JSON.stringify(manifest)));
-files.set('src/background/service-worker.js',Buffer.from(files.get('src/background/service-worker.js').toString().replaceAll('https://www.fanatical.com',origin)));
-files.set('src/providers/fanatical-content.js',Buffer.from('const originalAttach=Element.prototype.attachShadow;Element.prototype.attachShadow=function(o){return originalAttach.call(this,{...o,mode:"open"});};\n'+files.get('src/providers/fanatical-content.js').toString()+"\ndocument.documentElement.dataset.testReportUrl=chrome.runtime.getURL('test-report.html');"));
+files.set('src/background/service-worker.js',Buffer.from(files.get('src/background/service-worker.js').toString().replaceAll('https://www.fanatical.com',origin).replace('async function notifyVideoDiagnostics(){',`let fanaticalTestReject='',fanaticalTestWrites=0;const fanaticalTestSet=privateArea.set.bind(privateArea);privateArea.set=async patch=>{if(fanaticalTestReject&&patch.galacticLibraryDatabase)throw Error(fanaticalTestReject+' FAKE_TOKEN FAKE_ACCOUNT FAKE_ORDER FAKE_TITLE https://private.invalid FAKE_STACK');await fanaticalTestSet(patch);if(patch.galacticLibraryDatabase)fanaticalTestWrites++;};chrome.runtime.onMessage.addListener((r,s,reply)=>{if(r?.type==='GL_TEST_FANATICAL_STORAGE'){if(typeof r.reject==='string')fanaticalTestReject=r.reject;reply({writes:fanaticalTestWrites});return false;}});async function notifyVideoDiagnostics(){`)));
+files.set('src/providers/fanatical-content.js',Buffer.from('const originalObjectUrl=URL.createObjectURL;URL.createObjectURL=function(b){b.text().then(t=>{document.documentElement.dataset.testScanExport=t;});return originalObjectUrl.call(this,b);};const originalAttach=Element.prototype.attachShadow;Element.prototype.attachShadow=function(o){return originalAttach.call(this,{...o,mode:"open"});};\n'+files.get('src/providers/fanatical-content.js').toString()+"\ndocument.documentElement.dataset.testReportUrl=chrome.runtime.getURL('test-report.html');"));
 files.set('test-report.html',Buffer.from('<html><body><script type="module" src="test-report.js"></script></body></html>'));
 files.set('test-report.js',Buffer.from(`
 import {createStorageClient,createBackup,parseBackup} from './src/lib/storage.js';
 import {handleExternalApiRequest} from './src/lib/external-api.js';
-try{const c=createStorageClient(r=>chrome.runtime.sendMessage(r));if(new URL(location.href).searchParams.has('reset'))await c.clearDatabase();const db=await c.getDatabase(),items=Object.values(db.providerItems),state=db.providers.fanatical;
+try{
+ if(new URL(location.href).searchParams.has('boundary')){
+  const tab=(await chrome.tabs.query({url:'${origin}/en/orders'})).at(-1);let boundary;
+  try{const entries=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:async()=>{throw Error('FAKE_TOKEN FAKE_ACCOUNT FAKE_ORDER FAKE_TITLE https://private.invalid FAKE_STACK');}});boundary={resolved:true,resultNull:entries[0]?.result===null,hasError:!!entries[0]?.error};}catch{boundary={resolved:false};}
+  document.documentElement.dataset.result=JSON.stringify({boundary});
+ }else{const params=new URLSearchParams(location.search);if(params.has('reject'))await chrome.runtime.sendMessage({type:'GL_TEST_FANATICAL_STORAGE',reject:params.get('reject')});const c=createStorageClient(r=>chrome.runtime.sendMessage(r));if(params.has('reset'))await c.clearDatabase();if(params.has('enableDiagnostics'))await c.saveProviderDiagnosticsEnabled(true);const db=await c.getDatabase(),items=Object.values(db.providerItems),state=db.providers.fanatical;
  const match=items.length?handleExternalApiRequest(db,{type:'MATCH_ITEMS',apiVersion:1,items:[{title:items[0].title,mediaType:'book'}]}).results[0].owned:false;
  const raw=(await chrome.storage.local.get('galacticLibraryDatabase')).galacticLibraryDatabase;
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(raw))))).map(b=>b.toString(16).padStart(2,'0')).join('');
- const backup=parseBackup(createBackup(db));document.documentElement.dataset.result=JSON.stringify({count:items.length,owned:items.filter(i=>i.ownership==='owned').length,history:Object.keys(db.providerHistory).length,fullAt:state.fullSyncAt??null,acquisitionAt:state.syncState?.acquisitionCheckedAt??null,fingerprints:state.syncState?.knownOrderFingerprints??[],failed:state.syncState?.failedOrderFingerprints??[],listingIncomplete:state.syncState?.listingIncomplete===true,digest,health:state.syncHealth?.status,comparisonOwned:match,roundTrip:Object.keys(backup.providerItems).length===items.length});
-}catch(e){document.documentElement.dataset.result=JSON.stringify({error:e.message});}`));
+ const backup=parseBackup(createBackup(db));document.documentElement.dataset.result=JSON.stringify({count:items.length,owned:items.filter(i=>i.ownership==='owned').length,history:Object.keys(db.providerHistory).length,fullAt:state.fullSyncAt??null,acquisitionAt:state.syncState?.acquisitionCheckedAt??null,fingerprints:state.syncState?.knownOrderFingerprints??[],failed:state.syncState?.failedOrderFingerprints??[],listingIncomplete:state.syncState?.listingIncomplete===true,digest,health:state.syncHealth?.status,comparisonOwned:match,work:await chrome.runtime.sendMessage({type:'GL_TEST_FANATICAL_STORAGE'}),roundTrip:Object.keys(backup.providerItems).length===items.length});
+}}catch(e){document.documentElement.dataset.result=JSON.stringify({error:e.message});}`));
 const temporary=await mkdtemp(join(tmpdir(),'gl-fanatical-native-'));let child,driver,session,exited;
 try{
   const profile=join(temporary,'profile'),stage=join(temporary,'extension');await mkdir(profile);await mkdir(stage);
@@ -45,14 +50,15 @@ try{
   const candidates=firefox?[process.env.FIREFOX_BIN,'C:/Program Files/Mozilla Firefox/firefox.exe']:[process.env.CHROME_BIN,'C:/Program Files/Google/Chrome/Application/chrome.exe'];
   if(firefox&&process.platform==='win32'){const location=execFileSync('powershell.exe',['-NoProfile','-Command','(Get-AppxPackage -Name Mozilla.Firefox).InstallLocation'],{windowsHide:true,encoding:'utf8'}).trim();if(location)candidates.push(join(location,'VFS/ProgramFiles/Firefox Package Root/firefox.exe'));}
   let binary;for(const path of candidates.filter(Boolean))try{await access(path);binary=path;break;}catch{}if(!binary)throw Error('Set CHROME_BIN or FIREFOX_BIN.');
-  const port=firefox?await freePort():0;if(firefox)await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("extensions.update.enabled",false);\nuser_pref("toolkit.telemetry.enabled",false);\nuser_pref("network.captive-portal-service.enabled",false);\n`);
+  async function startBrowser(){const port=firefox?await freePort():0;if(firefox)await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("extensions.update.enabled",false);\nuser_pref("toolkit.telemetry.enabled",false);\nuser_pref("network.captive-portal-service.enabled",false);\n`);
   child=spawn(binary,firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe',`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,env:{...process.env,...(firefox?{MOZ_REMOTE_ALLOW_SYSTEM_ACCESS:'1'}:{})},stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});
   exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});driver=firefox?await firefoxMarionette(port):chromePipe(child);
   if(firefox){await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox'}}});const archive=join(temporary,'extension.zip');await writeFile(archive,runtimeZip(files));await driver.send('Addon:Install',{path:archive,temporary:true});
     await driver.send('Marionette:SetContext',{value:'chrome'});
     const granted=await driver.send('WebDriver:ExecuteAsyncScript',{script:'const done=arguments[arguments.length-1];const {ExtensionPermissions}=ChromeUtils.importESModule("resource://gre/modules/ExtensionPermissions.sys.mjs");ExtensionPermissions.add(arguments[0],{permissions:[],origins:["http://127.0.0.1/*"]},WebExtensionPolicy.getByID(arguments[0]).extension).then(()=>done(true),error=>done({error:error.message}));',args:['galactic-library@galactichamster.com'],newSandbox:true});assert.equal(granted.value??granted,true);
     await driver.send('Marionette:SetContext',{value:'content'});
-  }else await driver.send('Extensions.loadUnpacked',{path:stage});
+  }else await driver.send('Extensions.loadUnpacked',{path:stage});}
+  await startBrowser();
   async function evaluate(script){
     if(firefox){const r=await driver.send('WebDriver:ExecuteAsyncScript',{script:'(async()=>{'+script+'})().then(arguments[arguments.length-1],e=>arguments[arguments.length-1]({error:String(e)}));',args:[],newSandbox:false});const value=Object.hasOwn(r,'value')?r.value:r;assert(!value?.error,value?.error);return value;}
     const r=await driver.send('Runtime.evaluate',{expression:'(async()=>{'+script+'})()',awaitPromise:true,returnByValue:true},session);assert(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;
@@ -69,6 +75,7 @@ try{
     return evaluate(`return ${root}.querySelector('.status').textContent;`);
   }
   async function report(){await navigate(reportUrl);return JSON.parse(await wait('return document.documentElement?.dataset.result;','No saved report'));}
+  async function scanReport(){await wait(`return ${root}.querySelector('[data-export-scan]').closest('details').hidden===false;`,'Diagnostic control not visible');await evaluate(`const s=${root};s.querySelector('[data-export-scan]').closest('details').open=true;s.querySelector('[data-export-scan]').click();return true;`);return JSON.parse(await wait('return document.documentElement.dataset.testScanExport;','No aggregate scan report'));}
   const checks=[];
   await page();const reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
   await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);
@@ -81,19 +88,31 @@ try{
   await page();orders=[fanaticalOrder(1)];assert(!/failed/i.test(await sync()));d=await report();assert.equal(d.count,94);assert.equal(d.fingerprints.length,2);assert.equal(d.history,0);
   checks.push('headerless subset preserves absent active ownership and verified skip evidence');
   await page();status=401;assert(/failed/i.test(await sync()));status=200;d=await report();assert.equal(d.count,94);assert.equal(d.history,0);
-  checks.push('genuine authorization failure preserves records and remains visible');
+  await navigate(reportUrl+'?enableDiagnostics=1');await wait('return document.documentElement?.dataset.result;','Diagnostics setting not enabled');await page();status=403;const denied=await sync();assert(/Sign in to Fanatical/.test(denied),denied);let diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.category,'authentication');assert.equal(diagnostic.diagnostic.stage,'initial-listing');assert.equal(diagnostic.saveAttempted,false);assert.equal(diagnostic.committed,false);assert(!/FAKE_|SYNTHETIC-ONLY|order-000|product-|https?:/.test(JSON.stringify(diagnostic)));status=200;
+  checks.push('genuine authorization failure preserves records and exported category contains no private data');
+  invalidListing=true;const malformed=await sync();assert(/unrecognized purchase list/.test(malformed),malformed);diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.category,'shape');assert.equal(diagnostic.committed,false);invalidListing=false;
+  checks.push('installed MAIN controlled shape failure reaches worker and ordinary UI without save');
+  await evaluate("Object.defineProperty(crypto.subtle,'digest',{configurable:true,value:async()=>{throw Error('FAKE_TOKEN FAKE_ACCOUNT FAKE_ORDER FAKE_TITLE https://private.invalid FAKE_STACK');}});return true;");
+  const unexpected=await sync();assert(/stopped unexpectedly/.test(unexpected),unexpected);diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.category,'unknown');assert.equal(diagnostic.diagnostic.stage,'summaries');assert(!diagnostic.saveAttempted&&!diagnostic.committed);assert(!/FAKE_|private.invalid/.test(JSON.stringify(diagnostic)+unexpected));
+  checks.push('actual unexpected MAIN exception returns a private bounded unknown envelope and preserves purchases');
+  await navigate(reportUrl+'?boundary=1');const boundary=JSON.parse(await wait('return document.documentElement?.dataset.result;','No MAIN boundary result')).boundary;
+  if(!firefox){assert(boundary.resolved&&boundary.resultNull,JSON.stringify(boundary));}else assert(boundary.hasError||boundary.resultNull||!boundary.resolved,JSON.stringify(boundary));
+  console.log('MAIN boundary '+JSON.stringify({browser:firefox?'Firefox':'Chrome',...boundary}));checks.push('actual uncontrolled async MAIN throw independently observed');
+  await page();
   await page();total=1;assert(!/failed/i.test(await sync()));d=await report();assert.equal(d.count,47);assert.equal(d.history,47);assert(d.fullAt);const at=d.fullAt;
   await page();total=null;orders=[];assert(!/failed|incomplete/i.test(await sync()));d=await report();assert.equal(d.count,47);assert.equal(d.history,47);assert.equal(d.fullAt,at);
   checks.push('explicit coverage keeps existing reconciliation; empty headerless Full preserves history and complete timestamp');
   await page();assert(!/failed/i.test(await sync('incremental')));d=await report();assert.equal(d.count,47);assert.equal(d.owned,47);assert.equal(d.health,'succeeded');
   checks.push('persisted acquisition checkpoint and comparison visibility survive repeated reloads');
-  async function reset(){await navigate(reportUrl+'?reset=1');await wait('return document.documentElement?.dataset.result;','Reset did not finish');await page();await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);}
+  async function reset(){await navigate(reportUrl+'?reset=1&enableDiagnostics=1');await wait('return document.documentElement?.dataset.result;','Reset did not finish');await page();await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);}
   total=null;orders=Array.from({length:500},(_,i)=>fanaticalOrder(i+1,['book']));failedOrders=[orders[499]._id];await reset();
   let partialMessage=await sync();assert(/Saved 499 Fanatical purchases/.test(partialMessage),partialMessage);assert(!/import failed|repeat.*full/i.test(partialMessage));d=await report();assert.equal(d.count,499);assert.equal(d.failed.length,1);assert.equal(d.fullAt,null);assert(d.acquisitionAt&&d.comparisonOwned&&d.roundTrip);
+  await page();failedOrders=[orders[499]._id];await sync();diagnostic=await scanReport();assert(diagnostic.saveAttempted&&diagnostic.committed);assert.equal(diagnostic.persistence,'committed');assert.equal(diagnostic.diagnostic.ordersUnresolved,1);assert.equal(diagnostic.diagnostic.category,'detail');
   checks.push('initial 499/500 persists 499 owned orders with partial status and no fabricated Full');
+  if(firefox){driver.close();child.kill();}else await driver.send('Browser.close');await exited;driver.close?.();await startBrowser();d=await report();assert.equal(d.count,499);assert.equal(d.failed.length,1);assert(d.roundTrip);checks.push('browser restart retains persisted purchases, retry state and valid backup');
   failedOrders=[];await page();let beforeDetails=detailRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,500);assert.equal(d.failed.length,0);
   checks.push('reload preserves failed-order state; Quick retrieves exactly one missing detail');
-  const rawBefore=d.digest;await page();beforeDetails=detailRequests;const beforeLists=listRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests,beforeDetails);assert.equal(listRequests-beforeLists,1);d=await report();assert.equal(d.digest,rawBefore);
+  const rawBefore=d.digest,writesBefore=d.work.writes;await page();beforeDetails=detailRequests;const beforeLists=listRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests,beforeDetails);assert.equal(listRequests-beforeLists,1);d=await report();assert.equal(d.digest,rawBefore);assert.equal(d.work.writes,writesBefore);
   checks.push('unchanged Quick uses one list, zero details and no catalog rewrite');
   pageSize=499;failPage=true;await reset();partialMessage=await sync();assert(/Some purchase history could not be checked/.test(partialMessage),partialMessage);assert(!/1 purchase couldn't/.test(partialMessage));d=await report();assert.equal(d.count,499);assert(d.listingIncomplete);assert.equal(d.failed.length,0);assert.equal(d.fullAt,null);
   checks.push('failed later page saves 499 earlier orders without inventing a missing-purchase count');
@@ -104,9 +123,14 @@ try{
   checks.push('mixed page and detail failures recover both missing orders without duplicates');
   pageSize=0;orders=orders.slice(0,2);total=2;await page();assert(!/failed/i.test(await sync()));d=await report();assert.equal(d.count,2);assert.equal(d.history,1);assert(d.fullAt);
   checks.push('only later complete Full reconciles absent records after partial recovery');
+  const preserved=d;orders.push(fanaticalOrder(3,['book']));total=3;
+  for(const reason of ['Quota exceeded','Disk write rejected']){
+    await navigate(reportUrl+'?reject='+encodeURIComponent(reason));await wait('return document.documentElement?.dataset.result;','No storage rejection setup');await page();const failed=await sync();assert(/could not confirm/.test(failed),failed);diagnostic=await scanReport();assert(diagnostic.saveAttempted&&!diagnostic.committed);assert.equal(diagnostic.persistence,'unconfirmed');assert(!/FAKE_|private.invalid/.test(JSON.stringify(diagnostic)+failed));d=await report();assert.equal(d.count,preserved.count);assert.equal(d.history,preserved.history);assert.deepEqual(d.fingerprints,preserved.fingerprints);
+  }
+  await navigate(reportUrl+'?reject=');await wait('return document.documentElement?.dataset.result;','Storage rejection not cleared');await page();assert(!/failed/.test(await sync('incremental')));d=await report();assert.equal(d.count,3);checks.push('installed quota/disk failures preserve purchases and retry state; UI/export never claim a save or leak raw errors; retry succeeds');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{
-  if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;await new Promise(done=>server.close(done));
+  driver?.close?.();child?.kill();if(exited)await exited;await new Promise(done=>server.close(done));
   const target=resolve(temporary),base=resolve(tmpdir());if(target.startsWith(base+sep)&&target.slice(base.length+1).startsWith('gl-fanatical-native-'))await rm(target,{recursive:true,force:true,maxRetries:5,retryDelay:200});
 }
