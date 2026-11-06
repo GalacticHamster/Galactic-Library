@@ -76,6 +76,8 @@ export function validateProviderStates(value = {}) {
         if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Humble acquisition check');
       }
       if(provider==='fanatical'){
+        if(state.syncState.failedOrderFingerprints!==undefined){const failed=strings(state.syncState.failedOrderFingerprints,50000,64,'Failed order fingerprints');if(failed.some(id=>!/^[a-f0-9]{64}$/u.test(id)))throw Error('Invalid failed order fingerprint.');result.syncState.failedOrderFingerprints=failed;}
+        if(state.syncState.listingIncomplete!==undefined){if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Fanatical listing status.');if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;}
         if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Fanatical acquisition check');
         const fingerprints=strings(state.syncState.knownOrderFingerprints,50000,64,'Order fingerprints');
         if(fingerprints.some(entry=>!/^[a-f0-9]{64}$/iu.test(entry)))throw new Error('Invalid order fingerprint.');

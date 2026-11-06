@@ -37,12 +37,13 @@
         status.textContent = items.length ? `Saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally...` : 'No new supported Fanatical items; recording the completed check...';
         const response = await globalThis.GalacticSync.send({
           type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
-          scanDiagnostics:{retries:projection.result?.coverage?.retries??0,arrayOnly:projection.result?.coverage?.paginationEvidence==='array-only'},
-          syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [] }, snapshot: projection.result?.snapshot
+          scanDiagnostics:{incomplete:projection.result?.acquisitionComplete===false,failedRequestCount:(projection.result?.recovery?.failedOrders??0)+(projection.result?.recovery?.listingIncomplete?1:0),retries:projection.result?.coverage?.retries??0,arrayOnly:projection.result?.coverage?.paginationEvidence==='array-only'},
+          syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [],...(projection.result?.recovery?{failedOrderFingerprints:projection.result.recovery.failedOrderFingerprints,listingIncomplete:projection.result.recovery.listingIncomplete}:{}) }, snapshot: projection.result?.snapshot
         });
         if(!active())return;
         if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
         const stats = projection.result ?? {};
+        if(stats.recovery){status.textContent=`Saved ${stats.ordersScanned} Fanatical purchase${stats.ordersScanned===1?'':'s'}. ${stats.recovery.failedOrders?`${stats.recovery.failedOrders} purchase${stats.recovery.failedOrders===1?" couldn't":"s couldn't"} be loaded and will be retried by Quick update. `:''}${stats.recovery.listingIncomplete?'Some purchase history could not be checked and will be retried by Quick update. ':''}Earlier purchases were kept.`;return;}
         const scope = fullRescan
           ? `Full rescan read ${stats.ordersScanned ?? 0} completed order${stats.ordersScanned === 1 ? '' : 's'}`
           : `Quick update read ${stats.ordersScanned ?? 0} new completed order${stats.ordersScanned === 1 ? '' : 's'} and skipped ${Math.max(0, (stats.ordersAvailable ?? 0) - (stats.ordersScanned ?? 0))} already checked`;

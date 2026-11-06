@@ -600,6 +600,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const profile=database.providerProfiles[scan.profileId];
     if(provider==='fanatical'&&snapshot?.complete===false){
       validateProviderSnapshot(provider,values,snapshot);
+      if(snapshot.recovery){
+        const recovery=snapshot.recovery,state=syncDetails.syncState??{},known=state.knownOrderFingerprints??[],failed=state.failedOrderFingerprints??[];
+        if(known.length!==recovery.orderFingerprints.length||known.some(id=>!recovery.orderFingerprints.includes(id))||failed.length!==recovery.failedOrderFingerprints.length||failed.some(id=>!recovery.failedOrderFingerprints.includes(id))||Boolean(state.listingIncomplete)!==recovery.listingIncomplete)throw Error('Fanatical retry state does not match the validated acquisition.');
+      }
       syncDetails=fanaticalAcquisitionDetails(profile,syncDetails);
     }
     if(provider==='humble'&&snapshot?.complete===false){
@@ -1027,8 +1031,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   function fanaticalAcquisitionDetails(profile,details){
     const {fullSyncAt,...safe}=details;
     const prior=profile.state.syncState??{};
-    return {...safe,syncState:{...details.syncState,
-      knownOrderFingerprints:[...new Set([...(prior.knownOrderFingerprints??[]),...(details.syncState?.knownOrderFingerprints??[])])],
+    const incoming=details.syncState??{},failed=new Set([...(prior.failedOrderFingerprints??[]),...(incoming.failedOrderFingerprints??[])]);
+    for(const id of incoming.knownOrderFingerprints??[])failed.delete(id);
+    return {...safe,syncState:{...incoming,
+      knownOrderFingerprints:[...new Set([...(prior.knownOrderFingerprints??[]),...(incoming.knownOrderFingerprints??[])])].filter(id=>!failed.has(id)),
+      ...(failed.size?{failedOrderFingerprints:[...failed]}:{}),
       acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}};
   }
   function humbleAcquisitionDetails(profile,details,partialFull=false){
@@ -1055,6 +1062,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     if(provider==='fanatical'&&snapshot.complete===false){
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+      if(snapshot.recovery){const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});}
       return mergeIntoDatabase(provider,values,fanaticalAcquisitionDetails(profile,syncDetails),database,null,beforeSave,completion);
     }
     if(provider==='steam'&&syncDetails.syncState?.applications){
@@ -1166,6 +1174,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='fanatical'&&syncDetails.syncState&&(profile.state.syncState?.acquisitionCheckedAt||syncDetails.syncState.acquisitionCheckedAt)){
+      if(syncDetails.scanDiagnostics?.incomplete||profile.state.syncState?.failedOrderFingerprints?.length||profile.state.syncState?.listingIncomplete){
+        const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
+      }
+      syncDetails=fanaticalAcquisitionDetails(profile,syncDetails);
+    }
     if(provider==='humble'&&syncDetails.syncState){
       if(syncDetails.scanDiagnostics?.incomplete||profile.state.syncState?.failedPurchaseIds?.length){
         const historical=historicalRecords(database,profile.profileId);

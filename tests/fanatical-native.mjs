@@ -11,12 +11,14 @@ import {setTimeout as pause} from 'node:timers/promises';
 import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,runtimeZip} from '../scripts/release.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
-let orders=[fanaticalOrder()],total=null,status=200,detailRequests=0,listRequests=0;
+let orders=[fanaticalOrder()],total=null,status=200,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[];
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/api/user/orders')){
-  const listing=req.url==='/api/user/orders';if(listing)listRequests++;else detailRequests++;
-  res.statusCode=status;res.setHeader('Content-Type','application/json');if(listing&&total!==null)res.setHeader('x-total-count',String(total));
-  res.end(JSON.stringify(listing?orders:orders.find(o=>req.url.endsWith(o._id))));return;
+  const listing=/^\/api\/user\/orders(?:\?|$)/u.test(req.url),second=req.url.includes('?page=2');if(listing)listRequests++;else detailRequests++;
+  res.statusCode=status===200&&(listing&&second&&failPage||!listing&&failedOrders.some(id=>req.url.endsWith(id)))?404:status;
+  res.setHeader('Content-Type','application/json');if(listing&&total!==null)res.setHeader('x-total-count',String(total));
+  if(listing&&pageSize&&!second)res.setHeader('link','</api/user/orders?page=2>; rel="next"');
+  res.end(JSON.stringify(listing?(pageSize?second?orders.slice(pageSize):orders.slice(0,pageSize):orders):orders.find(o=>req.url.endsWith(o._id))));return;
  }
  res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body><main>Synthetic orders</main><script>localStorage.setItem("bsauth",JSON.stringify({token:"SYNTHETIC-ONLY"}));</script></body></html>');
 });
@@ -30,9 +32,11 @@ files.set('test-report.html',Buffer.from('<html><body><script type="module" src=
 files.set('test-report.js',Buffer.from(`
 import {createStorageClient,createBackup,parseBackup} from './src/lib/storage.js';
 import {handleExternalApiRequest} from './src/lib/external-api.js';
-try{const c=createStorageClient(r=>chrome.runtime.sendMessage(r));const db=await c.getDatabase(),items=Object.values(db.providerItems),state=db.providers.fanatical;
+try{const c=createStorageClient(r=>chrome.runtime.sendMessage(r));if(new URL(location.href).searchParams.has('reset'))await c.clearDatabase();const db=await c.getDatabase(),items=Object.values(db.providerItems),state=db.providers.fanatical;
  const match=items.length?handleExternalApiRequest(db,{type:'MATCH_ITEMS',apiVersion:1,items:[{title:items[0].title,mediaType:'book'}]}).results[0].owned:false;
- const backup=parseBackup(createBackup(db));document.documentElement.dataset.result=JSON.stringify({count:items.length,owned:items.filter(i=>i.ownership==='owned').length,history:Object.keys(db.providerHistory).length,fullAt:state.fullSyncAt??null,acquisitionAt:state.syncState?.acquisitionCheckedAt??null,fingerprints:state.syncState?.knownOrderFingerprints??[],health:state.syncHealth?.status,comparisonOwned:match,roundTrip:Object.keys(backup.providerItems).length===items.length});
+ const raw=(await chrome.storage.local.get('galacticLibraryDatabase')).galacticLibraryDatabase;
+ const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(raw))))).map(b=>b.toString(16).padStart(2,'0')).join('');
+ const backup=parseBackup(createBackup(db));document.documentElement.dataset.result=JSON.stringify({count:items.length,owned:items.filter(i=>i.ownership==='owned').length,history:Object.keys(db.providerHistory).length,fullAt:state.fullSyncAt??null,acquisitionAt:state.syncState?.acquisitionCheckedAt??null,fingerprints:state.syncState?.knownOrderFingerprints??[],failed:state.syncState?.failedOrderFingerprints??[],listingIncomplete:state.syncState?.listingIncomplete===true,digest,health:state.syncHealth?.status,comparisonOwned:match,roundTrip:Object.keys(backup.providerItems).length===items.length});
 }catch(e){document.documentElement.dataset.result=JSON.stringify({error:e.message});}`));
 const temporary=await mkdtemp(join(tmpdir(),'gl-fanatical-native-'));let child,driver,session,exited;
 try{
@@ -83,6 +87,23 @@ try{
   checks.push('explicit coverage keeps existing reconciliation; empty headerless Full preserves history and complete timestamp');
   await page();assert(!/failed/i.test(await sync('incremental')));d=await report();assert.equal(d.count,47);assert.equal(d.owned,47);assert.equal(d.health,'succeeded');
   checks.push('persisted acquisition checkpoint and comparison visibility survive repeated reloads');
+  async function reset(){await navigate(reportUrl+'?reset=1');await wait('return document.documentElement?.dataset.result;','Reset did not finish');await page();await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);}
+  total=null;orders=Array.from({length:500},(_,i)=>fanaticalOrder(i+1,['book']));failedOrders=[orders[499]._id];await reset();
+  let partialMessage=await sync();assert(/Saved 499 Fanatical purchases/.test(partialMessage),partialMessage);assert(!/import failed|repeat.*full/i.test(partialMessage));d=await report();assert.equal(d.count,499);assert.equal(d.failed.length,1);assert.equal(d.fullAt,null);assert(d.acquisitionAt&&d.comparisonOwned&&d.roundTrip);
+  checks.push('initial 499/500 persists 499 owned orders with partial status and no fabricated Full');
+  failedOrders=[];await page();let beforeDetails=detailRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,500);assert.equal(d.failed.length,0);
+  checks.push('reload preserves failed-order state; Quick retrieves exactly one missing detail');
+  const rawBefore=d.digest;await page();beforeDetails=detailRequests;const beforeLists=listRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests,beforeDetails);assert.equal(listRequests-beforeLists,1);d=await report();assert.equal(d.digest,rawBefore);
+  checks.push('unchanged Quick uses one list, zero details and no catalog rewrite');
+  pageSize=499;failPage=true;await reset();partialMessage=await sync();assert(/Some purchase history could not be checked/.test(partialMessage),partialMessage);assert(!/1 purchase couldn't/.test(partialMessage));d=await report();assert.equal(d.count,499);assert(d.listingIncomplete);assert.equal(d.failed.length,0);assert.equal(d.fullAt,null);
+  checks.push('failed later page saves 499 earlier orders without inventing a missing-purchase count');
+  failPage=false;await page();beforeDetails=detailRequests;let lists=listRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(listRequests-lists,2);assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,500);assert(!d.listingIncomplete);
+  checks.push('page recovery rereads two listing pages and only the one missing detail');
+  pageSize=2;failPage=true;orders=orders.slice(0,3);failedOrders=[orders[1]._id];await reset();partialMessage=await sync();d=await report();assert.equal(d.count,1);assert(d.listingIncomplete&&d.failed.length===1);
+  failPage=false;failedOrders=[];await page();beforeDetails=detailRequests;assert(!/failed/i.test(await sync('incremental')));assert.equal(detailRequests-beforeDetails,2);d=await report();assert.equal(d.count,3);
+  checks.push('mixed page and detail failures recover both missing orders without duplicates');
+  pageSize=0;orders=orders.slice(0,2);total=2;await page();assert(!/failed/i.test(await sync()));d=await report();assert.equal(d.count,2);assert.equal(d.history,1);assert(d.fullAt);
+  checks.push('only later complete Full reconciles absent records after partial recovery');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{

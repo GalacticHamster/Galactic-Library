@@ -22,11 +22,20 @@
     // persistence only; it must never be treated as a complete snapshot.
     if (provider === 'fanatical' && snapshot?.complete === false) {
       const scope = snapshot.scopes?.[0];
+      const recovery=snapshot.recovery;
+      if(recovery!==undefined){
+        const hashes=value=>Array.isArray(value)&&value.length<=50000&&value.every(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id))&&new Set(value).size===value.length;
+        if(!hashes(recovery?.orderFingerprints)||!hashes(recovery?.failedOrderFingerprints)||!recovery.orderFingerprints.length
+          ||recovery.failedOrders!==recovery.failedOrderFingerprints.length||typeof recovery.listingIncomplete!=='boolean'||!count(recovery.ordersSkipped)
+          ||!recovery.failedOrders&&!recovery.listingIncomplete||recovery.failedOrderFingerprints.some(id=>recovery.orderFingerprints.includes(id))
+          ||recovery.ordersAvailable!==recovery.orderFingerprints.length+recovery.failedOrders||scope?.readCount+recovery.ordersSkipped!==recovery.orderFingerprints.length
+          ||items.some(item=>!item.metadata?.purchaseOrigins?.length||item.metadata.purchaseOrigins.some(origin=>!recovery.orderFingerprints.includes(origin.orderRef))))fail('Invalid Fanatical partial purchase evidence.');
+      }
       if (snapshot.version !== 1 || snapshot.provider !== provider || !Array.isArray(items)
         || !count(snapshot.itemCount) || snapshot.itemCount !== new Set(items.map(item=>String(item?.providerItemId??'').trim())).size
         || !Array.isArray(snapshot.scopes) || snapshot.scopes.length !== 1 || scope?.id !== 'orders'
-        || scope.complete !== false || scope.limitReached !== false || scope.end !== 'acquisition-end'
-        || scope.expectedCount !== null || !count(scope.readCount) || scope.pagesRead !== 1) fail('Invalid Fanatical acquisition receipt.');
+        || scope.complete !== false || scope.limitReached !== false || scope.end !== (recovery?'partial-acquisition':'acquisition-end')
+        || scope.expectedCount !== null || !count(scope.readCount) || (recovery?(!count(scope.pagesRead)||scope.pagesRead<1||scope.pagesRead>1000):scope.pagesRead!==1)) fail('Invalid Fanatical acquisition receipt.');
       return snapshot;
     }
     if (!snapshot || snapshot.version !== 1 || snapshot.provider !== provider || snapshot.complete !== true) fail('A validated complete snapshot is required.');

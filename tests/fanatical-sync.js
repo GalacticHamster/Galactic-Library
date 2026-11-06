@@ -35,8 +35,9 @@ export const fanaticalSyncTests=[
     const entry=order(1);let attempts=0;
     const retry=harness(path=>path==='/api/user/orders'?{status:200,data:[entry]}:++attempts===1?{status:429,headers:{'retry-after':'0'},data:[]}:{status:200,data:entry});
     assert.equal((await retry.scan({fullScan:true})).coverage.retries,1);
+    const counted=harness(path=>path==='/api/user/orders'?{status:200,headers:{'x-total-count':'2'},data:[entry]}:{status:200,data:entry});
+    const partial=await counted.scan({fullScan:true});assert.equal(partial.coverage.complete,false);assert.equal(partial.items.length,1);assert(partial.recovery.listingIncomplete);
     for(const reply of [
-      path=>path==='/api/user/orders'?{status:200,headers:{'x-total-count':'2'},data:[entry]}:{status:200,data:entry},
       ()=>({status:200,headers:{link:'<https://foreign.example/api/user/orders?page=2>; rel="next"'},data:[entry]}),
       path=>({status:200,data:path==='/api/user/orders'?[entry]:{...entry,items:[]}})
     ])await assert.rejects(harness(reply).scan({fullScan:true}),/incomplete|unreadable/);
@@ -52,6 +53,6 @@ fanaticalSyncTests.push(['Fanatical count/range/link acquisition receipts distin
     });
     const result=await run.scan({fullScan:true});assert.equal(result.coverage.complete,true);assert(result.acquisitionComplete);assert.equal(result.coverage.paginationEvidence,evidence);assert.equal(result.items.length,2);
   }
-  const early=harness(path=>path==='/api/user/orders'?{status:200,data:[a],headers:{link:'</api/user/orders?page=2>; rel="next", </api/user/orders?page=3>; rel="last"'}}:{status:200,data:[b]});
-  await assert.rejects(early.scan({fullScan:true}),/only part/);
+  const early=harness(path=>path==='/api/user/orders'?{status:200,data:[a],headers:{link:'</api/user/orders?page=2>; rel="next", </api/user/orders?page=3>; rel="last"'}}:path==='/api/user/orders?page=2'?{status:200,data:[b]}:{status:200,data:path.endsWith(a._id)?a:b});
+  const partial=await early.scan({fullScan:true});assert.equal(partial.coverage.complete,false);assert.equal(partial.items.length,2);assert(partial.recovery.listingIncomplete);
 }]);

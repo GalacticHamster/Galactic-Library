@@ -42,8 +42,14 @@ export async function verifyFirefoxImporters({driver,navigate,evaluate,extension
       console.log(`PASS installed Firefox ${extension.label}: actual MAIN injection scans 200 purchases / 10 pages with private projection and bounded concurrency`);
       total=201;paths.length=0;const quick=await execute({knownOrderFingerprints:full.orderFingerprints});assert.equal(quick.ordersScanned,1);assert.equal(quick.coverage.pagesFetched,11);assert.equal(paths.filter(path=>path.includes('synthetic-order')).length,1);
       console.log(`PASS installed Firefox ${extension.label}: quick MAIN import traverses 11 pages and fetches only the new purchase`);
-      broken=true;assert.equal(await evaluate(`try{const {${extension.exportName}:importer}=await import(${JSON.stringify(extension.module)});const [result]=await chrome.scripting.executeScript({target:{tabId:${tabId}},world:'MAIN',func:importer,args:[{fullScan:true}]});return Boolean(result.error)||result.result===undefined;}catch{return true;}`),true);
-      console.log(`PASS installed Firefox ${extension.label}: broken MAIN pagination returns no importable snapshot`);
+      broken=true;
+      if(extension.label==='GL'){
+        const partial=await execute({fullScan:true});assert.equal(partial.ordersScanned,40);assert.equal(partial.coverage.complete,false);assert.equal(partial.acquisitionComplete,false);assert(partial.recovery.listingIncomplete);assert.equal(partial.items[0].purchaseOrigins.length,40);assert.doesNotMatch(JSON.stringify(partial),/SYNTHETIC-SECRET|synthetic-order-/);
+        console.log('PASS installed Firefox GL: broken MAIN pagination retains 40 validated purchases without complete coverage');
+      }else{
+        assert.equal(await evaluate(`try{const {${extension.exportName}:importer}=await import(${JSON.stringify(extension.module)});const [result]=await chrome.scripting.executeScript({target:{tabId:${tabId}},world:'MAIN',func:importer,args:[{fullScan:true}]});return Boolean(result.error)||result.result===undefined;}catch{return true;}`),true);
+        console.log(`PASS installed Firefox ${extension.label}: broken MAIN pagination returns no importable snapshot`);
+      }
     }
     await evaluate(`await chrome.tabs.remove(${tabId});return true;`);assert.equal(errors.length,0,String(errors[0]));
   }finally{server.closeAllConnections();await new Promise(done=>server.close(done));}

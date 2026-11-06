@@ -19,14 +19,15 @@ export function fanaticalOrder(number=1,types=Array(47).fill('book')) {
   }]};
 }
 export const fanaticalSender={id:'abcdefghijklmnopabcdefghijklmnop',url:'https://www.fanatical.com/en/orders',tab:{id:1}};
-export async function fanaticalWorker(run) {
+export async function fanaticalWorker(run,options={}) {
   return withWorker(async worker=>{
     let orders=[fanaticalOrder()],headers={},detailError=null,token='SYNTHETIC',status=200,responseTransform=value=>value;
-    const paths=[];
+    const paths=[];let reply=null;
     chrome.scripting={executeScript:async({func,args})=>{
       const ctx=vm.createContext({URL,TextEncoder,crypto:webcrypto,AbortController,setTimeout,clearTimeout,
         localStorage:{getItem:()=>JSON.stringify({token})},fetch:async path=>{
           paths.push(path);const listing=path==='/api/user/orders';
+          if(reply){const value=await reply(path);return {ok:value.status===200,status:value.status,headers:new Headers(value.headers??{}),json:async()=>structuredClone(value.data)};}
           if(!listing&&detailError)throw Error(detailError);
           const body=listing?orders:orders.find(order=>path.endsWith(order._id));
           return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>responseTransform(structuredClone(body),listing)};
@@ -44,12 +45,12 @@ export async function fanaticalWorker(run) {
       const p=acquired.projection;assert(p.ok,p.error);
       const request={type:'COMMIT_PROVIDER_SCAN',provider:'fanatical',mode:acquired.full?'full':'incremental',scanToken:acquired.state.scanToken,
         items:globalThis.GalacticFanatical.fanaticalItemsFromProjection(p.result),snapshot:p.result.snapshot,
-        syncState:{knownOrderFingerprints:p.result.orderFingerprints},scanDiagnostics:{arrayOnly:p.result.coverage.paginationEvidence==='array-only',retries:p.result.coverage.retries}};
+        syncState:{knownOrderFingerprints:p.result.orderFingerprints,...(p.result.recovery?{failedOrderFingerprints:p.result.recovery.failedOrderFingerprints,listingIncomplete:p.result.recovery.listingIncomplete}:{})},scanDiagnostics:{incomplete:p.result.acquisitionComplete===false,failedRequestCount:(p.result.recovery?.failedOrders??0)+(p.result.recovery?.listingIncomplete?1:0),arrayOnly:p.result.coverage.paginationEvidence==='array-only',retries:p.result.coverage.retries}};
       return {request,result:await worker.dispatch(request,fanaticalSender)};
     };
-    await run({...worker,paths,acquire,commit,setOrders:value=>{orders=structuredClone(value);},setHeaders:value=>{headers=value;},
+    await run({...worker,paths,acquire,commit,setReply:value=>{reply=value;},setOrders:value=>{orders=structuredClone(value);},setHeaders:value=>{headers=value;},
       setDetailError:value=>{detailError=value;},setStatus:value=>{status=value;},setTransform:value=>{responseTransform=value;},setToken:value=>{token=value;}});
-  });
+  },options);
 }
 export async function fanaticalUsabilityBaseline(){
   let evidence;
@@ -60,11 +61,13 @@ export async function fanaticalUsabilityBaseline(){
     assert.equal(db.providers.fanatical.syncHealth.status,'succeeded');
     const match=handleExternalApiRequest(db,{type:'MATCH_ITEMS',apiVersion:1,items:[{title:items[0].title,mediaType:'book'}]});
     assert.equal(match.results[0].owned,true);
+    const databaseWrites=h.memory.commits.length;
     h.paths.length=0;const quick=await h.acquire('incremental'),again=await h.commit(quick);assert(again.result.ok,again.result.error);
+    assert.equal(h.memory.commits.length,databaseWrites,'Unchanged Quick rewrote the catalog database.');
     assert.equal(quick.full,false);assert.equal(quick.projection.result.ordersScanned,0);assert.equal(h.paths.length,1);
     evidence={supported:items.length,ownership:'47 owned books',history:Object.keys(db.providerHistory).length,comparisonOwned:match.results[0].owned,
       fullDetails:full.projection.result.ordersScanned,quickDetails:quick.projection.result.ordersScanned,quickRequests:h.paths.length};
-  });
+  },{storageEvents:true,concurrentQueries:true});
   return evidence;
 }
 export const fanaticalCoverageTests=[['Fanatical one-purchase/47-product usable import remains visible and incremental',fanaticalUsabilityBaseline]];
@@ -128,12 +131,12 @@ fanaticalCoverageTests.push(
    const empty=await h.pageA.getDatabase();assert.equal(Object.keys(empty.providerItems).length,0);assert.equal(empty.providers.fanatical.fullSyncAt,undefined);
    const quick=await h.acquire('incremental');assert(!quick.full);assert((await h.commit(quick)).result.ok);
  })],
- ['Fanatical malformed orders, identity/multiplicity conflicts and contradictory counts remain fatal before saving',()=>fanaticalWorker(async h=>{
+ ['Fanatical malformed sole orders remain fatal; contradictory counts grant additive authority only',()=>fanaticalWorker(async h=>{
    assert((await h.commit(await h.acquire())).result.ok);const before=await h.pageA.getDatabase();
    for(const transform of [()=>({}), (v,list)=>list?v:{...v,_id:'foreign-order'},(v,list)=>list?v:{...v,items:[]},(v,list)=>{if(!list)v.items[0].bundles[0].games.pop();return v;}]){
      h.setTransform(transform);const a=await h.acquire();assert.equal(a.projection.ok,false);assert.deepEqual((await h.pageA.getDatabase()).providerItems,before.providerItems);
    }
-   h.setTransform(v=>v);h.setHeaders({'x-total-count':'2'});assert.equal((await h.acquire()).projection.ok,false);
+   h.setTransform(v=>v);h.setHeaders({'x-total-count':'2'});const partial=await h.acquire();assert(partial.projection.ok);assert.equal(partial.projection.result.coverage.complete,false);assert(partial.projection.result.recovery.listingIncomplete);
    h.setHeaders({});h.setOrders([fanaticalOrder(2)]);assert.equal((await h.acquire('incremental')).projection.ok,false);
  })],
  ['Fanatical queued commits reject stale leases and storage errors without losing acquisitions or skip state',()=>fanaticalWorker(async h=>{

@@ -39,6 +39,12 @@ If an individual Humble purchase cannot be loaded, GL saves the other validated 
 
 Sign-in errors stop the import and keep saved purchases unchanged. A valid empty purchase list can complete a Full rescan; as with other clean Humble Full scans, missing active records move to earlier-import history.
 
+## Fanatical purchase recovery
+
+If a Fanatical page or individual order cannot be loaded, GL saves independently validated purchases and keeps earlier purchases and history. **Quick update** retries by re-reading the available listing pages while skipping unchanged, validated order details. If a page failed, GL reports unchecked history without guessing how many purchases are missing.
+
+A clean headerless order list remains a successful import. It does not authorize moving omitted purchases into earlier-import history. A partial import also leaves the complete Full checkpoint unchanged; only a later complete Full rescan can reconcile omissions. Sign-in failures stop the import and preserve saved purchases.
+
 ## Use remembered accounts
 
 On a provider website, a single connected account eligible for reuse appears as

@@ -190,7 +190,8 @@ function fanaticalSyncState(value) {
   const knownOrderFingerprints = [...new Set((Array.isArray(value?.knownOrderFingerprints) ? value.knownOrderFingerprints : [])
     .map((fingerprint) => String(fingerprint ?? '').toLocaleLowerCase())
     .filter((fingerprint) => /^[a-f0-9]{64}$/u.test(fingerprint)))].slice(0, 50000);
-  return { knownOrderFingerprints };
+  const failedOrderFingerprints=[...new Set((Array.isArray(value?.failedOrderFingerprints)?value.failedOrderFingerprints:[]).filter(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id)))].slice(0,50000);
+  return { knownOrderFingerprints,...(failedOrderFingerprints.length?{failedOrderFingerprints}:{}),...(value?.listingIncomplete===true?{listingIncomplete:true}:{}) };
 }
 
 // This function is serialized into Fanatical's MAIN world. It is the only
@@ -199,19 +200,27 @@ function fanaticalSyncState(value) {
 function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprints:known=[]}={}) {
   const input = value && typeof value === 'object' ? value : {};
   const coverage=input.coverage;const count=value=>Number.isSafeInteger(value)&&value>=0;
-  if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||input.acquisitionComplete!==true
-    ||typeof coverage?.complete!=='boolean'||coverage.complete!==(coverage.paginationEvidence!=='array-only')
+  const partial=input.acquisitionComplete===false,recovery=input.recovery;
+  if(partial&&(!recovery||!Array.isArray(recovery.failedOrderFingerprints)||recovery.failedOrderFingerprints.length>50000
+    ||recovery.failedOrderFingerprints.some(id=>typeof id!=='string'||!/^[a-f0-9]{64}$/u.test(id))||new Set(recovery.failedOrderFingerprints).size!==recovery.failedOrderFingerprints.length
+    ||recovery.failedOrders!==recovery.failedOrderFingerprints.length||typeof recovery.listingIncomplete!=='boolean'||!count(recovery.ordersSkipped)
+    ||!recovery.failedOrders&&!recovery.listingIncomplete))throw Error('Invalid Fanatical partial recovery evidence.');
+  if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||!partial&&input.acquisitionComplete!==true
+    ||typeof coverage?.complete!=='boolean'||(partial?coverage.complete!==false:coverage.complete!==(coverage.paginationEvidence!=='array-only'))
     ||!count(input.ordersScanned)||!count(input.ordersAvailable)||!count(coverage.listedOrders)||coverage.listedOrders>100000
     ||coverage.listedOrders<input.ordersAvailable||coverage.validatedOrders!==input.ordersScanned
     ||coverage.emptyAccount!==(coverage.listedOrders===0)||!count(coverage.pagesFetched)||coverage.pagesFetched<1||coverage.pagesFetched>1000
     ||!count(coverage.retries)||coverage.concurrency!==3||!['array-only','link','count','range'].includes(coverage.paginationEvidence)
-    ||coverage.expectedTotal!==null&&(!count(coverage.expectedTotal)||coverage.expectedTotal!==coverage.listedOrders)
+    ||coverage.expectedTotal!==null&&(!count(coverage.expectedTotal)||!partial&&coverage.expectedTotal!==coverage.listedOrders)
     ||['count','range'].includes(coverage.paginationEvidence)!==(coverage.expectedTotal!==null)
-    ||coverage.paginationEvidence==='array-only'&&coverage.pagesFetched!==1||coverage.paginationEvidence==='link'&&coverage.pagesFetched<2)throw new Error('Fanatical did not return a complete validated order projection.');
+    ||!partial&&(coverage.paginationEvidence==='array-only'&&coverage.pagesFetched!==1||coverage.paginationEvidence==='link'&&coverage.pagesFetched<2))throw new Error('Fanatical did not return a complete validated order projection.');
   const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
-  if(!Array.isArray(input.orderFingerprints)||input.orderFingerprints.length!==input.ordersAvailable
-    ||knownOrderFingerprints.length!==input.ordersAvailable
-    ||input.ordersScanned!==(fullScan?input.ordersAvailable:knownOrderFingerprints.filter(id=>!known.includes(id)).length))throw new Error('Fanatical returned inconsistent order coverage.');
+  const cleanRecovery=partial?{failedOrderFingerprints:[...recovery.failedOrderFingerprints],failedOrders:recovery.failedOrders,listingIncomplete:recovery.listingIncomplete,ordersSkipped:recovery.ordersSkipped}:null;
+  const expectedFingerprints=input.ordersAvailable-(partial?recovery.failedOrders:0);
+  if(!Array.isArray(input.orderFingerprints)||input.orderFingerprints.length!==expectedFingerprints
+    ||knownOrderFingerprints.length!==expectedFingerprints
+    ||input.ordersScanned!==(fullScan?expectedFingerprints:knownOrderFingerprints.filter(id=>!known.includes(id)).length)
+    ||partial&&(knownOrderFingerprints.length!==input.ordersScanned+recovery.ordersSkipped||fullScan&&recovery.ordersSkipped!==0||recovery.failedOrderFingerprints.some(id=>knownOrderFingerprints.includes(id))))throw new Error('Fanatical returned inconsistent order coverage.');
   const items = [];
   for (const candidate of Array.isArray(input.items) ? input.items : []) {
     const sourceItemId = String(candidate?.sourceItemId ?? '').trim();
@@ -233,15 +242,18 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
       ,...(candidate?.purchaseOrigins!==undefined?{purchaseOrigins:validatePurchaseOrigins(candidate.purchaseOrigins)}:{})
     });
   }
+  if(partial&&items.some(item=>!item.purchaseOrigins?.length||item.purchaseOrigins.some(origin=>!knownOrderFingerprints.includes(origin.orderRef))))throw Error('Fanatical partial items do not belong to validated orders.');
   return {
     ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),
     orderFingerprints: knownOrderFingerprints,
-    acquisitionComplete:true,
+    acquisitionComplete:!partial,
+    ...(partial?{recovery:cleanRecovery}:{}),
     coverage:{complete:coverage.complete,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
     items: [...items.reduce((map,item)=>{const prior=map.get(item.sourceItemId);map.set(item.sourceItemId,{...item,...(item.purchaseOrigins||prior?.purchaseOrigins?{purchaseOrigins:mergePurchaseOrigins(prior?.purchaseOrigins??[],item.purchaseOrigins??[])}:{})});return map;},new Map()).values()],
     snapshot: !coverage.complete ? {version:1,provider:'fanatical',complete:false,itemCount:new Set(items.map(item=>item.sourceItemId)).size,
-      scopes:[{id:'orders',readCount:input.ordersScanned,expectedCount:null,end:'acquisition-end',pagesRead:1,complete:false,limitReached:false}]}
+      ...(partial?{recovery:{...cleanRecovery,orderFingerprints:knownOrderFingerprints,ordersAvailable:input.ordersAvailable}}:{}),
+      scopes:[{id:'orders',readCount:input.ordersScanned,expectedCount:null,end:partial?'partial-acquisition':'acquisition-end',pagesRead:partial?coverage.pagesFetched:1,complete:false,limitReached:false}]}
       : fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined
   };
 }
