@@ -49,10 +49,16 @@ try{
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-gog-epic-native-'));let child,driver,session,exited;
 async function stopBrowser(){
-  // Terminate only the process spawned by this test, never other Firefox windows.
-  driver?.close?.();
-  if(child&&child.exitCode===null&&child.signalCode===null)child.kill();
-  if(exited){let timer;try{await Promise.race([exited,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Test browser did not exit within five seconds.')),5000);})]);}finally{clearTimeout(timer);}}
+  // Let the owned browser flush its profile. Wait for process exit, not a
+  // Marionette Quit reply, which may be lost when its connection closes.
+  let command,error,timer;
+  if(child&&child.exitCode===null&&child.signalCode===null)command=driver.send(firefox?'Marionette:Quit':'Browser.close',firefox?{flags:['eForceQuit']}:{}).catch(e=>{error=e;});
+  try{
+    if(exited)await Promise.race([exited,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Test browser did not exit within five seconds.')),5000);})]);
+  }catch(e){child?.kill();throw e;}
+  finally{clearTimeout(timer);driver?.close?.();}
+  await command;
+  if(error&&!/Firefox connection closed|Chrome exited|ECONNRESET/u.test(error.message))throw error;
 }
 try{
   const profile=join(temporary,'profile'),stage=join(temporary,'extension');await mkdir(profile);await mkdir(stage);
@@ -89,7 +95,7 @@ try{
   let reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
   let d=await read(reportUrl);assert.equal(d.error,undefined);assert.equal(d.count,499);assert.equal(d.owned,499);assert.equal(d.fullAt,null);assert(d.roundTrip);const refs=d.refs;
   console.log('PASS '+provider+' installed: initial 499/500 partial acquisition committed without full checkpoint; backup roundtrip');
-  if(firefox)await stopBrowser();else{await driver.send('Browser.close');await stopBrowser();}
+  await stopBrowser();
   await startBrowser();
   if(provider==='gog'){
     await open('?server');reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');status=await sync();assert.match(status,/503.*Try again later/);assert.doesNotMatch(status,/Sign in|signed in/);assert.deepEqual((await read(reportUrl)).refs,refs);console.log('PASS gog installed: server503 gives retry-later guidance and preserves all saved records');
