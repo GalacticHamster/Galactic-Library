@@ -233,13 +233,14 @@ may require granting GL access to the PlayStation Library site.
 
 ## Epic session recovery
 
-Epic offers **Sync Epic library**, a complete library check; it has no separate
+Epic offers **Sync Epic library**, which checks its supported listing; it has no separate
 Quick update. Choose the correct saved account and sync normally.
 
 Epic can display a signed-in account while rejecting library access. If GL
 suggests **My Achievements**, open it through Epic's profile menu, then select
 **Sync Epic library** again. This has restored access in live testing, but its
-cause is unresolved. GL does not visit account pages or retry authorization
+cause is unresolved. If navigation does not help, sign in again and retry.
+GL does not visit account pages or retry authorization
 failures automatically. Other sign-in errors use the normal Epic sign-in
 instructions; a CAPTCHA is not assumed.
 
@@ -516,7 +517,7 @@ If a page or individual entry cannot be read, GL saves the readable games and ke
 
 For GOG, select **Quick update** to recover. After an interrupted scan, GL rereads the library pages, including hidden games where reported, before returning to its usual newest-first stopping behavior. No separate game-detail requests are needed. **Full rescan** remains available for complete reconciliation.
 
-Epic retains its single **Sync Epic library** action. Select it again to retry the cursor-based listing; there is no separate Quick mode or per-game metadata request. A completed Sync retains its existing reconciliation behavior.
+Epic retains its single **Sync Epic library** action. Select it again to retry the cursor-based listing; there is no separate Quick mode or per-game metadata request. A normally finished listing reports success and keeps earlier games that Epic did not return. It does not prove that Epic exposed every historical entitlement or that an unseen purchase was revoked. Identical repeated records are counted once; conflicting product definitions, unreadable entries and interrupted pagination still produce a partial-import warning. Scan diagnostics distinguish repeated records from conflicts and cursor problems without including product identifiers.
 
 Explicit sign-in rejection or an unreadable overall response stops the import without publishing partial results. If no readable games are returned, earlier records are kept; an empty response does not clear the library. Neither provider requires a new account confirmation step for recovery.
 

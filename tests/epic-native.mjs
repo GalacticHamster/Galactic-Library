@@ -17,6 +17,9 @@ for(const path of ['src/background/service-worker.js','src/background/epic-auth-
 const fixture=`
 const attach=Element.prototype.attachShadow;Element.prototype.attachShadow=function(options){return attach.call(this,{...options,mode:'open'});};
 const create=URL.createObjectURL;URL.createObjectURL=function(blob){blob.text().then(text=>{document.documentElement.dataset.exportedReport=text;});return create.call(this,blob);};
+// Capture the real export contents above without writing synthetic reports to
+// the user's default Downloads directory from this disposable browser.
+const click=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){if(this.download&&this.href.startsWith('blob:'))return;return click.call(this);};
 globalThis.fixtureRequests=0;
 globalThis.fetch=async(url,options)=>{
  if(url!=='/graphql')throw Error('Unexpected fixture request');globalThis.fixtureRequests++;document.documentElement.dataset.fixtureRequests=String(globalThis.fixtureRequests);
@@ -57,6 +60,7 @@ try{
   async function startBrowser(){
   const port=firefox?await freePort():0;if(firefox)await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("extensions.update.enabled",false);\nuser_pref("toolkit.telemetry.enabled",false);\nuser_pref("network.captive-portal-service.enabled",false);\n`);
   child=spawn(binary,firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe',`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});
+  child.stdout?.resume();child.stderr?.resume();
   exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});driver=firefox?await firefoxMarionette(port):chromePipe(child);
   if(firefox){await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox'}}});const archive=join(temporary,'extension.zip');await writeFile(archive,runtimeZip(files));await driver.send('Addon:Install',{path:archive,temporary:true});
     await driver.send('Marionette:SetContext',{value:'chrome'});

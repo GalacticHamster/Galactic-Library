@@ -71,7 +71,7 @@ export const providerFullStartTests=[
    const after=await h.writer.getDatabase(),prior=Object.values(after.providerItems).find(i=>i.providerItemId===raw.providerItemId);
    s=await begin(h,p);await finish(h,p,s,[added]);assert.equal(h.counts.databaseWrites,2);
    const missing=await h.writer.getDatabase();
-   if(consoleProvider(p)){assert(missing.providerItems[prior.id]);assert.equal(missing.providerItems[prior.id].observedAt,prior.observedAt);}
+   if(consoleProvider(p)||p==='epic'){assert(missing.providerItems[prior.id]);assert.equal(missing.providerItems[prior.id].observedAt,prior.observedAt);}
    else{assert(!missing.providerItems[prior.id]);assert.equal(missing.providerHistory[prior.recordRef].item.observedAt,prior.observedAt);}
    s=await begin(h,p);await finish(h,p,s,[{...raw,title:'Changed metadata'},added]);
    const restored=await h.writer.getDatabase();

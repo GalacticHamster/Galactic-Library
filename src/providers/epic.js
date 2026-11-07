@@ -15,7 +15,7 @@
   function failure(kind,httpStatus=null,upstreamStatus=null){
     if(diagnostics&&!diagnostics.firstFailure)diagnostics.firstFailure={stage:'library',kind,httpStatus,upstreamStatus,...pageState()};
     const librarySession=kind==='authorization'&&httpStatus===200&&upstreamStatus===401;
-    const error=Error(librarySession?"Epic's library isn't accepting requests right now, even if the site shows you as signed in. Try opening My Achievements from Epic's profile menu, then select Sync Epic library again. Your saved library hasn't changed.":['authorization','forbidden'].includes(kind)?sessionMessage:kind==='network'?'Epic Games could not connect to its library. Check your connection and retry. Your saved library is unchanged.':'Epic Games could not read your library. Retry later. Your saved library is unchanged.');
+    const error=Error(librarySession?"Epic did not authorize the library request, even if the site shows you as signed in. Open My Achievements from Epic's profile menu, then retry Sync Epic library. If that does not work, sign in again and retry. Your saved library hasn't changed.":['authorization','forbidden'].includes(kind)?sessionMessage:kind==='network'?'Epic Games could not connect to its library. Check your connection and retry. Your saved library is unchanged.':'Epic Games could not read your library. Retry later. Your saved library is unchanged.');
     error.epicFailure=librarySession?'library-session':kind;return error;
   }
   function upstreamStatus(errors){
@@ -131,43 +131,60 @@
     if (Array.isArray(body?.errors) && body.errors.length){const status=upstreamStatus(body.errors);throw failure(status===401?'authorization':status===403?'forbidden':'graphql',response.status,status);}
     const library = body?.data?.Library?.libraryItems;
     if (!Array.isArray(library?.records) || !library.responseMetadata || !Object.hasOwn(library.responseMetadata, 'nextCursor')) throw Object.assign(new Error('Epic Games Store returned a malformed library page; no library changes were saved.'),{fatal:true});
-    if (library.responseMetadata.nextCursor !== null && typeof library.responseMetadata.nextCursor !== 'string') throw new Error('Epic Games Store returned an invalid library cursor.');
+    if (library.responseMetadata.nextCursor !== null && (typeof library.responseMetadata.nextCursor !== 'string' || library.responseMetadata.nextCursor!==''&&!library.responseMetadata.nextCursor.trim())) throw failure('invalid-cursor',response.status);
     return body;
   }
 
   async function fetchEpicGames(reportProgress = () => {}) {
     if(reading)throw Error('An Epic library check is already running. Wait for it to finish.');
     reading=true;
-    diagnostics={format:1,provider:'epic',operation:'complete-library',requestsMade:0,pagesRead:0,httpStatuses:{},firstFailure:null,...pageState(),automaticRetries:0,saveState:'not-requested'};
+    diagnostics={format:1,provider:'epic',operation:'complete-library',requestsMade:0,pagesRead:0,httpStatuses:{},firstFailure:null,...pageState(),automaticRetries:0,saveState:'not-requested',incomplete:false,failedItems:0,duplicateRecords:0,conflictingIds:0,incompleteReasons:[],terminal:null};
     try{
       const itemsById = new Map();
       const skippedIds = new Set();
       const seenCursors = new Set();
+      const definitions = new Map(),conflicts = new Set();
+      const markIncomplete=kind=>{incomplete=true;if(!diagnostics.incompleteReasons.includes(kind))diagnostics.incompleteReasons.push(kind);};
       let cursor = null;
       let pagesRead = 0;
-      let recordsRead = 0,incomplete=false,failedItems=0;
+      let recordsRead = 0,incomplete=false,failedItems=0,terminalReached=false;
       try { do {
-        if (pagesRead >= MAX_PAGES) throw new Error(`Epic Games Store reached the ${MAX_PAGES}-page limit before the end of the library.`);
-        if (cursor && seenCursors.has(cursor)) throw new Error('Epic Games Store repeated a library page. Please try again later.');
+        if (pagesRead >= MAX_PAGES) throw failure('page-limit');
+        if (cursor && seenCursors.has(cursor)) throw failure('cursor-loop');
         if (cursor) seenCursors.add(cursor);
         reportProgress({ pagesRead, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
         const page = await fetchLibraryPage(cursor);
         recordsRead += page.data.Library.libraryItems.records.length;
         const records=page.data.Library.libraryItems.records;
-        const valid=records.filter(record=>{const ok=record&&typeof record==='object'&&((record.namespace==='ue'||record.sandboxType==='PRIVATE')||(String(record.catalogItem?.id??record.catalogItemId??'').trim()&&String(record.catalogItem?.id??record.catalogItemId??'').trim().length<=500&&typeof record.catalogItem?.title==='string'&&record.catalogItem.title.replace(/\s+/gu,' ').trim().length<=500&&record.catalogItem.title.trim()));if(!ok){incomplete=true;failedItems++;}return ok;});
-        const { items, skipped } = epicItemsFromLibraryPage({data:{Library:{libraryItems:{records:valid}}}});
-        if(items.some(item=>itemsById.has(item.providerItemId)))incomplete=true;
-        for (const item of items) itemsById.set(item.providerItemId, item);
-        for (const id of skipped) skippedIds.add(id);
+        const valid=records.filter(record=>{const ok=record&&typeof record==='object'&&((record.namespace==='ue'||record.sandboxType==='PRIVATE')||(String(record.catalogItem?.id??record.catalogItemId??'').trim()&&String(record.catalogItem?.id??record.catalogItemId??'').trim().length<=500&&typeof record.catalogItem?.title==='string'&&record.catalogItem.title.replace(/\s+/gu,' ').trim().length<=500&&record.catalogItem.title.trim()));if(!ok){markIncomplete('invalid-entry');failedItems++;}return ok;});
+        // Deduplicate equivalent observations within and across pages. A
+        // conflicting definition is unresolved evidence, never last-write-wins.
+        for(const record of valid){
+          const {items,skipped}=epicItemsFromLibraryPage({data:{Library:{libraryItems:{records:[record]}}}});
+          for(const id of skipped)skippedIds.add(id);
+          for (const item of items) {
+            const id=item.providerItemId,namespace=record.namespace??null;
+            const definition=JSON.stringify({...item,platform:[...item.platform].sort(),namespace});
+            if(definitions.has(id)){
+              diagnostics.duplicateRecords++;
+              if(definitions.get(id)!==definition){
+                if(!conflicts.has(id)){conflicts.add(id);diagnostics.conflictingIds++;failedItems++;}
+                itemsById.delete(id);markIncomplete('conflicting-entry');
+              }
+            }else definitions.set(id,definition);
+            if(!conflicts.has(id))itemsById.set(id,item);
+          }
+        }
         pagesRead += 1;diagnostics.pagesRead=pagesRead;
         reportProgress({ pagesRead, games: [...itemsById.values()].filter((item) => item.mediaType === 'game').length });
         cursor = nextCursorFromPage(page);
+        terminalReached=cursor===null||cursor==='';
       } while (cursor);
-      }catch(error){if(error.fatal||['authorization','forbidden','library-session','unreadable'].includes(error.epicFailure))throw error;incomplete=true;}
+      }catch(error){if(error.fatal||['authorization','forbidden','library-session','unreadable'].includes(error.epicFailure))throw error;markIncomplete(error.epicFailure??'acquisition');}
       if (![...itemsById.values()].some((item) => item.mediaType === 'game')&&(!incomplete||!itemsById.size)) throw new Error('Epic Games Store returned no readable games. Confirm that this signed-in account has games in its library.');
       const items = [...itemsById.values()];
       const snapshot=incomplete?{version:1,provider:'epic',complete:false,itemCount:items.length,scopes:[{id:'library',readCount:items.length,expectedCount:null,end:'partial-acquisition',pagesRead,complete:false,limitReached:false}],recovery:{failedItems}}:global.GalacticProviderSnapshot.completeProviderSnapshot('epic', items, [global.GalacticProviderSnapshot.completedScope('library', recordsRead, null, 'pagination-end', pagesRead)]);
-      if(incomplete)Object.assign(diagnostics,{incomplete:true,failedItems});
+      Object.assign(diagnostics,{incomplete,failedItems,recordsRead,terminal:terminalReached?'cursor-exhausted':null});
       return { items, skippedCount: skippedIds.size, snapshot,incomplete,failedItems };
     }catch(error){if(!diagnostics.firstFailure)diagnostics.firstFailure={stage:'library-validation',kind:'validation',httpStatus:null,upstreamStatus:null,...pageState()};throw error;}
     finally{reading=false;}

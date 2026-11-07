@@ -1178,6 +1178,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       const {fullSyncAt,...safe}=syncDetails;
       return mergeIntoDatabase(provider,values,{...safe,scanDiagnostics:{...safe.scanDiagnostics,incomplete:true}},database,null,beforeSave,completion);
     }
+    // Epic's explicit cursor exhaustion finishes the supported enumeration;
+    // it does not establish that an omitted entitlement was revoked. Preserve
+    // unseen purchases while retaining the validated Full/check receipt.
+    if(provider==='epic')return mergeIntoDatabase(provider,values,{...syncDetails,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},authoritativeDatabase,null,beforeSave,completion);
     if(provider==='humble'&&snapshot.complete===false){
       const database=authoritativeDatabase??await getDatabase(),profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
       const historical=historicalRecords(database,profile.profileId);
@@ -1349,7 +1353,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(provider==='audible')incoming=enrichAudibleRecords(database,profile.profileId,incoming,audible.history);
     const unique = new Map(incoming.map((item) => [item.id, item]));
     const syncHealth=successfulSyncHealth(database,provider,[...unique.values()],false,syncDetails);
-    if(['amazon-games','steam','fanatical','humble','fandango-at-home','audible','kobo'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
+    if(['amazon-games','steam','fanatical','humble','fandango-at-home','audible','kobo','epic'].includes(provider)&&syncDetails.syncMode==='full')syncHealth.mode='full';
     reconcileMediaChanges(database,incoming);
     database.providerItems = { ...database.providerItems, ...Object.fromEntries(unique) };
     for(const [ref,entry]of Object.entries(database.providerHistory))if(entry.item.provider===provider&&entry.item.profileId===profile.profileId&&unique.get(entry.item.id)?.recordRef===ref)delete database.providerHistory[ref];

@@ -5,6 +5,7 @@ import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {ownershipCorrectionTarget} from '../src/ui/quick-access.js';
 import {handleExternalApiRequest} from '../src/lib/external-api.js';
 import {performanceWriter,syntheticProviderLibrary} from './provider-performance-fixture.js';
+import {epicValidationTests} from './epic-validation.js';
 
 const plain=v=>JSON.parse(JSON.stringify(v));
 const product=id=>({id,title:`Synthetic recovery game ${id}`});
@@ -18,7 +19,7 @@ async function save(w,provider,result,mode='full'){
  const r=await w.dispatch({type:'COMMIT_PROVIDER_SCAN',provider,scanToken:start.scanToken,mode,items:result.items,snapshot:result.snapshot,scanDiagnostics:{incomplete:result.incomplete===true}},sender(provider));return {start,result:r};
 }
 const rows=(db,p)=>Object.values(db.providerItems).filter(i=>i.provider===p);
-export const gogEpicRecoveryTests=[];
+export const gogEpicRecoveryTests=[...epicValidationTests];
 for(const provider of ['gog','epic']){
  gogEpicRecoveryTests.push([`${provider} recovery: 499 validated records survive later HTTP failure; reload/restore/retry`,()=>withWorker(async w=>{
   const ids=Array.from({length:499},(_,i)=>i+1);
@@ -43,10 +44,17 @@ for(const provider of ['gog','epic']){
  gogEpicRecoveryTests.push([`${provider} recovery: partial omissions, historical records, manual corrections and unrelated providers stay intact`,()=>withWorker(async w=>{
   assert((await save(w,provider,await acquire(provider,()=>json(page(provider,[1,2]))))).result.ok);
   assert((await save(w,provider,await acquire(provider,()=>json(page(provider,[1]))))).result.ok);
+  if(provider==='epic'){
+   // A legacy backup may already contain an earlier historical transition.
+   // Current Epic enumeration must preserve it during a partial retry.
+   const legacy=await w.pageA.getDatabase(),item=rows(legacy,provider).find(i=>i.providerItemId==='2');
+   legacy.providerHistory[item.recordRef]={item,profileLabel:'Synthetic',reason:'missing-from-complete-scan',missingSince:'2026-01-01'};delete legacy.providerItems[item.id];
+   await w.pageA.restoreDatabase(parseBackup(createBackup(legacy)));
+  }
   let db=await w.pageA.getDatabase();await w.pageA.saveOwnershipCorrections([ownershipCorrectionTarget(rows(db,provider)[0],db)],{ownership:'returned',note:'Synthetic correction'});
   await w.pageA.mergeProviderItems('steam',[{providerItemId:'42',title:'Unrelated game',mediaType:'game',ownership:'owned'}]);db=await w.pageA.getDatabase();const before=plain(db);
   const partial=await acquire(provider,n=>n===1?json(page(provider,[2,3],'next')):{ok:false,status:503});const saved=await save(w,provider,partial);assert(saved.result.ok,saved.result.error);db=await w.pageB.getDatabase();assert.deepEqual(rows(db,provider).map(i=>i.providerItemId).sort(),['1','3']);assert.deepEqual(db.providerHistory,before.providerHistory);assert.deepEqual(db.ownershipReviews,before.ownershipReviews);assert.deepEqual(db.providerItems['steam:42'],before.providerItems['steam:42']);assert.equal(db.providers[provider].fullSyncAt,before.providers[provider].fullSyncAt);
-  assert((await save(w,provider,await acquire(provider,()=>json(page(provider,[3]))))).result.ok);db=await w.pageB.getDatabase();assert.deepEqual(rows(db,provider).map(i=>i.providerItemId),['3']);assert(Object.values(db.providerHistory).some(entry=>entry.item.provider===provider&&entry.item.providerItemId==='1'));
+  assert((await save(w,provider,await acquire(provider,()=>json(page(provider,[3]))))).result.ok);db=await w.pageB.getDatabase();assert.deepEqual(rows(db,provider).map(i=>i.providerItemId).sort(),provider==='epic'?['1','3']:['3']);assert.equal(Object.values(db.providerHistory).some(entry=>entry.item.provider===provider&&entry.item.providerItemId==='1'),provider!=='epic');
  })]);
  gogEpicRecoveryTests.push([`${provider} recovery: empty/all malformed remains safe; forged partial receipts rejected`,()=>withWorker(async w=>{
   await assert.rejects(acquire(provider,()=>json(page(provider,[]))));
@@ -66,9 +74,9 @@ for(const provider of ['gog','epic']){
    assert.equal(after.providers[provider].fullSyncAt,db.providers[provider].fullSyncAt);
   }
  }]);
- gogEpicRecoveryTests.push([`${provider} recovery: duplicate IDs and invalid records cannot certify complete coverage`,async()=>{
+ gogEpicRecoveryTests.push([`${provider} recovery: duplicate observations and invalid records have distinct outcomes`,async()=>{
   const first=page(provider,[1],'next'),second=page(provider,[1,2]);if(provider==='gog'){first.totalProducts=3;second.totalPages=2;second.totalProducts=3;}
-  const result=await acquire(provider,n=>json(n===1?first:second));assert.equal(result.items.length,2);assert.equal(result.snapshot.complete,false);
+  const result=await acquire(provider,n=>json(n===1?first:second));assert.equal(result.items.length,2);assert.equal(result.snapshot.complete,provider==='epic');
   const malformed=page(provider,[1]);if(provider==='gog')malformed.products.push(null,{id:4,title:'x'.repeat(501)});else malformed.data.Library.libraryItems.records.push(null,{catalogItem:{id:'4',title:'x'.repeat(501)}});
   const valid=await acquire(provider,()=>json(malformed));assert.equal(valid.items.length,1);assert.equal(valid.failedItems,2);
  }]);
