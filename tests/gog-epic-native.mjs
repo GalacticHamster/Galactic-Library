@@ -21,6 +21,7 @@ globalThis.fixtureRequests=0;
 globalThis.fetch=async(url,options)=>{
  globalThis.fixtureRequests++;document.documentElement.dataset.fixtureRequests=String(globalThis.fixtureRequests);
  const gog=${JSON.stringify(provider)}==='gog',partial=location.search.includes('partial'),auth=location.search.includes('auth'),broken=location.search.includes('broken'),malformed=location.search.includes('malformed'),duplicate=location.search.includes('duplicate');
+ if(gog&&location.search.includes('server'))return {ok:false,status:503};
  const index=gog?Number(new URL(url,location.href).searchParams.get('page'))-1:Number(JSON.parse(options.body).variables.cursor||0);
  if(index===1&&(partial||auth))return {ok:false,status:auth?401:503};
  const ids=index===0?Array.from({length:499},(_,i)=>String(i+1)):['500'];
@@ -90,6 +91,9 @@ try{
   console.log('PASS '+provider+' installed: initial 499/500 partial acquisition committed without full checkpoint; backup roundtrip');
   if(firefox)await stopBrowser();else{await driver.send('Browser.close');await stopBrowser();}
   await startBrowser();
+  if(provider==='gog'){
+    await open('?server');reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');status=await sync();assert.match(status,/503.*Try again later/);assert.doesNotMatch(status,/Sign in|signed in/);assert.deepEqual((await read(reportUrl)).refs,refs);console.log('PASS gog installed: server503 gives retry-later guidance and preserves all saved records');
+  }
   await open('?auth');reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');status=await sync();assert.match(status,/failed/);let failed=await read(reportUrl);assert.deepEqual(failed.refs,refs);assert.equal(failed.count,499);
   await open('?broken');status=await sync();assert.match(status,/failed/);failed=await read(reportUrl);assert.deepEqual(failed.refs,refs);
   console.log('PASS '+provider+' installed: later authentication and malformed top-level responses do not publish partial success');

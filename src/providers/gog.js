@@ -45,15 +45,21 @@
       page: String(page),
       sortBy: 'date_purchased'
     });
-    const response = await fetch(`/account/getFilteredProducts?${parameters}`, { credentials: 'include', cache: 'no-store' });
-    if (!response.ok) throw Object.assign(new Error(`GOG returned ${response.status} while loading your library. Confirm that you are signed in to GOG.`),{fatal:response.status===401||response.status===403});
-    try {
-      const payload = await response.json();
-      if (!Array.isArray(payload?.products) || !Number.isSafeInteger(Number(payload.totalPages)) || Number(payload.totalPages) < 0) throw new Error('Malformed GOG page.');
-      return payload;
-    } catch {
-      throw Object.assign(new Error('GOG returned an unreadable library response. Confirm that you are signed in to GOG.'),{fatal:true});
+    let response;
+    try{response=await fetch(`/account/getFilteredProducts?${parameters}`, { credentials: 'include', cache: 'no-store' });}
+    catch{throw new Error('GL could not connect to GOG. Check your connection and retry.');}
+    if (!response.ok) {
+      const auth=response.status===401||response.status===403;
+      throw Object.assign(new Error(auth?'GOG could not authorize the library request. Sign in to GOG or finish verifying your session, then retry.':`GOG returned ${response.status} while loading your library. Try again later.`),{fatal:auth});
     }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw Object.assign(new Error('GOG returned an unreadable library response. Reload your GOG library and retry; if it continues, try again later.'),{fatal:true});
+    }
+    if (!Array.isArray(payload?.products) || !Number.isSafeInteger(Number(payload.totalPages)) || Number(payload.totalPages) < 0) throw Object.assign(new Error('GOG returned an unreadable library response: GL does not recognize its structure. Retry later; if it continues, report the import failure.'),{fatal:true});
+    return payload;
   }
 
   async function fetchGogGames(reportProgress = () => {}, knownItemIds = null, recover = false) {

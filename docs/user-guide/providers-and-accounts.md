@@ -59,6 +59,13 @@ When Amazon supplies no library total, finishing the readable listing does not p
 
 ## Use remembered accounts
 
+For an ordinary first import, GL can create a **Default account** automatically.
+A nickname is optional: it helps you recognize a saved account but does not
+identify or sign in to the provider. Renaming changes that display name without
+changing the account's saved identity or ownership evidence. If you use multiple
+provider accounts, select or add the correct saved account explicitly; matching
+nicknames are not proof that two website accounts are the same.
+
 On a provider website, a single connected account eligible for reuse appears as
 **Selected account for updates** with **Change account**. Use that action to choose a
 saved account or **Add account**. Changing the input does not rename an account;
@@ -106,8 +113,18 @@ not require checking a hidden confirmation box again; changing accounts still
 requires confirmation. Epic uses **Sync Epic library** without Quick update. Nintendo offers Quick update and Full rescan; both require its complete loaded non-hidden card list.
 
 Quick update uses the selected account's saved import history and reads the
-provider-specific update scope. Xbox and PlayStation check the same supported web listing as Full rescan; their quick operation is not a shorter traversal. It is unavailable until a full import exists,
-while an update is running, or until an unnamed account is named. Epic uses **Sync Epic library**. Nintendo uses **Quick update** or **Full rescan** for its complete loaded card list.
+provider-specific update scope. You can start Quick without naming the default
+account. When no usable initial baseline exists, the provider page explains
+that it will perform the initial Full work instead. Unfinished recovery can also
+make Quick check the full required listing; after successful recovery, normal
+incremental stopping resumes. An active update or an unselected saved account
+can prevent another update from starting.
+
+Xbox and PlayStation check the same supported web listing as Full rescan; their
+Quick operation is not a shorter traversal. Epic uses **Sync Epic library**.
+Nintendo uses **Quick update** or **Full rescan** for its complete loaded card
+list; Quick avoids rewriting an unchanged catalog rather than requesting fewer
+pages. Quick therefore does not always mean fewer network requests.
 Amazon Games needs a full scan after more than 70 days
 without an update. Fandango quick updates run from Recently Purchased View All
 grids; full scans check My Library. The provider panel remains authoritative
