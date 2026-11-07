@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {withWorker} from './storage.js';
 import {completeProviderSnapshot,completedScope} from '../src/lib/provider-snapshot.js';
@@ -25,4 +25,3 @@ for(const production of [false,true])test(`Kobo failed-Full guards and rejected 
  assert(!(await fail(h,scan,['archive'])).ok,'Rejected recovery persistence must not be acknowledged');h.memory.area.set=set;const after=await h.pageB.getDatabase();assert.deepEqual(after.providerItems,before.providerItems);assert.deepEqual(after.providers.kobo.syncState,before.providers.kobo.syncState);
  assert((await fail(h,await begin(h),['archive'])).ok);const current=await h.pageA.getDatabase();await fail(h,scan,['audiobooks']);assert.deepEqual((await h.pageB.getDatabase()).providers.kobo.syncState,current.providers.kobo.syncState);
 },{storageEvents:production,concurrentQueries:production}));
-
