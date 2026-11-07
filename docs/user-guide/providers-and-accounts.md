@@ -20,7 +20,7 @@ Choose **Add a library** from an empty Library or the toolbar popup. In Provider
 expand a provider and open its website. Sign in to the account you want to
 import. The Galactic Library panel can use an unnamed **Default account** for
 your first import; naming is optional. Confirm the signed-in account when
-requested. Choose **Sync Epic library** on Epic, **Import Nintendo cards** on Nintendo, or **Full rescan** on other providers. Keep the provider tab open until the import finishes. Return to Library
+requested. Choose **Sync Epic library** on Epic, **Full rescan** on Nintendo and other providers. Keep the provider tab open until the import finishes. Return to Library
 to browse the saved items. The **Add a library: import instructions** disclosure opens on a first empty library and stays collapsed by default for returning users.
 
 A nickname is a label you choose, not a website login verified by GL. The
@@ -63,7 +63,7 @@ saved account or **Add account**. Changing the input does not rename an account;
 the panel links to GL Providers for renaming. **Cancel account change** restores
 the prior selection without starting an import. With multiple saved accounts,
 confirm the signed-in account as requested; switching needs explicit consent.
-A new alternate account starts with its first supported-list import (Sync Epic library on Epic; Import Nintendo cards on Nintendo; Full rescan elsewhere). Completing initial setup refreshes
+A new alternate account starts with its first supported-list import (Sync Epic library on Epic; Full rescan elsewhere). Completing initial setup refreshes
 the account display automatically without overwriting edits made during a save.
 
 Provider cards show accounts, imported counts, update dates, complete-scan
@@ -101,11 +101,11 @@ update or Full rescan. The importer returns to its required listing or resets
 its traversal as needed, keeping the selected account. Fandango returns from
 Movies/TV View All to My Library automatically. A reusable saved account does
 not require checking a hidden confirmation box again; changing accounts still
-requires confirmation. Epic uses **Sync Epic library** and Nintendo uses **Import Nintendo cards**; neither offers Quick update.
+requires confirmation. Epic uses **Sync Epic library** without Quick update. Nintendo offers Quick update and Full rescan; both require its complete loaded non-hidden card list.
 
 Quick update uses the selected account's saved import history and reads the
 provider-specific update scope. Xbox and PlayStation check the same supported web listing as Full rescan; their quick operation is not a shorter traversal. It is unavailable until a full import exists,
-while an update is running, or until an unnamed account is named. Epic uses **Sync Epic library**. Nintendo uses **Import Nintendo cards** for the loaded card list.
+while an update is running, or until an unnamed account is named. Epic uses **Sync Epic library**. Nintendo uses **Quick update** or **Full rescan** for its complete loaded card list.
 Amazon Games needs a full scan after more than 70 days
 without an update. Fandango quick updates run from Recently Purchased View All
 grids; full scans check My Library. The provider panel remains authoritative
@@ -297,7 +297,9 @@ Open **Providers → Nintendo — Switch Virtual Game Cards**, then open Nintend
 Virtual Game Cards page and sign in normally. Reload that page after installing
 or reloading GL so it can observe the website's card-list request. Let the list
 finish loading; if Nintendo loads several pages, browse all pages before import.
-Enter/confirm a nickname on first use and choose **Import loaded cards**.
+Enter/confirm a nickname on first use and choose **Full rescan**. Later, use **Quick update** for a normal check. Both validate every card in the complete loaded list. Quick avoids rewriting unchanged catalog records; Full refreshes the captured records. Neither action requests more cards or scans hidden cards. Reload Nintendo to discover new purchases or changes made elsewhere, then let all cards load before checking.
+
+The panel shows loaded/expected counts while Nintendo loads pages, then checking, account confirmation, comparison and saving phases. A slow save shows elapsed time. Missing pages or a stalled list cannot report a successful import. Under GL Settings, enable provider diagnostics to make **Scan diagnostics: Export scan report** available. It exports counts and the last check phase/result, never a game list, account IDs or credentials. Response bytes may be unavailable for website JSON requests; storage-call counts are not collected in this report.
 
 GL imports only a complete, non-hidden card list observed on that page. It makes
 no Nintendo API requests, copies no authentication headers, and never stores a

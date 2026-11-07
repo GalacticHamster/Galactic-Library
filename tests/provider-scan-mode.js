@@ -6,13 +6,13 @@ import {createStorageWriter} from '../src/background/storage-writer.js';
 import {createEmptyDatabase} from '../src/lib/models.js';
 import {withWorker} from './storage.js';
 import {providerSyncLibrary as library,providerSyncValue as value,providerSyncSnapshot as snapshot,consoleProvider,fingerprint} from './provider-sync-fixture.js';
-const fullOnly=p=>['epic','nintendo'].includes(p);
+const fullOnly=p=>p==='epic';
 const known=p=>p==='humble'?{knownPurchaseIds:['purchase-1']}:p==='fanatical'?{knownOrderFingerprints:['b'.repeat(64)]}:{};
 function memory(db=createEmptyDatabase()){
  const stored={galacticLibraryDatabase:structuredClone(db)};
  const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...stored}),set:async patch=>Object.assign(stored,structuredClone(patch))});return {writer,stored};
 }
-const begin=(w,p,label='Personal',mode='incremental',switching=false)=>w.beginProviderScan(p,label,p==='nintendo'?'full':mode,switching,1,null,false,consoleProvider(p)?fingerprint:null);
+const begin=(w,p,label='Personal',mode='incremental',switching=false)=>w.beginProviderScan(p,label,mode,switching,1,null,false,consoleProvider(p)?fingerprint:null);
 const commit=(w,p,s,items,mode)=>w.commitProviderScan(p,items,{syncMode:mode,...(mode==='full'?{fullSyncAt:new Date().toISOString()}:{quickSyncAt:new Date().toISOString()}),...(['humble','fanatical'].includes(p)?{syncState:known(p)}:{})},mode==='full'||consoleProvider(p)?snapshot(p,items):undefined,s.scanToken,1,false,consoleProvider(p)?fingerprint:null);
 export const providerScanModeTests=PROVIDERS.flatMap(p=>[
  ['quick orchestration '+p+': first import uses the normal complete commit, then updates the established baseline',async()=>{
@@ -27,14 +27,14 @@ export const providerScanModeTests=PROVIDERS.flatMap(p=>[
  }],
  ['quick orchestration '+p+': missing library baseline selects full without trusting existing item count',async()=>{
   const db=library(p);delete db.providers[p].fullSyncAt;delete db.providerProfiles[db.providers[p].activeProfileId].state.fullSyncAt;
-  const {writer}=memory(db),s=await begin(writer,p);assert(s.forceFull);assert.equal(s.scanReason,p==='nintendo'?'requested':'baseline-unavailable');
+  const {writer}=memory(db),s=await begin(writer,p);assert(s.forceFull);assert.equal(s.scanReason,'baseline-unavailable');
   await assert.rejects(commit(writer,p,s,[value(p)],'incremental'),/requires.*full|Nintendo requires/);
  }],
  ['quick orchestration '+p+': selected new account cannot borrow another account baseline',async()=>{
   const {writer}=memory(library(p)),old=await writer.getDatabase(),active=old.providers[p].activeProfileId;
   if(consoleProvider(p)){
    await assert.rejects(begin(writer,p,'Other','incremental',true),/already saved/);
-   const s=await writer.beginProviderScan(p,'Other',p==='nintendo'?'full':'incremental',true,1,null,false,'c'.repeat(64));assert(s.forceFull);return;
+   const s=await writer.beginProviderScan(p,'Other','incremental',true,1,null,false,'c'.repeat(64));assert(s.forceFull);return;
   }
   const s=await begin(writer,p,'Other','incremental',true);assert(s.forceFull);assert.notEqual(s.profileId,active);
   const db=await commit(writer,p,s,[value(p)],'full');

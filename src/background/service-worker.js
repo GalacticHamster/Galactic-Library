@@ -581,7 +581,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if(['nintendo','playstation','xbox'].includes(request.provider)&&request.type!=='COMMIT_PROVIDER_SCAN'){
     sendResponse({ok:false,error:'Console imports require a confirmed account-bound scan.'});return undefined;
   }
-  const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home', 'playstation', 'xbox'].includes(request.provider);
+  const incrementalProvider = request.mode === 'incremental' && ['humble', 'fanatical', 'steam', 'gog', 'kindle', 'amazon-games', 'audible', 'kobo', 'amazon-video', 'fandango-at-home', 'playstation', 'xbox', 'nintendo'].includes(request.provider);
   if (!Array.isArray(request.items) || request.items.length > 50000) {
     sendResponse({ ok: false, error: 'The provider did not provide a valid game list.' });
     return undefined;
@@ -637,7 +637,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const timing=providerTiming(request),end=timing?.begin('provider_finish');
   const reply=value=>{end?.();providerResponse(timing,sendResponse,value);};
   (request.type==='COMMIT_PROVIDER_SCAN'
-    ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,request.provider==='kobo',request.sourceAccountFingerprint],timing)
+    ? storageWriter.execute('commitProviderScan',[request.provider,request.items,syncDetails,request.snapshot,request.scanToken,sender.tab?.id,['kobo','nintendo'].includes(request.provider),request.sourceAccountFingerprint],timing)
     : storageWriter.importUnscopedProviderItems(request.provider,request.items,syncDetails,request.snapshot))
     .then(async (result) => {const database=result.database??result;
       if(request.provider==='epic')await epicAuthDiagnostics.committed(request,sender,syncDetails.syncMode).catch(()=>{});
@@ -655,7 +655,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ...(request.provider==='amazon-games'?{savedCount:database.providers[request.provider].syncHealth?.differences?.observed,listingIncomplete:database.providers[request.provider].syncState?.listingIncomplete===true}:{}),
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
-      ...(['steam','epic','playstation','xbox','audible'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
+      ...(request.provider==='nintendo'?{persistence:result.scanResult?.metadataOnly?'metadata-only':'catalog-saved'}:{}),
+      ...(['steam','epic','playstation','xbox','audible','nintendo'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
       syncedAt: database.providers[request.provider].lastSync
     });})
     .catch((error) => reply({ ok: false, error: error.message }));

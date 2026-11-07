@@ -53,10 +53,10 @@ providersUxTests.push(['Provider presentation names supported operations without
  for(const site of PROVIDER_SITES){
    assert(!site.name.includes(' \u2014 '));
    assert.equal(providerActionLabel(site.provider,'full'),site.fullLabel);
-   assert.equal(Boolean(site.quickLabel),!['epic','nintendo'].includes(site.provider));
+   assert.equal(Boolean(site.quickLabel),site.provider!=='epic');
  }
  assert.equal(providerActionLabel('epic','full'),'Sync Epic library');
- assert.equal(providerActionLabel('nintendo','full'),'Import Nintendo cards');
+ assert.equal(providerActionLabel('nintendo','full'),'Full rescan');
  assert.match(PROVIDER_SITES.find(s=>s.provider==='xbox').scope,/not.*lifetime/u);
  assert.match(PROVIDER_SITES.find(s=>s.provider==='playstation').scope,/PS4\/PS5/u);
  assert.match(PROVIDER_SITES.find(s=>s.provider==='amazon-games').scope,/three months/u);

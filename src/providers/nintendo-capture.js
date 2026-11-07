@@ -5,7 +5,8 @@
   'use strict';
   if(location.origin!=='https://accounts.nintendo.com'||!/^\/portal\/vgcs(?:\/|$)/u.test(location.pathname)||!globalThis.GalacticConsoleLibrary)return;
   const endpoint='https://wb.lp1.savanna.srv.nintendo.net/graphql',pages=new Map();
-  let account=null,problem='',epoch=0,pending=0,generation=0,scope=null;
+  let account=null,problem='',epoch=0,pending=0,generation=0,scope=null,prepared=null;
+  const metrics={requestsObserved:0,responseBytesMeasured:0,responsesWithoutByteSize:0,progressEvents:0,prepareChecks:0};
   // Optional GraphQL input objects may be omitted, null, or empty. An empty
   // object does not select a card type/status; nonempty inputs need validation.
   const emptySelection=value=>value==null||typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===0;
@@ -44,11 +45,12 @@
       if(page.complete)complete=true;
     }
     const isComplete=complete&&(total==null||contiguousItems===total);
-    window.postMessage({channel:'gl-nintendo-progress',loaded:contiguousItems,total,complete:isComplete,pending:pending>0,problem:problem||''},location.origin);
+    metrics.progressEvents++;
+    window.postMessage({channel:'gl-nintendo-progress',loaded:contiguousItems,total,pages:ordered.length,complete:isComplete,pending:pending>0,problem:problem||''},location.origin);
   }
   function begin(info){
     if(!info)return null;
-    epoch++;pending++;
+    epoch++;pending++;prepared=null;metrics.requestsObserved++;
     if(info.unsupported){pages.clear();problem=info.unsupported;emitProgress();return {...info,generation};}
     // A new first page starts a new observation set. Never union scans or filters.
     if(info.offset===0){generation++;pages.clear();problem='';scope=info.scope;}
@@ -59,9 +61,10 @@
     emitProgress();
     return {...info,account,generation};
   }
-  function finish(ticket,status,body){
+  function finish(ticket,status,body,bytes=null){
     if(!ticket)return;pending--;epoch++;
-    if(ticket.generation!==generation)return;
+    if(Number.isSafeInteger(bytes)&&bytes>=0)metrics.responseBytesMeasured+=bytes;else metrics.responsesWithoutByteSize++;
+    if(ticket.generation!==generation){emitProgress();return;}
     if(ticket.unsupported){emitProgress();return;}
     try{
       if(ticket.account!==account||currentAccount()!==ticket.account)throw Error('The signed-in Nintendo account changed. Reload the page before importing.');
@@ -83,7 +86,7 @@
         const chunks=[];let size=0;
         try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2097152){void reader.cancel();throw Error();}chunks.push(value);}}finally{reader.releaseLock();}
         const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
-        finish(ticket,200,JSON.parse(new TextDecoder().decode(bytes)));
+        finish(ticket,200,JSON.parse(new TextDecoder().decode(bytes)),size);
       }catch{finish(ticket,0,null);}
     },()=>finish(ticket,0,null));
     return result;
@@ -104,6 +107,7 @@
     };
   }
   async function snapshot(){
+    metrics.prepareChecks++;
     if(problem)throw Error(problem);
     if(pending)throw Error('Nintendo is still loading cards. Wait for the list to finish, then try again.');
     if(!account||currentAccount()!==account)throw Error('Reload this Nintendo library page before importing.');
@@ -114,21 +118,33 @@
       total=page.expectedCount;
       for(const item of page.items){if(seen.has(item.providerItemId))throw Error('Nintendo repeated a card. Reload the page before importing.');seen.add(item.providerItemId);items.push(item);}
       offset=page.nextOffset;complete=page.complete;
+      metrics.progressEvents++;
+      window.postMessage({channel:'gl-nintendo-progress',phase:'validating',loaded:items.length,total, pages:ordered.length,complete:false},location.origin);
+      // Yield between bounded website pages so large captures can paint progress.
+      if(ordered.length>1)await new Promise(resolve=>setTimeout(resolve,0));
     }
     if(!complete||total!==items.length)throw Error('The loaded card list is incomplete. Browse all cards or reload the page before importing.');
     const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('nintendo\u0000'+account));
     if(version!==epoch||pending||problem||currentAccount()!==account)throw Error('The Nintendo library changed while preparing the import. Try again.');
     const fingerprint=[...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('');
     const S=globalThis.GalacticProviderSnapshot;
-    return {items,sourceAccountFingerprint:fingerprint,captureVersion:version,snapshot:S.completeProviderSnapshot('nintendo',items,[S.completedScope('non-hidden-virtual-cards',items.length,total,'reported-count',ordered.length)]),
+    const value={items,sourceAccountFingerprint:fingerprint,captureVersion:version,snapshot:S.completeProviderSnapshot('nintendo',items,[S.completedScope('non-hidden-virtual-cards',items.length,total,'reported-count',ordered.length)]),
       counts:{cards:items.length,products:new Set(items.map(i=>i.metadata.applicationId)).size,owned:items.filter(i=>i.ownership==='owned').length,borrowed:items.filter(i=>i.ownership==='borrowed').length,unknown:items.filter(i=>i.ownership==='unknown').length}};
+    prepared={sourceAccountFingerprint:fingerprint,captureVersion:version};return value;
   }
   addEventListener('message',async event=>{
     const r=event.data;
     if(event.source!==window||event.origin!==location.origin)return;
     if(r?.channel==='gl-nintendo-status-request'){emitProgress();return;}
-    if(r?.channel!=='gl-nintendo-request'||!['prepare','verify'].includes(r.action)||typeof r.nonce!=='string'||!/^[a-f0-9]{32}$/u.test(r.nonce))return;
-    try{const value=await snapshot();window.postMessage({channel:'gl-nintendo-response',nonce:r.nonce,ok:true,...(r.action==='verify'?{sourceAccountFingerprint:value.sourceAccountFingerprint,captureVersion:value.captureVersion}:value)},location.origin);}
+    if(r?.channel!=='gl-nintendo-request'||!['prepare','verify','diagnostics'].includes(r.action)||typeof r.nonce!=='string'||!/^[a-f0-9]{32}$/u.test(r.nonce))return;
+    try{
+      let value;
+      if(r.action==='diagnostics')value={diagnostics:{...metrics,pagesObserved:pages.size,pendingRequests:pending,cardsObserved:[...pages.values()].reduce((n,p)=>n+p.items.length,0),problemPresent:Boolean(problem),glAcquisitionRequests:0}};
+      else if(r.action==='verify'){
+        if(!prepared||prepared.captureVersion!==epoch||pending||problem||!account||currentAccount()!==account)throw Error('The Nintendo account or card list changed. Reload the page and try again.');
+        value=prepared;
+      }else value=await snapshot();
+      window.postMessage({channel:'gl-nintendo-response',nonce:r.nonce,ok:true,...value},location.origin);}
     catch(error){window.postMessage({channel:'gl-nintendo-response',nonce:r.nonce,ok:false,error:error.message},location.origin);}
   });
 }());

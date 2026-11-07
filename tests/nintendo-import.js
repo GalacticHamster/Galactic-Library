@@ -19,14 +19,14 @@ const begin=(w,name='Personal',fp=fingerprint,switching=false,tab=1)=>w.beginPro
 const commit=(w,scan,items,fp=fingerprint,tab=1,s=snapshot(items))=>w.commitProviderScan('nintendo',items,{syncMode:'full',fullSyncAt:'2026-10-15'},s,scan.scanToken,tab,false,fp);
 const record=(database,native='card-a')=>Object.values(database.providerItems).find(i=>i.providerItemId===native);
 
-function captureHarness(){
+export function captureHarness(){
   let actor='private-account',reply;const posts=[],listeners=[];
   class XHR{open(){}send(){}addEventListener(name,fn){this.done=fn;}}
   const ctx=vm.createContext({URL,TextDecoder,TextEncoder,Uint8Array,crypto:webcrypto,
-    location:{origin:'https://accounts.nintendo.com',pathname:'/portal/vgcs'},
+    setTimeout,location:{origin:'https://accounts.nintendo.com',pathname:'/portal/vgcs'},
     document:{getElementById:name=>name==='state'?{getAttribute:()=>JSON.stringify({user:{obfuscatedId:actor}})}:null},
     fetch:()=>{throw Error('No independent network requests allowed');},XMLHttpRequest:XHR,addEventListener:(name,fn)=>listeners.push(fn)});
-  ctx.window=ctx;ctx.listeners=listeners;ctx.postMessage=value=>{posts.push(value);reply?.(value);};
+  ctx.window=ctx;ctx.listeners=listeners;ctx.postMessage=value=>{posts.push(value);if(value.channel==='gl-nintendo-response')reply?.(value);};
   for(const path of ['src/providers/provider-snapshot.js','src/providers/console-library.js','src/providers/nintendo-capture.js'])vm.runInContext(readFileSync(new URL('../'+path,import.meta.url),'utf8'),ctx);
   const rows=(n=1)=>Array.from({length:n},(_,i)=>({id:'card-'+i,applicationId:'app-'+i,applicationName:'Synthetic Game '+i,apparentPlatform:'NX',ownerNaId:actor,userNaId:actor,hasReleasedApplication:true}));
   function start(list=rows(),offset=0,total=list.length,changes={},query='query getVgcsVgcs { account { vgc { vgcViewsV2(isHidden: false) { views { id } } } } }'){
@@ -122,7 +122,7 @@ export const nintendoImportTests=[
  }],
  ['Nintendo is discoverable with a correctly scoped website and complete-list updates only',()=>{
    const site=PROVIDER_SITES.find(p=>p.provider==='nintendo');assert.equal(site.name,'Nintendo');assert(site.scope.includes('Switch Virtual Game Cards'));assert.equal(site.url,'https://accounts.nintendo.com/portal/vgcs');
-   const eligibility=updateEligibility({provider:'nintendo',active:true,nickname:'Personal'},{fullSyncAt:'2026-10-15'});assert.equal(eligibility.full,true);assert.equal(eligibility.quick,false);
+   const eligibility=updateEligibility({provider:'nintendo',active:true,nickname:'Personal'},{fullSyncAt:'2026-10-15'});assert.equal(eligibility.full,true);assert.equal(eligibility.quick,true);
  }],
  ['Nintendo failed persistence leaves source records and the profile binding unchanged atomically',async()=>{
    const values={};let fail=false;const writer=createStorageWriter({get:async defaults=>structuredClone({...defaults,...values}),set:async patch=>{if(fail)throw Error('Synthetic write failure');Object.assign(values,structuredClone(patch));},remove:async keys=>{for(const k of keys)delete values[k];}});

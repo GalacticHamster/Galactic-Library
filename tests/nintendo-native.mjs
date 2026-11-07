@@ -55,22 +55,22 @@ try{
   async function wait(script,message){for(let i=0;i<250;i++){const v=await evaluate(script);if(v)return v;await pause(100);}const state=await evaluate('return {url:location.href,ready:document.readyState,status:document.querySelector("#galactic-library-nintendo-importer")?.shadowRoot?.querySelector("[data-import-status]")?.textContent};');throw Error(message+' '+JSON.stringify(state));}
   await navigate(origin+'/portal/vgcs');await wait('return !!document.querySelector("#galactic-library-nintendo-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Nintendo panel missing');
   const root='document.querySelector("#galactic-library-nintendo-importer").shadowRoot';
-  await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Personal';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;s.querySelector('[data-mode]').click();return true;`);
-  await wait(`const s=${root};return !s.querySelector('[data-mode]').disabled&&/Reload|incomplete/.test(s.querySelector('[data-import-status]').textContent);`,'Unloaded cards were not rejected');
+  await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Personal';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;s.querySelector('[data-mode="full"]').click();return true;`);
+  await wait(`const s=${root};return !s.querySelector('[data-mode="full"]').disabled&&/Reload|incomplete/.test(s.querySelector('[data-import-status]').textContent);`,'Unloaded cards were not rejected');
   await evaluate('loadCards();return true;');
   for(let attempt=0;attempt<2;attempt++){
-    await evaluate(`const s=${root};s.querySelector('[data-mode]').click();return true;`);
-    await wait(`const s=${root};return !s.querySelector('[data-mode]').disabled&&s.querySelector('[data-import-status]').textContent.includes('Imported 115 cards · 112 owned · 3 with unconfirmed access');`,'Complete import/reimport did not commit');
+    await evaluate(`const s=${root};s.querySelector('[data-mode="full"]').click();return true;`);
+    await wait(`const s=${root};return !s.querySelector('[data-mode="full"]').disabled&&s.querySelector('[data-import-status]').textContent.includes('Checked 115 loaded cards');`,'Complete import/reimport did not commit');
   }
-  await evaluate('window.fixtureCount=114;loadCards();return true;');await evaluate(`const s=${root};s.querySelector('[data-mode]').click();return true;`);
-  await wait(`const s=${root};return !s.querySelector('[data-mode]').disabled&&s.querySelector('[data-import-status]').textContent.includes('Imported 114 cards');`,'Additive reimport did not finish');
-  await evaluate("window.fixtureActor='synthetic-other-account';loadCards();return true;");await evaluate(`const s=${root};s.querySelector('[data-mode]').click();return true;`);
-  await wait(`const s=${root};return !s.querySelector('[data-mode]').disabled&&/different Nintendo account|Nintendo account changed/.test(s.querySelector('[data-import-status]').textContent);`,'Wrong-account import was not blocked');
+  await evaluate('window.fixtureCount=114;loadCards();return true;');await evaluate(`const s=${root};s.querySelector('[data-mode="full"]').click();return true;`);
+  await wait(`const s=${root};return !s.querySelector('[data-mode="full"]').disabled&&s.querySelector('[data-import-status]').textContent.includes('Checked 114 loaded cards');`,'Additive reimport did not finish');
+  await evaluate("window.fixtureActor='synthetic-other-account';loadCards();return true;");await evaluate(`const s=${root};s.querySelector('[data-mode="full"]').click();return true;`);
+  await wait(`const s=${root};return !s.querySelector('[data-mode="full"]').disabled&&/different Nintendo account|Nintendo account changed/.test(s.querySelector('[data-import-status]').textContent);`,'Wrong-account import was not blocked');
   const reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');await navigate(reportUrl);
   const result=JSON.parse(await wait('return document.documentElement?.dataset.result;','Committed database report unavailable'));
   assert.equal(result.error,undefined);assert.equal(result.records,115);assert.equal(result.refs,115);assert.equal(result.owned,112);assert.equal(result.unknown,3);assert.equal(result.history,0);assert.equal(result.binding,64);assert.equal(result.roundTrip,true);assert.equal(result.snapshot,114);assert.equal(result.source,'nintendo-virtual-game-cards');
   console.log('PASS '+(firefox?'Firefox':'Chrome')+' installed packaged Nintendo importer: newest-first website default, MAIN/isolated bridge, profile consent, 115 cards, 112 owned/3 unknown, repeat import, retained omission, account-switch rejection, real atomic worker save and backup round trip.');
 }finally{
-  if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;await new Promise(done=>server.close(done));
+  child?.kill();driver?.close?.();if(exited)await exited;await new Promise(done=>server.close(done));
   const target=resolve(temporary),base=resolve(tmpdir());if(target.startsWith(base+sep)&&target.slice(base.length+1).startsWith('gl-nintendo-native-'))await rm(target,{recursive:true,force:true,maxRetries:5,retryDelay:200});
 }

@@ -16,8 +16,8 @@ export const PROVIDER_SITES=[
  ['playstation','PlayStation','https://library.playstation.com/recently-purchased'],
  ['nintendo','Nintendo','https://accounts.nintendo.com/portal/vgcs']
 ].map(([provider,name,url])=>({provider,name,url,
- quickLabel:['epic','nintendo'].includes(provider)?null:'Quick update',
- fullLabel:provider==='epic'?'Sync Epic library':provider==='nintendo'?'Import Nintendo cards':'Full rescan',
+ quickLabel:provider==='epic'?null:'Quick update',
+ fullLabel:provider==='epic'?'Sync Epic library':'Full rescan',
  scope:provider==='xbox'?'The complete Owned catalog loaded by Xbox Web Library; not the complete console or lifetime purchase history. Earlier saved items are retained.':provider==='playstation'?'The active PS4/PS5 Purchased web library; older consoles and lifetime order history are not included. Earlier saved items are retained.':provider==='nintendo'?'The loaded, non-hidden Switch Virtual Game Cards list, not all Nintendo purchase history. Earlier saved cards are retained.':provider==='amazon-games'?'Games delivered to Amazon Games. Quick update checks the past three months; Full rescan checks all available calendar years. Code claims and deliveries to other stores are excluded.':''
 }));
 export const providerSite=provider=>PROVIDER_SITES.find(site=>site.provider===provider);
@@ -31,7 +31,6 @@ export function updateEligibility(profile,state={},now=Date.now()){
  const fullReason=!profile.active?'Select this account for updates first.':profile.syncHealth?.status==='running'?'Check the provider tab for the current update.':'';
  let quickReason=fullReason;
  if(!quickReason&&profile.provider==='epic')quickReason='Use Sync Epic library to check the supported listing.';
- if(!quickReason&&profile.provider==='nintendo')quickReason='Use Import Nintendo cards to check the loaded card list.';
  // Baseline and freshness select acquisition mode on the provider page; they
  // do not prevent starting an update. Account and running-scan guards still apply.
  return {quick:!quickReason,full:!fullReason,quickReason,fullReason};

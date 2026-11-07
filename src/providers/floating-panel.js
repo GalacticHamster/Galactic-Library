@@ -85,7 +85,7 @@
     humble:'Import supported books, audiobooks, games and entitlements from Humble purchases.',
     xbox:'Import your web-visible Xbox Owned catalog. This is not your complete console or lifetime purchase history.',
     playstation:'Import your active PS4/PS5 Purchased web library. Older consoles and complete lifetime purchase history are not included.',
-    nintendo:'Import the loaded, non-hidden Switch Virtual Game Cards. Other Nintendo purchase history is not included.'
+    nintendo:'Check the complete non-hidden Virtual Game Cards list loaded by Nintendo. Scroll to load every card first. Reload Nintendo to discover purchases or changes made elsewhere; GL does not request cards itself.'
   };
   const importHelp={
     steam:'Quick update checks newly added or previously unidentified applications. Full rescan checks the complete supported Steam library. Earlier saved titles stay if Steam cannot identify them.',
@@ -101,10 +101,10 @@
     humble:'Quick update checks new purchases and refreshes pending key-status information. Full rescan checks all supported purchases again, including previously saved purchases. This can pick up information after an importer update. Redemption codes are removed before purchase details are read and are never saved.',
     xbox:'Quick update and Full rescan both inspect the entire supported web list; Quick update does not traverse less data. Quick update saves additions and changes; Full rescan records a complete supported-list check. Both keep earlier saved items that are absent from this limited view.',
     playstation:'Quick update and Full rescan both inspect the entire supported listing; Quick update does not traverse less data. Quick update saves additions and changes; Full rescan records a complete supported-list check. Both keep earlier saved items that are absent from this limited view.',
-    nintendo:'Let the available cards finish loading before selecting Import Nintendo cards. This single action checks the loaded list and adds or updates matching saved cards. Earlier saved cards stay if they are not in this view.'
+    nintendo:'Both actions require the complete loaded Nintendo list. Quick update validates every loaded card and avoids rewriting unchanged records. Full rescan refreshes all loaded cards. Neither scans hidden cards or lifetime purchase history; earlier saved cards are retained. No purchase dates are inferred.'
   };
 
-  const singleActions={epic:'Sync Epic library',nintendo:'Import Nintendo cards'};
+  const singleActions={epic:'Sync Epic library'};
   function render(shadow,provider,{diagnostics='',specialized='',footer='',styles='',onImport}={}){
     if(!Object.hasOwn(names,provider)||!Object.hasOwn(introductions,provider)||!Object.hasOwn(importHelp,provider))throw Error('Unknown provider overlay.');
     shadow.host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483647;color:var(--gh-text);';

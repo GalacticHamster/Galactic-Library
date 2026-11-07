@@ -541,7 +541,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     let bindingUnchanged=true;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
-      if(provider==='nintendo'&&mode!=='full'||typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
+      if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint))throw Error('Reload '+label+' and import its complete library with a verified account.');
       const bound=Object.values(database.providerProfiles).find(p=>p.provider===provider&&p.sourceAccountFingerprint===sourceAccountFingerprint);
       if(bound&&bound.profileId!==existing?.profileId){if(requestedProfileId||profileLabel)throw Error('This '+label+' account is already saved as '+(bound.nickname||'an existing profile')+'. Select that saved profile instead of creating another one.');existing=bound;profileLabel=bound.nickname;}
       if(existing?.sourceAccountFingerprint&&existing.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('This saved account belongs to a different '+label+' account. Choose another saved account and confirm switching.');
@@ -672,20 +672,33 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     if(scanCompleted(profile,scan))throw Error('This scan already completed. Start a fresh scan.');
     pendingScanCompletion=activeObservationRead?.envelope?{provider,profileId:profile.profileId,attemptRef:scan.attemptRef,scanToken:scan.scanToken,tabId:scan.tabId,mode:scan.mode,sourceAccountFingerprint:scan.sourceAccountFingerprint??null,requestDigest:await requestDigest()}:null;
-    let result,changes,preparedIncoming;
+    let result,changes,preparedIncoming,metadataOnly=false;
     const completion=observationCompletions&&scan.readOnlyStart&&canPersistProviderCheck(database,provider,profile,scan)&&activeObservationRead?.envelope?{scan,base:checkedBase,observations:activeObservationRead,storedScans:stored[SCANS],returnedIds:new Set(values.map(v=>v.providerItemId)),before:{...database,providerItems:{...database.providerItems},providerHistory:{...database.providerHistory},providers:structuredClone(database.providers),providerProfiles:structuredClone(database.providerProfiles)}}:null;
     if(['nintendo','playstation','xbox'].includes(provider)){
       const label=provider==='nintendo'?'Nintendo':provider==='xbox'?'Xbox':'PlayStation';
       if(typeof sourceAccountFingerprint!=='string'||!/^[a-f0-9]{64}$/u.test(sourceAccountFingerprint)||scan.sourceAccountFingerprint!==sourceAccountFingerprint||profile.sourceAccountFingerprint&&profile.sourceAccountFingerprint!==sourceAccountFingerprint)throw Error('The '+label+' account changed before saving. No items were imported. Start a fresh import.');
-      if(provider==='nintendo'&&details.syncMode!=='full')throw Error('Nintendo requires a complete loaded card list.');
       validateProviderSnapshot(provider,values,snapshot);
       const scope=snapshot.scopes[0];
       if(snapshot.scopes.length!==1||scope.id!==(provider==='nintendo'?'non-hidden-virtual-cards':provider==='xbox'?'owned-web-library':'ps4-ps5-purchased')||(provider==='playstation'?scope.expectedCount!==null||scope.end!=='pagination-end':scope.expectedCount!==values.length||provider==='xbox'&&scope.end!=='reported-count')||scope.readCount!==values.length||new Set(values.map(v=>v.providerItemId)).size!==values.length)throw Error(label+' library coverage is incomplete. Previously saved items were kept.');
       if(provider==='xbox'&&values.some(v=>v.provider!=='xbox'||!/^[A-Z0-9]{12}$/u.test(v.providerItemId)||v.metadata?.productId!==v.providerItemId||v.metadata?.source!=='xbox-web-library'||v.metadata?.accessBasis!=='personal-owned-web-catalog'||v.ownership!=='owned'||!Array.isArray(v.metadata?.accessTypes)||!v.metadata.accessTypes.includes(1)))throw Error('Xbox items do not match the validated web-owned source. Previously saved items were kept.');
       profile.sourceAccountFingerprint=sourceAccountFingerprint;
+      if(provider==='nintendo'&&details.syncMode==='incremental'&&scan.readOnlyStart&&canPersistProviderCheck(database,provider,profile,scan)){
+        const incoming=timed('entry_validation',()=>normalizedIncoming(database,provider,profile,values));
+        // Revalidate every identity and content field. Only freshness timestamps
+        // may differ; a count-only or title-only comparison is never sufficient.
+        const unchanged=timed('provider_compare',()=>incoming.every(item=>{
+          const prior=database.providerItems[item.id];
+          return prior&&equalDatabaseData({...item,observedAt:prior.observedAt,updatedAt:prior.updatedAt},prior);
+        }));
+        if(unchanged){
+          const health=successfulSyncHealth(database,provider,incoming,false,details);changes=health.differences;
+          result=await persistProviderCheck(database,provider,profile,scan,{...details,lastSync:new Date().toISOString(),lastError:null,syncHealth:health},stored[SCANS]);
+          metadataOnly=true;
+        }
+      }
       // A complete non-hidden view is still not a complete purchase history.
       // Reuse the additive importer; never archive omissions or revoke access.
-      result=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave,completion);
+      result??=await mergeIntoDatabase(provider,values,{...details,snapshotValidation:{...snapshot,validatedAt:new Date().toISOString()}},database,null,beforeFullSave,completion);
     }
     if(!result&&provider==='audible'&&!values.length&&snapshot?.complete!==false&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)&&details.audibleHistory!==undefined){
       const audible=audibleHistoryDetails(provider,details,profile,new Date().toISOString());
@@ -714,7 +727,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     }
     result??=await (details.syncMode==='full'?replaceIntoDatabase(provider,values,details,snapshot,database,beforeFullSave,completion):mergeIntoDatabase(provider,values,details,database,preparedIncoming,beforeFullSave,completion));
     if(!includeResult)return result;
-    return {database:result,scanResult:providerScanResult(result,provider,profile.profileId,values,changes)};
+    return {database:result,scanResult:{...providerScanResult(result,provider,profile.profileId,values,changes),...(provider==='nintendo'?{metadataOnly}:{})}};
   }
   function providerScanResult(database,provider,profileId,values,changes){
     const observedIds=new Set(values.map(value=>value.providerItemId));
@@ -865,7 +878,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const failedRequestCount=diagnostics.failedRequestCount??0;
     const informationalCoverage=provider==='fanatical'&&diagnostics.coverageLimit==='array-only-index-without-total';
     const incomplete=failedRequestCount>0||diagnostics.incomplete===true||Boolean(diagnostics.coverageLimit)&&!informationalCoverage;
-    return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic','audible'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
+    return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic','audible','nintendo'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
     const restored=validateDatabase(database),retirement=await GalacticPurchaseSync.retirementPatch(storageArea),extra={...retirement.patch,[PROVIDER_CHECKS_KEY]:null};
@@ -1010,6 +1023,11 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
         ...(keepOwnership?{ownership:previous.ownership}:{})};
     }
     if(incoming.provider==='steam'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
+    if(incoming.provider==='nintendo'&&previous){
+      const metadata={...incoming.metadata};
+      for(const key of ['publisher','edition','authors','language'])if(!metadata[key]?.length&&previous.metadata?.[key]?.length)metadata[key]=previous.metadata[key];
+      incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata};
+    }
     if(incoming.provider==='kindle'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt};
     if(incoming.provider==='fandango-at-home'&&previous)incoming={...incoming,acquiredAt:incoming.acquiredAt??previous.acquiredAt,metadata:{...previous.metadata,...incoming.metadata}};
     if(incoming.provider==='kindle'&&previous?.ownership==='owned'&&incoming.ownership==='unknown'&&!incoming.metadata.ownershipBasis){

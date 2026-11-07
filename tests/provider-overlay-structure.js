@@ -14,7 +14,7 @@ const expectations={
   humble:[/books, audiobooks, games and entitlements/u,/Quick update.*pending key-status/u,/Full rescan.*all supported purchases.*previously saved/u],
   xbox:[/web-visible Xbox Owned.*not your complete/u,/both inspect the entire supported web list/u,/Quick update does not traverse less/u,/Full rescan records a complete supported-list check/u,/Both keep earlier saved items/u],
   playstation:[/PS4\/PS5 Purchased.*lifetime purchase history/u,/both inspect the entire supported listing/u,/Quick update does not traverse less/u,/Full rescan records a complete supported-list check/u,/Both keep earlier saved items/u],
-  nintendo:[/loaded, non-hidden.*Other Nintendo purchase history/u,/finish loading before selecting Import Nintendo cards/u,/single action.*adds or updates/u,/Earlier saved cards stay/u]
+  nintendo:[/complete non-hidden.*loaded by Nintendo/u,/Both actions require.*complete loaded Nintendo list/u,/Quick update validates every loaded card/u,/Full rescan refreshes all loaded cards/u,/earlier saved cards are retained/u]
 };
 export function checkProviderOverlayStructure(root,provider){
   const check=(ok,message)=>{if(!ok)throw Error(provider+': '+message);};
@@ -37,7 +37,7 @@ export function checkProviderOverlayStructure(root,provider){
   const intersection=[...a].filter(v=>b.has(v)).length;
   check(intersection/Math.min(a.size,b.size)<0.65,'introduction and help are near-duplicates');
   for(const sentence of intro.textContent.split(/[.!?]/u).map(s=>s.trim()).filter(s=>s.length>25))check(!help.textContent.includes(sentence),'copied introductory sentence');
-  if(provider==='epic'||provider==='nintendo'){
+  if(provider==='epic'){
     check(actions.length===1&&!/Quick update|Full rescan/u.test(help.textContent),'unsupported incremental/full action');
     check(actions[0].textContent===(provider==='epic'?'Sync Epic library':'Import Nintendo cards'),'single action changed');
   }else check(actions.map(a=>a.textContent).join('|')==='Quick update|Full rescan','two-action order changed');
