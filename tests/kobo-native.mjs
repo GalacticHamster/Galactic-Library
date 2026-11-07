@@ -40,7 +40,7 @@ try{
  if(mode==='restore'){await client.restoreDatabase(parseBackup(createBackup(d)));d=await client.getDatabase();}
  const stable=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.entries(x).sort(([a],[b])=>a.localeCompare(b))):x);
  const selected=Object.values(d.providerItems).filter(i=>i.provider==='kobo');
- document.documentElement.dataset.result=JSON.stringify({items:selected,unrelated:Object.values(d.providerItems).filter(i=>i.provider!=='kobo'),history:d.providerHistory,reviews:d.ownershipReviews,fullAt:d.providers.kobo?.fullSyncAt,roundTrip:stable(parseBackup(createBackup(d)))===stable(d),writes:await chrome.runtime.sendMessage({type:'GL_TEST_KOBO_WRITES'}),matches:matchItems(d.providerItems,selected.map(i=>({title:i.title,mediaType:i.mediaType})),d).map(r=>r.matches.map(m=>m.itemRef)),effective:selected.map(i=>[i.providerItemId,effectiveOwnershipRecord(i,d).ownership])});
+ document.documentElement.dataset.result=JSON.stringify({items:selected,unrelated:Object.values(d.providerItems).filter(i=>i.provider!=='kobo'),history:d.providerHistory,reviews:d.ownershipReviews,fullAt:d.providers.kobo?.fullSyncAt,state:d.providers.kobo?.syncState,roundTrip:stable(parseBackup(createBackup(d)))===stable(d),writes:await chrome.runtime.sendMessage({type:'GL_TEST_KOBO_WRITES'}),matches:matchItems(d.providerItems,selected.map(i=>({title:i.title,mediaType:i.mediaType})),d).map(r=>r.matches.map(m=>m.itemRef)),effective:selected.map(i=>[i.providerItemId,effectiveOwnershipRecord(i,d).ownership])});
 }catch(e){document.documentElement.dataset.result=JSON.stringify({error:e.message});}`));
 const temporary=await mkdtemp(join(tmpdir(),'gl-kobo-native-'));let child,driver,session,exited;
 try{
@@ -88,7 +88,7 @@ try{
   await open('both');result=await sync('incremental');assert(!result.status.includes('failed'),result.status);assert.equal(result.requests,1);d=await read();assert.equal(d.writes,0,'Unchanged empty-root Quick rewrote catalog');assert.deepEqual(d.items,before.items);
   console.log('PASS installed Kobo: browser restart retains records; unchanged empty-root Quick makes one request and zero catalog writes');
   for(const scenario of ['401','403','503','malformed','unreadable','invalid-link']){
-    const prior=d;await open(scenario);result=await sync();assert.match(result.status,/failed/);d=await read();assert.deepEqual(d.items,prior.items);assert.deepEqual(d.history,prior.history);assert.deepEqual(d.reviews,prior.reviews);assert.deepEqual(d.unrelated,prior.unrelated);assert.equal(d.fullAt,prior.fullAt);assert.equal(d.writes,prior.writes,'Failure rewrote catalog');
+    const prior=d;await open(scenario);result=await sync();assert.match(result.status,/failed/);d=await read();assert.deepEqual(d.items,prior.items);assert.deepEqual(d.history,prior.history);assert.deepEqual(d.reviews,prior.reviews);assert.deepEqual(d.unrelated,prior.unrelated);assert.equal(d.fullAt,prior.fullAt);assert(d.state.listingIncomplete);assert.equal(d.writes-prior.writes,prior.state?.listingIncomplete&&JSON.stringify(prior.state?.pendingKoboScopes??[])===JSON.stringify(d.state.pendingKoboScopes??[])?0:1,'Only changed recovery metadata may require a database commit');
     console.log('PASS installed Kobo: '+scenario+' leaves prior library, history, corrections, other providers and Full checkpoint unchanged');
   }
   for(const scenario of ['count-mismatch','pagination']){
