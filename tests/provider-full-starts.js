@@ -40,7 +40,14 @@ export const providerFullStartTests=[
      assert.equal((await next.writer.getCommittedLibraryView()).database.providers[p].syncHealth.status,'running');
      assert.equal(h.counts.databaseWrites,0);
      if(terminal==='failed')await next.writer.failProviderScan(p,s.scanToken,1,{code:'network'});else await next.writer.cancelProviderScan(p,lease.attemptRef);
-     assert.equal(next.counts.databaseWrites,0);assert.deepEqual(h.stored.galacticLibraryDatabase,db);
+     const recoveryTransition=p==='kobo'&&terminal==='failed';
+     assert.equal(next.counts.databaseWrites,recoveryTransition?1:0);
+     if(recoveryTransition){
+       const committed=h.stored.galacticLibraryDatabase;
+       assert(committed.providers.kobo.syncState.listingIncomplete);
+       for(const key of ['providerItems','providerHistory','ownershipReviews'])assert.deepEqual(committed[key],db[key]);
+       for(const provider of PROVIDERS.filter(v=>v!=='kobo'))assert.deepEqual(committed.providers[provider],db.providers[provider]);
+     }else assert.deepEqual(h.stored.galacticLibraryDatabase,db);
      const saved=await next.writer.getDatabase();assert.equal(saved.providers[p].syncHealth.status,terminal);assert.equal(saved.providers[p].fullSyncAt,oldObservation);assert.deepEqual(saved.providerItems,db.providerItems);
      const backup=parseBackup(createBackup(saved));assert.deepEqual(backup.providerItems,db.providerItems);
      const newer=await begin(next,p);await assert.rejects(finish(next,p,s),/superseded/);await finish(next,p,newer);

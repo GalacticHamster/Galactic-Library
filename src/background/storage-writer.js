@@ -859,7 +859,12 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       if(!Array.isArray(scopes)||scopes.length>4||scopes.some(id=>!['my-books','archive','audiobooks','audiobooks-archive'].includes(id)))throw Error('Invalid Kobo recovery sections.');
       patch.syncState={...profile.state.syncState,listingIncomplete:true,pendingKoboScopes:[...new Set([...(profile.state.syncState?.pendingKoboScopes??[]),...scopes])]};
     }
-    if(canPersistProviderCheck(database,provider,profile,scan)){await persistProviderCheck(database,provider,profile,scan,patch,stored[SCANS]);return true;}
+    // Status receipts cannot carry recovery transitions. Commit a changed Kobo
+    // recovery state through the existing validated database writer; repeated
+    // identical failures can still use the small status-only receipt.
+    const recoveryChanged=patch.syncState&&(profile.state.syncState?.listingIncomplete!==true
+      ||!equalDatabaseData(patch.syncState.pendingKoboScopes,profile.state.syncState?.pendingKoboScopes??[]));
+    if(!recoveryChanged&&canPersistProviderCheck(database,provider,profile,scan)){await persistProviderCheck(database,provider,profile,scan,{syncHealth:health},stored[SCANS]);return true;}
     profile.state={...profile.state,...patch};
     if(database.providers[provider]?.activeProfileId===profile.profileId)profileState(database,profile,profile.state);
     await persistDatabase(database,provider);return true;
