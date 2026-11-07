@@ -5,6 +5,7 @@ export function koboRecoveryFixture(scenario,value){
   const link=(label,path)=>`<a href="${url.origin}${path}">${label}</a>`;
   const page=(ids,count,next=false,links='')=>`<main><button>All Items (${count})</button><div class="filter-btn"></div>${ids.map(id=>card(id)).join('')}${ids.length?'':'<p>No items</p>'}</main>${next?`<nav class="pagination"><a class="page-link" data-page="2" href="${url.origin}${url.pathname}?pageNumber=2" rel="next">Next</a></nav>`:''}${links}`;
   if(scenario==='root-failure'&&!archive)return {status:503,html:''};
+  if(scenario==='malformed-root'&&!archive&&!audio)return {status:200,html:'<main>Unrecognized library response</main>'};
   const failure=scenario==='later-library'&&!archive&&n===2||scenario==='archive-first'&&archive||scenario==='archive-later'&&archive&&n===2||scenario==='empty-root-fail'&&archive;
   if(failure)return {status:503,html:''};
   if(scenario==='auth-later'&&!archive&&n===2)return {status:401,html:''};
