@@ -1,8 +1,17 @@
 // Bounded, read-only Fanatical MAIN-world scanner. No credentials leave this function.
-export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], diagnostics = false } = {}) {
+export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], diagnostics = false, progressId = '' } = {}) {
   // Diagnostic evidence only: never a receipt or permission to persist purchases.
   const diagnostic = {version:1,countsAvailable:true,category:'none',stage:'initial-listing',pagesAttempted:0,pagesParsed:0,ordersDiscovered:0,ordersValidated:0,ordersUnresolved:0,detailsAttempted:0,detailsParsed:0,continuationPending:false,acquisitionFinished:false};
   let contextCategory='listing',failureStage=null;
+  const began=Date.now(),activity={sequence:0,phase:'listing',pages:0,discovered:0,scheduled:0,completed:0,failed:0,active:0,retries:0,validatedItems:0};
+  let lastProgress=0,lastPhase='';
+  const progress=(phase=activity.phase,force=false)=>{
+    activity.phase=phase;const now=Date.now();
+    if(!force&&phase===lastPhase&&now-lastProgress<150)return;
+    lastProgress=now;lastPhase=phase;
+    if(!/^[a-f0-9]{32}$/u.test(progressId)||typeof window==='undefined')return;
+    try{window.postMessage({channel:'gl-fanatical-progress',progressId,progress:{...activity,sequence:++activity.sequence,elapsedMs:now-began}},location.origin);}catch{/* Informational only; never affects acquisition. */}
+  };
   const note=(error,fallback=contextCategory,stage=diagnostic.stage)=>{diagnostic.category=({FANATICAL_AUTH:'authentication',FANATICAL_LIST:'shape',FANATICAL_SCOPE:'scope',FANATICAL_LIMIT:'limit',FANATICAL_SUMMARY:'summary'})[error?.code]??fallback;failureStage=stage;};
   try {
   const safeTextInPage = (value, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -103,6 +112,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
       if (attempt === maxAttempts - 1) throw incomplete('An order request failed after three attempts. Please try again later.');
       const delay = retryDelay(response?.headers?.get('retry-after'), attempt);
       retries++;
+      activity.retries=retries;progress('retry',true);
       if ([429, 503].includes(response?.status)) cooldownUntil = Math.max(cooldownUntil, Date.now() + delay);
       await pause(delay);
     }
@@ -170,6 +180,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     if (visitedPages.size >= maxPages) throw Object.assign(incomplete('The 1,000-page safety limit was reached.'),{code:'FANATICAL_LIMIT'});
     visitedPages.add(path);
     diagnostic.stage=pagesFetched?'pagination':'initial-listing';contextCategory='listing';diagnostic.continuationPending=true;diagnostic.pagesAttempted++;
+    progress('listing',true);
     const { data, headers } = await request(path);
     // Envelopes/query conventions are not guessed from a fabricated contract.
     if (!Array.isArray(data)) throw Object.assign(unreadable(),{code:'FANATICAL_LIST'});
@@ -181,6 +192,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
       if(pageOrderIds.has(order._id)){diagnostic.category='continuation';failureStage=diagnostic.stage;listingIncomplete=true;continue;}
       pageOrderIds.add(order._id);summaries.push(order);diagnostic.ordersDiscovered=summaries.length;
     }
+    activity.pages=pagesFetched;activity.discovered=summaries.length;progress('listing');
     contextCategory='continuation';
     const total = headers?.get('x-total-count');
     if (total !== null && total !== undefined) {
@@ -218,6 +230,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     }
   }
   diagnostic.stage='summaries';contextCategory='summary';
+  progress('validating',true);
   const listed = new Set();
   const expectedProducts = new Map();
   const productCounts = (parents) => {
@@ -277,8 +290,10 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
   }
   const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ order,fingerprint }) => invalidOrders.has(order._id)||!known.has(fingerprint));
   diagnostic.stage='details';contextCategory='detail';
+  activity.scheduled=toInspect.length;progress('details',true);
   const failedFingerprints=new Set();
   const details = await boundedMap(toInspect, async ({ order: listedOrder, fingerprint }) => {
+    activity.active++;progress('details',activity.completed===0&&activity.active===Math.min(3,activity.scheduled));
     try {
     if(invalidOrders.has(listedOrder._id))throw unreadable();
     diagnostic.detailsAttempted++;
@@ -303,14 +318,16 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
       }
     }
     diagnostic.detailsParsed++;diagnostic.ordersValidated++;
+    activity.validatedItems+=projectedItems.length;
     return projectedItems;
     }catch(error){
       note(error,invalidOrders.has(listedOrder._id)?'summary':'detail',invalidOrders.has(listedOrder._id)?'summaries':diagnostic.stage);
       if(error?.code==='FANATICAL_AUTH')throw error;
       failedFingerprints.add(fingerprint);diagnostic.ordersUnresolved=failedFingerprints.size;return null;
-    }
+    }finally{activity.active--;activity.completed++;activity.failed=failedFingerprints.size;progress('details',activity.completed===activity.scheduled);}
   });
   diagnostic.stage='projection';contextCategory='unknown';
+  progress('validating',true);
   const items = new Map();
   for (const products of details.filter(Boolean)) for (const product of products){
     const prior=items.get(product.sourceItemId),purchaseOrigins=[...(prior?.purchaseOrigins??[]),...product.purchaseOrigins];

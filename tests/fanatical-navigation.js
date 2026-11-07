@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {webcrypto} from 'node:crypto';
 const source=fs.readFileSync(new URL('../src/providers/fanatical-content.js',import.meta.url),'utf8');
 export function fixture(start='/en/orders'){
  const roots=[],events={},polls=[],reports=[],failures=[];
@@ -13,12 +14,12 @@ export function fixture(start='/en/orders'){
   remove(){const index=roots.indexOf(this);if(index>=0)roots.splice(index,1);}
  }
  const calls=[];let getState=async()=>({ok:true,hasFullBaseline:true}),fetch=async()=>({ok:true,result:{items:[]}}),commit=async()=>({ok:true,gameCount:1,bookCount:0,audiobookCount:0});
- const c={console,Blob,URL:{createObjectURL:blob=>{reports.push(blob.text());return 'blob:synthetic';},revokeObjectURL(){}},setTimeout:fn=>fn(),location:{href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
+ const c={console,Blob,crypto:webcrypto,chrome:{runtime:{getManifest:()=>({version:'1.0.0'}),getURL:()=> 'chrome-extension://synthetic/'}},clearInterval(){},removeEventListener(name){delete events[name];},URL:{createObjectURL:blob=>{reports.push(blob.text());return 'blob:synthetic';},revokeObjectURL(){}},setTimeout:fn=>fn(),location:{origin:'https://www.fanatical.com',href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
   MutationObserver:class{constructor(fn){this.callback=fn;}observe(){}},addEventListener:(name,fn)=>{events[name]=fn;},setInterval:fn=>polls.push(fn),
-  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch():commit();},failed:async(_,error)=>{failures.push(error.message);}}};
- c.globalThis=c;vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),c);vm.runInContext(source,c);
+  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch(m):commit();},failed:async(_,error)=>{failures.push(error.message);}}};
+ c.globalThis=c;c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),c);vm.runInContext(source,c);
  const navigate=(path,signal='poll')=>{c.location.pathname=path;c.location.href='https://www.fanatical.com'+path;if(signal==='poll')polls.forEach(fn=>fn());else events[signal]();};
- return {c,roots,calls,reports,failures,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};
+ return {c,events,roots,calls,reports,failures,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};
 }
 export const fanaticalNavigationTests=[
  ['Fanatical route controller is loaded for SPA entry pages without adding host permissions',()=>{

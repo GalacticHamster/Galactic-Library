@@ -16,29 +16,42 @@
     const buttons = [...shadow.querySelectorAll('button[data-mode]')];
     const status = shadow.querySelector('.status');
     const tools=globalThis.GalacticFanatical,exportButton=shadow.querySelector('[data-export-scan]');
-    let report=null;
+    let report=null,importing=false;
     exportButton.addEventListener('click',()=>{
       if(!report)return;
-      const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
+      try{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
       const link=document.createElement('a');link.href=url;link.download='GL-fanatical-scan.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }catch{exportButton.textContent='Export unavailable; retry';}
     });
 
     async function sync(mode) {
-      if(!active())return;
+      if(!active()||importing)return;importing=true;
       buttons.forEach((button) => { button.disabled = true; });
       status.dataset.busy = 'true';
       report={provider:'fanatical',format:1,diagnostic:null,validatedDataReturned:false,saveAttempted:false,committed:false,persistence:'not-attempted',retry:'retry'};
       exportButton.disabled=true;
       let phase='account';
+      const progressId=[...crypto.getRandomValues(new Uint8Array(16))].map(n=>n.toString(16).padStart(2,'0')).join(''),started=Date.now();
+      let lastProgress=null,progressEvents=0,uiUpdates=0,lastMessage='Confirming the saved Fanatical account',lastActivity=Date.now();
+      const show=message=>{lastMessage=message;status.textContent=message+'...';uiUpdates++;};
+      const onProgress=event=>{
+        if(!active()||!importing||phase!=='acquisition'||event.source!==window||event.origin!==location.origin||event.data?.channel!=='gl-fanatical-progress'||event.data.progressId!==progressId)return;
+        const p=tools.scanProgress(event.data.progress);if(!p||p.sequence<=(lastProgress?.sequence??0))return;
+        lastProgress=p;progressEvents++;lastActivity=Date.now();show(tools.progressMessage(p));
+      };
+      window.addEventListener('message',onProgress);show(lastMessage);
+      const heartbeat=setInterval(()=>{if(active()&&importing){status.textContent=lastMessage+'... '+Math.floor((Date.now()-started)/1000)+' seconds elapsed.'+(phase==='acquisition'&&Date.now()-lastActivity>=1000?' Waiting for Fanatical; the check is still pending.':'');uiUpdates++;}},1000);
       try {
+        report.extensionVersion=chrome.runtime.getManifest().version;report.browserFamily=chrome.runtime.getURL('').startsWith('moz-extension://')?'firefox':'chromium';report.mode=mode;
         const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'fanatical' });
         if(!active())return;
         if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Fanatical sync state.');
         const fullRescan = mode === 'full' || !(state.hasAcquisitionBaseline ?? state.hasFullBaseline);
-        status.textContent = fullRescan ? 'Reading your completed Fanatical order history...' : 'Checking Fanatical for newly completed orders...';
+        report.mode=fullRescan?'full':'incremental';show(fullRescan ? 'Reading your completed Fanatical order history' : 'Checking Fanatical for newly completed orders');
         phase='acquisition';report.diagnostic=tools.failureReport();
         const projection = await globalThis.GalacticSync.send({
           type: 'FETCH_FANATICAL_ORDERS',
+          progressId,
           fullScan: fullRescan,
           knownOrderFingerprints: fullRescan ? [] : state.syncState?.knownOrderFingerprints ?? []
         });
@@ -47,7 +60,7 @@
         if (!projection?.ok) throw new Error(tools.failureMessage(report.diagnostic.category));
         report.validatedDataReturned=true;
         const items = globalThis.GalacticFanatical.fanaticalItemsFromProjection(projection.result);
-        status.textContent = items.length ? `Saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally...` : 'No new supported Fanatical items; recording the completed check...';
+        show(items.length ? `Comparing and saving ${items.length} Fanatical item${items.length === 1 ? '' : 's'} locally` : 'No new supported Fanatical items; recording the completed check');
         phase='save';report.saveAttempted=true;report.persistence='unconfirmed';
         const response = await globalThis.GalacticSync.send({
           type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
@@ -57,6 +70,7 @@
         if(!active())return;
         if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
         report.committed=true;report.persistence='committed';
+        report.savedItems=items.length;
         const stats = projection.result ?? {};
         if(stats.recovery){status.textContent=`Saved ${stats.ordersScanned} Fanatical purchase${stats.ordersScanned===1?'':'s'}. ${stats.recovery.failedOrders?`${stats.recovery.failedOrders} purchase${stats.recovery.failedOrders===1?" couldn't":"s couldn't"} be loaded and will be retried by Quick update. `:''}${stats.recovery.listingIncomplete?'Some purchase history could not be checked and will be retried by Quick update. ':''}Earlier purchases were kept.`;return;}
         const scope = fullRescan
@@ -71,6 +85,9 @@
         if(!active())return;
         status.textContent = `Fanatical import failed: ${message} For a scan report, enable provider diagnostics in GL Settings, reload this page and retry.`;
       } finally {
+        clearInterval(heartbeat);window.removeEventListener('message',onProgress);importing=false;
+        report.elapsedMs=Date.now()-started;report.progress=lastProgress;report.progressEvents=progressEvents;report.uiUpdates=uiUpdates;
+        report.phase=phase;report.outcome=report.committed?(report.diagnostic?.acquisitionFinished?'complete':'partial'):'failed';
         if(active()){
           report.retry=report.committed?(report.diagnostic?.acquisitionFinished?'none':'quick'):report.diagnostic?.category==='authentication'?'sign-in':report.diagnostic?.category==='scope'?'check-account':'retry';
           exportButton.disabled=false;

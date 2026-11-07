@@ -74,5 +74,20 @@
     const reason={authentication:'Fanatical could not authorize the request. Sign in to Fanatical, then retry.',shape:'Fanatical returned an unrecognized purchase list. Retry later; export the scan report if this continues.',listing:'The purchase list could not be loaded. Retry the import.',continuation:'The next purchase page could not be verified. Retry the import.',summary:'A purchase could not be read safely. Retry later; export the scan report if this continues.',detail:'Purchase details could not be read. Retry the import.',limit:'The scan reached a safety limit. Export the scan report for support.',scope:'The signed-in account or purchase history changed. Check the selected account before retrying.',validation:'The purchase information could not be validated. Retry later; export the scan report if this continues.',storage:'The purchases could not be saved locally. Check available browser storage, then retry.',unknown:'The purchase check stopped unexpectedly. Retry later; export the scan report if this continues.',unavailable:'The purchase check returned no usable result. Reload the Fanatical page, then retry.'};
     return `${reason[category]??reason.unavailable} No purchases were saved by this attempt; earlier records were kept.`;
   }
-  global.GalacticFanatical = { fanaticalMediaType, fanaticalItemsFromProjection, scanReport, failureReport, failureMessage };
+  function scanProgress(value){
+    if(!value||!['listing','details','retry','validating'].includes(value.phase))return null;
+    const result={phase:value.phase};
+    for(const key of ['sequence','pages','discovered','scheduled','completed','failed','active','retries','validatedItems','elapsedMs']){
+      const max=key==='elapsedMs'?Number.MAX_SAFE_INTEGER:key==='validatedItems'?500000:key==='retries'?300000:key==='sequence'?1000000:100000;
+      if(!Number.isSafeInteger(value[key])||value[key]<0||value[key]>max)return null;result[key]=value[key];
+    }
+    if(result.completed>result.scheduled||result.active>3||result.completed+result.active>result.scheduled||result.failed>result.completed)return null;
+    return result;
+  }
+  function progressMessage(p){
+    if(p.phase==='listing')return 'Reading Fanatical purchase pages: '+p.pages+' read | '+p.discovered+' purchases found';
+    if(p.phase==='validating')return 'Checking acquired purchase information';
+    return (p.phase==='retry'?'Retrying a purchase request':'Reading purchase details')+': '+p.completed+' of '+p.scheduled+' checked | '+p.active+' active'+(p.failed?' | '+p.failed+' unreadable':'')+(p.retries?' | '+p.retries+' retries':'');
+  }
+  global.GalacticFanatical = { fanaticalMediaType, fanaticalItemsFromProjection, scanReport, failureReport, failureMessage,scanProgress,progressMessage };
 }(globalThis));

@@ -377,7 +377,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       target: { tabId: sender.tab.id },
       world: 'MAIN',
       func: readFanaticalOrdersInPage,
-      args: [{ diagnostics:true, fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
+      args: [{ diagnostics:true, progressId:/^[a-f0-9]{32}$/u.test(request.progressId??'')?request.progressId:'', fullScan: request.fullScan === true, knownOrderFingerprints: fanaticalSyncState({ knownOrderFingerprints: request.knownOrderFingerprints }).knownOrderFingerprints }]
     })
       .then((results) => {
         const tools=globalThis.GalacticFanatical,value=results?.length===1?results[0]?.result:null;

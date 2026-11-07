@@ -161,7 +161,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     const epicSender=()=>({id:epicRuntime.id,frameId:0,url:'https://store.epicgames.com'+location.pathname,tab:{id:1,url:'https://store.epicgames.com'+location.pathname}});
     let epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});
     const reloadEpicDiagnostics=()=>{epicAuth=createEpicAuthDiagnostics({area:authArea,runtime:epicRuntime});};
-    globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
+    globalThis.chrome={storage:{local:{get:denied,set:denied},session:{get:denied,set:denied}},runtime:{getManifest:()=>({version:'1.0.0'}),getURL:path=>location.origin+'/'+path,sendMessage:async request=>{
       if(request.type==='VALIDATE_AUDIBLE_ITEMS')return {ok:true,statuses:audibleItemStatuses(request.items)};
       if(request.type==='VALIDATE_KOBO_ITEMS')return {ok:true,statuses:koboItemStatuses(request.items)};
       if(request.type==='VALIDATE_KINDLE_ITEMS')return {ok:true,statuses:kindleItemStatuses(request.items)};

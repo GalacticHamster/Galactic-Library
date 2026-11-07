@@ -41,6 +41,8 @@ Sign-in errors stop the import and keep saved purchases unchanged. A valid empty
 
 ## Fanatical purchase recovery
 
+While GL reads Fanatical purchases, the panel shows pages read, purchases found and the number of scheduled purchase-detail checks finished. One purchase may contain several products, so these are not item totals. Slow responses show elapsed time and a waiting message; waiting alone does not mean the import failed. Comparing and saving is a separate phase, and success appears only after the save is confirmed. Progress stays on this page and is not saved as a per-purchase log.
+
 If a Fanatical page or individual order cannot be loaded, GL saves independently validated purchases and keeps earlier purchases and history. **Quick update** retries by re-reading the available listing pages while skipping unchanged, validated order details. If a page failed, GL reports unchecked history without guessing how many purchases are missing.
 
 A clean headerless order list remains a successful import. It does not authorize moving omitted purchases into earlier-import history. A partial import also leaves the complete Full checkpoint unchanged; only a later complete Full rescan can reconcile omissions. Sign-in failures stop the import and preserve saved purchases.
