@@ -47,6 +47,12 @@ try{
 }catch(error){document.documentElement.dataset.result=JSON.stringify({error:error.message});}
 `));
 const temporary=await mkdtemp(join(tmpdir(),'gl-gog-epic-native-'));let child,driver,session,exited;
+async function stopBrowser(){
+  // Terminate only the process spawned by this test, never other Firefox windows.
+  driver?.close?.();
+  if(child&&child.exitCode===null&&child.signalCode===null)child.kill();
+  if(exited){let timer;try{await Promise.race([exited,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Test browser did not exit within five seconds.')),5000);})]);}finally{clearTimeout(timer);}}
+}
 try{
   const profile=join(temporary,'profile'),stage=join(temporary,'extension');await mkdir(profile);await mkdir(stage);
   for(const [name,bytes]of files){const target=join(stage,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);}
@@ -56,6 +62,7 @@ try{
   async function startBrowser(){
   const port=firefox?await freePort():0;if(firefox)await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("extensions.update.enabled",false);\nuser_pref("toolkit.telemetry.enabled",false);\nuser_pref("network.captive-portal-service.enabled",false);\n`);
   child=spawn(binary,firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe',`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});
+  child.stdout?.resume();child.stderr?.resume();
   exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});driver=firefox?await firefoxMarionette(port):chromePipe(child);
   if(firefox){await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox'}}});const archive=join(temporary,'extension.zip');await writeFile(archive,runtimeZip(files));await driver.send('Addon:Install',{path:archive,temporary:true});
     await driver.send('Marionette:SetContext',{value:'chrome'});
@@ -81,8 +88,8 @@ try{
   let reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
   let d=await read(reportUrl);assert.equal(d.error,undefined);assert.equal(d.count,499);assert.equal(d.owned,499);assert.equal(d.fullAt,null);assert(d.roundTrip);const refs=d.refs;
   console.log('PASS '+provider+' installed: initial 499/500 partial acquisition committed without full checkpoint; backup roundtrip');
-  if(firefox)await driver.send('Marionette:Quit',{flags:['eForceQuit']});else await driver.send('Browser.close');
-  await exited;driver.close?.();await startBrowser();
+  if(firefox)await stopBrowser();else{await driver.send('Browser.close');await stopBrowser();}
+  await startBrowser();
   await open('?auth');reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');status=await sync();assert.match(status,/failed/);let failed=await read(reportUrl);assert.deepEqual(failed.refs,refs);assert.equal(failed.count,499);
   await open('?broken');status=await sync();assert.match(status,/failed/);failed=await read(reportUrl);assert.deepEqual(failed.refs,refs);
   console.log('PASS '+provider+' installed: later authentication and malformed top-level responses do not publish partial success');
@@ -95,6 +102,6 @@ try{
   await open('');status=await sync();assert(!status.includes('failed'),status);d=await read(reportUrl);assert.equal(d.count,500);assert(d.fullAt);assert(d.roundTrip);
   console.log('PASS '+provider+' installed: later clean Full establishes existing reconciliation authority and persistence');
 }finally{
-  if(firefox&&driver)try{await driver.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}child?.kill();driver?.close?.();if(exited)await exited;await new Promise(done=>server.close(done));
+  await stopBrowser();await new Promise(done=>server.close(done));
   const target=resolve(temporary),base=resolve(tmpdir());if(target.startsWith(base+sep)&&target.slice(base.length+1).startsWith('gl-gog-epic-native-'))await rm(target,{recursive:true,force:true,maxRetries:5,retryDelay:200});
 }
