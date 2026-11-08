@@ -29,6 +29,53 @@ It rejects named panels that did not use `render`. It retains the original
 provider-specific attachment timing, including Xbox route/hydration recovery.
 Rendering never starts a scan or changes save authority.
 
+## Humble and Fanatical importer ownership
+
+Only these two provider panels call `importerOwnership` after attaching. The
+worker's `provider-importer.js` probes existing authorized identities with API-1
+PING and checks the provider role, readiness and importer capability. Released
+1.x peers with the established role/readiness handshake remain compatible.
+This read-only check neither creates a purchase relationship nor reads purchases.
+Current peers additionally answer GET_IMPORTER_STATUS by checking their own live
+content script in the requesting provider tab; the response contains only UI
+presence. A missing/stale panel offers reload, rather than a false working UI.
+Legacy 1.x peers do not advertise that page-liveness check; reload their provider
+page after an installation/update. In-memory routing hints distinguish known
+Humble and Fanatical custom IDs, but never establish current availability.
+
+GL hides its duplicate host when the companion owns imports. No-receiver results
+restore the standalone GL panel; uncertain/time-out results offer recovery and
+never automatically acquire through GL. The choice is not persisted. Foreground
+checks run every 30 seconds and on focus/visibility changes; import clicks recheck
+before acquisition. Already-running GL imports finish before UI handoff. Stale
+companion DOM is hidden when its extension is unavailable. No new permissions or
+purchase-sync authorization are involved. Existing independent storage writers,
+partial receipts, account checks and synchronization remain unchanged.
+
+The provider launch action opens a fixed Humble/Fanatical URL, not a peer-supplied
+URL or remote acquisition endpoint. The active importer starts only on a user
+click. Providers retains the existing Connect and sync workflow and account tools.
+
+## Follow-up: acquisition code sharing
+
+UI ownership is intentionally separate from engine consolidation. GL/HB Humble
+both retrieve purchase-list/detail evidence, but HB also retains richer purchase
+summaries/prices and key evidence; GL projects records into its provider/profile
+model. Their incremental refresh and partial receipts have different contracts.
+GL/FAN both enumerate orders, validate detail/product identity and retry failures;
+FAN has a stricter supported purchase projection and explicit partial receipt
+sets, while GL maps to provider snapshots and scan leases. Neither an array-only
+response nor a successful HTTP request establishes full coverage. Writers and
+diagnostic exports are extension-specific and must not be blindly unified.
+
+A separate pilot could extract pure Fanatical pagination/header parsing and
+bounded retry decisions with the existing shared fixture matrix, mirrored at build
+time using the established shared-source workflow. First prove equivalent outcomes
+for counts, ranges, missing/ambiguous links, failed details and account/session
+changes in both engines. Keep authentication context, account admission, ownership
+projection, atomic persistence and consented sync extension-specific. Do not add a
+runtime package dependency or migrate saved checkpoints merely for code reuse.
+
 The common hierarchy is heading, short WHAT description, account controls,
 import actions, ordinary status, collapsed HOW help, specialized workflows,
 then enabled diagnostics. A single scroll body reserves room for keyboard focus

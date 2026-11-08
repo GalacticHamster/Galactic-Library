@@ -36,6 +36,7 @@ import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
 import {OBSERVATION_KEY,OBSERVATION_HEAD_KEY} from '../lib/observation-overlays.js';
 import {createWorkerLifecycleDiagnostics} from '../lib/worker-lifecycle-diagnostics.js';
 import {PROVIDERS} from '../lib/constants.js';
+import {createProviderImporterHandler} from './provider-importer.js';
 import {effectiveOwnershipRecord} from '../lib/ownership.js';
 
 let workerLifecycle,purchaseSync;
@@ -81,6 +82,7 @@ async function observePurchaseSync(database,initialize=false){
 const { getDatabase, getGoogleBooksApiKey, mergeProviderItems, replaceProviderItems, saveKindleComicContents } = storageWriter;
 chrome.runtime.onMessage.addListener(createStorageMessageHandler(storageWriter, chrome.runtime));
 chrome.runtime.onMessage.addListener(createXboxNavigationHandler(chrome));
+chrome.runtime.onMessage.addListener(createProviderImporterHandler({browser:chrome,allowed:()=>storageWriter.getAllowedExternalClientIds(),isProviderPage:isProviderImportPage}));
 const contentsPerformance=globalThis.GalacticContentsPerformance;
 const contentsUiTimings=contentsPerformance.collector();
 const companionTimings=contentsPerformance.collector();

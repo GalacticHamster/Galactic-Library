@@ -9,8 +9,12 @@
   globalThis.GalacticFloatingPanel.render(shadow,'humble',{onImport:sync});
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const status = shadow.querySelector('.status');
+  let importing=false,ownership;
 
   async function sync(mode) {
+    if(importing||ownership&&!await ownership.check())return;
+    if(importing)return;
+    importing=true;
     buttons.forEach((button) => { button.disabled = true; });
     status.dataset.busy = 'true';
     try {
@@ -41,11 +45,14 @@
       await globalThis.GalacticSync.failed('humble',error);
       status.textContent = `Humble import failed: ${error.message}`;
     } finally {
+      importing=false;
       buttons.forEach((button) => { button.disabled = false; });
       delete status.dataset.busy;
+      ownership?.present();
     }
   }
 
   globalThis.GalacticFloatingPanel?.attach(shadow, 'humble');
   document.documentElement.append(host);
+  ownership=globalThis.GalacticFloatingPanel.importerOwnership(host,'humble',()=>importing);
 }());

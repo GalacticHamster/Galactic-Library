@@ -168,6 +168,7 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
       if(request.type==='VALIDATE_KINDLE_ITEMS')return {ok:true,statuses:kindleItemStatuses(request.items)};
       if(request.type==='VALIDATE_STEAM_TITLES')return {ok:true,statuses:steamTitleStatuses(request.titles)};
       if(request.type==='GET_PROVIDER_DIAGNOSTICS_SETTING')return {ok:true,enabled:providerDiagnosticsEnabled};
+      if(request.type==='GET_PROVIDER_IMPORTER')return {ok:true,owner:'galactic',provider:request.provider};
       if(request.type==='EPIC_AUTH_DIAGNOSTICS')return new Promise(resolve=>epicAuth.handle(request,epicSender(),resolve));
       if(request.type==='GET_KINDLE_CONTENTS_REFRESH')return {ok:true,eligible:0,checkpoint:null};
       if(request.type==='GET_PROVIDER_PROFILE'){const d=await writer.getDatabase(),p=d.providerProfiles[d.providers[provider]?.activeProfileId],profiles=Object.values(d.providerProfiles).filter(p=>p.provider===provider);return {ok:true,profileLabel:p?.nickname??'fixture',profileId:p?.profileId,profiles,reuseAllowed:profiles.length===1&&p?.state.connected===true&&Boolean(p?.state.lastSync)};}

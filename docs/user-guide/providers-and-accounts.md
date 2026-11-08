@@ -16,6 +16,21 @@ or change their ownership.
 
 ## Add your first library
 
+On Humble and Fanatical, a responsive **Humble Library** or **Fanatical Library**
+handles imports when installed. GL hides its duplicate importer. Use **Import new
+purchases** or **Rescan all purchases** in the companion's panel, including its
+progress, recovery and diagnostic controls. In GL Providers, **Open importer**
+opens the store page; it never starts a scan. Choose **Connect and sync** separately
+to share already-saved purchases with GL. Being installed or responding to a
+connection check does not grant purchase-sharing permission.
+
+Without the companion, GL's usual importer remains available. If an extension is
+installed, enabled or updated while a store page is open, reload the page when
+prompted. If it cannot be verified, use **Check importer again** or reload after
+checking that it is enabled. GL does not start a competing scan automatically.
+Disabling/removing a companion restores GL's importer on the next foreground
+check or page reload. Existing purchases, corrections and saved accounts remain.
+
 Choose **Add a library** from an empty Library or the toolbar popup. In Providers,
 expand a provider and open its website. Sign in to the account you want to
 import. The Galactic Library panel can use an unnamed **Default account** for

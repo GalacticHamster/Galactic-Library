@@ -16,7 +16,7 @@ export function fixture(start='/en/orders'){
  const calls=[];let getState=async()=>({ok:true,hasFullBaseline:true}),fetch=async()=>({ok:true,result:{items:[]}}),commit=async()=>({ok:true,gameCount:1,bookCount:0,audiobookCount:0});
  const c={console,Blob,crypto:webcrypto,chrome:{runtime:{getManifest:()=>({version:'1.0.0'}),getURL:()=> 'chrome-extension://synthetic/'}},clearInterval(){},removeEventListener(name){delete events[name];},URL:{createObjectURL:blob=>{reports.push(blob.text());return 'blob:synthetic';},revokeObjectURL(){}},setTimeout:fn=>fn(),location:{origin:'https://www.fanatical.com',href:'https://www.fanatical.com'+start,pathname:start},document:{createElement:()=>new Element(),documentElement:{append:node=>roots.push(node)}},
   MutationObserver:class{constructor(fn){this.callback=fn;}observe(){}},addEventListener:(name,fn)=>{events[name]=fn;},setInterval:fn=>polls.push(fn),
-  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch(m):commit();},failed:async(_,error)=>{failures.push(error.message);}}};
+  GalacticFanatical:{fanaticalItemsFromProjection:()=>[]},GalacticFloatingPanel:{render(shadow,provider,{onImport}){for(const button of shadow.buttons)button.addEventListener('click',()=>onImport(button.dataset.mode));},attach(){},importerOwnership(){return {check:async()=>true,present(){}};}},GalacticSync:{send:async m=>{calls.push(m.type);return m.type==='GET_PROVIDER_SYNC_STATE'?getState():m.type==='FETCH_FANATICAL_ORDERS'?fetch(m):commit();},failed:async(_,error)=>{failures.push(error.message);}}};
  c.globalThis=c;c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),c);vm.runInContext(source,c);
  const navigate=(path,signal='poll')=>{c.location.pathname=path;c.location.href='https://www.fanatical.com'+path;if(signal==='poll')polls.forEach(fn=>fn());else events[signal]();};
  return {c,events,roots,calls,reports,failures,navigate,runAgain:()=>vm.runInContext(source,c),setState:fn=>{getState=fn;},setFetch:fn=>{fetch=fn;},setCommit:fn=>{commit=fn;}};
@@ -41,7 +41,8 @@ export const fanaticalNavigationTests=[
   if(stage==='fetch')f.setFetch(()=>new Promise(resolve=>{finish=resolve;}));
   if(stage==='commit')f.setCommit(()=>new Promise(resolve=>{finish=resolve;}));
   const old=f.roots[0],pending=old.shadow.buttons[0].listeners.click();
-  for(let n=0;n<8&&!finish;n++)await Promise.resolve();assert(finish);
+  // The click now awaits read-only importer ownership before the scan state.
+  for(let n=0;n<32&&!finish;n++)await Promise.resolve();assert(finish);
   f.navigate('/en/bundle/fixture');assert.equal(f.roots.length,0);
   f.navigate('/en/orders');const fresh=f.roots[0];assert.notEqual(fresh,old);
   finish(stage==='state'?{ok:true,hasFullBaseline:true}:stage==='fetch'?{ok:true,result:{items:[]}}:{ok:true,gameCount:1});await pending;

@@ -16,7 +16,7 @@
     const buttons = [...shadow.querySelectorAll('button[data-mode]')];
     const status = shadow.querySelector('.status');
     const tools=globalThis.GalacticFanatical,exportButton=shadow.querySelector('[data-export-scan]');
-    let report=null,importing=false;
+    let report=null,importing=false,ownership;
     exportButton.addEventListener('click',()=>{
       if(!report)return;
       try{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
@@ -25,7 +25,7 @@
     });
 
     async function sync(mode) {
-      if(!active()||importing)return;importing=true;
+      if(!active()||importing||ownership&&!await ownership.check())return;if(!active()||importing)return;importing=true;
       buttons.forEach((button) => { button.disabled = true; });
       status.dataset.busy = 'true';
       report={provider:'fanatical',format:1,diagnostic:null,validatedDataReturned:false,saveAttempted:false,committed:false,persistence:'not-attempted',retry:'retry'};
@@ -86,6 +86,7 @@
         status.textContent = `Fanatical import failed: ${message} For a scan report, enable provider diagnostics in GL Settings, reload this page and retry.`;
       } finally {
         clearInterval(heartbeat);window.removeEventListener('message',onProgress);importing=false;
+        ownership?.present();
         report.elapsedMs=Date.now()-started;report.progress=lastProgress;report.progressEvents=progressEvents;report.uiUpdates=uiUpdates;
         report.phase=phase;report.outcome=report.committed?(report.diagnostic?.acquisitionFinished?'complete':'partial'):'failed';
         if(active()){
@@ -99,6 +100,7 @@
 
     globalThis.GalacticFloatingPanel?.attach(shadow, 'fanatical');
     document.documentElement.append(host);
+    ownership=globalThis.GalacticFloatingPanel.importerOwnership(host,'fanatical',()=>importing);
   }
   function refresh() {
     if(routeUrl!==location.href){routeUrl=location.href;generation++;currentHost?.remove();currentHost=null;}

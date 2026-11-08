@@ -1,5 +1,6 @@
 [
   "manifest.json",
+  "src/background/provider-importer.js",
   "LICENSE",
   "NOTICE",
   "src/providers/kobo-diagnostics.js",

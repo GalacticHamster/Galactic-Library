@@ -280,5 +280,45 @@
     panel.append(minimize);
     shadow.append(style, restore);
   }
-  global.GalacticFloatingPanel = { render,attach,diagnosticsEnabled };
+  // Ownership is a presentation decision, never a purchase-sharing grant.
+  function importerOwnership(host,provider,isBusy=()=>false){
+    if(!['humble','fanatical'].includes(provider))return {check:async()=>true,dispose(){}};
+    const selector=provider==='humble'?'#hcl-importer':'#fanatical-library-importer';
+    const name=provider==='humble'?'Humble Library':'Fanatical Library';
+    let disposed=false,pending=null,owner='checking',pageReady,lastCheck=0,seenPeer=null,arrivalTimer;
+    const notice=document.createElement('aside');notice.dataset.importerOwnership=provider;
+    notice.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483647;max-width:320px;padding:14px;background:var(--gh-surface,#202938);color:var(--gh-text,#fff);border:1px solid var(--gh-border,#677);border-radius:8px;font:14px/1.4 system-ui;';
+    const text=document.createElement('p'),retry=document.createElement('button'),reload=document.createElement('button');
+    text.setAttribute('role','status');retry.textContent='Check importer again';reload.textContent='Reload provider page';
+    retry.type=reload.type='button';notice.append(text,retry,reload);notice.hidden=true;host.after(notice);
+    const show=(node,visible)=>{if(visible)node.style.removeProperty('display');else node.style.setProperty('display','none','important');};
+    function present(){
+      if(disposed)return;
+      const peer=document.querySelector(selector);
+      if(peer!==seenPeer){seenPeer=peer;if(peer){clearTimeout(arrivalTimer);arrivalTimer=setTimeout(()=>check(),250);}}
+      // Finish an already-started GL import before changing its interface.
+      const running=isBusy();show(host,running||owner==='galactic');
+      if(peer)show(peer,!running&&owner!=='galactic'&&pageReady!==false);
+      const missing=owner==='companion'&&(!peer||pageReady===false);
+      notice.hidden=running||!(missing||owner==='unavailable');
+      const message=missing?name+' manages imports. Reload this page to show its importer. Connect and sync in GL Providers to share saved purchases.':'Could not verify '+name+'. No import has started. Check that the extension is enabled, then check again or reload this page.';
+      if(text.textContent!==message)text.textContent=message;
+    }
+    async function check(){
+      if(disposed)return false;if(pending)return pending;
+      pending=(async()=>{try{const result=await chrome.runtime.sendMessage({type:'GET_PROVIDER_IMPORTER',provider});if(disposed)return false;owner=result?.ok===true&&['galactic','companion','unavailable'].includes(result.owner)?result.owner:'unavailable';pageReady=result?.pageReady;}
+      catch{owner='unavailable';}finally{lastCheck=Date.now();pending=null;present();}return owner==='galactic';})();return pending;
+    }
+    retry.addEventListener('click',check);reload.addEventListener('click',()=>global.location.reload());
+    const focus=()=>{if(Date.now()-lastCheck>1000&&!document.hidden)check();};
+    global.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);
+    const observer=new MutationObserver(()=>{if(!host.isConnected){dispose();return;}present();});
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+    // No persisted installed flag. A bounded live check also recovers enable/disable
+    // transitions while the provider page stays in the foreground.
+    const timer=global.setInterval(()=>{if(!document.hidden&&!isBusy())check();},30000);
+    function dispose(){if(disposed)return;disposed=true;clearTimeout(arrivalTimer);clearInterval(timer);observer.disconnect();global.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);notice.remove();const peer=document.querySelector(selector);if(peer)show(peer,true);}
+    show(host,false);check();return {check,present,dispose};
+  }
+  global.GalacticFloatingPanel = { render,attach,diagnosticsEnabled,importerOwnership };
 }(globalThis));
