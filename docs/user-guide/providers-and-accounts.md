@@ -143,6 +143,14 @@ If a Fandango grid stops loading or contains unreadable cards, GL saves independ
 
 Run **Full rescan** to recover unchecked Fandango titles. **Quick update** performs that Full traversal while recovery is pending, because stopping at known titles could miss older unchecked cards. After successful recovery, Quick returns to its normal newest-first early stop. Only a completed, count-validated Full rescan can move omitted records to Earlier imports.
 
+For an intermittent Fandango import error, enable **Settings → Troubleshooting →
+Enable provider diagnostics**, reload the provider page and retry. Open **Scan
+diagnostics → Export scan report** before starting another check. The last import
+report follows the movie-to-TV navigation and contains scan mode, stopping
+reasons, aggregate parsing/rejection counts and save acknowledgment, without
+titles, product IDs or account details. **Check movie listing (no import)** runs
+a separate read-only diagnostic and replaces that report.
+
 For a Fandango movie-count failure, open **My Library → GL panel → Scan
 diagnostics → Check movie listing (no import)**. This opens Movies View All and
 checks the rendered listing without saving library records. When finished,

@@ -6,11 +6,34 @@
   host.id = 'galactic-library-fandango-at-home-importer';
 
   const shadow = host.attachShadow({ mode: 'closed' });
-  globalThis.GalacticFloatingPanel.render(shadow,'fandango-at-home',{onImport:sync,diagnostics:"<details data-scan-diagnostics><summary>Scan diagnostics</summary><p>Check the movie listing without importing. From My Library, this opens Movies View All and scrolls through its cards. The report contains counts and page structure, with no titles, product IDs or account information.</p><button type=\"button\" data-check-listing>Check movie listing (no import)</button> <button type=\"button\" data-export-report disabled>Export scan report</button></details>"});
+  globalThis.GalacticFloatingPanel.render(shadow,'fandango-at-home',{onImport:sync,diagnostics:"<details data-scan-diagnostics><summary>Scan diagnostics</summary><p>Export the last import report, or check the movie listing without importing. From My Library, this opens Movies View All and scrolls through its cards. The report contains counts and page structure, with no titles, product IDs or account information.</p><button type=\"button\" data-check-listing>Check movie listing (no import)</button> <button type=\"button\" data-export-report disabled>Export scan report</button></details>"});
   const buttons = [...shadow.querySelectorAll('button[data-mode]')];
   const checkButton=shadow.querySelector('[data-check-listing]'),exportButton=shadow.querySelector('[data-export-report]');
   const diagnosticKey='galactic-library-fandango-listing-check';
-  let diagnosticReport=null;
+  const importDiagnosticKey='galactic-library-fandango-import-diagnostics';
+  // This tab-local aggregate report carries no scan authority or item data.
+  function savedImportDiagnostics(){
+    try{
+      const raw=JSON.parse(sessionStorage.getItem(importDiagnosticKey)??'null');
+      if(raw?.kind!=='import'||raw.provider!=='fandango-at-home')return null;
+      const number=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+      const report={format:1,provider:'fandango-at-home',kind:'import',requestedMode:raw.requestedMode==='full'?'full':'incremental',effectiveMode:['quick','full'].includes(raw.effectiveMode)?raw.effectiveMode:null,outcome:['starting','reading','saving','success','partial','failed'].includes(raw.outcome)?raw.outcome:'failed',submittedRecords:number(raw.submittedRecords),acknowledgedRecords:number(raw.acknowledgedRecords),sections:[]};
+      for(const key of ['storedMovies','storedTv','saveElapsedMs'])report[key]=number(raw[key]);
+      for(const s of (Array.isArray(raw.sections)?raw.sections:[]).slice(0,2)){
+        if(!['movie','tv'].includes(s.section))continue;
+        const d={section:s.section,terminationReason:['known-group','empty-timeout','stable-bottom','scan-limit','interrupted'].includes(s.terminationReason)?s.terminationReason:null,incomplete:s.incomplete===true};
+        for(const key of ['passes','scrollIterations','tilesInspected','parsedObservations','duplicateObservations','rejectedObservations','uniqueParsed','knownMatches','newTitles','unresolvedTitles','failedItems','elapsedMs'])d[key]=number(s[key]);
+        d.rejectionReasons=Object.fromEntries(['missingTitle','invalidCard','conflict'].map(k=>[k,number(s.rejectionReasons?.[k])]));report.sections.push(d);
+      }
+      return report;
+    }catch{return null;}
+  }
+  let diagnosticReport=savedImportDiagnostics();
+  exportButton.disabled=!diagnosticReport;
+  function recordImport(patch){
+    diagnosticReport={...(savedImportDiagnostics()??{format:1,provider:'fandango-at-home',kind:'import',sections:[]}),...patch};
+    try{sessionStorage.setItem(importDiagnosticKey,JSON.stringify(diagnosticReport));}catch{}
+  }
   const status = shadow.querySelector('.status');
 
   function busy(value) {
@@ -91,14 +114,18 @@
 
   async function saveItems(items, expected, fullRescan, sections = []) {
     const incomplete = sections.some(section=>section.incomplete);
+    recordImport({outcome:'saving',submittedRecords:items.length,acknowledgedRecords:0});
     if(incomplete&&!items.length)throw Error('No readable Fandango titles could be saved. Earlier records were kept. Run Full rescan to retry.');
     const snapshot = incomplete ? {version:1,provider:'fandango-at-home',complete:false,itemCount:items.length,scopes:sections.map(section=>({id:section.id,readCount:items.filter(item=>item.mediaType===section.id).length,expectedCount:expected[section.id==='movie'?'movies':'tv'],pagesRead:section.passes,failedItems:section.failedItems,complete:false,limitReached:section.limitReached===true,end:'partial-acquisition',incomplete:section.incomplete,...(section.unavailable?{unavailable:true}:{})}))} : fullRescan ? globalThis.GalacticProviderSnapshot.completeProviderSnapshot('fandango-at-home', items, [
       globalThis.GalacticProviderSnapshot.completedScope('movie', items.filter((item) => item.mediaType === 'movie').length, expected.movies, 'reported-count'),
       globalThis.GalacticProviderSnapshot.completedScope('tv', items.filter((item) => item.mediaType === 'tv').length, expected.tv, 'reported-count')
     ]) : undefined;
     status.textContent = items.length ? `Saving ${items.length} Fandango at Home title${items.length === 1 ? '' : 's'} locally...` : 'No new Fandango at Home titles; recording the completed check...';
+    const saveStarted=Date.now();
     const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'fandango-at-home', mode: fullRescan ? 'full' : 'incremental', items, snapshot });
+    recordImport({saveElapsedMs:Date.now()-saveStarted});
     if (!response?.ok) throw new Error(response?.error ?? 'Fandango at Home import did not complete.');
+    recordImport({outcome:incomplete?'partial':'success',acknowledgedRecords:items.length,storedMovies:response.movieCount,storedTv:response.tvCount});
     if(incomplete){
       const counts=countsFor(items),names=sections.filter(section=>section.incomplete).map(section=>section.id==='movie'?'Movies':'TV Shows').join(' and ');
       status.textContent=`Saved ${counts.movies} readable movies and ${counts.tv} TV shows. ${names} could not be fully checked. Earlier records were kept. Run Full rescan to retry the unchecked titles.`;
@@ -160,6 +187,8 @@
         status.textContent = `Reading Fandango ${section === 'movie' ? 'Movies' : 'TV Shows'} View All grid: ${count}${expectedCount === null ? '' : ` / ${expectedCount}`} titles found (${passes} passes).`;
       }, fullRescan ? null : state.knownItemIds ?? [], {recover:true});
       const gridItems=Array.isArray(result)?result:result.items;
+      const prior=savedImportDiagnostics();
+      recordImport({outcome:'reading',effectiveMode:fullRescan?'full':'quick',sections:[...(prior?.sections??[]).filter(s=>s.section!==section),{section,...(result.diagnostics??{}),incomplete:result.incomplete===true}]});
       const sections=[...(state.sections??[]),{id:section,incomplete:result.incomplete===true,failedItems:result.failedItems??0,passes:result.passes??1,limitReached:result.limitReached===true}];
       if (!result.incomplete && expectedCount !== null && gridItems.length !== expectedCount) {
         throw new Error(`Fandango reported ${expectedCount} ${section === 'movie' ? 'movies' : 'TV shows'}, but its View All grid yielded ${gridItems.length}. No library changes were saved.`);
@@ -176,6 +205,7 @@
       await saveItems(completeItems, state.expected, fullRescan, sections);
       await importState('clear');
     } catch (error) {
+      recordImport({outcome:'failed'});
       await globalThis.GalacticSync.failed('fandango-at-home',error);
       await importState('clear').catch(() => {});
       status.textContent = `Fandango at Home import failed: ${error.message}`;
@@ -186,6 +216,8 @@
 
   async function sync(mode) {
     busy(true);
+    recordImport({requestedMode:mode,effectiveMode:null,outcome:'starting',sections:[],submittedRecords:0,acknowledgedRecords:0});
+    status.textContent='Preparing the Fandango at Home library check...';
     try {
       // View All is where a completed scan leaves the user. Validate the saved
       // account through the normal admission path before persisting navigation;
@@ -199,11 +231,13 @@
         return;
       }
       const fullRescan = mode === 'full' || !state.hasFullBaseline || state.syncState?.listingIncomplete===true;
+      recordImport({effectiveMode:fullRescan?'full':'quick'});
       if(state.syncState?.listingIncomplete&&mode!=='full')status.textContent='Earlier titles remain unchecked; running a Full rescan to recover them...';
       if (!state.hasFullBaseline && mode !== 'full') status.textContent = 'No full Fandango at Home baseline yet; reading every title once…';
       await importState('clear');
       await startFromMyLibrary(fullRescan, state.syncState?.knownProviderItemIds ?? []);
     } catch (error) {
+      recordImport({outcome:'failed'});
       await globalThis.GalacticSync.failed('fandango-at-home',error);
       status.textContent = `Fandango at Home import failed: ${error.message}`;
       busy(false);
