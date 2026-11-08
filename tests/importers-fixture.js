@@ -407,7 +407,8 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
     return new Response(captcha?'<input id="captchacharacters">':'<div id="bookDescription_feature_div">'+description+'</div>',{status:200});
   };
   // Reload the actual content script with a deliberately delayed saved queue.
-  // Nothing may begin while the read is pending, even a synthetic click.
+  // Contents actions cannot begin while their saved-state read is pending.
+  // Independent library imports still use their own account/scan admission.
   const frozen=await writer.beginKindleContentsRefresh('start',1);
   await writer.finishKindleContentsRefresh(frozen.refresh.runRef,frozen.refresh.leaseRef,1,'paused');
   const savedBefore=structuredClone(values.galacticLibraryKindleContentsRefresh);
@@ -423,6 +424,22 @@ checks.push(...await (await import('./provider-panel-restart-fixture.js')).check
   let primaryRect=rect(start),restartRect=rect(newRefresh);
   const preparedBefore=contentsMessages.filter(request=>request.type==='GET_KINDLE_COMIC_CONTENT_CANDIDATES').length;
   assert(start.disabled&&resume.disabled&&newRefresh.disabled&&selector.disabled,'Checkpoint loading exposed actionable contents controls.');
+  const contentsTransport=chrome.runtime.sendMessage,gogShadow=shadows.find(root=>root.host.id==='galactic-library-gog-importer'),gogAcquire=globalThis.GalacticGog.fetchGogGames;
+  globalThis.GalacticGog.fetchGogGames=async()=>({items:[{providerItemId:'fixture-123',title:'Test gog',mediaType:'game',ownership:'owned'}]});
+  let independentScans=0;
+  chrome.runtime.sendMessage=async request=>{
+    if(request.provider!=='gog')return contentsTransport(request);
+    if(request.type==='GET_PROVIDER_SYNC_STATE'){independentScans++;const scan=await writer.beginProviderScan('gog','fixture','incremental',false,1);return {ok:true,scanToken:scan.scanToken,hasFullBaseline:true,syncState:{knownProviderItemIds:[]}};}
+    if(request.type==='COMMIT_PROVIDER_SCAN'){const d=await writer.commitProviderScan('gog',request.items,{syncMode:'incremental'},request.snapshot,request.scanToken,1);return {ok:true,gameCount:d.providers.gog.itemCount};}
+    return contentsTransport(request);
+  };
+  try{
+    gogShadow.querySelector('[data-mode="incremental"]').click();
+    await wait(()=>!gogShadow.querySelector('.status').dataset.busy);
+    assert(independentScans===1&&!/failed/.test(gogShadow.querySelector('.status').textContent),'Independent GOG action: '+independentScans+' starts; '+gogShadow.querySelector('.status').textContent);
+    assert((await writer.getDatabase()).providers.gog.itemCount>0&&start.disabled,'GOG did not persist independently of pending Contents initialization');
+    checks.push('GOG library action persists through real writer while Kindle saved Contents state is pending');
+  }finally{chrome.runtime.sendMessage=contentsTransport;globalThis.GalacticGog.fetchGogGames=gogAcquire;}
   for(const button of [start,resume,newRefresh])button.dispatchEvent(new MouseEvent('click',{bubbles:true}));
   start.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
   delayedState=null;releaseState({ok:true,...await writer.getKindleContentsRefresh()});

@@ -57,6 +57,11 @@ Deliberate exceptions remain bounded:
   export control; no image, permission or collection changes are involved.
 - Kindle supplies only its unique workflow/footer markup and footer styles.
   Existing queue, pause/resume/stop, refresh controls and progress messages remain.
+  Library import does not wait for the saved Contents refresh checkpoint: it
+  acknowledges the click immediately, then waits for its own account preparation
+  and scan admission. Contents actions still require their saved state. An active
+  library import and active contents discovery remain mutually exclusive; late
+  checkpoint replies cannot enable contents controls during an import.
 - Audible's opt-in read-only history checker replaces the ordinary actions/help
   within the shared body and attaches without provider account controls. It is
   a diagnostic workflow, not a second import-shell implementation.
@@ -76,3 +81,7 @@ disposable installed Chrome/Firefox extensions. Existing importer and native
 controller suites separately test real callbacks, diagnostics, recovery and
 save guards with synthetic sources. Visual renders do not establish live
 provider compatibility. See the [inventory and validation ledger](../development/gl-provider-overlay-ux-audit.md).
+
+`node tests/kindle-native.mjs --readiness` (also with `--firefox`) exercises
+delayed Contents/account replies, duplicate gestures, account changes, runtime
+and writer failures through installed disposable extensions with synthetic data.

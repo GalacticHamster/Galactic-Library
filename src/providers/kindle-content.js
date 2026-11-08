@@ -103,10 +103,16 @@
   }
 
   async function sync(mode) {
-    if(syncing||comicContentsRunning||!controlsState.ready)return;
+    if(syncing||comicContentsRunning){
+      status.textContent=syncing?'A Kindle library update is already running. Please wait for it to finish.':'Contents discovery is running. Pause it before updating the Kindle library.';
+      return;
+    }
+    // Saved Contents refresh progress is only needed by contents actions.
+    // Library imports retain their own account, scan lease and writer checks.
     syncing=true;controlsState.invalidate();setSyncButtonsDisabled(true);renderContentsControls(true);
     libraryDiagnostics.textContent='';libraryDiagnostics.hidden=true;
     status.dataset.busy = 'true';
+    status.textContent=`Checking the Kindle account before starting ${mode==='full'?'Full rescan':'Quick update'}...`;
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
       if (!state?.ok) throw new Error(state?.error ?? 'Could not read the local Kindle sync state.');
