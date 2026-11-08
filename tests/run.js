@@ -640,7 +640,7 @@ const tests = [
     const database = { providerItems: { [steam.id]: steam }, providers: { steam: { connected: true, itemCount: 1 } } };
     assert.equal(isExtensionId('abcdefghijklmnopabcdefghijklmnop'), true);
     assert.deepEqual(normaliseExternalClientIds(['abcdefghijklmnopabcdefghijklmnop', 'bad', 'ponmlkjihgfedcbaponmlkjihgfedcba', 'abcdefghijklmnopabcdefghijklmnop']), ['abcdefghijklmnopabcdefghijklmnop', 'ponmlkjihgfedcbaponmlkjihgfedcba']);
-    assert.deepEqual(handleExternalApiRequest(database, { type: 'PING' }), { ok: true, apiVersion: 1, appVersion: '1.0.0' });
+    assert.deepEqual(handleExternalApiRequest(database, { type: 'PING' }), { ok: true, apiVersion: 1, appVersion: '1.0.1' });
     const response = handleExternalApiRequest(database, { type: 'MATCH_ITEMS', apiVersion: 1, items: [{ requestId: 'deathloop', mediaType: 'game', title: 'Deathloop' }] });
     assert.equal(response.ok, true);
     assert.equal(response.results[0].owned, true);

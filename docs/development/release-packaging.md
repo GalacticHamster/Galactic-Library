@@ -1,5 +1,28 @@
 # Release packaging (GL-18)
 
+For patch release candidates, keep published ZIPs and their reports unchanged.
+Use the existing `createRelease` builder with a separate, new versioned output
+directory (the default package command writes to `dist`). For example, from the
+repository root:
+
+```javascript
+import {createRelease} from './scripts/release.mjs';
+import {mkdir, writeFile} from 'node:fs/promises';
+const output = 'candidate-output/1.0.1'; // choose a new, untracked staging path
+await mkdir(output, {recursive: true});
+for (const target of ['chrome', 'firefox']) {
+  const release = await createRelease(undefined, undefined, target);
+  await writeFile(`${output}/GalacticLibrary-${release.report.version}${target === 'firefox' ? '-firefox' : ''}.zip`, release.zip, {flag: 'wx'});
+}
+```
+
+Firefox output is an unsigned ZIP, not a signed production XPI. Keep the exact
+source commit, source archive, build environment and hashes with the candidates.
+GL/FAN builders normalize runtime text line endings; HB's PowerShell builder
+preserves checkout bytes, so retain those bytes in its corresponding-source
+archive when reproducing a candidate. No protocol/schema version changes are
+needed for a package patch increment.
+
 Run with Node 20 or newer; no npm dependencies are required:
 
 ```powershell

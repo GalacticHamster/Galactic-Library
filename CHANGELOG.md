@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.1 — Release candidate
+
+- Preserve independently verified purchases during supported partial imports across Humble, Fanatical, GOG, Epic, Amazon Games, Amazon Video, Kindle, Audible, Kobo and Fandango. Earlier records and manual corrections remain protected; unresolved work can be retried without claiming complete coverage.
+- Keep provider-specific Quick updates incremental where supported, with clearer recovery guidance. Nintendo refreshes avoid unnecessary unchanged catalog saves and show capture progress.
+- Treat equivalent Epic product observations as duplicates rather than incomplete scans, retain warnings for conflicting records, and avoid full-catalog persistence on unchanged scans. Omitted Epic records are retained rather than treated as revoked purchases.
+- Let Kindle library updates start while unrelated Contents initialization is pending, acknowledge clicks immediately and use concise successful Quick update messages. Existing acquisition limits and account/save protections remain unchanged.
+- Restore Fandango Quick early stopping after a known tile finishes loading its title. Genuine unreadable cards and incomplete scans still remain protected; aggregate import diagnostics are available through the existing scan report.
+- Improve provider progress, waiting states and privacy-preserving failure reports, including Fanatical page-script errors and Steam applications that still need usable title/type information.
+
+Prepared locally for review; not submitted or published. No new permissions, storage schema or companion protocol changes. These changes are measured against published 1.0.0; companion transport semantics remain unchanged.
+
 ## 1.0.0 ? Local release candidate
 
 - Bring supported game, software, book, audiobook, movie and TV libraries together in one browser-local catalog.
