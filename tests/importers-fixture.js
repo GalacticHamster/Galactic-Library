@@ -78,6 +78,7 @@ const fixtures=[
   ['fandango-at-home','fandango-at-home','GalacticFandangoAtHome','readFandangoGrid','/content/browse/mylibrary']
 ];
 try{
+checks.push(...await (await import('./kindle-quick-message-browser-fixture.js')).checkKindleQuickMessages());
 checks.push(...await (await import('./provider-panel-restart-fixture.js')).checkProviderRememberedRestarts());
 // The same shared start path runs in both packaged browsers for all providers.
 {

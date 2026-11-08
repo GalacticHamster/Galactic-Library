@@ -12,6 +12,9 @@
   const comicContentsButton = shadow.querySelector('button[data-action="comic-contents"]');
   const pauseComicContentsButton = shadow.querySelector('button[data-action="pause-comic-contents"]');
   const status = shadow.querySelector('.status');
+  const libraryDiagnostics=document.createElement('p');
+  libraryDiagnostics.dataset.kindleScanDetails='';libraryDiagnostics.hidden=true;
+  shadow.querySelector('[data-contents-diagnostics]').closest('details').append(libraryDiagnostics);
   const contentsMode = shadow.querySelector('[data-contents-mode]');
   const resumeContentsButton=shadow.querySelector('[data-action="resume-contents"]');
   const stopContentsButton=shadow.querySelector('[data-action="stop-contents"]');
@@ -102,6 +105,7 @@
   async function sync(mode) {
     if(syncing||comicContentsRunning||!controlsState.ready)return;
     syncing=true;controlsState.invalidate();setSyncButtonsDisabled(true);renderContentsControls(true);
+    libraryDiagnostics.textContent='';libraryDiagnostics.hidden=true;
     status.dataset.busy = 'true';
     try {
       const state = await globalThis.GalacticSync.send({ type: 'GET_PROVIDER_SYNC_STATE', provider: 'kindle' });
@@ -113,6 +117,12 @@
         const documents = categoryCounts?.['personal-documents'] ?? 0;
         status.textContent = `Reading Kindle library: ${pagesRead} page${pagesRead === 1 ? '' : 's'} checked; ${books} items found (${documents} personal document${documents === 1 ? '' : 's'}).`;
       }, fullRescan ? null : state.syncState?.knownProviderItemIds ?? []);
+      const categoryDetails = Object.entries(diagnostics).map(([category, detail]) => {
+        const name = category === 'books' ? 'Books' : 'Personal Documents';
+        const reported = detail.reportedCount === null ? 'unknown' : detail.reportedCount;
+        return `${name}: Amazon reported ${reported}, returned ${detail.rawCount}, usable ${detail.readableCount}, duplicate IDs ${detail.duplicateCount}`;
+      }).join('; ');
+      libraryDiagnostics.textContent=`Last acquisition: ${categoryDetails}.`;libraryDiagnostics.hidden=false;
       status.textContent = items.length ? `Saving ${items.length} Kindle item${items.length === 1 ? '' : 's'} locally...` : 'No new Kindle items; recording the completed check...';
       const response = await globalThis.GalacticSync.send({ type: 'IMPORT_PROVIDER_ITEMS', provider: 'kindle', mode: fullRescan ? 'full' : 'incremental', items, snapshot,scanDiagnostics:{incomplete:incomplete===true,failedRequestCount:Object.values(diagnostics).reduce((n,d)=>n+(d.failedItems??0)+(d.failedPages??0),0)} });
       if (!response?.ok) throw new Error(response?.error ?? 'Kindle import did not complete.');
@@ -121,12 +131,14 @@
         status.textContent=`Saved ${items.length} readable Kindle item${items.length===1?'':'s'}. ${failedItems?`${failedItems} entries could not be validated. `:''}${failedPages?'Some library pages remain unchecked. ':''}Earlier records and access corrections were kept. Run Full rescan to recover unchecked history; Quick update will also run that Full rescan while recovery is pending.`;
         return;
       }
-      const categoryDetails = Object.entries(diagnostics).map(([category, detail]) => {
-        const name = category === 'books' ? 'Books' : 'Personal Documents';
-        const reported = detail.reportedCount === null ? 'unknown' : detail.reportedCount;
-        return `${name}: Amazon reported ${reported}, returned ${detail.rawCount}, usable ${detail.readableCount}, duplicate IDs ${detail.duplicateCount}`;
-      }).join('; ');
-      const scope = fullRescan ? coverageUnverified?'Library check finished; Amazon did not confirm complete coverage':'Full rescan complete' : `Quick update added ${items.length} Kindle item${items.length === 1 ? '' : 's'}`;
+      if(!fullRescan){
+        const added=response.changes?.added??items.length,updated=response.changes?.updated??0;
+        const additions=added?`${added.toLocaleString()} new item${added===1?'':'s'} added.`:'No new items found.';
+        const updates=updated?` ${updated.toLocaleString()} existing item${updated===1?'':'s'} updated.`:'';
+        status.textContent=`Kindle quick update complete. ${additions}${updates} ${response.bookCount.toLocaleString()} item${response.bookCount===1?'':'s'} stored locally.`;
+        return;
+      }
+      const scope = coverageUnverified?'Library check finished; Amazon did not confirm complete coverage':'Full rescan complete';
       status.textContent = `${scope}. ${response.bookCount} Kindle item${response.bookCount === 1 ? '' : 's'} stored locally. ${categoryDetails}.`;
     } catch (error) {
       await globalThis.GalacticSync.failed('kindle',error);

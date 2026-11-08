@@ -656,7 +656,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
       ...(request.provider==='nintendo'?{persistence:result.scanResult?.metadataOnly?'metadata-only':'catalog-saved'}:{}),
-      ...(['steam','epic','playstation','xbox','audible','nintendo'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
+      ...(['steam','epic','playstation','xbox','audible','nintendo','kindle'].includes(request.provider)?{changes:database.providers[request.provider].syncHealth?.differences}:{}),
       syncedAt: database.providers[request.provider].lastSync
     });})
     .catch((error) => reply({ ok: false, error: error.message }));
