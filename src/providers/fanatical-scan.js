@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-da80ea3524de1a69; contract 1; SHA-256 46b761a5abe176eaece4c5df0bd247c344fdf47ac78fb7dff51fc2e23a0f34b1
+// Pinned acquisition fanatical-v1-294d4e692f8516d7; contract 1; SHA-256 96fb5097b04290afecef379499db2171750c7eeeb481b3f3c72ade517779e9bf
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan' } = {}) {
@@ -8,6 +8,20 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   // Fixed counters only: never export provider statuses, keys, field names or values.
   const compatibility={version:1,counts:Object.fromEntries(['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'].map(key=>[key,0]))};
   const issue=key=>{compatibility.counts[key]++;};
+  // Bounded shapes at the failing boundary, never provider keys or values.
+  const bundleShape=(parent)=>{
+    const shapes=compatibility.bundleShapes??={version:1,records:[],truncated:false};
+    if(shapes.records.length>=8){shapes.truncated=true;return;}
+    const type=v=>v===undefined?'missing':v===null?'null':Array.isArray(v)?'array':['object','string','number','boolean'].includes(typeof v)?typeof v:'other';
+    const bundles=parent?.bundles;let child,size=null;
+    if(Array.isArray(bundles)){size=bundles.length;child=bundles[0];}
+    else if(bundles&&typeof bundles==='object'){size=0;for(const key in bundles)if(Object.hasOwn(bundles,key)){if(size===0)child=bundles[key];if(++size===2)break;}}
+    shapes.records.push({stage:diagnostic.stage==='summaries'?'summaries':'details',reason:bundles==null?'missing':Array.isArray(bundles)?'empty-array':'non-array',
+      parentType:type(parent),bundlesType:type(bundles),bundlesSize:size===null?'not-container':size===0?'empty':size===1?'one':'many',
+      parentId:type(parent?._id),parentName:type(parent?.name),parentGames:type(parent?.games),parentProducts:type(parent?.products),parentItems:type(parent?.items),parentTiers:type(parent?.tiers),
+      bundleGames:type(bundles?.games),bundleProducts:type(bundles?.products),bundleItems:type(bundles?.items),bundleTiers:type(bundles?.tiers),
+      childType:type(child),childId:type(child?._id),childName:type(child?.name),childGames:type(child?.games),childProducts:type(child?.products),childItems:type(child?.items),childTiers:type(child?.tiers)});
+  };
   const diagnostic = {listingEvidence,compatibility,stage:'authentication',pagesAttempted:0,pagesParsed:0,ordersRecognized:0,detailsParsed:0,retries:0,terminalReached:false,authentication:'unknown',httpStatus:null};
   const unresolved=new Set(),ineligible=new Set(),verified=new Set(),failureCounts=new Map();
   let discoveryComplete=true,unidentifiedRecords=0;
@@ -507,7 +521,7 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     const counts = new Map();
     for (const parent of parents) {
       if (!safeTextInPage(parent?.name)) bad('missingNames');
-      if (!Array.isArray(parent?.bundles) || !parent.bundles.length) bad(parent?.bundles==null?'missingBundles':'invalidBundles');
+      if (!Array.isArray(parent?.bundles) || !parent.bundles.length){bundleShape(parent);bad(parent?.bundles==null?'missingBundles':'invalidBundles');}
       for (const group of parent.bundles) {
         if (!Array.isArray(group?.games) || !group.games.length) bad(group?.games==null?'missingGames':'invalidGames');
         for (const leaf of group.games) {
@@ -632,8 +646,17 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
 
 function fanaticalCompatibilityReport(value){
   const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
-  if(!value||value.version!==1||Object.keys(value).some(k=>!['version','counts'].includes(k))||!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==fields.length||fields.some(k=>!Number.isSafeInteger(value.counts[k])||value.counts[k]<0||value.counts[k]>100000))return null;
-  return {version:1,counts:Object.fromEntries(fields.map(k=>[k,value.counts[k]]))};
+  if(!value||value.version!==1||Object.keys(value).some(k=>!['version','counts','bundleShapes'].includes(k))||!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==fields.length||fields.some(k=>!Number.isSafeInteger(value.counts[k])||value.counts[k]<0||value.counts[k]>100000))return null;
+  const result={version:1,counts:Object.fromEntries(fields.map(k=>[k,value.counts[k]]))};
+  if(value.bundleShapes!==undefined){
+    const shapes=value.bundleShapes,types=['missing','null','array','object','string','number','boolean','other'];
+    const typed=['parentType','bundlesType','parentId','parentName','parentGames','parentProducts','parentItems','parentTiers','bundleGames','bundleProducts','bundleItems','bundleTiers','childType','childId','childName','childGames','childProducts','childItems','childTiers'];
+    const keys=['stage','reason','bundlesSize',...typed];
+    if(!shapes||shapes.version!==1||Object.keys(shapes).length!==3||Object.keys(shapes).some(k=>!['version','records','truncated'].includes(k))||typeof shapes.truncated!=='boolean'||!Array.isArray(shapes.records)||shapes.records.length>8)return null;
+    if(shapes.records.some(r=>!r||Object.keys(r).length!==keys.length||Object.keys(r).some(k=>!keys.includes(k))||!['summaries','details'].includes(r.stage)||!['missing','empty-array','non-array'].includes(r.reason)||!['not-container','empty','one','many'].includes(r.bundlesSize)||typed.some(k=>!types.includes(r[k]))))return null;
+    result.bundleShapes={version:1,records:shapes.records.map(r=>Object.fromEntries(keys.map(k=>[k,r[k]]))),truncated:shapes.truncated};
+  }
+  return result;
 }
 function assertFanaticalAcquisitionContract(raw,options={}){
   const invalid=()=>{throw Error('Invalid or contradictory Fanatical acquisition contract. Earlier purchases were kept.');};

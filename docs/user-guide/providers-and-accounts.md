@@ -66,6 +66,8 @@ For troubleshooting, enable **Settings → Troubleshooting → Enable provider d
 
 Fanatical scan reports separate unrecognized order statuses, missing or malformed product lists, conflicting summaries and detail-request failures. They also count scheduled detail checks and validated purchases skipped by Quick update. Unknown statuses stay unresolved; an order's presence in purchase history alone does not establish gift entitlement. These diagnostic counts do not change ownership or authorize removal of older purchases.
 
+Rejected Fanatical bundle containers additionally produce up to eight `compatibility.bundleShapes` observations: empty/missing/non-array reasons, container types, bucketed sizes and types of fixed expected fields on the item, bundle container and first child. No values or provider-defined property names are exported. A public pick-and-mix catalog describes available choices and cannot substitute for a validated purchase. To investigate a rejected selection, export a fresh scan report from the updated build after **Full rescan**, with provider diagnostics enabled as above; it should contain `compatibility.bundleShapes.version: 1`.
+
 ## Kindle import recovery
 
 If an individual Kindle entry cannot be validated or a later page fails temporarily, GL saves independently readable items and keeps earlier records, purchase evidence, acquisition dates and your access corrections. The result reports a partial save, without guessing how many books are behind an unreadable page. Purchased, subscription, borrowed, sample and personal-document access remain distinct.

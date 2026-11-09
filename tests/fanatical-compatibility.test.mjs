@@ -12,9 +12,25 @@ async function run(engine,{list=[order(0)],details=list,known=[],fullScan=true,h
  const result=structuredClone(await vm.runInNewContext('('+engine.toString()+')',scope)({fullScan,knownOrderFingerprints:known,accountOrderFingerprints:known,allowPartial:true,returnFailure:true,diagnostics:true}));
  const diagnostic=engine===gl?result.diagnostic?.compatibility:result.coverage?.compatibility??result.diagnostic?.compatibility;
  assert(diagnostic);assert(!/PRIVATE_TOKEN|synthetic-order-|Book |synthetic-product-/.test(JSON.stringify(diagnostic)));
- return {result,counts:diagnostic.counts,paths};
+ return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': rejected bundle containers export shapes, never alternate ownership or private values',async()=>{
+  const leaf={_id:'PRIVATE_ID',name:'PRIVATE_TITLE',token:'PRIVATE_TOKEN'};
+  for(const [bundles,type,size,reason]of [[[], 'array','empty','empty-array'],[{},'object','empty','non-array'],[{games:[leaf]},'object','one','non-array'],[{PRIVATE_KEY:{games:[leaf]}},'object','one','non-array'],[{PRIVATE_KEY:{games:[leaf]},PRIVATE_SECOND:{games:[leaf]}},'object','many','non-array'],['PRIVATE_STRING','string','not-container','non-array'],[42,'number','not-container','non-array'],[false,'boolean','not-container','non-array'],[null,'null','not-container','missing'],[undefined,'missing','not-container','missing']]){
+   const bad=order(1);Object.assign(bad.items[0],{name:'PRIVATE_TITLE',bundles,products:[leaf],tiers:[{token:'PRIVATE_TOKEN'}]});
+   const r=await run(engine,{list:[order(0),bad]});const shapes=r.compatibility.bundleShapes,record=shapes.records[0];
+   assert.equal(shapes.version,1);assert.equal(shapes.truncated,false);assert.equal(shapes.records.length,1);assert.equal(record.stage,'summaries');assert.equal(record.reason,reason);assert.equal(record.bundlesType,type);assert.equal(record.bundlesSize,size);assert.equal(record.parentProducts,'array');assert.equal(record.parentTiers,'array');assert.equal(record.parentName,'string');
+   assert.equal(r.result.items.length,1);assert.equal(r.counts.scheduled,1);assert.equal(r.paths.length,2);assert.equal(r.result.coverage.complete,false);assert.equal(r.counts[reason==='missing'?'missingBundles':'invalidBundles'],1);assert(!/PRIVATE|42/.test(JSON.stringify(shapes)));
+   if(bundles?.games)assert.equal(record.bundleGames,'array');if(bundles?.PRIVATE_KEY)assert.equal(record.childGames,'array');
+   if(engine===gl)assert(!r.result.coverage.compatibility,'diagnostics cannot enter GL stored coverage');
+  }
+ });
+ test(name+': shape collection is capped and detail failures retain their own stage',async()=>{
+  const bad=Array.from({length:10},(_,i)=>{const o=order(i+1);o.items[0].bundles=[];return o;});
+  const r=await run(engine,{list:[order(0),...bad]});assert.equal(r.compatibility.bundleShapes.records.length,8);assert.equal(r.compatibility.bundleShapes.truncated,true);assert.equal(r.counts.invalidBundles,10);assert.equal(r.result.items.length,1);
+  const detail=order(1);detail.items[0].bundles={games:[{name:'PRIVATE_TITLE'}]};const d=await run(engine,{list:[order(0),order(1)],details:[order(0),detail]});assert.equal(d.compatibility.bundleShapes.records[0].stage,'details');assert.equal(d.compatibility.bundleShapes.records[0].bundleGames,'array');assert.equal(d.counts.detailStructure,1);assert.equal(d.result.items.length,1);
+ });
  test(name+': reordered identical JSON summaries do not quarantine a legitimate purchase',async()=>{
   const a=order(0),r=await run(engine,{list:[a,reorder(a)]});assert.equal(r.result.items.length,1);assert.equal(r.counts.summaryConflict,0);assert.equal(r.counts.scheduled,1);assert.equal(r.result.coverage.complete,false);
  });
@@ -53,4 +69,14 @@ test('optional aggregate diagnostic contract remains backward compatible and rej
   const unsafe=structuredClone(clean);alter(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);
   const receipt=structuredClone(result);receipt.coverage.compatibility=unsafe;assert.throws(()=>assertFanaticalAcquisitionContract(receipt),/Invalid or contradictory/);
  }
+});
+
+test('both export boundaries accept bounded bundle shapes and reject injected keys, types and oversized lists',async()=>{
+ const bad=order(1);bad.items[0].bundles=[];const {compatibility:clean,result}=await run(canonical,{list:[order(0),bad]});
+ const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),context);const ui=context.GalacticFanatical,report=ui.failureReport('unknown');
+ assert.deepEqual(fanaticalCompatibilityReport(clean),clean);assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:clean})).compatibility,clean);
+ for(const mutate of [v=>v.bundleShapes.records[0].raw='PRIVATE',v=>v.bundleShapes.records[0].parentName='PRIVATE_TITLE',v=>v.bundleShapes.records[0].stage='PRIVATE_URL',v=>v.bundleShapes.records=Array(9).fill(v.bundleShapes.records[0]),v=>v.bundleShapes.truncated='PRIVATE',v=>v.bundleShapes.raw='PRIVATE_TOKEN',v=>v.bundleShapes.version=2]){
+  const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);const receipt=structuredClone(result);receipt.coverage.compatibility=unsafe;assert.throws(()=>assertFanaticalAcquisitionContract(receipt),/Invalid or contradictory/);
+ }
+ const old=structuredClone(clean);delete old.bundleShapes;assert(fanaticalCompatibilityReport(old),'old counter-only reports remain valid');
 });

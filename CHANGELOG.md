@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Extend shared Fanatical diagnostics with bounded structural observations for rejected bundle containers; purchase admission and conservative coverage checks remain unchanged.
+
 - Accept identical Fanatical purchase summaries whose JSON field order differs, while retaining conflict checks for changed values and product multiplicity. Export bounded compatibility counters without purchase details; unknown statuses and malformed orders remain retryable and cannot authorize reconciliation.
 
 - Preserve independently verified purchases during supported partial imports across Humble, Fanatical, GOG, Epic, Amazon Games, Amazon Video, Kindle, Audible, Kobo and Fandango. Earlier records and manual corrections remain protected; unresolved work can be retried without claiming complete coverage.

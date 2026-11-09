@@ -68,7 +68,16 @@
     // Diagnostic counters only; never copy provider values or arbitrary keys.
     const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
     const c=value.compatibility;
-    if(c?.version===1&&Object.keys(c).every(k=>['version','counts'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000))report.compatibility={version:1,counts:Object.fromEntries(fields.map(k=>[k,c.counts[k]]))};
+    if(c?.version===1&&Object.keys(c).every(k=>['version','counts','bundleShapes'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000)){
+      const clean={version:1,counts:Object.fromEntries(fields.map(k=>[k,c.counts[k]]))};let valid=true;
+      if(c.bundleShapes!==undefined){
+        const s=c.bundleShapes,types=['missing','null','array','object','string','number','boolean','other'];
+        const typed=['parentType','bundlesType','parentId','parentName','parentGames','parentProducts','parentItems','parentTiers','bundleGames','bundleProducts','bundleItems','bundleTiers','childType','childId','childName','childGames','childProducts','childItems','childTiers'],keys=['stage','reason','bundlesSize',...typed];
+        valid=!!s&&s.version===1&&Object.keys(s).length===3&&Object.keys(s).every(k=>['version','records','truncated'].includes(k))&&typeof s.truncated==='boolean'&&Array.isArray(s.records)&&s.records.length<=8&&s.records.every(r=>r&&Object.keys(r).length===keys.length&&Object.keys(r).every(k=>keys.includes(k))&&['summaries','details'].includes(r.stage)&&['missing','empty-array','non-array'].includes(r.reason)&&['not-container','empty','one','many'].includes(r.bundlesSize)&&typed.every(k=>types.includes(r[k])));
+        if(valid)clean.bundleShapes={version:1,records:s.records.map(r=>Object.fromEntries(keys.map(k=>[k,r[k]]))),truncated:s.truncated};
+      }
+      if(valid)report.compatibility=clean;
+    }
     return report;
   }
   function failureReport(category='unavailable',stage='execution') {
