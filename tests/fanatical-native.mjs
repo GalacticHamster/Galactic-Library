@@ -14,14 +14,18 @@ import {observeImportLifecycle} from './import-lifecycle.mjs';
 import {candidateFiles} from './provider-candidate-build.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome');
 const files=process.argv.includes('--candidate')?await candidateFiles('GL',release.files):new Map(release.files);
-let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[];
+let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[],sparseSummary=false,sparseDetailFailure=false,foreignRecovery=false;
+const thin=o=>({...o,items:o.items.map(p=>({name:p.name,bundles:[]}))});
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/api/user/orders')){
   const listing=/^\/api\/user\/orders(?:\?|$)/u.test(req.url),second=req.url.includes('?page=2');if(listing)listRequests++;else detailRequests++;
   res.statusCode=status===200&&(listing&&second&&failPage||!listing&&failedOrders.some(id=>req.url.endsWith(id)))?404:status;
   res.setHeader('Content-Type','application/json');if(listing&&total!==null)res.setHeader('x-total-count',String(total));
   if(listing&&pageSize&&!second)res.setHeader('link','</api/user/orders?page=2>; rel="next"');
-  res.end(JSON.stringify(listing&&invalidListing?{unexpected:true}:listing?(pageSize?second?orders.slice(pageSize):orders.slice(0,pageSize):orders):orders.find(o=>req.url.endsWith(o._id))));return;
+  let payload=listing&&invalidListing?{unexpected:true}:listing?(pageSize?second?orders.slice(pageSize):orders.slice(0,pageSize):orders):orders.find(o=>req.url.endsWith(o._id));
+  if(sparseSummary&&Array.isArray(payload))payload=payload.map(o=>o._id===orders.at(-1)._id?thin(o):o);
+  if(!listing&&payload?._id===orders.at(-1)?._id){if(sparseDetailFailure)payload=thin(payload);if(foreignRecovery)payload={...payload,_id:'foreign-order'};}
+  res.end(JSON.stringify(payload));return;
  }
  res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body><main>Synthetic orders</main><script>localStorage.setItem("bsauth",JSON.stringify({token:"SYNTHETIC-ONLY"}));</script></body></html>');
 });
@@ -149,6 +153,11 @@ try{
   checks.push('installed mixed summary failures export safe reasons; unchanged Quick skips only verified orders and repairs unresolved orders after reload');
   orders.push(Object.fromEntries(Object.entries(orders[0]).reverse()));await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests,beforeDetails);diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.compatibility.counts.summaryConflict,0);assert.equal(diagnostic.diagnostic.compatibility.counts.knownSkipped,3);d=await report();assert.equal(d.count,3);assert.equal(d.failed.length,0);assert.equal(d.history,0);assert.equal(d.fullAt,null);
   checks.push('installed reordered identical summaries retain skip authority and purchases without granting complete coverage');
+  orders=[fanaticalOrder(1),fanaticalOrder(2,['game'])];sparseSummary=true;sparseDetailFailure=true;await reset();await sync();diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.compatibility.summaryRecovery.unresolved,1);assert.equal(diagnostic.diagnostic.compatibility.summaryRecovery.recovered,0);d=await report();assert.equal(d.count,47);assert.equal(d.failed.length,1);assert.equal(d.fullAt,null);
+  sparseDetailFailure=false;await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.compatibility.summaryRecovery.recovered,1);assert.equal(diagnostic.diagnostic.compatibility.summaryRecovery.detailItemTypes.array,1);assert(!/order-|product-|Synthetic collection|PRIVATE/.test(JSON.stringify(diagnostic.diagnostic.compatibility)));d=await report();assert.equal(d.count,48);assert.equal(d.owned,48);assert.equal(d.failed.length,0);assert.equal(d.history,0);assert.equal(d.fullAt,null);assert(d.roundTrip);
+  await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,48);assert.equal(d.history,0);
+  foreignRecovery=true;await page();await sync();diagnostic=await scanReport();assert(!diagnostic.committed);d=await report();assert.equal(d.count,48);assert.equal(d.owned,48);assert.equal(d.history,0);
+  checks.push('installed sparse summary recovers 47+1 products through validated detail, retries after reload, rechecks known Quick and rejects foreign detail without altering purchases');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{

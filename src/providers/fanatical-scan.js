@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-294d4e692f8516d7; contract 1; SHA-256 96fb5097b04290afecef379499db2171750c7eeeb481b3f3c72ade517779e9bf
+// Pinned acquisition fanatical-v1-0adae1859c9d55d4; contract 1; SHA-256 d540f8cd43c2141a3a81662491ab791c4c8c19b1b3b5a46bad2ca8cef49a42e8
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan' } = {}) {
@@ -8,11 +8,12 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   // Fixed counters only: never export provider statuses, keys, field names or values.
   const compatibility={version:1,counts:Object.fromEntries(['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'].map(key=>[key,0]))};
   const issue=key=>{compatibility.counts[key]++;};
+  const valueType=v=>v===undefined?'missing':v===null?'null':Array.isArray(v)?'array':['object','string','number','boolean'].includes(typeof v)?typeof v:'other';
   // Bounded shapes at the failing boundary, never provider keys or values.
   const bundleShape=(parent)=>{
     const shapes=compatibility.bundleShapes??={version:1,records:[],truncated:false};
     if(shapes.records.length>=8){shapes.truncated=true;return;}
-    const type=v=>v===undefined?'missing':v===null?'null':Array.isArray(v)?'array':['object','string','number','boolean'].includes(typeof v)?typeof v:'other';
+    const type=valueType;
     const bundles=parent?.bundles;let child,size=null;
     if(Array.isArray(bundles)){size=bundles.length;child=bundles[0];}
     else if(bundles&&typeof bundles==='object'){size=0;for(const key in bundles)if(Object.hasOwn(bundles,key)){if(size===0)child=bundles[key];if(++size===2)break;}}
@@ -515,6 +516,12 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   diagnostic.stage='summaries';
   const listed = new Set();
   const expectedProducts = new Map();
+  const sparseSummaries=new Map();
+  const parentEvidence=parents=>{
+    const names=new Map(),ids=new Map();
+    for(const parent of parents){const name=safeTextInPage(parent.name);names.set(name,(names.get(name)??0)+1);if(parent._id!==undefined){const key=JSON.stringify([name,parent._id]);ids.set(key,(ids.get(key)??0)+1);}}
+    return {names,ids};
+  };
   const productCounts = (parents) => {
     const bad=key=>{issue(diagnostic.stage==='summaries'?key:'detailStructure');throw unreadable();};
     if (!Array.isArray(parents) || !parents.length) bad(parents==null?'missingItems':'invalidItems');
@@ -539,7 +546,13 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     try{
       if(conflictingIds.has(order._id)){issue('summaryConflict');throw unreadable();}
       if(typeof order.status!=='string'||!/^[A-Z][A-Z_]*$/u.test(order.status)){issue('invalidStatus');throw unreadable();}
-      if(order.status==='COMPLETE'){const counts=productCounts(order.items);expectedProducts.set(order._id,counts);if([...counts.values()].some(n=>n>1))issue('multipleCopies');}
+      if(order.status==='COMPLETE'){
+        // A sparse summary can locate an authenticated detail request, but is
+        // never product evidence or authority to skip that detail on Quick.
+        const sparse=allowPartial&&Array.isArray(order.items)&&order.items.length>0&&order.items.every(parent=>parent&&typeof parent==='object'&&!Array.isArray(parent)&&typeof parent.name==='string'&&safeTextInPage(parent.name)&&Array.isArray(parent.bundles)&&parent.bundles.length===0&&(parent._id===undefined||typeof parent._id==='string'&&safeIdInPage(parent._id))&&['games','products','items','tiers'].every(key=>!Object.hasOwn(parent,key)));
+        if(sparse){sparseSummaries.set(order._id,parentEvidence(order.items));expectedProducts.set(order._id,null);order.items.forEach(bundleShape);}
+        else {const counts=productCounts(order.items);expectedProducts.set(order._id,counts);if([...counts.values()].some(n=>n>1))issue('multipleCopies');}
+      }
       else if(allowPartial){
         if(!['REFUNDED','CANCELLED','CANCELED','PENDING','FAILED'].includes(order.status)){issue('unsupportedStatus');throw unreadable();}
         ineligible.add(await fingerprintOrderInPage(order._id));
@@ -576,7 +589,9 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     const error=failure('history-missing-known','Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.');
     if(!allowPartial)throw error;discoveryComplete=false;note(error,'listing');
   }
-  const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ fingerprint }) => !known.has(fingerprint));
+  const toInspect = fullScan ? completeWithFingerprints : completeWithFingerprints.filter(({ order,fingerprint }) => !known.has(fingerprint)||sparseSummaries.has(order._id));
+  const recovery=sparseSummaries.size?{version:1,eligible:sparseSummaries.size,scheduled:toInspect.filter(({order})=>sparseSummaries.has(order._id)).length,recovered:0,unresolved:0,emptyDetailItems:0,detailItemTypes:Object.fromEntries(['missing','null','array','object','string','number','boolean','other'].map(k=>[k,0]))}:null;
+  if(recovery)compatibility.summaryRecovery=recovery;
   compatibility.counts.scheduled=toInspect.length;compatibility.counts.knownSkipped=complete.length-toInspect.length;
   const scope = {fullScan,scanHistoryMissing,total:toInspect.length,skipped:complete.length-toInspect.length};
   reportProgress({phase:'plan',...scope});
@@ -584,11 +599,13 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   diagnostic.stage='details';
   activity.pages=diagnostic.pagesParsed;activity.discovered=summaries.length;activity.scheduled=toInspect.length;activityProgress('details',true);
   const details = await boundedMap(toInspect, async ({ order: listedOrder, fingerprint }) => {
+    const sparse=sparseSummaries.get(listedOrder._id);
     activity.active++;activityProgress('details',activity.completed===0&&activity.active===Math.min(3,activity.scheduled));
     let detailRead=false;
     try {
     const { data: order } = await request(`/api/user/orders/${encodeURIComponent(listedOrder._id)}`);
     detailRead=true;
+    if(sparse){recovery.detailItemTypes[valueType(order?.items)]++;if(Array.isArray(order?.items)&&order.items.length===0)recovery.emptyDetailItems++;}
     if(allowPartial&&typeof order?._id==='string'&&order._id!==listedOrder._id){issue('detailIdentity');throw failure('order-identity-conflict','A purchase response belonged to a different order.');}
     const projectedItems = [];
     if (!order || order._id !== listedOrder._id){issue('detailIdentity');throw unreadable();}
@@ -596,7 +613,10 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     if(!Array.isArray(order.items)||!order.items.length){issue('detailStructure');throw unreadable();}
     const expected = expectedProducts.get(order._id);
     const actual = productCounts(order.items);
-    if (actual.size !== expected.size || [...expected].some(([key, quantity]) => actual.get(key) !== quantity)){issue('detailProductMismatch');throw unreadable();}
+    if(sparse){
+      const actualParents=parentEvidence(order.items);
+      if(sparse.names.size!==actualParents.names.size||[...sparse.names].some(([name,n])=>actualParents.names.get(name)!==n)||[...sparse.ids].some(([key,n])=>(actualParents.ids.get(key)??0)<n)){issue('detailProductMismatch');throw unreadable();}
+    }else if (actual.size !== expected.size || [...expected].some(([key, quantity]) => actual.get(key) !== quantity)){issue('detailProductMismatch');throw unreadable();}
     let occurrence=0;
     for (const parent of order.items) {
       if (!parent || typeof parent._id !== 'string' || !safeIdInPage(parent._id) || !safeTextInPage(parent.name) || !Array.isArray(parent.bundles) || !parent.bundles.length) throw unreadable();
@@ -613,9 +633,10 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     }
     reportProgress({phase:'details',...scope,completed:++completedDetails});
     diagnostic.detailsParsed=completedDetails;verified.add(fingerprint);
+    if(sparse)recovery.recovered++;
     activity.validatedItems+=projectedItems.length;
     return projectedItems;
-    }catch(error){if(!detailRead)issue('detailRequest');activity.failed++;if(!allowPartial||fatal(error))throw error;unresolved.add(fingerprint);note(error,'details');return [];}
+    }catch(error){if(sparse)recovery.unresolved++;if(!detailRead)issue('detailRequest');activity.failed++;if(!allowPartial||fatal(error))throw error;unresolved.add(fingerprint);note(error,'details');return [];}
     finally{activity.active--;activity.completed++;activityProgress('details',activity.completed===activity.scheduled);}
   });
   activityProgress('validating',true);
@@ -646,8 +667,13 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
 
 function fanaticalCompatibilityReport(value){
   const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
-  if(!value||value.version!==1||Object.keys(value).some(k=>!['version','counts','bundleShapes'].includes(k))||!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==fields.length||fields.some(k=>!Number.isSafeInteger(value.counts[k])||value.counts[k]<0||value.counts[k]>100000))return null;
+  if(!value||value.version!==1||Object.keys(value).some(k=>!['version','counts','bundleShapes','summaryRecovery'].includes(k))||!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==fields.length||fields.some(k=>!Number.isSafeInteger(value.counts[k])||value.counts[k]<0||value.counts[k]>100000))return null;
   const result={version:1,counts:Object.fromEntries(fields.map(k=>[k,value.counts[k]]))};
+  if(value.summaryRecovery!==undefined){
+    const r=value.summaryRecovery,counts=['eligible','scheduled','recovered','unresolved','emptyDetailItems'],types=['missing','null','array','object','string','number','boolean','other'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+    if(!r||r.version!==1||Object.keys(r).length!==7||Object.keys(r).some(k=>!['version','detailItemTypes',...counts].includes(k))||counts.some(k=>!bounded(r[k]))||!r.detailItemTypes||Object.keys(r.detailItemTypes).length!==types.length||types.some(k=>!bounded(r.detailItemTypes[k]))||r.scheduled>r.eligible||r.recovered+r.unresolved>r.scheduled||r.emptyDetailItems>r.detailItemTypes.array||types.reduce((n,k)=>n+r.detailItemTypes[k],0)>r.scheduled)return null;
+    result.summaryRecovery={version:1,...Object.fromEntries(counts.map(k=>[k,r[k]])),detailItemTypes:Object.fromEntries(types.map(k=>[k,r.detailItemTypes[k]]))};
+  }
   if(value.bundleShapes!==undefined){
     const shapes=value.bundleShapes,types=['missing','null','array','object','string','number','boolean','other'];
     const typed=['parentType','bundlesType','parentId','parentName','parentGames','parentProducts','parentItems','parentTiers','bundleGames','bundleProducts','bundleItems','bundleTiers','childType','childId','childName','childGames','childProducts','childItems','childTiers'];

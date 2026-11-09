@@ -7,8 +7,8 @@ import {fanaticalCompatibilityReport,assertFanaticalAcquisitionContract} from '.
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const order=i=>({_id:`synthetic-order-${i}`,status:'COMPLETE',items:[{_id:'synthetic-bundle',name:'Bundle',bundles:[{games:[{_id:`synthetic-product-${i}`,name:`Book ${i}`,type:'book'}]}]}]});
 const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,v])=>[k,reorder(v)])):v;
-async function run(engine,{list=[order(0)],details=list,known=[],fullScan=true,headers={},detailStatus=200}={}){
- const paths=[],scope={URL,Headers,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,crypto:webcrypto,localStorage:{getItem:()=>JSON.stringify({token:'PRIVATE_TOKEN'})},fetch:async path=>{paths.push(path);const listing=path==='/api/user/orders',status=listing?200:detailStatus;return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>structuredClone(listing?list:details.find(o=>path.endsWith(o._id)))};}};
+async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false}={}){
+ let reads=0;const paths=[],scope={URL,Headers,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,crypto:webcrypto,localStorage:{getItem:()=>JSON.stringify({token:sessionChange&&reads++?'CHANGED_TOKEN':'PRIVATE_TOKEN'})},fetch:async path=>{paths.push(path);const listing=path==='/api/user/orders',status=listing?200:detailStatus;return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>structuredClone(listing?list:Object.hasOwn(detailResponses,path.split('/').at(-1))?detailResponses[path.split('/').at(-1)]:details.find(o=>path.endsWith(o._id)))};}};
  const result=structuredClone(await vm.runInNewContext('('+engine.toString()+')',scope)({fullScan,knownOrderFingerprints:known,accountOrderFingerprints:known,allowPartial:true,returnFailure:true,diagnostics:true}));
  const diagnostic=engine===gl?result.diagnostic?.compatibility:result.coverage?.compatibility??result.diagnostic?.compatibility;
  assert(diagnostic);assert(!/PRIVATE_TOKEN|synthetic-order-|Book |synthetic-product-/.test(JSON.stringify(diagnostic)));
@@ -27,9 +27,33 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
   }
  });
  test(name+': shape collection is capped and detail failures retain their own stage',async()=>{
-  const bad=Array.from({length:10},(_,i)=>{const o=order(i+1);o.items[0].bundles=[];return o;});
+  const bad=Array.from({length:10},(_,i)=>{const o=order(i+1);o.items[0].bundles=[];o.items[0].products=[];return o;});
   const r=await run(engine,{list:[order(0),...bad]});assert.equal(r.compatibility.bundleShapes.records.length,8);assert.equal(r.compatibility.bundleShapes.truncated,true);assert.equal(r.counts.invalidBundles,10);assert.equal(r.result.items.length,1);
   const detail=order(1);detail.items[0].bundles={games:[{name:'PRIVATE_TITLE'}]};const d=await run(engine,{list:[order(0),order(1)],details:[order(0),detail]});assert.equal(d.compatibility.bundleShapes.records[0].stage,'details');assert.equal(d.compatibility.bundleShapes.records[0].bundleGames,'array');assert.equal(d.counts.detailStructure,1);assert.equal(d.result.items.length,1);
+ });
+ test(name+': identity-bearing sparse summaries recover only from validated details, including known Quick orders',async()=>{
+  const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]};
+  for(const options of [{},{known:[hash(order(0)._id),hash(detail._id)],fullScan:false}]){
+   const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail],...options}),d=r.compatibility.summaryRecovery;
+   assert.equal(r.result.items.length,options.fullScan===false?1:2);assert.equal(d.eligible,1);assert.equal(d.scheduled,1);assert.equal(d.recovered,1);assert.equal(d.unresolved,0);assert.equal(d.detailItemTypes.array,1);assert.equal(r.counts.invalidBundles,0);assert(r.paths.some(p=>p.endsWith(detail._id)));assert.equal(r.result.coverage.complete,false);
+  }
+  const covered=await run(engine,{list:[sparse],details:[detail],headers:{'x-total-count':'1'}});assert.equal(covered.result.coverage.complete,true);
+ });
+ test(name+': missing detail products, changed parents, wrong identities and ineligible statuses cannot recover sparse summaries',async()=>{
+  const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]};
+  for(const bad of [{...detail,items:[]},{...detail,items:null},{...detail,items:{}},{...detail,status:'PENDING'},{...detail,status:'UNRECOGNIZED'}, {...detail,_id:'foreign-order'}, {...detail,items:[{name:'Different',_id:'other-bundle',bundles:detail.items[0].bundles}]},{...detail,items:[{...detail.items[0],bundles:[]}]},{...detail,items:[{...detail.items[0],bundles:[{games:[{name:'No ID'}]}]}]}]){
+   const r=await run(engine,{list:[order(0),sparse],detailResponses:{[detail._id]:bad}});assert.equal(r.compatibility.summaryRecovery.recovered,0);assert.equal(r.compatibility.summaryRecovery.unresolved,1);assert.equal(r.result.coverage?.complete??false,false);if(bad._id!==detail._id)assert(!r.result.items);else assert.equal(r.result.items.length,1);
+  }
+  const withId={...sparse,items:[{...sparse.items[0],_id:'different-bundle'}]},r=await run(engine,{list:[order(0),withId],details:[order(0),detail]});assert.equal(r.result.items.length,1);assert.equal(r.counts.detailProductMismatch,1);
+ });
+ test(name+': sparse recovery retains summary conflicts, scope/session guards and ordinary product-mismatch validation',async()=>{
+  const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]};
+  for(const bad of [{...sparse,status:'UNKNOWN'},{...sparse,items:[{name:'Bundle',bundles:[],products:[]}]},{...sparse,items:[{name:'Bundle',bundles:{}}]},{...sparse,items:[{name:'Bundle',bundles:[],_id:'bad'}]},{...sparse,items:[...sparse.items,order(2).items[0]]}]){
+   const r=await run(engine,{list:[order(0),bad],details:[order(0),detail]});assert(!r.compatibility.summaryRecovery);assert.equal(r.paths.length,2);assert.equal(r.result.items.length,1);
+  }
+  const conflict=await run(engine,{list:[order(0),sparse,{...sparse,status:'REFUNDED'}]});assert.equal(conflict.counts.summaryConflict,1);assert.equal(conflict.paths.length,2);
+  for(const options of [{known:[hash('other-account')]},{sessionChange:true}]){const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail],...options});assert(!r.result.items);if(options.known)assert.equal(r.paths.length,1);}
+  const ordinary=await run(engine,{list:[order(0),detail],detailResponses:{[detail._id]:{...detail,items:order(2).items}}});assert.equal(ordinary.result.items.length,1);assert.equal(ordinary.counts.detailProductMismatch,1);
  });
  test(name+': reordered identical JSON summaries do not quarantine a legitimate purchase',async()=>{
   const a=order(0),r=await run(engine,{list:[a,reorder(a)]});assert.equal(r.result.items.length,1);assert.equal(r.counts.summaryConflict,0);assert.equal(r.counts.scheduled,1);assert.equal(r.result.coverage.complete,false);
@@ -79,4 +103,13 @@ test('both export boundaries accept bounded bundle shapes and reject injected ke
   const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);const receipt=structuredClone(result);receipt.coverage.compatibility=unsafe;assert.throws(()=>assertFanaticalAcquisitionContract(receipt),/Invalid or contradictory/);
  }
  const old=structuredClone(clean);delete old.bundleShapes;assert(fanaticalCompatibilityReport(old),'old counter-only reports remain valid');
+});
+
+test('recovery diagnostics are allowlisted, bounded and independent from persisted purchase authority',async()=>{
+ const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]},r=await run(canonical,{list:[sparse],details:[detail]}),clean=r.compatibility;
+ const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),context);const ui=context.GalacticFanatical,report=ui.failureReport('unknown');assert.deepEqual(fanaticalCompatibilityReport(clean),clean);assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:clean})).compatibility,clean);
+ for(const mutate of [v=>v.summaryRecovery.raw='PRIVATE',v=>v.summaryRecovery.eligible=-1,v=>v.summaryRecovery.scheduled=100001,v=>v.summaryRecovery.recovered=2,v=>v.summaryRecovery.detailItemTypes.raw='PRIVATE',v=>v.summaryRecovery.detailItemTypes.array=2,v=>v.summaryRecovery.emptyDetailItems=2]){const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);}
+ const old=structuredClone(clean);delete old.summaryRecovery;assert(fanaticalCompatibilityReport(old));
+ for(const items of [[],null,{},undefined]){const d=await run(canonical,{list:[sparse],detailResponses:{[detail._id]:{...detail,items}}});assert.equal(d.compatibility.summaryRecovery.recovered,0);assert.equal(d.compatibility.summaryRecovery.emptyDetailItems,Array.isArray(items)?1:0);assert.equal(Object.values(d.compatibility.summaryRecovery.detailItemTypes).reduce((a,b)=>a+b),1);assert.equal(d.result.items.length,0);}
+ const failed=await run(canonical,{list:[sparse],detailStatus:404});assert.equal(failed.compatibility.summaryRecovery.unresolved,1);assert.equal(failed.compatibility.summaryRecovery.recovered,0);assert.equal(failed.counts.detailRequest,1);assert.equal(failed.result.items.length,0);
 });
