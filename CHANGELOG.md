@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Coordinate purchase-specific Fanatical reminder reviews with standalone FAN through existing consented purchase sync. Preserve local reviews across evidence refreshes and native/companion provenance reconciliation; older peers omit unsupported reviews.
+
 - Show dated unrevealed-key observations for supported Fanatical Steam purchases in reminders, with consented companion sharing and no key-value reads or reveal actions. Quick checks new purchases; Full refreshes older observations.
 
 - Import authenticated standalone game selections with empty bundle arrays, as rendered by Fanatical's order UI. Keep exact order/product identities, purchase provenance, duplicate occurrences and conservative history coverage.

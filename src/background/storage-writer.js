@@ -51,7 +51,7 @@ import {keyObservationSummary,mergePurchaseOrigins} from '../lib/purchase-origin
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
 import {FEED_UPLOAD_KEY,validateEntitlementEntry} from '../lib/companion-entitlements.js';
 import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/reading.js';
-import {libraryReminders} from '../lib/reminders.js';
+import {fanaticalKeyOrigins,libraryReminders} from '../lib/reminders.js';
 import {date} from '../lib/validation.js';
 import {validateSyncHealth,snapshotDifferences,SYNC_FAILURE_CODES,providerScanDisplay} from '../lib/sync-health.js';
 import {PROVIDER_CHECKS_KEY,providerCheckDigest,validProviderChecks,providerCheckPatch,providerCheckBaseline,applyProviderChecks} from '../lib/provider-scan-checks.js';
@@ -2094,6 +2094,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   async function saveReminderReview(ref,action,basis,until=null){
     const database=await getDatabase(),entry=libraryReminders(database,Date.now(),true).find(item=>item.reminderRef===ref);
     if(!entry||entry.basis!==basis)throw new Error('This reminder changed. Refresh before reviewing.');
+    const native=Object.values(database.providerItems).find(i=>i.recordRef===entry.itemRef),origins=native?.provider==='fanatical'&&entry.kind==='activation'?fanaticalKeyOrigins(native,database):[];
+    if(origins?.some(o=>o.keyCheckedAt)){
+      if(!['restore','dismissed','snoozed'].includes(action))throw Error('Invalid reminder action.');
+      const deadline=date(until);if(action==='snoozed'&&(!deadline||Date.parse(deadline)<=Date.now()||Date.parse(deadline)>Date.now()+366*86400000))throw Error('Snooze must end within the next year.');
+      const stamp=new Date(Math.max(Date.now(),...origins.map(o=>Date.parse(o.keyReview?.updatedAt??'')+1||0))).toISOString();
+      native.metadata.purchaseOrigins=origins.map(o=>!o.keyCheckedAt?o:{...o,keyReview:globalThis.GalacticPurchaseSnapshot.keyReview({action:action==='restore'?'active':action,basis:o.keyStatus,until:action==='snoozed'?deadline:null,updatedAt:stamp})});
+      delete database.reminderReviews[ref];return persistDatabase(database);
+    }
     if(action==='restore')delete database.reminderReviews[ref];
     else{
       if(!['dismissed','snoozed'].includes(action))throw new Error('Invalid reminder action.');

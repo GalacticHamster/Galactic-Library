@@ -1,3 +1,4 @@
+import '../../shared/purchase-snapshot.js';
 import {object,text,date} from './validation.js';
 import {effectiveOwnershipRecord} from './ownership.js';
 
@@ -12,21 +13,33 @@ export function validateReminderReviews(value={}){
     return [id,{action:entry.action,basis:text(entry.basis,250,'Reminder evidence'),until,updatedAt:date(entry.updatedAt)}];
   }));
 }
+/** Interpret legacy item-level decisions without rewriting stored history. */
+export function fanaticalKeyOrigins(item,database){
+ const origins=item.metadata?.purchaseOrigins??[],saved=database.reminderReviews?.[`${item.recordRef}:activation`];
+ const basis=JSON.stringify(['activation',null,item.metadata?.keyStatus??'',database.ownershipReviews?.[item.recordRef]?.reviewRef??'']);
+ if(!saved?.updatedAt||saved.basis!==basis)return origins;
+ return origins.map(o=>{if(!o.keyCheckedAt)return o;const review=GalacticPurchaseSnapshot.mergeKeyReview(o.keyReview,{action:saved.action,basis:o.keyStatus,until:saved.until,updatedAt:saved.updatedAt});return {...o,keyReview:review};});
+}
 /** Current records only. Dates are reported evidence, never estimated deadlines. */
 export function libraryReminders(database,now=Date.now(),includeHidden=false){
   const reminders=[];
   for(const item of Object.values(database.providerItems)){
     const metadata=item.metadata??{},review=database.ownershipReviews?.[item.recordRef],effective=effectiveOwnershipRecord(item,database,now,{ignoreOverride:true});
     const key=metadata.entitlement==='third-party-key'||item.provider==='fanatical'&&['game','software'].includes(item.mediaType);
-    const add=(kind,dueAt=null)=>{
+    const add=(kind,dueAt=null,managed=null)=>{
       const overdue=dueAt&&Date.parse(dueAt)<=now,soon=dueAt&&Date.parse(dueAt)<=now+7*86400000;
       const severity=overdue||kind==='key-unavailable'?'attention':soon?'due-soon':'information';
-      const basis=JSON.stringify([kind,dueAt,metadata.keyStatus??'',review?.reviewRef??'']);
+      const basis=JSON.stringify([kind,dueAt,metadata.keyStatus??'',review?.reviewRef??'',...(managed?.stamp?[managed.stamp]:[])]);
       const reminderRef=`${item.recordRef}:${kind}`,saved=database.reminderReviews?.[reminderRef];
-      const hidden=saved?.basis===basis&&(saved.action==='dismissed'||saved.action==='snoozed'&&Date.parse(saved.until)>now);
-      if(!hidden||includeHidden)reminders.push({reminderRef,itemRef:item.recordRef,title:item.title,provider:item.provider,mediaType:item.mediaType,kind,dueAt,severity,basis,hidden:Boolean(hidden),...(['unknown','unrevealed'].includes(metadata.keyStatus)&&metadata.keyCheckedAt?{keyStatus:metadata.keyStatus,keyCheckedAt:metadata.keyCheckedAt}:{})});
+      const hidden=managed?.hasReviews?managed.hidden:saved?.basis===basis&&(saved.action==='dismissed'||saved.action==='snoozed'&&Date.parse(saved.until)>now);
+      const keyStatus=managed?.status??metadata.keyStatus,keyCheckedAt=managed?.checkedAt??metadata.keyCheckedAt;
+      if(!hidden||includeHidden)reminders.push({reminderRef,itemRef:item.recordRef,title:item.title,provider:item.provider,mediaType:item.mediaType,kind,dueAt,severity,basis,hidden:Boolean(hidden),...(['unknown','unrevealed'].includes(keyStatus)&&keyCheckedAt?{keyStatus,keyCheckedAt}:{})});
     };
-    if(key){
+    const observed=item.provider==='fanatical'?fanaticalKeyOrigins(item,database).filter(o=>o.keyCheckedAt&&['unrevealed','unknown'].includes(o.keyStatus)):[];
+    if(observed.length){
+      const hasReviews=observed.some(o=>o.keyReview),visible=observed.filter(o=>!GalacticPurchaseSnapshot.keyReviewHidden(o,now));
+      add('activation',null,{hasReviews,hidden:visible.length===0,status:(visible.length?visible:observed).some(o=>o.keyStatus==='unrevealed')?'unrevealed':'unknown',checkedAt:(visible.length?visible:observed).map(o=>o.keyCheckedAt).sort()[0],stamp:hasReviews?observed.map(o=>o.keyReview?.updatedAt??'').sort().at(-1)+':'+observed.length:null});if(metadata.expiresAt)add('key-expiry',metadata.expiresAt);
+    }else if(key){
       if(['expired','unavailable'].includes(metadata.keyStatus))add('key-unavailable',metadata.expiresAt??null);
       else{add('activation');if(metadata.expiresAt)add('key-expiry',metadata.expiresAt);}
     }

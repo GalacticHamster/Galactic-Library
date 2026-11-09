@@ -1,3 +1,4 @@
+import '../../shared/purchase-snapshot.js';
 import {object,text,date} from './validation.js';
 
 export function validateKeyObservation(value){
@@ -15,13 +16,14 @@ export function validatePurchaseOrigins(value){
   const refs=new Set();return value.map(entry=>{
     object(entry,'Purchase origin');const occurrenceRef=text(entry.occurrenceRef,64,'Purchase occurrence reference'),orderRef=text(entry.orderRef,64,'Opaque order reference');
     if(!/^[a-f0-9]{64}$/u.test(occurrenceRef)||!/^[a-f0-9]{64}$/u.test(orderRef)||refs.has(occurrenceRef))throw new Error('Invalid or duplicate purchase occurrence.');refs.add(occurrenceRef);
+    if(entry.keyReview!==undefined&&!entry.keyCheckedAt)throw Error('Key reminder review needs a dated observation.');
     if(entry.basis!==undefined&&entry.basis!=='order-bundle-count')throw Error('Invalid purchase occurrence basis.');
-    return {occurrenceRef,orderRef,...validateKeyObservation(entry),...(entry.basis?{basis:entry.basis}:{}),bundleId:text(entry.bundleId,128,'Bundle ID'),bundleTitle:text(entry.bundleTitle,500,'Bundle title'),purchasedAt:date(entry.purchasedAt),observedAt:date(entry.observedAt)};
+    return {occurrenceRef,orderRef,...validateKeyObservation(entry),...(entry.keyReview!==undefined?{keyReview:GalacticPurchaseSnapshot.keyReview(entry.keyReview)}:{}),...(entry.basis?{basis:entry.basis}:{}),bundleId:text(entry.bundleId,128,'Bundle ID'),bundleTitle:text(entry.bundleTitle,500,'Bundle title'),purchasedAt:date(entry.purchasedAt),observedAt:date(entry.observedAt)};
   });
 }
 
 export function mergePurchaseOrigins(prior=[],incoming=[]){
-  const byRef=new Map();for(const entry of [...prior,...incoming]){const old=byRef.get(entry.occurrenceRef),observation=old?.keyCheckedAt&&(!entry.keyCheckedAt||Date.parse(old.keyCheckedAt)>Date.parse(entry.keyCheckedAt))?old:entry;byRef.set(entry.occurrenceRef,{...entry,...validateKeyObservation(observation)});}const merged=[...byRef.values()];
+  const byRef=new Map();for(const entry of [...prior,...incoming]){const old=byRef.get(entry.occurrenceRef),observation=old?.keyCheckedAt&&(!entry.keyCheckedAt||Date.parse(old.keyCheckedAt)>Date.parse(entry.keyCheckedAt))?old:entry;byRef.set(entry.occurrenceRef,{...entry,...validateKeyObservation(observation),...(GalacticPurchaseSnapshot.mergeKeyReview(old?.keyReview,entry.keyReview)?{keyReview:GalacticPurchaseSnapshot.mergeKeyReview(old?.keyReview,entry.keyReview)}:{})});}const merged=[...byRef.values()];
   // Companion history has confirmed order/bundle quantities but not native
   // occurrence IDs. Keep that distinction. A later native scan supplies real
   // occurrences for the same group; they replace aggregate slots, not add a
@@ -33,7 +35,8 @@ export function mergePurchaseOrigins(prior=[],incoming=[]){
   for(const group of aggregateGroups){
     const rows=merged.filter(entry=>key(entry)===group),native=rows.filter(entry=>!entry.basis),aggregate=rows.filter(entry=>entry.basis);
     const remaining=Math.max(0,Math.max(oldCounts.get(group)??0,newCounts.get(group)??0)-native.length);
-    selected.push(...native,...aggregate.slice(0,remaining));
+    const groupReview=aggregate.reduce((r,o)=>GalacticPurchaseSnapshot.mergeKeyReview(r,o.keyReview),undefined);
+    selected.push(...native.map(o=>{const review=GalacticPurchaseSnapshot.mergeKeyReview(o.keyReview,groupReview);return {...o,...(review?{keyReview:review}:{})};}),...aggregate.slice(0,remaining));
   }
   selected.push(...merged.filter(entry=>!aggregateGroups.has(key(entry))));
   return validatePurchaseOrigins(selected.sort((a,b)=>a.occurrenceRef.localeCompare(b.occurrenceRef)));
