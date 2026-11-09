@@ -45,6 +45,10 @@ try{
  async function remove(key){if(firefox)await driver.send('Addon:Uninstall',{id:installed.get(key)});else await driver.send('Extensions.uninstall',{id:installed.get(key)});installed.delete(key);}
  async function pairTransport(){if(!installed.has('GL'))return;await navigate(await extensionUrl('GL','options.html'));await wait("try{await import('./src/lib/storage.js');return true;}catch{return false;}",'GL options');await evaluate(`const S=await import('./src/lib/storage.js');await S.saveAllowedExternalClientIds(${JSON.stringify([...installed].filter(([key])=>key!=='GL').map(([,id])=>id))});return true;`);for(const key of ['HB','FAN'])if(installed.has(key)){await navigate(await extensionUrl(key,key==='HB'?'options.html':'src/options.html'));await wait('return !!globalThis.chrome?.storage?.local;','Companion options');await evaluate(`await chrome.storage.local.set({galacticLibraryExtensionId:${JSON.stringify(installed.get('GL'))}});return true;`);}}
  const ids={humble:['#galactic-library-humble-importer','#hcl-importer'],fanatical:['#galactic-library-fanatical-importer','#fanatical-library-importer']};
+ async function recoveryStyle(provider){
+  const s=await evaluate(`const n=document.querySelector('[data-importer-ownership="${provider}"]'),b=[...n.querySelectorAll('button')],r=b[1];b[0].focus();const c=getComputedStyle(b[0]),p=getComputedStyle(r);return {count:b.length,secondary:c.backgroundColor,primary:p.backgroundColor,radius:c.borderRadius,padding:c.padding,font:c.fontSize,gap:getComputedStyle(b[0].parentElement).gap,outline:c.outlineWidth,focused:document.activeElement===b[0],disabled:b[0].disabled,tabIndex:b[0].tabIndex};`);
+  assert.equal(s.count,2);assert.notEqual(s.primary,s.secondary);assert.equal(s.radius,'5px');assert.equal(s.padding,'8px 10px');assert.equal(s.font,'14px');assert.equal(s.gap,'8px');assert.equal(s.outline,'2px');assert(s.focused);assert.equal(s.disabled,false);assert.equal(s.tabIndex,0);console.log('PASS '+target+' '+provider+' recovery notice: themed primary/secondary buttons, spacing and keyboard focus');
+ }
  async function check(provider,expected){await navigate(origin+(provider==='humble'?'/home/purchases':'/en/orders'));const selectors=ids[provider];await wait(`const visible=${JSON.stringify(selectors)}.filter(s=>{const e=document.querySelector(s);return e&&getComputedStyle(e).display!=='none';});return visible.length===1&&visible[0]===${JSON.stringify(selectors[expected==='GL'?0:1])};`,provider+' expected '+expected);console.log('PASS '+target+' '+[...installed.keys()].join('+')+' '+provider+': one visible importer, '+expected);}
  await build('GL');await build('HB');await build('FAN');await install('GL');await pairTransport();await check('humble','GL');await check('fanatical','GL');
  await install('HB');await pairTransport();await check('humble','HB');await check('fanatical','GL');
@@ -57,11 +61,12 @@ try{
  await wait("const e=document.querySelector('#galactic-library-fanatical-importer');return e&&getComputedStyle(e).display!=='none'&&getComputedStyle(document.querySelector('#fanatical-library-importer')).display==='none';",'Live removal must restore GL and hide stale companion DOM');
  await install('FAN');await pause(1100);await evaluate("window.dispatchEvent(new Event('focus'));return true;");
  await wait("const e=document.querySelector('[data-importer-ownership=fanatical]');return e&&!e.hidden&&e.innerText.includes('Reload');",'Enable on an existing page must offer reload instead of stale importer');
+ await recoveryStyle('fanatical');
  await check('fanatical','FAN');console.log('PASS '+target+' removal/re-enable on the open page: GL recovery, stale-DOM protection and reload');
  await check('humble','HB');await remove('HB');await pause(1100);await evaluate("window.dispatchEvent(new Event('focus'));return true;");
  await wait("const e=document.querySelector('#galactic-library-humble-importer');return e&&getComputedStyle(e).display!=='none';",'Live HB removal must restore GL');
  await install('HB');await pause(1100);await evaluate("window.dispatchEvent(new Event('focus'));return true;");
- await wait("const e=document.querySelector('[data-importer-ownership=humble]');return e&&!e.hidden;",'Live HB enable must offer recovery');await pairTransport();await check('humble','HB');
+ await wait("const e=document.querySelector('[data-importer-ownership=humble]');return e&&!e.hidden;",'Live HB enable must offer recovery');await recoveryStyle('humble');await pairTransport();await check('humble','HB');
  console.log('PASS '+target+' Humble live removal/re-enable and independent Fanatical ownership');
  await remove('HB');await check('humble','GL');await check('fanatical','FAN');
  await remove('FAN');await check('fanatical','GL');
