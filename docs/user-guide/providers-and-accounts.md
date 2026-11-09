@@ -64,6 +64,8 @@ A clean headerless order list remains a successful import. It does not authorize
 
 For troubleshooting, enable **Settings → Troubleshooting → Enable provider diagnostics**, reload Fanatical's Orders page and retry. Open **Scan diagnostics → Export scan report** before reloading again. The report contains only error categories, stages, aggregate counts and the confirmed save outcome, without titles, order identifiers or account details. An unavailable acquisition result has unknown counts; an unconfirmed save means GL did not receive a successful save acknowledgment. Ordinary error messages work with diagnostics turned off.
 
+Fanatical scan reports separate unrecognized order statuses, missing or malformed product lists, conflicting summaries and detail-request failures. They also count scheduled detail checks and validated purchases skipped by Quick update. Unknown statuses stay unresolved; an order's presence in purchase history alone does not establish gift entitlement. These diagnostic counts do not change ownership or authorize removal of older purchases.
+
 ## Kindle import recovery
 
 If an individual Kindle entry cannot be validated or a later page fails temporarily, GL saves independently readable items and keeps earlier records, purchase evidence, acquisition dates and your access corrections. The result reports a partial save, without guessing how many books are behind an unreadable page. Purchased, subscription, borrowed, sample and personal-document access remain distinct.

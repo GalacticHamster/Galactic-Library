@@ -65,6 +65,10 @@
     for(const key of counters){if(!value.countsAvailable&&value[key]===null){report[key]=null;continue;}if(!value.countsAvailable||!Number.isSafeInteger(value[key])||value[key]<0||value[key]>100000)return null;report[key]=value[key];}
     if(report.pagesParsed>report.pagesAttempted||report.detailsParsed>report.detailsAttempted||report.ordersValidated>report.ordersDiscovered||report.ordersUnresolved>report.ordersDiscovered)return null;
     for(const key of ['continuationPending','acquisitionFinished']){if(typeof value[key]!=='boolean')return null;report[key]=value[key];}
+    // Diagnostic counters only; never copy provider values or arbitrary keys.
+    const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
+    const c=value.compatibility;
+    if(c?.version===1&&Object.keys(c).every(k=>['version','counts'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000))report.compatibility={version:1,counts:Object.fromEntries(fields.map(k=>[k,c.counts[k]]))};
     return report;
   }
   function failureReport(category='unavailable',stage='execution') {

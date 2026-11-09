@@ -26,7 +26,7 @@ export async function candidateFiles(consumer,input){
 export function buildCandidateFiles(consumer,input,{engine,adapter,contract,pin}){
   if(pin.contractVersion!==1||pin.engine!==digest(engine)||pin.adapter!==digest(adapter)||pin.contract!==digest(contract)||pin.revision!==`fanatical-v1-${digest(pin.engine+pin.adapter+pin.contract).slice(0,16)}`)throw Error('Candidate revision/digest mismatch; do not relabel or regenerate a pin automatically.');
   const files=new Map(input);
-  const validator=contract.slice(contract.indexOf('export function assertFanaticalAcquisitionContract')).replace('export function','function');
+  const validator=contract.slice(contract.indexOf('export function fanaticalCompatibilityReport')).replaceAll('export function','function');
   if(consumer==='GL')files.set('src/providers/fanatical-scan.js',Buffer.from(`// Pinned acquisition ${pin.revision}; contract 1; SHA-256 ${pin.engine}\nexport async function readFanaticalOrdersInPage(options={}){\n${engine.replace('export async function','async function')}\n${validator}\n${adapter.replace(/^import .*;\r?\n/gmu,'').replace('export function','function')}\nreturn fanaticalAcquisitionForGL(await importFanaticalOrdersInPage({...options,allowPartial:true,returnFailure:true,progressFormat:'gl'}),options);\n}\n`));
   else if(consumer==='FAN'){
     files.set('src/order-importer.mjs',Buffer.from(engine));
@@ -34,7 +34,7 @@ export function buildCandidateFiles(consumer,input,{engine,adapter,contract,pin}
     if(files.has('src/service-worker.js')){
       const worker=files.get('src/service-worker.js').toString(),needle='  const projected = validateScanResult(result[0]?.result, { fullScan, knownOrderFingerprints });';
       if(!worker.includes(needle))throw Error('Candidate FAN worker boundary changed.');
-      const boundaryImport="import {assertFanaticalAcquisitionContract} from './acquisition-contract.mjs';\n";
+      const boundaryImport="import {assertFanaticalAcquisitionContract,fanaticalCompatibilityReport} from './acquisition-contract.mjs';\n";
       const admission="  const authority=assertFanaticalAcquisitionContract(result[0]?.result,{fullScan,knownOrderFingerprints,accountOrderFingerprints});\n";
       const consistency="\n  if(authority.finished!==(projected.acquisitionComplete??true))throw Error('Fanatical acquisition/writer completeness disagreement.');";
       if(worker.includes(boundaryImport)){

@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Accept identical Fanatical purchase summaries whose JSON field order differs, while retaining conflict checks for changed values and product multiplicity. Export bounded compatibility counters without purchase details; unknown statuses and malformed orders remain retryable and cannot authorize reconciliation.
+
 - Preserve independently verified purchases during supported partial imports across Humble, Fanatical, GOG, Epic, Amazon Games, Amazon Video, Kindle, Audible, Kobo and Fandango. Earlier records and manual corrections remain protected; unresolved work can be retried without claiming complete coverage.
 - Keep provider-specific Quick updates incremental where supported, with clearer recovery guidance. Nintendo refreshes avoid unnecessary unchanged catalog saves and show capture progress.
 - Treat equivalent Epic product observations as duplicates rather than incomplete scans, retain warnings for conflicting records, and avoid full-catalog persistence on unchanged scans. Omitted Epic records are retained rather than treated as revoked purchases.
