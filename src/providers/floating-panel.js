@@ -293,12 +293,12 @@
     const noticeStyle=document.createElement('style');noticeStyle.textContent=`
       [data-importer-ownership] p { margin:0 0 12px; }
       [data-importer-ownership] .recovery-actions { display:flex; flex-wrap:wrap; gap:8px; }
-      [data-importer-ownership] button { appearance:none; font:inherit; line-height:1.4; padding:8px 10px; border:1px solid var(--gh-border,#68758a); border-radius:5px; cursor:pointer; background:var(--gh-input,#293548); color:var(--gh-text,#fff); }
-      [data-importer-ownership] button[data-primary] { background:var(--gh-accent,#7c3aed); color:var(--gh-on-accent,#fff); border-color:transparent; }
-      [data-importer-ownership] button:hover:not(:disabled) { background:var(--gh-surface-hover,#35435a); }
-      [data-importer-ownership] button[data-primary]:hover:not(:disabled) { background:var(--gh-accent-hover,#6d28d9); }
-      [data-importer-ownership] button:focus-visible,[data-importer-ownership] button:focus { outline:2px solid var(--gh-focus,#c4b5fd); outline-offset:3px; }
-      [data-importer-ownership] button:disabled { opacity:.65; cursor:default; }
+      [data-importer-ownership] button { appearance:none; font:inherit; line-height:1.4; padding:8px 10px; border:1px solid transparent; border-radius:5px; cursor:pointer; background:var(--gh-accent,#7c3aed); color:var(--gh-on-accent,#fff); font-weight:500; box-shadow:none; text-transform:none; letter-spacing:normal; }
+      [data-importer-ownership] button[data-primary] { font-weight:600; }
+      [data-importer-ownership] button:hover:not(:disabled) { background:var(--gh-accent-hover,#6d28d9); }
+      [data-importer-ownership] button:active:not(:disabled) { background:var(--gh-accent-pressed,#5b21b6); }
+      [data-importer-ownership] button:focus-visible { outline:2px solid var(--gh-focus,#c4b5fd); outline-offset:3px; }
+      [data-importer-ownership] button:disabled { background:var(--gh-disabled,#475569); color:var(--gh-disabled-text,#cbd5e1); opacity:1; cursor:wait; }
     `;
     const actions=document.createElement('div');actions.className='recovery-actions';reload.dataset.primary='';
     retry.type=reload.type='button';actions.append(retry,reload);notice.append(noticeStyle,text,actions);notice.hidden=true;host.after(notice);
@@ -317,9 +317,9 @@
     }
     async function check(){
       if(disposed)return false;if(pending)return pending;
-      retry.disabled=true;
+      retry.disabled=true;retry.textContent='Checking...';retry.setAttribute('aria-busy','true');
       pending=(async()=>{try{const result=await chrome.runtime.sendMessage({type:'GET_PROVIDER_IMPORTER',provider});if(disposed)return false;owner=result?.ok===true&&['galactic','companion','unavailable'].includes(result.owner)?result.owner:'unavailable';pageReady=result?.pageReady;}
-      catch{owner='unavailable';}finally{lastCheck=Date.now();pending=null;retry.disabled=false;present();}return owner==='galactic';})();return pending;
+      catch{owner='unavailable';}finally{lastCheck=Date.now();pending=null;retry.disabled=false;retry.textContent='Check importer again';retry.removeAttribute('aria-busy');present();}return owner==='galactic';})();return pending;
     }
     retry.addEventListener('click',check);reload.addEventListener('click',()=>global.location.reload());
     const focus=()=>{if(Date.now()-lastCheck>1000&&!document.hidden)check();};
