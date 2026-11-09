@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Import authenticated standalone game selections with empty bundle arrays, as rendered by Fanatical's order UI. Keep exact order/product identities, purchase provenance, duplicate occurrences and conservative history coverage.
+
 - Prioritize precise Fanatical detail validation failures within bounded diagnostic reports, without changing product admission. Style the shared Humble/Fanatical importer-recovery notice consistently with the provider panels.
 
 - Recover sparse completed Fanatical summaries through identity-checked order details, preserving parent evidence and requiring fully validated nonempty products. Quick rechecks these details; failed recovery retains earlier purchases and unverified listing coverage remains conservative.

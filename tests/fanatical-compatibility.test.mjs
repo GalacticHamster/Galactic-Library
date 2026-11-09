@@ -15,6 +15,30 @@ async function run(engine,{list=[order(0)],details=list,detailResponses={},known
  return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ // Direct-item fixtures follow Fanatical's public AccountArea order renderer
+ // (AccountArea~102ff935.00f250fe.js, inspected 2026-11-09): empty bundles
+ // passes the authenticated item itself as game; pickAndMix only groups it.
+ // These are synthetic products, not a captured customer purchase payload.
+ test(name+': authenticated direct pick-and-mix games are purchased items, not empty bundle catalogs',async()=>{
+  const direct={_id:'synthetic-order-direct',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({_id:'direct-game-'+i,name:'Selected '+i,type:'game',bundles:[],pickAndMix:'Synthetic pick and mix',drm:{steam:true},steam:{id:1000+i}}))};
+  const r=await run(engine,{list:[order(0),direct]});assert.equal(r.result.items.length,11);assert.equal(r.result.ordersScanned,2);if(engine===gl)assert.equal(r.result.diagnostic.ordersUnresolved,0);else assert.equal(r.result.unresolvedOrderFingerprints.length,0);assert.equal(r.result.coverage.complete,false);assert.equal(r.counts.detailStructure,0);
+  const game=r.result.items.find(p=>p.sourceItemId==='direct-game-0');assert.equal(game.mediaType,'game');assert.equal(game.externalIds.steamAppId,'1000');assert.equal(game.bundle.sourceItemId,'direct-game-0');assert.equal(game.bundle.title,'Selected 0');assert.equal(game.purchaseDate,'2026-11-01');if(engine===gl)assert.equal(game.purchaseOrigins[0].orderRef,hash(direct._id));else {assert.equal(game.purchaseOrigins[0].purchaseRef,hash(direct._id));assert.equal(game.purchaseOrigins[0].quantity,1);}assert.equal(game.occurrences.length,1);assert(!JSON.stringify(game).includes('pick and mix'));
+  const quick=await run(engine,{list:[order(0),direct],known:[hash(order(0)._id),hash(direct._id)],fullScan:false});assert.equal(quick.paths.length,1);assert.equal(quick.counts.knownSkipped,2);
+  const mixed=structuredClone(direct);mixed.items.push(structuredClone(order(0).items[0]));const combined=await run(engine,{list:[mixed]});assert.equal(combined.result.items.length,11);
+  const partlySparse=structuredClone(direct);delete partlySparse.items[9].type;const substituted=structuredClone(direct);substituted.items[0].type='bundle';substituted.items[0].bundles=[{games:[{_id:'different-game',name:'Different',type:'game'}]}];const conflict=await run(engine,{list:[order(0),partlySparse],details:[order(0),substituted]});assert.equal(conflict.result.items.length,1);assert.equal(conflict.counts.detailProductMismatch,1);
+  const sparse=structuredClone(direct);for(const p of sparse.items)delete p.type;
+  const recovered=await run(engine,{list:[sparse],details:[direct]});assert.equal(recovered.result.items.length,10);assert.equal(recovered.compatibility.summaryRecovery.recovered,1);
+  const twice=structuredClone(direct);twice.items.push(structuredClone(twice.items[0]));const copies=await run(engine,{list:[twice]});const repeated=copies.result.items.find(p=>p.sourceItemId==='direct-game-0');if(engine===gl)assert.equal(repeated.purchaseOrigins.length,2);else assert.equal(repeated.purchaseOrigins[0].quantity,2);assert.equal(repeated.occurrences.length,2);assert.notEqual(repeated.occurrences[0].occurrenceRef,repeated.occurrences[1].occurrenceRef);
+ });
+ test(name+': direct game details preserve exact identities, multiplicity and all-or-nothing order admission',async()=>{
+  const direct={_id:'synthetic-order-direct',status:'COMPLETE',items:[{_id:'direct-game',name:'Selected',type:'game',bundles:[]}]};
+  for(const mutation of [d=>{d.items[0]._id='foreign-game';},d=>{d.status='PENDING';},d=>{d._id='foreign-order';},d=>{d.items.push(structuredClone(d.items[0]));},d=>{d.items[0].type='bundle';},d=>{d.items[0].products=[{_id:'catalog-only',name:'Not purchased'}];}]){
+   const detail=structuredClone(direct);mutation(detail);const r=await run(engine,{list:[order(0),direct],detailResponses:{[direct._id]:detail}});if(detail._id!==direct._id){if(engine===gl)assert.equal(r.result.fanaticalFailure,1);else assert.equal(r.result.fanaticalImportFailure,1);assert.equal(r.result.items,undefined);}else {assert.equal(r.result.items.length,1);assert.equal(r.result.items[0].sourceItemId,order(0).items[0].bundles[0].games[0]._id);if(engine===gl){assert.equal(r.result.recovery.failedOrders,1);assert.equal(r.result.recovery.failedOrderFingerprints.length,1);assert.equal(r.result.diagnostic.ordersUnresolved,1);}else assert.equal(r.result.unresolvedOrderFingerprints.length,1);}
+  }
+  for(const mutation of [d=>{delete d.items[0]._id;},d=>{d.items[0].bundles={};},d=>{d.items[0].type='bundle';},d=>{d.items[0].display_type='software';},d=>{d.items[0].games=[];}]){
+   const bad=structuredClone(direct);mutation(bad);const r=await run(engine,{list:[order(0),bad]});assert.equal(r.result.items.length,1);if(engine===gl){assert.equal(r.result.recovery.failedOrders,1);assert.equal(r.result.recovery.failedOrderFingerprints.length,1);assert.equal(r.result.diagnostic.ordersUnresolved,1);}else assert.equal(r.result.unresolvedOrderFingerprints.length,1);
+  }
+ });
  test(name+': detail failure branch survives ten sparse summary observations without leaking selected titles',async()=>{
   const sparse={_id:order(1)._id,status:'COMPLETE',items:Array.from({length:10},(_,i)=>({name:'PRIVATE_SELECTION_'+i,bundles:[]}))};
   for(const reason of ['invalidGames','missing-parent-name','missing-leaf-name']){
@@ -124,4 +148,10 @@ test('recovery diagnostics are allowlisted, bounded and independent from persist
  const old=structuredClone(clean);delete old.summaryRecovery;assert(fanaticalCompatibilityReport(old));
  for(const items of [[],null,{},undefined]){const d=await run(canonical,{list:[sparse],detailResponses:{[detail._id]:{...detail,items}}});assert.equal(d.compatibility.summaryRecovery.recovered,0);assert.equal(d.compatibility.summaryRecovery.emptyDetailItems,Array.isArray(items)?1:0);assert.equal(Object.values(d.compatibility.summaryRecovery.detailItemTypes).reduce((a,b)=>a+b),1);assert.equal(d.result.items.length,0);}
  const failed=await run(canonical,{list:[sparse],detailStatus:404});assert.equal(failed.compatibility.summaryRecovery.unresolved,1);assert.equal(failed.compatibility.summaryRecovery.recovered,0);assert.equal(failed.counts.detailRequest,1);assert.equal(failed.result.items.length,0);
+});
+
+for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan]])test(name+': legacy purchased-detail projection recognizes direct games only for matching completed order identities',async()=>{
+ const direct={_id:'direct-order',status:'COMPLETE',date:'2026-11-01',items:[{_id:'direct-game',name:'Selected',type:'game',bundles:[]}]};
+ const projected=await engine({operation:'project',orderSummaries:[direct],orderDetails:[direct]});assert.equal(projected.items.length,1);assert.equal(projected.items[0].sourceItemId,'direct-game');assert.equal(projected.items[0].purchaseOrigins[0].purchaseRef,hash(direct._id));
+ for(const changed of [{...direct,status:'PENDING'},{...direct,_id:'foreign-order'}]){const rejected=await engine({operation:'project',orderSummaries:[direct],orderDetails:[changed]});assert.equal(rejected.items.length,0);}
 });

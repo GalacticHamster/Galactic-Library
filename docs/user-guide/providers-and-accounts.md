@@ -70,6 +70,8 @@ Rejected Fanatical bundle containers additionally produce up to eight `compatibi
 
 A completed Fanatical summary containing only named items with empty bundle arrays can be checked through its authenticated order detail. GL still requires the same order ID, completed status, matching item names and any supplied item IDs, plus independently valid purchased products. Sparse summaries are rechecked on Quick update even if previously saved. Unknown structures, missing detail evidence and conflicts remain unresolved; existing purchases are kept. `compatibility.summaryRecovery` reports eligible, scheduled, recovered and unresolved counts, plus value-free detail-item types. A summary's empty-array shape may therefore appear in a successful recovery report; it does not itself indicate that the purchase failed. Listing coverage remains a separate check.
 
+Fanatical can store a purchased game directly in an authenticated order's `items` array with an empty `bundles` array. GL accepts a validated game item itself in that representation; it does not look up the public Build Your Own Bundle selection pool. Fanatical's `pickAndMix` name is a display grouping, not a product or bundle identity. Each direct game keeps its native product identity and order evidence; the stored parent reference is that purchased item itself. Unsupported or conflicting empty containers remain unresolved.
+
 Within the existing bounded `bundleShapes` report, detail failures take priority over repeated summary observations and identify the exact validation branch. For detail failures, child-type fields describe the failing group or leaf. This can distinguish missing names from invalid bundle/game containers without exposing selected titles or identifiers.
 
 ## Kindle import recovery

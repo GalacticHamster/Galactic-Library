@@ -158,6 +158,13 @@ try{
   await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,48);assert.equal(d.history,0);
   foreignRecovery=true;await page();await sync();diagnostic=await scanReport();assert(!diagnostic.committed);d=await report();assert.equal(d.count,48);assert.equal(d.owned,48);assert.equal(d.history,0);
   checks.push('installed sparse summary recovers 47+1 products through validated detail, retries after reload, rechecks known Quick and rejects foreign detail without altering purchases');
+  sparseSummary=false;foreignRecovery=false;sparseDetailFailure=false;
+  const direct={_id:'order-direct-games',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({_id:'direct-game-'+i,name:'Selected '+i,type:'game',bundles:[],pickAndMix:'Synthetic pick and mix',drm:{steam:true}}))};
+  orders=[fanaticalOrder(1),direct];await reset();await sync();d=await report();assert.equal(d.count,57);assert.equal(d.owned,57);assert.equal(d.history,0);assert.equal(d.failed.length,0);assert.equal(d.fullAt,null);assert(d.roundTrip);
+  await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests,beforeDetails);d=await report();assert.equal(d.count,57);
+  sparseDetailFailure=true;await page();await sync();d=await report();assert.equal(d.count,57);assert.equal(d.owned,57);assert.equal(d.failed.length,1);assert.equal(d.history,0);
+  sparseDetailFailure=false;await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,57);assert.equal(d.failed.length,0);assert(d.roundTrip);
+  checks.push('direct pick-and-mix purchase saves 47 comics plus 10 games, skips verified Quick details and preserves all purchases during detail failure/retry without complete coverage');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{
