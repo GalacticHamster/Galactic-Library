@@ -255,6 +255,7 @@ export async function readFanaticalOrdersInPage({ fullScan = false, knownOrderFi
     if (!order || typeof order._id !== 'string' || !safeIdInPage(order._id) || typeof order.status !== 'string' || !/^[A-Z][A-Z_]*$/u.test(order.status) || listed.has(order._id)) throw unreadable();
     listed.add(order._id);
     if (order.status === 'COMPLETE') expectedProducts.set(order._id, productCounts(order.items));
+    else if (!['REFUNDED','CANCELLED','CANCELED','PENDING','FAILED'].includes(order.status)) throw unreadable();
     }catch{diagnostic.category='summary';failureStage=diagnostic.stage;listed.add(order._id);invalidOrders.add(order._id);diagnostic.ordersUnresolved=invalidOrders.size;}
   }
   const complete = summaries.filter((order) => order.status === 'COMPLETE'||invalidOrders.has(order._id));

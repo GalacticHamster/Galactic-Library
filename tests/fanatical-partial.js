@@ -10,6 +10,21 @@ const records=db=>Object.values(db.providerItems).filter(i=>i.provider==='fanati
 const acquired=async h=>{const a=await h.acquire();assert(a.projection.ok,a.projection.error);const saved=await h.commit(a);assert(saved.result.ok,saved.result.error);return a;};
 
 export const fanaticalPartialTests=[
+ ['Fanatical unresolved status cannot archive an active purchase or authorize reconciliation',()=>fanaticalWorker(async h=>{
+   const a=one(1),b=one(2);h.setOrders([a,b]);h.setHeaders({'x-total-count':'2'});await acquired(h);
+   const before=await h.pageA.getDatabase();
+   for(const status of ['REVIEW','UNKNOWN_PROVIDER_STATUS']){
+     h.setOrders([a,{...b,status}]);const result=await acquired(h);
+     assert.equal(result.projection.result.coverage.complete,false);
+     assert.equal(result.projection.result.recovery.failedOrders,1);
+     const after=await h.pageB.getDatabase();
+     assert.equal(records(after).length,2);assert.deepEqual(after.providerHistory,before.providerHistory);
+     assert.deepEqual(after.ownershipReviews,before.ownershipReviews);
+     assert.equal(after.providers.fanatical.fullSyncAt,before.providers.fanatical.fullSyncAt);
+   }
+   h.setOrders([a,b]);const recovered=await acquired(h);assert.equal(recovered.projection.result.coverage.complete,true);
+   assert.equal(records(await h.pageB.getDatabase()).length,2);
+ })],
  ['Fanatical partial: headerless 47 and one-list zero-detail Quick remain unchanged',async()=>{const result=await fanaticalUsabilityBaseline();assert.equal(result.supported,47);}],
  ['Fanatical partial: first 499/500 persists ownership and Quick recovers exactly one detail',()=>fanaticalWorker(async h=>{
    const orders=Array.from({length:500},(_,i)=>one(i+1));let failing=true;
