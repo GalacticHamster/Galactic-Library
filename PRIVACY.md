@@ -1,6 +1,6 @@
 # Privacy Policy for Galactic Library
 
-Last updated: October 30, 2026
+Last updated: November 9, 2026
 
 Galactic Library (GL) is an unofficial personal library manager. It is not affiliated with the providers whose libraries it imports.
 
@@ -16,7 +16,7 @@ Provider imports run from supported signed-in pages after the user starts an imp
 - **Audible acquisition history:** Full rescan reads all offered purchase, refund and received-gift history years and pages; Quick update reads only current and previous calendar years. Both read history using a temporary same-site background page and the existing browser session. GL retains matched acquisition calendar dates (including gift redemption dates), acquisition methods and supported refund dates for existing audiobook identifiers. It does not retain payment amounts, raw order identifiers, gift-sender details or gift codes from this traversal. Missing history is not proof of ownership or loss of access; unresolved refund conflicts do not automatically override stronger saved evidence. User corrections remain separate. Provider history requests still go to Audible; they are not sent to a Galactic Hamster server.
 - **Amazon Video and Fandango at Home:** purchased/rented library cards, titles, identifiers, available artwork and access labels. GL paginates or traverses the supported library views rather than treating general browsing results as purchases.
 - **Kobo:** rendered library cards and pagination, titles, authors, source genres, available series, product identifiers and access evidence. An optional account-level ownership preference covers otherwise unconfirmed items without overriding explicit contradictory evidence.
-- **Humble and Fanatical:** purchase lists and details, supported product/bundle identifiers, titles, formats, dates, purchase information and provenance. Humble redemption-key values are redacted before parsing; GL does not retain redemption-key values.
+- **Humble and Fanatical:** purchase lists and details, supported product/bundle identifiers, titles, formats, dates, purchase information and provenance. Ordinary supported Fanatical Steam purchases can retain a dated unrevealed-key observation based on non-secret order fields and absence of a key field. Present key fields are not read to determine status; reveal status is not redemption evidence. Humble redemption-key values are redacted before parsing; GL does not retain redemption-key values.
 - **PlayStation:** the supported active PS4/PS5 purchased-listing scope and signed-in profile identity, with available membership/access fields; this is not a claim to include every historical PlayStation product.
 - **Nintendo:** Virtual Game Card records and signed-in account identity, including ownership/lending and available product flags; the supported visible-listing scope is not the entire historical Nintendo account.
 - **Xbox:** the website's account-scoped Owned catalog and supporting cached product/access information; it is not a complete mobile-app or historical-console purchase inventory.
@@ -35,7 +35,7 @@ Official HB and FAN companions are recognized through fixed browser-specific ide
 
 Separately, confirming a specific provider/account relationship authorizes **bidirectional saved-purchase synchronization** between GL and HB or FAN. Supported transfers include account references and labels, product/bundle identifiers, titles, available dates, formats, and purchase provenance. Subsequent saved-purchase changes synchronize automatically, with background retries. Manual purchase transfers are also available. Recognizing a companion for queries does not itself authorize purchase writes. Identity, provider, account scope, and consent checks apply; these exchanges use local browser extension messaging, not a remote Galactic Hamster server.
 
-HB can also explicitly publish a same-account key-reminder feed to GL containing titles, access/expiry/check information and opaque references. That feed excludes key values and raw purchase identifiers and is separate from purchase synchronization. FAN cannot publish Humble reminder feeds. GL retains saved companion data until removed; disconnecting or uninstalling a companion does not erase it. Removing an additional allowed ID does not remove built-in companion recognition; disable or uninstall a companion to stop its queries.
+HB can also explicitly publish a same-account key-reminder feed to GL containing titles, access/expiry/check information and opaque references. That feed excludes key values and raw purchase identifiers and is separate from purchase synchronization. FAN cannot publish Humble reminder feeds. Compatible Fanatical purchase transfers can carry dated non-secret key-status observations through the existing account-specific purchase consent; GL can return these in its reminder list. GL retains saved companion data until removed; disconnecting or uninstalling a companion does not erase it. Removing an additional allowed ID does not remove built-in companion recognition; disable or uninstall a companion to stop its queries.
 
 ## Browser permissions used
 

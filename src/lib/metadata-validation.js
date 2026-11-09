@@ -11,7 +11,7 @@ const FIELDS = {
   steam:['parentProviderItemId','ownershipBasis'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery','collectedOn','claimKey','claimProductKey','claimBasis','observationIds','deliveryDestination'],
   audible:['narrators','libraryAction','libraryAvailability','audibleOwnershipBasis','audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
-  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
+  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins','keyStatus','keyCheckedAt'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
   xbox:['productId','accessBasis','accessTypes','productKind','supportedPlatforms'],
   playstation:['productId','titleId','conceptId','accessBasis','membership','subscriptionService','isActive','isTrial'],
   nintendo:['cardId','applicationId','accessBasis','productKind','lendingExpiresAt','isHidden','isLending','isPartialLending','hasApplication','hasAddOnContents','hasReleasedApplication','hasReleasedAddOnContents','hasReleasedUpgrade']
@@ -94,7 +94,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
       if (!Array.isArray(value[key]) || value[key].length>50) throw new Error('Contributors must be a bounded list.');
       result[key]=value[key].map(entry=>{object(entry,'Contributor');return {name:text(entry.name,500,'Contributor name'),role:text(entry.role,80,'Contributor role')};}).filter(entry=>entry.name);
     } else if (key==='detailUrl'||key==='imageUrl') result[key]=url(value[key],key==='detailUrl'?{hosts:HOSTS[provider]}:{});
-    else if(key==='expiresAt'||provider==='nintendo'&&key==='lendingExpiresAt')result[key]=date(value[key]);
+    else if(key==='keyCheckedAt'||key==='expiresAt'||provider==='nintendo'&&key==='lendingExpiresAt')result[key]=date(value[key]);
     else result[key]=text(value[key],LIMITS[key]??500,key);
   }
   if(result.acquisitionMethod && result.acquisitionMethod!=='permanent-claim')throw Error('Invalid acquisition method.');
@@ -102,6 +102,7 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
   if(provider==='audible'&&result.libraryAvailability!==undefined&&result.libraryAvailability!=='unavailable')throw Error('Invalid Audible library availability.');
   if(provider==='steam'&&result.ownershipBasis&&!['owned-app-index','master-subscription','auto-grant'].includes(result.ownershipBasis))throw Error('Invalid Steam access basis.');
   if (result.steamAppId && !/^\d{1,16}$/u.test(result.steamAppId)) throw new Error('Invalid Steam App ID.');
+  if(provider==='fanatical'&&result.keyCheckedAt&&(!['unknown','unrevealed'].includes(result.keyStatus)))throw Error('Invalid key observation.');
   if(result.keyStatus&&!['unknown','unrevealed','revealed','expired','unavailable'].includes(result.keyStatus))throw new Error('Invalid key status.');
   if(provider==='kobo'&&result.ownershipBasis&&!['purchase-attribute','purchase-label','kobo-plus-subscription','kobo-plus-availability','library-presence-only','conflicting-evidence','borrowed','rental','free-claim','free-availability','not-purchased'].includes(result.ownershipBasis))throw new Error('Invalid Kobo ownership basis.');
   if(provider==='kobo'&&result.titleEvidence&&!['title-attribute','title-element','cover-alt','action-label'].includes(result.titleEvidence))throw new Error('Invalid Kobo title evidence.');

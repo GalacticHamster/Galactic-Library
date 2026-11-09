@@ -29,7 +29,7 @@ import {providerScanMode} from '../lib/provider-scan-mode.js';
 import { restrictStorageAccess } from './storage-access.js';
 import { validateFandangoState } from './import-state.js';
 import {openLibraryEditionUrl,openLibraryEditionCandidate} from '../lib/open-library-edition.js';
-import {validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {validateKeyObservation,validatePurchaseOrigins,mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {libraryStorageArea,PRIVATE_STORAGE_CHANGED} from './private-storage.js';
 import {createQueryDiagnostics,diagnosticStorageKey} from '../lib/query-diagnostics.js';
 import {committedSnapshotSequence} from '../lib/committed-snapshot.js';
@@ -241,7 +241,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     const steamAppId = /^\d{1,16}$/u.test(String(candidate?.externalIds?.steamAppId ?? '')) ? String(candidate.externalIds.steamAppId) : '';
     const isbn = /^[0-9X]{10,17}$/iu.test(String(candidate?.externalIds?.isbn ?? '')) ? String(candidate.externalIds.isbn).toUpperCase() : '';
     items.push({
-      sourceItemId, title, mediaType, slug: safeText(candidate?.slug),
+      sourceItemId, title, mediaType,...validateKeyObservation(candidate), slug: safeText(candidate?.slug),
       externalIds: { ...(steamAppId ? { steamAppId } : {}), ...(isbn ? { isbn } : {}) },
       bibliographic: globalThis.GalacticProviderMetadata.extract(candidate),
       drm: safeList(candidate?.drm), platforms: safeList(candidate?.platforms), formats: safeList(candidate?.formats),

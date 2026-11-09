@@ -7,14 +7,22 @@ import {fanaticalCompatibilityReport,assertFanaticalAcquisitionContract} from '.
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const order=i=>({_id:`synthetic-order-${i}`,status:'COMPLETE',items:[{_id:'synthetic-bundle',name:'Bundle',bundles:[{games:[{_id:`synthetic-product-${i}`,name:`Book ${i}`,type:'book'}]}]}]});
 const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,v])=>[k,reorder(v)])):v;
-async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false}={}){
- let reads=0;const paths=[],scope={URL,Headers,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,crypto:webcrypto,localStorage:{getItem:()=>JSON.stringify({token:sessionChange&&reads++?'CHANGED_TOKEN':'PRIVATE_TOKEN'})},fetch:async path=>{paths.push(path);const listing=path==='/api/user/orders',status=listing?200:detailStatus;return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>structuredClone(listing?list:Object.hasOwn(detailResponses,path.split('/').at(-1))?detailResponses[path.split('/').at(-1)]:details.find(o=>path.endsWith(o._id)))};}};
+async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false,rawDetail=false}={}){
+ let reads=0;const paths=[],scope={URL,Headers,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,crypto:webcrypto,localStorage:{getItem:()=>JSON.stringify({token:sessionChange&&reads++?'CHANGED_TOKEN':'PRIVATE_TOKEN'})},fetch:async path=>{paths.push(path);const listing=path==='/api/user/orders',status=listing?200:detailStatus;return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>{const value=listing?list:Object.hasOwn(detailResponses,path.split('/').at(-1))?detailResponses[path.split('/').at(-1)]:details.find(o=>path.endsWith(o._id));return rawDetail&&!listing?value:structuredClone(value);}};}};
  const result=structuredClone(await vm.runInNewContext('('+engine.toString()+')',scope)({fullScan,knownOrderFingerprints:known,accountOrderFingerprints:known,allowPartial:true,returnFailure:true,diagnostics:true}));
  const diagnostic=engine===gl?result.diagnostic?.compatibility:result.coverage?.compatibility??result.diagnostic?.compatibility;
  assert(diagnostic);assert(!/PRIVATE_TOKEN|synthetic-order-|Book |synthetic-product-/.test(JSON.stringify(diagnostic)));
  return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': Steam key absence is dated evidence, fulfilled is not reveal/activation, and secret getters are never read',async()=>{
+  const purchase={_id:'synthetic-order-keys',status:'COMPLETE',items:[{_id:'key-product',name:'Synthetic Steam product',type:'game',display_type:'game',status:'fulfilled',drm:{steam:true},bundles:[],serialExpiry:null}]};
+  const r=await run(engine,{list:[purchase]});const item=r.result.items[0];assert.equal(item.keyStatus,'unrevealed');assert(Number.isFinite(Date.parse(item.keyCheckedAt)));assert.equal(item.occurrences[0].keyStatus,'unrevealed');assert.equal(item.purchaseOrigins[0].keyStatus,'unrevealed');assert(!/activationStatus|PRIVATE_TOKEN/.test(JSON.stringify(item)));
+  const detail=structuredClone(purchase);Object.defineProperty(detail.items[0],'key',{enumerable:true,get(){throw Error('SECRET VALUE MUST NEVER BE READ');}});
+  const present=await run(engine,{list:[purchase],details:[detail],rawDetail:true});assert.equal(present.result.items.length,1);assert.equal(present.result.items[0].keyStatus,'unknown');assert.equal(present.result.items[0].occurrences[0].keyStatus,'unknown');assert(!JSON.stringify(present.result).includes('SECRET'));
+  for(const patch of [{status:'revealed'},{status:'refunded'},{noKeyDelivery:true},{mystery:true},{mysteryV2:true},{preorder_pending:true},{epic_ska:true},{vaultnKeyless:true},{reveal_template:'unrecognized'},{serialExpiry:'2020-01-01'}]){const unsupported=structuredClone(purchase);Object.assign(unsupported.items[0],patch);const checked=await run(engine,{list:[unsupported]});assert.equal(checked.result.items[0].keyStatus,'unknown');}
+  const other=structuredClone(purchase);other.items[0].drm={gog:true};const unobserved=await run(engine,{list:[other]});assert.equal(unobserved.result.items[0].keyStatus,undefined);
+ });
  // Direct-item fixtures follow Fanatical's public AccountArea order renderer
  // (AccountArea~102ff935.00f250fe.js, inspected 2026-11-09): empty bundles
  // passes the authenticated item itself as game; pickAndMix only groups it.

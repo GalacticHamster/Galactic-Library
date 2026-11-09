@@ -47,7 +47,7 @@ import {validateEnrichment} from '../lib/metadata-validation.js';
 import {validateKindleCategoryPaths} from '../lib/kindle-categories.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
-import {mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {keyObservationSummary,mergePurchaseOrigins} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
 import {FEED_UPLOAD_KEY,validateEntitlementEntry} from '../lib/companion-entitlements.js';
 import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/reading.js';
@@ -1075,6 +1075,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     if(incoming.provider==='fanatical'){
       const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>({...entry,observedAt:incoming.observedAt}));
       if(origins.length||previous?.metadata.purchaseOrigins?.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(previous?.metadata.purchaseOrigins??[],origins);
+      Object.assign(incoming.metadata,keyObservationSummary(incoming.metadata.purchaseOrigins??[]));
       const dates=[previous?.acquiredAt,incoming.acquiredAt,...(incoming.metadata.purchaseOrigins??[]).map(entry=>entry.purchasedAt)].filter(Boolean).sort();incoming.acquiredAt=dates[0]??null;
     }
     if(previous&&previous.mediaType!==incoming.mediaType)return incoming;

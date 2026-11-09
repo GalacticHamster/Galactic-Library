@@ -24,7 +24,7 @@ export function libraryReminders(database,now=Date.now(),includeHidden=false){
       const basis=JSON.stringify([kind,dueAt,metadata.keyStatus??'',review?.reviewRef??'']);
       const reminderRef=`${item.recordRef}:${kind}`,saved=database.reminderReviews?.[reminderRef];
       const hidden=saved?.basis===basis&&(saved.action==='dismissed'||saved.action==='snoozed'&&Date.parse(saved.until)>now);
-      if(!hidden||includeHidden)reminders.push({reminderRef,itemRef:item.recordRef,title:item.title,provider:item.provider,mediaType:item.mediaType,kind,dueAt,severity,basis,hidden:Boolean(hidden)});
+      if(!hidden||includeHidden)reminders.push({reminderRef,itemRef:item.recordRef,title:item.title,provider:item.provider,mediaType:item.mediaType,kind,dueAt,severity,basis,hidden:Boolean(hidden),...(['unknown','unrevealed'].includes(metadata.keyStatus)&&metadata.keyCheckedAt?{keyStatus:metadata.keyStatus,keyCheckedAt:metadata.keyCheckedAt}:{})});
     };
     if(key){
       if(['expired','unavailable'].includes(metadata.keyStatus))add('key-unavailable',metadata.expiresAt??null);
@@ -49,6 +49,6 @@ export function libraryReminders(database,now=Date.now(),includeHidden=false){
   }
   return reminders.sort((a,b)=>(a.dueAt??'9999').localeCompare(b.dueAt??'9999')||a.reminderRef.localeCompare(b.reminderRef));
 }
-export function companionReminder({reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,source}){
-  return {reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,...(source?{source,reviewAvailable:false}:{})};
+export function companionReminder({reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,source,keyStatus,keyCheckedAt}){
+  return {reminderRef,itemRef,title,provider,mediaType,kind,dueAt,severity,...(['unknown','unrevealed'].includes(keyStatus)&&keyCheckedAt?{keyStatus,keyCheckedAt}:{}),...(source?{source,reviewAvailable:false}:{})};
 }

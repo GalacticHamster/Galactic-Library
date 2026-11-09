@@ -39,6 +39,7 @@
         metadata: {
           ...(global.GalacticProviderMetadata?.extract(source?.bibliographic) ?? {}),
           source: 'fanatical-order-history',
+          ...(['unknown','unrevealed'].includes(source.keyStatus)&&typeof source.keyCheckedAt==='string'?{keyStatus:source.keyStatus,keyCheckedAt:source.keyCheckedAt}:{}),
           bundleId: compactText(source?.bundle?.sourceItemId),
           bundleTitle: compactText(source?.bundle?.title),
           bundleSlug: compactText(source?.bundle?.slug),

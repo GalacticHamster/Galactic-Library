@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Show dated unrevealed-key observations for supported Fanatical Steam purchases in reminders, with consented companion sharing and no key-value reads or reveal actions. Quick checks new purchases; Full refreshes older observations.
+
 - Import authenticated standalone game selections with empty bundle arrays, as rendered by Fanatical's order UI. Keep exact order/product identities, purchase provenance, duplicate occurrences and conservative history coverage.
 
 - Prioritize precise Fanatical detail validation failures within bounded diagnostic reports, without changing product admission. Style the shared Humble/Fanatical importer-recovery notice consistently with the provider panels.
@@ -19,7 +21,7 @@
 - Restore Fandango Quick early stopping after a known tile finishes loading its title. Genuine unreadable cards and incomplete scans still remain protected; aggregate import diagnostics are available through the existing scan report.
 - Improve provider progress, waiting states and privacy-preserving failure reports, including Fanatical page-script errors and Steam applications that still need usable title/type information.
 
-Prepared locally for review; not submitted or published. No new permissions, storage schema or companion protocol changes. These changes are measured against published 1.0.0; companion transport semantics remain unchanged.
+Prepared locally for review; not submitted or published. No new permissions or storage/companion protocol version changes. These changes are measured against published 1.0.0; companion transport semantics remain unchanged.
 
 ## 1.0.0 ? Local release candidate
 

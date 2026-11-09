@@ -565,3 +565,9 @@ Run **Full rescan** to recover unchecked library pages. **Quick update** also ru
 If a later Kobo page or Archive request fails temporarily, GL saves independently readable books and keeps earlier records. A Kobo Archive entry remains a library record with its existing access evidence; archiving a book on Kobo does not mean you no longer own it or move it into GL’s Earlier imports.
 
 Run **Full rescan** to recover unchecked sections. **Quick update** also runs Full while recovery is pending, including after a failed Full with no readable books to save. Once recovery completes, Quick returns to checking newest-first My Books until it reaches a known page; it does not ordinarily traverse Archive. Sign-in errors or an unrecognized overall page stop the import. Your earlier records are kept. Only a validated complete Full can move absent records into Earlier imports; explicit empty sections must be checked before an empty library can be reconciled.
+
+### Fanatical key reminders
+
+Supported ordinary Steam purchases can report that a key was unrevealed when checked. This is separate from ownership and does not establish whether a game is activated on Steam. No reveal action is performed or key value saved. Other purchase types and ambiguous evidence remain unknown.
+
+Quick imports check new purchases; Full rescans refresh older key observations. With compatible extensions, Connect and sync shares the dated observations under the existing confirmed Fanatical account relationship. Review reminders in GL or load the GL reminder list in FAN. Dismissal affects the reminder, not the purchase or provider key.
