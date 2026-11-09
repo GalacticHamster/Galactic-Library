@@ -2,6 +2,8 @@
 
 ## 1.0.1 — Release candidate
 
+- Prioritize precise Fanatical detail validation failures within bounded diagnostic reports, without changing product admission. Style the shared Humble/Fanatical importer-recovery notice consistently with the provider panels.
+
 - Recover sparse completed Fanatical summaries through identity-checked order details, preserving parent evidence and requiring fully validated nonempty products. Quick rechecks these details; failed recovery retains earlier purchases and unverified listing coverage remains conservative.
 
 - Extend shared Fanatical diagnostics with bounded structural observations for rejected bundle containers; purchase admission and conservative coverage checks remain unchanged.

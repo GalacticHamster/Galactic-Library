@@ -15,6 +15,18 @@ async function run(engine,{list=[order(0)],details=list,detailResponses={},known
  return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': detail failure branch survives ten sparse summary observations without leaking selected titles',async()=>{
+  const sparse={_id:order(1)._id,status:'COMPLETE',items:Array.from({length:10},(_,i)=>({name:'PRIVATE_SELECTION_'+i,bundles:[]}))};
+  for(const reason of ['invalidGames','missing-parent-name','missing-leaf-name']){
+   const detail={...sparse,items:sparse.items.map((p,i)=>({_id:'private-parent-'+i,name:p.name,bundles:[{games:[{_id:'private-leaf-'+i,name:'PRIVATE_LEAF',type:'game'}]}]}))};
+   if(reason==='invalidGames')detail.items[9].bundles[0].games={PRIVATE_TOKEN:'PRIVATE_TOKEN'};
+   if(reason==='missing-parent-name')delete detail.items[9].name;
+   if(reason==='missing-leaf-name')delete detail.items[9].bundles[0].games[0].name;
+   const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail]}),shapes=r.compatibility.bundleShapes;
+   assert.equal(r.counts.detailStructure,1);assert.equal(r.result.items.length,1);assert.equal(shapes.records.length,8);assert.equal(shapes.truncated,true);const failure=shapes.records.find(s=>s.stage==='details');assert(failure);assert.equal(failure.reason,reason);assert(!/PRIVATE|private-/.test(JSON.stringify(shapes)));
+   if(reason==='invalidGames')assert.equal(failure.childGames,'object');if(reason==='missing-parent-name')assert.equal(failure.parentName,'missing');if(reason==='missing-leaf-name'){assert.equal(failure.childName,'missing');assert.equal(failure.childId,'string');}
+  }
+ });
  test(name+': rejected bundle containers export shapes, never alternate ownership or private values',async()=>{
   const leaf={_id:'PRIVATE_ID',name:'PRIVATE_TITLE',token:'PRIVATE_TOKEN'};
   for(const [bundles,type,size,reason]of [[[], 'array','empty','empty-array'],[{},'object','empty','non-array'],[{games:[leaf]},'object','one','non-array'],[{PRIVATE_KEY:{games:[leaf]}},'object','one','non-array'],[{PRIVATE_KEY:{games:[leaf]},PRIVATE_SECOND:{games:[leaf]}},'object','many','non-array'],['PRIVATE_STRING','string','not-container','non-array'],[42,'number','not-container','non-array'],[false,'boolean','not-container','non-array'],[null,'null','not-container','missing'],[undefined,'missing','not-container','missing']]){
