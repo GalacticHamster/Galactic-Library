@@ -8,6 +8,7 @@ import {join,dirname,resolve,sep} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as pause} from 'node:timers/promises';
 import {runtimeZip} from '../scripts/release.mjs';
+import {candidateFiles} from './provider-candidate-build.mjs';
 import {chromePipe,firefoxMarionette,freePort} from './native-protocol.mjs';
 const firefox=process.argv.includes('--firefox'),target=firefox?'firefox':'chrome';
 const server=createServer((req,res)=>{res.setHeader('content-type','text/html');res.end('<!doctype html><html><body><main>Synthetic purchase history</main></body></html>');});
@@ -32,6 +33,7 @@ try{
    const zip=await readFile(join(out,'Humble-Comic-Library-'+JSON.parse(await readFile(join(root,'manifest.json'),'utf8')).version+(firefox?'-firefox':'')+'.zip'));
    files=readArchive(zip);
   }else files=new Map((await (await import(pathToFileURL(join(root,'scripts/release.mjs')))).createRelease(root,undefined,target)).files);
+  if(process.argv.includes('--candidate')&&key!=='HB')files=await candidateFiles(key,files);
   const manifest=JSON.parse(files.get('manifest.json'));
   manifest.content_scripts=manifest.content_scripts.filter(s=>s.matches.some(p=>p.includes('humblebundle')||p.includes('fanatical'))).map(s=>({...s,matches:s.matches.filter(p=>p.includes('humblebundle')||p.includes('fanatical')).map(p=>p.includes('humblebundle')?'http://127.0.0.1/home/purchases*':'http://127.0.0.1/en/orders*')}));
   manifest.host_permissions=[...(manifest.host_permissions??[]),'http://127.0.0.1/*'];files.set('manifest.json',Buffer.from(JSON.stringify(manifest)));

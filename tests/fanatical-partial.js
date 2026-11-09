@@ -49,9 +49,17 @@ export const fanaticalPartialTests=[
    const orders=[one(2),one(3),one(4)];h.setReply(p=>p==='/api/user/orders'?{status:200,data:orders}:p.endsWith('000004')?{status:404,data:null}:{status:200,data:details(p,orders)});
    await acquired(h);const after=await h.pageA.getDatabase();assert.equal(records(after).length,2);assert.deepEqual(after.providerHistory,before.providerHistory);assert.deepEqual(after.ownershipReviews,before.ownershipReviews);assert.deepEqual(after.providerItems[other.id],other);assert.equal(after.providers.fanatical.fullSyncAt,before.providers.fanatical.fullSyncAt);
  })],
- ['Fanatical partial: malformed order, explicit identity mismatch and count conflict isolate one order',()=>fanaticalWorker(async h=>{
+ ['Fanatical partial: malformed details isolate one order; explicit foreign identity rejects the acquisition',()=>fanaticalWorker(async h=>{
    const orders=[one(1),one(2)];for(const bad of [{}, {...one(2),_id:'different-order'}, {...one(2),items:[]}]){
      h.setReply(p=>p==='/api/user/orders'?{status:200,data:orders}:{status:200,data:p.endsWith('000002')?bad:orders[0]});
+     if(bad._id==='different-order'){
+       const before=await h.pageA.getDatabase(),rejected=await h.acquire();
+       assert.equal(rejected.projection.ok,false);
+       const after=await h.pageA.getDatabase();
+       for(const key of ['providerItems','providerHistory','ownershipReviews'])assert.deepEqual(after[key],before[key]);
+       assert.equal(after.providers.fanatical.fullSyncAt,before.providers.fanatical.fullSyncAt);
+       continue;
+     }
      const a=await acquired(h);assert.equal(a.projection.result.recovery.failedOrders,1);assert.equal(records(await h.pageA.getDatabase()).length,1);
    }
  })],

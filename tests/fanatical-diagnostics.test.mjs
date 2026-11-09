@@ -59,7 +59,11 @@ test('diagnostics: malformed summaries and details retain valid peers without le
  for(const kind of ['summary','status','missing','transport','malformed','identity']){
  const a=one(1),b=one(2);if(kind==='summary')b.items=[];if(kind==='status')b.status='bad status';
  const h=scanner(p=>{if(!p.includes('/orders/'))return {data:[a,b]};if(p.endsWith(a._id))return {data:a};if(kind==='transport')throw Error('FAKE_ORDER');return {data:kind==='missing'?null:kind==='malformed'?{...b,items:[]}:kind==='identity'?a:b};});
- const r=await h.run();assert.equal(r.items.length,1,kind);assert.equal(r.recovery.failedOrders,1,kind);assert.equal(r.diagnostic.ordersUnresolved,1);assert.equal(r.diagnostic.category,['summary','status'].includes(kind)?'summary':'detail');assert(tools.scanReport(r.diagnostic));
+ const r=await h.run();
+ // A response explicitly belonging to another order is a fatal scope conflict,
+ // unlike a malformed detail. No evidence from that session may be persisted.
+ if(kind==='identity'){checkFailure(r,'scope','details');continue;}
+ assert.equal(r.items.length,1,kind);assert.equal(r.recovery.failedOrders,1,kind);assert.equal(r.diagnostic.ordersUnresolved,1);assert.equal(r.diagnostic.category,['summary','status'].includes(kind)?'summary':'detail');assert(tools.scanReport(r.diagnostic));
  }
 });
 test('diagnostics: strict report allowlist rejects invalid fields and discards secrets',()=>{

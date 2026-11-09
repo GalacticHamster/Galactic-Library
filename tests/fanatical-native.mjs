@@ -10,7 +10,10 @@ import {join,resolve,sep,dirname} from 'node:path';
 import {setTimeout as pause} from 'node:timers/promises';
 import {chromePipe,freePort,firefoxMarionette} from './native-protocol.mjs';
 import {createRelease,runtimeZip} from '../scripts/release.mjs';
-const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome'),files=new Map(release.files);
+import {observeImportLifecycle} from './import-lifecycle.mjs';
+import {candidateFiles} from './provider-candidate-build.mjs';
+const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome');
+const files=process.argv.includes('--candidate')?await candidateFiles('GL',release.files):new Map(release.files);
 let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[];
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/api/user/orders')){
@@ -70,14 +73,23 @@ try{
   const ready=()=>wait('return !!document.querySelector("#galactic-library-fanatical-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Fanatical panel unavailable');
   async function page(){await navigate(origin+'/en/orders');await ready();}
   async function sync(mode='full'){
-    await evaluate(`const s=${root};s.querySelector('[data-mode="${mode}"]').click();return true;`);
-    await wait(`return !${root}.querySelector('.status').dataset.busy;`,'Import did not finish');
-    return evaluate(`return ${root}.querySelector('.status').textContent;`);
+    const lifecycle=await evaluate(`const s=${root};return (${observeImportLifecycle.toString()})({button:s.querySelector('[data-mode="${mode}"]'),status:s.querySelector('.status')});`);
+    assert(['succeeded','failed'].includes(lifecycle.state),'Import lifecycle: '+JSON.stringify(lifecycle));
+    assert(lifecycle.started,'A scan that never started cannot satisfy this test');
+    return lifecycle.message;
   }
   async function report(){await navigate(reportUrl);return JSON.parse(await wait('return document.documentElement?.dataset.result;','No saved report'));}
   async function scanReport(){await wait(`return ${root}.querySelector('[data-export-scan]').closest('details').hidden===false;`,'Diagnostic control not visible');await evaluate(`const s=${root};s.querySelector('[data-export-scan]').closest('details').open=true;s.querySelector('[data-export-scan]').click();return true;`);return JSON.parse(await wait('return document.documentElement.dataset.testScanExport;','No aggregate scan report'));}
   const checks=[];
   await page();const reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
+  const controls=await evaluate(`const s=${root},status=document.createElement('p'),button=document.createElement('button');s.append(status,button);
+    const observe=${observeImportLifecycle.toString()};const idle=await observe({button,status,timeoutMs:50});
+    button.onclick=()=>{status.dataset.busy='true';};const hung=await observe({button,status,timeoutMs:50});
+    delete status.dataset.busy;button.disabled=true;const disabled=await observe({button,status,timeoutMs:50});status.remove();button.remove();return {idle,hung,disabled};`);
+  assert.equal(controls.idle.state,'timed-out');assert.equal(controls.idle.started,false);assert.equal(controls.idle.reason,'import-not-started');
+  assert.equal(controls.hung.state,'timed-out');assert.equal(controls.hung.started,true);assert.equal(controls.hung.reason,'completion-not-observed');
+  assert.equal(controls.disabled.state,'not-started');
+  checks.push('lifecycle negative controls reject no-op clicks, hung imports and disabled buttons');
   await evaluate(`const s=${root};s.querySelector('[data-profile-label]').value='Synthetic';s.querySelector('[data-profile-label]').dispatchEvent(new Event('input'));s.querySelector('[data-profile-confirm]').checked=true;return true;`);
   const message=await sync();assert(!/failed|incomplete|truncation|could not|warning/i.test(message),message);
   let d=await report();assert(!d.error,d.error);assert.equal(d.count,47);assert.equal(d.owned,47);assert.equal(d.history,0);assert.equal(d.fullAt,null);assert(d.acquisitionAt);assert.equal(d.health,'succeeded');assert(d.comparisonOwned&&d.roundTrip);
