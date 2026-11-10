@@ -19,7 +19,7 @@ export function fanaticalAcquisitionForGL(raw,options={}){
     throw Error('Fanatical acquisition incomplete or unreadable. Earlier purchases were kept.');
   };
   if(raw?.fanaticalImportFailure)return fail();
-  assertFanaticalAcquisitionContract(raw,options);
+  const authority=assertFanaticalAcquisitionContract(raw,options);
   if(partial&&!raw.orderFingerprints.length)return fail();
   const items=raw.items.map(item=>{
     if((item.occurrences?.length??0)>500){diagnostic.category='limit';diagnostic.stage='projection';return null;}
@@ -32,5 +32,5 @@ export function fanaticalAcquisitionForGL(raw,options={}){
   return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
     ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned}}:{}),
     coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
-    ...(raw.rejectedPurchaseItems?{rejectedPurchaseItems:raw.rejectedPurchaseItems}:{})};
+    ...(authority.rejectedPurchaseItems!==undefined?{rejectedPurchaseItems:authority.rejectedPurchaseItems}:{})};
 }

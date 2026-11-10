@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-8013d22a792cfa23; contract 1; SHA-256 95dee98ef7bf8fd57a7ceacec17e52ab0ebc7f17a7f149d857bfe9918441f859
+// Pinned acquisition fanatical-v1-d16db7095151d027; contract 1; SHA-256 95dee98ef7bf8fd57a7ceacec17e52ab0ebc7f17a7f149d857bfe9918441f859
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan' } = {}) {
@@ -807,13 +807,64 @@ function fanaticalCompatibilityReport(value){
   }
   return result;
 }
+// Rejected purchase diagnostics are data, not arbitrary page-world objects.
+// Reconstruct only these fields; unknown fields (including getters) are never read.
+function fanaticalRejectedPurchaseItems(value){
+  const invalid=()=>{throw Error('Invalid Fanatical rejected purchase information. Earlier purchases were kept.');};
+  const object=v=>{
+    if(!v||typeof v!=='object'||Array.isArray(v))invalid();
+    const proto=Object.getPrototypeOf(v);
+    if(proto!==null&&Object.getPrototypeOf(proto)!==null)invalid();
+  };
+  const field=(v,key)=>{
+    const descriptor=Object.getOwnPropertyDescriptor(v,key);
+    if(descriptor&&!Object.hasOwn(descriptor,'value'))invalid();
+    return descriptor?.value;
+  };
+  const text=(v,max,required=false)=>{
+    if(typeof v!=='string'||v.length>max||required&&!v.trim())invalid();
+    return v;
+  };
+  const list=(v,max,project)=>{
+    if(!Array.isArray(v)||v.length>max)invalid();
+    const result=[];
+    for(let n=0;n<v.length;n++){
+      const descriptor=Object.getOwnPropertyDescriptor(v,String(n));
+      if(!descriptor||!Object.hasOwn(descriptor,'value'))invalid();
+      result.push(project(descriptor.value));
+    }
+    return result;
+  };
+  return list(value,50000,item=>{
+    object(item);
+    const result={sourceItemId:text(field(item,'sourceItemId'),128,true),title:text(field(item,'title'),500,true)};
+    for(const [key,max]of [['sourceBundle',500],['reason',500],['delivery',500]]){
+      if(Object.hasOwn(item,key))result[key]=text(field(item,key),max);
+    }
+    if(Object.hasOwn(item,'purchaseDate')){
+      const date=field(item,'purchaseDate');
+      if(date!==null&&(typeof date!=='string'||date.length>64||!Number.isFinite(Date.parse(date))))invalid();
+      result.purchaseDate=date;
+    }
+    if(Object.hasOwn(item,'streaming')){
+      const streaming=field(item,'streaming');if(typeof streaming!=='boolean')invalid();result.streaming=streaming;
+    }
+    if(Object.hasOwn(item,'formats'))result.formats=list(field(item,'formats'),30,v=>text(v,40));
+    if(Object.hasOwn(item,'bundle')){
+      const bundle=field(item,'bundle');object(bundle);
+      result.bundle={sourceItemId:text(field(bundle,'sourceItemId'),128),title:text(field(bundle,'title'),500)};
+      if(Object.hasOwn(bundle,'slug'))result.bundle.slug=text(field(bundle,'slug'),300);
+    }
+    return result;
+  });
+}
 function assertFanaticalAcquisitionContract(raw,options={}){
   const invalid=()=>{throw Error('Invalid or contradictory Fanatical acquisition contract. Earlier purchases were kept.');};
   const keys=(value,allowed)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(key=>allowed.includes(key));
   const ids=value=>Array.isArray(value)&&value.length<=100000&&value.every(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id))&&new Set(value).size===value.length;
   const same=(a,b)=>{if(!ids(a)||!ids(b)||a.length!==b.length)return false;const set=new Set(b);return a.every(id=>set.has(id));};
   if(!keys(raw,['acquisitionContract','partialScanVersion','outcome','verifiedOrderFingerprints','unresolvedOrderFingerprints','ineligibleOrderFingerprints','observedOrderFingerprints','failures','unidentifiedRecords','schemaVersion','coverage','ordersScanned','ordersAvailable','orderFingerprints','items','rejectedPurchaseItems'])||raw.schemaVersion!==1||raw.partialScanVersion!==1)invalid();
-  if(raw.rejectedPurchaseItems!==undefined&&(!Array.isArray(raw.rejectedPurchaseItems)||raw.rejectedPurchaseItems.length>50000))invalid();
+  const rejected=raw.rejectedPurchaseItems===undefined?undefined:fanaticalRejectedPurchaseItems(raw.rejectedPurchaseItems);
   const c=raw.acquisitionContract,coverage=raw.coverage;
   const compatibility=coverage?.compatibility===undefined?null:fanaticalCompatibilityReport(coverage.compatibility);
   if(coverage?.compatibility!==undefined&&!compatibility)invalid();
@@ -835,7 +886,7 @@ function assertFanaticalAcquisitionContract(raw,options={}){
   if(c.scope.authority!==authority||coverage.accountAffinity!==authority||saved.size&&observed.length&&!overlap)invalid();
   const known=new Set(options.fullScan?[]:normalizedKnown),verified=new Set(c.verified),processed=new Set(raw.orderFingerprints);
   if(raw.ordersScanned!==c.verified.length||raw.orderFingerprints.some(id=>!verified.has(id)&&!known.has(id))||c.verified.some(id=>!processed.has(id)))invalid();
-  return {finished,coverage:status,scope:authority,...(compatibility?{compatibility}:{})};
+  return {finished,coverage:status,scope:authority,...(compatibility?{compatibility}:{}),...(rejected!==undefined?{rejectedPurchaseItems:rejected}:{})};
 }
 
 // Self-contained projection, embedded by sync-provider-engines for MAIN serialization.
@@ -858,7 +909,7 @@ function fanaticalAcquisitionForGL(raw,options={}){
     throw Error('Fanatical acquisition incomplete or unreadable. Earlier purchases were kept.');
   };
   if(raw?.fanaticalImportFailure)return fail();
-  assertFanaticalAcquisitionContract(raw,options);
+  const authority=assertFanaticalAcquisitionContract(raw,options);
   if(partial&&!raw.orderFingerprints.length)return fail();
   const items=raw.items.map(item=>{
     if((item.occurrences?.length??0)>500){diagnostic.category='limit';diagnostic.stage='projection';return null;}
@@ -871,7 +922,7 @@ function fanaticalAcquisitionForGL(raw,options={}){
   return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
     ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned}}:{}),
     coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
-    ...(raw.rejectedPurchaseItems?{rejectedPurchaseItems:raw.rejectedPurchaseItems}:{})};
+    ...(authority.rejectedPurchaseItems!==undefined?{rejectedPurchaseItems:authority.rejectedPurchaseItems}:{})};
 }
 
 return fanaticalAcquisitionForGL(await importFanaticalOrdersInPage({...options,allowPartial:true,returnFailure:true,progressFormat:'gl'}),options);

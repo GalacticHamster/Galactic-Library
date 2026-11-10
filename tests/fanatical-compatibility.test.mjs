@@ -4,6 +4,7 @@ import {importFanaticalOrdersInPage as canonical} from '../shared/fanatical-acqu
 import {importFanaticalOrdersInPage as fan} from '../../Fanatical/src/order-importer.mjs';
 import {readFanaticalOrdersInPage as gl} from '../src/providers/fanatical-scan.js';
 import {fanaticalCompatibilityReport,assertFanaticalAcquisitionContract} from '../shared/provider-acquisition-contract.js';
+import {multiBundlePurchase} from './fixtures/fanatical-multi-bundle.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const order=i=>({_id:`synthetic-order-${i}`,status:'COMPLETE',items:[{_id:'synthetic-bundle',name:'Bundle',bundles:[{games:[{_id:`synthetic-product-${i}`,name:`Book ${i}`,type:'book'}]}]}]});
 const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,v])=>[k,reorder(v)])):v;
@@ -249,41 +250,22 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    }
   });
 
-  test(name+': live customer payload Fanantical-multi-bundle.json parses 122 verified titles and 1 rejected promo gift with realistic summary',async()=>{
-   const realPath='C:/Users/nvesd/Downloads/Fanantical-multi-bundle.json';
-   let realOrder;
-   try { realOrder=JSON.parse(readFileSync(realPath,'utf8')); } catch { return; }
-   for (const realisticSummary of [
-     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:[
-       realOrder.items[3],
-       realOrder.items[8],
-       {name:'Nightmare Tales Build your own Graphic Novels Bundle',bundles:[]}
-     ]},
-     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:[
-       realOrder.items[3],
-       realOrder.items[8],
-       {name:'Nightmare Tales Build your own Graphic Novels Bundle',bundles:[]},
-       {name:'BIRTHDAY BASH SALE - GIFT',bundles:[]}
-     ]},
-     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:realOrder.items.map(item=>Array.isArray(item.bundles)&&item.bundles.length>0?item:{name:item.name,bundles:[]})}
-   ]){
-     const r=await run(engine,{list:[realisticSummary],details:[realOrder]});
+  test(name+': synthetic multi-bundle checkout recovers every summary representation without private input',async()=>{
+   const {detail,summaries}=multiBundlePurchase();
+   assert.equal(summaries.length,3);
+   for(const summary of summaries){
+     const r=await run(engine,{list:[summary],details:[detail]});
      assert.equal(r.result.ordersScanned,1);
      assert.equal(r.counts.detailStructure,0);
      assert.equal(r.counts.invalidBundles,0);
      assert.equal(r.counts.detailProductMismatch,0);
-     assert.equal(r.result.items.length,122);
-     assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
-     assert(!r.result.items.some(p=>p.title==='BIRTHDAY BASH SALE - GIFT'||p.title==='Troublemaker'));
-     if(engine===gl){
-       assert.equal(r.result.diagnostic.ordersUnresolved,0);
-     }else{
-       assert.equal(r.result.unresolvedOrderFingerprints.length,0);
-     }
-     if(r.result.rejectedPurchaseItems){
-       assert.equal(r.result.rejectedPurchaseItems.length,1);
-       assert.equal(r.result.rejectedPurchaseItems[0].title,'BIRTHDAY BASH SALE - GIFT');
-     }
+     assert.equal(r.result.items.length,4);
+     assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,4);
+     assert(!r.result.items.some(p=>p.title==='Synthetic mystery gift'));
+     if(engine===gl)assert.equal(r.result.diagnostic.ordersUnresolved,0);
+     else assert.equal(r.result.unresolvedOrderFingerprints.length,0);
+     assert.equal(r.result.rejectedPurchaseItems.length,1);
+     assert.equal(r.result.rejectedPurchaseItems[0].title,'Synthetic mystery gift');
    }
   });
 }
