@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import '../shared/purchase-snapshot.js';import '../shared/purchase-transfer.js';import '../shared/purchase-sync.js';
+import '../shared/purchase-snapshot.js';import '../shared/purchase-adapters.js';import '../shared/purchase-transfer.js';import '../shared/purchase-sync.js';
 const S=GalacticPurchaseSnapshot,T=GalacticPurchaseTransfer,Y=GalacticPurchaseSync;
 const row=(n,p='humble')=>({providerItemId:p==='humble'?'purchase_'+n+':product:native_'+n:'product_'+n,title:'Synthetic '+n,mediaType:'book',metadata:p==='humble'?{purchaseId:'purchase_'+n}:{},purchasedAt:null,origins:[]});
 function fixture(provider='humble',initial={gl:[],companion:[]}){
@@ -224,3 +224,30 @@ test('a genuine source validation failure is diagnosed separately from account a
 });
 
 test('startup rechecks a repaired validation failure without discarding its verified mapping',async()=>{const f=fixture('humble',{gl:[],companion:[row(1)]});try{await f.connect();await f.drain();const id=f.nodes.gl.saved[Y.KEY].humble.id;f.nodes.companion.records[0].metadata.keyCheckedAt='invalid';await f.nodes.gl.coordinator.startup();assert.equal(f.nodes.gl.saved[Y.KEY].humble.errorCode,'operation-failed');delete f.nodes.companion.records[0].metadata.keyCheckedAt;f.start('gl');await f.nodes.gl.coordinator.startup();assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.saved[Y.KEY].humble.id,id);assert.equal(f.nodes.gl.records.length,1);}finally{f.dispose();}});
+
+
+test('a stale content-based companion reference preserves consent and retries current saved data',async()=>{
+ const provider='fanatical',f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});
+ try{
+  await f.connect();await f.drain();const original=structuredClone(f.nodes.gl.saved[Y.KEY][provider]);
+  f.nodes.companion.records.push(row(2,provider));let raced=false;
+  f.nodes.gl.intercept=async(_peer,message)=>{if(message.type==='GH_PURCHASE_BEGIN'&&!raced){raced=true;f.nodes.companion.records.push(row(3,provider));throw Error('Saved account data changed. Refresh the account choices and confirm again.');}};
+  await f.nodes.gl.coordinator.mark(provider);await f.nodes.gl.coordinator.run(provider);assert(raced);
+  const interrupted=f.nodes.gl.saved[Y.KEY][provider];assert.equal(interrupted.errorCode,'source-busy');assert.equal(interrupted.status,'waiting');assert(interrupted.confirmed&&interrupted.remoteConfirmed);assert.equal(interrupted.id,original.id);assert.equal(interrupted.localId,original.localId);assert.equal(interrupted.remoteId,original.remoteId);assert.equal(f.nodes.gl.records.length,1);
+  // A later dirty event can recover without reconnecting; all guards rerun.
+  f.nodes.gl.intercept=null;await f.nodes.companion.coordinator.mark(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,3);assert.equal(f.nodes.gl.saved[Y.KEY][provider].id,original.id);
+  f.nodes.companion.accountId='different-stable-account';await f.nodes.gl.coordinator.mark(provider);await f.nodes.gl.coordinator.run(provider);
+  assert.equal(f.nodes.gl.saved[Y.KEY][provider].status,'attention');assert.equal(f.nodes.gl.saved[Y.KEY][provider].remoteConfirmed,false);assert.equal(f.nodes.gl.records.length,3);
+ }finally{f.dispose();}
+});
+
+
+test('a Fanatical review changes the transfer reference, never the stable account identity',async()=>{
+ const A=GalacticPurchaseAdapters,origin={purchaseRef:'a'.repeat(64),bundle:{sourceItemId:'bundle_1',title:'Synthetic bundle'},purchaseDate:null,quantity:1,keyStatus:'unrevealed',keyCheckedAt:'2026-11-10T00:00:00.000Z'},state={fanaticalAccountId:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',fanaticalProfileLabel:'Synthetic',fanaticalLibraryItems:[{sourceItemId:'product_1',title:'Synthetic game',mediaType:'game',purchaseOrigins:[origin]}],fanaticalProfileArchives:[]};
+ const before=(await A.accounts('fan',state))[0];assert.equal((await A.snapshot('fan',state,before.accountRef)).records.length,1);
+ origin.keyReview={action:'dismissed',basis:'unrevealed',until:null,updatedAt:'2026-11-10T00:00:01.000Z'};
+ const after=(await A.accounts('fan',state))[0];assert.equal(after.stableId,before.stableId);assert.notEqual(after.accountRef,before.accountRef);
+ await assert.rejects(A.snapshot('fan',state,before.accountRef),error=>Y.failureKind(error)==='source-busy');
+ const current=await A.snapshot('fan',state,after.accountRef);assert.equal(current.records.length,1);assert.equal(current.records[0].providerItemId,'product_1');assert.equal(current.records[0].origins[0].keyReview.action,'dismissed');
+ for(const message of ['Invalid key reminder review.','Companion returned an unexpected purchase-sharing response. Update and check pairing.','Saved account data changed unexpectedly.'])assert.equal(Y.failureKind(message),'operation-failed');
+});
