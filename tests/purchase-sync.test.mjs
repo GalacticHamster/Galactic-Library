@@ -6,7 +6,7 @@ function fixture(provider='humble',initial={gl:[],companion:[]}){
  const nodes={},services={},calls=[],commits=[];const role=provider==='humble'?'hb':'fan';
  function start(id){const n=nodes[id]??={saved:{},records:structuredClone(initial[id]??[]),accountId:id+'-stable',label:'Personal',alarms:new Map(),online:true};n.coordinator?.dispose();
   const area={get:async defaults=>structuredClone({...defaults,...n.saved}),set:async patch=>{n.saved={...n.saved,...structuredClone(patch)};}},runtime={id,getURL:()=>id+':///',onMessage:{addListener(){}},onMessageExternal:{addListener(){}},onStartup:{addListener(){}},onInstalled:{addListener(){}},sendMessage:async(peer,m)=>{if(typeof peer!=='string')return {};calls.push({from:id,to:peer,type:m.type});if(!nodes[peer]?.online||!services[peer])throw Error('Companion unavailable');if(n.intercept)await n.intercept(peer,m);try{const result=await services[peer].external(m,{id});if(n.afterResponse)await n.afterResponse(m,result);return {ok:true,protocolVersion:1,...result};}catch(e){return {ok:false,protocolVersion:1,error:e.message};}}};
-  const account=()=>({accountRef:id+'-'+n.records.length+'-'+JSON.stringify(n.records),label:n.label,active:true,stableId:n.accountId,count:n.records.length});
+  const account=()=>({accountRef:id+'-'+n.records.length+'-'+JSON.stringify(n.records),label:n.label,active:true,stableId:n.accountId,count:n.records.length,historicalCount:n.historicalCount??0,unassigned:n.records.length===0&&!n.historicalCount&&!n.assigned});
   // Handoff references may change; stable IDs do not. Use bounded SHA refs like real companions.
   const catalog=async()=>[{...account(),accountRef:await S.hash(account().accountRef)},...(n.extraAccounts??[])];
   const snapshot=async(_,ref)=>{assert((await catalog()).some(a=>a.accountRef===ref));return S.validate({protocolVersion:1,provider,snapshotId:crypto.randomUUID(),accountRef:ref,accountLabel:n.label,capturedAt:new Date().toISOString(),scope:'historical',completeness:'partial',limitations:[],records:n.records});};
@@ -16,7 +16,100 @@ function fixture(provider='humble',initial={gl:[],companion:[]}){
  start('gl');start('companion');
  async function connect(first='gl'){const second=first==='gl'?'companion':'gl',a=nodes[first],b=nodes[second];await a.coordinator.local({action:'syncConnect',provider,localId:a.accountId,remoteId:b.accountId,confirmed:true,sameAccount:true});assert.equal(b.saved[Y.KEY][provider].confirmed,true,'one local confirmation enables the verified peer');}
  async function drain(){for(let n=0;n<4;n++){await nodes.companion.coordinator.run(provider);await nodes.gl.coordinator.run(provider);await Promise.resolve();}return nodes.gl.saved[Y.KEY]?.[provider];}
- const dispose=()=>Object.values(nodes).forEach(n=>n.coordinator.dispose());return {nodes,services,calls,commits,start,connect,drain,dispose,provider};
+const dispose=()=>Object.values(nodes).forEach(n=>n.coordinator.dispose());return {nodes,services,calls,commits,start,connect,drain,dispose,provider};
+}
+for(const provider of ['humble','fanatical']){
+ for(const destination of ['history-only','previously-assigned'])test(provider+' automatic setup never treats '+destination+' as a fresh empty account',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   if(destination==='history-only')f.nodes.gl.historicalCount=3;else f.nodes.gl.assigned=true;
+   await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);assert.equal((await f.nodes.gl.coordinator.local({action:'syncState',provider})).availability,'account-resolution-required');
+  }finally{f.dispose();}
+ });
+ test(provider+' a busy source defers first setup instead of binding an in-progress account',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   f.nodes.companion.busy=true;await f.nodes.gl.coordinator.discover(provider);assert.equal(f.commits.length,0);assert.equal(f.nodes.gl.saved[Y.KEY]?.[provider],undefined);
+   f.nodes.companion.busy=false;await f.nodes.gl.coordinator.discover(provider,undefined,true);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);
+  }finally{f.dispose();}
+ });
+ test(provider+' an incompatible sharing model cannot fall back to automatic account setup',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   f.nodes.gl.afterResponse=async(m,result)=>{if(m.type===Y.PREFIX+'DISCOVER')result.sharingModel=2;};
+   await f.nodes.gl.coordinator.discover(provider);assert.equal(f.commits.length,0);assert.equal((await f.nodes.gl.coordinator.local({action:'syncState',provider})).availability,'incompatible');
+  }finally{f.dispose();}
+ });
+ test(provider+' default-on discovery transfers saved purchases without injected pairing',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   assert.equal(f.nodes.gl.saved[Y.KEY],undefined);assert.equal(f.nodes.companion.saved[Y.KEY],undefined);
+   await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');
+   assert.equal(f.nodes.gl.records.length,1);assert.equal(f.nodes.companion.records.length,1);
+   assert.equal(f.nodes.gl.saved[Y.PREFERENCE].version,1);assert.equal(f.nodes.gl.saved[Y.PREFERENCE][provider],true);
+  }finally{f.dispose();}
+ });
+ test(provider+' new-model opt-out blocks old transfer entry points, survives restart and reconciles when enabled',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   await f.nodes.gl.coordinator.discover(provider);await f.drain();
+   await f.nodes.companion.coordinator.local({action:'syncSetSharing',provider,enabled:false});
+   f.nodes.companion.records.push(row(2,provider));await f.nodes.companion.coordinator.mark(provider);await f.drain();
+   assert.equal(f.nodes.gl.records.length,1);
+   await assert.rejects(f.services.companion.external({type:'GH_PURCHASE_BEGIN',protocolVersion:1,provider,accountRef:'old-peer'},{id:'gl'}),/disabled/);
+   f.start('companion');await f.nodes.companion.coordinator.startup();assert.equal(f.nodes.companion.saved[Y.PREFERENCE][provider],false);
+   await f.nodes.companion.coordinator.local({action:'syncSetSharing',provider,enabled:true});
+   assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,2);
+  }finally{f.dispose();}
+ });
+ test(provider+' automatic discovery never merges two populated accounts with the same nickname',async()=>{
+  const f=fixture(provider,{gl:[row(1,provider)],companion:[row(2,provider)]});try{
+   await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);
+   const s=await f.nodes.gl.coordinator.local({action:'syncState',provider});assert.equal(s.availability,'account-resolution-required');assert.equal(s.state,null);
+  }finally{f.dispose();}
+ });
+ test(provider+' opt-out during transfer prevents persistence even with an existing valid account mapping',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   await f.connect();f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_CHUNK')await f.nodes.gl.coordinator.local({action:'syncSetSharing',provider,enabled:false});};
+   await f.nodes.gl.coordinator.run(provider);assert.equal(f.commits.length,0);assert.equal(f.nodes.gl.records.length,0);
+  }finally{f.dispose();}
+ });
+}
+test('legacy settings migrate once; future version opt-outs and malformed preferences cannot be silently enabled',async()=>{
+ for(const legacy of [{},{syncEnabled:false},{galacticPurchaseSync:{}},{syncEnabled:true}]){
+  let state=structuredClone(legacy);const area={get:async d=>({...d,...state}),set:async p=>Object.assign(state,p)};
+  assert.equal((await Y.sharingPreferences(area)).humble,true);state[Y.PREFERENCE].humble=false;
+  assert.equal((await Y.sharingPreferences(area)).humble,false);
+  state[Y.PREFERENCE].version=2;assert.equal((await Y.sharingPreferences(area)).humble,false);
+  state[Y.PREFERENCE]={version:1,humble:'false',fanatical:true};await assert.rejects(Y.sharingPreferences(area),/unreadable/);
+ }
+});
+for(const provider of ['humble','fanatical']){
+ test(provider+' a lost legacy mapping recovers only when verified dataset identities still exist',async()=>{
+  const f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});try{
+   await f.connect();await f.drain();const original=f.nodes.gl.saved[Y.KEY][provider];delete f.nodes.companion.saved[Y.KEY];
+   await f.nodes.gl.coordinator.startup();assert.equal((await f.drain()).status,'synced');
+   assert.equal(f.nodes.gl.saved[Y.KEY][provider].localId,original.localId);assert.equal(f.nodes.gl.saved[Y.KEY][provider].remoteId,original.remoteId);assert.equal(f.nodes.gl.records.length,1);
+  }finally{f.dispose();}
+ });
+ test(provider+' restore can reuse reverse-verified lineage without relying on an account name',async()=>{
+  const f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});try{
+   await f.connect();await f.drain();delete f.nodes.gl.saved[Y.KEY];f.nodes.gl.label='Renamed after restore';
+   await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);
+  }finally{f.dispose();}
+ });
+ test(provider+' legacy unconfirmed setup with an empty receiver does not become a permanent opt-out',async()=>{
+  const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
+   f.nodes.gl.saved[Y.KEY]={[provider]:{id:'legacy-proposal',peerId:'companion',localId:f.nodes.gl.accountId,remoteId:f.nodes.companion.accountId,confirmed:false,remoteConfirmed:false}};
+   await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);
+  }finally{f.dispose();}
+ });
+ test(provider+' restoration retires stale tickets and reconnects only a retained verified account identity',async()=>{
+  const f=fixture(provider,{gl:[row(1,provider)],companion:[row(1,provider)]});try{
+   await f.connect();await f.drain();const old=structuredClone(f.nodes.companion.saved[Y.KEY][provider]);
+   const area={get:async d=>({...d,...f.nodes.companion.saved}),set:async v=>Object.assign(f.nodes.companion.saved,v)};
+   const restored=await Y.restorationPatch(area,{[provider]:[old.localId]});Object.assign(f.nodes.companion.saved,restored.patch);
+   assert.equal(restored.retired.length,0);assert.notEqual(f.nodes.companion.saved[Y.KEY][provider].id,old.id);assert.equal(f.nodes.companion.saved[Y.KEY][provider].confirmed,false);
+   await assert.rejects(Y.assertCommit(area,provider,{autoSync:old},old.localId),/changed/);
+   await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);
+   const foreign=await Y.restorationPatch(area,{[provider]:['foreign-account']});assert.deepEqual(foreign.patch[Y.KEY],{});assert.equal(foreign.retired.length,1);
+  }finally{f.dispose();}
+ });
 }
 for(const p of ['humble','fanatical'])for(const first of ['gl','companion'])test(p+' installed/connected '+first+' first: additive initial and both automatic directions',async()=>{
  const f=fixture(p,{gl:[row(1,p)],companion:[row(2,p)]});try{await f.connect(first);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,2);assert.equal(f.nodes.companion.records.length,2);
@@ -74,8 +167,8 @@ for(const provider of ['humble','fanatical'])test('R1 '+provider+': a committed 
   assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,2);
  }finally{f.dispose();}
 });
-test('R1 missing remote consent is permanent and cannot be revived by a dirty event',async()=>{
- const f=fixture('humble',{gl:[row(1)],companion:[row(1)]});try{await f.connect();await f.drain();delete f.nodes.companion.saved[Y.KEY];await f.nodes.gl.coordinator.startup();const state=f.nodes.gl.saved[Y.KEY].humble;assert.equal(state.errorCode,'consent-required');assert.equal(state.remoteConfirmed,false);const before=f.commits.length;await f.nodes.gl.coordinator.mark('humble');await f.drain();assert.equal(f.commits.length,before);assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');}finally{f.dispose();}
+test('new-model remote opt-out is permanent and cannot be revived by a dirty event',async()=>{
+ const f=fixture('humble',{gl:[row(1)],companion:[row(1)]});try{await f.connect();await f.drain();delete f.nodes.companion.saved[Y.KEY];f.nodes.companion.saved[Y.PREFERENCE]={version:1,humble:false,fanatical:true};await f.nodes.gl.coordinator.startup();const state=f.nodes.gl.saved[Y.KEY].humble;assert.equal(state.errorCode,'sharing-disabled');assert.equal(state.remoteConfirmed,false);const before=f.commits.length;await f.nodes.gl.coordinator.mark('humble');await f.drain();assert.equal(f.commits.length,before);assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');}finally{f.dispose();}
 });
 
 async function repairFixture(f){const p=f.provider,c=await f.nodes.gl.coordinator.local({action:'syncChoices',provider:p}),a=c.accounts[0],b=c.remoteAccounts[0];return f.nodes.gl.coordinator.local({action:'syncRepair',provider:p,confirmed:true,sameAccount:true,localId:a.stableId,remoteId:b.stableId,expectedId:c.state?.id??null,expectedRemoteId:c.remoteRelationshipId,localFingerprint:a.fingerprint,remoteFingerprint:b.fingerprint});}

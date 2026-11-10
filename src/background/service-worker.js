@@ -48,6 +48,7 @@ const privateArea=libraryStorageArea(chrome,globalThis.indexedDB,keys=>{
   if(keys.includes('galacticLibraryProviderDiagnostics'))notifyVideoDiagnostics();
   if(keys.includes('galacticLibraryDatabase')||keys.includes('galacticLibraryKindleContentsRefresh'))storageWriter.invalidateRefreshPreflight();
   if(keys.includes('galacticLibraryDatabase')){storageWriter.invalidateQuerySnapshot(undefined,'private-observer');observePurchaseSync().catch(()=>{});}
+  if(keys.includes('galacticPurchaseSync'))resumeRestoredPurchaseSync().catch(()=>{});
   if(keys.includes(OBSERVATION_KEY)||keys.includes(OBSERVATION_HEAD_KEY))storageWriter.invalidateObservationSnapshot();
   if(keys.includes('galacticLibraryReminderNotifications'))reconcileReminders();
 });
@@ -72,6 +73,10 @@ const purchaseHandoff=createPurchaseHandoff({runtime:chrome.runtime,area:private
 purchaseSync=chrome.alarms?GalacticPurchaseSync.createCoordinator({runtime:chrome.runtime,area:privateArea,alarms:chrome.alarms,service:purchaseHandoff,role:'gl',ensureAccount:provider=>storageWriter.ensurePurchaseAccount(provider),catalog:async provider=>(await purchaseAccounts(await storageWriter.getQueryDatabase(),provider)).map(a=>({...a,stableId:a.accountRef})),busy:async provider=>Boolean((await privateArea.get({galacticLibraryProviderScans:{}})).galacticLibraryProviderScans[provider]),onActive:async()=>{purchaseSyncActive=true;await observePurchaseSync(undefined,true);}}):null;
 purchaseSync?.register();
 let purchaseSignatures={},purchaseSyncActive=false;
+async function resumeRestoredPurchaseSync(){
+ if(!purchaseSync)return;const saved=(await privateArea.get({galacticPurchaseSync:{}})).galacticPurchaseSync;
+ for(const p of ['humble','fanatical'])if(saved[p]?.recovery&&!saved[p].confirmed)await purchaseSync.discover(p,undefined,true);
+}
 async function observePurchaseSync(database,initialize=false){
  if(!purchaseSync||!purchaseSyncActive)return;const db=database??await storageWriter.getQueryDatabase();
  for(const provider of ['humble','fanatical']){
@@ -130,6 +135,7 @@ registerReminderEvents();
 chrome.permissions?.onAdded?.addListener(()=>{registerReminderEvents();reconcileReminders();});
 chrome.permissions?.onRemoved?.addListener(()=>reconcileReminders());
 chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==='local'&&changes.galacticPurchaseSync)resumeRestoredPurchaseSync().catch(()=>{});
   if(area==='local'&&Object.hasOwn(changes,'galacticLibraryProviderDiagnostics'))notifyVideoDiagnostics();
   if(area==='local'&&(Object.hasOwn(changes,OBSERVATION_KEY)||Object.hasOwn(changes,OBSERVATION_HEAD_KEY)))storageWriter.invalidateObservationSnapshot();
   if(area==='local')for(const key of Object.keys(changes).slice(0,16))queryDiagnostics.event('storage_change',{key:diagnosticStorageKey(key),source:'observer'});

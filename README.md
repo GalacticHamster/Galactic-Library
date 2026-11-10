@@ -66,10 +66,10 @@ missing records to earlier-import history; these console views retain earlier
 saved records. Failed or incomplete scans preserve the previous validated library.
 See [Providers and saved accounts](docs/user-guide/providers-and-accounts.md).
 
-For HB/FAN, **Connect and sync** can populate an empty library from saved
-purchases without another store scan. One confirmation authorizes ongoing sync
-between the verified extensions for the selected account. Nicknames are optional
-for this connection. When both contain purchases, confirm they represent the
+With HB/FAN installed, default-on local sharing can populate an empty library from saved
+purchases without another store scan. A unique unused receiver is assigned
+automatically; verified saved account mappings are reused. Nicknames are optional.
+When both contain purchases without a verified relationship, confirm they represent the
 same store account. Multiple accounts require explicit selection. **Sync now**
 checks saved purchases; **Check connections** only tests communication.
 See [purchase sync](docs/user-guide/purchase-sharing.md).
@@ -134,7 +134,7 @@ uses protected extension storage. See [Firefox setup](docs/user-guide/firefox.md
 
 Provider imports, identity decisions and source history use the validated
 background writer. Read-only committed snapshots support browsing and companion
-queries. Companion identity verification, explicit account-scoped sync consent
+queries. Companion identity verification, account-scoped sharing preferences and verified mappings
 and atomic saves remain separate safeguards.
 
 ```powershell

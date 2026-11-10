@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased ? automatic local sharing
+
+- Discover official Galactic Hamster companions automatically and share supported saved purchases locally by default. Upgrade legacy setup states without treating them as explicit opt-outs; remember the new sharing setting across restart and library restore.
+- Preserve verified account mappings, additive purchase/history merges and save-time authorization. Ambiguous populated accounts still need a one-time account decision in Advanced.
+- Keep standalone imports and reminders available without GL; share supported additional HB reminders through the mapped account without duplicate native reminders. No key values or provider credentials are shared.
+
 ## 1.0.1 — Release candidate
 
 - Coordinate purchase-specific Fanatical reminder reviews with standalone FAN through existing consented purchase sync. Preserve local reviews across evidence refreshes and native/companion provenance reconciliation; older peers omit unsupported reviews.

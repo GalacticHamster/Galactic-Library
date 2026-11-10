@@ -2,8 +2,8 @@ import {createConfirmation} from './confirmation.js';
 import {createOperation} from './operation-feedback.js';
 
 export const BACKUP_SCOPE_HELP='Backups contain library records, saved accounts, reviews and supported comic coverage preferences when present. API keys, companion pairing, automatic purchase-sync permission, diagnostics settings, appearance and other browser-only preferences are not included.';
-export const RESTORE_LOCAL_HELP='Existing API keys, companion pairing and browser preferences are not replaced by the backup. Automatic purchase-sync relationships are reset; reconnect Humble or Fanatical purchase sync after restoring.';
-export const CLEAR_LIBRARY_HELP='Clear saved libraries, account labels, reviews, API keys, companion links and local update settings in this browser. Appearance stays unchanged. Purchases at your stores are unaffected. A library backup does not include API keys, companion links or browser-only settings.';
+export const RESTORE_LOCAL_HELP='Existing API keys, companion pairing and browser preferences are not replaced by the backup. Live purchase-sync relationships are reset and rechecked. Previously verified accounts can reconnect automatically when their saved identities still match. Automatic-sharing preferences stay unchanged; turn sharing off first if you do not want companions to update the restored library.';
+export const CLEAR_LIBRARY_HELP='Clear saved libraries, account labels, reviews, API keys, companion links and local update settings in this browser. Appearance and automatic-sharing preferences stay unchanged. Turn automatic sharing off first if you do not want installed companions to restore their saved purchases. Purchases at your stores are unaffected. A library backup does not include API keys, companion links or browser-only settings.';
 export const CLEAR_LIBRARY_WARNING='Clear Galactic Library in this browser? '+CLEAR_LIBRARY_HELP+' Export a library backup first if you need to recover your library records.';
 
 // Page-local state; full validation and authoritative stale confirmation remain.

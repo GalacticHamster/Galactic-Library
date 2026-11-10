@@ -886,7 +886,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     return validateSyncHealth({attemptRef:details.scanAttempt||prior?.status==='running'?prior.attemptRef:'',status:incomplete?'partial':'succeeded',mode:full?'full':'incremental',attemptedProfileLabel:details.profileLabel??database.providers[provider]?.profileLabel??'',startedAt:details.scanAttempt||prior?.status==='running'?prior.startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),retryable:incomplete,failedRequestCount,retries:diagnostics.retries??null,coverageLimit:diagnostics.coverageLimit??'',differences:{...snapshotDifferences(Object.values(database.providerItems).filter(item=>item.profileId===profile?.profileId),records,full,['steam','epic','audible','nintendo'].includes(provider)),...(provider==='kobo'?{updated:records.filter(item=>koboObservationChanged(database.providerItems[item.id],item)).length}:{})}});
   }
   async function restoreDatabase(database,preferences){
-    const restored=validateDatabase(database),retirement=await GalacticPurchaseSync.retirementPatch(storageArea),extra={...retirement.patch,[PROVIDER_CHECKS_KEY]:null};
+    const restored=validateDatabase(database),retirement=await GalacticPurchaseSync.restorationPatch(storageArea,Object.fromEntries(['humble','fanatical'].map(p=>[p,Object.values(restored.providerProfiles).filter(a=>a.provider===p).map(a=>a.profileId)]))),extra={...retirement.patch,[PROVIDER_CHECKS_KEY]:null};
     if(preferences!==undefined){
       if(!preferences||Object.keys(preferences).some(key=>!['comicCoverageStarts','comicCoverageTransitions','comicCoverageMerges','comicCoverageNames'].includes(key))||!Object.keys(preferences).length)throw Error('Invalid backup display preferences.');
       extra[UI_PREFERENCES_KEY]=validateUiPreferences({...await getUiPreferences(),...preferences});
@@ -2152,18 +2152,24 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
   }
 
   async function feedUploads(){return (await storageArea.get({[FEED_UPLOAD_KEY]:{}}))[FEED_UPLOAD_KEY];}
-  async function feedClient(client,external=false){if(!isExtensionId(client))throw new Error('Invalid reminder client.');if(external&&(!effectiveExternalClientIds(await getAllowedExternalClientIds()).includes(client)||!allowedCompanionOperation(client,'BEGIN_ENTITLEMENT_FEED')))throw new Error('Companion permission was revoked.');}
+  async function feedClient(client,external=false){if(!isExtensionId(client))throw new Error('Invalid reminder client.');if(external&&(!effectiveExternalClientIds(await getAllowedExternalClientIds()).includes(client)||!allowedCompanionOperation(client,'BEGIN_ENTITLEMENT_FEED')))throw new Error('Companion permission was revoked.');if(external&&!await GalacticPurchaseSync.sharingAllowed(storageArea,'humble'))throw new Error('Automatic Humble sharing is disabled.');}
+  async function feedRelationship(client,relationship,profileId){
+    if(!relationship)return;const state=(await storageArea.get({[GalacticPurchaseSync.KEY]:{}}))[GalacticPurchaseSync.KEY].humble;
+    if(!state?.confirmed||!state.remoteConfirmed||state.peerId!==client||state.id!==relationship.id||state.localId!==profileId||state.remoteId!==relationship.sourceAccountId)throw new Error('The saved Humble reminder account relationship changed. Existing reminders were kept.');
+  }
   async function beginCompanionFeed(client,value,external=false){
     await feedClient(client,external);const database=await getDatabase(),profileLabel=text(value?.profileLabel,100,'Humble profile');
-    if(!profileLabel||database.providers.humble?.profileLabel!==profileLabel)throw new Error('The GL Humble profile does not match. Confirm the same account and enter its current GL profile label.');
+    if(!profileLabel&&!value.relationship||database.providers.humble?.profileLabel!==profileLabel)throw new Error('The GL Humble profile does not match. Confirm the same account and enter its current GL profile label.');
+    if(value.relationship!==undefined&&(!value.relationship||Object.keys(value.relationship).some(k=>!['id','sourceAccountId'].includes(k))||!GalacticPurchaseSync.accountUuid(value.relationship.id)||!GalacticPurchaseSync.accountUuid(value.relationship.sourceAccountId)))throw new Error('Invalid reminder account relationship.');
+    await feedRelationship(client,value.relationship,database.providers.humble.activeProfileId);
     if(!Number.isSafeInteger(value.count)||value.count<0||value.count>100000||!['complete','partial'].includes(value.coverage)||!date(value.sentAt))throw new Error('Invalid reminder feed summary.');
     const uploads=Object.fromEntries(Object.entries(await feedUploads()).filter(([key,entry])=>key!==client&&entry.expiresAt>Date.now()));
     if(Object.keys(uploads).length>=64)throw new Error('Too many active reminder uploads.');
-    const uploadToken=crypto.randomUUID();uploads[client]={uploadToken,profileId:database.providers.humble.activeProfileId,profileLabel,count:value.count,coverage:value.coverage,sentAt:date(value.sentAt),expiresAt:Date.now()+600000,entries:[]};await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {uploadToken};
+    const uploadToken=crypto.randomUUID();uploads[client]={uploadToken,profileId:database.providers.humble.activeProfileId,profileLabel,count:value.count,coverage:value.coverage,sentAt:date(value.sentAt),expiresAt:Date.now()+600000,entries:[],...(value.relationship?{relationship:value.relationship}:{})};await storageArea.set({[FEED_UPLOAD_KEY]:uploads});return {uploadToken};
   }
   async function activeFeedUpload(client,token,external=false){
     await feedClient(client,external);const uploads=await feedUploads(),upload=uploads[client];if(!upload||upload.uploadToken!==token||upload.expiresAt<=Date.now())throw new Error('Reminder upload expired or was superseded. Send it again.');
-    const database=await getDatabase();if(database.providers.humble?.activeProfileId!==upload.profileId)throw new Error('The GL Humble profile changed during reminder sharing.');return {uploads,upload,database};
+    const database=await getDatabase();if(database.providers.humble?.activeProfileId!==upload.profileId)throw new Error('The GL Humble profile changed during reminder sharing.');await feedRelationship(client,upload.relationship,upload.profileId);return {uploads,upload,database};
   }
   async function appendCompanionFeed(client,token,offset,entries,external=false){
     const {uploads,upload}=await activeFeedUpload(client,token,external);

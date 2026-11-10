@@ -20,9 +20,9 @@ On Humble and Fanatical, a responsive **Humble Library** or **Fanatical Library*
 handles imports when installed. GL hides its duplicate importer. Use **Import new
 purchases** or **Rescan all purchases** in the companion's panel, including its
 progress, recovery and diagnostic controls. In GL Providers, **Open importer**
-opens the store page; it never starts a scan. Choose **Connect and sync** separately
-to share already-saved purchases with GL. Being installed or responding to a
-connection check does not grant purchase-sharing permission.
+opens the store page; it never starts a scan. Compatible companions share supported
+saved purchases automatically by default. Turn sharing off in either extension to
+stop future transfers. Account identity checks remain separate from discovery.
 
 Without the companion, GL's usual importer remains available. If an extension is
 installed, enabled or updated while a store page is open, reload the page when
@@ -42,10 +42,10 @@ A nickname is a label you choose, not a website login verified by GL. The
 importer records the access the provider reports; loans and subscriptions are
 not automatically permanent ownership.
 
-For Humble and Fanatical, you can instead choose **Connect and sync** to use
-saved companion purchases without a new store scan. This setup supports unnamed
-default accounts and one confirmation for both verified extensions. If both
-sides contain purchases, confirm they are the same store account. See
+For Humble and Fanatical, automatic sharing can use saved companion purchases
+without a new store scan. A unique unused receiver needs no setup; verified saved
+relationships are reused. Two populated accounts without an established relationship
+require a one-time same-account decision in Advanced. See
 [purchase sync](purchase-sharing.md).
 
 ## Humble purchase recovery
@@ -522,9 +522,9 @@ Contents discovery, integrated review and collection comparison are described in
 ## Connections in provider cards
 
 Humble Bundle and Fanatical each have one provider card containing purchase-sync
-status, Connect and sync, Sync now and Disconnect. Saved accounts and store imports
-are in the same card. Advanced manual sharing remains collapsed and separate
-from automatic sync. Multi-account setup still requires exact choices and consent.
+status and a default-on sharing checkbox. Saved accounts and store imports
+are in the same card. Account mapping, repair, Sync now and manual sharing remain
+under Advanced. Multi-account setup still requires exact choices and confirmation.
 Account-list refreshes preserve the existing connection form and staged choices.
 
 Providers also contains Advanced companion communication checks. These only test
@@ -570,6 +570,6 @@ Run **Full rescan** to recover unchecked sections. **Quick update** also runs Fu
 
 Supported ordinary Steam purchases can report that a key was unrevealed when checked. This is separate from ownership and does not establish whether a game is activated on Steam. No reveal action is performed or key value saved. Other purchase types and ambiguous evidence remain unknown.
 
-Quick imports check new purchases; Full rescans refresh older key observations. With compatible extensions, Connect and sync shares the dated observations under the existing confirmed Fanatical account relationship. Review reminders in GL or load the GL reminder list in FAN. Dismissal affects the reminder, not the purchase or provider key.
+Quick imports check new purchases; Full rescans refresh older key observations. With compatible extensions, enabled automatic sharing transfers the dated observations under the verified saved Fanatical account relationship. Review reminders in GL or load the GL reminder list in FAN. Dismissal affects the reminder, not the purchase or provider key.
 
 FAN also displays and reviews its own purchase-specific key reminders without GL. Compatible account-confirmed purchase sync shares review actions in both directions; the newest saved review wins, including explicit restoration. A GL item-level review applies to its recorded purchase observations; FAN can review individual purchases. A refreshed check date alone does not undo dismissal. Older companions omit unsupported reviews and their lists may differ. FAN creates no desktop notifications; GL remains the sole optional notifier.

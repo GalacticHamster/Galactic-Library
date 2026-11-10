@@ -13,23 +13,26 @@ export async function verifyFanaticalNativeSync({browser,peerId,navigate,evaluat
    await gl('const S=await import("./src/lib/storage.js");await S.addAllowedExternalClientId('+JSON.stringify(peerId)+');return true;');
    const paired=await fan('return {response:await chrome.runtime.sendMessage({type:"FANATICAL_STORE",operation:"patch",args:[{galacticLibraryExtensionId:'+JSON.stringify(browser==='Firefox'?'galactic-library@galactichamster.com':new URL(glUrl).hostname)+'}]})};');assert(paired.response.ok,paired.response.error);
  }
- await gl('const S=await import("./src/lib/storage.js");await S.mergeProviderItems("fanatical",[],{profileLabel:"Default account"});await S.mergeProviderItems("gog",[{providerItemId:"isolated",title:"Unrelated synthetic game",mediaType:"game",ownership:"owned"}]);return true;');
+ await gl('const S=await import("./src/lib/storage.js");await S.mergeProviderItems("gog",[{providerItemId:"isolated",title:"Unrelated synthetic game",mediaType:"game",ownership:"owned"}]);return true;');
  setSource({size:92,fail:false});await openOrders();await scan('new');
- assert.equal((await action({action:'syncState'})).state,null);assert.equal((await view()).items.length,0);
- console.log('PASS installed '+browser+' FAN sync: real purchase commit and discovery grant no standing consent');
+ const automatic=typeof (await action({action:'syncState'})).sharing==='boolean';
+ if(automatic){await waitCount(92);assert.equal((await action({action:'syncState'})).state.confirmed,true);console.log('PASS installed '+browser+' FAN sync: committed purchases synchronize under the default-on preference without a setup action');}
+ else {assert.equal((await action({action:'syncState'})).state,null);assert.equal((await view()).items.length,0);}
  const choices=await action({action:'syncChoices',peerId});assert(choices.ok,choices.error);
  const mapping={peerId:choices.peerId,localId:choices.accounts.find(a=>a.active)?.stableId??choices.accounts[0].stableId,remoteId:choices.remoteAccounts.find(a=>a.active)?.stableId??choices.remoteAccounts[0].stableId,confirmed:true,sameAccount:true};
- assert((await action({action:'syncConnect',...mapping})).ok);let before=await waitCount(92);const unrelated=before.other;
+ if(!automatic)assert((await action({action:'syncConnect',...mapping})).ok);let before=await waitCount(92);const unrelated=before.other;
  const invalid=await action({action:'syncConnect',...mapping,remoteId:'unavailable-synthetic-account'});assert.equal(invalid.ok,false);assert.equal((await view()).items.length,92);
  await gl('const S=await import("./src/lib/storage.js"),Q=await import("./src/ui/quick-access.js"),db=await S.getDatabase(),item=Object.values(db.providerItems).find(i=>i.provider==="fanatical");await S.saveOwnershipCorrections([Q.ownershipCorrectionTarget(item,db)],{ownership:"returned",note:"Synthetic review"});return true;');
  const reviews=(await view()).reviews;
  for(let i=0;i<2;i++){assert((await action({action:'syncNow'})).ok);const state=await waitCount(92);assert.deepEqual(state.reviews,reviews);assert.deepEqual(state.other,unrelated);assert(state.items.every(item=>item.metadata.purchaseOrigins?.length===1));}
  console.log('PASS installed '+browser+' FAN sync: explicit consent, account rejection, idempotency, correction and purchase provenance preservation');
- assert((await action({action:'syncDisconnect'})).ok);assert.equal((await action({action:'syncState'})).state,null);
+ assert((await action(automatic?{action:'syncSetSharing',enabled:false}:{action:'syncDisconnect'})).ok);
+ if(automatic)assert.equal((await action({action:'syncState'})).sharing,false);else assert.equal((await action({action:'syncState'})).state,null);
  setSource({size:93,fail:false});await openOrders();await scan('new');await action({action:'syncNow'});assert.equal((await view()).items.length,92);
- const peerState=await fan('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",provider:"fanatical",action:"syncState"});');assert.equal(peerState.state,null);
- const again=await action({action:'syncChoices',peerId:mapping.peerId});assert(again.ok,again.error);assert((await action({action:'syncConnect',...mapping})).ok);await waitCount(93);
- console.log('PASS installed '+browser+' FAN sync: revocation prevents further transfers; explicit reconnection recovers the committed purchase');
+ if(automatic){const consent=await fan('return await chrome.runtime.sendMessage('+JSON.stringify(new URL(glUrl).protocol==='moz-extension:'?'galactic-library@galactichamster.com':new URL(glUrl).hostname)+',{type:"GH_PURCHASE_SYNC_CONSENT",provider:"fanatical",protocolVersion:1});');assert.equal(consent.mapping.confirmed,false);assert((await action({action:'syncSetSharing',enabled:true})).ok);}
+ else {const peerState=await fan('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",provider:"fanatical",action:"syncState"});');assert.equal(peerState.state,null);assert((await action({action:'syncConnect',...mapping})).ok);}
+ await waitCount(93);
+ console.log('PASS installed '+browser+' FAN sync: persistent opt-out blocks transfers and re-enable reconciles committed purchases');
  setSource({size:94,fail:true});await openOrders();await scan('new');assert.equal((await view()).items.length,93);
  await restart();setSource({size:94,fail:false});await openOrders();await scan('new');const recovered=await waitCount(94);assert.deepEqual(recovered.reviews,reviews);assert.deepEqual(recovered.other,unrelated);assert(recovered.items.every(item=>item.metadata.purchaseOrigins?.length===1));
  console.log('PASS installed '+browser+' FAN sync: interrupted detail acquisition, restart and Quick retry retain consent, corrections, unrelated providers and exactly one purchase origin');
@@ -39,7 +42,14 @@ export async function verifyFanaticalKeyReminders({browser,peerId,navigate,evalu
  const gl=async code=>{await navigate(glUrl);await wait('return !!globalThis.chrome?.runtime?.id;','GL options readiness');return evaluate(code);};
  const action=value=>evaluate('return await chrome.runtime.sendMessage('+JSON.stringify({type:'GH_PURCHASE_ACTION',provider:'fanatical',...value})+');');
  await fan('return await chrome.runtime.sendMessage({type:"FANATICAL_STORE",operation:"patch",args:[{galacticLibraryExtensionId:'+JSON.stringify(browser==='Firefox'?'galactic-library@galactichamster.com':new URL(glUrl).hostname)+'}]});');
- await gl('return true;');await action({action:'syncDisconnect'});const created=await action({action:'syncCreateAccount',newLabel:'Key observations',confirmed:true});assert(created.ok,created.error);await gl('const S=await import("./src/lib/storage.js"),db=await S.getDatabase(),p=Object.values(db.providerProfiles).find(p=>p.nickname==="Key observations");await S.selectProviderProfile(p.profileId,db.providers.fanatical.activeProfileId,true);return true;');const choices=await action({action:'syncChoices',peerId});assert(choices.ok,choices.error);const connected=await action({action:'syncConnect',peerId:choices.peerId,localId:choices.accounts.find(a=>a.active).stableId,remoteId:choices.remoteAccounts.find(a=>a.active).stableId,confirmed:true,sameAccount:true});assert(connected.ok,connected.error);
+ // This scenario deliberately changes to a different named receiving account.
+ // Pause automatic work on both sides while performing that advanced action;
+ // legacy Disconnect alone is intentionally no longer a persistent opt-out.
+ await gl('return true;');const automatic=typeof(await action({action:'syncState'})).sharing==='boolean';
+ if(automatic){assert((await action({action:'syncSetSharing',enabled:false})).ok);await fan('return true;');assert((await action({action:'syncSetSharing',enabled:false})).ok);await gl('return true;');}
+ await action({action:'syncDisconnect'});const created=await action({action:'syncCreateAccount',newLabel:'Key observations',confirmed:true});assert(created.ok,created.error);await gl('const S=await import("./src/lib/storage.js"),db=await S.getDatabase(),p=Object.values(db.providerProfiles).find(p=>p.nickname==="Key observations");await S.selectProviderProfile(p.profileId,db.providers.fanatical.activeProfileId,true);return true;');
+ if(automatic){await fan('return true;');assert((await action({action:'syncSetSharing',enabled:true})).ok);await gl('return true;');assert((await action({action:'syncSetSharing',enabled:true})).ok);}
+ const choices=await action({action:'syncChoices',peerId});assert(choices.ok,choices.error);const connected=await action({action:'syncConnect',peerId:choices.peerId,localId:choices.accounts.find(a=>a.active).stableId,remoteId:choices.remoteAccounts.find(a=>a.active).stableId,confirmed:true,sameAccount:true});assert(connected.ok,connected.error);
  const view=()=>evaluate('const S=await import("./src/lib/storage.js"),R=await import("./src/lib/reminders.js"),db=await S.getDatabase(),items=Object.values(db.providerItems).filter(i=>i.profileId===db.providers.fanatical.activeProfileId);return {items,pending:R.libraryReminders(db).filter(r=>r.provider==="fanatical"&&r.keyStatus==="unrevealed"),reviews:db.ownershipReviews};');
  await wait('const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.profileId===db.providers.fanatical.activeProfileId).length===37;','Consented key purchases did not sync');let state=await view();assert.equal(state.items.filter(i=>i.metadata.keyStatus==='unrevealed').length,10);assert.equal(state.pending.length,10);assert(state.items.filter(i=>i.metadata.keyStatus==='unrevealed').every(i=>i.metadata.purchaseOrigins.some(o=>o.keyStatus==='unrevealed')));const purchases=state.items.map(i=>({id:i.id,ownership:i.ownership,origins:i.metadata.purchaseOrigins.map(o=>o.occurrenceRef)})),reviews=state.reviews;
  await evaluate('const S=await import("./src/lib/storage.js"),R=await import("./src/lib/reminders.js"),db=await S.getDatabase(),r=R.libraryReminders(db).find(r=>r.provider==="fanatical"&&r.keyStatus==="unrevealed");await S.saveReminderReview(r.reminderRef,"dismissed",r.basis);return true;');assert.equal((await view()).pending.length,9);
