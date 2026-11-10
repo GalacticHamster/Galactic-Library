@@ -89,7 +89,7 @@ for(const phase of ['state','fetch','commit'])test(`diagnostics UI: ${phase} err
  if(phase==='state')h.setState(async()=>{throw Error(secret);});
  if(phase==='fetch')h.setFetch(async()=>{throw Error(secret);});
  if(phase==='commit')h.setCommit(async()=>({ok:false,error:secret}));
- await h.roots[0].shadow.buttons[0].click();assert.match(h.roots[0].shadow.status.textContent,/import failed/u);assert(!/FAKE_|private.invalid/u.test(h.roots[0].shadow.status.textContent));assert(!/FAKE_|private.invalid/u.test(h.failures.join('')));
+ await h.roots[0].shadow.buttons[0].click();assert.match(h.roots[0].shadow.status.textContent,/import failed/iu);assert(!/FAKE_|private.invalid/u.test(h.roots[0].shadow.status.textContent));assert(!/FAKE_|private.invalid/u.test(h.failures.join('')));
  h.roots[0].shadow.exportButton.click();const report=JSON.parse(await h.reports[0]);assert.equal(report.committed,false);assert.equal(report.saveAttempted,phase==='commit');assert.equal(report.persistence,phase==='commit'?'unconfirmed':'not-attempted');assert(!/FAKE_|private.invalid/u.test(JSON.stringify(report)));
 });
 test('diagnostics UI: complete and partial save outcomes require actual acknowledgment',async()=>{

@@ -113,7 +113,7 @@
       :host { font:14px/1.4 var(--gh-font,system-ui,sans-serif); color:var(--gh-text); }
       .panel { background:var(--gh-surface); color:var(--gh-text); border:1px solid var(--gh-border); box-shadow:var(--gh-shadow); padding:14px; border-radius:8px; }
       p { margin:0 0 10px; } button { border:0; border-radius:5px; background:var(--gh-accent); color:var(--gh-on-accent); cursor:pointer; font:inherit; padding:8px 10px; }
-      button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; }
+      button:disabled { cursor:wait; opacity:.7; } .status { color:var(--gh-text); margin-top:10px; white-space:pre-line; }
       .status[data-busy="true"]::before { content:'*'; display:inline-block; margin-right:6px; animation:pulse 1s ease-in-out infinite; }
       @keyframes pulse { 50% { opacity:.2; transform:scale(.7); } }
     `+styles;

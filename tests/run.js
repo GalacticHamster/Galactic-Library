@@ -10,6 +10,7 @@ import {contentsConfirmationTests} from './contents-confirmation.js';
 import {contentsReviewUsabilityTests} from './contents-review-usability.js';
 import {lookupDismissalTests} from './lookup-dismissal.js';
 import {fanaticalNavigationTests} from './fanatical-navigation.js';
+import {fanaticalPresentationTests} from './fanatical-presentation.js';
 import {epicAuthDiagnosticsTests} from './epic-auth-diagnostics.js';
 import {epicSessionTests} from './epic-session.js';
 import {xboxImportTests} from './xbox-import.js';
@@ -649,7 +650,7 @@ const tests = [
 ];
 
 let failures = 0;
-for (const [name, run] of [...gogEpicRecoveryTests,...fanaticalPartialTests,...humbleRecoveryTests,...steamOwnedApplicationTests, ...permanentClaimTests, ...amazonGamesClaimTests, ...fanaticalNavigationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
+for (const [name, run] of [...gogEpicRecoveryTests,...fanaticalPartialTests,...humbleRecoveryTests,...steamOwnedApplicationTests, ...permanentClaimTests, ...amazonGamesClaimTests, ...fanaticalNavigationTests, ...fanaticalPresentationTests, ...bundleMatchContextTests, ...tests, ...boundedManifestTests, ...independentEvidenceTests, ...kindleWholeManifestTests, ...kindleSourceCaptureTests, ...kindleManifestTests, ...contentsParserV4Tests, ...kindleScanPerformanceTests, ...contentsPerformanceTests, ...kindleContentsTests, ...kindleContentsQualityTests, ...companionFeedTests, ...(process.argv.includes('--unit')?[]:releaseTests), ...finalGlTests, ...localEnrichmentTests, ...enrichmentTests, ...fanaticalSyncTests, ...storageTests, ...providerSnapshotTests, ...relationshipTests, ...securityTests, ...matchingCandidateTests, ...workspacePreferenceTests]) {
   try {
     await run();
     console.log(`PASS ${name}`);
@@ -660,4 +661,4 @@ for (const [name, run] of [...gogEpicRecoveryTests,...fanaticalPartialTests,...h
   }
 }
 if (failures) process.exitCode = 1;
-else console.log(`\n${gogEpicRecoveryTests.length + fanaticalPartialTests.length + humbleRecoveryTests.length + steamOwnedApplicationTests.length + permanentClaimTests.length + amazonGamesClaimTests.length + fanaticalNavigationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);
+else console.log(`\n${gogEpicRecoveryTests.length + fanaticalPartialTests.length + humbleRecoveryTests.length + steamOwnedApplicationTests.length + permanentClaimTests.length + amazonGamesClaimTests.length + fanaticalNavigationTests.length + fanaticalPresentationTests.length + bundleMatchContextTests.length + tests.length + boundedManifestTests.length + independentEvidenceTests.length + kindleWholeManifestTests.length + kindleSourceCaptureTests.length + kindleManifestTests.length + contentsParserV4Tests.length + kindleScanPerformanceTests.length + contentsPerformanceTests.length + kindleContentsTests.length + kindleContentsQualityTests.length + companionFeedTests.length + (process.argv.includes('--unit')?0:releaseTests.length) + finalGlTests.length + localEnrichmentTests.length + enrichmentTests.length + fanaticalSyncTests.length + storageTests.length + providerSnapshotTests.length + relationshipTests.length + securityTests.length + matchingCandidateTests.length + workspacePreferenceTests.length} tests passed.`);

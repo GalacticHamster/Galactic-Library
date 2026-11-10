@@ -72,18 +72,27 @@
         report.committed=true;report.persistence='committed';
         report.savedItems=items.length;
         const stats = projection.result ?? {};
-        if(stats.recovery){status.textContent=`Saved ${stats.ordersScanned} Fanatical purchase${stats.ordersScanned===1?'':'s'}. ${stats.recovery.failedOrders?`${stats.recovery.failedOrders} purchase${stats.recovery.failedOrders===1?" couldn't":"s couldn't"} be loaded and will be retried by Quick update. `:''}${stats.recovery.listingIncomplete?'Some purchase history could not be checked and will be retried by Quick update. ':''}Earlier purchases were kept.`;return;}
-        const scope = fullRescan
-          ? `Full rescan read ${stats.ordersScanned ?? 0} completed order${stats.ordersScanned === 1 ? '' : 's'}`
-          : `Quick update read ${stats.ordersScanned ?? 0} new completed order${stats.ordersScanned === 1 ? '' : 's'} and skipped ${Math.max(0, (stats.ordersAvailable ?? 0) - (stats.ordersScanned ?? 0))} already checked`;
-        status.textContent = `${scope}. ${response.gameCount} Fanatical game${response.gameCount === 1 ? '' : 's'}, ${response.bookCount} book${response.bookCount === 1 ? '' : 's'}, and ${response.audiobookCount} audiobook${response.audiobookCount === 1 ? '' : 's'} stored locally.`;
+        const totalItems = (response.gameCount ?? 0) + (response.bookCount ?? 0) + (response.audiobookCount ?? 0) + (response.softwareCount ?? 0);
+        const formatted = tools.formatScanSummary({
+          ordersScanned: stats.ordersScanned ?? 0,
+          addedItems: items.length,
+          totalItems,
+          recovery: stats.recovery,
+          outcome: stats.recovery ? 'partial' : 'complete'
+        }, { fullScan: fullRescan });
+        status.textContent = formatted.text;
       } catch (error) {
         if(!active())return;
         if(phase!=='acquisition')report.diagnostic=tools.failureReport(phase==='account'||/account|profile|lease|stale|authorization|receipt/iu.test(error?.message??'')?'scope':'storage',phase==='account'?'execution':'save');
         const message=phase==='save'?'GL could not confirm that these purchases were saved. Earlier records were kept. Check the selected account and available browser storage, then retry. Export the scan report if this continues.':tools.failureMessage(report.diagnostic?.category);
         await globalThis.GalacticSync.failed('fanatical',new Error(message));
         if(!active())return;
-        status.textContent = `Fanatical import failed: ${message} For a scan report, enable provider diagnostics in GL Settings, reload this page and retry.`;
+        const formatted = tools.formatScanSummary({
+          outcome: 'failed',
+          category: report.diagnostic?.category,
+          error: message
+        });
+        status.textContent = formatted.text;
       } finally {
         clearInterval(heartbeat);window.removeEventListener('message',onProgress);importing=false;
         ownership?.present();
