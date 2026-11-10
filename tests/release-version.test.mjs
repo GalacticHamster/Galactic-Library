@@ -8,7 +8,7 @@ import {createEmptyDatabase} from '../src/lib/models.js';
 test('release manifests, package metadata and runtime handshake agree without changing API/schema versions',async()=>{
   const manifest=JSON.parse(await readFile(new URL('../manifest.json',import.meta.url),'utf8'));
   const metadata=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-  assert.equal(manifest.version,'1.0.1');assert.equal(metadata.version,manifest.version);
+  assert.equal(manifest.version,'1.0.2');assert.equal(metadata.version,manifest.version);
   const ping=handleExternalApiRequest(createEmptyDatabase(),{type:'PING'});
   assert.equal(ping.appVersion,manifest.version);assert.equal(ping.apiVersion,1);
   for(const browser of ['chrome','firefox']){
