@@ -1,4 +1,5 @@
 // Real installed workers and content imports, disposable synthetic data only.
+import {observeReminderReview} from './reminder-review-lifecycle.mjs';
 import assert from 'node:assert/strict';import {setTimeout as pause} from 'node:timers/promises';
 export async function verifyFanaticalNativeSync({browser,peerId,navigate,evaluate,wait,glUrl,fanUrl,openOrders,scan,restart,setSource}){
  const extension=async(url,code)=>{await navigate(url);await wait('return location.href==='+JSON.stringify(url)+'&&document.readyState==="complete"&&!!globalThis.chrome?.runtime?.id;','Extension page not ready');return evaluate(code);};
@@ -41,6 +42,14 @@ export async function verifyFanaticalNativeSync({browser,peerId,navigate,evaluat
  console.log('PASS installed '+browser+' FAN sync: interrupted detail acquisition, restart and Quick retry retain consent, corrections, unrelated providers and exactly one purchase origin');
 }
 export async function verifyFanaticalKeyReminders({browser,peerId,navigate,evaluate,wait,glUrl,fanUrl,openOrders,scan,setKeysPresent,restart}){
+ const review=async(filter,before,after,pending)=>{
+  await evaluate('const f=document.querySelector("#local-reminder-filter");f.value='+JSON.stringify(filter)+';f.dispatchEvent(new Event("change"));return true;');
+  await wait('return document.querySelector("#local-reminder-list")?.children.length==='+before+'&&!document.querySelector("#local-reminder-list button")?.disabled;','Reminder review controls not ready');
+  const result=await evaluate('return ('+observeReminderReview.toString()+')({button:document.querySelector("#local-reminder-list button"),status:document.querySelector("#local-reminder-action-status"),list:document.querySelector("#local-reminder-list"),expectedBefore:'+before+',expectedAfter:'+after+'});');
+  assert.equal(result.state,'saved','Reminder mutation did not acknowledge its save: '+JSON.stringify(result));
+  assert.equal(await evaluate('const D=await import("./library-data.mjs"),s=await chrome.storage.local.get("fanaticalLibraryItems");return D.localKeyReminders(s.fanaticalLibraryItems).filter(r=>!r.hidden).length;'),pending,'Acknowledged review must match persisted FAN state');
+ };
+
  const fan=async code=>{await navigate(fanUrl);await wait('return !!globalThis.LibraryBrowser&&!!document.querySelector("#preview-note").textContent;','FAN options readiness');return evaluate(code);};
  const gl=async code=>{await navigate(glUrl);await wait('return !!globalThis.chrome?.runtime?.id;','GL options readiness');return evaluate(code);};
  const action=value=>evaluate('return await chrome.runtime.sendMessage('+JSON.stringify({type:'GH_PURCHASE_ACTION',provider:'fanatical',...value})+');');
@@ -57,9 +66,9 @@ export async function verifyFanaticalKeyReminders({browser,peerId,navigate,evalu
  await wait('const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.profileId===db.providers.fanatical.activeProfileId).length===37;','Consented key purchases did not sync');let state=await view();assert.equal(state.items.filter(i=>i.metadata.keyStatus==='unrevealed').length,10);assert.equal(state.pending.length,10);assert(state.items.filter(i=>i.metadata.keyStatus==='unrevealed').every(i=>i.metadata.purchaseOrigins.some(o=>o.keyStatus==='unrevealed')));const purchases=state.items.map(i=>({id:i.id,ownership:i.ownership,origins:i.metadata.purchaseOrigins.map(o=>o.occurrenceRef)})),reviews=state.reviews;
  await evaluate('const S=await import("./src/lib/storage.js"),R=await import("./src/lib/reminders.js"),db=await S.getDatabase(),r=R.libraryReminders(db).find(r=>r.provider==="fanatical"&&r.keyStatus==="unrevealed");await S.saveReminderReview(r.reminderRef,"dismissed",r.basis);return true;');assert.equal((await view()).pending.length,9);
  await fan('return true;');await wait('return document.querySelector("#local-key-status")?.textContent.includes("9 active purchase reminders");','Automatic GL review did not reach FAN');await evaluate('document.querySelector("#load-reminders").click();return true;');await wait('return document.querySelector("#reminder-status").textContent.includes("reported reminders");','FAN central reminder display');assert.equal(await evaluate('return [...document.querySelector("#reminder-list").children].filter(li=>li.textContent.includes("Key reported unrevealed")).length;'),9);assert.match(await evaluate('return document.querySelector("#local-key-status").textContent;'),/9 active purchase reminders/);
- await evaluate('const f=document.querySelector("#local-reminder-filter");f.value="hidden";f.dispatchEvent(new Event("change"));document.querySelector("#local-reminder-list button").click();return true;');await wait('return document.querySelector("#local-reminder-list")?.children.length===0;','Local restore did not save');
+ await review('hidden',1,0,10);
  await gl('return true;');await wait('const S=await import("./src/lib/storage.js"),R=await import("./src/lib/reminders.js");return R.libraryReminders(await S.getDatabase()).filter(r=>r.provider==="fanatical"&&r.keyStatus==="unrevealed").length===10;','Local restore did not reach GL');
- await fan('const f=document.querySelector("#local-reminder-filter");f.value="pending";f.dispatchEvent(new Event("change"));document.querySelector("#local-reminder-list button").click();return true;');await wait('return document.querySelector("#local-reminder-list")?.children.length===9;','Local dismissal did not save');
+ await fan('return true;');await review('pending',10,9,9);
  await gl('return true;');await wait('const S=await import("./src/lib/storage.js"),R=await import("./src/lib/reminders.js");return R.libraryReminders(await S.getDatabase()).filter(r=>r.provider==="fanatical"&&r.keyStatus==="unrevealed").length===9;','Local dismissal did not reach GL');
 
  setKeysPresent();await openOrders();await scan('new');await fan('return true;');assert.match(await evaluate('return document.querySelector("#local-key-status").textContent;'),/9 active purchase reminders/);await openOrders();await scan('all');await fan('return true;');assert.match(await evaluate('return document.querySelector("#local-key-status").textContent;'),/0 active purchase reminders/);assert.equal(await evaluate('const s=await chrome.storage.local.get("fanaticalLibraryItems");return JSON.stringify(s).includes("SYNTHETIC_SECRET_DO_NOT_RETAIN");'),false);
