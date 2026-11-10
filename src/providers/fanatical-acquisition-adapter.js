@@ -31,5 +31,6 @@ export function fanaticalAcquisitionForGL(raw,options={}){
   const {compatibility:ignoredCompatibility,...coverage}=raw.coverage;
   return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
     ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned}}:{}),
-    coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items};
+    coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
+    ...(raw.rejectedPurchaseItems?{rejectedPurchaseItems:raw.rejectedPurchaseItems}:{})};
 }

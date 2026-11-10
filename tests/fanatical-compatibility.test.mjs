@@ -197,6 +197,75 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    assert.equal(detailFailure.parentId,'string');
    assert.equal(detailFailure.parentName,'string');
   });
+
+  test(name+': multi-bundle order with 108 comic titles, 14 direct pick-and-mix books and 1 promotional mystery gift admits 122 items cleanly',async()=>{
+   const comicBundle1={_id:'bndl-house-of-horrors',name:'Image Comics House of Horrors Collection',type:'bundle',display_type:'comic-bundle',bundles:[
+     {games:Array.from({length:4},(_,i)=>({_id:`hoh-t1-${i}`,name:`HoH Vol ${i+1}`,type:'book'}))},
+     {games:Array.from({length:21},(_,i)=>({_id:`hoh-t2-${i}`,name:`HoH Vol ${i+5}`,type:'book'}))},
+     {games:Array.from({length:38},(_,i)=>({_id:`hoh-t3-${i}`,name:`HoH Vol ${i+26}`,type:'book'}))}
+   ]};
+   const comicBundle2={_id:'bndl-monster-mash',name:'Monster Mash Horror Comic Collection',type:'bundle',display_type:'comic-bundle',bundles:[
+     {games:Array.from({length:4},(_,i)=>({_id:`mm-t1-${i}`,name:`MM Vol ${i+1}`,type:'book'}))},
+     {games:Array.from({length:16},(_,i)=>({_id:`mm-t2-${i}`,name:`MM Vol ${i+5}`,type:'book'}))},
+     {games:Array.from({length:25},(_,i)=>({_id:`mm-t3-${i}`,name:`MM Vol ${i+21}`,type:'book'}))}
+   ]};
+   const directBooks=Array.from({length:14},(_,i)=>({_id:`direct-book-${i}`,name:`Pick Book ${i+1}`,type:'book',display_type:'book',bundles:[],pickAndMix:'Nightmare Tales Pick and Mix'}));
+   const promoGift={_id:'promo-gift-id',name:'BIRTHDAY BASH SALE - GIFT',type:'game',display_type:'game',isFreeProduct:true,mystery:true,reveal_template:'present',status:'fulfilled',bundles:[],drm:{steam:true}};
+   const multiDetail={_id:'order-multi-123',status:'COMPLETE',date:'2026-11-10',items:[
+     directBooks[0], directBooks[1], directBooks[2],
+     comicBundle1,
+     ...directBooks.slice(3, 7),
+     comicBundle2,
+     ...directBooks.slice(7),
+     promoGift
+   ]};
+   const multiSummary={_id:'order-multi-123',status:'COMPLETE',date:'2026-11-10',items:multiDetail.items.map(p=>Array.isArray(p.bundles)&&p.bundles.length>0?p:{name:p.name,bundles:[]})};
+   const r=await run(engine,{list:[multiSummary],details:[multiDetail]});
+   assert.equal(r.result.ordersScanned,1);
+   assert.equal(r.counts.detailStructure,0);
+   assert.equal(r.counts.invalidBundles,0);
+   assert.equal(r.counts.detailProductMismatch,0);
+   assert.equal(r.result.items.length,122);
+   assert(!r.result.items.some(p=>p.title.includes('BIRTHDAY BASH')||p.title==='Troublemaker'));
+   assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
+   if(engine===gl){
+     assert.equal(r.result.diagnostic.ordersUnresolved,0);
+     assert.equal(r.result.diagnostic.ordersValidated,1);
+   }else{
+     assert.equal(r.result.unresolvedOrderFingerprints.length,0);
+     assert.equal(r.result.verifiedOrderFingerprints.length,1);
+   }
+   if(r.result.rejectedPurchaseItems){
+     assert.equal(r.result.rejectedPurchaseItems.length,1);
+     assert.equal(r.result.rejectedPurchaseItems[0].title,'BIRTHDAY BASH SALE - GIFT');
+     assert.equal(r.result.rejectedPurchaseItems[0].reason,'Unclassified promotional or non-product content');
+     assert.equal(r.result.rejectedPurchaseItems[0].delivery,'external-key');
+   }
+  });
+
+  test(name+': live customer payload Fanantical-multi-bundle.json parses 122 verified titles and 1 rejected promo gift',async()=>{
+   const realPath='C:/Users/nvesd/Downloads/Fanantical-multi-bundle.json';
+   let realOrder;
+   try { realOrder=JSON.parse(readFileSync(realPath,'utf8')); } catch { return; }
+   const realSummary={_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:realOrder.items.map(item=>Array.isArray(item.bundles)&&item.bundles.length>0?item:{name:item.name,bundles:[]})};
+   const r=await run(engine,{list:[realSummary],details:[realOrder]});
+   assert.equal(r.result.ordersScanned,1);
+   assert.equal(r.counts.detailStructure,0);
+   assert.equal(r.counts.invalidBundles,0);
+   assert.equal(r.counts.detailProductMismatch,0);
+   assert.equal(r.result.items.length,122);
+   assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
+   assert(!r.result.items.some(p=>p.title==='BIRTHDAY BASH SALE - GIFT'||p.title==='Troublemaker'));
+   if(engine===gl){
+     assert.equal(r.result.diagnostic.ordersUnresolved,0);
+   }else{
+     assert.equal(r.result.unresolvedOrderFingerprints.length,0);
+   }
+   if(r.result.rejectedPurchaseItems){
+     assert.equal(r.result.rejectedPurchaseItems.length,1);
+     assert.equal(r.result.rejectedPurchaseItems[0].title,'BIRTHDAY BASH SALE - GIFT');
+   }
+  });
 }
 test('optional aggregate diagnostic contract remains backward compatible and rejects unsafe values',async()=>{
  const {result}=await run(canonical);assert(assertFanaticalAcquisitionContract(result).compatibility);const legacy=structuredClone(result);delete legacy.coverage.compatibility;assert.equal(assertFanaticalAcquisitionContract(legacy).compatibility,undefined);
