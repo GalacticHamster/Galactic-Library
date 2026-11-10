@@ -46,7 +46,7 @@ for(const [name,input,policy]of cases)test('account transition: '+name,async()=>
     if(engine===candidate){
       if(['conflict','session'].includes(policy)){assert(fatal);assert.equal(r.code,policy==='session'?'session-changed':'account-scope-conflict');continue;}
       assert(!fatal,JSON.stringify(r));assert.equal(r.acquisitionContract.reconciliation.authority,'none');assert.equal(r.acquisitionContract.persistence.outcome,'not-attempted');
-      if(policy==='empty'){assert.equal(r.acquisitionContract.acquisition.outcome,'finished');assert.equal(r.acquisitionContract.coverage.status,'unverified');assert.equal(r.coverage.accountAffinity,'declared-scope');assert.deepEqual(r.orderFingerprints,[]);assert.deepEqual(r.items,[]);assert.deepEqual(r.acquisitionContract.verified,[]);assert.deepEqual(r.acquisitionContract.retry,[]);}
+      if(policy==='empty'){assert.equal(r.acquisitionContract.acquisition.outcome,'interrupted');assert.equal(r.acquisitionContract.coverage.status,'incomplete');assert(r.failures.some(f=>f.code==='history-missing-known'));assert.equal(r.coverage.accountAffinity,'declared-scope');assert.deepEqual(r.orderFingerprints,[]);assert.deepEqual(r.items,[]);assert.deepEqual(r.acquisitionContract.verified,[]);assert.deepEqual(r.acquisitionContract.retry,[]);}
       if(policy==='complete')assert.equal(r.coverage.complete,true);
       if(policy==='withhold'){assert.equal(r.coverage.complete,false);assert.equal(r.acquisitionContract.acquisition.outcome,'interrupted');}
     }else if(policy==='empty'){
@@ -85,7 +85,15 @@ for(const useCandidate of [false,true])test('GL real writer: Full empty then Qui
   db=await h.pageA.getDatabase();await h.pageA.restoreDatabase(parseBackup(createBackup(db)));
   const before=await h.pageA.getDatabase();h.setOrders([]);h.setHeaders({});
   for(const mode of ['full','incremental']){
-    const acquired=await h.acquire(mode);assert(acquired.projection.ok,acquired.projection.error);assert.equal(acquired.projection.result.acquisitionComplete,true);assert.equal(acquired.projection.result.coverage.complete,false);assert((await h.commit(acquired)).result.ok);
+    const acquired=await h.acquire(mode);
+    if(mode==='full'){
+      // Full sends no skip checkpoint. Headerless completion still cannot authorize archival.
+      assert(acquired.projection.ok,acquired.projection.error);assert.equal(acquired.projection.result.acquisitionComplete,true);
+      assert.equal(acquired.projection.result.coverage.complete,true);assert.equal(acquired.projection.result.coverage.paginationEvidence,'array-only');assert((await h.commit(acquired)).result.ok);
+    }else{
+      // Quick supplies saved order identities; missing all of them cannot pass as a clean scan.
+      assert.equal(acquired.projection.ok,false);assert.equal(acquired.projection.diagnostic.category,'continuation');assert.equal(acquired.projection.diagnostic.acquisitionFinished,false);
+    }
     db=await h.pageB.getDatabase();for(const key of ['providerItems','providerHistory','ownershipReviews'])assert.deepEqual(db[key],before[key]);
     assert.equal(Object.keys(db.providerItems).length,47);assert.equal(Object.keys(db.providerHistory).length,47);
     assert.equal(db.providers.fanatical.fullSyncAt,before.providers.fanatical.fullSyncAt);assert.deepEqual(db.providers.fanatical.syncState.knownOrderFingerprints,before.providers.fanatical.syncState.knownOrderFingerprints);
@@ -101,7 +109,8 @@ for(const engine of [productionFan,candidate])test('FAN real worker/writer: empt
   const send=async full=>{const reply=await h.send(full);await new Promise(resolve=>setImmediate(resolve));return reply;};
   assert.equal((await send(true)).ok,true);const before=structuredClone(h.stored);
   listing=[];headers={};
-  for(const full of [true,false]){const reply=await send(full);assert.equal(reply.ok,true,reply.error);assert.equal(reply.summary.acquisitionComplete,true);assert.equal(reply.summary.coverage.complete,false);
+  for(const full of [true,false]){const reply=await send(full);assert.equal(reply.ok,true,reply.error);// FAN supplies retained order provenance; an empty listing omits that history.
+    assert.equal(reply.summary.acquisitionComplete,false);assert.equal(reply.summary.coverage.complete,false);assert.equal(reply.summary.completeCheckpointAdvanced,false);assert(reply.summary.failures.some(f=>f.code==='history-missing-known'));
     for(const key of ['fanaticalLibraryItems','fanaticalHistoricalItems','fanaticalScannedOrderFingerprints','fanaticalImportSummary','fanaticalAccountId'])assert.deepEqual(h.stored[key],before[key]);}
   listing=[foreign];assert.equal((await send(false)).ok,false);assert.deepEqual(h.stored.fanaticalLibraryItems,before.fanaticalLibraryItems);
   listing=[a,b];headers={'x-total-count':'2'};fail=true;const interrupted=await send(true);assert(interrupted.ok,interrupted.error);assert.equal(interrupted.summary.acquisitionComplete,false);assert.equal(h.stored.fanaticalScannedOrderFingerprints.includes(hash(b._id)),false);assert.deepEqual(h.stored.fanaticalLibraryItems,before.fanaticalLibraryItems);

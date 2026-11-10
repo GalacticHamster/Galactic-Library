@@ -235,6 +235,12 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    assert.equal(r.result.items.length,122);
    assert(!r.result.items.some(p=>p.title.includes('BIRTHDAY BASH')||p.title==='Troublemaker'));
    assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
+   // Sparse checkout summaries must be rechecked in Quick; saved identity alone
+   // cannot stand in for the selected products on the authenticated detail.
+   const quick=await run(engine,{list:[multiSummary],details:[multiDetail],known:[hash(multiDetail._id)],fullScan:false});
+   assert.equal(quick.result.ordersScanned,1);assert.equal(quick.paths.length,2);
+   assert.deepEqual(quick.result.items.map(p=>p.sourceItemId),r.result.items.map(p=>p.sourceItemId));
+   assert.equal(quick.counts.invalidBundles,0);assert.equal(quick.compatibility.summaryRecovery.recovered,1);
    if(engine===gl){
      assert.equal(r.result.diagnostic.ordersUnresolved,0);
      assert.equal(r.result.diagnostic.ordersValidated,1);

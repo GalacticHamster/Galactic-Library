@@ -27,8 +27,16 @@ pin tests. Runtime archives exclude build metadata, audit files and test inputs.
 
 Acquisition outcome, independently established coverage, account affinity,
 unresolved/retry information and persistence are distinct. Neither a finished
-acquisition nor its contract grants reconciliation authority. A bare array may
-finish successfully while coverage remains unverified. Unknown statuses remain
+acquisition nor its contract grants reconciliation authority. A bare array can
+finish the supported single-response acquisition contract (`coverage.complete`)
+without independently proving enumeration (`paginationEvidence: 'array-only'`).
+GL withholds archival for that evidence. FAN merges it additively, rejects a
+headerless replacement that omits active products, and retains an earlier
+count/range/link coverage summary. Valid per-order skip evidence can still advance.
+An empty listing that omits supplied saved order identities is interrupted, not
+a clean empty account. FAN supplies retained purchase origins in Full and Quick;
+GL's Full acquisition omits the skip checkpoint and its writer separately
+withholds archival for headerless results. Unknown statuses remain
 unresolved and cannot authorize archival. Explicit session or order-identity
 conflicts reject the acquisition. Consumer writers retain account/lease checks,
 correction and history preservation, atomic commits and purchase-sharing consent.

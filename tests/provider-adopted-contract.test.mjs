@@ -10,7 +10,7 @@ for(const [name,input,expectedGL,expectedFAN]of [
   ['complete',{},[false,2,true,0],[false,2,true,0]],
   ['verified empty',{list:[],headers:{'x-total-count':'0'}},[false,0,true,0],[false,0,true,0]],
   ['range',{headers:{'content-range':'orders 0-1/2'}},[false,2,true,0],[false,2,true,0]],
-  ['bare array',{headers:{}},[false,2,false,0],[false,2,false,0]],
+  ['bare array',{headers:{}},[false,2,true,0],[false,2,true,0]],
   ['later unreadable page',{list:[a],headers:{link:'</api/user/orders?page=2>; rel="next"'},next:{data:{unknown:[]}}},[false,1,false,0],[false,1,false,0]],
   ['later failed page',{list:[a],headers:{link:'</api/user/orders?page=2>; rel="next"'},next:{status:404}},[false,1,false,0],[false,1,false,0]],
   ['identical duplicate',{list:[a,a],headers:{}},[false,1,false,0],[false,1,false,0]],
@@ -26,6 +26,6 @@ for(const [name,input,expectedGL,expectedFAN]of [
   for(const [engine,expected]of [[gl,expectedGL],[fan,expectedFAN]]){
     const {result,summary}=await fanaticalFixture(engine,input);
     assert.deepEqual(Object.values(summary),expected);
-    if(!summary.fatal){assert.equal(result.acquisitionContract.persistence.outcome,'not-attempted');assert.equal(result.acquisitionContract.reconciliation.authority,'none');}
+    if(!summary.fatal){assert.equal(result.acquisitionContract.persistence.outcome,'not-attempted');assert.equal(result.acquisitionContract.reconciliation.authority,'none');if(name==='bare array'){assert.equal(result.acquisitionContract.coverage.evidence.length,1);assert.equal(result.acquisitionContract.coverage.evidence[0],'array-only');assert.equal(result.coverage.expectedTotal,null);}}
   }
 });

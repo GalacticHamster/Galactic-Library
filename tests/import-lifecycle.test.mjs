@@ -15,11 +15,11 @@ test('absence of busy is not completion; no-op click times out as not started',a
 });
 test('delayed start remains pending until an observed busy cycle completes',async()=>{
   const f=fixture();let settled=false;const pending=f.run().then(value=>{settled=true;return value;});await Promise.resolve();assert(!settled);
-  f.status.dataset.busy='true';await Promise.resolve();assert(!settled);f.status.textContent='Saved 1 Fanatical purchase';delete f.status.dataset.busy;
-  const r=await pending;assert.equal(r.state,'succeeded');assert(r.started);assert.equal(r.message,'Saved 1 Fanatical purchase');assert(!f.observing);
+  f.status.dataset.busy='true';await Promise.resolve();assert(!settled);f.status.textContent='Full import completed\n\nChecked 1 purchase. Imported 47 new items.\n\n47 items in your library.';delete f.status.dataset.busy;
+  const r=await pending;assert.equal(r.state,'succeeded');assert(r.started);assert.equal(r.message,'Full import completed\n\nChecked 1 purchase. Imported 47 new items.\n\n47 items in your library.');assert(!f.observing);
 });
 test('a synchronous start and completion in one observer batch is retained',async()=>{
-  const f=fixture();f.button.action=()=>{f.status.dataset.busy='true';f.status.textContent='Saved 1 Fanatical purchase';delete f.status.dataset.busy;};
+  const f=fixture();f.button.action=()=>{f.status.dataset.busy='true';f.status.textContent='Full import completed\n\nChecked 1 purchase. Imported 47 new items.\n\n47 items in your library.';delete f.status.dataset.busy;};
   const r=await f.run();assert.equal(r.state,'succeeded');assert(r.started);
 });
 for(const message of ['Fanatical import failed: sign in','GL could not confirm that these purchases were saved'])test('completed failure remains a failure: '+message,async()=>{
@@ -35,4 +35,12 @@ test('disabled buttons and already-running imports cannot impersonate a new scan
 test('clearing busy without a terminal message cannot pass as success',async()=>{
   const f=fixture();f.button.action=()=>{f.status.dataset.busy='true';f.status.textContent='Loading purchases';delete f.status.dataset.busy;};
   const r=await f.run();assert.equal(r.state,'unconfirmed');assert(r.started);assert.equal(r.reason,'completion-message-missing');
+});
+
+for(const title of ['Full import','Quick update'])test('partial completion has its own lifecycle state: '+title,async()=>{
+  const f=fixture();f.button.action=()=>{f.status.dataset.busy='true';f.status.textContent=title+" partially completed\n\nCouldn't check 1 purchase. It will be retried on your next update.\n\nSaved 2 purchases. Your library now contains 47 items. Earlier records were preserved.";delete f.status.dataset.busy;};
+  const r=await f.run();assert.equal(r.state,'partial');assert(r.started);
+});
+test('a success heading without counts is not a verified completion',async()=>{
+  const f=fixture();f.button.action=()=>{f.status.dataset.busy='true';f.status.textContent='Full import completed';delete f.status.dataset.busy;};assert.equal((await f.run()).state,'unconfirmed');
 });
