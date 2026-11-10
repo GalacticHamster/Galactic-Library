@@ -166,6 +166,37 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    assert.equal(quick.counts.scheduled,2);
    assert.equal(quick.compatibility.summaryRecovery.recovered,2);
   });
+
+  test(name+': empty bundle container in authenticated detail leaves order unresolved with detailStructure: 1 (reproduces report 10)',async()=>{
+   const comicOrder={_id:'order-comic-47',status:'COMPLETE',date:'2026-10-01',items:[{_id:'bundle-comic',name:'Comic Collection',bundles:[{games:Array.from({length:47},(_,i)=>({_id:`comic-${i}`,name:`Comic Volume ${i+1}`,type:'book'}))}]}]};
+   const directSummary={_id:'order-direct-10',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({name:`Direct Game ${i}`,bundles:[]}))};
+   const directDetail={_id:'order-direct-10',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({_id:`direct-game-${i}`,name:`Direct Game ${i}`,type:'game',bundles:[]}))};
+   const mixedSummary={_id:'order-mixed-3',status:'COMPLETE',date:'2026-11-05',items:[{_id:'bundle-pop',name:'Populated Bundle',bundles:[{games:[{_id:'pop-game-1',name:'Pop Game 1',type:'game'}]}]},{name:'Sparse Item',bundles:[]}]};
+   const mixedDetail={_id:'order-mixed-3',status:'COMPLETE',date:'2026-11-05',items:[{_id:'bundle-pop',name:'Populated Bundle',bundles:[{games:[{_id:'pop-game-1',name:'Pop Game 1',type:'game'}]}]},{_id:'empty-bundle-id',name:'Sparse Item',type:'bundle',bundles:[]}]};
+   const list=[mixedSummary,directSummary,comicOrder];
+   const details=[mixedDetail,directDetail,comicOrder];
+   const r=await run(engine,{list,details});
+   assert.equal(r.counts.detailStructure,1);
+   assert.equal(r.counts.invalidBundles,0);
+   assert.equal(r.result.items.length,57);
+   assert.equal(r.compatibility.summaryRecovery.eligible,2);
+   assert.equal(r.compatibility.summaryRecovery.recovered,1);
+   assert.equal(r.compatibility.summaryRecovery.unresolved,1);
+   if(engine===gl){
+     assert.equal(r.result.diagnostic.ordersUnresolved,1);
+     assert.equal(r.result.diagnostic.ordersValidated,2);
+   }else{
+     assert.equal(r.result.unresolvedOrderFingerprints.length,1);
+     assert.equal(r.result.verifiedOrderFingerprints.length,2);
+   }
+   const shapes=r.compatibility.bundleShapes;
+   const detailFailure=shapes.records.find(s=>s.stage==='details');
+   assert(detailFailure);
+   assert.equal(detailFailure.reason,'invalidBundles');
+   assert.equal(detailFailure.bundlesSize,'empty');
+   assert.equal(detailFailure.parentId,'string');
+   assert.equal(detailFailure.parentName,'string');
+  });
 }
 test('optional aggregate diagnostic contract remains backward compatible and rejects unsafe values',async()=>{
  const {result}=await run(canonical);assert(assertFanaticalAcquisitionContract(result).compatibility);const legacy=structuredClone(result);delete legacy.coverage.compatibility;assert.equal(assertFanaticalAcquisitionContract(legacy).compatibility,undefined);
