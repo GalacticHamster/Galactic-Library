@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-19e934a728069176; contract 1; SHA-256 2951b8df8787100023630f7932b0a373f31c7c21b5ad9b0847a81e37b07c419a
+// Pinned acquisition fanatical-v1-d8025101f972af95; contract 1; SHA-256 108836cb22dbb1128fec310a23f5962903b01eb3705dfa4efa68a3ae28b057b1
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan' } = {}) {
@@ -591,7 +591,9 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
           &&order.items.every(parent=>isSparse(parent)||isPopulated(parent));
         if(sparse){
           sparseSummaries.set(order._id,parentEvidence(order.items));
-          expectedProducts.set(order._id,null);
+          // Retain independently available product evidence from populated parents.
+          const populated=order.items.filter(parent=>isPopulated(parent)||isDirectPurchasedGame(parent));
+          expectedProducts.set(order._id,populated.length?productCounts(populated):new Map());
           order.items.filter(parent=>isSparse(parent)&&!isDirectPurchasedGame(parent)).forEach(parent=>bundleShape(parent));
         } else {
           const counts=productCounts(order.items);
@@ -661,7 +663,7 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
     const actual = productCounts(order.items);
     if(sparse){
       const actualParents=parentEvidence(order.items);
-      if(sparse.names.size!==actualParents.names.size||[...sparse.names].some(([name,n])=>actualParents.names.get(name)!==n)||[...sparse.ids].some(([key,n])=>(actualParents.ids.get(key)??0)<n)||[...sparse.direct].some(([key,n])=>(actualParents.direct.get(key)??0)<n)){issue('detailProductMismatch');throw unreadable();}
+      if(sparse.names.size!==actualParents.names.size||[...sparse.names].some(([name,n])=>actualParents.names.get(name)!==n)||[...sparse.ids].some(([key,n])=>(actualParents.ids.get(key)??0)<n)||[...sparse.direct].some(([key,n])=>(actualParents.direct.get(key)??0)<n)||[...expected].some(([key,n])=>(actual.get(key)??0)<n)){issue('detailProductMismatch');throw unreadable();}
     }else if (actual.size !== expected.size || [...expected].some(([key, quantity]) => actual.get(key) !== quantity)){issue('detailProductMismatch');throw unreadable();}
     let occurrence=0;
     for (const parent of order.items) {

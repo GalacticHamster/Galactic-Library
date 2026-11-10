@@ -45,3 +45,18 @@ test('a validation failure offers an existing retry control without inventing a 
 
 test('an unverified stale synced label cannot claim a current successful relationship',async()=>{const f=await fixture({initial:{status:'synced'}});await f.open();assert.notEqual(f.get('syncSummary').textContent,'Synced');assert(!/^Synced/.test(f.get('syncStatus').textContent));});
 test('retry remains disabled while sharing is explicitly off',async()=>{const f=await fixture({sharing:false});await f.open();assert(f.get('syncRetry').disabled);await f.get('syncRetry').click();assert(!f.calls.some(m=>m.action==='syncRetry'));});
+
+// A skipped transfer is not necessarily an actionable exclusion: older native IDs
+// and unsupported product types also contribute. Keep it visible without calling
+// informational limitations a review task.
+test('successful sync distinguishes informational limits, skipped transfers and actionable exclusions',async()=>{
+ const limitations=['GL retains supported provider records, not raw orders.','Saved supported purchase records; absence is not deletion.'];
+ for(const [skipped,excludedHere,excludedThere,expected] of [[0,0,0,'Synced'],[5178,0,0,'Synced. Some records were not shared; see Advanced.'],[0,1,0,'Synced. Some items need review; see Advanced.'],[5178,0,1,'Synced. Some items need review; see Advanced.']]){
+  const f=await fixture({initial:{confirmed:true,remoteConfirmed:true,status:'synced',skipped,review:{excludedHere,excludedThere,limitations}}});await f.open();
+  assert.equal(f.get('syncStatus').textContent,expected);assert.equal(f.get('syncStatus').hidden,!skipped&&!excludedHere&&!excludedThere);
+  assert(f.get('syncAdvanced').textContent.includes(limitations[0]));assert(f.get('syncAdvanced').textContent.includes('5178')===!!skipped);
+ }
+});
+test('a reminder-sharing failure remains actionable despite zero purchase exclusions',async()=>{
+ const f=await fixture({initial:{confirmed:true,remoteConfirmed:true,status:'synced',skipped:0,reminderError:'Failed',review:{excludedHere:0,excludedThere:0}}});await f.open();assert.match(f.get('syncStatus').textContent,/reminder sharing needs attention/);assert.equal(f.get('syncStatus').hidden,false);
+});

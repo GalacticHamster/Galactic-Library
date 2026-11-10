@@ -138,6 +138,14 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
   }
  });
 
+  test(name+': populated products inside mixed sparse orders retain summary/detail mismatch protection',async()=>{
+   const populated=order(1).items[0],summary={...order(1),items:[populated,{name:'Sparse',bundles:[]}]};
+   const detail={...order(1),items:[structuredClone(populated),{_id:'sparse-bundle',name:'Sparse',bundles:[{games:[{_id:'other-product',name:'Other',type:'book'}]}]}]};
+   detail.items[0].bundles[0].games[0].name='Conflicting product';
+   const r=await run(engine,{list:[order(0),summary],details:[order(0),detail]});
+   assert.equal(r.result.items.length,1);assert.equal(r.counts.detailProductMismatch,1);assert.equal(r.compatibility.summaryRecovery.unresolved,1);
+  });
+
   test(name+': three-order mixed catalog with direct games and sparse bundle recovers without invalidBundles',async()=>{
    const comicOrder={_id:'order-comic-47',status:'COMPLETE',date:'2026-10-01',items:[{_id:'bundle-comic',name:'Comic Collection',bundles:[{games:Array.from({length:47},(_,i)=>({_id:`comic-${i}`,name:`Comic Volume ${i+1}`,type:'book'}))}]}]};
    const directSummary={_id:'order-direct-10',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({name:`Direct Game ${i}`,bundles:[]}))};

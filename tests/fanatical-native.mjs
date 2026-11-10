@@ -14,8 +14,8 @@ import {observeImportLifecycle} from './import-lifecycle.mjs';
 import {candidateFiles} from './provider-candidate-build.mjs';
 const firefox=process.argv.includes('--firefox'),release=await createRelease(undefined,undefined,firefox?'firefox':'chrome');
 const files=process.argv.includes('--candidate')?await candidateFiles('GL',release.files):new Map(release.files);
-let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[],sparseSummary=false,sparseDetailFailure=false,foreignRecovery=false;
-const thin=o=>({...o,items:o.items.map(p=>({name:p.name,bundles:[]}))});
+let orders=[fanaticalOrder()],total=null,status=200,invalidListing=false,detailRequests=0,listRequests=0,pageSize=0,failPage=false,failedOrders=[],sparseSummary=false,sparseDetailFailure=false,foreignRecovery=false,mixedSummary=false;
+const thin=o=>({...o,items:o.items.map((p,i)=>mixedSummary&&i===0?p:({name:p.name,bundles:[]}))});
 const server=createServer((req,res)=>{
  if(req.url.startsWith('/api/user/orders')){
   const listing=/^\/api\/user\/orders(?:\?|$)/u.test(req.url),second=req.url.includes('?page=2');if(listing)listRequests++;else detailRequests++;
@@ -166,6 +166,13 @@ try{
   sparseDetailFailure=false;await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,57);assert.equal(d.keyPending,10);assert.equal(d.secretRetained,false);assert.equal(d.failed.length,0);assert(d.roundTrip);
   checks.push('direct pick-and-mix purchase saves 47 comics plus 10 games, skips verified Quick details and preserves all purchases during detail failure/retry without complete coverage');
   direct.items.forEach(i=>{i.key='SYNTHETIC_SECRET_DO_NOT_RETAIN';});await page();await sync();d=await report();assert.equal(d.count,57);assert.equal(d.owned,57);assert.equal(d.keyPending,0);assert.equal(d.keyUnknown,10);assert.equal(d.secretRetained,false);assert(d.roundTrip);checks.push('dated unrevealed Steam observations survive Quick and partial recovery; Full refresh marks present-key evidence unknown without retaining keys or changing ownership');
+  const mixed=fanaticalOrder(8,['book']);const parent=mixed.items[0];mixed.items=[parent,...[1,2].map(n=>({...structuredClone(parent),_id:'mixed-bundle-'+n,name:'Mixed comic bundle '+n,bundles:[{games:[{_id:'mixed-comic-'+n,name:'Mixed comic '+n,type:'book'}]}]}))];
+  orders=[fanaticalOrder(7,['book']),mixed];mixedSummary=true;sparseSummary=true;await reset();await sync();diagnostic=await scanReport();d=await report();assert.equal(d.count,4);assert.equal(d.owned,4);assert.equal(d.failed.length,0);assert.equal(d.history,0);assert.equal(d.fullAt,null);assert(d.roundTrip);
+  assert.equal(diagnostic.diagnostic.compatibility.summaryRecovery.recovered,1);assert.equal(diagnostic.diagnostic.compatibility.counts.invalidBundles,0);
+  await page();beforeDetails=detailRequests;await sync('incremental');assert.equal(detailRequests-beforeDetails,1);d=await report();assert.equal(d.count,4);assert.equal(d.failed.length,0);
+  sparseDetailFailure=true;await page();await sync();d=await report();assert.equal(d.count,4);assert.equal(d.failed.length,1);assert.equal(d.history,0);assert.equal(d.fullAt,null);
+  sparseDetailFailure=false;await page();await sync('incremental');d=await report();assert.equal(d.count,4);assert.equal(d.failed.length,0);assert(d.roundTrip);
+  checks.push('three comic bundles in one mixed sparse/populated checkout recover through authenticated detail; Quick rechecks, failed detail preserves all purchases, retry clears failure without complete coverage');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{
