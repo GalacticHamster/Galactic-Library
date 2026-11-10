@@ -69,7 +69,7 @@
     // Diagnostic counters only; never copy provider values or arbitrary keys.
     const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
     const c=value.compatibility;
-    if(c?.version===1&&Object.keys(c).every(k=>['version','counts','bundleShapes','summaryRecovery'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000)){
+    if(c?.version===1&&Object.keys(c).every(k=>['version','counts','bundleShapes','summaryRecovery','productMismatches'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000)){
       const clean={version:1,counts:Object.fromEntries(fields.map(k=>[k,c.counts[k]]))};let valid=true;
       if(c.summaryRecovery!==undefined){
         const r=c.summaryRecovery,counts=['eligible','scheduled','recovered','unresolved','emptyDetailItems'],types=['missing','null','array','object','string','number','boolean','other'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
@@ -81,6 +81,11 @@
         const typed=['parentType','bundlesType','parentId','parentName','parentGames','parentProducts','parentItems','parentTiers','bundleGames','bundleProducts','bundleItems','bundleTiers','childType','childId','childName','childGames','childProducts','childItems','childTiers'],keys=['stage','reason','bundlesSize',...typed];
         valid=valid&&!!s&&s.version===1&&Object.keys(s).length===3&&Object.keys(s).every(k=>['version','records','truncated'].includes(k))&&typeof s.truncated==='boolean'&&Array.isArray(s.records)&&s.records.length<=8&&s.records.every(r=>r&&Object.keys(r).length===keys.length&&Object.keys(r).every(k=>keys.includes(k))&&['summaries','details'].includes(r.stage)&&['missing','empty-array','non-array','missingItems','invalidItems','missing-parent-name','missing-leaf-name','missingBundles','invalidBundles','missingGames','invalidGames'].includes(r.reason)&&['not-container','empty','one','many'].includes(r.bundlesSize)&&typed.every(k=>types.includes(r[k])));
         if(valid)clean.bundleShapes={version:1,records:s.records.map(r=>Object.fromEntries(keys.map(k=>[k,r[k]]))),truncated:s.truncated};
+      }
+      if(c.productMismatches!==undefined){
+        const pm=c.productMismatches,cats=['parent-missing','unexpected-detail-item','id-missing','direct-missing','product-missing','product-count'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+        valid=valid&&!!pm&&pm.version===1&&Object.keys(pm).length===3&&Object.keys(pm).every(k=>['version','records','truncated'].includes(k))&&typeof pm.truncated==='boolean'&&Array.isArray(pm.records)&&pm.records.length<=8&&pm.records.every(r=>r&&typeof r==='object'&&Object.keys(r).length===3&&Object.keys(r).every(k=>['category','expectedCount','observedCount'].includes(k))&&cats.includes(r.category)&&bounded(r.expectedCount)&&bounded(r.observedCount));
+        if(valid)clean.productMismatches={version:1,records:pm.records.map(r=>({category:r.category,expectedCount:r.expectedCount,observedCount:r.observedCount})),truncated:pm.truncated};
       }
       if(valid)report.compatibility=clean;
     }

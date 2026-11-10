@@ -219,7 +219,13 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
      ...directBooks.slice(7),
      promoGift
    ]};
-   const multiSummary={_id:'order-multi-123',status:'COMPLETE',date:'2026-11-10',items:multiDetail.items.map(p=>Array.isArray(p.bundles)&&p.bundles.length>0?p:{name:p.name,bundles:[]})};
+   // Realistic summary represents the checkout as 2 bundles, 1 pick-and-mix container, and 1 promo gift
+   const multiSummary={_id:'order-multi-123',status:'COMPLETE',date:'2026-11-10',items:[
+     comicBundle1,
+     comicBundle2,
+     {name:'Nightmare Tales Pick and Mix',bundles:[]},
+     {name:'BIRTHDAY BASH SALE - GIFT',bundles:[]}
+   ]};
    const r=await run(engine,{list:[multiSummary],details:[multiDetail]});
    assert.equal(r.result.ordersScanned,1);
    assert.equal(r.counts.detailStructure,0);
@@ -243,27 +249,41 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    }
   });
 
-  test(name+': live customer payload Fanantical-multi-bundle.json parses 122 verified titles and 1 rejected promo gift',async()=>{
+  test(name+': live customer payload Fanantical-multi-bundle.json parses 122 verified titles and 1 rejected promo gift with realistic summary',async()=>{
    const realPath='C:/Users/nvesd/Downloads/Fanantical-multi-bundle.json';
    let realOrder;
    try { realOrder=JSON.parse(readFileSync(realPath,'utf8')); } catch { return; }
-   const realSummary={_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:realOrder.items.map(item=>Array.isArray(item.bundles)&&item.bundles.length>0?item:{name:item.name,bundles:[]})};
-   const r=await run(engine,{list:[realSummary],details:[realOrder]});
-   assert.equal(r.result.ordersScanned,1);
-   assert.equal(r.counts.detailStructure,0);
-   assert.equal(r.counts.invalidBundles,0);
-   assert.equal(r.counts.detailProductMismatch,0);
-   assert.equal(r.result.items.length,122);
-   assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
-   assert(!r.result.items.some(p=>p.title==='BIRTHDAY BASH SALE - GIFT'||p.title==='Troublemaker'));
-   if(engine===gl){
-     assert.equal(r.result.diagnostic.ordersUnresolved,0);
-   }else{
-     assert.equal(r.result.unresolvedOrderFingerprints.length,0);
-   }
-   if(r.result.rejectedPurchaseItems){
-     assert.equal(r.result.rejectedPurchaseItems.length,1);
-     assert.equal(r.result.rejectedPurchaseItems[0].title,'BIRTHDAY BASH SALE - GIFT');
+   for (const realisticSummary of [
+     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:[
+       realOrder.items[3],
+       realOrder.items[8],
+       {name:'Nightmare Tales Build your own Graphic Novels Bundle',bundles:[]}
+     ]},
+     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:[
+       realOrder.items[3],
+       realOrder.items[8],
+       {name:'Nightmare Tales Build your own Graphic Novels Bundle',bundles:[]},
+       {name:'BIRTHDAY BASH SALE - GIFT',bundles:[]}
+     ]},
+     {_id:realOrder._id,status:'COMPLETE',date:realOrder.date,items:realOrder.items.map(item=>Array.isArray(item.bundles)&&item.bundles.length>0?item:{name:item.name,bundles:[]})}
+   ]){
+     const r=await run(engine,{list:[realisticSummary],details:[realOrder]});
+     assert.equal(r.result.ordersScanned,1);
+     assert.equal(r.counts.detailStructure,0);
+     assert.equal(r.counts.invalidBundles,0);
+     assert.equal(r.counts.detailProductMismatch,0);
+     assert.equal(r.result.items.length,122);
+     assert.equal(new Set(r.result.items.map(p=>p.sourceItemId)).size,122);
+     assert(!r.result.items.some(p=>p.title==='BIRTHDAY BASH SALE - GIFT'||p.title==='Troublemaker'));
+     if(engine===gl){
+       assert.equal(r.result.diagnostic.ordersUnresolved,0);
+     }else{
+       assert.equal(r.result.unresolvedOrderFingerprints.length,0);
+     }
+     if(r.result.rejectedPurchaseItems){
+       assert.equal(r.result.rejectedPurchaseItems.length,1);
+       assert.equal(r.result.rejectedPurchaseItems[0].title,'BIRTHDAY BASH SALE - GIFT');
+     }
    }
   });
 }
@@ -287,6 +307,22 @@ test('both export boundaries accept bounded bundle shapes and reject injected ke
   const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);const receipt=structuredClone(result);receipt.coverage.compatibility=unsafe;assert.throws(()=>assertFanaticalAcquisitionContract(receipt),/Invalid or contradictory/);
  }
  const old=structuredClone(clean);delete old.bundleShapes;assert(fanaticalCompatibilityReport(old),'old counter-only reports remain valid');
+});
+
+test('product mismatch diagnostics are allowlisted, bounded and independent from persisted purchase authority',async()=>{
+ const bad=order(1);
+ const {compatibility:clean,result}=await run(canonical,{list:[order(0)],detailResponses:{[order(0)._id]:{...order(0),items:bad.items}}});
+ assert.equal(clean.counts.detailProductMismatch,1);
+ assert(clean.productMismatches);
+ assert.equal(clean.productMismatches.records.length,1);
+ assert.equal(clean.productMismatches.records[0].category,'product-missing');
+ const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),context);const ui=context.GalacticFanatical,report=ui.failureReport('unknown');
+ assert.deepEqual(fanaticalCompatibilityReport(clean),clean);
+ assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:clean})).compatibility,clean);
+ for(const mutate of [v=>v.productMismatches.records[0].raw='PRIVATE',v=>v.productMismatches.records[0].category='PRIVATE_CAT',v=>v.productMismatches.records[0].expectedCount=-1,v=>v.productMismatches.records=Array(9).fill(v.productMismatches.records[0]),v=>v.productMismatches.truncated='PRIVATE',v=>v.productMismatches.version=2]){
+  const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);
+ }
+ const old=structuredClone(clean);delete old.productMismatches;assert(fanaticalCompatibilityReport(old));
 });
 
 test('recovery diagnostics are allowlisted, bounded and independent from persisted purchase authority',async()=>{
