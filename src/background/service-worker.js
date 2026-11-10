@@ -220,7 +220,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ||recovery.failedOrders!==recovery.failedOrderFingerprints.length||typeof recovery.listingIncomplete!=='boolean'||!count(recovery.ordersSkipped)
     ||!recovery.failedOrders&&!recovery.listingIncomplete))throw Error('Invalid Fanatical partial recovery evidence.');
   if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||!partial&&input.acquisitionComplete!==true
-    ||typeof coverage?.complete!=='boolean'||(partial?coverage.complete!==false:coverage.complete!==(coverage.paginationEvidence!=='array-only'))
+    ||typeof coverage?.complete!=='boolean'||(partial?coverage.complete!==false:coverage.complete!==true)
     ||!count(input.ordersScanned)||!count(input.ordersAvailable)||!count(coverage.listedOrders)||coverage.listedOrders>100000
     ||coverage.listedOrders<input.ordersAvailable||coverage.validatedOrders!==input.ordersScanned
     ||coverage.emptyAccount!==(coverage.listedOrders===0)||!count(coverage.pagesFetched)||coverage.pagesFetched<1||coverage.pagesFetched>1000
@@ -265,7 +265,7 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ...(partial?{recovery:cleanRecovery}:{}),
     coverage:{complete:coverage.complete,listedOrders:coverage.listedOrders,pagesFetched:coverage.pagesFetched,expectedTotal:coverage.expectedTotal,paginationEvidence:coverage.paginationEvidence,retries:coverage.retries,concurrency:3},
     items: [...items.reduce((map,item)=>{const prior=map.get(item.sourceItemId);map.set(item.sourceItemId,{...item,...(item.purchaseOrigins||prior?.purchaseOrigins?{purchaseOrigins:mergePurchaseOrigins(prior?.purchaseOrigins??[],item.purchaseOrigins??[])}:{})});return map;},new Map()).values()],
-    snapshot: !coverage.complete ? {version:1,provider:'fanatical',complete:false,itemCount:new Set(items.map(item=>item.sourceItemId)).size,
+    snapshot: (!coverage.complete || coverage.paginationEvidence === 'array-only') ? {version:1,provider:'fanatical',complete:false,itemCount:new Set(items.map(item=>item.sourceItemId)).size,
       ...(partial?{recovery:{...cleanRecovery,orderFingerprints:knownOrderFingerprints,ordersAvailable:input.ordersAvailable}}:{}),
       scopes:[{id:'orders',readCount:input.ordersScanned,expectedCount:null,end:partial?'partial-acquisition':'acquisition-end',pagesRead:partial?coverage.pagesFetched:1,complete:false,limitReached:false}]}
       : fullScan ? completeProviderSnapshot('fanatical', items.map((item) => ({ providerItemId: item.sourceItemId })), [completedScope('orders', input.ordersScanned, input.ordersAvailable, 'index-complete', coverage.pagesFetched)]) : undefined

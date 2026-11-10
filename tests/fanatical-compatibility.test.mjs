@@ -29,7 +29,7 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
  // These are synthetic products, not a captured customer purchase payload.
  test(name+': authenticated direct pick-and-mix games are purchased items, not empty bundle catalogs',async()=>{
   const direct={_id:'synthetic-order-direct',status:'COMPLETE',date:'2026-11-01',items:Array.from({length:10},(_,i)=>({_id:'direct-game-'+i,name:'Selected '+i,type:'game',bundles:[],pickAndMix:'Synthetic pick and mix',drm:{steam:true},steam:{id:1000+i}}))};
-  const r=await run(engine,{list:[order(0),direct]});assert.equal(r.result.items.length,11);assert.equal(r.result.ordersScanned,2);if(engine===gl)assert.equal(r.result.diagnostic.ordersUnresolved,0);else assert.equal(r.result.unresolvedOrderFingerprints.length,0);assert.equal(r.result.coverage.complete,false);assert.equal(r.counts.detailStructure,0);
+  const r=await run(engine,{list:[order(0),direct]});assert.equal(r.result.items.length,11);assert.equal(r.result.ordersScanned,2);if(engine===gl)assert.equal(r.result.diagnostic.ordersUnresolved,0);else assert.equal(r.result.unresolvedOrderFingerprints.length,0);assert.equal(r.result.coverage.complete,true);assert.equal(r.counts.detailStructure,0);
   const game=r.result.items.find(p=>p.sourceItemId==='direct-game-0');assert.equal(game.mediaType,'game');assert.equal(game.externalIds.steamAppId,'1000');assert.equal(game.bundle.sourceItemId,'direct-game-0');assert.equal(game.bundle.title,'Selected 0');assert.equal(game.purchaseDate,'2026-11-01');if(engine===gl)assert.equal(game.purchaseOrigins[0].orderRef,hash(direct._id));else {assert.equal(game.purchaseOrigins[0].purchaseRef,hash(direct._id));assert.equal(game.purchaseOrigins[0].quantity,1);}assert.equal(game.occurrences.length,1);assert(!JSON.stringify(game).includes('pick and mix'));
   const quick=await run(engine,{list:[order(0),direct],known:[hash(order(0)._id),hash(direct._id)],fullScan:false});assert.equal(quick.paths.length,1);assert.equal(quick.counts.knownSkipped,2);
   const mixed=structuredClone(direct);mixed.items.push(structuredClone(order(0).items[0]));const combined=await run(engine,{list:[mixed]});assert.equal(combined.result.items.length,11);
@@ -85,7 +85,7 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
   const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]};
   for(const options of [{},{known:[hash(order(0)._id),hash(detail._id)],fullScan:false}]){
    const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail],...options}),d=r.compatibility.summaryRecovery;
-   assert.equal(r.result.items.length,options.fullScan===false?1:2);assert.equal(d.eligible,1);assert.equal(d.scheduled,1);assert.equal(d.recovered,1);assert.equal(d.unresolved,0);assert.equal(d.detailItemTypes.array,1);assert.equal(r.counts.invalidBundles,0);assert(r.paths.some(p=>p.endsWith(detail._id)));assert.equal(r.result.coverage.complete,false);
+   assert.equal(r.result.items.length,options.fullScan===false?1:2);assert.equal(d.eligible,1);assert.equal(d.scheduled,1);assert.equal(d.recovered,1);assert.equal(d.unresolved,0);assert.equal(d.detailItemTypes.array,1);assert.equal(r.counts.invalidBundles,0);assert(r.paths.some(p=>p.endsWith(detail._id)));assert.equal(r.result.coverage.complete,true);
   }
   const covered=await run(engine,{list:[sparse],details:[detail],headers:{'x-total-count':'1'}});assert.equal(covered.result.coverage.complete,true);
  });

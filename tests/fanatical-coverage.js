@@ -96,7 +96,7 @@ fanaticalCoverageTests.push(
    const reviews=structuredClone((await h.pageA.getDatabase()).ownershipReviews);
    h.setOrders([fanaticalOrder(1)]);
    for(const mode of ['incremental','full','incremental']){
-     const a=await h.acquire(mode);assert.equal(a.full,mode==='full');assert.equal(a.projection.result.coverage.complete,false);
+     const a=await h.acquire(mode);assert.equal(a.full,mode==='full');assert.equal(a.projection.result.coverage.complete,mode==='full');
      assert((await h.commit(a)).result.ok);
      db=await h.pageA.getDatabase();assert.equal(Object.keys(db.providerItems).length,95);assert.equal(Object.keys(db.providerHistory).length,0);
      assert.equal(db.providers.fanatical.syncState.knownOrderFingerprints.length,2);assert.equal(db.providers.fanatical.fullSyncAt,undefined);

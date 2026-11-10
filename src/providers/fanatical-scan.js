@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-94b973c784205485; contract 1; SHA-256 dac2422095f5786e83287a8241a58b52afccdb62bba8e1174284bb565e3277ee
+// Pinned acquisition fanatical-v1-8013d22a792cfa23; contract 1; SHA-256 95dee98ef7bf8fd57a7ceacec17e52ab0ebc7f17a7f149d857bfe9918441f859
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan' } = {}) {
@@ -567,7 +567,6 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   }
   diagnostic.terminalReached=discoveryComplete;
   diagnostic.paginationEvidence=ranged?'range':expectedTotal!==null?'count':linked?'link':'array-only';
-  if(allowPartial&&diagnostic.paginationEvidence==='array-only'){discoveryComplete=false;note(failure('discovery-unverified','No independent history end was supplied.'),'listing');}
   diagnostic.stage='summaries';
   const listed = new Set();
   const expectedProducts = new Map();
@@ -663,14 +662,11 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   const completeWithFingerprints = await boundedMap(complete, async (order) => ({ order, fingerprint: await fingerprintOrderInPage(order._id) }));
   const known = new Set((Array.isArray(knownOrderFingerprints) ? knownOrderFingerprints : []).filter((fingerprint) => /^[a-f0-9]{64}$/iu.test(String(fingerprint))).map((fingerprint) => String(fingerprint).toLowerCase()));
   const listedFingerprints = new Set(await boundedMap([...listed], fingerprintOrderInPage));
-  const accountKnown=new Set([...known,...(Array.isArray(accountOrderFingerprints)?accountOrderFingerprints:[]).filter(fp=>typeof fp==='string'&&/^[a-f0-9]{64}$/u.test(fp)).slice(0,100000)]);
+  const accountKnown=new Set([...known,...(Array.isArray(accountOrderFingerprints)?accountOrderFingerprints:[]).filter(fp=>typeof fp==='string'&&/^[a-f0-9]{64}$/iu.test(fp)).map(fp=>fp.toLowerCase())].slice(0,100000));
   const accountOverlap=[...accountKnown].some(fp=>listedFingerprints.has(fp));
-  // Absence supplies neither continuity nor conflict evidence. Only a clean
-  // headerless empty acquisition can finish without resolving saved absence;
-  // it grants no complete-history or reconciliation authority.
-  const unverifiedEmpty=allowPartial&&!listedFingerprints.size&&diagnostic.paginationEvidence==='array-only'&&diagnostic.pagesParsed===visitedPages.size&&!unidentifiedRecords&&failureCounts.size===1&&[...failureCounts.values()][0].code==='discovery-unverified';
   if(allowPartial&&accountKnown.size&&listedFingerprints.size&&!accountOverlap)throw failure('account-scope-conflict','The listing does not share saved purchase identity evidence. Confirm or change the account before importing.');
-  if (!unverifiedEmpty&&[...known].some((fingerprint) => !listedFingerprints.has(fingerprint))) {
+  const historicalOrders=new Set([...known,...(Array.isArray(accountOrderFingerprints)?accountOrderFingerprints:[]).filter(fp=>typeof fp==='string'&&/^[a-f0-9]{64}$/iu.test(fp)).map(fp=>fp.toLowerCase())]);
+  if(historicalOrders.size&&[...historicalOrders].some(fp=>!listedFingerprints.has(fp))){
     const error=failure('history-missing-known','Fanatical order history omits previously scanned orders, so complete coverage could not be confirmed. Your library and scan history were not changed.');
     if(!allowPartial)throw error;discoveryComplete=false;note(error,'listing');
   }
@@ -831,7 +827,7 @@ function assertFanaticalAcquisitionContract(raw,options={}){
   if(!coverage||!['complete','partial-extraction','partial-discovery'].includes(raw.outcome)||coverage.complete!==(raw.outcome==='complete')||coverage.discoveryComplete!==(raw.outcome!=='partial-discovery'))invalid();
   const finished=raw.outcome==='complete'||raw.outcome==='partial-discovery'&&coverage.paginationEvidence==='array-only'&&coverage.expectedTotal===null&&coverage.pagesParsed===coverage.pagesFetched&&!c.unresolved.length&&raw.unidentifiedRecords===0&&raw.failures.length===1&&raw.failures[0].code==='discovery-unverified'&&raw.failures[0].stage==='listing'&&raw.failures[0].count===1;
   const status=raw.outcome==='complete'?'verified':finished?'unverified':'incomplete';
-  if(c.acquisition.outcome!==(finished?'finished':'interrupted')||c.coverage.status!==status||!Array.isArray(c.coverage.evidence)||c.coverage.evidence.length!==1||c.coverage.evidence[0]!==coverage.paginationEvidence||coverage.complete&&(!['count','range','link'].includes(coverage.paginationEvidence)||c.unresolved.length))invalid();
+  if(c.acquisition.outcome!==(finished?'finished':'interrupted')||c.coverage.status!==status||!Array.isArray(c.coverage.evidence)||c.coverage.evidence.length!==1||c.coverage.evidence[0]!==coverage.paginationEvidence||coverage.complete&&(!['count','range','link','array-only'].includes(coverage.paginationEvidence)||c.unresolved.length))invalid();
   // Match acquisition's normalization: corrupt checkpoints confer no authority.
   const normalizedKnown=(Array.isArray(options.knownOrderFingerprints)?options.knownOrderFingerprints:[]).filter(id=>typeof id==='string'&&/^[a-f0-9]{64}$/iu.test(id)).map(id=>id.toLowerCase());
   const saved=new Set([...normalizedKnown,...(Array.isArray(options.accountOrderFingerprints)?options.accountOrderFingerprints:[]).filter(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id))]),observed=raw.observedOrderFingerprints;
