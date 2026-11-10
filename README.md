@@ -67,10 +67,9 @@ saved records. Failed or incomplete scans preserve the previous validated librar
 See [Providers and saved accounts](docs/user-guide/providers-and-accounts.md).
 
 With HB/FAN installed, default-on local sharing can populate an empty library from saved
-purchases without another store scan. A unique unused receiver is assigned
-automatically; verified saved account mappings are reused. Nicknames are optional.
-When both contain purchases without a verified relationship, confirm they represent the
-same store account. Multiple accounts require explicit selection. **Sync now**
+purchases without another store scan. The single provider account on each side is paired
+automatically, including populated accounts; verified saved mappings are reused. Nicknames are optional.
+Multiple accounts without an unambiguous verified mapping require an account decision. **Sync now**
 checks saved purchases; **Check connections** only tests communication.
 See [purchase sync](docs/user-guide/purchase-sharing.md).
 

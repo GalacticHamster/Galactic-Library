@@ -1,5 +1,8 @@
 // Installed production content scripts/workers; synthetic pages and disposable profiles only.
 import assert from 'node:assert/strict';
+import '../shared/purchase-snapshot.js';
+import '../shared/purchase-adapters.js';
+const populated=process.argv.includes('--populated');
 import {spawn,execFileSync} from 'node:child_process';
 import {readFile,writeFile,mkdir,mkdtemp,rm,access,readdir} from 'node:fs/promises';
 import {createServer} from 'node:http';
@@ -19,7 +22,7 @@ const server=createServer((req,res)=>{
  if(req.url==='/api/user/orders'){res.setHeader('x-total-count',String(fanCount));res.end(JSON.stringify(Array.from({length:fanCount},(_,i)=>fanOrder(i))));return;}
  if(req.url.startsWith('/api/user/orders/')){res.end(JSON.stringify(fanOrder(Number(req.url.split('-').at(-1)))));return;}
  if(req.url.startsWith('/api/v1/user/order')){res.end(JSON.stringify(Array.from({length:hbCount},(_,i)=>({gamekey:'humble-order-'+i,product:{human_name:'Synthetic Humble bundle '+i},created:'2026-11-01T00:00:00Z'}))));return;}
- if(req.url.startsWith('/api/v1/order/')){const n=req.url.match(/humble-order-(\d+)/)[1];res.end(JSON.stringify({gamekey:'humble-order-'+n,subproducts:[{human_name:'Synthetic Humble book '+n,machine_name:'humble-book-'+n,downloads:[{platform:'ebook',download_struct:[{url:'https://example.invalid/book.epub',name:'EPUB'}]}]}]}));return;}
+ if(req.url.startsWith('/api/v1/order/')){const match=req.url.match(/humble-order-(\d+)/);if(!match){res.statusCode=404;res.end('{}');return;}const n=match[1];res.end(JSON.stringify({gamekey:'humble-order-'+n,subproducts:[{human_name:'Synthetic Humble book '+n,machine_name:'humble-book-'+n,downloads:[{platform:'ebook',download_struct:[{url:'https://example.invalid/book.epub',name:'EPUB'}]}]}]}));return;}
  res.setHeader('content-type','text/html');res.end('<!doctype html><html><body><main>Synthetic purchase history</main><script>localStorage.setItem("bsauth",JSON.stringify({token:"SYNTHETIC_ONLY"}));</script></body></html>');
 });
 // Public Web Store signing identities only, never provider redemption keys.
@@ -115,14 +118,31 @@ try{
   assert.equal(await evaluate('window.confirm=()=>true;const b=document.querySelector('+JSON.stringify(selector)+').querySelector("[data-import-mode='+mode+']");if(b.disabled)throw Error("Import already busy");b.click();return b.disabled;'),true,'Import never started');
   await wait('return !document.querySelector('+JSON.stringify(selector)+').querySelector("[data-import-mode='+mode+']").disabled;','Import did not finish');
   const status=await evaluate('return document.querySelector('+JSON.stringify(selector)+').querySelector("output")?.textContent??document.querySelector('+JSON.stringify(selector)+').innerText;');
-  assert(!/Import failed|Scan incomplete|Could not|Error:/i.test(status),status);console.log('PASS '+target+' '+key+' production import lifecycle: '+status.slice(-280));
+  assert(!/Import failed|Scan incomplete|Error:/i.test(status),status);if(!populated)assert(!/Could not/i.test(status),status);else if(/Could not/i.test(status))assert(/purchase could not be imported and will be retried/i.test(status),status);console.log('PASS '+target+' '+key+' production import lifecycle: '+status.slice(-280));
  }
  async function count(p){return onOptions('GL','const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.provider==='+JSON.stringify(p)+').length;');}
- async function received(key,n){await navigate(await options('GL'));try{await wait('const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.provider==='+JSON.stringify(provider(key))+').length==='+n+'&&(await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'})).state?.status==="synced";','Automatic '+key+' sync did not reach '+n+' records',upgrade==='companions'?900:150);}catch(error){console.log('GL FAILURE STATE '+JSON.stringify(await evaluate('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});')));console.log('COMPANION FAILURE STATE '+JSON.stringify(await onOptions(key,'return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});')));throw error;}}
+ async function received(key,n){n+=populated?1:0;await navigate(await options('GL'));try{await wait('const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.provider==='+JSON.stringify(provider(key))+').length==='+n+'&&(await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'})).state?.status==="synced";','Automatic '+key+' sync did not reach '+n+' records',upgrade==='companions'?900:150);}catch(error){console.log('GL FAILURE STATE '+JSON.stringify(await evaluate('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});')));console.log('COMPANION FAILURE STATE '+JSON.stringify(await onOptions(key,'return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});')));throw error;}}
  await build('GL',!!upgrade);for(const key of companions)await build(key,!!upgrade);
  if(process.argv.includes('--gl-first'))await install('GL');
  for(const key of companions){await install(key);await scan(key);}
  if(!installed.has('GL'))await install('GL');
+ if(populated){
+  assert(upgrade,'Populated fixture uses installed legacy runtimes before upgrade, without saved mappings');
+  for(const key of companions){
+   let source=await onOptions(key,'return await chrome.storage.local.get(null);');
+   if(key==='HB'){
+    // The established HB schema already permits these dated observations.
+    await onOptions('HB',`const s=await chrome.storage.local.get('libraryItems');s.libraryItems[0]={...s.libraryItems[0],entitlement:'third-party-key',keyStatus:'unrevealed',keyCheckedAt:'2026-10-01T12:00:00Z'};await chrome.storage.local.set({libraryItems:s.libraryItems});return true;`);
+    source=await onOptions('HB','return await chrome.storage.local.get(null);');
+   }
+   const role=key==='HB'?'hb':'fan',accounts=await GalacticPurchaseAdapters.accounts(role,source),data=await GalacticPurchaseAdapters.snapshot(role,source,accounts[0].accountRef),first=data.records[0];
+   const extra={...first,providerItemId:key==='HB'?'gl-only-purchase:product:gl-only':'gl_only_product',title:'Synthetic GL-only saved purchase',metadata:key==='HB'?{purchaseId:'gl-only-purchase'}:{bundleId:'gl_only_bundle',bundleTitle:'Synthetic earlier bundle'}};
+   const items=[first,extra].map(r=>{const metadata={...r.metadata};delete metadata.keyCheckedAt;return {providerItemId:r.providerItemId,title:r.title,mediaType:r.mediaType,ownership:'owned',metadata,acquiredAt:r.purchasedAt};});
+   // Seed representative saved GL purchases using its actual validated writer.
+   // No pairing, sharing permissions or mapping state is injected.
+   await onOptions('GL','const S=await import("./src/lib/storage.js");await S.mergeProviderItems('+JSON.stringify(provider(key))+','+JSON.stringify(items)+');return true;');
+  }
+ }
  if(upgrade){
   // Legacy state is produced by installed, tagged runtimes, not injected maps.
   // A real old setup is optional; the other journey has no saved relationship.
@@ -146,8 +166,14 @@ try{
    await wait('const r=await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(key==='FAN'?'fanatical':'humble')+'});return typeof r.sharing==="boolean";','Upgraded worker did not load the new sharing contract');
    }catch(error){await navigate('chrome://extensions/');await wait('return !!chrome.developerPrivate;','No developer diagnostics');console.log('UPGRADE DIAGNOSTICS '+JSON.stringify(await evaluate('return new Promise(resolve=>chrome.developerPrivate.getExtensionsInfo({includeDisabled:true,includeTerminated:true},rows=>resolve(rows.map(({id,name,state,disableReasons,manifestErrors})=>({id,name,state,disableReasons,manifestErrors})))));')));console.log('STAGED NEW MODEL '+(await readFile(join(archives.get(key).stage,key==="GL"?"shared/purchase-sync.js":key==="HB"?"purchase-sync.js":"src/purchase-sync.js"),'utf8')).includes('galacticPurchaseSharing'));throw error;}
   }
-  for(const key of companions)assert.deepEqual(await onOptions(key,identityView(key)),savedPurchases.get(key),'Upgrade changed saved '+key+' purchase/account identities');
+  for(const key of companions){const after=await onOptions(key,identityView(key)),before=savedPurchases.get(key);assert.equal(after.account,before.account);if(populated){for(const original of before.items)assert(after.items.some(i=>JSON.stringify(i)===JSON.stringify(original)),'Upgrade lost a saved purchase');}else assert.deepEqual(after,before,'Upgrade changed saved purchase/account identities');}
   console.log('UPGRADED '+roles.join('+')+'; legacy preference false retained only as migration input');
+ }
+ if(populated&&companions.includes('HB')){
+  await received('HB',2);
+  const observation=await evaluate('const S=await import("./src/lib/storage.js"),db=await S.getDatabase();return Object.values(db.providerItems).filter(i=>i.provider==="humble"&&i.metadata.keyCheckedAt).map(i=>({status:i.metadata.keyStatus,date:i.metadata.keyCheckedAt}));');
+  assert.deepEqual(observation,[{status:'unrevealed',date:'2026-10-01T12:00:00.000Z'}]);
+  console.log('PASS '+target+' historical HB dated observation reaches populated GL through the actual writer');
  }
  for(const key of companions){await received(key,2);console.log('PASS '+target+' '+key+' fresh automatic pairing, no injected pairing/allowlist/mapping or manual sync');}
  for(const key of companions){
@@ -156,11 +182,23 @@ try{
   const controller=legacyRoles.has(key)?'GL':key;
   const disabled=await onOptions(controller,'return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncSetSharing",provider:'+JSON.stringify(provider(key))+',enabled:false});');assert(disabled.ok,disabled.error);
   if(key==='HB')hbCount=4;else fanCount=4;await scan(key,'new');
-  assert.equal(await count(provider(key)),3);
+  assert.equal(await count(provider(key)),3+(populated?1:0));
   await restartInstalled();
   const pref=await onOptions(controller,'return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});');assert.equal(pref.sharing,false);
   const enabled=await evaluate('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncSetSharing",provider:'+JSON.stringify(provider(key))+',enabled:true});');assert(enabled.ok,enabled.error);
   await received(key,4);console.log('PASS '+target+' '+key+' opt-out blocks new purchases, survives page reload; re-enable reconciles');
+ }
+ if(process.argv.includes('--layout')){
+  for(const width of [1200,480]){
+   await navigate(await options('GL')+'#providers');
+   if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height:1000});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false},session);
+   await wait('for(const h of document.querySelectorAll("[data-purchase-handoff]"))for(let p=h.parentElement;p;p=p.parentElement)if(p.tagName==="DETAILS")p.open=true;return document.querySelectorAll(".purchase-sharing-toggle input:not(:disabled)").length===2;','Sharing controls did not render');
+   const rows=await evaluate(`return [...document.querySelectorAll('.purchase-sharing-toggle')].map(l=>{const i=l.querySelector('input'),t=l.querySelector('span'),a=i.getBoundingClientRect(),b=t.getBoundingClientRect();i.focus();return {left:a.right<=b.left,gap:b.left-a.right,aligned:Math.abs((a.top+a.height/2)-(b.top+b.height/2))<2,width:a.width,label:l.control===i,focused:document.activeElement===i,summary:l.closest('[data-purchase-sync]').querySelector('[data-sync-summary]').textContent};});`);
+   assert.equal(rows.length,2);for(const r of rows){assert(r.left&&r.aligned&&r.label&&r.focused,JSON.stringify(r));assert(r.gap>=4&&r.gap<=12);assert.equal(r.width,16);assert.equal(r.summary,'Synced');}
+   await evaluate('document.querySelector(".purchase-sharing-toggle span").click();return true;');await wait('return !document.querySelector(".purchase-sharing-toggle input").checked&&!document.querySelector(".purchase-sharing-toggle input").disabled;','Clicking label did not persist OFF');
+   await evaluate('document.querySelector(".purchase-sharing-toggle span").click();return true;');await wait('return document.querySelector(".purchase-sharing-toggle input").checked&&!document.querySelector(".purchase-sharing-toggle input").disabled;','Clicking label did not resume sharing');await wait('return [...document.querySelectorAll("[data-sync-summary]")].every(n=>n.textContent==="Synced");','Sharing did not return to verified synced status');
+   console.log('PASS '+target+' actual rendered sharing controls at '+width+'px: alignment, label activation, focus and verified status');
+  }
  }
  if(process.argv.includes('--reminders')){
   if(companions.includes('FAN')){

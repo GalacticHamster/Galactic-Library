@@ -19,10 +19,10 @@ function fixture(provider='humble',initial={gl:[],companion:[]}){
 const dispose=()=>Object.values(nodes).forEach(n=>n.coordinator.dispose());return {nodes,services,calls,commits,start,connect,drain,dispose,provider};
 }
 for(const provider of ['humble','fanatical']){
- for(const destination of ['history-only','previously-assigned'])test(provider+' automatic setup never treats '+destination+' as a fresh empty account',async()=>{
+ for(const destination of ['history-only','previously-assigned'])test(provider+' single-account setup includes '+destination+' datasets without treating names as identity',async()=>{
   const f=fixture(provider,{gl:[],companion:[row(1,provider)]});try{
    if(destination==='history-only')f.nodes.gl.historicalCount=3;else f.nodes.gl.assigned=true;
-   await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);assert.equal((await f.nodes.gl.coordinator.local({action:'syncState',provider})).availability,'account-resolution-required');
+   await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,1);assert.equal(f.nodes.gl.historicalCount,destination==='history-only'?3:undefined);
   }finally{f.dispose();}
  });
  test(provider+' a busy source defers first setup instead of binding an in-progress account',async()=>{
@@ -57,10 +57,10 @@ for(const provider of ['humble','fanatical']){
    assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,2);
   }finally{f.dispose();}
  });
- test(provider+' automatic discovery never merges two populated accounts with the same nickname',async()=>{
+ test(provider+' single-account discovery additively reconciles populated subsets without a prior mapping',async()=>{
   const f=fixture(provider,{gl:[row(1,provider)],companion:[row(2,provider)]});try{
-   await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);
-   const s=await f.nodes.gl.coordinator.local({action:'syncState',provider});assert.equal(s.availability,'account-resolution-required');assert.equal(s.state,null);
+   f.nodes.gl.label='Different label';await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');
+   assert.deepEqual(f.nodes.gl.records.map(r=>r.providerItemId).sort(),[row(1,provider).providerItemId,row(2,provider).providerItemId].sort());assert.equal(f.nodes.companion.records.length,2);
   }finally{f.dispose();}
  });
  test(provider+' opt-out during transfer prevents persistence even with an existing valid account mapping',async()=>{
@@ -185,3 +185,42 @@ for(const provider of ['humble','fanatical'])test('R4 '+provider+': diagnostic r
 });
 
 test('manual Sync now persists a missing-account repair state instead of only returning an error',async()=>{const f=fixture();try{await f.connect();await f.drain();f.nodes.companion.accountId='replacement';await assert.rejects(f.nodes.gl.coordinator.local({action:'syncNow',provider:'humble'}),/Mapped account/);assert.equal(f.nodes.gl.saved[Y.KEY].humble.errorCode,'missing-account');assert.equal(f.nodes.gl.saved[Y.KEY].humble.status,'attention');}finally{f.dispose();}});
+
+for(const provider of ['humble','fanatical'])test(provider+' populated overlapping accounts retain mapping over repeated OFF/ON and restart',async()=>{
+ const f=fixture(provider,{gl:[row(1,provider),row(2,provider)],companion:[row(2,provider),row(3,provider)]});try{
+  await f.nodes.gl.coordinator.discover(provider);await f.drain();const id=f.nodes.gl.saved[Y.KEY][provider].id;
+  for(let n=0;n<2;n++){
+   await f.nodes.gl.coordinator.local({action:'syncSetSharing',provider,enabled:false});assert.equal(f.nodes.gl.saved[Y.KEY][provider].id,id);
+   f.start('gl');await f.nodes.gl.coordinator.startup();assert.equal(f.nodes.gl.saved[Y.PREFERENCE][provider],false);
+   await f.nodes.gl.coordinator.local({action:'syncSetSharing',provider,enabled:true});assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.saved[Y.KEY][provider].id,id);
+   assert.equal(f.nodes.gl.records.length,3);assert.equal(f.nodes.companion.records.length,3);
+  }
+ }finally{f.dispose();}
+});
+for(const provider of ['humble','fanatical'])test(provider+' genuine multiple-account ambiguity never uses the single-account policy',async()=>{
+ const f=fixture(provider,{gl:[row(1,provider)],companion:[row(2,provider)]});try{
+  f.nodes.gl.extraAccounts=[{stableId:'another',accountRef:'another',label:'Personal',count:1}];
+  await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);assert.equal((await f.nodes.gl.coordinator.local({action:'syncState',provider})).availability,'account-resolution-required');
+ }finally{f.dispose();}
+});
+test('retry cannot override an explicit opt-out',async()=>{const f=fixture();try{await f.nodes.gl.coordinator.local({action:'syncSetSharing',provider:'humble',enabled:false});await assert.rejects(f.nodes.gl.coordinator.local({action:'syncRetry',provider:'humble'}),/disabled/);assert.equal(f.nodes.gl.saved[Y.PREFERENCE].humble,false);}finally{f.dispose();}});
+
+for(const provider of ['humble','fanatical'])test(provider+' single-account policy cannot overwrite a foreign confirmed relationship',async()=>{
+ const f=fixture(provider,{gl:[row(1,provider)],companion:[row(2,provider)]});try{
+  const foreign={id:'foreign-relationship',peerId:'another-extension',localId:f.nodes.companion.accountId,remoteId:'foreign-account',confirmed:true,remoteConfirmed:true};f.nodes.companion.saved[Y.KEY]={[provider]:foreign};
+  await f.nodes.gl.coordinator.discover(provider);await f.drain();assert.equal(f.commits.length,0);assert.deepEqual(f.nodes.companion.saved[Y.KEY][provider],foreign);
+ }finally{f.dispose();}
+});
+
+for(const provider of ['humble','fanatical'])test(provider+' unique empty accounts establish a relationship without waiting for an import',async()=>{const f=fixture(provider,{gl:[],companion:[]});try{await f.nodes.gl.coordinator.discover(provider);assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.records.length,0);assert.equal(f.nodes.companion.records.length,0);}finally{f.dispose();}});
+
+test('a genuine source validation failure is diagnosed separately from account ambiguity and retry recovers',async()=>{
+ const f=fixture('humble',{gl:[row(1)],companion:[row(2)]});try{
+  f.nodes.companion.records[0].metadata.keyCheckedAt='INVALID_OPTIONAL_WIRE_DATA';await f.nodes.gl.coordinator.discover('humble');
+  const state=await f.nodes.gl.coordinator.local({action:'syncState',provider:'humble'});assert.equal(state.availability,'validation-failed');assert.equal(state.discoveryError.code,'operation-failed');assert.equal(f.commits.length,0);
+  const diagnostic=(await f.nodes.gl.coordinator.local({action:'syncDiagnostics',provider:'humble'})).report;assert.equal(diagnostic.failureCode,'operation-failed');assert(!JSON.stringify(diagnostic).includes('INVALID_OPTIONAL_WIRE_DATA'));
+  delete f.nodes.companion.records[0].metadata.keyCheckedAt;await f.nodes.gl.coordinator.local({action:'syncRetry',provider:'humble'});assert.equal((await f.drain()).status,'synced');assert.equal((await f.nodes.gl.coordinator.local({action:'syncState',provider:'humble'})).discoveryError,null);
+ }finally{f.dispose();}
+});
+
+test('startup rechecks a repaired validation failure without discarding its verified mapping',async()=>{const f=fixture('humble',{gl:[],companion:[row(1)]});try{await f.connect();await f.drain();const id=f.nodes.gl.saved[Y.KEY].humble.id;f.nodes.companion.records[0].metadata.keyCheckedAt='invalid';await f.nodes.gl.coordinator.startup();assert.equal(f.nodes.gl.saved[Y.KEY].humble.errorCode,'operation-failed');delete f.nodes.companion.records[0].metadata.keyCheckedAt;f.start('gl');await f.nodes.gl.coordinator.startup();assert.equal((await f.drain()).status,'synced');assert.equal(f.nodes.gl.saved[Y.KEY].humble.id,id);assert.equal(f.nodes.gl.records.length,1);}finally{f.dispose();}});

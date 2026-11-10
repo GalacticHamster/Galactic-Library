@@ -43,9 +43,9 @@ importer records the access the provider reports; loans and subscriptions are
 not automatically permanent ownership.
 
 For Humble and Fanatical, automatic sharing can use saved companion purchases
-without a new store scan. A unique unused receiver needs no setup; verified saved
-relationships are reused. Two populated accounts without an established relationship
-require a one-time same-account decision in Advanced. See
+without a new store scan. One provider account on each side needs no setup,
+including when both contain purchases. Multiple accounts reuse verified mappings
+or require a decision in Advanced. See
 [purchase sync](purchase-sharing.md).
 
 ## Humble purchase recovery

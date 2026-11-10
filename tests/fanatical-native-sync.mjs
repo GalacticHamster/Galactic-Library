@@ -5,8 +5,11 @@ export async function verifyFanaticalNativeSync({browser,peerId,navigate,evaluat
  const gl=code=>extension(glUrl,code);
  const fan=code=>extension(fanUrl,code);
  const action=async fields=>(await gl('return {response:await chrome.runtime.sendMessage('+JSON.stringify({type:'GH_PURCHASE_ACTION',provider:'fanatical',...fields})+')};')).response;
- const view=()=>gl('const S=await import("./src/lib/storage.js");const db=await S.getDatabase();return {items:Object.values(db.providerItems).filter(i=>i.provider==="fanatical"),other:Object.values(db.providerItems).filter(i=>i.provider!=="fanatical"),history:db.providerHistory,reviews:db.ownershipReviews};');
- const waitCount=async count=>{for(let i=0;i<160;i++){const state=await view();if(state.items.length===count)return state;await pause(50);}throw Error('Consented FAN synchronization did not reach '+count+' records');};
+ const viewScript='const S=await import("./src/lib/storage.js");const db=await S.getDatabase();return {items:Object.values(db.providerItems).filter(i=>i.provider==="fanatical"),other:Object.values(db.providerItems).filter(i=>i.provider!=="fanatical"),history:db.providerHistory,reviews:db.ownershipReviews};';
+ const view=()=>gl(viewScript);
+ // Poll the same installed Options page; opening a new tab every 50ms adds
+ // unrelated renderer work and can starve the lifecycle being observed.
+ const waitCount=async count=>{await gl('return true;');for(let i=0;i<160;i++){const state=await evaluate(viewScript);if(state.items.length===count)return state;await pause(50);}throw Error('Consented FAN synchronization did not reach '+count+' records '+JSON.stringify({gl:await action({action:'syncState'}),fan:await fan('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:"fanatical"});')}));};
  if(browser==='Chrome'){
    // Unpacked Chrome test IDs are explicitly paired exactly as in the existing
    // runtime campaign. Pairing is not standing purchase-sharing permission.

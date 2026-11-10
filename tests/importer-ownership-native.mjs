@@ -66,9 +66,10 @@ try{
  await build('GL');await build('HB');await build('FAN');await install('GL');await pairTransport();await check('humble','GL');await check('fanatical','GL');
  await install('HB');await pairTransport();await check('humble','HB');await check('fanatical','GL');
  await install('FAN');await pairTransport();await check('humble','HB');await check('fanatical','FAN');
- // Discovery alone must not create a standing purchase permission.
- await navigate(await extensionUrl('GL','options.html'));await wait('return !!globalThis.chrome?.runtime?.id;','GL options ready');assert.equal(await evaluate("const r=await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'syncState',provider:'fanatical'});return r.state===null;"),true);
- console.log('PASS '+target+' unconnected discovery grants no purchase sharing');
+ // Default-on single-account discovery may pair empty accounts; UI ownership
+ // must still perform no acquisition or invent any purchases.
+ await navigate(await extensionUrl('GL','options.html'));await wait('return !!globalThis.chrome?.runtime?.id;','GL options ready');await wait("const r=await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'syncState',provider:'fanatical'});return r.sharing===true&&r.state?.confirmed&&r.state.remoteConfirmed;",'Single-account discovery did not pair');assert.equal(await evaluate("const S=await import('./src/lib/storage.js');return Object.keys((await S.getDatabase()).providerItems).length;"),0);
+ console.log('PASS '+target+' default-on discovery pairs empty single accounts without acquisition');
  // A disabled/removed extension can leave its old DOM in a live page.
  await check('fanatical','FAN');await remove('FAN');await pause(1100);await evaluate("window.dispatchEvent(new Event('focus'));return true;");
  await wait("const e=document.querySelector('#galactic-library-fanatical-importer');return e&&getComputedStyle(e).display!=='none'&&getComputedStyle(document.querySelector('#fanatical-library-importer')).display==='none';",'Live removal must restore GL and hide stale companion DOM');

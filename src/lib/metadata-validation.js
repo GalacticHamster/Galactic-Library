@@ -11,7 +11,7 @@ const FIELDS = {
   steam:['parentProviderItemId','ownershipBasis'],gog:[],epic:['parentProviderItemId'],'amazon-games':['delivery','collectedOn','claimKey','claimProductKey','claimBasis','observationIds','deliveryDestination'],
   audible:['narrators','libraryAction','libraryAvailability','audibleOwnershipBasis','audiblePurchaseEvidence','audibleRefundDates','audibleAcquiredOn'],kindle:['collections','originType','contentType','itemStatus','libraryCategory','ownershipBasis'],
   'amazon-video':['entityType','libraryView','ownershipEvidence'],'fandango-at-home':['cardType'],kobo:['librarySection','ownershipBasis','titleEvidence','genres'],
-  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins','keyStatus','keyCheckedAt'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','expiresAt'],
+  fanatical:['bundleId','bundleTitle','bundleSlug','slug','drm','formats','steamAppId','purchaseOrigins','keyStatus','keyCheckedAt'],humble:['sourceBundle','purchaseId','entitlement','keyType','keyStatus','keyCheckedAt','expiresAt'],
   xbox:['productId','accessBasis','accessTypes','productKind','supportedPlatforms'],
   playstation:['productId','titleId','conceptId','accessBasis','membership','subscriptionService','isActive','isTrial'],
   nintendo:['cardId','applicationId','accessBasis','productKind','lendingExpiresAt','isHidden','isLending','isPartialLending','hasApplication','hasAddOnContents','hasReleasedApplication','hasReleasedAddOnContents','hasReleasedUpgrade']

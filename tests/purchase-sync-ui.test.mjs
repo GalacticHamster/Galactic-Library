@@ -36,5 +36,12 @@ test('explicit opt-out is displayed and changed without setup confirmations or l
  const f=await fixture({sharing:false,initial:{confirmed:true,remoteConfirmed:true,status:'synced'}});await f.open();const toggle=f.get('syncSharing');assert.equal(toggle.checked,false);assert.match(f.get('syncStatus').textContent,/sharing is off/);toggle.checked=true;await toggle.event('change');await f.flush();assert.equal(f.calls.filter(m=>m.action==='syncSetSharing').length,1);assert.equal(toggle.checked,true);assert.equal(f.confirmations.length,0);assert(!f.calls.some(m=>['syncChoices','syncConnect','syncDisconnect','clear','remove'].includes(m.action)));
 });
 test('ambiguous accounts have a clear Advanced action instead of a false synced status',async()=>{
- const f=await fixture({availability:'account-resolution-required'});await f.open();assert.match(f.get('syncStatus').textContent,/Choose which saved accounts belong together in Advanced/);assert(!f.calls.some(m=>m.action==='syncConnect'));
+ const f=await fixture({availability:'account-resolution-required'});await f.open();assert.match(f.get('syncStatus').textContent,/Review the saved account relationship in Advanced/);assert(!f.calls.some(m=>m.action==='syncConnect'));
 });
+
+test('a validation failure offers an existing retry control without inventing a Repair button',async()=>{
+ const f=await fixture({availability:'validation-failed'});await f.open();assert.match(f.get('syncStatus').textContent,/Retry connection/);assert.equal(f.get('syncRepair').hidden,true);assert.equal(f.get('syncRetry').hidden,false);await f.get('syncRetry').click();await f.flush();assert(f.calls.some(m=>m.action==='syncRetry'));
+});
+
+test('an unverified stale synced label cannot claim a current successful relationship',async()=>{const f=await fixture({initial:{status:'synced'}});await f.open();assert.notEqual(f.get('syncSummary').textContent,'Synced');assert(!/^Synced/.test(f.get('syncStatus').textContent));});
+test('retry remains disabled while sharing is explicitly off',async()=>{const f=await fixture({sharing:false});await f.open();assert(f.get('syncRetry').disabled);await f.get('syncRetry').click();assert(!f.calls.some(m=>m.action==='syncRetry'));});
