@@ -1,5 +1,5 @@
 import {seedSimplePurchases,simplePurchaseSetupChecks} from './simple-purchase-setup-browser.mjs';
-import {automaticPurchaseChecks} from './automatic-purchase-browser.mjs';
+import {automaticPurchaseChecks} from './automatic-purchase-browser.mjs';import {nativePurchaseChecks,nativeUpgradeChecks} from './native-purchase-browser.mjs';
 // Offline native extension checks. Own disposable profiles; no user libraries.
 import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
@@ -13,11 +13,11 @@ import {createRelease,projectRoot,runtimeZip} from './release.mjs';
 import {chromePipe,freePort,firefoxMarionette} from '../tests/native-protocol.mjs';
 
 const firefox=process.argv.includes('--firefox'),kind=firefox?'firefox':'chrome';
-const hbRoot=resolve(projectRoot,'../HB'),fanRoot=resolve(projectRoot,'../Fanatical');
+const hbRoot=resolve(process.env.HB_ROOT??resolve(projectRoot,'../HB')),fanRoot=resolve(projectRoot,'../Fanatical');
 const temporary=await mkdtemp(join(tmpdir(),'gh-purchase-check-'));
-const automatic=process.argv.includes('--automatic'),simple=process.argv.includes('--simple-setup'),reverse=process.argv.includes('--reverse');
+const upgrade=process.argv.includes('--native-upgrade'),native=process.argv.includes('--native')||upgrade,automatic=process.argv.includes('--automatic')||native,simple=process.argv.includes('--simple-setup'),reverse=process.argv.includes('--reverse');
 const guided=process.argv.includes('--guided'),readable=process.argv.includes('--readable');
-const artifacts=simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
+const artifacts=upgrade?'native-purchase-upgrade':native?'native-purchase-sync':simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
 const output=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/results.json');
 const checks=[],screenshots=[];let child,driver,exited;
 try{
@@ -74,7 +74,7 @@ try{
     await navigate(role);await evaluate(`await chrome.runtime.sendMessage({type:${JSON.stringify(role==='hb'?'HCL_STORE':'FANATICAL_STORE')},operation:'patch',args:[{galacticLibraryExtensionId:${JSON.stringify(installed.gl.id)}}]});return true;`);
 
   }
-  if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
+  if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
     await navigate('gl');await evaluate('document.querySelector("#check-companion-connections").click();return true;');
     await pause(6500);
     const connections=await evaluate('const C=await import("./src/lib/companion-identities.js");return Promise.all(C.builtinCompanions(chrome.runtime).map(async c=>({role:c.role,id:c.id,result:await C.checkCompanionConnection(chrome.runtime,c.id)})));');
