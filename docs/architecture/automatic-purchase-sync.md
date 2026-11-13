@@ -29,6 +29,14 @@ Conflicts follow existing adapters. Automatic imports additionally skip contradi
 
 The `skipped` counter sums records that the receiving adapters did not apply on the incoming and outgoing legs. It is retained when fingerprints avoid another transfer. It is not a count of unchanged records or missing purchases: causes include unsupported media, unmatched legacy identifiers, ambiguous matches, and conflicting media or purchase associations. It therefore cannot by itself identify an actionable review. Successful connections disclose skipped transfers neutrally, while actual account exclusions retain the review warning. Informational snapshot limitations remain in Advanced, and existing diagnostic exports are unchanged; validation and reminder-sharing failures keep their separate attention states.
 
+## Known issue: a manual import during an automatic sync
+
+One transfer service holds a single import lock. If a manual (Advanced) import is running when an automatic sync tries to import, the sync fails with `A purchase handoff is already importing. Wait for it to finish.` `failureKind` in `shared/purchase-sync.js` does not recognize that message, so it is classified `operation-failed`. That code is not retryable: the relationship moves to Needs attention and waits for the user to repair or retry, instead of retrying on the normal backoff.
+
+No purchases are lost. The lock is taken before any write, so the refused import changes nothing, and the manual import completes normally. The next successful sync after a retry or repair transfers any remaining changes, and fingerprints prevent duplicates. The browser suites reproduce this when automatic sync and the manual-handoff checks overlap.
+
+Proposed fix for a future coordinated GL, HB and FAN update: add `already importing` to the `source-busy` pattern in `failureKind`, which retries with backoff like `still saving`. Mirror it with `scripts/sync-companion-purchases.mjs` and release all three together. Deferred on 2026-11-13 so that HB 1.1.1 ships without shared-code changes and FAN 1.0.5 (published) is not modified.
+
 ## UI and validation
 
 Normal UI shows the default-on sharing checkbox, disclosure, status and last success. Account choices, repair, retry and diagnostics are under Advanced. The former direction/preview/offer/import workflow remains under Advanced. Validation covers synthetic account lifecycles, all four propagation directions, replay/no-change storage growth, actual packaged Chrome/Firefox messaging, and restart/retry handling. Real installed extensions and personal backups are never used as test destinations.
