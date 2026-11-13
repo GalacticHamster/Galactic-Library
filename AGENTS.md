@@ -24,3 +24,18 @@ Automatic local sharing defaults on under the versioned opt-out model. Legacy di
 
 Install the version-controlled identity guard with `git config --local core.hooksPath .githooks`.
 See [.githooks/README.md](.githooks/README.md) for installation, effective-identity checks and tests.
+
+## Testing workflow
+
+Rules:
+- During development, run focused tests for the files and behaviors changed.
+- Add integration runs when a change touches shared synchronization, account isolation, storage preservation or cross-extension behavior.
+- Reserve the full Chrome+Firefox release battery for final release validation, significant architectural changes, or a focused failure that suggests a broader regression. Never rerun it automatically after each fix.
+- Before starting any suite expected to take more than 15 minutes, state why it is needed and ask the owner.
+- Never skip, delete or weaken tests to save time. Speed-ups must keep coverage.
+- Focused passes are not release validation. Release gates remain unchanged.
+
+Typical runtimes on the development machine:
+- Development: `npm test` and `node --test tests/*.test.mjs` (about 1 min together), or a single test file.
+- Integration: `node scripts/check-purchase-handoff-browser.mjs --native | --native-upgrade | --collision` (under 1 min each, add `--firefox`). Add `--automatic` (about 4 min) and the default manual-handoff mode (about 5-8 min) only when automatic sync or the manual handoff changes. Shared purchase files: `node scripts/sync-companion-purchases.mjs --check`.
+- Release: all cross-extension modes in Chrome and Firefox plus the unit suites (about 25 min).

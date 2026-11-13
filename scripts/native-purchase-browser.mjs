@@ -176,3 +176,57 @@ export async function nativePurchaseChecks({navigate,evaluate,wait,call,driver,f
  measurements.push({noChangeSyncMs:Date.now()-repeat});assert.equal(await evaluate(digest),before,'an unchanged sync rewrote GL');
  checks.push('repeating the purchase sync with no changes leaves the GL database byte-identical');
 }
+
+// Known issue (docs/architecture/automatic-purchase-sync.md): an automatic sync that meets a running
+// manual import stops with Needs attention instead of retrying. This proves it loses nothing.
+export async function collisionChecks({navigate,evaluate,call,installed,checks,measurements}){
+ await navigate('gl');
+ await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),P=await import('./src/lib/provider-profiles.js'),d=M.createEmptyDatabase();
+  const h=P.newProviderProfile('humble','Personal');d.providerProfiles[h.profileId]=h;h.state={connected:true};d.providers.humble={...h.state,profileLabel:h.nickname,activeProfileId:h.profileId};
+  d.canonicalItems=M.rebuildCanonicalItems(d.providerItems);await S.restoreDatabase(d);await S.addAllowedExternalClientId(${JSON.stringify(installed.hb.id)});return true;`);
+ await settle(call);
+ await navigate('hb');
+ await evaluate(`const items=[];for(let n=0;n<3000;n++){const purchase='order_'+Math.floor(n/20);items.push({title:'Collision book '+n,kind:'book',source:'humble',purchaseKey:purchase,providerItemId:purchase+':product:p'+n,sourceBundle:'Bundle '+Math.floor(n/20),entitlement:'direct-download'});}await chrome.storage.local.set({humbleProfileLabel:'Personal',libraryItems:items});return true;`);
+ await pair(call);await navigate('gl');await waitForHumble(evaluate,call,3000);
+ // GL-held purchases that HB lacks, so the manual GL -> HB import below has real work to do.
+ await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),d=await S.getDatabase(),p=Object.values(d.providerProfiles).find(p=>p.provider==='humble'),items=[];for(let n=0;n<2500;n++)items.push(M.normalizeProviderItem({provider:'humble',profileId:p.profileId,providerItemId:'glonly_'+n+':product:x'+n,title:'GL-held book '+n,mediaType:'book',ownership:'owned',metadata:{source:'humble-purchase-library',entitlement:'direct-download',purchaseId:'glonly_'+n,sourceBundle:'GL bundle'}},undefined,{profileKeySpace:p.keySpace}));await S.mergeProviderItems('humble',items,{profileLabel:p.nickname});return true;`);
+ const glState=(await call('gl','state','humble')).accounts.find(a=>a.label==='Personal'),hbBefore=await (async()=>{await navigate('hb');return evaluate(`const s=await chrome.storage.local.get({libraryItems:[]});return s.libraryItems.length;`);})();
+ // Start a manual GL -> HB import and, at the same moment, an automatic sync.
+ await navigate('hb');
+ // The import runs in HB's worker; the page only starts it. GL then starts its own sync at once.
+ const race={manual:{ok:true},auto:{}};
+ await evaluate(`const accounts=(await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'state',provider:'humble'})).accounts;chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'import',provider:'humble',peerId:${JSON.stringify(installed.gl.id)},accountRef:${JSON.stringify(glState.accountRef)},confirmed:true,target:{accountRef:accounts[0].accountRef}}).catch(()=>{});return true;`);
+ await navigate('gl');const auto=await call('gl','syncNow','humble');race.auto={ok:auto.ok,error:auto.error??null};
+ await navigate('hb');for(let n=0;n<600;n++){if(await evaluate(`return (await chrome.storage.local.get({libraryItems:[]})).libraryItems.length;`)===hbBefore+2500)break;await new Promise(r=>setTimeout(r,100));}
+ await navigate('gl');let st;for(let n=0;n<300;n++){st=(await call('gl','syncState','humble')).state;if(!st?.pending||st.status==='attention')break;await new Promise(r=>setTimeout(r,100));}
+ measurements.push({collision:{race,statusAfter:st?.status,errorCode:st?.errorCode??null}});
+ await navigate('hb');const hb=await evaluate(`const s=await chrome.storage.local.get({libraryItems:[]}),ids=s.libraryItems.flatMap(i=>(i.provenance?.length?i.provenance:[i]).map(p=>p.providerItemId));return {items:s.libraryItems.length,unique:new Set(ids).size,ids:ids.length};`);
+ assert.equal(hb.items,hbBefore+2500,'the manual import completed in full');assert.equal(hb.unique,hb.ids,'no duplicate purchase records in HB');
+ await navigate('gl');const gl=await evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase(),rows=Object.values(d.providerItems).filter(i=>i.provider==='humble');return {rows:rows.length,unique:new Set(rows.map(i=>i.providerItemId)).size};`);
+ assert.equal(gl.rows,5500);assert.equal(gl.unique,gl.rows,'no duplicate purchase records in GL');
+ // Recovery: Retry (Advanced) or a later sync brings the relationship back without data changes.
+ if(st?.status==='attention'){await navigate('hb');const retry=await call('hb','syncRetry','humble');assert.equal(retry.ok,true,retry.error);await navigate('gl');await call('gl','syncNow','humble');}
+ await navigate('gl');st=await waitSynced(call);
+ const after=await evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase();return Object.values(d.providerItems).filter(i=>i.provider==='humble').length;`);
+ await navigate('hb');const hbAfter=await evaluate(`const s=await chrome.storage.local.get({libraryItems:[]});return s.libraryItems.length;`);
+ assert.deepEqual([after,hbAfter],[5500,hbBefore+2500],'recovery adds and removes nothing');
+ // Phase 2, the documented case: GL's own automatic sync meets GL's import lock, held by a large manual
+ // import into a second GL account. A one-item HB change gives the automatic sync work to do.
+ await navigate('hb');
+ await evaluate(`const s=await chrome.storage.local.get({libraryItems:[]});s.libraryItems.push({title:'Collision late book',kind:'book',source:'humble',purchaseKey:'late',providerItemId:'late:product:l',sourceBundle:'Late',entitlement:'direct-download'});await chrome.storage.local.set({libraryItems:s.libraryItems});return true;`);
+ const hbAccount=(await call('hb','state','humble')).accounts[0].accountRef;
+ const hbNow=await evaluate(`return (await chrome.storage.local.get({libraryItems:[]})).libraryItems.length;`);
+ await navigate('gl');const activeId=await evaluate(`const S=await import('./src/lib/storage.js');return (await S.getDatabase()).providers.humble.activeProfileId;`);
+ const second=await evaluate(`const send=a=>chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',...a});const manual=send({action:'import',provider:'humble',peerId:${JSON.stringify(installed.hb.id)},accountRef:${JSON.stringify(hbAccount)},confirmed:true,target:{newLabel:'Second',expectedActiveId:${JSON.stringify(activeId)}}});
+  const auto=await send({action:'syncNow',provider:'humble'});const m=await manual;return {manual:{ok:m.ok,added:m.added??null,error:m.error??null},auto:{ok:auto.ok,error:auto.error??null}};`);
+ let st2;for(let n=0;n<300;n++){st2=(await call('gl','syncState','humble')).state;if(!st2?.pending||st2.status==='attention')break;await new Promise(r=>setTimeout(r,100));}
+ const counts=async()=>evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase(),rows=Object.values(d.providerItems).filter(i=>i.provider==='humble'),by={};for(const r of rows){const label=d.providerProfiles[r.profileId].nickname;by[label]=(by[label]??0)+1;}return {by,unique:new Set(rows.map(i=>i.id)).size,rows:rows.length};`);
+ const during=await counts();measurements.push({collisionPhase2:{second,status:st2?.status,errorCode:st2?.errorCode??null,during}});
+ assert.equal(second.manual.ok,true,second.manual.error);assert.equal(during.unique,during.rows,'no duplicate GL records');
+ assert.equal(during.by.Second,hbNow,'the manual import into the second account completed in full');
+ if(st2?.status==='attention'){await navigate('hb');const retry=await call('hb','syncRetry','humble');assert.equal(retry.ok,true,retry.error);await navigate('gl');await call('gl','syncNow','humble');}
+ await navigate('gl');await waitSynced(call);const recovered=await counts();
+ assert.equal(recovered.by.Personal,5501,'after recovery the late purchase arrives exactly once');assert.equal(recovered.by.Second,hbNow);assert.equal(recovered.unique,recovered.rows);
+ checks.push('documented case: '+(st2?.status==='attention'?'GL automatic sync stopped with Needs attention ('+String(st2.errorCode)+') while a manual import held the lock; Retry recovered':'automatic sync was not stopped this time')+'; no purchase lost or duplicated');
+ checks.push('manual import colliding with automatic sync: manual import completes, no purchase lost or duplicated in HB or GL, '+(race.auto.error?'automatic sync deferred ("'+String(race.auto.error).slice(0,60)+'") and completed later':'automatic sync was not affected this time'));
+}
