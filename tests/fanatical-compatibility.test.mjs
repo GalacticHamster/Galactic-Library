@@ -327,3 +327,130 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan]])test(nam
  const projected=await engine({operation:'project',orderSummaries:[direct],orderDetails:[direct]});assert.equal(projected.items.length,1);assert.equal(projected.items[0].sourceItemId,'direct-game');assert.equal(projected.items[0].purchaseOrigins[0].purchaseRef,hash(direct._id));
  for(const changed of [{...direct,status:'PENDING'},{...direct,_id:'foreign-order'}]){const rejected=await engine({operation:'project',orderSummaries:[direct],orderDetails:[changed]});assert.equal(rejected.items.length,0);}
 });
+
+
+for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': promotional leaves stripped of gift flags in sparse summaries recover without inflating owned items',async()=>{
+  const ownedBundle=structuredClone(order(0).items[0]);
+  for(const promoFlags of [{isFreeProduct:true,mystery:true},{isFreeProduct:true,reveal_template:'present'}]){
+   const sparse={_id:'synthetic-order-promo',status:'COMPLETE',date:'2026-10-29',items:[structuredClone(ownedBundle),{name:'Seasonal Box',bundles:[]}]};
+   const detail={_id:'synthetic-order-promo',status:'COMPLETE',date:'2026-10-29',items:[structuredClone(ownedBundle),{_id:'promo-leaf',name:'Seasonal Box',type:'game',bundles:[],...promoFlags}]};
+   const r=await run(engine,{list:[sparse],details:[detail]});
+   assert.equal(r.counts.detailProductMismatch,0);
+   assert.equal(r.compatibility.summaryRecovery.recovered,1);
+   assert.equal(r.compatibility.summaryRecovery.unresolved,0);
+   assert.equal(r.result.items.length,1);
+   assert.equal(r.result.items[0].sourceItemId,ownedBundle.bundles[0].games[0]._id);
+   if(engine!==gl)assert.equal(r.result.rejectedPurchaseItems.length,1);
+  }
+ });
+
+ test(name+': genuine parent-missing failures still reject orders and emit bounded zero-PII parentContext',async()=>{
+  const cases=[
+   {
+    label:'renamed-parent',
+    summaryItems:[{name:'PRIVATE_SUMMARY_TITLE',bundles:[]}],
+    detailItems:[{_id:'detail-game',name:'PRIVATE_DETAIL_TITLE',type:'game',bundles:[]}],
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false}
+   },
+   {
+    label:'non-string-pickAndMix-with-matching-object-name',
+    summaryItems:[{name:'PRIVATE_PICK_MIX_POOL',bundles:[]}],
+    detailItems:[{_id:'detail-game',name:'PRIVATE_LEAF_TITLE',type:'game',bundles:[],pickAndMix:{name:'private pick mix pool'}}],
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:1,normalizedNameMatched:true}
+   },
+   {
+    label:'omitted-detail-parent',
+    summaryItems:[{name:'Bundle',bundles:[]},{name:'PRIVATE_OMITTED_PARENT',bundles:[]}],
+    detailItems:[{_id:'bundle-id',name:'Bundle',bundles:[{games:[{_id:'synthetic-leaf',name:'Leaf Title',type:'game'}]}]}],
+    expectedContext:{summaryParents:2,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:1,nonStringPickAndMix:0,normalizedNameMatched:false}
+   }
+  ];
+  for(const tc of cases){
+   const sparse={_id:'synthetic-order-miss',status:'COMPLETE',items:tc.summaryItems};
+   const detail={_id:'synthetic-order-miss',status:'COMPLETE',items:tc.detailItems};
+   const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail]});
+   assert.equal(r.counts.detailProductMismatch,1,tc.label);
+   assert.equal(r.result.items.length,1,tc.label);
+   assert(!/PRIVATE_/.test(JSON.stringify(r.compatibility)),tc.label);
+   const rec=r.compatibility.productMismatches?.records?.[0];
+   assert.equal(rec?.category,'parent-missing',tc.label);
+   assert.deepEqual(rec?.parentContext,tc.expectedContext,tc.label);
+  }
+ });
+}
+
+test('parentContext validation accepts allowlisted context and rejects invalid or unallowlisted parentContext',async()=>{
+ const sparse={_id:'synthetic-order-ctx',status:'COMPLETE',items:[{name:'Expected Parent',bundles:[]}]};
+ const detail={_id:'synthetic-order-ctx',status:'COMPLETE',items:[{_id:'actual-leaf',name:'Other Parent',type:'game',bundles:[]}]};
+ const {compatibility:clean}=await run(canonical,{list:[order(0),sparse],details:[order(0),detail]});
+ const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),context);
+ const ui=context.GalacticFanatical,report=ui.failureReport('unknown');
+ assert(clean.productMismatches.records[0].parentContext);
+ assert.deepEqual(fanaticalCompatibilityReport(clean),clean);
+ assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:clean})).compatibility,clean);
+ for(const mutate of [
+  v=>v.productMismatches.records[0].parentContext.extra='PRIVATE',
+  v=>v.productMismatches.records[0].parentContext.summaryParents=-1,
+  v=>v.productMismatches.records[0].parentContext.detailParents=100001,
+  v=>v.productMismatches.records[0].parentContext.normalizedNameMatched='true',
+  v=>{delete v.productMismatches.records[0].parentContext.normalizedNameMatched;},
+  v=>{v.productMismatches.records[0].parentContext=null;}
+ ]){
+  const unsafe=structuredClone(clean);mutate(unsafe);
+  assert.equal(fanaticalCompatibilityReport(unsafe),null);
+  assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);
+ }
+});
+
+
+for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': promotional and purchased-product reconciliation distinguishes comics, games, copies, duplicate names and ID conflicts without admitting promo items',async()=>{
+  const comicBundle={_id:'comic-bundle',name:'Comic Pack',bundles:[{games:[{_id:'comic-1',name:'Issue 1',type:'comic'},{_id:'comic-2',name:'Issue 2',type:'comic'}]}]};
+  const gameBundle={_id:'game-bundle',name:'Game Pack',bundles:[{games:[{_id:'game-1',name:'Quest 1',type:'game'},{_id:'game-2',name:'Quest 1',type:'game'}]}]};
+  const gameCopy2={_id:'game-bundle-2',name:'Game Pack',bundles:[{games:[{_id:'game-1',name:'Quest 1',type:'game'}]}]};
+  const mixedPick={_id:'pick-book-1',name:'Pick Comic',type:'book',bundles:[],pickAndMix:'Mix Pool'};
+  const gamePick={_id:'pick-game-1',name:'Pick Game',type:'game',bundles:[],pickAndMix:'Mix Pool'};
+  const sharedNameOwned={_id:'owned-bonus-id',name:'Bonus',type:'game',bundles:[]};
+  const promoOne={_id:'promo-1',name:'Mystery Surprise Alpha',type:'game',isFreeProduct:true,mystery:true,bundles:[]};
+  const promoTwo={_id:'promo-2',name:'Present Box Beta',type:'game',isFreeProduct:true,reveal_template:'present',bundles:[]};
+  const sharedNamePromo={_id:'promo-bonus-id',name:'Bonus',type:'game',isFreeProduct:true,mystery:true,bundles:[]};
+  const fullOrder={_id:'synthetic-order-reconcile',status:'COMPLETE',date:'2026-10-30',items:[comicBundle,gameBundle,gameCopy2,mixedPick,gamePick,sharedNameOwned,promoOne,promoTwo,sharedNamePromo]};
+  const sparseSummary={_id:fullOrder._id,status:'COMPLETE',date:'2026-10-30',items:[
+   {name:comicBundle.name,bundles:[]},
+   {name:gameBundle.name,bundles:[]},
+   {name:gameCopy2.name,bundles:[]},
+   {name:'Mix Pool',bundles:[]},
+   {name:'Bonus',bundles:[]},
+   {name:promoOne.name,bundles:[]},
+   {name:promoTwo.name,bundles:[]},
+   {name:'Bonus',bundles:[]}
+  ]};
+  const ok=await run(engine,{list:[sparseSummary],details:[fullOrder]});
+  assert.equal(ok.counts.detailProductMismatch,0);
+  assert.equal(ok.compatibility.summaryRecovery.recovered,1);
+  assert.equal(ok.compatibility.summaryRecovery.unresolved,0);
+  assert.deepEqual(ok.result.items.map(i=>i.sourceItemId).sort(),['comic-1','comic-2','game-1','game-2','owned-bonus-id','pick-book-1','pick-game-1']);
+  assert.equal(ok.result.items.find(i=>i.sourceItemId==='game-1').occurrences.length,2);
+  if(engine!==gl)assert.equal(ok.result.rejectedPurchaseItems.length,3);
+
+  // Conflicting _id on a promotional item must fail id-missing instead of reconciling silently
+  const summaryWithPromoId={_id:'synthetic-order-id-conflict',status:'COMPLETE',items:[{_id:'summary-promo-id',name:'Seasonal Box',bundles:[]}]};
+  const detailWithOtherId={_id:'synthetic-order-id-conflict',status:'COMPLETE',items:[{_id:'detail-promo-id',name:'Seasonal Box',type:'game',isFreeProduct:true,mystery:true,bundles:[]}]};
+  const idConflict=await run(engine,{list:[order(0),summaryWithPromoId],details:[order(0),detailWithOtherId]});
+  assert.equal(idConflict.counts.detailProductMismatch,1);
+  assert.equal(idConflict.compatibility.productMismatches.records[0].category,'id-missing');
+  assert.equal(idConflict.result.items.length,1);
+
+  // Promotional item cannot substitute for an unrelated missing purchased product
+  const summaryWithMissing={_id:'synthetic-order-promo-sub',status:'COMPLETE',items:[{name:'Purchased Game',bundles:[]}]};
+  const detailOnlyOtherPromo={_id:'synthetic-order-promo-sub',status:'COMPLETE',items:[{_id:'promo-only',name:'Seasonal Box',type:'game',isFreeProduct:true,mystery:true,bundles:[]}]};
+  const promoSub=await run(engine,{list:[order(0),summaryWithMissing],details:[order(0),detailOnlyOtherPromo]});
+  assert.equal(promoSub.counts.detailProductMismatch,1);
+  assert.equal(promoSub.compatibility.productMismatches.records[0].category,'parent-missing');
+  assert.deepEqual(promoSub.compatibility.productMismatches.records[0].parentContext,{
+   summaryParents:1,detailParents:0,promotionalDetailParents:1,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false
+  });
+  assert.equal(promoSub.result.items.length,1);
+ });
+}
