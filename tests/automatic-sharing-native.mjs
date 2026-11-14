@@ -69,7 +69,8 @@ try{
    files=readArchive(zip);
   }else files=new Map((await (await import(pathToFileURL(join(root,'scripts/release.mjs')))).createRelease(root,undefined,target)).files);
   if(legacy){
-   const tag=key==='GL'?'v1.0.1':key==='HB'?'v1.0.2':'v1.0.3';
+   // The currently published store versions: upgrades are tested from what users actually have installed.
+   const tag=key==='GL'?'v1.0.2':key==='HB'?'v1.0.3':'v1.0.5';
    const tree=readArchive(execFileSync('git',['archive','--format=zip',tag],{cwd:root,windowsHide:true,maxBuffer:40*1024*1024}));
    const paths=key==='HB'?[...tree.get('scripts/package-release.ps1').toString().split('$releaseFiles = @(')[1].split('\n)')[0].matchAll(/'([^']+)'/g)].map(m=>m[1]):JSON.parse(tree.get('scripts/runtime-files.json'));
    files=new Map(paths.map(path=>{assert(tree.has(path),'Missing historical runtime '+path);return [path,tree.get(path)];}));
