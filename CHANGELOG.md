@@ -1,6 +1,11 @@
 # Release notes
 
-## Unreleased ? automatic local sharing
+## 1.0.3 — Fanatical purchase scanning
+
+- Fanatical purchase scans in Galactic Library now handle promotional items in purchases the same way as Fanatical Library 1.0.5, and keep its expanded diagnostics for incomplete imports. Purchase admission and coverage checks are unchanged.
+- Works with Humble Library 1.1.1, including purchases synced from the Humble Library. The purchase-sync protocol is unchanged, so Humble Library 1.1.1 also works with Galactic Library 1.0.2.
+
+## 1.0.2 — automatic local sharing
 
 - Automatically pair the sole saved provider account on each side, including populated libraries; retain relationships over sharing OFF/ON. Preserve valid historical Humble key dates and isolate malformed optional observations. Correct sharing checkbox alignment and actionable connection diagnostics.
 
