@@ -103,6 +103,10 @@ GET_REMINDERS includes these entries with source: humble-companion and reviewAva
 
 GL backups preserve published feeds and reminder reviews. Private in-progress uploads and HB's salt are excluded. Revoking a client prevents new transfers but retains its previously published feed until the user removes it; clearing/uninstalling HB likewise does not remotely retract saved GL data.
 
+### Known issue: Firefox reminder feed arrives empty
+
+Unresolved; cause unknown. In `node tests/firefox.mjs --companions`, installed HB reports "Shared 1 entitlements", but a few steps later GL's stored `companionFeeds` entry for HB has no entries (expected one). It reproduces with the published GL 1.0.2 + HB 1.0.3 as well as the GL 1.0.3 and HB 1.1.1 candidates. Whether the product or the test is at fault has not been established, so treat it as a possible product defect until investigated.
+
 ## Browser identity and central review
 
 Allow-list entries may be Chrome IDs, conservative Firefox email-style add-on IDs, or brace-wrapped Gecko UUIDs. Use the declared stable Firefox IDs, not the private per-profile `moz-extension` URL. The sender must match an allowed ID for every request, including staged feed operations.

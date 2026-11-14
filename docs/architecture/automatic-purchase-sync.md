@@ -37,6 +37,14 @@ No purchases are lost. The lock is taken before any write, so the refused import
 
 Proposed fix for a future coordinated GL, HB and FAN update: add `already importing` to the `source-busy` pattern in `failureKind`, which retries with backoff like `still saving`. Mirror it with `scripts/sync-companion-purchases.mjs` and release all three together. Deferred on 2026-11-13 so that HB 1.1.1 ships without shared-code changes and FAN 1.0.5 (published) is not modified.
 
+In Chrome, `--collision` also times out intermittently in its second phase's recovery step, after every data-integrity assertion has passed: GL's `syncNow` over about 11,000 synthetic records can exceed the harness's 20-second browser-command limit. This is probably harness timing or performance, not lost data; see the GL 1.0.3 release record in `docs/development/1.0-submission.md`.
+
+## Known issue: duplicate after a manual restore
+
+Medium severity; priority for the next release. When a companion's saved purchases are cleared and restored from GL with a manual (Advanced) import, and automatic sharing then runs, GL can end up with a second record (a new item reference, same source) for a purchase it already held. Ownership queries then return both. No purchase is lost. It reproduces in Chrome and Firefox with the published GL 1.0.2, HB 1.0.3 and FAN 1.0.5 as well as the GL 1.0.3 and HB 1.1.1 candidates. The extent across a restored library has not been measured.
+
+The regression test is the default (manual) mode of `scripts/check-purchase-handoff-browser.mjs`: its `afterQuery` assertion compares ownership answers before and after the round trip. Keep it unchanged; it is expected to fail until the defect is fixed. The cause has not been diagnosed. The fix belongs in shared purchase-sync code and should ship as a coordinated GL, HB and FAN update, like the collision fix above.
+
 ## UI and validation
 
 Normal UI shows the default-on sharing checkbox, disclosure, status and last success. Account choices, repair, retry and diagnostics are under Advanced. The former direction/preview/offer/import workflow remains under Advanced. Validation covers synthetic account lifecycles, all four propagation directions, replay/no-change storage growth, actual packaged Chrome/Firefox messaging, and restart/retry handling. Real installed extensions and personal backups are never used as test destinations.
