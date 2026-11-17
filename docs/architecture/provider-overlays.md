@@ -41,6 +41,14 @@ Preferences are independent of accounts, library records and purchase sharing;
 they are not part of a library backup. A failed preference write still changes
 the current panel, but cannot guarantee persistence to another page.
 
+The shared **How importing works** disclosure also remembers its open state per
+provider at `galacticLibraryPanelHelp:<provider>`. Programmatic restoration and
+cross-tab changes do not write it back. Only a changed disclosure writes once.
+Provider panels have a fixed position and no position/view selector to retain.
+Import actions, account confirmation, diagnostic sections, profiling choices,
+loading, results and errors remain transient; restoring them could be misleading
+or repeat a diagnostic action. This is deliberately not a general UI-state store.
+
 ## Humble and Fanatical importer ownership
 
 Only these two provider panels call `importerOwnership` after attaching. The

@@ -14,6 +14,7 @@
       for(const state of panelStates){
         if(!state.shadow.host.isConnected){panelStates.delete(state);continue;}
         if(Object.hasOwn(changes,state.key)){state.changed=true;state.apply(changes[state.key].newValue===true);}
+        if(Object.hasOwn(changes,state.helpKey)){state.helpChanged=true;state.applyHelp(changes[state.helpKey].newValue===true);}
       }
     });
     observingPanelState=true;
@@ -285,7 +286,9 @@
     restore.dataset.galacticFloatingPanelControl = 'restore';
     restore.textContent = 'Galactic Library — Expand';
     restore.hidden = true;
-    const state={shadow,key:panelStateKey(provider),changed:false,apply(minimized){
+    const state={shadow,key:panelStateKey(provider),helpKey:'galacticLibraryPanelHelp:'+provider,changed:false,helpChanged:false,helpValue:false,applyHelp(open){
+      this.helpValue=open;if(help)help.open=open;
+    },apply(minimized){
       panel.hidden=minimized;restore.hidden=!minimized;panel.dataset.panelStateReady='true';
     }};
     const choose=minimized=>{
@@ -297,12 +300,20 @@
     };
     restore.addEventListener('click',()=>choose(false));
     minimize.addEventListener('click',()=>choose(true));
+    help?.addEventListener('toggle',()=>{
+      if(help.open===state.helpValue)return;
+      state.helpChanged=true;state.helpValue=help.open;
+      if(Object.hasOwn(names,provider))try{Promise.resolve(chrome.storage?.local?.set({[state.helpKey]:help.open})).catch(()=>{});}catch{}
+    });
     panel.append(minimize);
     shadow.append(style, restore);
     observePanelStates();panelStates.add(state);
     (async()=>{
       let minimized=false;
       try{if(Object.hasOwn(names,provider))minimized=(await chrome.storage?.local?.get(state.key))?.[state.key]===true;}catch{}
+      let helpOpen=false;
+      try{if(Object.hasOwn(names,provider))helpOpen=(await chrome.storage?.local?.get(state.helpKey))?.[state.helpKey]===true;}catch{}
+      if(!state.helpChanged)state.applyHelp(helpOpen);
       if(!state.changed)state.apply(minimized);
     })();
   }

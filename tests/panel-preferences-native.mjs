@@ -80,17 +80,22 @@ try{
   await click(1,'restore');await waitHidden(0,false);
   await click(0,'minimize');await waitHidden(1,true);
   assert.equal(await hidden(2),false);
+  await evaluate('panels[0].querySelector("[data-import-help]").open=true;return true;');
+  for(let n=0;n<100;n++){if(await evaluate('return (await chrome.storage.local.get("galacticLibraryPanelHelp:steam"))["galacticLibraryPanelHelp:steam"]===true;'))break;await pause(10);}
+  assert.equal(await evaluate('return panels[1].querySelector("[data-import-help]").open;'),true,'same-provider help disclosure did not follow');
+  assert.equal(await evaluate('return panels[2].querySelector("[data-import-help]").open;'),false,'help preference crossed provider boundary');
   await evaluate('return mountPanel("audible");');await click(3,'minimize');
   for(let i=0;i<3;i++)assert.equal((await evaluate('return mountPanel("audible");')).hidden,true);
   // Same-document navigation/reinitialization never writes a default.
   assert.equal(await evaluate('const shadow=panels[0],before=shadow.querySelectorAll("button").length;GalacticFloatingPanel.attach(shadow,"steam");return shadow.querySelectorAll("button").length===before;'),true);
   assert.equal(await evaluate('globalThis.savedController=GalacticFloatingPanel;'+source+';return savedController===GalacticFloatingPanel;'),true,'Repeated script initialization replaced the controller');
-  const preserved=await evaluate('const s=await chrome.storage.local.get(null);for(const k of Object.keys(s))if(k.startsWith("galacticLibraryPanelState:"))delete s[k];return JSON.stringify(s);');
+  const preserved=await evaluate('const s=await chrome.storage.local.get(null);for(const k of Object.keys(s))if(k.startsWith("galacticLibraryPanelState:")||k.startsWith("galacticLibraryPanelHelp:"))delete s[k];return JSON.stringify(s);');
   assert.equal(preserved,baseline,'UI preference changed library or synchronization storage');
   if(firefox)await driver.send('WebDriver:Navigate',{url});else await driver.send('Page.reload',{},session);
   await pause(300);await installController();assert.equal((await evaluate('return mountPanel("steam");')).hidden,true);
   if(firefox)await driver.send('Marionette:Quit',{flags:['eForceQuit']});else await driver.send('Browser.close');await exited;driver.close?.();
   await start();await installController();assert.equal((await evaluate('return mountPanel("steam");')).hidden,true);assert.equal((await evaluate('return mountPanel("audible");')).hidden,true);assert.equal((await evaluate('return mountPanel("epic");')).hidden,false);
+  assert.equal(await evaluate('return panels[0].querySelector("[data-import-help]").open;'),true,'help preference lost at restart');
   await click(0,'restore');await pause(80);
   assert.equal((await evaluate('return mountPanel("steam");')).hidden,false);
   assert.equal(await evaluate(`const get=panelChrome.storage.local.get;let release,reading;

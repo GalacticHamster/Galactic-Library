@@ -105,7 +105,15 @@ GL backups preserve published feeds and reminder reviews. Private in-progress up
 
 ### Known issue: Firefox reminder feed arrives empty
 
-Unresolved; cause unknown. In `node tests/firefox.mjs --companions`, installed HB reports "Shared 1 entitlements", but a few steps later GL's stored `companionFeeds` entry for HB has no entries (expected one). It reproduces with the published GL 1.0.2 + HB 1.0.3 as well as the GL 1.0.3 and HB 1.1.1 candidates. Whether the product or the test is at fault has not been established, so treat it as a possible product defect until investigated.
+Resolved as a test account-selection error on November 16, 2026. The bare client
+ID identifies one feed, not necessarily the manually selected destination
+profile's feed. Automatic sharing retained an empty feed for its mapped unnamed
+profile; the manual private reminder remained intact in the separate
+`clientId:profileId` feed for `central-synthetic`. Both activation and key-expiry
+reminders remained available. The regression now selects the exact intended
+profile, requires exactly one matching feed and one entry, and preserves the
+activation/privacy assertions. It also checks page and HB extension reloads.
+No production reminder synchronization, permissions or feed persistence changed.
 
 ## Browser identity and central review
 

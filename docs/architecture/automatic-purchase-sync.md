@@ -45,6 +45,18 @@ Medium severity; priority for the next release. When a companion's saved purchas
 
 The regression test is the default (manual) mode of `scripts/check-purchase-handoff-browser.mjs`: its `afterQuery` assertion compares ownership answers before and after the round trip. Keep it unchanged; it is expected to fail until the defect is fixed. The cause has not been diagnosed. The fix belongs in shared purchase-sync code and should ship as a coordinated GL, HB and FAN update, like the collision fix above.
 
+November 16 investigation isolated the two records to **different GL profiles**:
+the automatically mapped unnamed profile and a separately created `Personal`
+profile requested by the manual fixture. The native product ID and purchase ID
+remain identical through GL → HB → GL; importing back into the same profile is
+idempotent. Automatic sharing continues using its existing mapping, rather than
+silently adopting the manual destination. The original browser assertion remains
+unchanged and failing. Do not deduplicate these records across profiles or alter
+an established mapping based on titles or equal purchase tokens alone. A follow-up
+must define how manual restore confirms/reuses or explicitly repairs the mapped
+destination, including intentional separate-account transfers. No production
+identity/reconciliation change has been made for this case.
+
 ## UI and validation
 
 Normal UI shows the default-on sharing checkbox, disclosure, status and last success. Account choices, repair, retry and diagnostics are under Advanced. The former direction/preview/offer/import workflow remains under Advanced. Validation covers synthetic account lifecycles, all four propagation directions, replay/no-change storage growth, actual packaged Chrome/Firefox messaging, and restart/retry handling. Real installed extensions and personal backups are never used as test destinations.

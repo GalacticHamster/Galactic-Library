@@ -18,5 +18,8 @@ galactic-library-backup*.json
 /node_modules/
 /start.txt
 
+/AGENTS.md
+/CLAUDE.md
+
 icons/provider-icons/*128.png
 icons/provider-icons/*24.png
