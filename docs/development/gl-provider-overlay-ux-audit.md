@@ -1,6 +1,11 @@
 # Provider overlay UX and account lifecycle audit — Phase A
 
 October 26, 2026. **Phase A findings with approved Phase B implementation results.**
+
+November 16 maintenance: the historical in-memory-only Minimize finding is
+resolved by provider-scoped local UI preferences. Explicit Minimize/Expand
+choices survive navigation and restarts and propagate between open provider
+tabs. See [the current overlay architecture](../architecture/provider-overlays.md#panel-size-preference).
 Sections A–I preserve the original audit of baseline `017de8b`; their descriptions
 of defects and old presentation are historical. Phase A changed no production
 behavior. The implementation status below supersedes the original pending-review

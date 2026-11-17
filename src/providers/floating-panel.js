@@ -1,7 +1,23 @@
 /* Shared collapse/restore control for Galactic Library's provider panels. */
 (function attachFloatingPanelControls(global) {
   'use strict';
+  if(global.GalacticFloatingPanel)return;
   const sessions=new Map();
+  const panelStates=new Set();
+  let observingPanelState=false;
+  const panelStateKey=provider=>'galacticLibraryPanelState:'+provider;
+  function observePanelStates(){
+    for(const state of panelStates)if(!state.shadow.host.isConnected)panelStates.delete(state);
+    if(observingPanelState||!chrome.storage?.onChanged?.addListener)return;
+    chrome.storage.onChanged.addListener((changes,area)=>{
+      if(area!=='local')return;
+      for(const state of panelStates){
+        if(!state.shadow.host.isConnected){panelStates.delete(state);continue;}
+        if(Object.hasOwn(changes,state.key)){state.changed=true;state.apply(changes[state.key].newValue===true);}
+      }
+    });
+    observingPanelState=true;
+  }
   let profiling=false,profileSequence=100;
   let profilePrefix;
   async function diagnosticsEnabled(provider){
@@ -137,6 +153,8 @@
     append(body,specialized);append(body,diagnostics);panel.append(body);append(panel,footer);
     for(const section of body.querySelectorAll('details'))if(/diagnostic/iu.test(section.querySelector('summary')?.textContent??'')){section.dataset.providerDiagnostic='';section.hidden=true;}
     shadow.replaceChildren(baseStyle,panel);
+    // Attach completes preference loading before either presentation is shown.
+    panel.hidden=true;
     return {panel,body,actions,status};
   }
   function attach(shadow,provider) {
@@ -267,18 +285,26 @@
     restore.dataset.galacticFloatingPanelControl = 'restore';
     restore.textContent = 'Galactic Library — Expand';
     restore.hidden = true;
-    restore.addEventListener('click', () => {
-      panel.hidden = false;
-      restore.hidden = true;
-      minimize.focus();
-    });
-    minimize.addEventListener('click', () => {
-      panel.hidden = true;
-      restore.hidden = false;
-      restore.focus();
-    });
+    const state={shadow,key:panelStateKey(provider),changed:false,apply(minimized){
+      panel.hidden=minimized;restore.hidden=!minimized;panel.dataset.panelStateReady='true';
+    }};
+    const choose=minimized=>{
+      state.changed=true;state.apply(minimized);
+      (minimized?restore:minimize).focus();
+      if(Object.hasOwn(names,provider))try{
+        Promise.resolve(chrome.storage?.local?.set({[state.key]:minimized})).catch(()=>{});
+      }catch{}
+    };
+    restore.addEventListener('click',()=>choose(false));
+    minimize.addEventListener('click',()=>choose(true));
     panel.append(minimize);
     shadow.append(style, restore);
+    observePanelStates();panelStates.add(state);
+    (async()=>{
+      let minimized=false;
+      try{if(Object.hasOwn(names,provider))minimized=(await chrome.storage?.local?.get(state.key))?.[state.key]===true;}catch{}
+      if(!state.changed)state.apply(minimized);
+    })();
   }
   // Ownership is a presentation decision, never a purchase-sharing grant.
   function importerOwnership(host,provider,isBusy=()=>false){

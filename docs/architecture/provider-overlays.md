@@ -29,6 +29,18 @@ It rejects named panels that did not use `render`. It retains the original
 provider-specific attachment timing, including Xbox route/hydration recovery.
 Rendering never starts a scan or changes save authority.
 
+## Panel size preference
+
+Minimize and Expand save a boolean UI preference in extension-local storage at
+`galacticLibraryPanelState:<canonical-provider-id>`. Missing or unreadable
+preferences default to expanded. The panel remains hidden until initialization
+settles, so a saved minimized panel never flashes expanded. Only explicit clicks
+write preferences; rendering and storage-change listeners do not write defaults.
+Open tabs for the same provider follow changes without changing keyboard focus.
+Preferences are independent of accounts, library records and purchase sharing;
+they are not part of a library backup. A failed preference write still changes
+the current panel, but cannot guarantee persistence to another page.
+
 ## Humble and Fanatical importer ownership
 
 Only these two provider panels call `importerOwnership` after attaching. The
