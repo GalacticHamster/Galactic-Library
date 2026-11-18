@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createEmptyDatabase,providerItemKey} from '../src/lib/models.js';
+import {createEmptyDatabase,normalizeProviderItem,providerItemKey,rebuildCanonicalItems} from '../src/lib/models.js';
+import {createBackup,parseBackup} from '../src/lib/storage.js';
 import {newProviderProfile} from '../src/lib/provider-profiles.js';
 import {entitlementEvidence,effectiveOwnershipRecord} from '../src/lib/ownership.js';
 import {applyPurchaseSnapshot,purchaseSnapshot,purchaseAccounts} from '../src/background/purchase-handoff.js';
@@ -47,4 +48,34 @@ test('GL returns synced Library records with their identities so Humble Library 
  const back=await purchaseSnapshot(db,'humble',p.profileId);
  assert.deepEqual(back.records.map(r=>r.providerItemId).sort(),['humble-library:download_drm_free:'+uuid(1),'humble-library:steam:'+uuid(3)]);
  assert(back.records.every(r=>r.metadata.purchaseId.startsWith('humble-library:')));
+});
+
+test('filtered Humble snapshots leave existing copies and precise access corrections intact through restore',async()=>{
+ const {db,p}=database(),other=newProviderProfile('humble','Other account');
+ db.providerProfiles[other.profileId]=other;
+ const slot={providerItemId:'old-order:product:slot',title:'No Content',mediaType:'book',
+   metadata:{purchaseId:'old-order',entitlement:'direct-download'},purchasedAt:null,origins:[]};
+ const legitimate={...slot,providerItemId:'old-order:product:book',metadata:{...slot.metadata,formats:['pdf']}};
+ const target=async(d,profile)=> (await purchaseAccounts(d,'humble')).find(a=>a.accountRef===profile.profileId);
+ await applyPurchaseSnapshot(db,snapshot([slot,legitimate]),await target(db,p));
+ await applyPurchaseSnapshot(db,snapshot([slot]),await target(db,other));
+ const kindle=newProviderProfile('kindle','Synthetic Kindle');
+ db.providerProfiles[kindle.profileId]=kindle;
+ const additional=normalizeProviderItem({provider:'kindle',profileId:kindle.profileId,providerItemId:'B000000001',
+   title:'No Content',mediaType:'book',ownership:'owned'},undefined,{profileKeySpace:kindle.keySpace});
+ db.providerItems[additional.id]=additional;
+ db.canonicalItems=rebuildCanonicalItems(db.providerItems);
+ const savedSlot=db.providerItems[providerItemKey('humble',slot.providerItemId,p.keySpace)];
+ db.ownershipReviews[savedSlot.recordRef]={reviewRef:uuid(98),source:'user-correction',ownership:'unknown',note:'Empty delivery',
+   confirmedAt:'2026-11-16T00:00:00.000Z',evidenceDate:null,expiresAt:null,sourceUrl:''};
+ const restored=parseBackup(createBackup(db));
+ const before=structuredClone(restored);
+ for(let n=0;n<2;n++){
+   const stats=await applyPurchaseSnapshot(restored,snapshot([legitimate]),{...await target(restored,p),autoSync:{id:'synthetic'}});
+   assert.deepEqual(stats,{added:0,updated:0,unchanged:1,skipped:0});
+ }
+ assert.deepEqual(restored,before,'absence leaves all provider records, profiles, canonical links and user corrections intact');
+ assert.equal(effectiveOwnershipRecord(restored.providerItems[savedSlot.id],restored).ownership,'unknown');
+ assert.equal(effectiveOwnershipRecord(restored.providerItems[additional.id],restored).ownership,'owned');
+ assert.equal(effectiveOwnershipRecord(restored.providerItems[providerItemKey('humble',slot.providerItemId,other.keySpace)],restored).ownership,'owned');
 });

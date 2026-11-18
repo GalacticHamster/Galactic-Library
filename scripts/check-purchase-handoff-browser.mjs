@@ -13,11 +13,12 @@ import {createRelease,projectRoot,runtimeZip} from './release.mjs';
 import {chromePipe,freePort,firefoxMarionette} from '../tests/native-protocol.mjs';
 
 const firefox=process.argv.includes('--firefox'),kind=firefox?'firefox':'chrome';
+const placeholder=process.argv.includes('--humble-placeholder');
 const hbRoot=resolve(process.env.HB_ROOT??resolve(projectRoot,'../HB')),fanRoot=resolve(projectRoot,'../Fanatical');
 const temporary=await mkdtemp(join(tmpdir(),'gh-purchase-check-'));
 const collision=process.argv.includes('--collision'),upgrade=process.argv.includes('--native-upgrade'),native=process.argv.includes('--native')||upgrade||collision,automatic=process.argv.includes('--automatic')||native,simple=process.argv.includes('--simple-setup'),reverse=process.argv.includes('--reverse');
 const guided=process.argv.includes('--guided'),readable=process.argv.includes('--readable');
-const artifacts=collision?'purchase-sync-collision':upgrade?'native-purchase-upgrade':native?'native-purchase-sync':simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
+const artifacts=placeholder?'humble-placeholder':collision?'purchase-sync-collision':upgrade?'native-purchase-upgrade':native?'native-purchase-sync':simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
 const output=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/results.json');
 const checks=[],screenshots=[];let child,driver,exited;
 try{
@@ -29,12 +30,25 @@ try{
   const port=firefox?await freePort():0;
   if(firefox)await writeFile(join(profile,'user.js'),`user_pref("marionette.port",${port});\nuser_pref("browser.shell.checkDefaultBrowser",false);\nuser_pref("extensions.update.enabled",false);\nuser_pref("toolkit.telemetry.enabled",false);\nuser_pref("network.captive-portal-service.enabled",false);\n`);
   const args=firefox?['--headless','--no-remote','--profile',profile,'--marionette','--remote-allow-system-access','about:blank']:['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--enable-unsafe-extension-debugging','--remote-debugging-pipe',`--user-data-dir=${profile}`,'about:blank'];
-  child=spawn(binary,args,{windowsHide:true,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});
+  child=spawn(binary,args,{windowsHide:true,env:firefox?{...process.env,MOZ_REMOTE_ALLOW_SYSTEM_ACCESS:'1'}:process.env,stdio:firefox?['ignore','pipe','pipe']:['ignore','pipe','pipe','pipe','pipe']});exited=new Promise(done=>child.once('exit',done));child.on('error',()=>{});
   driver=firefox?await firefoxMarionette(port):chromePipe(child);
   if(firefox)await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox',...(simple?{unhandledPromptBehavior:'ignore'}:{})}}});
   async function load(root,role){
     let archive,manifest,stage;
-    if(role==='hb'){
+    if(placeholder){
+      // Use existing browser-specific manifests and install unpacked test copies.
+      // Overlay the current HB files under test without building release archives.
+      const suffix=firefox?'-firefox':'';
+      archive=role==='hb'?(process.env.HB_RUNTIME_PACKAGE??join(root,'dist/1.1.1-rc6','Humble-Comic-Library-1.1.1'+suffix+'.zip'))
+        :(process.env.GL_RUNTIME_PACKAGE??join(root,'dist/1.0.3-rc1','GalacticLibrary-1.0.3'+suffix+'.zip'));
+      stage=join(temporary,role);
+      execFileSync('powershell.exe',['-NoProfile','-Command','Expand-Archive -LiteralPath $env:GH_TEST_ZIP -DestinationPath $env:GH_TEST_STAGE'],{windowsHide:true,env:{...process.env,GH_TEST_ZIP:archive,GH_TEST_STAGE:stage}});
+      if(role==='hb')for(const file of ['shared.js','library-entitlements.js','library-browser.js']){
+        const source=process.env.HB_PLACEHOLDER_REF?execFileSync('git',['show',process.env.HB_PLACEHOLDER_REF+':'+file],{cwd:root}):await readFile(join(root,file));
+        await writeFile(join(stage,file),source);
+      }
+      manifest=JSON.parse(await readFile(join(stage,'manifest.json'),'utf8'));
+    }else if(role==='hb'){
       const directory=join(temporary,'hb-package');await mkdir(directory);
       execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(root,'scripts/package-release.ps1'),'-Target',firefox?'Firefox':'Chrome','-OutputDirectory',directory],{windowsHide:true,stdio:'pipe'});
       manifest=JSON.parse(await readFile(join(root,'manifest.json'),'utf8'));archive=join(directory,'Humble-Comic-Library-'+manifest.version+(firefox?'-firefox':'')+'.zip');
@@ -45,11 +59,11 @@ try{
       if(!firefox){stage=join(temporary,role);await mkdir(stage);for(const [path,bytes]of release.files){await mkdir(resolve(stage,path,'..'),{recursive:true});await writeFile(join(stage,path),bytes);}}
     }
     if(role==='hb')for(const path of ['options.html','purchase-handoff-ui.js','purchase-transfer.js']){const bytes=await readFile(join(stage,path)),text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);assert(!/[\uFFFD\u00C3\u00C2]/u.test(text),path+' packaged text corruption');}
-    const result=await driver.send(firefox?'Addon:Install':'Extensions.loadUnpacked',firefox?{path:archive,temporary:true}:{path:stage});
+    const result=await driver.send(firefox?'Addon:Install':'Extensions.loadUnpacked',firefox?{path:placeholder?stage:archive,temporary:true}:{path:stage});
     return {id:firefox?(result.value??result):result.id,manifest,role};
   }
   const installed={};let session;
-  for(const role of simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
+  for(const role of placeholder?['gl','hb']:simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
     installed[role]=await load(role==='gl'?projectRoot:role==='hb'?hbRoot:fanRoot,role);
     if(simple&&(reverse?role==='gl':role!=='gl')){await navigate(role);await seedSimplePurchases(role,evaluate);}
   }
@@ -69,12 +83,15 @@ try{
   const measurements=[];
   const call=(role,action,provider,fields={})=>evaluate(`return chrome.runtime.sendMessage(${JSON.stringify({type:'GH_PURCHASE_ACTION',action,provider,...fields})});`);
   const state=async(role,provider)=>{await navigate(role);const value=await call(role,'state',provider);assert.equal(value.ok,true,value.error);return value;};
-  await navigate('gl');await evaluate(`const S=await import('./src/lib/storage.js');await S.addAllowedExternalClientId(${JSON.stringify(installed.hb.id)});await S.addAllowedExternalClientId(${JSON.stringify(installed.fan.id)});return true;`);
-  for(const role of ['hb','fan']){
+  await navigate('gl');await evaluate(`const S=await import('./src/lib/storage.js');for(const id of ${JSON.stringify(Object.values(installed).filter(item=>item.role!=='gl').map(item=>item.id))})await S.addAllowedExternalClientId(id);return true;`);
+  for(const role of placeholder?['hb']:['hb','fan']){
     await navigate(role);await evaluate(`await chrome.runtime.sendMessage({type:${JSON.stringify(role==='hb'?'HCL_STORE':'FANATICAL_STORE')},operation:'patch',args:[{galacticLibraryExtensionId:${JSON.stringify(installed.gl.id)}}]});return true;`);
 
   }
-  if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(collision){await collisionChecks({navigate,evaluate,call,installed,checks,measurements});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
+  if(placeholder){
+    const {humblePlaceholderChecks}=await import('./humble-placeholder-browser.mjs');
+    await humblePlaceholderChecks({navigate,evaluate,call,checks});
+  }else if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(collision){await collisionChecks({navigate,evaluate,call,installed,checks,measurements});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
     await navigate('gl');await evaluate('document.querySelector("#check-companion-connections").click();return true;');
     await pause(6500);
     const connections=await evaluate('const C=await import("./src/lib/companion-identities.js");return Promise.all(C.builtinCompanions(chrome.runtime).map(async c=>({role:c.role,id:c.id,result:await C.checkCompanionConnection(chrome.runtime,c.id)})));');
