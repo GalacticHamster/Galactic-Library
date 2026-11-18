@@ -513,6 +513,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const timing=providerTiming(request);
     storageWriter.getProviderProfileHint('kobo',timing).then(hint=>providerResponse(timing,sendResponse,{ok:true,hint})).catch(()=>providerResponse(timing,sendResponse,{ok:false}));return true;
   }
+  // Provider panel preferences: minimized and help disclosure, one pair per provider. Provider pages cannot read
+  // library storage, so they ask here, for the provider whose page asks.
+  if(request?.type==='GET_PROVIDER_PANEL_STATE'||request?.type==='SET_PROVIDER_PANEL_STATE'){
+    if(sender.id!==chrome.runtime.id||!isKnownProvider(request.provider)||!isProviderImportPage(request.provider,sender.url)){sendResponse({ok:false});return undefined;}
+    const keys={minimized:'galacticLibraryPanelState:'+request.provider,helpOpen:'galacticLibraryPanelHelp:'+request.provider};
+    if(request.type==='GET_PROVIDER_PANEL_STATE'){
+      chrome.storage.local.get(Object.values(keys)).then(saved=>sendResponse({ok:true,minimized:saved[keys.minimized]===true,helpOpen:saved[keys.helpOpen]===true})).catch(()=>sendResponse({ok:false}));
+      return true;
+    }
+    const fields=Object.fromEntries(Object.keys(keys).filter(field=>typeof request[field]==='boolean').map(field=>[field,request[field]]));
+    if(!Object.keys(fields).length){sendResponse({ok:false});return undefined;}
+    chrome.storage.local.set(Object.fromEntries(Object.entries(fields).map(([field,value])=>[keys[field],value]))).then(()=>{
+      sendResponse({ok:true});
+      // Other open pages show the change too; only this provider's panels act on it.
+      Promise.resolve(chrome.tabs?.query?.({})).then(tabs=>{for(const tab of tabs??[])if(Number.isInteger(tab.id)&&tab.id!==sender.tab?.id)
+        Promise.resolve(chrome.tabs.sendMessage(tab.id,{type:'GL_PROVIDER_PANEL_STATE_CHANGED',provider:request.provider,...fields})).catch(()=>{});}).catch(()=>{});
+    }).catch(()=>sendResponse({ok:false}));
+    return true;
+  }
   if(request?.type==='GET_PROVIDER_DIAGNOSTICS_SETTING'){
     if(sender.id!==chrome.runtime.id||!isKnownProvider(request.provider)||!isProviderImportPage(request.provider,sender.url)){sendResponse({ok:false});return undefined;}
     storageWriter.getProviderDiagnosticsEnabled().then(enabled=>sendResponse({ok:true,enabled})).catch(()=>sendResponse({ok:false}));return true;

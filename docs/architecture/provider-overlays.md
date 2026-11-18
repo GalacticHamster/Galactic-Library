@@ -41,6 +41,19 @@ Preferences are independent of accounts, library records and purchase sharing;
 they are not part of a library backup. A failed preference write still changes
 the current panel, but cannot guarantee persistence to another page.
 
+Provider pages cannot use extension storage: the service worker restricts
+`chrome.storage.local` to trusted contexts when it starts (Chrome). The panel
+therefore reads both preferences with `GET_PROVIDER_PANEL_STATE` and saves a
+change with `SET_PROVIDER_PANEL_STATE`. The worker accepts these only for a
+known provider from that provider's own pages, as it does for the diagnostics
+setting, and stores them under the same keys. After a change it notifies other
+open tabs (`GL_PROVIDER_PANEL_STATE_CHANGED`), where only that provider's panels
+follow it; a later notification also wins over a slower first read. Firefox
+leaves `storage.local` open to content scripts but uses the same path.
+`tests/panel-state-native.mjs` checks this with the installed extension and
+real content scripts on synthetic Steam, GOG and Audible pages in Chrome and
+Firefox.
+
 The shared **How importing works** disclosure also remembers its open state per
 provider at `galacticLibraryPanelHelp:<provider>`. Programmatic restoration and
 cross-tab changes do not write it back. Only a changed disclosure writes once.

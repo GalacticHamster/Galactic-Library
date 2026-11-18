@@ -8,8 +8,20 @@
   const panelStateKey=provider=>'galacticLibraryPanelState:'+provider;
   function observePanelStates(){
     for(const state of panelStates)if(!state.shadow.host.isConnected)panelStates.delete(state);
-    if(observingPanelState||!chrome.storage?.onChanged?.addListener)return;
-    chrome.storage.onChanged.addListener((changes,area)=>{
+    if(observingPanelState)return;
+    observingPanelState=true;
+    // A change made in another tab reaches provider pages from the service worker; extension pages may also see
+    // the storage change itself. Either way only this provider's panels follow it, and nothing is written back.
+    chrome.runtime?.onMessage?.addListener?.(message=>{
+      if(message?.type!=='GL_PROVIDER_PANEL_STATE_CHANGED')return;
+      for(const state of panelStates){
+        if(!state.shadow.host.isConnected){panelStates.delete(state);continue;}
+        if(state.provider!==message.provider)continue;
+        if(typeof message.minimized==='boolean'){state.changed=true;state.apply(message.minimized);}
+        if(typeof message.helpOpen==='boolean'){state.helpChanged=true;state.applyHelp(message.helpOpen);}
+      }
+    });
+    chrome.storage?.onChanged?.addListener?.((changes,area)=>{
       if(area!=='local')return;
       for(const state of panelStates){
         if(!state.shadow.host.isConnected){panelStates.delete(state);continue;}
@@ -17,7 +29,16 @@
         if(Object.hasOwn(changes,state.helpKey)){state.helpChanged=true;state.applyHelp(changes[state.helpKey].newValue===true);}
       }
     });
-    observingPanelState=true;
+  }
+  // Library storage is open only to extension pages (TRUSTED_CONTEXTS), so provider pages read and save their
+  // panel preferences (minimized, help open) through the service worker, one provider at a time.
+  async function readPanelPreferences(provider){
+    if(!Object.hasOwn(names,provider))return null;
+    try{const result=await chrome.runtime.sendMessage({type:'GET_PROVIDER_PANEL_STATE',provider});return result?.ok===true?result:null;}catch{return null;}
+  }
+  function savePanelPreference(provider,update){
+    if(!Object.hasOwn(names,provider))return;
+    try{Promise.resolve(chrome.runtime.sendMessage({type:'SET_PROVIDER_PANEL_STATE',provider,...update})).catch(()=>{});}catch{}
   }
   let profiling=false,profileSequence=100;
   let profilePrefix;
@@ -286,7 +307,7 @@
     restore.dataset.galacticFloatingPanelControl = 'restore';
     restore.textContent = 'Galactic Library — Expand';
     restore.hidden = true;
-    const state={shadow,key:panelStateKey(provider),helpKey:'galacticLibraryPanelHelp:'+provider,changed:false,helpChanged:false,helpValue:false,applyHelp(open){
+    const state={shadow,provider,key:panelStateKey(provider),helpKey:'galacticLibraryPanelHelp:'+provider,changed:false,helpChanged:false,helpValue:false,applyHelp(open){
       this.helpValue=open;if(help)help.open=open;
     },apply(minimized){
       panel.hidden=minimized;restore.hidden=!minimized;panel.dataset.panelStateReady='true';
@@ -294,28 +315,24 @@
     const choose=minimized=>{
       state.changed=true;state.apply(minimized);
       (minimized?restore:minimize).focus();
-      if(Object.hasOwn(names,provider))try{
-        Promise.resolve(chrome.storage?.local?.set({[state.key]:minimized})).catch(()=>{});
-      }catch{}
+      savePanelPreference(provider,{minimized});
     };
     restore.addEventListener('click',()=>choose(false));
     minimize.addEventListener('click',()=>choose(true));
     help?.addEventListener('toggle',()=>{
       if(help.open===state.helpValue)return;
       state.helpChanged=true;state.helpValue=help.open;
-      if(Object.hasOwn(names,provider))try{Promise.resolve(chrome.storage?.local?.set({[state.helpKey]:help.open})).catch(()=>{});}catch{}
+      savePanelPreference(provider,{helpOpen:help.open});
     });
     panel.append(minimize);
     shadow.append(style, restore);
     observePanelStates();panelStates.add(state);
-    (async()=>{
-      let minimized=false;
-      try{if(Object.hasOwn(names,provider))minimized=(await chrome.storage?.local?.get(state.key))?.[state.key]===true;}catch{}
-      let helpOpen=false;
-      try{if(Object.hasOwn(names,provider))helpOpen=(await chrome.storage?.local?.get(state.helpKey))?.[state.helpKey]===true;}catch{}
-      if(!state.helpChanged)state.applyHelp(helpOpen);
-      if(!state.changed)state.apply(minimized);
-    })();
+    // The panel stays hidden until the saved state arrives. Unavailable preferences show it expanded and write
+    // nothing, so a saved choice is never replaced by the fallback; a choice made meanwhile wins.
+    readPanelPreferences(provider).then(saved=>{
+      if(!state.helpChanged)state.applyHelp(saved?.helpOpen===true);
+      if(!state.changed)state.apply(saved?.minimized===true);
+    });
   }
   // Ownership is a presentation decision, never a purchase-sharing grant.
   function importerOwnership(host,provider,isBusy=()=>false){
