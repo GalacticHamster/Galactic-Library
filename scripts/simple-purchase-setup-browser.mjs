@@ -6,16 +6,37 @@ export async function seedSimplePurchases(role,evaluate){
  if(role==='gl')return evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),P=await import('./src/lib/provider-profiles.js'),d=M.createEmptyDatabase();for(const provider of ['humble','fanatical']){const p=P.newProviderProfile(provider);d.providerProfiles[p.profileId]=p;d.providers[provider]={activeProfileId:p.profileId,profileLabel:''};for(let n=0;n<3;n++){const item=M.normalizeProviderItem({provider,profileId:p.profileId,providerItemId:provider==='humble'?'purchase_'+n+':product:product_'+n:'product_'+n,title:provider+' saved book '+n,mediaType:'book',ownership:'owned',metadata:provider==='humble'?{source:'humble-purchase-library',purchaseId:'purchase_'+n,entitlement:'direct-download'}:{source:'fanatical-order-history',bundleId:'bundle_123',bundleTitle:'Saved bundle'}},undefined,{profileKeySpace:p.keySpace});d.providerItems[item.id]=item;}}d.canonicalItems=M.rebuildCanonicalItems(d.providerItems);await S.restoreDatabase(d);return true;`);
  return evaluate(`const role='${role}',items=Array.from({length:3},(_,n)=>role==='hb'?{title:'humble saved book '+n,source:'humble',kind:'book',providerItemId:'purchase_'+n+':product:product_'+n,purchaseKey:'purchase_'+n,entitlement:'direct-download'}:{title:'fanatical saved book '+n,source:'fanatical',mediaType:'book',sourceItemId:'product_'+n,bundle:{sourceItemId:'bundle_123',title:'Saved bundle'}});await chrome.storage.local.set(role==='hb'?{libraryItems:items,humbleProfileLabel:''}:{fanaticalLibraryItems:items,fanaticalProfileLabel:''});return true;`);
 }
-export async function simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse}){
+export async function simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,getSession,firefox,checks,screenshots,reverse}){
  async function show(provider){await evaluate(`document.dispatchEvent(new CustomEvent('gh-purchase-open',{detail:{provider:'${provider}'}}));const h=document.querySelector('[data-purchase-handoff][data-provider="${provider}"]');for(let n=h.parentElement;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true;h.querySelector('[data-purchase-sync]').scrollIntoView();return true;`);await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-purchase-sync]').getAttribute('aria-busy')==='false'`);}
- async function approve(provider,expectSame=false,fromProvider=false){await evaluate(`document.querySelector('${fromProvider?'[data-purchase-connect="'+provider+'"]':'[data-purchase-handoff][data-provider="'+provider+'"] [data-sync-connect]'}').click();return true;`);let question;for(let n=0;n<100;n++){try{question=(await driver.send('WebDriver:GetAlertText')).value;break;}catch{}await new Promise(r=>setTimeout(r,50));}assert(question,'missing explicit connection confirmation');if(expectSame)assert.match(question,/same store account/);await driver.send('WebDriver:AcceptAlert');await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-status]').textContent.startsWith('Synced')`);}
+ async function approve(provider){
+  const session=getSession();
+  let question,unsubscribe;
+  if(!firefox){
+   await driver.send('Page.enable',{},session);
+   unsubscribe=driver.on(event=>{if(event.sessionId===session&&event.method==='Page.javascriptDialogOpening')question=event.params.message;});
+  }
+  try{
+   await evaluate(`const button=document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-connect]');setTimeout(()=>button.click(),0);return !button.disabled;`);
+   for(let n=0;n<100&&!question;n++){
+    if(firefox)try{question=(await driver.send('WebDriver:GetAlertText')).value;}catch{}
+    if(!question)await new Promise(r=>setTimeout(r,50));
+   }
+   assert.match(question??'',/same store account/,'missing explicit same-account confirmation');
+   if(firefox)await driver.send('WebDriver:AcceptAlert');
+   else await driver.send('Page.handleJavaScriptDialog',{accept:true},session);
+  }finally{unsubscribe?.();}
+  await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-summary]').textContent==='Synced'`);
+ }
  async function count(provider,expected){let state;for(let n=0;n<300;n++){state=await call('gl','syncState',provider);if(state.state?.status==='synced'&&!state.state.pending&&state.accounts.find(a=>a.stableId===state.state.localId)?.count===expected){assert.equal(state.state.remoteConfirmed,true);return state;}await new Promise(r=>setTimeout(r,30));}throw Error('Sync did not commit expected count: '+JSON.stringify(state));}
 
  await navigate('gl');
  for(const provider of ['humble','fanatical']){
-  await show(provider);await wait(`Boolean(document.querySelector('[data-purchase-connect="${provider}"]'))`);await approve(provider,false,true);const state=await count(provider,3);await wait(`document.querySelector('.provider-card[data-provider="${provider}"] summary').textContent.includes('3 items')`);assert.equal(state.accounts[0].label,'');
+  await show(provider);const state=await count(provider,3);assert.equal(state.state.confirmed,true);
+  await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-summary]').textContent==='Synced'`);
+  assert.equal(state.accounts.length,1);assert.equal(state.accounts[0].label,'');
   assert.equal(await evaluate(`return document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-advanced]').open;`),false);
-  checks.push(provider+' single GL confirmation populated the unnamed default from '+(reverse?'GL':'the previously installed companion'));
+  checks.push(provider+' automatically paired the unnamed default from '+(reverse?'GL':'the previously installed companion')+' without setup');
+  console.log('Verified automatic setup for '+provider);
  }
  for(const role of ['hb','fan']){
   const provider=role==='hb'?'humble':'fanatical',key=role==='hb'?'libraryItems':'fanaticalLibraryItems';
@@ -25,12 +46,25 @@ export async function simplePurchaseSetupChecks({navigate,evaluate,wait,call,dri
   await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),d=await S.getDatabase(),p=Object.values(d.providerProfiles).find(p=>p.provider==='${provider}'),i=M.normalizeProviderItem({provider:'${provider}',profileId:p.profileId,providerItemId:'${role==='hb'?'later_gl:product:later_product':'later_product'}',title:'Later GL saved book',mediaType:'book',ownership:'owned',metadata:${JSON.stringify(role==='hb'?{source:'humble-purchase-library',purchaseId:'later_gl',entitlement:'direct-download'}:{source:'fanatical-order-history',bundleId:'later_bundle',bundleTitle:'Later bundle'})}},undefined,{profileKeySpace:p.keySpace});await S.mergeProviderItems('${provider}',[i],{profileLabel:''});return true;`);
   await navigate(role);await wait(`(async()=>{const r=await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'syncState',provider:'${provider}'});return r.state?.status==='synced'&&!r.state.pending&&(await chrome.storage.local.get('${key}'))['${key}'].length===5;})()`);
   await navigate('gl');await count(provider,5);const before=await evaluate(`const S=await import('./src/lib/storage.js');return JSON.stringify(await S.getDatabase());`);await call('gl','syncNow',provider);await call('gl','syncNow',provider);assert.equal(await evaluate(`const S=await import('./src/lib/storage.js');return JSON.stringify(await S.getDatabase());`),before);
-  const selected=await call('gl','syncState',provider);await call('gl','syncDisconnect',provider);await show(provider);await approve(provider,true);assert.equal((await count(provider,5)).state.localId,selected.state.localId);
+  const selected=await call('gl','syncState',provider);await call('gl','syncSetSharing',provider,{enabled:false});await call('gl','syncSetSharing',provider,{enabled:true});assert.equal((await count(provider,5)).state.localId,selected.state.localId);
   checks.push(provider+' automatic updates in both directions, repeat no-change bytes and same-account reconnection without duplicates');
+  console.log('Verified automatic round trip for '+provider);
  }
- await navigate('gl');const before=await count('humble',5);await call('gl','syncDisconnect','humble');
+ await navigate('gl');const before=await count('humble',5);
  await evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase();const result=await chrome.runtime.sendMessage({type:'LIBRARY_STORAGE_OPERATION',operation:'importPurchaseSnapshot',args:[{protocolVersion:1,provider:'humble',snapshotId:crypto.randomUUID(),accountRef:'synthetic-empty',accountLabel:'',capturedAt:new Date().toISOString(),scope:'historical',completeness:'partial',limitations:[],records:[]},{newLabel:'Other saved account',expectedActiveId:d.providers.humble.activeProfileId}]});if(!result.ok)throw Error(result.error);return true;`);
- await show('humble');await evaluate(`document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-connect]').click();return true;`);await wait(`document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-advanced]').open&&document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-connect]').disabled`);
- assert.equal((await call('gl','syncState','humble')).state,null);await evaluate(`const select=document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-local]');select.value='${before.state.localId}';select.dispatchEvent(new Event('change'));return true;`);await approve('humble',true);await count('humble',5);assert.equal((await call('gl','syncState','humble')).accounts.find(a=>a.label==='Other saved account').count,0);checks.push('ambiguous multiple accounts stay disconnected until an explicit Advanced selection; unrelated account untouched');
- for(const width of [1200,560]){await driver.send('WebDriver:SetWindowRect',{width,height:900});await show('humble');assert.equal(await evaluate('return document.documentElement.scrollWidth>innerWidth+1;'),false);const capture=await driver.send('WebDriver:TakeScreenshot'),path=await outputPath(`audit-artifacts/simple-purchase-setup/${reverse?'reverse':'companions-first'}-${width}.png`);await writeFile(path,Buffer.from(capture.value,'base64'));screenshots.push(path);}
+ await call('gl','syncDisconnect','humble');
+ await navigate('gl');await show('humble');
+ await evaluate(`document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-connect]').click();return true;`);
+ await wait(`(()=>{const h=document.querySelector('[data-purchase-handoff][data-provider="humble"]');return h.querySelector('[data-sync-local]').options.length===3&&h.querySelector('[data-sync-connect]').disabled})()`);
+ assert.equal((await call('gl','syncState','humble')).state,null);
+ await evaluate(`const select=document.querySelector('[data-purchase-handoff][data-provider="humble"] [data-sync-local]');select.value='${before.state.localId}';select.dispatchEvent(new Event('change'));return true;`);
+ await approve('humble');await count('humble',5);assert.equal((await call('gl','syncState','humble')).accounts.find(a=>a.label==='Other saved account').count,0);checks.push('ambiguous multiple accounts stay disconnected until an explicit Advanced selection; unrelated account untouched');
+ for(const width of [1200,560]){
+  if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height:900});
+  else await driver.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false},getSession());
+  await show('humble');assert.equal(await evaluate('return document.documentElement.scrollWidth>innerWidth+1;'),false);
+  const capture=firefox?await driver.send('WebDriver:TakeScreenshot'):await driver.send('Page.captureScreenshot',{format:'png'},getSession());
+  const path=await outputPath(`audit-artifacts/simple-purchase-setup/${firefox?'firefox':'chrome'}-${reverse?'reverse':'companions-first'}-${width}.png`);
+  await writeFile(path,Buffer.from(firefox?capture.value:capture.data,'base64'));screenshots.push(path);
+ }
 }

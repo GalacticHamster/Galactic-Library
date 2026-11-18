@@ -1,6 +1,7 @@
 // Installed production acquisition/worker/writer, synthetic localhost data only.
 // Run: node tests/fanatical-native.mjs [--firefox]
 import assert from 'node:assert/strict';
+import {observeImportLifecycle} from './import-lifecycle.mjs';
 import {fanaticalOrder} from './fanatical-coverage.js';
 import {spawn,execFileSync} from 'node:child_process';
 import {access,mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
@@ -26,6 +27,11 @@ await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin='http://
 // Test-only origin substitution, never shipping permissions or application guards.
 const manifest=JSON.parse(files.get('manifest.json'));for(const entry of manifest.content_scripts)entry.matches=entry.matches.map(p=>p==='https://www.fanatical.com/*'?'http://127.0.0.1/*':p);
 manifest.host_permissions.push('http://127.0.0.1/*');files.set('manifest.json',Buffer.from(JSON.stringify(manifest)));
+// MAIN posts progress only to the provider origin. Keep that restriction in
+// the fixture, substituting its localhost origin just as for the worker.
+const scanPath='src/providers/fanatical-scan.js',scanSource=files.get(scanPath).toString();
+assert.match(scanSource,/window\.postMessage[^\n]+,'https:\/\/www\.fanatical\.com'\)/u);
+files.set(scanPath,Buffer.from(scanSource.replaceAll(",'https://www.fanatical.com')",','+JSON.stringify(origin)+')').replaceAll(", 'https://www.fanatical.com')",', '+JSON.stringify(origin)+')')));
 files.set('src/background/service-worker.js',Buffer.from(files.get('src/background/service-worker.js').toString().replaceAll('https://www.fanatical.com',origin).replace('async function notifyVideoDiagnostics(){',`let fanaticalTestReject='',fanaticalTestWrites=0;const testEvents=[];const fanaticalTestSet=privateArea.set.bind(privateArea);privateArea.set=async patch=>{if(fanaticalTestReject&&patch.galacticLibraryDatabase)throw Error(fanaticalTestReject+' FAKE_TOKEN FAKE_ACCOUNT FAKE_ORDER FAKE_TITLE https://private.invalid FAKE_STACK');await fanaticalTestSet(patch);testEvents.push({keys:Object.keys(patch),bytes:new TextEncoder().encode(JSON.stringify(patch)).length});if(patch.galacticLibraryDatabase)fanaticalTestWrites++;};chrome.runtime.onMessage.addListener((r,s,reply)=>{if(r?.type==='GL_TEST_FANATICAL_STORAGE'){if(typeof r.reject==='string')fanaticalTestReject=r.reject;reply({writes:fanaticalTestWrites,events:testEvents});return false;}});async function notifyVideoDiagnostics(){`)));
 files.set('src/providers/fanatical-content.js',Buffer.from('const originalObjectUrl=URL.createObjectURL;URL.createObjectURL=function(b){b.text().then(t=>{document.documentElement.dataset.testScanExport=t;});return originalObjectUrl.call(this,b);};const originalAttach=Element.prototype.attachShadow;Element.prototype.attachShadow=function(o){return originalAttach.call(this,{...o,mode:"open"});};\n'+files.get('src/providers/fanatical-content.js').toString()+"\ndocument.documentElement.dataset.testReportUrl=chrome.runtime.getURL('test-report.html');"));
 files.set('test-report.html',Buffer.from('<html><body><script type="module" src="test-report.js"></script></body></html>'));
@@ -70,12 +76,15 @@ try{
   const ready=()=>wait('return !!document.querySelector("#galactic-library-fanatical-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Fanatical panel unavailable');
   async function page(){await navigate(origin+'/en/orders');await ready();}
   async function sync(mode='full'){
-    await evaluate(`const s=${root};s.querySelector('[data-mode="${mode}"]').click();return true;`);
-    await wait(`return !${root}.querySelector('.status').dataset.busy;`,'Import did not finish');
-    return evaluate(`return ${root}.querySelector('.status').textContent;`);
+    await evaluate(`const s=${root},out=document.documentElement.dataset;delete out.testImportLifecycle;
+      (${observeImportLifecycle.toString()})({button:s.querySelector('[data-mode="${mode}"]'),status:s.querySelector('.status')})
+        .then(result=>{out.testImportLifecycle=JSON.stringify(result);});return true;`);
+    const result=JSON.parse(await wait('return document.documentElement.dataset.testImportLifecycle;','Import did not finish'));
+    assert(result.started && ['succeeded','partial','failed'].includes(result.state),JSON.stringify(result));
+    return result.message;
   }
   async function report(){await navigate(reportUrl);return JSON.parse(await wait('return document.documentElement?.dataset.result;','No saved report'));}
-  async function scanReport(){await wait(`return ${root}.querySelector('[data-export-scan]').closest('details').hidden===false;`,'Diagnostic control not visible');await evaluate(`const s=${root};s.querySelector('[data-export-scan]').closest('details').open=true;s.querySelector('[data-export-scan]').click();return true;`);return JSON.parse(await wait('return document.documentElement.dataset.testScanExport;','No aggregate scan report'));}
+  async function scanReport(){await wait(`const button=${root}.querySelector('[data-export-scan]');return !button.disabled&&!button.closest('details').hidden;`,'Diagnostic control not ready');await evaluate(`const s=${root};delete document.documentElement.dataset.testScanExport;s.querySelector('[data-export-scan]').closest('details').open=true;s.querySelector('[data-export-scan]').click();return true;`);return JSON.parse(await wait('return document.documentElement.dataset.testScanExport;','No aggregate scan report'));}
 
   await page();const reportUrl=await evaluate('return document.documentElement.dataset.testReportUrl;');
   for(const scenario of [{name:'small',n:3,delay:0},{name:'large',n:90,delay:0},{name:'slow',n:12,delay:350},{name:'waiting',n:3,delay:2400},{name:'partial',n:5,delay:100,fail:true}]){

@@ -179,7 +179,7 @@ export async function nativePurchaseChecks({navigate,evaluate,wait,call,driver,f
 
 // Known issue (docs/architecture/automatic-purchase-sync.md): an automatic sync that meets a running
 // manual import stops with Needs attention instead of retrying. This proves it loses nothing.
-export async function collisionChecks({navigate,evaluate,call,installed,checks,measurements}){
+export async function collisionChecks({navigate,evaluate,pollOperation,call,installed,checks,measurements}){
  await navigate('gl');
  await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),P=await import('./src/lib/provider-profiles.js'),d=M.createEmptyDatabase();
   const h=P.newProviderProfile('humble','Personal');d.providerProfiles[h.profileId]=h;h.state={connected:true};d.providers.humble={...h.state,profileLabel:h.nickname,activeProfileId:h.profileId};
@@ -187,7 +187,24 @@ export async function collisionChecks({navigate,evaluate,call,installed,checks,m
  await settle(call);
  await navigate('hb');
  await evaluate(`const items=[];for(let n=0;n<3000;n++){const purchase='order_'+Math.floor(n/20);items.push({title:'Collision book '+n,kind:'book',source:'humble',purchaseKey:purchase,providerItemId:purchase+':product:p'+n,sourceBundle:'Bundle '+Math.floor(n/20),entitlement:'direct-download'});}await chrome.storage.local.set({humbleProfileLabel:'Personal',libraryItems:items});return true;`);
- await pair(call);await navigate('gl');await waitForHumble(evaluate,call,3000);
+ const choice=await pair(call);
+ const confirmed=async role=>{
+   await navigate(role);
+   for(let n=0;n<100;n++){
+     const {state}=await call(role,'syncState','humble');
+     if(state?.confirmed&&state.remoteConfirmed)return state;
+     await new Promise(done=>setTimeout(done,100));
+   }
+   return null;
+ };
+ const initial=await confirmed('gl'),peer=await confirmed('hb');
+ assert(initial?.confirmed&&initial.remoteConfirmed&&peer?.confirmed&&peer.remoteConfirmed&&peer.id===initial.id,
+   'both workers must acknowledge the same collision-fixture relationship');
+ assert.equal(initial.remoteId,choice.accounts[0].stableId,'collision fixture uses the intended HB account');
+ await navigate('gl');
+ const ready=await call('gl','syncNow','humble');
+ assert.equal(ready.ok,true,ready.error);
+ await waitForHumble(evaluate,call,3000);
  // GL-held purchases that HB lacks, so the manual GL -> HB import below has real work to do.
  await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),d=await S.getDatabase(),p=Object.values(d.providerProfiles).find(p=>p.provider==='humble'),items=[];for(let n=0;n<2500;n++)items.push(M.normalizeProviderItem({provider:'humble',profileId:p.profileId,providerItemId:'glonly_'+n+':product:x'+n,title:'GL-held book '+n,mediaType:'book',ownership:'owned',metadata:{source:'humble-purchase-library',entitlement:'direct-download',purchaseId:'glonly_'+n,sourceBundle:'GL bundle'}},undefined,{profileKeySpace:p.keySpace}));await S.mergeProviderItems('humble',items,{profileLabel:p.nickname});return true;`);
  const glState=(await call('gl','state','humble')).accounts.find(a=>a.label==='Personal'),hbBefore=await (async()=>{await navigate('hb');return evaluate(`const s=await chrome.storage.local.get({libraryItems:[]});return s.libraryItems.length;`);})();
@@ -217,12 +234,24 @@ export async function collisionChecks({navigate,evaluate,call,installed,checks,m
  const hbAccount=(await call('hb','state','humble')).accounts[0].accountRef;
  const hbNow=await evaluate(`return (await chrome.storage.local.get({libraryItems:[]})).libraryItems.length;`);
  await navigate('gl');const activeId=await evaluate(`const S=await import('./src/lib/storage.js');return (await S.getDatabase()).providers.humble.activeProfileId;`);
- const second=await evaluate(`const send=a=>chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',...a});const manual=send({action:'import',provider:'humble',peerId:${JSON.stringify(installed.hb.id)},accountRef:${JSON.stringify(hbAccount)},confirmed:true,target:{newLabel:'Second',expectedActiveId:${JSON.stringify(activeId)}}});
+ const manualRequest={action:'import',provider:'humble',peerId:installed.hb.id,accountRef:hbAccount,confirmed:true,target:{newLabel:'Second',expectedActiveId:activeId}};
+ const second=await pollOperation(`const send=a=>chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',...a});const manual=send(${JSON.stringify(manualRequest)});
   const auto=await send({action:'syncNow',provider:'humble'});const m=await manual;return {manual:{ok:m.ok,added:m.added??null,error:m.error??null},auto:{ok:auto.ok,error:auto.error??null}};`);
  let st2;for(let n=0;n<300;n++){st2=(await call('gl','syncState','humble')).state;if(!st2?.pending||st2.status==='attention')break;await new Promise(r=>setTimeout(r,100));}
  const counts=async()=>evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase(),rows=Object.values(d.providerItems).filter(i=>i.provider==='humble'),by={};for(const r of rows){const label=d.providerProfiles[r.profileId].nickname;by[label]=(by[label]??0)+1;}return {by,unique:new Set(rows.map(i=>i.id)).size,rows:rows.length};`);
+ let manual=second.manual;
+ if(!manual.ok){
+   // The background timer can acquire the same writer lock first. Verify
+   // that refusal made no second profile, then retry that exact manual import.
+   assert.match(manual.error,/already importing/);
+   assert.equal((await counts()).by.Second,undefined,'a rejected transfer can never create a destination');
+   await waitSynced(call);
+   const source=(await call('gl','remoteAccounts','humble')).accounts[0];
+   assert.equal(source.accountRef,hbAccount,'retry uses the same saved source checkout');
+   manual=await pollOperation(`return chrome.runtime.sendMessage(${JSON.stringify({type:'GH_PURCHASE_ACTION',...manualRequest})});`);
+ }
  const during=await counts();measurements.push({collisionPhase2:{second,status:st2?.status,errorCode:st2?.errorCode??null,during}});
- assert.equal(second.manual.ok,true,second.manual.error);assert.equal(during.unique,during.rows,'no duplicate GL records');
+ assert.equal(manual.ok,true,manual.error);assert.equal(during.unique,during.rows,'no duplicate GL records');
  assert.equal(during.by.Second,hbNow,'the manual import into the second account completed in full');
  if(st2?.status==='attention'){await navigate('hb');const retry=await call('hb','syncRetry','humble');assert.equal(retry.ok,true,retry.error);await navigate('gl');await call('gl','syncNow','humble');}
  await navigate('gl');await waitSynced(call);const recovered=await counts();

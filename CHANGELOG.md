@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.0.4
+
+- Galactic Library remembers whether each provider panel is minimized and whether its help is open. Preferences carry across reloads and tabs on the same provider.
+- Chrome provider pages now save these choices through the extension. A saved minimized panel opens directly in its compact state without flashing the expanded panel.
+
 ## 1.0.3 — Fanatical purchase scanning
 
 - Fanatical purchase scans in Galactic Library now handle promotional items in purchases the same way as Fanatical Library 1.0.5, and keep its expanded diagnostics for incomplete imports. Purchase admission and coverage checks are unchanged.

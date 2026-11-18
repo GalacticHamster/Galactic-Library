@@ -1,6 +1,7 @@
 // Installed production acquisition/worker/writer, synthetic localhost data only.
 // Run: node tests/humble-native.mjs [--firefox]
 import assert from 'node:assert/strict';
+import {observeImportLifecycle} from './import-lifecycle.mjs';
 import {humbleOrder,humbleDetail} from './humble-recovery.js';
 import {spawn,execFileSync} from 'node:child_process';
 import {access,mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
@@ -62,9 +63,12 @@ try{
   const ready=()=>wait('return !!document.querySelector("#galactic-library-humble-importer")?.shadowRoot?.querySelector("[data-profile-label]");','Humble panel unavailable');
   async function page(){await navigate(origin+'/home/purchases');await ready();}
   async function sync(mode='full'){
-    await evaluate(`const s=${root};s.querySelector('[data-mode="${mode}"]').click();return true;`);
-    await wait(`return !${root}.querySelector('.status').dataset.busy;`,'Import did not finish');
-    return evaluate(`return ${root}.querySelector('.status').textContent;`);
+    await evaluate(`const s=${root},out=document.documentElement.dataset;delete out.testImportLifecycle;
+      (${observeImportLifecycle.toString()})({button:s.querySelector('[data-mode="${mode}"]'),status:s.querySelector('.status'),classify:message=>message.trim()?'completed':null})
+        .then(result=>{out.testImportLifecycle=JSON.stringify(result);});return true;`);
+    const result=JSON.parse(await wait('return document.documentElement.dataset.testImportLifecycle;','Import did not finish'));
+    assert(result.started && result.state==='completed',JSON.stringify(result));
+    return result.message;
   }
   async function report(){await navigate(reportUrl);return JSON.parse(await wait('return document.documentElement?.dataset.result;','No saved report'));}
   const checks=[];

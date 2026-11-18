@@ -169,6 +169,13 @@ try{
     await navigate(hb.id,hb.manifest.options_page);
     assert(await evaluate(`for(let n=0;n<200&&!document.querySelector('#galactic-library-link-status').textContent.includes('Automatic Galactic Library pairing ready.');n++)await new Promise(done=>setTimeout(done,20));document.querySelector('#test-galactic-library-link').click();for(let n=0;n<200;n++){const text=document.querySelector('#galactic-library-link-status').textContent;if(text.startsWith('Connected to Galactic Library'))return true;await new Promise(done=>setTimeout(done,20));}throw Error('HB automatic settings connection check failed: '+document.querySelector('#galactic-library-link-status').textContent);`));console.log('PASS Firefox settings: HB verifies automatic GL connection through the normal UI');
     const hbChecks=await evaluate((await readFile(join(hbRoot,'tests/runtime-checks.js'),'utf8'))+';return await installedRuntimeChecks();');hbChecks.checks.forEach(name=>console.log('PASS installed Firefox HB: '+name));
+    // The account-switch check waits for storage. The reminder form renders
+    // separately and must show the restored account before the user confirms it.
+    assert(await evaluate(`for(let n=0;n<200;n++){
+      const form=document.querySelector('#share-hb-profile'),stored=await chrome.storage.local.get('humbleProfileLabel');
+      if(form.dataset.profileLabel==='personal'&&stored.humbleProfileLabel==='personal'&&!document.querySelector('#share-entitlements').disabled)return true;
+      await new Promise(done=>setTimeout(done,20));
+    }throw Error('HB reminder form did not render the restored active profile');`));
     await evaluate(`const H=HumbleComicLibrary;if(H.resolveGalacticId('',chrome.runtime)!==${JSON.stringify(installed.id)})throw Error('Wrong automatic HB target');document.querySelector('#share-gl-profile').value='central-synthetic';document.querySelector('#confirm-reminder-sharing').checked=true;document.querySelector('#share-entitlements').click();for(let n=0;n<200;n++){const text=document.querySelector('#entitlement-share-status').textContent;if(text.startsWith('Shared 1 entitlements'))return true;if(!document.querySelector('#share-entitlements').disabled)throw Error(text);await new Promise(done=>setTimeout(done,20));}throw Error('Reminder sharing did not complete');`);console.log('PASS Firefox pairing: installed HB options shares private entitlement reminders using its stable add-on ID');
     await navigate(fan.id,fan.manifest.options_page);
     const fanChecks=await evaluate(`

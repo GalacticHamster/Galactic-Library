@@ -35,7 +35,13 @@ try{
   if(firefox)await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox',...(simple?{unhandledPromptBehavior:'ignore'}:{})}}});
   async function load(root,role){
     let archive,manifest,stage;
-    if(placeholder){
+    const supplied=role==='hb'?process.env.HB_RUNTIME_PACKAGE:role==='gl'?process.env.GL_RUNTIME_PACKAGE:undefined;
+    if(supplied&&!process.env.HB_PLACEHOLDER_REF){
+      archive=resolve(supplied);stage=join(temporary,role);
+      execFileSync('powershell.exe',['-NoProfile','-Command','Expand-Archive -LiteralPath $env:GH_TEST_ZIP -DestinationPath $env:GH_TEST_STAGE'],{windowsHide:true,env:{...process.env,GH_TEST_ZIP:archive,GH_TEST_STAGE:stage}});
+      manifest=JSON.parse(await readFile(join(stage,'manifest.json'),'utf8'));
+      assert.equal(Boolean(manifest.browser_specific_settings?.gecko),firefox,'supplied archive browser does not match the run');
+    }else if(placeholder){
       // Use existing browser-specific manifests and install unpacked test copies.
       // Overlay the current HB files under test without building release archives.
       const suffix=firefox?'-firefox':'';
@@ -59,7 +65,8 @@ try{
       if(!firefox){stage=join(temporary,role);await mkdir(stage);for(const [path,bytes]of release.files){await mkdir(resolve(stage,path,'..'),{recursive:true});await writeFile(join(stage,path),bytes);}}
     }
     if(role==='hb')for(const path of ['options.html','purchase-handoff-ui.js','purchase-transfer.js']){const bytes=await readFile(join(stage,path)),text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);assert(!/[\uFFFD\u00C3\u00C2]/u.test(text),path+' packaged text corruption');}
-    const result=await driver.send(firefox?'Addon:Install':'Extensions.loadUnpacked',firefox?{path:placeholder?stage:archive,temporary:true}:{path:stage});
+    const fixtureDirectory=placeholder&&(!supplied||process.env.HB_PLACEHOLDER_REF);
+    const result=await driver.send(firefox?'Addon:Install':'Extensions.loadUnpacked',firefox?{path:fixtureDirectory?stage:archive,temporary:true}:{path:stage});
     return {id:firefox?(result.value??result):result.id,manifest,role};
   }
   const installed={};let session;
@@ -81,8 +88,29 @@ try{
   async function restart(role){if(firefox){await navigate(role==='gl'?'hb':'gl');await driver.send('Marionette:SetContext',{value:'chrome'});const result=await driver.send('WebDriver:ExecuteAsyncScript',{script:'const done=arguments[arguments.length-1],id=arguments[0];const {AddonManager}=ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs");AddonManager.getAddonByID(id).then(addon=>addon.reload()).then(()=>done(true),error=>done({error:error.message}));',args:[installed[role].id],newSandbox:true});assert.equal(result.value??result,true);await driver.send('Marionette:SetContext',{value:'content'});}else{await driver.send('ServiceWorker.enable',{},session);await driver.send('ServiceWorker.stopAllWorkers',{},session);}await pause(100);}
   async function readableScreenshot(role,name){if(!readable)return;for(const palette of ['light','dark'])for(const width of [1200,420]){await evaluate(`await chrome.runtime.sendMessage({type:'GH_SET_APPEARANCE',mode:${JSON.stringify(palette)},followGl:false});await GalacticHamsterTheme.page.load();return true;`);if(firefox)await driver.send('WebDriver:SetWindowRect',{width,height:1000});else await driver.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false},session);for(const expanded of [false,true]){await evaluate(`const h=document.querySelector('[data-purchase-handoff]'),d=h.querySelector('[data-purchase-technical]');d.open=${expanded};h.querySelector('[data-purchase-status=diagnostic]').scrollIntoView();return true;`);if(expanded)await wait('document.querySelector("[data-purchase-technical] pre").textContent.length>0');const result=await evaluate(`const h=document.querySelector('[data-purchase-handoff]'),r=h.querySelector('[data-purchase-status=diagnostic]'),copy=r.cloneNode(true);copy.querySelectorAll('details').forEach(d=>d.remove());return {primary:copy.textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,technical:r.querySelector('details').open};`);assert.equal(result.overflow,false,role+' '+name+' '+palette+' '+width+' overflow');assert(!/\b(observation|enrichment|correspondence|canonical|identity conflict|scoped record|provenance|hydration|purchase origin)s?\b/i.test(result.primary));assert(result.primary.includes('No library data was changed')||result.primary.includes('Nothing has been imported yet'));const image=await driver.send(firefox?'WebDriver:TakeScreenshot':'Page.captureScreenshot',firefox?{}:{format:'png'},firefox?undefined:session);const path=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/'+role+'-'+name+'-'+palette+'-'+width+(expanded?'-technical':'')+'.png');await writeFile(path,Buffer.from(firefox?image.value:image.data,'base64'));screenshots.push(path);}}}
   const measurements=[];
-  const call=(role,action,provider,fields={})=>evaluate(`return chrome.runtime.sendMessage(${JSON.stringify({type:'GH_PURCHASE_ACTION',action,provider,...fields})});`);
+  const pollOperation=async script=>{
+    // Poll the real worker result while retaining the normal per-command
+    // deadline. Bulk recovery can legitimately outlast one browser command.
+    await evaluate(`const out=document.documentElement.dataset;delete out.purchaseOperationReply;
+      (async()=>{${script}})().then(reply=>{out.purchaseOperationReply=JSON.stringify({reply});},
+        error=>{out.purchaseOperationReply=JSON.stringify({error:error.message});});return true;`);
+    const deadline=Date.now()+90000;
+    while(Date.now()<deadline){
+      const raw=await evaluate('return document.documentElement.dataset.purchaseOperationReply??null;');
+      if(typeof raw==='string'&&raw){const {reply,error}=JSON.parse(raw);assert.equal(error,undefined);return reply;}
+      await pause(100);
+    }
+    throw Error('Purchase operation did not finish within its 90-second recovery budget');
+  };
+  const call=(role,action,provider,fields={})=>{
+    const script=`return chrome.runtime.sendMessage(${JSON.stringify({type:'GH_PURCHASE_ACTION',action,provider,...fields})});`;
+    return (collision||automatic)&&action==='syncNow'?pollOperation(script):evaluate(script);
+  };
   const state=async(role,provider)=>{await navigate(role);const value=await call(role,'state',provider);assert.equal(value.ok,true,value.error);return value;};
+  const openManual=async()=>{
+    await wait('Boolean(document.querySelector("[data-purchase-handoff] [data-purchase-manual]"))');
+    await evaluate('const manual=document.querySelector("[data-purchase-handoff] [data-purchase-manual]");for(let n=manual;n;n=n.parentElement)if(n.tagName==="DETAILS")n.open=true;return true;');
+  };
   await navigate('gl');await evaluate(`const S=await import('./src/lib/storage.js');for(const id of ${JSON.stringify(Object.values(installed).filter(item=>item.role!=='gl').map(item=>item.id))})await S.addAllowedExternalClientId(id);return true;`);
   for(const role of placeholder?['hb']:['hb','fan']){
     await navigate(role);await evaluate(`await chrome.runtime.sendMessage({type:${JSON.stringify(role==='hb'?'HCL_STORE':'FANATICAL_STORE')},operation:'patch',args:[{galacticLibraryExtensionId:${JSON.stringify(installed.gl.id)}}]});return true;`);
@@ -91,7 +119,7 @@ try{
   if(placeholder){
     const {humblePlaceholderChecks}=await import('./humble-placeholder-browser.mjs');
     await humblePlaceholderChecks({navigate,evaluate,call,checks});
-  }else if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,checks,screenshots,reverse});}else if(collision){await collisionChecks({navigate,evaluate,call,installed,checks,measurements});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
+  }else if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,getSession:()=>session,firefox,checks,screenshots,reverse});}else if(collision){await collisionChecks({navigate,evaluate,pollOperation,call,installed,checks,measurements});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
     await navigate('gl');await evaluate('document.querySelector("#check-companion-connections").click();return true;');
     await pause(6500);
     const connections=await evaluate('const C=await import("./src/lib/companion-identities.js");return Promise.all(C.builtinCompanions(chrome.runtime).map(async c=>({role:c.role,id:c.id,result:await C.checkCompanionConnection(chrome.runtime,c.id)})));');
@@ -102,28 +130,75 @@ try{
   // These checks exercise the manual handoff. Automatic sharing (on by default) pairs the only accounts
   // by itself and would race them, so let that pairing settle first.
   await navigate('gl');for(const provider of ['humble','fanatical']){for(let n=0;n<100;n++){const s=(await call('gl','syncState',provider)).state;if(s?.confirmed&&s.remoteConfirmed&&!s.pending)break;await pause(100);}}
-  const activeGl=async provider=>{await navigate('gl');const d=await evaluate('const S=await import("./src/lib/storage.js");return (await S.getDatabase()).providers['+JSON.stringify(provider)+']?.activeProfileId??null;');return d;};
   // Automatic sync reacts to seeded purchases and imports; manual handoffs and lookups wait for it to finish.
-  const settleSync=async role=>{await navigate('gl');for(const p of ['humble','fanatical'])for(let n=0;n<1800;n++){const s=(await call('gl','syncState',p)).state;if(!s||s.status==='synced'&&!s.pending)break;await pause(100);}await navigate(role);};
+  const settleSync=async role=>{
+    const provider=role==='hb'?'humble':'fanatical';
+    await navigate('gl');
+    let state,retried=false;
+    for(let n=0;n<600;n++){
+      state=(await call('gl','syncState',provider)).state;
+      if(!state||state.status==='synced'&&!state.pending){await navigate(role);return;}
+      if(state.status==='attention'){
+        // A manual restore can win the writer lock while the background
+        // transfer is queued. Exercise the supported recovery once and insist
+        // on a settled relationship before comparing the saved library.
+        if(retried||!/already importing/u.test(state.error??''))break;
+        retried=true;
+        await navigate(role);
+        const retry=await call(role,'syncRetry',provider);assert.equal(retry.ok,true,retry.error);
+        await navigate('gl');
+        const sync=await pollOperation(`return chrome.runtime.sendMessage(${JSON.stringify({type:'GH_PURCHASE_ACTION',action:'syncNow',provider})});`);
+        assert.equal(sync.ok,true,sync.error);
+        assert.equal(sync.error??null,null,sync.error);
+      }
+      await pause(100);
+    }
+    throw Error('Expected '+provider+' synchronization to settle: '+JSON.stringify(state));
+  };
   for(const role of ['hb','fan']){await navigate(role);const linked=await call(role,'remoteAccounts',role==='hb'?'humble':'fanatical');assert.equal(linked.ok,true,linked.error);}
   checks.push('incoming-first purchase negotiation initializes only already authorized development peers through reverse identity verification');
   await navigate('gl');await wait('document.querySelectorAll("#official-companion-status li").length===2&&!document.querySelector("#check-companion-connections").disabled');
   await evaluate('document.querySelector("[data-workspace=settings]").click();document.querySelector("#check-companion-connections").click();return true;');
   await wait('[...document.querySelectorAll("#official-companion-status li")].every(row=>row.textContent.includes("purchase sharing supported"))');
-  for(const role of ['hb','fan']){await navigate(role);const button=role==='hb'?'test-galactic-library-link':'test-galactic',status=role==='hb'?'galactic-library-link-status':'galactic-status';await wait('document.querySelector("#'+(role==='hb'?'galactic-library-extension-id':'galactic-id')+'").value==='+JSON.stringify(installed.gl.id));await evaluate('document.querySelector("#'+button+'").click();return true;');await wait('document.querySelector("#'+status+'").textContent.includes("Connected to Galactic Library")');const linked=await call(role,'connection',role==='hb'?'humble':'fanatical');assert.equal(linked.ok,true,linked.error);}
+  for(const role of ['hb','fan']){
+    await navigate(role);
+    const button=role==='hb'?'test-galactic-library-link':'test-galactic',status=role==='hb'?'galactic-library-link-status':'galactic-status';
+    await wait('document.querySelector("#'+(role==='hb'?'galactic-library-extension-id':'galactic-id')+'").value==='+JSON.stringify(installed.gl.id));
+    // A storage-driven Options refresh can replace the check's status before
+    // the next test poll. Capture the check's actual rendered result.
+    await evaluate(`const status=document.getElementById('${status}'),button=document.getElementById('${button}');
+      const out=document.documentElement.dataset;delete out.connectionResult;
+      const observer=new MutationObserver(records=>{
+        for(const record of records)for(const added of record.addedNodes){
+          const text=added.textContent??'';
+          if(text.startsWith('Connected to Galactic Library')||text.startsWith('Could not connect to Galactic Library')){
+            out.connectionResult=text;observer.disconnect();return;
+          }
+        }
+      });
+      observer.observe(status,{childList:true,characterData:true,subtree:true});button.click();return true;`);
+    await wait('Boolean(document.documentElement.dataset.connectionResult)');
+    assert.match(await evaluate('return document.documentElement.dataset.connectionResult;'),/^Connected to Galactic Library/u);
+    const linked=await call(role,'connection',role==='hb'?'humble':'fanatical');assert.equal(linked.ok,true,linked.error);
+  }
   checks.push('actual Settings checks and purchase capability negotiation succeed in all four directions without explicit outbound peer ID');
   for(const role of ['hb','fan']){
-    const provider=role==='hb'?'humble':'fanatical';await navigate(role);
+    const provider=role==='hb'?'humble':'fanatical';
+    await navigate(role);
     const seed=await evaluate(`const role=${JSON.stringify(role)},items=[];for(let n=0;n<6321;n++){const purchase='purchase_'+Math.floor(n/20),bundle='Synthetic bundle '+Math.floor(n/20),title=role+' Synthetic book '+n;const bytes=new TextEncoder().encode(purchase),hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');items.push(role==='hb'?{providerItemId:purchase+':product:product_'+n,title,kind:'book',source:'humble',purchaseKey:purchase,sourceBundle:bundle,purchasedAt:'2026-10-01T00:00:00.000Z',authors:['Synthetic Author'],publisher:'Synthetic Press',edition:'First',formats:['epub','pdf'],entitlement:'direct-download',provenance:[{providerItemId:purchase+':product:product_'+n,title,purchaseKey:purchase,sourceBundle:bundle,purchasedAt:'2026-10-01T00:00:00.000Z',entitlement:'direct-download'}]}:{source:'fanatical',sourceItemId:'product_'+n,title,mediaType:'book',authors:['Synthetic Author'],publisher:'Synthetic Press',edition:'First',formats:['epub','pdf'],bundle:{sourceItemId:'bundle_'+Math.floor(n/20),title:bundle},purchaseDate:'2026-10-01T00:00:00.000Z',purchaseOrigins:[{purchaseRef:hash,bundle:{sourceItemId:'bundle_'+Math.floor(n/20),title:bundle},purchaseDate:'2026-10-01T00:00:00.000Z',quantity:n===0?2:1}]});}await chrome.storage.local.set(role==='hb'?{humbleProfileLabel:'Personal',libraryItems:items}:{fanaticalProfileLabel:'Personal',fanaticalLibraryItems:items});return {ok:true};`);assert.equal(seed.ok,true,seed.error);
-    await settleSync(role);
-    const source=(await state(role,provider)).accounts[0];
-    await navigate('gl');const invalid=await call('gl','import',provider,{peerId:installed[role].id,accountRef:source.accountRef,target:{newLabel:'Personal',expectedActiveId:await activeGl(provider)}});assert.equal(invalid.ok,false);assert.match(invalid.error,/Confirm/);
-    const started=Date.now();const result=await call('gl','import',provider,{peerId:installed[role].id,accountRef:source.accountRef,confirmed:true,target:{newLabel:'Personal',expectedActiveId:await activeGl(provider)}});assert.equal(result.ok,true,result.error);assert.equal(result.added,6321);assert.equal(result.received,6321);
-    measurements.push({direction:role+' -> GL',...result,wallMs:Date.now()-started});
-    const target=(await state('gl',provider)).accounts.find(v=>v.label==='Personal');
+    await navigate('gl');
+    await wait(`(async()=>{const r=await chrome.runtime.sendMessage({type:'GH_PURCHASE_ACTION',action:'syncState',provider:${JSON.stringify(provider)}});return r.state?.status==='synced'&&!r.state.pending&&r.state.confirmed&&r.state.remoteConfirmed&&r.accounts.find(a=>a.stableId===r.state.localId)?.count===6321;})()`);
+    const relationship=(await call('gl','syncState',provider)).state;
+    const [source]=(await state(role,provider)).accounts;
+    assert.equal(source.stableId,relationship.remoteId);
+    const [target,...otherTargets]=(await state('gl',provider)).accounts;
+    assert.equal(otherTargets.length,0);assert.equal(target.accountRef,relationship.localId);assert.equal(target.count,6321);
+    console.log('Verified mapped destination for '+provider+' manual restore');
+    const invalid=await call('gl','import',provider,{peerId:installed[role].id,accountRef:source.accountRef,target});
+    assert.equal(invalid.ok,false);assert.match(invalid.error,/Confirm/);
     const again=await call('gl','import',provider,{peerId:installed[role].id,accountRef:source.accountRef,confirmed:true,target});assert.equal(again.ok,true,again.error);assert.equal(again.unchanged,6321);assert.equal(again.added,0);
+    assert.equal(again.received,6321);measurements.push({direction:role+' -> GL',...again});
     const query={type:'MATCH_ITEMS',apiVersion:1,items:[{requestId:'test',title:role+' Synthetic book 1',mediaType:'book',excludeProviders:[provider==='humble'?'fanatical':'humble']}]};
-    await settleSync(role);
     await navigate(role);const beforeQuery=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.gl.id)},${JSON.stringify(query)});`);assert.equal(beforeQuery.ok,true,beforeQuery.error);assert.equal(beforeQuery.results[0].owned,true);
     // Empty only this disposable companion's native rows, retaining its account.
     const cleared=await evaluate(`await chrome.storage.local.set(${JSON.stringify(role==='hb'?{libraryItems:[],purchaseSummaries:[]}:{fanaticalLibraryItems:[]})});return {ok:true};`);assert.equal(cleared.ok,true,cleared.error);
@@ -134,7 +209,18 @@ try{
     const importStart=Date.now();const reverse=await call(role,'import',provider,{useOffer:true,offerToken:offer.manifest.token,accountRef:target.accountRef,confirmed:true,target:{accountRef:empty.accountRef}});assert.equal(reverse.ok,true,reverse.error);assert.equal(reverse.added,6321);
     measurements.push({direction:'GL -> '+role,...reverse,wallMs:Date.now()-importStart,bytes:offer.manifest.bytes,chunkCount:offer.manifest.chunkCount});
     const imported=(await state(role,provider)).accounts[0];assert.equal(imported.count,6321);
-    const repeat=await call(role,'import',provider,{accountRef:target.accountRef,confirmed:true,target:{accountRef:imported.accountRef}});assert.equal(repeat.ok,true,repeat.error);assert.equal(repeat.unchanged,6321);
+    // Restoring rows can wake the automatic coordinator. Check manual
+    // idempotence after that transfer settles, and verify the first restore
+    // still holds if the coordinator takes the lock before the repeat.
+    await settleSync(role);
+    const repeatArgs={accountRef:target.accountRef,confirmed:true,target:{accountRef:imported.accountRef}};
+    let repeat=await call(role,'import',provider,repeatArgs);
+    if(!repeat.ok&&/already importing/u.test(repeat.error??'')){
+      await settleSync(role);
+      assert.equal((await state(role,provider)).accounts.find(account=>account.accountRef===imported.accountRef)?.count,6321);
+      repeat=await call(role,'import',provider,repeatArgs);
+    }
+    assert.equal(repeat.ok,true,repeat.error);assert.equal(repeat.unchanged,6321);
     const record=await evaluate(`return (await chrome.storage.local.get({${role==='hb'?'libraryItems':'fanaticalLibraryItems'}:[]})).${role==='hb'?'libraryItems':'fanaticalLibraryItems'}[0];`);assert.equal(record.title,role+' Synthetic book 0');assert.deepEqual(record.authors,['Synthetic Author']);assert.equal(record.edition,'First');if(role==='fan')assert.equal(record.publisher,'Synthetic Press');assert.equal(role==='hb'?record.provenance[0].sourceBundle:record.purchaseOrigins[0].bundle.title,'Synthetic bundle 0');if(role==='fan')assert.equal(record.purchaseOrigins[0].quantity,2);
     await settleSync(role);
     // Open normally: no Refresh click and no initial heavy account read.
@@ -150,6 +236,7 @@ try{
     const afterQuery=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.gl.id)},${JSON.stringify(query)});`);
     if(process.env.GH_HANDOFF_TRACE){await navigate('gl');console.log('HANDOFF TRACE '+JSON.stringify(await evaluate(`const S=await import('./src/lib/storage.js'),d=await S.getDatabase();return {rows:Object.values(d.providerItems).filter(i=>i.title==='hb Synthetic book 1').map(i=>({id:i.id,native:i.providerItemId,profile:i.profileId,purchase:i.metadata.purchaseId,ref:i.recordRef})),profiles:Object.values(d.providerProfiles).filter(p=>p.provider==='humble').map(p=>({id:p.profileId,keySpace:p.keySpace,name:p.nickname})),active:d.providers.humble.activeProfileId};`)));}
     assert.deepEqual(afterQuery.results,beforeQuery.results);
+    console.log('Verified unchanged ownership results after '+provider+' manual restore');
     await navigate('gl');assert.equal(await evaluate('const S=await import("./src/lib/storage.js");const value=JSON.stringify(await S.getDatabase());return [...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)))].map(v=>v.toString(16).padStart(2,"0")).join("");'),databaseBefore);
     // Preparing is worker-owned: closing the source Options document is harmless.
     const current=(await state(role,provider)).accounts[0];await navigate('gl');const grant=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed[role].id)},{type:'GH_PURCHASE_BEGIN',provider:${JSON.stringify(provider)},protocolVersion:1,accountRef:${JSON.stringify(current.accountRef)}});`);assert.equal(grant.ok,true,grant.error);
@@ -192,25 +279,47 @@ try{
     checks.push(provider+': native guided send + receiver review in both directions, read-only Continue, unchanged Back reuse, final approval, duplicate clicks, Advanced collapsed and theme/geometry');
    }
   }
-  // Historical schemas observed in saved backups; all values below are synthetic.
+   // Restore multiple separate saved accounts for the manual-only scenario.
+   // Fresh profile IDs and an ambiguous mapping keep auto setup from creating
+   // a relationship while this test seeds and compares the two libraries.
   await navigate('gl');
-  await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),P=await import('./src/lib/provider-profiles.js'),d=M.createEmptyDatabase();for(const [provider,count]of [['humble',7077],['fanatical',47]]){const p=P.newProviderProfile(provider,'Legacy Personal');d.providerProfiles[p.profileId]=p;for(let n=0;n<count;n++){const item=M.normalizeProviderItem({provider,profileId:p.profileId,providerItemId:provider==='humble'?'legacy_'+Math.floor(n/20)+':product:'+n:'legacy_product_'+n,title:'Legacy '+provider+' book '+n,mediaType:'book',ownership:'owned',metadata:provider==='humble'?{source:'humble-purchase-library',entitlement:'direct-download',purchaseId:'legacy_'+Math.floor(n/20),sourceBundle:'Legacy bundle'}:{source:'fanatical-order-history',bundleId:'legacy_bundle',bundleTitle:'Legacy bundle',bundleSlug:'legacy-bundle',slug:'legacy-product-'+n,drm:[],formats:[]}},undefined,{profileKeySpace:p.keySpace});d.providerItems[item.id]=item;}p.state={...p.state,connected:true,recordCount:count,bookCount:count};d.providers[provider]={...p.state,profileLabel:p.nickname,activeProfileId:p.profileId};}d.canonicalItems=M.rebuildCanonicalItems(d.providerItems);await S.restoreDatabase(d);return true;`);
+   // Historical schemas observed in saved backups; all values below are synthetic.
+   await evaluate(`const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js'),P=await import('./src/lib/provider-profiles.js'),d=M.createEmptyDatabase();for(const [provider,count]of [['humble',7077],['fanatical',47]]){const p=P.newProviderProfile(provider,'Legacy Personal'),other=P.newProviderProfile(provider,'Legacy Other');d.providerProfiles[p.profileId]=p;d.providerProfiles[other.profileId]=other;for(let n=0;n<count;n++){const item=M.normalizeProviderItem({provider,profileId:p.profileId,providerItemId:provider==='humble'?'legacy_'+Math.floor(n/20)+':product:'+n:'legacy_product_'+n,title:'Legacy '+provider+' book '+n,mediaType:'book',ownership:'owned',metadata:provider==='humble'?{source:'humble-purchase-library',entitlement:'direct-download',purchaseId:'legacy_'+Math.floor(n/20),sourceBundle:'Legacy bundle'}:{source:'fanatical-order-history',bundleId:'legacy_bundle',bundleTitle:'Legacy bundle',bundleSlug:'legacy-bundle',slug:'legacy-product-'+n,drm:[],formats:[]}},undefined,{profileKeySpace:p.keySpace});d.providerItems[item.id]=item;}p.state={...p.state,connected:true,recordCount:count,bookCount:count};d.providers[provider]={...p.state,profileLabel:p.nickname,activeProfileId:p.profileId};}d.canonicalItems=M.rebuildCanonicalItems(d.providerItems);await S.restoreDatabase(d);return true;`);
+   for(const provider of ['humble','fanatical']){
+    const legacyMapping=await call('gl','syncState',provider);
+    assert.equal(legacyMapping.state?.confirmed??false,false);
+    assert.equal(legacyMapping.accounts.find(account=>account.label==='Legacy Other')?.count,0);
+   }
   for(const role of ['hb','fan']){
    const provider=role==='hb'?'humble':'fanatical',count=role==='hb'?6321:47;await navigate(role);
    await evaluate(`const rows=[];for(let n=0;n<${count};n++)rows.push(${JSON.stringify(role)}==='hb'?{kind:'book',source:'humble',title:'Legacy humble book '+n,purchaseKey:'legacy_'+Math.floor(n/20),purchasedAt:null,sourceBundle:'Legacy bundle',provenance:[{purchaseKey:'legacy_'+Math.floor(n/20),purchasedAt:null,sourceBundle:'Legacy bundle',title:'Legacy humble book '+n}]}:{source:'fanatical',sourceItemId:'legacy_product_'+n,title:'Legacy fanatical book '+n,mediaType:'book',bundle:{sourceItemId:'legacy_bundle',title:'Legacy bundle'},drm:[],formats:[]});if(${JSON.stringify(role)}==='hb'){await chrome.storage.local.set({humbleProfileLabel:'Legacy Personal',libraryItems:rows,profileArchives:[{profileLabel:'Empty',backup:HumbleComicLibrary.createLibraryBackup({...HumbleComicLibrary.LIBRARY_STATE_DEFAULTS,humbleProfileLabel:'Empty'})},{profileLabel:'Manual',backup:HumbleComicLibrary.createLibraryBackup({...HumbleComicLibrary.LIBRARY_STATE_DEFAULTS,humbleProfileLabel:'Manual',libraryItems:[{title:'Manual no-purchase book',kind:'book'}]})}],galacticPurchaseOffer:null});}else await chrome.storage.local.set({fanaticalProfileLabel:'Legacy Personal',fanaticalLibraryItems:rows,fanaticalProfileArchives:[{profileLabel:'Empty',items:[]},{profileLabel:'Incomplete',items:[{title:'Unknown product',mediaType:'book'}]}],galacticPurchaseOffer:null});return true;`);
-   await navigate(role);const start=Date.now();await evaluate('const h=document.querySelector("[data-purchase-handoff]");for(let n=h.parentElement;n;n=n.parentElement)if(n.tagName==="DETAILS")n.open=true;h.querySelector("[data-purchase-manual]").open=true;return true;');
+   await navigate(role);const start=Date.now();await openManual();
    await wait('document.querySelector("[data-purchase-status=local]").textContent.includes("3 saved")&&document.querySelector("[data-purchase-status=remote]").textContent.includes("saved account(s)")');
    measurements.push({direction:role+' legacy automatic enumeration',wallMs:Date.now()-start,rows:count});
-   const mine=await call(role,'state',provider),remote=await call(role,'remoteAccounts',provider);assert.equal(mine.accounts[0].count,count);assert.equal(mine.accounts[1].count,0);assert.equal(mine.accounts[2].eligibleCount,0);assert.equal(remote.accounts[0].count,role==='hb'?7077:47);
+    const mine=await call(role,'state',provider),remote=await call(role,'remoteAccounts',provider);
+    const legacyLocal=mine.accounts.find(account=>account.active&&account.label==='Legacy Personal');
+    const legacyTarget=remote.accounts.find(account=>account.active&&account.label==='Legacy Personal');
+    assert.equal(legacyLocal?.count,count);
+    assert.equal(mine.accounts.find(account=>account.label==='Empty')?.count,0);
+    assert.equal(mine.accounts.find(account=>account.label===(role==='hb'?'Manual':'Incomplete'))?.eligibleCount,0);
+    assert.equal(legacyTarget?.count,role==='hb'?7077:47);
    if(role==='hb'){
-    const fingerprint=async which=>{await navigate(which);return evaluate(`const value=${which==='gl'?"await (await import('./src/lib/storage.js')).getDatabase()":"await chrome.storage.local.get({libraryItems:[],historicalLibraryItems:[],purchaseSummaries:[],historicalPurchaseSummaries:[],profileArchives:[],galacticPurchaseOffer:null})"};return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))].map(v=>v.toString(16).padStart(2,'0')).join('');`);};
+     const fingerprint=async which=>{
+      await navigate(which);
+      return evaluate(`const value=${which==='gl'?"await (await import('./src/lib/storage.js')).getDatabase()":"await chrome.storage.local.get({libraryItems:[],historicalLibraryItems:[],purchaseSummaries:[],historicalPurchaseSummaries:[],profileArchives:[],galacticPurchaseOffer:null})"};
+       const hash=async data=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(data))))].map(v=>v.toString(16).padStart(2,'0')).join('');
+       const counts={};for(const item of Object.values(value.providerItems??{}))counts[item.provider]=(counts[item.provider]??0)+1;
+       return {digest:await hash(value),counts,sections:Object.fromEntries(await Promise.all(Object.entries(value).map(async ([key,data])=>[key,await hash(data)])))};`);
+     };
     const beforeHB=await fingerprint('hb'),beforeGL=await fingerprint('gl');await navigate('hb');
-    const comparison=await call('hb','reconcile','humble',{localAccountRef:mine.accounts[0].accountRef,remoteAccountRef:remote.accounts[0].accountRef});assert.equal(comparison.ok,true,comparison.error);assert.equal(comparison.reconciliation.counts.confident,6321);assert.equal(comparison.reconciliation.counts.glOnly,756);
-    const preview=await call('hb','preview','humble',{direction:'send',accountRef:mine.accounts[0].accountRef,target:{accountRef:remote.accounts[0].accountRef,stamp:remote.accounts[0].stamp}});assert.equal(preview.ok,true,preview.error);assert.equal(preview.preview.added,0);assert.equal(preview.preview.legacyMatchable,6321);
-    const reversePreview=await call('hb','preview','humble',{direction:'import',accountRef:remote.accounts[0].accountRef,target:{accountRef:mine.accounts[0].accountRef}});assert.equal(reversePreview.ok,true,reversePreview.error);assert.equal(reversePreview.preview.added,756);
-    assert.equal(await fingerprint('hb'),beforeHB);assert.equal(await fingerprint('gl'),beforeGL);assert.equal((await call('gl','pending','humble')).offer,null);
-    await settleSync('hb');await evaluate('const h=document.querySelector("[data-purchase-handoff]");for(let n=h.parentElement;n;n=n.parentElement)if(n.tagName==="DETAILS")n.open=true;h.querySelector("[data-purchase-manual]").open=true;return true;');await wait('document.querySelector("[data-purchase-status=local]").textContent.includes("saved account(s)")&&document.querySelector("[data-purchase-status=remote]").textContent.includes("saved account(s)")&&document.querySelector("[data-purchase-control=source]").options.length>1');
-    await evaluate(`const d=document.querySelector('[data-purchase-control=direction]');d.value='send';d.dispatchEvent(new Event('change'));const s=document.querySelector('[data-purchase-control=source]'),t=document.querySelector('[data-purchase-control=target]');s.value=${JSON.stringify(mine.accounts[0].accountRef)};s.dispatchEvent(new Event('change'));t.value=${JSON.stringify(remote.accounts[0].accountRef)};t.dispatchEvent(new Event('change'));return true;`);await wait('!document.querySelector("[data-purchase-control=reconcile]").disabled');await evaluate('document.querySelector("[data-purchase-control=reconcile]").click();return true;');await wait('document.querySelector("[data-purchase-status=diagnostic]").textContent.includes("Differences found")');assert.equal(await evaluate('return document.querySelector("[data-purchase-control=action]").disabled;'),true);
+     const comparison=await call('hb','reconcile','humble',{localAccountRef:legacyLocal.accountRef,remoteAccountRef:legacyTarget.accountRef});assert.equal(comparison.ok,true,comparison.error);assert.equal(comparison.reconciliation.counts.confident,6321);assert.equal(comparison.reconciliation.counts.glOnly,756);
+     const preview=await call('hb','preview','humble',{direction:'send',accountRef:legacyLocal.accountRef,target:{accountRef:legacyTarget.accountRef,stamp:legacyTarget.stamp}});assert.equal(preview.ok,true,preview.error);assert.equal(preview.preview.added,0);assert.equal(preview.preview.legacyMatchable,6321);
+     const reversePreview=await call('hb','preview','humble',{direction:'import',accountRef:legacyTarget.accountRef,target:{accountRef:legacyLocal.accountRef}});assert.equal(reversePreview.ok,true,reversePreview.error);assert.equal(reversePreview.preview.added,756);
+     assert.deepEqual(await fingerprint('hb'),beforeHB,'Legacy comparison or preview changed HB');
+     assert.deepEqual(await fingerprint('gl'),beforeGL,'Legacy comparison or preview changed GL');
+     assert.equal((await call('gl','pending','humble')).offer,null);
+    await navigate('hb');await evaluate('const h=document.querySelector("[data-purchase-handoff]");for(let n=h.parentElement;n;n=n.parentElement)if(n.tagName==="DETAILS")n.open=true;h.querySelector("[data-purchase-manual]").open=true;return true;');await wait('document.querySelector("[data-purchase-status=local]").textContent.includes("saved account(s)")&&document.querySelector("[data-purchase-status=remote]").textContent.includes("saved account(s)")&&document.querySelector("[data-purchase-control=source]").options.length>1');
+     await evaluate(`const d=document.querySelector('[data-purchase-control=direction]');d.value='send';d.dispatchEvent(new Event('change'));const s=document.querySelector('[data-purchase-control=source]'),t=document.querySelector('[data-purchase-control=target]');s.value=${JSON.stringify(legacyLocal.accountRef)};s.dispatchEvent(new Event('change'));t.value=${JSON.stringify(legacyTarget.accountRef)};t.dispatchEvent(new Event('change'));return true;`);await wait('!document.querySelector("[data-purchase-control=reconcile]").disabled');await evaluate('document.querySelector("[data-purchase-control=reconcile]").click();return true;');await wait('document.querySelector("[data-purchase-status=diagnostic]").textContent.includes("Differences found")');assert.equal(await evaluate('return document.querySelector("[data-purchase-control=action]").disabled;'),true);
     await readableScreenshot('hb','differences');
     await evaluate('document.querySelector("[data-purchase-control=preview]").click();return true;');await wait('document.querySelector("[data-purchase-status=diagnostic]").textContent.includes("Transfer preview")');assert.equal(await evaluate('return document.querySelector("[data-purchase-control=export]").disabled;'),false);
     await readableScreenshot('hb','preview');
@@ -223,8 +332,12 @@ try{
    const form=await evaluate('const h=document.querySelector("[data-purchase-handoff]");return {selects:h.querySelector("[data-purchase-manual]").querySelectorAll("select").length,source:h.querySelector("[data-purchase-control=source]").closest("label").textContent,destination:h.querySelector("[data-purchase-control=target]").closest("label").textContent,newVisible:!h.querySelector("[data-purchase-control=new-name]").closest("label").hidden,disabled:h.querySelector("[data-purchase-control=action]").disabled};');assert.equal(form.selects,3);assert.equal(form.newVisible,true);assert.equal(form.disabled,true);assert(form.source.includes(role==='hb'?'Humble Library':'Fanatical Library'));assert(form.destination.includes('Galactic Library'));
    await evaluate(`const target=document.querySelector('[data-purchase-control=target]');target.value=[...target.options].find(o=>o.value&&o.value!=='new').value;target.dispatchEvent(new Event('change'));return true;`);assert.equal(await evaluate('return document.querySelector("[data-purchase-handoff] [data-purchase-control=new-name]").closest("label").hidden;'),true);
    // Historical source enriches the existing GL profile; missing HB native IDs never become invented IDs.
-   await navigate('gl');let target=(await call('gl','state',provider)).accounts[0];const first=await call('gl','import',provider,{accountRef:mine.accounts[0].accountRef,confirmed:true,target});assert.equal(first.ok,true,first.error);assert.equal(first.added,0);assert.equal(first.received,count);target=(await call('gl','state',provider)).accounts[0];const repeat=await call('gl','import',provider,{accountRef:mine.accounts[0].accountRef,confirmed:true,target});assert.equal(repeat.ok,true,repeat.error);assert.equal(repeat.unchanged,count);
-   await navigate(role);const reverse=await call(role,'import',provider,{accountRef:target.accountRef,confirmed:true,target:{accountRef:(await call(role,'state',provider)).accounts[0].accountRef}});assert.equal(reverse.ok,true,reverse.error);assert.equal(reverse.added,role==='hb'?756:0);const next=await call(role,'state',provider);assert.equal(next.accounts[0].count,role==='hb'?7077:47);
+    await navigate('gl');const first=await call('gl','import',provider,{accountRef:legacyLocal.accountRef,confirmed:true,target:legacyTarget});assert.equal(first.ok,true,first.error);assert.equal(first.added,0);assert.equal(first.received,count);const target=(await call('gl','state',provider)).accounts.find(account=>account.accountRef===legacyTarget.accountRef);const repeat=await call('gl','import',provider,{accountRef:legacyLocal.accountRef,confirmed:true,target});assert.equal(repeat.ok,true,repeat.error);assert.equal(repeat.unchanged,count);
+     await navigate(role);const reverse=await call(role,'import',provider,{accountRef:target.accountRef,confirmed:true,target:{accountRef:legacyLocal.accountRef}});assert.equal(reverse.ok,true,reverse.error);assert.equal(reverse.added,role==='hb'?756:0);
+     // Legacy companion account references include the saved records and are
+     // refreshed by a write. Inspect the same known active fixture afterward.
+     const next=await call(role,'state',provider);
+     assert.equal(next.accounts.find(account=>account.active&&account.label==='Legacy Personal')?.count,role==='hb'?7077:47);
    checks.push(provider+': observed legacy shapes, thousands/small existing GL accounts, zero/missing-ID accounts, all directions and stable repeats');
   }
   // Screenshots, navigation, keyboard-labelled controls, primary export, no rereads on direction changes.
@@ -247,10 +360,14 @@ try{
    assert.equal(await evaluate('return window.accountSelectionCalls;'),0);if(role==='gl'){await evaluate('document.querySelector("[data-workspace=settings]").click();return true;');const color=await evaluate('return getComputedStyle(document.querySelector("#export")).backgroundColor;');assert.equal(color,'rgb(124, 58, 237)');const image=await driver.send(firefox?'WebDriver:TakeScreenshot':'Page.captureScreenshot',firefox?{}:{format:'png'},firefox?undefined:session);const path=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/gl-settings-navigation.png');await writeFile(path,Buffer.from(firefox?image.value:image.data,'base64'));screenshots.push(path);await evaluate('document.querySelector("[data-purchase-provider=fanatical]").click();return true;');await wait('document.querySelector("#purchase-sharing-fanatical").open&&!document.querySelector("#providers-workspace").hidden');}
    checks.push(role+': settings navigation/labelled controls, Dark/Light/System, 1200/560/420 geometry, zero discovery on selection/theme and purple GL export');
   }
+  for(const provider of ['humble','fanatical']){
+   const separate=(await state('gl',provider)).accounts.find(account=>account.label==='Legacy Other');
+   assert.equal(separate?.count,0,provider+' legacy transfer touched the unrelated GL account');
+  }
   // A real source extension restart loses staging but preserves saved accounts.
   await navigate('hb');let sourceAccount=(await call('hb','state','humble')).accounts[0];await navigate('gl');let staged=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.hb.id)},{type:'GH_PURCHASE_BEGIN',protocolVersion:1,provider:'humble',accountRef:${JSON.stringify(sourceAccount.accountRef)}});`);assert.equal(staged.ok,true,staged.error);
   await navigate('hb');await restart('hb');await navigate('gl');let stale=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.hb.id)},{type:'GH_PURCHASE_CHUNK',protocolVersion:1,provider:'humble',token:${JSON.stringify(staged.manifest.token)},index:0});`);assert.equal(stale.ok,false);assert.match(stale.error,/restarted|expired/);await navigate('hb');assert.equal((await call('hb','state','humble')).accounts[0].count,7077);
-  await navigate('gl');await restart('gl');await navigate('hb');assert.equal((await call('hb','connection','humble')).ok,true);assert.equal((await call('hb','remoteAccounts','humble')).ok,true);await navigate('gl');const source=(await state('hb','humble')).accounts[0];await navigate('gl');const target=(await call('gl','state','humble')).accounts[0];const resumed=await call('gl','import','humble',{accountRef:source.accountRef,target,confirmed:true});assert.equal(resumed.ok,true,resumed.error);assert.equal(resumed.unchanged,7077);checks.push('native source/GL restart: staging expires safely, saved libraries and authorized development role bindings survive');
+  await navigate('gl');await restart('gl');await navigate('hb');assert.equal((await call('hb','connection','humble')).ok,true);assert.equal((await call('hb','remoteAccounts','humble')).ok,true);await navigate('gl');const source=(await state('hb','humble')).accounts[0];await navigate('gl');const target=(await call('gl','state','humble')).accounts.find(account=>account.active&&account.label==='Legacy Personal');assert.equal(target?.count,7077);const resumed=await call('gl','import','humble',{accountRef:source.accountRef,target,confirmed:true});assert.equal(resumed.ok,true,resumed.error);assert.equal(resumed.unchanged,7077);checks.push('native source/GL restart: staging expires safely, saved libraries and authorized development role bindings survive');
   installed.intruder=await load(projectRoot,'intruder');await navigate('intruder');for(const message of [{type:'PING',apiVersion:1},{type:'GH_PURCHASE_CAPABILITIES',protocolVersion:1,provider:'humble'}]){const result=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.gl.id)},${JSON.stringify(message)});`);assert.equal(result.ok,false);}
   checks.push('real unrelated extension sender is rejected by both connection and purchase APIs');
   await navigate('hb');for(const message of [{type:'GH_PURCHASE_CAPABILITIES',protocolVersion:2,provider:'humble'},{type:'GH_PURCHASE_CAPABILITIES',protocolVersion:1,provider:'fanatical'},{type:'GH_PURCHASE_IMPORT',protocolVersion:1,provider:'humble'}]){const response=await evaluate(`return chrome.runtime.sendMessage(${JSON.stringify(installed.gl.id)},${JSON.stringify(message)});`);assert.equal(response.ok,false);}

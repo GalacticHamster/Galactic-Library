@@ -1,4 +1,4 @@
-import {createRelease} from '../scripts/release.mjs';
+import {createRelease,readRuntimeZip} from '../scripts/release.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm, access } from 'node:fs/promises';
@@ -15,7 +15,12 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const firefox=process.argv.includes('--firefox');
 const narrow=process.argv.includes('--narrow');
 const medium=process.argv.includes('--medium'),tiny=process.argv.includes('--tiny'),width=tiny?420:narrow?560:medium?820:1200;
-const packaged=process.argv.includes('--release')?await createRelease(undefined,undefined,firefox?'firefox':'chrome'):null;
+const packaged=process.argv.includes('--release')
+  ?process.env.GL_RUNTIME_PACKAGE
+    ?{files:readRuntimeZip(await readFile(process.env.GL_RUNTIME_PACKAGE))}
+    :await createRelease(undefined,undefined,firefox?'firefox':'chrome')
+  :null;
+if(packaged)assert.equal(Boolean(JSON.parse(packaged.files.get('manifest.json')).browser_specific_settings?.gecko),firefox,'packaged browser does not match the run');
 const amazonVideoMode=process.argv.includes('--amazon-video');
 const steamOwnedMode=process.argv.includes('--steam-owned');
 const amazonGamesMode=process.argv.includes('--amazon-games');
