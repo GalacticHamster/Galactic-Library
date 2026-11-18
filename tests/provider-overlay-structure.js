@@ -8,7 +8,7 @@ const expectations={
   audible:[/Owned, subscription, expired and unconfirmed/u,/Quick update.*previously saved/u,/current and previous calendar years/u,/Full rescan.*all available history years/u,/ownership evidence and acquisition dates/u],
   kindle:[/Kindle library/u,/Quick update.*newest Kindle pages.*already saved/u,/Full rescan.*supported library/u],
   'amazon-video':[/movies and TV/u,/Quick update.*already saved group/u,/Full rescan.*purchase labels/u,/Earlier saved titles stay.*complete listing/u],
-  'fandango-at-home':[/movies and TV shows/u,/Quick update.*Recently Purchased.*known titles/u,/Full rescan.*reported counts/u,/no replacement library is saved/u],
+  'fandango-at-home':[/movies and TV shows/u,/Quick update.*Recently Purchased.*known titles/u,/Full rescan.*reported counts/u,/unfinished scan.*saved without removing earlier records/u,/Full rescan to recover unchecked titles/u],
   kobo:[/Library presence alone does not confirm ownership/u,/Quick update.*My Books/u,/Full rescan.*Archive and Audiobooks/u,/preference and manual corrections remain separate/u],
   fanatical:[/completed Fanatical orders/u,/Quick update.*new completed orders/u,/Full rescan.*all completed orders/u],
   humble:[/books, audiobooks, games and entitlements/u,/Quick update.*pending key-status/u,/Full rescan.*all supported purchases.*previously saved/u],
