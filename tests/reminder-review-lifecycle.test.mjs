@@ -5,7 +5,7 @@ function fixture(){
  const status={get textContent(){return text;},set textContent(value){text=value;notify();}},list={get children(){return Array(rows);}},button={disabled:false,click(){button.action?.();}};
  const context=vm.createContext({MutationObserver:class{constructor(fn){callback=fn;}observe(){}disconnect(){callback=null;}},setTimeout:fn=>{expire=fn;return 1;},clearTimeout(){expire=null;}});
  const observe=vm.runInContext('('+observeReminderReview.toString()+')',context);
- return {button,status,list,setRows:n=>{rows=n;notify();},run:()=>observe({button,status,list,expectedBefore:10,expectedAfter:9}),timeout:()=>expire()};
+ return {button,status,list,setRows:n=>{rows=n;notify();},run:successText=>observe({button,status,list,expectedBefore:10,expectedAfter:9,successText}),timeout:()=>expire()};
 }
 const saved='Reminder review saved. Purchases and keys are unchanged.';
 test('row-count transition cannot complete before the explicit save acknowledgment',async()=>{
@@ -22,4 +22,8 @@ test('save rejection remains failure even after an optimistic nine-row refresh',
 });
 test('acknowledgment with the wrong row count cannot pass',async()=>{
  const f=fixture();f.button.action=()=>{f.status.textContent=saved;};const pending=f.run();await Promise.resolve();f.timeout();assert.equal((await pending).state,'timed-out');
+});
+test('Fanatical uses its own exact save acknowledgment while retaining row-count validation',async()=>{
+ const f=fixture();f.button.action=()=>{f.setRows(9);f.status.textContent='Reminder review saved.';};
+ assert.equal((await f.run('Reminder review saved.')).state,'saved');
 });

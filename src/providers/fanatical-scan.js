@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-55a57dcee45c18c3; contract 1; SHA-256 8b54676322facd5311ccc4144db31cfff6141f7953da90aa7308b4b60eba62bc
+// Pinned acquisition fanatical-v1-928fb95d4e5b70a4; contract 1; SHA-256 6fcb41b1240fafbb8ed5f3282274ede284e4bda76b8ba8822f782b69fe61bcb8
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan', detailLimit = 0, retryLaterOrderFingerprints = [], orderNavigationRefs } = {}) {
@@ -828,7 +828,7 @@ async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerp
   const navigationRefs = progressFormat === 'fan' && allowPartial && Array.isArray(orderNavigationRefs)
     ? new Set(orderNavigationRefs.slice(0,100000)) : null;
   if (navigationRefs) for (const item of items) for (const origin of item.purchaseOrigins) {
-    if (origin.keyCheckedAt && verified.has(origin.purchaseRef)) navigationRefs.add(origin.purchaseRef);
+    if (verified.has(origin.purchaseRef)) navigationRefs.add(origin.purchaseRef);
   }
   return {
     ...(navigationRefs ? {orderNavigation:completeWithFingerprints

@@ -45,7 +45,7 @@ export async function verifyFanaticalKeyReminders({browser,peerId,navigate,evalu
  const review=async(filter,before,after,pending)=>{
   await evaluate('const f=document.querySelector("#local-reminder-filter");f.value='+JSON.stringify(filter)+';f.dispatchEvent(new Event("change"));return true;');
   await wait('return document.querySelector("#local-reminder-list")?.children.length==='+before+'&&!document.querySelector("#local-reminder-list button")?.disabled;','Reminder review controls not ready');
-  const result=await evaluate('return ('+observeReminderReview.toString()+')({button:document.querySelector("#local-reminder-list button"),status:document.querySelector("#local-reminder-action-status"),list:document.querySelector("#local-reminder-list"),expectedBefore:'+before+',expectedAfter:'+after+'});');
+  const result=await evaluate('return ('+observeReminderReview.toString()+')({button:document.querySelector("#local-reminder-list button"),status:document.querySelector("#local-reminder-action-status"),list:document.querySelector("#local-reminder-list"),expectedBefore:'+before+',expectedAfter:'+after+',successText:"Reminder review saved."});');
   assert.equal(result.state,'saved','Reminder mutation did not acknowledge its save: '+JSON.stringify(result));
   assert.equal(await evaluate('const D=await import("./library-data.mjs"),s=await chrome.storage.local.get("fanaticalLibraryItems");return D.localKeyReminders(s.fanaticalLibraryItems).filter(r=>!r.hidden).length;'),pending,'Acknowledged review must match persisted FAN state');
  };

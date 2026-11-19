@@ -16,12 +16,15 @@ async function run(engine,{list=[order(0)],details=list,detailResponses={},known
  return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
 test('FAN opts into private order navigation and the GL callable never returns it',async()=>{
- const purchase=order(0);
- Object.assign(purchase.items[0].bundles[0].games[0],{type:'game',status:'fulfilled',drm:{steam:true}});
- assert(!Object.hasOwn((await run(fan,{list:[purchase]})).result,'orderNavigation'));
- assert.deepEqual((await run(fan,{list:[purchase],orderNavigationRefs:[]})).result.orderNavigation,[[hash(purchase._id),purchase._id]]);
- const result=(await run(gl,{list:[purchase],orderNavigationRefs:[hash(purchase._id)]})).result;
- assert(!JSON.stringify(result).includes(purchase._id));
+ const book=order(0), steam=order(1), list=[book,steam];
+ Object.assign(steam.items[0].bundles[0].games[0],{type:'game',status:'fulfilled',drm:{steam:true}});
+ const expected=list.map(purchase=>[hash(purchase._id),purchase._id]);
+ assert(!Object.hasOwn((await run(fan,{list})).result,'orderNavigation'));
+ const withNavigation=(await run(fan,{list,orderNavigationRefs:[]})).result;
+ assert.deepEqual(withNavigation.orderNavigation,expected);
+ assert(!withNavigation.items.find(item=>item.title==='Book 0').keyCheckedAt);
+ const result=(await run(gl,{list,orderNavigationRefs:expected.map(([ref])=>ref)})).result;
+ for(const purchase of list)assert(!JSON.stringify(result).includes(purchase._id));
 });
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
  test(name+': Steam key absence is dated evidence, fulfilled is not reveal/activation, and secret getters are never read',async()=>{
