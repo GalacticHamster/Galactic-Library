@@ -351,19 +351,19 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
     label:'renamed-parent',
     summaryItems:[{name:'PRIVATE_SUMMARY_TITLE',bundles:[]}],
     detailItems:[{_id:'detail-game',name:'PRIVATE_DETAIL_TITLE',type:'game',bundles:[]}],
-    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false}
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false}
    },
    {
     label:'non-string-pickAndMix-with-matching-object-name',
     summaryItems:[{name:'PRIVATE_PICK_MIX_POOL',bundles:[]}],
     detailItems:[{_id:'detail-game',name:'PRIVATE_LEAF_TITLE',type:'game',bundles:[],pickAndMix:{name:'private pick mix pool'}}],
-    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:1,normalizedNameMatched:true}
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:1,normalizedNameMatched:true,missingParentHasId:false,promotionalIdMatched:false}
    },
    {
     label:'omitted-detail-parent',
     summaryItems:[{name:'Bundle',bundles:[]},{name:'PRIVATE_OMITTED_PARENT',bundles:[]}],
     detailItems:[{_id:'bundle-id',name:'Bundle',bundles:[{games:[{_id:'synthetic-leaf',name:'Leaf Title',type:'game'}]}]}],
-    expectedContext:{summaryParents:2,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:1,nonStringPickAndMix:0,normalizedNameMatched:false}
+    expectedContext:{summaryParents:2,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:1,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false}
    }
   ];
   for(const tc of cases){
@@ -449,8 +449,70 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
   assert.equal(promoSub.counts.detailProductMismatch,1);
   assert.equal(promoSub.compatibility.productMismatches.records[0].category,'parent-missing');
   assert.deepEqual(promoSub.compatibility.productMismatches.records[0].parentContext,{
-   summaryParents:1,detailParents:0,promotionalDetailParents:1,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false
+   summaryParents:1,detailParents:0,promotionalDetailParents:1,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false
   });
   assert.equal(promoSub.result.items.length,1);
  });
 }
+
+// Reported structure: 8 orders, 4 known and skipped by Quick, 4 sparse summaries
+// rechecked. One summary lists three parents; its detail returns two purchased
+// parents and one promotional gift renamed after reveal but keeping its parent ID.
+const renamedGiftScan=({giftSummary={_id:'synthetic-gift-parent',name:'Synthetic seasonal present',bundles:[]},gift={_id:'synthetic-gift-parent',name:'Synthetic revealed game',type:'game',display_type:'game',isFreeProduct:true,mystery:true,reveal_template:'present',status:'fulfilled',bundles:[],drm:{steam:true}},extraSummary=[],extraDetail=[]}={})=>{
+ const populated=i=>({_id:'synthetic-known-'+i,status:'COMPLETE',date:'2026-11-0'+(i+1),items:[{_id:'synthetic-known-bundle-'+i,name:'Known bundle '+i,bundles:[{games:Array.from({length:5},(_,n)=>({_id:`synthetic-known-${i}-${n}`,name:`Known ${i} ${n}`,type:'book'}))}]}]});
+ const bundle=(order,parent,count)=>({_id:`${order}-${parent}`,name:`Recovered ${order} ${parent}`,bundles:[{games:Array.from({length:count},(_,n)=>({_id:`${order}-${parent}-${n}`,name:`Recovered ${order} ${parent} ${n}`,type:'game'}))}]});
+ const sparse=(id,parents,detailItems)=>({summary:{_id:id,status:'COMPLETE',date:'2026-11-10',items:parents.map(p=>({_id:p._id,name:p.name,bundles:[]}))},detail:{_id:id,status:'COMPLETE',date:'2026-11-10',items:detailItems}});
+ const ok=['synthetic-sparse-a','synthetic-sparse-b','synthetic-sparse-c'].map(id=>{const parents=[bundle(id,'one',4),bundle(id,'two',4)];return sparse(id,parents,parents);});
+ const giftOrder='synthetic-sparse-gift',paid=[bundle(giftOrder,'one',3),bundle(giftOrder,'two',3)];
+ const failing={summary:{_id:giftOrder,status:'COMPLETE',date:'2026-11-12',items:[...paid.map(p=>({_id:p._id,name:p.name,bundles:[]})),giftSummary,...extraSummary]},detail:{_id:giftOrder,status:'COMPLETE',date:'2026-11-12',items:[...paid,gift,...extraDetail]}};
+ const known=[0,1,2,3].map(populated);
+ return {list:[...known,...ok.map(o=>o.summary),failing.summary],details:[...known,...ok.map(o=>o.detail),failing.detail],known:known.map(o=>hash(o._id)),giftOrder,paidIds:paid.flatMap(p=>p.bundles[0].games.map(g=>g._id))};
+};
+const unresolved=(engine,r)=>engine===gl?r.result.diagnostic.ordersUnresolved:r.result.unresolvedOrderFingerprints.length;
+for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+ test(name+': a renamed promotional parent with the same parent ID recovers the reported partial order without admitting the gift',async()=>{
+  const scan=renamedGiftScan(),r=await run(engine,{list:scan.list,details:scan.details,known:scan.known,fullScan:false});
+  assert.equal(r.counts.knownSkipped,4);assert.equal(r.counts.scheduled,4);
+  assert.equal(r.compatibility.summaryRecovery.scheduled,4);assert.equal(r.compatibility.summaryRecovery.detailItemTypes.array,4);
+  assert.equal(r.counts.detailProductMismatch,0,JSON.stringify(r.compatibility.productMismatches));
+  assert.equal(r.compatibility.summaryRecovery.recovered,4);assert.equal(r.compatibility.summaryRecovery.unresolved,0);assert.equal(unresolved(engine,r),0);
+  assert.equal(r.result.items.length,30);
+  for(const id of scan.paidIds)assert(r.result.items.some(i=>i.sourceItemId===id),id);
+  assert(!r.result.items.some(i=>i.sourceItemId==='synthetic-gift-parent'||/revealed|seasonal/i.test(i.title)));
+  if(engine!==gl){assert.equal(r.result.rejectedPurchaseItems.length,1);assert.equal(r.result.rejectedPurchaseItems[0].title,'Synthetic revealed game');}
+  const again=await run(engine,{list:scan.list,details:scan.details,known:scan.known,fullScan:false});
+  assert.deepEqual(again.result.items.map(i=>[i.sourceItemId,i.occurrences.map(o=>o.occurrenceRef)]),r.result.items.map(i=>[i.sourceItemId,i.occurrences.map(o=>o.occurrenceRef)]));
+ });
+
+ test(name+': renamed promotional parents never stand in without matching parent identity or for purchased-product claims',async()=>{
+  const cases=[
+   {label:'summary parent without ID',giftSummary:{name:'Synthetic seasonal present',bundles:[]},category:'parent-missing',context:{missingParentHasId:false,promotionalIdMatched:false}},
+   {label:'different parent ID',giftSummary:{_id:'synthetic-other-parent',name:'Synthetic seasonal present',bundles:[]},category:'parent-missing',context:{missingParentHasId:true,promotionalIdMatched:false}},
+   {label:'summary claims a direct purchased game',giftSummary:{_id:'synthetic-gift-parent',name:'Synthetic seasonal present',type:'game',bundles:[]},category:'parent-missing',context:{missingParentHasId:true,promotionalIdMatched:true}},
+   {label:'one gift cannot satisfy two summary parents',extraSummary:[{_id:'synthetic-gift-parent',name:'Synthetic second present',bundles:[]}],category:'parent-missing',context:{missingParentHasId:true,promotionalIdMatched:true}},
+   {label:'name already returned by a purchased parent with another ID',extraDetail:[{_id:'synthetic-other-bundle',name:'Synthetic seasonal present',bundles:[{games:[{_id:'synthetic-other-game',name:'Other game',type:'game'}]}]}],category:'id-missing'}
+  ];
+  for(const tc of cases){
+   const scan=renamedGiftScan(tc),r=await run(engine,{list:scan.list,details:scan.details,known:scan.known,fullScan:false});
+   assert.equal(r.counts.detailProductMismatch,1,tc.label);assert.equal(r.compatibility.summaryRecovery.recovered,3,tc.label);assert.equal(r.compatibility.summaryRecovery.unresolved,1,tc.label);assert.equal(unresolved(engine,r),1,tc.label);
+   assert.equal(r.result.items.length,24,tc.label);assert(!r.result.items.some(i=>scan.paidIds.includes(i.sourceItemId)),tc.label);
+   const record=r.compatibility.productMismatches.records[0];assert.equal(record.category,tc.category,tc.label);
+   if(tc.context)for(const [key,value] of Object.entries(tc.context))assert.equal(record.parentContext[key],value,tc.label+' '+key);
+   assert(!/synthetic-gift-parent|seasonal|revealed|synthetic-sparse/i.test(JSON.stringify(r.compatibility)),tc.label);
+  }
+ });
+}
+
+test('parentContext identity booleans are optional, boolean-only and preserved at both export boundaries',async()=>{
+ const scan=renamedGiftScan({giftSummary:{_id:'synthetic-other-parent',name:'Synthetic seasonal present',bundles:[]}});
+ const {compatibility:clean}=await run(canonical,{list:scan.list,details:scan.details,known:scan.known,fullScan:false});
+ const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../src/providers/fanatical.js',import.meta.url),'utf8'),context);
+ const ui=context.GalacticFanatical,report=ui.failureReport('unknown');
+ assert.equal(clean.productMismatches.records[0].parentContext.missingParentHasId,true);
+ assert.deepEqual(fanaticalCompatibilityReport(clean),clean);assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:clean})).compatibility,clean);
+ const legacy=structuredClone(clean);delete legacy.productMismatches.records[0].parentContext.missingParentHasId;delete legacy.productMismatches.records[0].parentContext.promotionalIdMatched;
+ assert.deepEqual(fanaticalCompatibilityReport(legacy),legacy);assert.deepEqual(structuredClone(ui.scanReport({...report,compatibility:legacy})).compatibility,legacy);
+ for(const mutate of [v=>{v.productMismatches.records[0].parentContext.missingParentHasId='true';},v=>{v.productMismatches.records[0].parentContext.promotionalIdMatched=1;},v=>{v.productMismatches.records[0].parentContext.parentId='PRIVATE';}]){
+  const unsafe=structuredClone(clean);mutate(unsafe);assert.equal(fanaticalCompatibilityReport(unsafe),null);assert(!ui.scanReport({...report,compatibility:unsafe}).compatibility);
+ }
+});
