@@ -8,13 +8,21 @@ import {multiBundlePurchase} from './fixtures/fanatical-multi-bundle.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const order=i=>({_id:`synthetic-order-${i}`,status:'COMPLETE',items:[{_id:'synthetic-bundle',name:'Bundle',bundles:[{games:[{_id:`synthetic-product-${i}`,name:`Book ${i}`,type:'book'}]}]}]});
 const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,v])=>[k,reorder(v)])):v;
-async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false,rawDetail=false}={}){
+async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false,rawDetail=false,orderNavigationRefs}={}){
  let reads=0;const paths=[],scope={URL,Headers,TextEncoder,Uint8Array,AbortController,setTimeout,clearTimeout,crypto:webcrypto,localStorage:{getItem:()=>JSON.stringify({token:sessionChange&&reads++?'CHANGED_TOKEN':'PRIVATE_TOKEN'})},fetch:async path=>{paths.push(path);const listing=path==='/api/user/orders',status=listing?200:detailStatus;return {ok:status===200,status,headers:new Headers(listing?headers:{}),json:async()=>{const value=listing?list:Object.hasOwn(detailResponses,path.split('/').at(-1))?detailResponses[path.split('/').at(-1)]:details.find(o=>path.endsWith(o._id));return rawDetail&&!listing?value:structuredClone(value);}};}};
- const result=structuredClone(await vm.runInNewContext('('+engine.toString()+')',scope)({fullScan,knownOrderFingerprints:known,accountOrderFingerprints:known,allowPartial:true,returnFailure:true,diagnostics:true}));
+ const result=structuredClone(await vm.runInNewContext('('+engine.toString()+')',scope)({fullScan,knownOrderFingerprints:known,accountOrderFingerprints:known,allowPartial:true,returnFailure:true,diagnostics:true,orderNavigationRefs}));
  const diagnostic=engine===gl?result.diagnostic?.compatibility:result.coverage?.compatibility??result.diagnostic?.compatibility;
  assert(diagnostic);assert(!/PRIVATE_TOKEN|synthetic-order-|Book |synthetic-product-/.test(JSON.stringify(diagnostic)));
  return {result,compatibility:diagnostic,counts:diagnostic.counts,paths};
 }
+test('FAN opts into private order navigation and the GL callable never returns it',async()=>{
+ const purchase=order(0);
+ Object.assign(purchase.items[0].bundles[0].games[0],{type:'game',status:'fulfilled',drm:{steam:true}});
+ assert(!Object.hasOwn((await run(fan,{list:[purchase]})).result,'orderNavigation'));
+ assert.deepEqual((await run(fan,{list:[purchase],orderNavigationRefs:[]})).result.orderNavigation,[[hash(purchase._id),purchase._id]]);
+ const result=(await run(gl,{list:[purchase],orderNavigationRefs:[hash(purchase._id)]})).result;
+ assert(!JSON.stringify(result).includes(purchase._id));
+});
 for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
  test(name+': Steam key absence is dated evidence, fulfilled is not reveal/activation, and secret getters are never read',async()=>{
   const purchase={_id:'synthetic-order-keys',status:'COMPLETE',items:[{_id:'key-product',name:'Synthetic Steam product',type:'game',display_type:'game',status:'fulfilled',drm:{steam:true},bundles:[],serialExpiry:null}]};
