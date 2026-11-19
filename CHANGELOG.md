@@ -1,5 +1,10 @@
 # Release notes
 
+## Unreleased
+
+- Fanatical purchase scans import a purchase whose free promotional gift is renamed in the order details only when the gift keeps the same item ID as in the order list; the gift is never counted as owned. Scan reports say whether the unmatched order-list item carried an ID and whether a promotional item shares it.
+- Automatic Fanatical Library pairing works when Fanatical Library has saved comics, Unclassified or Video items, or a record that cannot be shared. Previously the companion's account could not be read, so the connection report showed both accounts as absent with a generic failure.
+
 ## 1.0.4
 
 - Galactic Library remembers whether each provider panel is minimized and whether its help is open. Preferences carry across reloads and tabs on the same provider.
