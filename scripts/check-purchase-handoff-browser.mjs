@@ -13,12 +13,12 @@ import {createRelease,projectRoot,runtimeZip} from './release.mjs';
 import {chromePipe,freePort,firefoxMarionette} from '../tests/native-protocol.mjs';
 
 const firefox=process.argv.includes('--firefox'),kind=firefox?'firefox':'chrome';
-const placeholder=process.argv.includes('--humble-placeholder'),fanaticalMedia=process.argv.includes('--fanatical-media');
+const placeholder=process.argv.includes('--humble-placeholder'),fanaticalMedia=process.argv.includes('--fanatical-media'),humbleRecords=process.argv.includes('--humble-records'),companionRecords=fanaticalMedia?'fan':humbleRecords?'hb':null;
 const hbRoot=resolve(process.env.HB_ROOT??resolve(projectRoot,'../HB')),fanRoot=resolve(projectRoot,'../Fanatical');
 const temporary=await mkdtemp(join(tmpdir(),'gh-purchase-check-'));
 const collision=process.argv.includes('--collision'),upgrade=process.argv.includes('--native-upgrade'),native=process.argv.includes('--native')||upgrade||collision,automatic=process.argv.includes('--automatic')||native,simple=process.argv.includes('--simple-setup'),reverse=process.argv.includes('--reverse');
 const guided=process.argv.includes('--guided'),readable=process.argv.includes('--readable');
-const artifacts=placeholder?'humble-placeholder':fanaticalMedia?'fanatical-media':collision?'purchase-sync-collision':upgrade?'native-purchase-upgrade':native?'native-purchase-sync':simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
+const artifacts=placeholder?'humble-placeholder':fanaticalMedia?'fanatical-media':humbleRecords?'humble-records':collision?'purchase-sync-collision':upgrade?'native-purchase-upgrade':native?'native-purchase-sync':simple?'simple-purchase-setup/'+(reverse?'reverse':'companions-first'):automatic?'automatic-purchase-sync':guided?'simplified-purchase-sharing':readable?'human-readable-purchases':process.argv.includes('--reconciliation')?'humble-reconciliation':'purchase-repair';
 const output=await outputPath('audit-artifacts/'+artifacts+'/'+kind+'/results.json');
 const checks=[],screenshots=[];let child,driver,exited;
 try{
@@ -70,10 +70,10 @@ try{
     return {id:firefox?(result.value??result):result.id,manifest,role};
   }
   const installed={};let session;
-  for(const role of placeholder?['gl','hb']:fanaticalMedia?['gl','fan']:simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
+  for(const role of placeholder?['gl','hb']:companionRecords?['gl',companionRecords]:simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
     installed[role]=await load(role==='gl'?projectRoot:role==='hb'?hbRoot:fanRoot,role);
     if(simple&&(reverse?role==='gl':role!=='gl')){await navigate(role);await seedSimplePurchases(role,evaluate);}
-    if(fanaticalMedia){await navigate(role);await (await import('./fanatical-media-browser.mjs')).seedFanaticalMedia(role,evaluate);}
+    if(companionRecords){await navigate(role);await (await import('./companion-records-browser.mjs')).seedCompanionRecords(role,companionRecords,evaluate);}
   }
   async function navigate(role,popup=false){
     const item=installed[role],path=popup?item.manifest.action.default_popup:item.manifest.options_page;
@@ -113,16 +113,16 @@ try{
     await evaluate('const manual=document.querySelector("[data-purchase-handoff] [data-purchase-manual]");for(let n=manual;n;n=n.parentElement)if(n.tagName==="DETAILS")n.open=true;return true;');
   };
   await navigate('gl');await evaluate(`const S=await import('./src/lib/storage.js');for(const id of ${JSON.stringify(Object.values(installed).filter(item=>item.role!=='gl').map(item=>item.id))})await S.addAllowedExternalClientId(id);return true;`);
-  for(const role of placeholder?['hb']:fanaticalMedia?['fan']:['hb','fan']){
+  for(const role of placeholder?['hb']:companionRecords?[companionRecords]:['hb','fan']){
     await navigate(role);await evaluate(`await chrome.runtime.sendMessage({type:${JSON.stringify(role==='hb'?'HCL_STORE':'FANATICAL_STORE')},operation:'patch',args:[{galacticLibraryExtensionId:${JSON.stringify(installed.gl.id)}}]});return true;`);
 
   }
   if(placeholder){
     const {humblePlaceholderChecks}=await import('./humble-placeholder-browser.mjs');
     await humblePlaceholderChecks({navigate,evaluate,call,checks});
-  }else if(fanaticalMedia){
-    const {fanaticalMediaChecks}=await import('./fanatical-media-browser.mjs');
-    await fanaticalMediaChecks({navigate,evaluate,call,checks});
+  }else if(companionRecords){
+    const {companionRecordChecks}=await import('./companion-records-browser.mjs');
+    await companionRecordChecks({companion:companionRecords,navigate,evaluate,call,checks});
   }else if(simple){await simplePurchaseSetupChecks({navigate,evaluate,wait,call,driver,getSession:()=>session,firefox,checks,screenshots,reverse});}else if(collision){await collisionChecks({navigate,evaluate,pollOperation,call,installed,checks,measurements});}else if(upgrade){await nativeUpgradeChecks({navigate,evaluate,call,installed,checks,measurements});}else if(native){await nativePurchaseChecks({navigate,evaluate,wait,call,driver,firefox,installed,checks,measurements});}else if(automatic){await automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession:()=>session,firefox,installed,checks,measurements,screenshots});}else if(process.argv.includes('--reproduce-repair')){
     await navigate('gl');await evaluate('document.querySelector("#check-companion-connections").click();return true;');
     await pause(6500);

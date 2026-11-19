@@ -23,7 +23,10 @@ for(const change of [{keyCheckedAt:'bad-date'},{keyStatus:{secret:'MUST_NOT_TRAN
 });
 test('HB missing optional observation stays missing and strict purchase/wire validation remains',async()=>{
  const data=await project([{...item,keyStatus:undefined,keyCheckedAt:null}]);assert.equal(data.records[0].metadata.keyStatus,undefined);assert.equal(data.records[0].metadata.keyCheckedAt,undefined);
- await assert.rejects(project([{...item,purchaseKey:{unsafe:true}}]));
+ // An unsafe purchase identity is never put on the wire; the record is withheld and counted, and the rest of the account is shared.
+ const unsafe=await project([{...item,purchaseKey:{unsafe:true}},{...item,purchaseKey:'synthetic-order-2',providerItemId:'synthetic-order-2:key:game:0'}]);
+ assert.deepEqual(unsafe.records.map(r=>r.metadata.purchaseId),['synthetic-order-2']);assert(!JSON.stringify(unsafe).includes('unsafe'));
+ assert(unsafe.limitations.includes('1 saved record has details that cannot be shared and was left out; it remains saved here.'));
  assert.throws(()=>S.record({...data.records[0],metadata:{...data.records[0].metadata,keyStatus:'unrevealed',keyCheckedAt:'bad-date'}},'humble'));
  assert.throws(()=>S.record({...data.records[0],metadata:{...data.records[0].metadata,key:'SECRET'}},'humble'));
 });

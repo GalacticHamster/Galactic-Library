@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Automatic pairing with Humble Library works when it has a saved purchase that cannot be represented for sharing; that record is left out and counted, as for Fanatical Library. Unsafe optional store links are dropped without withholding the purchase. Installed GL+HB (--humble-records) and GL+FAN (--fanatical-media) checks cover Chrome and Firefox.
 - Fanatical purchase scans import a purchase whose free promotional gift is renamed in the order details only when the gift keeps the same item ID as in the order list; the gift is never counted as owned. Scan reports say whether the unmatched order-list item carried an ID and whether a promotional item shares it.
 - Automatic Fanatical Library pairing works when Fanatical Library has saved comics, Unclassified or Video items, or a record that cannot be shared. Previously the companion's account could not be read, so the connection report showed both accounts as absent with a generic failure.
 
