@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The shared Fanatical acquisition engine (pinned revision fanatical-v1-cc892d7ab7dc6261) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.
 - The Humble sharing limitation for older purchases without product IDs no longer refers to the retired Import new purchases action.
 - Automatic pairing with Humble Library works when it has a saved purchase that cannot be represented for sharing; that record is left out and counted, as for Fanatical Library. Unsafe optional store links are dropped without withholding the purchase. Installed GL+HB (--humble-records) and GL+FAN (--fanatical-media) checks cover Chrome and Firefox.
 - Fanatical purchase scans import a purchase whose free promotional gift is renamed in the order details only when the gift keeps the same item ID as in the order list; the gift is never counted as owned. Scan reports say whether the unmatched order-list item carried an ID and whether a promotional item shares it.
