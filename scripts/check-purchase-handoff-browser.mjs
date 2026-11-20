@@ -73,6 +73,7 @@ try{
   for(const role of placeholder||humbleMedia?['gl','hb']:companionRecords?['gl',companionRecords]:simple?(reverse?['gl','hb','fan']:['hb','fan','gl']):['gl','hb','fan']){
     installed[role]=await load(role==='gl'?projectRoot:role==='hb'?hbRoot:fanRoot,role);
     if(simple&&(reverse?role==='gl':role!=='gl')){await navigate(role);await seedSimplePurchases(role,evaluate);}
+    if(automatic&&!native&&process.argv.includes('--automatic')){await navigate(role);await (await import('./automatic-purchase-browser.mjs')).seedAutomaticPurchases(role,evaluate);}
     if(humbleMedia){await navigate(role);await (await import('./humble-media-browser.mjs')).seedHumbleMedia(role,evaluate);}
     if(companionRecords){await navigate(role);await (await import('./companion-records-browser.mjs')).seedCompanionRecords(role,companionRecords,evaluate);}
   }
