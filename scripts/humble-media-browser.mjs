@@ -38,6 +38,10 @@ export async function humbleMediaChecks({navigate,evaluate,call,restart,checks,m
  let rows=await converge({[imp(1)]:'book',[imp(2)]:'book',[imp(3)]:'book','synthetic_gl:product:synthetic_gl':'book'},'single-account automatic pairing');
  assert.equal(rows.length,4,'Library-only titles with unknown media are withheld');
  const count=rows.length;
+ // Let the initial two-way sync finish on both sides before the first correction.
+ const settled=async()=>{for(let n=0;n<160;n++){await navigate('gl');const g=(await call('gl','syncState','humble')).state;await navigate('hb');const h=(await call('hb','syncState','humble')).state;
+  if(g?.status==='synced'&&!g.pending&&h?.status==='synced'&&!h.pending)return;await new Promise(r=>setTimeout(r,250));}throw Error('The initial sync did not settle on both sides.');};
+ await settled();
  checks.push('HB and GL pair automatically; imported purchases are shared and unknown Library media is withheld');
 
  await hb('setNativeMediaOverride',[libraryRefs,'book']);rows=await converge({[lib(1)]:'book',[lib(2)]:'book'},'unknown -> book');
