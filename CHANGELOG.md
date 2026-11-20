@@ -1,16 +1,17 @@
 # Release notes
 
-## Unreleased
+## 1.0.5
 
+- Works with Humble Library 1.1.3 and Fanatical Library 1.0.6, which also make sure a purchase change saved during a sync reaches Galactic Library in that sync. Galactic Library 1.0.5 also works with Humble Library 1.1.2 and Fanatical Library 1.0.5; the purchase-sharing protocol is unchanged.
 - Pairing with Humble Library or Fanatical Library no longer stops for good when saved purchases change while the two extensions are connecting. Galactic Library connects the same two accounts again with current data, on its own or when you choose Sync now; a change in which accounts exist still asks for a decision.
 - Checking an interrupted sync with Humble Library no longer fails because of saved Humble records that cannot be shared; those records stay saved and are left out of the check, as they are from sharing.
 - Dotted game acronyms match the same game without dots, as in Humble Library and Fanatical Library: a saved FEAR 2 shows as owned for F.E.A.R. 2. Sequel numbers, subtitles, editions and remaster wording still decide, and books and software are unaffected.
 - A media correction made in Humble Library, for example from book to game, now updates the matching Humble purchase in Galactic Library on the next sync. Previously only a first classification of an unknown title arrived and later corrections were skipped. Only the purchase or Library entitlement with the same ID changes: same-title purchases, other accounts and other stores are untouched, and the purchase count stays the same. A purchase you linked, separated or reviewed contents for in Galactic Library keeps its Galactic Library classification. Ownership corrections are kept. Fanatical records are unchanged.
-- The shared Fanatical acquisition engine (pinned revision fanatical-v1-cc892d7ab7dc6261) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.
+- The shared Fanatical acquisition engine (pinned revision fanatical-v1-928fb95d4e5b70a4, the revision Fanatical Library 1.0.6 uses) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.
 - The Humble sharing limitation for older purchases without product IDs no longer refers to the retired Import new purchases action.
-- Automatic pairing with Humble Library works when it has a saved purchase that cannot be represented for sharing; that record is left out and counted, as for Fanatical Library. Unsafe optional store links are dropped without withholding the purchase. Installed GL+HB (--humble-records) and GL+FAN (--fanatical-media) checks cover Chrome and Firefox.
+- With Humble Library 1.1.3, automatic pairing works when Humble Library has a saved purchase that cannot be represented for sharing; that record is left out and counted, as for Fanatical Library. Unsafe optional store links are dropped without withholding the purchase. Installed GL+HB (--humble-records) and GL+FAN (--fanatical-media) checks cover Chrome and Firefox.
 - Fanatical purchase scans import a purchase whose free promotional gift is renamed in the order details only when the gift keeps the same item ID as in the order list; the gift is never counted as owned. Scan reports say whether the unmatched order-list item carried an ID and whether a promotional item shares it.
-- Automatic Fanatical Library pairing works when Fanatical Library has saved comics, Unclassified or Video items, or a record that cannot be shared. Previously the companion's account could not be read, so the connection report showed both accounts as absent with a generic failure.
+- With Fanatical Library 1.0.6, automatic pairing works when Fanatical Library has saved comics, Unclassified or Video items, or a record that cannot be shared. Previously the companion's account could not be read, so the connection report showed both accounts as absent with a generic failure.
 
 ## 1.0.4
 
