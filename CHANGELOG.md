@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pairing with Humble Library or Fanatical Library no longer stops for good when saved purchases change while the two extensions are connecting. Galactic Library connects the same two accounts again with current data, on its own or when you choose Sync now; a change in which accounts exist still asks for a decision.
+- Checking an interrupted sync with Humble Library no longer fails because of saved Humble records that cannot be shared; those records stay saved and are left out of the check, as they are from sharing.
 - Dotted game acronyms match the same game without dots, as in Humble Library and Fanatical Library: a saved FEAR 2 shows as owned for F.E.A.R. 2. Sequel numbers, subtitles, editions and remaster wording still decide, and books and software are unaffected.
 - A media correction made in Humble Library, for example from book to game, now updates the matching Humble purchase in Galactic Library on the next sync. Previously only a first classification of an unknown title arrived and later corrections were skipped. Only the purchase or Library entitlement with the same ID changes: same-title purchases, other accounts and other stores are untouched, and the purchase count stays the same. A purchase you linked, separated or reviewed contents for in Galactic Library keeps its Galactic Library classification. Ownership corrections are kept. Fanatical records are unchanged.
 - The shared Fanatical acquisition engine (pinned revision fanatical-v1-cc892d7ab7dc6261) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.

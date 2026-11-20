@@ -4,14 +4,15 @@ const S=GalacticPurchaseSnapshot,T=GalacticPurchaseTransfer,Y=GalacticPurchaseSy
 const row=(n,p='humble')=>({providerItemId:p==='humble'?'purchase_'+n+':product:native_'+n:'product_'+n,title:'Synthetic '+n,mediaType:'book',metadata:p==='humble'?{purchaseId:'purchase_'+n}:{},purchasedAt:null,origins:[]});
 function fixture(provider='humble',initial={gl:[],companion:[]}){
  const nodes={},services={},calls=[],commits=[];const role=provider==='humble'?'hb':'fan';
- function start(id){const n=nodes[id]??={saved:{},records:structuredClone(initial[id]??[]),accountId:id+'-stable',label:'Personal',alarms:new Map(),online:true};n.coordinator?.dispose();
+ function start(id){const n=nodes[id]??={saved:{},records:structuredClone(initial[id]??[]),accountId:id+'-stable',label:'Personal',alarms:new Map(),online:true,revision:0};n.coordinator?.dispose();
   const area={get:async defaults=>structuredClone({...defaults,...n.saved}),set:async patch=>{n.saved={...n.saved,...structuredClone(patch)};}},runtime={id,getURL:()=>id+':///',onMessage:{addListener(){}},onMessageExternal:{addListener(){}},onStartup:{addListener(){}},onInstalled:{addListener(){}},sendMessage:async(peer,m)=>{if(typeof peer!=='string')return {};calls.push({from:id,to:peer,type:m.type});if(!nodes[peer]?.online||!services[peer])throw Error('Companion unavailable');if(n.intercept)await n.intercept(peer,m);try{const result=await services[peer].external(m,{id});if(n.afterResponse)await n.afterResponse(m,result);return {ok:true,protocolVersion:1,...result};}catch(e){return {ok:false,protocolVersion:1,error:e.message};}}};
   const account=()=>({accountRef:id+'-'+n.records.length+'-'+JSON.stringify(n.records),label:n.label,active:true,stableId:n.accountId,count:n.records.length,historicalCount:n.historicalCount??0,unassigned:n.records.length===0&&!n.historicalCount&&!n.assigned});
   // Handoff references may change; stable IDs do not. Use bounded SHA refs like real companions.
   const catalog=async()=>[{...account(),accountRef:await S.hash(account().accountRef)},...(n.extraAccounts??[])];
-  const snapshot=async(_,ref)=>{assert((await catalog()).some(a=>a.accountRef===ref));return S.validate({protocolVersion:1,provider,snapshotId:crypto.randomUUID(),accountRef:ref,accountLabel:n.label,capturedAt:new Date().toISOString(),scope:'historical',completeness:'partial',limitations:[],records:n.records});};
-  services[id]=T.createService({runtime,area,authorize:async(peer,p)=>p===provider&&peer===(id==='gl'?'companion':'gl'),peer:async()=>n.peerOverride??(id==='gl'?'companion':'gl'),accounts:catalog,snapshot,preview:async data=>({added:data.records.filter(r=>!n.records.some(old=>old.providerItemId===r.providerItemId)).length,updated:0,skipped:0}),commit:async(data,target)=>{if(n.skipAll&&data.records.length)throw Error('No compatible records can be imported. Synthetic unsupported records.');assert.equal(target.accountRef,(await catalog())[0].accountRef);const merged=new Map(n.records.map(r=>[r.providerItemId,r]));let added=0,updated=0;for(const r of data.records){const old=merged.get(r.providerItemId),next=old?{...old,metadata:S.richer(old.metadata,r.metadata)}:r;if(!old)added++;else if(!S.equal(old,next))updated++;merged.set(r.providerItemId,next);}if(added||updated){n.records=[...merged.values()];commits.push({id,added,updated});}return {added,updated,unchanged:data.records.length-added-updated,skipped:0};}});
-  n.coordinator=Y.createCoordinator({runtime,area,alarms:{create:async(name,value)=>n.alarms.set(name,value),clear:async name=>n.alarms.delete(name),onAlarm:{addListener(){}}},service:services[id],role:id==='gl'?'gl':role,catalog,busy:async()=>n.busy,coalesceMs:3600000});services[id].setSync(n.coordinator);return n;
+  const stale=()=>Error('Saved account data changed. Refresh the account choices and confirm again.');
+  const snapshot=async(_,ref)=>{if(!(await catalog()).some(a=>a.accountRef===ref))throw stale();if(n.onSnapshot)await n.onSnapshot();return S.validate({protocolVersion:1,provider,snapshotId:crypto.randomUUID(),accountRef:ref,accountLabel:n.label,capturedAt:new Date().toISOString(),scope:'historical',completeness:'partial',limitations:[],records:n.records});};
+  services[id]=T.createService({runtime,area,authorize:async(peer,p)=>p===provider&&peer===(id==='gl'?'companion':'gl'),peer:async()=>n.peerOverride??(id==='gl'?'companion':'gl'),accounts:catalog,snapshot,preview:async data=>({added:data.records.filter(r=>!n.records.some(old=>old.providerItemId===r.providerItemId)).length,updated:0,skipped:0}),commit:async(data,target)=>{if(n.skipAll&&data.records.length)throw Error('No compatible records can be imported. Synthetic unsupported records.');if(target.accountRef!==(await catalog())[0].accountRef)throw stale();const revisionBefore=n.revision;const merged=new Map(n.records.map(r=>[r.providerItemId,r]));let added=0,updated=0;for(const r of data.records){const old=merged.get(r.providerItemId),next=old?{...old,metadata:S.richer(old.metadata,r.metadata)}:r;if(!old)added++;else if(!S.equal(old,next))updated++;merged.set(r.providerItemId,next);}if(added||updated){n.records=[...merged.values()];n.revision++;commits.push({id,added,updated});}return {added,updated,unchanged:data.records.length-added-updated,skipped:0,revisionBefore,revision:n.revision};}});
+  n.coordinator=Y.createCoordinator({runtime,area,alarms:{create:async(name,value)=>n.alarms.set(name,value),clear:async name=>n.alarms.delete(name),onAlarm:{addListener(){}}},service:services[id],role:id==='gl'?'gl':role,catalog,busy:async()=>n.busy,revision:()=>n.revision,coalesceMs:3600000});services[id].setSync(n.coordinator);return n;
  }
  start('gl');start('companion');
  async function connect(first='gl'){const second=first==='gl'?'companion':'gl',a=nodes[first],b=nodes[second];await a.coordinator.local({action:'syncConnect',provider,localId:a.accountId,remoteId:b.accountId,confirmed:true,sameAccount:true});assert.equal(b.saved[Y.KEY][provider].confirmed,true,'one local confirmation enables the verified peer');}
@@ -250,4 +251,84 @@ test('a Fanatical review changes the transfer reference, never the stable accoun
  await assert.rejects(A.snapshot('fan',state,before.accountRef),error=>Y.failureKind(error)==='source-busy');
  const current=await A.snapshot('fan',state,after.accountRef);assert.equal(current.records.length,1);assert.equal(current.records[0].providerItemId,'product_1');assert.equal(current.records[0].origins[0].keyReview.action,'dismissed');
  for(const message of ['Invalid key reminder review.','Companion returned an unexpected purchase-sharing response. Update and check pairing.','Saved account data changed unexpectedly.'])assert.equal(Y.failureKind(message),'operation-failed');
+});
+
+// Deterministic in-flight mutation races. Barriers are message boundaries and the snapshot hook; scheduling is
+// driven only by the alarms each coordinator actually sets (timers are disabled), so nothing depends on timing.
+async function settle(f,rounds=20){for(let n=0;n<rounds;n++){let fired=false;for(const id of ['companion','gl']){const node=f.nodes[id];for(const name of [...node.alarms.keys()]){node.alarms.delete(name);fired=true;
+ if(name.startsWith(Y.ALARM+'discovery-'))await node.coordinator.discover(f.provider);else if(name.startsWith(Y.ALARM))await node.coordinator.run(f.provider).catch(()=>{});}}if(!fired)return;}}
+const mutate=async(f,record)=>{const c=f.nodes.companion;c.records.push(record);c.revision++;await c.coordinator.mark(f.provider).catch(()=>{});};
+const ids=records=>records.map(r=>r.providerItemId).sort();
+const synced=f=>['gl','companion'].map(id=>{const s=f.nodes[id].saved[Y.KEY][f.provider];return [s.status,Boolean(s.pending)];});
+async function paired(provider,{companion=[row(1,provider)],gl=[row(9,provider)]}={}){const f=fixture(provider,{gl,companion});await f.nodes.gl.coordinator.discover(provider);await settle(f);
+ assert.deepEqual(synced(f),[['synced',false],['synced',false]]);return f;}
+const barriers=[
+ ['before snapshot capture',(f,go)=>{f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_BEGIN')await go();};}],
+ ['during snapshot creation',(f,go)=>{f.nodes.companion.onSnapshot=go;}],
+ ['after snapshot capture, before transfer',(f,go)=>{f.nodes.gl.afterResponse=async m=>{if(m.type==='GH_PURCHASE_BEGIN')await go();};}],
+ ['during transfer',(f,go)=>{let chunks=0;f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_CHUNK'&&++chunks===2)await go();};}],
+ ['after GL applies companion records, before its acknowledgment',(f,go)=>{f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_ACK')await go();};}],
+ ['after the companion applies GL records, before its acknowledgment',(f,go)=>{f.nodes.companion.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_ACK')await go();};}],
+ ['immediately after an acknowledgment',(f,go)=>{f.nodes.companion.afterResponse=async m=>{if(m.type==='GH_PURCHASE_ACK')await go();};}],
+ ['before completion is reported',(f,go)=>{f.nodes.gl.intercept=async(_,m)=>{if(m.type===Y.PREFIX+'COMPLETE')await go();};}]
+];
+for(const provider of ['humble','fanatical'])for(const [label,arm] of barriers)test(`${provider} in-flight mutation ${label} is synchronized, never acknowledged as synced while unsent`,async()=>{
+ // 600 companion records give a multi-chunk transfer; GL also sends a new record, so both directions run.
+ const f=await paired(provider,{companion:Array.from({length:600},(_,n)=>row(n+1,provider)),gl:[row(9000,provider)]});try{
+  let fired=0;const commitsBefore=f.commits.length;
+  arm(f,async()=>{if(fired++)return;await mutate(f,row(7001,provider));});
+  f.nodes.gl.records.push(row(9001,provider));f.nodes.gl.revision++;await mutate(f,row(7000,provider));
+  await settle(f);
+  assert.equal(fired>=1,true,'the barrier was reached');
+  assert.deepEqual(ids(f.nodes.gl.records),ids(f.nodes.companion.records),'both libraries hold the same purchases');
+  assert(f.nodes.gl.records.some(r=>r.providerItemId===row(7001,provider).providerItemId),'the in-flight mutation reached GL');
+  assert.deepEqual(synced(f),[['synced',false],['synced',false]]);
+  // Unchanged data is idempotent afterwards: no transfer writes, stable fingerprints.
+  const commits=f.commits.length,pair=f.nodes.gl.saved[Y.KEY][provider].pair;
+  for(let n=0;n<2;n++){await f.nodes.gl.coordinator.local({action:'syncNow',provider});await settle(f);}
+  assert.equal(f.commits.length,commits,'repeated unchanged sync writes nothing');assert.deepEqual(f.nodes.gl.saved[Y.KEY][provider].pair,pair);
+  assert(f.commits.length-commitsBefore<=6,'bounded transfers: '+(f.commits.length-commitsBefore));
+ }finally{f.dispose();}
+});
+for(const provider of ['humble','fanatical'])test(provider+' two rapid mutations, a 6,000-record library, restart with pending work and an interrupted transfer converge without rewriting',async()=>{
+ const f=await paired(provider,{companion:Array.from({length:6000},(_,n)=>row(n+1,provider)),gl:[]});try{
+  assert.equal(f.nodes.gl.records.length,6000);
+  const quiet=f.commits.length,pair=f.nodes.gl.saved[Y.KEY][provider].pair;
+  for(let n=0;n<2;n++){await f.nodes.gl.coordinator.local({action:'syncNow',provider});await settle(f);}
+  assert.equal(f.commits.length,quiet,'6,000 unchanged records are not rewritten');assert.deepEqual(f.nodes.gl.saved[Y.KEY][provider].pair,pair,'fingerprints are stable');
+  // Two rapid mutations, the second during the transfer of the first.
+  let chunks=0;f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_CHUNK'&&++chunks===10)await mutate(f,row(8002,provider));};
+  await mutate(f,row(8001,provider));await settle(f);f.nodes.gl.intercept=null;
+  assert.deepEqual(ids(f.nodes.gl.records),ids(f.nodes.companion.records));assert.deepEqual(synced(f),[['synced',false],['synced',false]]);
+  // Pending work survives a restart of both extensions.
+  await mutate(f,row(8003,provider));f.nodes.companion.alarms.clear();f.nodes.gl.alarms.clear();f.start('companion');f.start('gl');
+  await f.nodes.gl.coordinator.startup();await f.nodes.companion.coordinator.startup();await settle(f);
+  assert(f.nodes.gl.records.some(r=>r.providerItemId===row(8003,provider).providerItemId),'pending work resumes after restart');
+  // A connection interruption mid-transfer stays visible and retryable, then converges.
+  chunks=0;f.nodes.gl.intercept=async(_,m)=>{if(m.type==='GH_PURCHASE_CHUNK'&&++chunks===3)f.nodes.companion.online=false;};
+  await mutate(f,row(8004,provider));await settle(f,3);f.nodes.gl.intercept=null;
+  const interrupted=f.nodes.gl.saved[Y.KEY][provider];assert.notEqual(interrupted.status,'synced','an interrupted transfer is not reported as synced');
+  f.nodes.companion.online=true;await f.nodes.gl.coordinator.local({action:'syncNow',provider}).catch(()=>{});await settle(f);
+  assert.deepEqual(ids(f.nodes.gl.records),ids(f.nodes.companion.records));assert.deepEqual(synced(f),[['synced',false],['synced',false]]);
+ }finally{f.dispose();}
+});
+
+// Initial pairing: a saved-purchase change during the handshake must not need a manual reconnect.
+for(const provider of ['humble','fanatical'])for(const recovery of ['Sync now','discovery retry','restart'])test(`${provider} a change at each pairing boundary recovers by ${recovery} without changing accounts`,async()=>{
+ let exercised=0;
+ for(const injector of ['gl','companion'])for(let k=0;k<10;k++){
+  const f=fixture(provider,{gl:[row(9,provider)],companion:[row(1,provider)]});try{
+   let seen=0,fired=false;f.nodes[injector].intercept=async()=>{if(!fired&&seen++===k){fired=true;await mutate(f,row(2,provider));}};
+   await f.nodes.gl.coordinator.discover(provider);f.nodes[injector].intercept=null;
+   if(!fired)continue;exercised++;
+   if(recovery==='Sync now')await f.nodes.gl.coordinator.local({action:'syncNow',provider}).catch(()=>{});
+   else if(recovery==='restart'){f.nodes.gl.alarms.clear();f.nodes.companion.alarms.clear();f.start('gl');f.start('companion');await f.nodes.gl.coordinator.startup();await f.nodes.companion.coordinator.startup();}
+   await settle(f);
+   const g=f.nodes.gl.saved[Y.KEY][provider],c=f.nodes.companion.saved[Y.KEY][provider];
+   assert.deepEqual([g.status,c?.status],['synced','synced'],`${injector} boundary ${k}: ${g.errorCode} ${g.error}`);
+   assert.deepEqual([g.localId,g.remoteId,c.localId,c.remoteId],['gl-stable','companion-stable','companion-stable','gl-stable'],'the same two accounts');
+   assert.deepEqual(ids(f.nodes.gl.records),ids(f.nodes.companion.records));
+  }finally{f.dispose();}
+ }
+ assert(exercised>=6,'handshake boundaries exercised: '+exercised);
 });
