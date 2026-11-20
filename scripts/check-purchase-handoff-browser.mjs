@@ -35,7 +35,7 @@ try{
   if(firefox)await driver.send('WebDriver:NewSession',{capabilities:{alwaysMatch:{browserName:'firefox',...(simple?{unhandledPromptBehavior:'ignore'}:{})}}});
   async function load(root,role){
     let archive,manifest,stage;
-    const supplied=role==='hb'?process.env.HB_RUNTIME_PACKAGE:role==='gl'?process.env.GL_RUNTIME_PACKAGE:undefined;
+    const supplied=role==='hb'?process.env.HB_RUNTIME_PACKAGE:role==='gl'?process.env.GL_RUNTIME_PACKAGE:role==='fan'?process.env.FAN_RUNTIME_PACKAGE:undefined;
     if(supplied&&!process.env.HB_PLACEHOLDER_REF){
       archive=resolve(supplied);stage=join(temporary,role);
       execFileSync('powershell.exe',['-NoProfile','-Command','Expand-Archive -LiteralPath $env:GH_TEST_ZIP -DestinationPath $env:GH_TEST_STAGE'],{windowsHide:true,env:{...process.env,GH_TEST_ZIP:archive,GH_TEST_STAGE:stage}});
