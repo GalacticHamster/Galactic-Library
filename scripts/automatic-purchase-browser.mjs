@@ -1,6 +1,6 @@
 // Disposable packaged-browser checks. Called only by the purchase browser harness.
 import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';
-import {outputPath} from './audit-artifacts.mjs';
+import {outputPath} from './audit-artifacts.mjs';import {settlePairing} from './pairing-settle.mjs';
 export async function automaticPurchaseChecks({navigate,evaluate,wait,call,restart,driver,getSession,firefox,installed,checks,measurements,screenshots}){
  const browser=firefox?'firefox':'chrome';
  async function show(provider){await evaluate(`document.dispatchEvent(new CustomEvent('gh-purchase-open',{detail:{provider:'${provider}'}}));const h=document.querySelector('[data-purchase-handoff][data-provider="${provider}"]');for(let n=h.parentElement;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true;h.querySelector('[data-purchase-sync]').scrollIntoView();return true;`);await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-purchase-sync]').getAttribute('aria-busy')==='false'`);}
@@ -10,11 +10,16 @@ export async function automaticPurchaseChecks({navigate,evaluate,wait,call,resta
   const provider=role==='hb'?'humble':'fanatical',count=role==='hb'?6321:47;
   await navigate(role);await evaluate(`const items=[],role='${role}';for(let n=0;n<${count};n++){const purchase='purchase_'+Math.floor(n/20),title=role+' Synthetic book '+n,bundle='Synthetic bundle '+Math.floor(n/20),base={providerItemId:purchase+':product:product_'+n,title,purchaseKey:purchase,sourceBundle:bundle,entitlement:'direct-download'};items.push(role==='hb'?{...base,kind:'book',source:'humble',authors:['Synthetic Author'],provenance:[base,...(n<716?[{...base,providerItemId:'repeat_'+n+':product:product_'+n,purchaseKey:'repeat_'+n}]:[])]}:{source:'fanatical',sourceItemId:'product_'+n,title,mediaType:'book',authors:['Synthetic Author'],bundle:{sourceItemId:'bundle_'+Math.floor(n/20),title:bundle},purchaseOrigins:[{purchaseRef:'a'.repeat(64),bundle:{sourceItemId:'bundle_'+Math.floor(n/20),title:bundle},purchaseDate:null,quantity:n===0?2:1},{purchaseRef:'b'.repeat(64),bundle:{sourceItemId:'other_bundle',title:'Another bundle'},purchaseDate:null,quantity:1}]});}await chrome.storage.local.set(role==='hb'?{humbleProfileLabel:'Personal',libraryItems:items}:{fanaticalProfileLabel:'Personal',fanaticalLibraryItems:items});return true;`);
   await show(provider);await shot(role,provider,'disconnected');
-  const first=role==='hb'?role:'gl',second=first==='gl'?role:'gl';await navigate(first);const choice=await call(first,'syncChoices',provider,{peerId:first==='gl'?installed[role].id:undefined});assert.equal(choice.ok,true,choice.error);const initial=Date.now();
-  // The only saved account on each side pairs automatically as soon as it has purchases; an explicit connect
-  // during that setup races it. Connect only when automatic pairing has not happened.
-  const paired=async()=>{const s=(await call(first,'syncState',provider)).state;return Boolean(s?.confirmed&&s.remoteConfirmed);};let automaticallyPaired=false;for(let n=0;n<100&&!(automaticallyPaired=await paired());n++)await new Promise(r=>setTimeout(r,100));
-  if(!automaticallyPaired){const proposed=await call(first,'syncConnect',provider,{peerId:choice.peerId,localId:choice.accounts[0].stableId,remoteId:choice.remoteAccounts[0].stableId,confirmed:true,sameAccount:true});assert.equal(proposed.ok,true,proposed.error);}measurements.push({provider,automaticallyPaired});await show(provider);await shot(first,provider,'connecting');
+  const first=role==='hb'?role:'gl',second=first==='gl'?role:'gl';await navigate(first);const initial=Date.now();
+  // The only saved account on each side pairs automatically as soon as it has purchases. Wait for that; an
+  // explicit connect is only a fallback and uses account choices read at that moment (see pairing-settle.mjs).
+  const {automaticallyPaired,state:pairing}=await settlePairing({readState:async()=>(await call(first,'syncState',provider)).state,
+    readChoices:()=>call(first,'syncChoices',provider,{peerId:first==='gl'?installed[role].id:undefined}),
+    connect:({peerId,localId,remoteId})=>call(first,'syncConnect',provider,{peerId,localId,remoteId,confirmed:true,sameAccount:true})});
+  measurements.push({provider,automaticallyPaired});
+  await navigate(second);const mirrored=(await call(second,'syncState',provider)).state;
+  assert(mirrored?.confirmed&&mirrored.remoteConfirmed,provider+' connection is confirmed on both sides');
+  assert.deepEqual([mirrored.localId,mirrored.remoteId],[pairing.remoteId,pairing.localId],provider+' both sides save the same account pair');await navigate(first);await show(provider);await shot(first,provider,'connecting');
   const syncStart=initial;await navigate(second);await show(provider);
   await wait(`document.querySelector('[data-purchase-handoff][data-provider="${provider}"] [data-sync-status]').textContent.startsWith('Synced')`);measurements.push({provider,initialMs:Date.now()-syncStart,setupAndSyncMs:Date.now()-initial,sourceEntries:count,expectedGlObservations:role==='hb'?7077:50});
   await navigate('gl');let current=await call('gl','syncState',provider);assert.equal(current.ok,true,current.error);assert.equal(current.accounts.find(a=>a.stableId===current.state.localId).count,role==='hb'?7077:50);
