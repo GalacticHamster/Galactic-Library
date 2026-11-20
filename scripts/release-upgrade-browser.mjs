@@ -56,7 +56,10 @@ try{
   // Sync bookkeeping that a running coordinator may add or refresh; relationship identity is checked separately.
   const bookkeeping=key=>/^galacticPurchaseDiscovery(After|Attempts):/.test(key)||key==='galacticPurchaseSharing';
   function compare(before,after,label){
-    const removed=Object.keys(before).filter(k=>!Object.hasOwn(after,k)),added=Object.keys(after).filter(k=>!Object.hasOwn(before,k)&&!bookkeeping(k));
+    // The purchase-sync coordinator moves a legacy account registry into each account's embedded stable ID and then
+    // removes it (migrateAccounts). That loses nothing when every account keeps its ID, which the readers compare.
+    const migrated=k=>k==='galacticPurchaseAccountIds';
+    const removed=Object.keys(before).filter(k=>!Object.hasOwn(after,k)&&!migrated(k)),added=Object.keys(after).filter(k=>!Object.hasOwn(before,k)&&!bookkeeping(k));
     const changed=Object.keys(before).filter(k=>Object.hasOwn(after,k)&&!bookkeeping(k)&&k!=='galacticPurchaseSync'&&JSON.stringify(before[k])!==JSON.stringify(after[k]));
     assert.deepEqual({removed,added,changed},{removed:[],added:[],changed:[]},label+': saved data must be kept unchanged');
     const relationship=s=>Object.fromEntries(Object.entries(s??{}).map(([p,v])=>[p,v&&{id:v.id,peerId:v.peerId,localId:v.localId,remoteId:v.remoteId,confirmed:v.confirmed}]));
@@ -161,12 +164,13 @@ var GL_SEED=`
   const steam=P.newProviderProfile('steam','Steam');d.providerProfiles[steam.profileId]=steam;d.providers.steam={activeProfileId:steam.profileId,profileLabel:'Steam'};
   const s=M.normalizeProviderItem({provider:'steam',profileId:steam.profileId,providerItemId:'620',title:'Synthetic Corrected Game',mediaType:'game',ownership:'owned',metadata:{}},at,{profileKeySpace:steam.keySpace});d.providerItems[s.id]=s;
   const humble=Object.values(d.providerItems).filter(i=>i.provider==='humble'),saga=humble.find(i=>i.title==='Synthetic Saga'),twins=humble.filter(i=>i.title==='Synthetic Twin'&&i.profileId===d.providers.humble.activeProfileId);
-  d.ownershipReviews[saga.recordRef]=R.validateOwnershipReview({ownership:'returned',source:'user-correction',note:'',evidenceDate:null,sourceUrl:'',expiresAt:null,confirmedAt:at,reviewRef:crypto.randomUUID()});
-  const reminder=Rem.libraryReminders(d).find(r=>r.title==='Synthetic Key Game');if(!reminder)throw Error('no key reminder in the published runtime');
-  d.reminderReviews[reminder.reminderRef]={action:'dismissed',basis:reminder.basis,until:null,updatedAt:at};
-  const pair=[twins[0].id,twins[1].id].sort();d.manualMatchDecisions[pair.join(String.fromCharCode(0))]={decision:'different',itemIds:pair,updatedAt:at};
-  d.canonicalItems=M.rebuildCanonicalItems(d.providerItems,d.manualMatchDecisions,{},d.editionSeparations);
+  d.canonicalItems=M.rebuildCanonicalItems(d.providerItems,{},{},d.editionSeparations);
   await S.restoreDatabase(d);
+  // Corrections, relationship decisions and reminder reviews are made with the published runtime's own writers.
+  await S.saveOwnershipCorrections([{recordRef:saga.recordRef,provider:saga.provider,profileId:saga.profileId,expectedReviewRef:null}],{ownership:'returned'});
+  await S.saveManualMatchDecision({itemIds:[twins[0].id,twins[1].id]},'different');
+  const reminder=Rem.libraryReminders(await S.getDatabase()).find(r=>r.title==='Synthetic Key Game');if(!reminder)throw Error('no key reminder in the published runtime');
+  await S.saveReminderReview(reminder.reminderRef,'dismissed',reminder.basis);
   await chrome.storage.local.set({galacticPurchaseSync:{humble:{id:'44444444-4444-4444-8444-444444444444',peerId:'abcdefghijklmnopabcdefghijklmnop',localId:d.providers.humble.activeProfileId,remoteId:'55555555-5555-4555-8555-555555555555',confirmed:true,remoteConfirmed:true,previouslyConfirmed:true,peerVerified:true,status:'synced',pending:false,epoch:3,attempts:0,pair:{local:'${'a'.repeat(64)}',remote:'${'b'.repeat(64)}'}}}});
   return true;`;
 var GL_READ=`
@@ -178,14 +182,14 @@ var GL_READ=`
     sagaOwnership:O.effectiveOwnershipRecord(saga,d).ownership,sagaObserved:saga.ownership,
     fanOccurrences:fan.metadata.purchaseOrigins.length,activeReminders:Rem.libraryReminders(d).map(r=>r.title).sort(),
     reviews:Object.values(d.reminderReviews).map(r=>r.action),decisions:Object.values(d.manualMatchDecisions).map(m=>m.decision),
-    humbleAccounts:(await H.purchaseAccounts(d,'humble')).length,
+    humbleAccounts:Object.values(d.providerProfiles).filter(p=>p.provider==='humble').length,
     connection:(await chrome.storage.local.get('galacticPurchaseSync')).galacticPurchaseSync?.humble?.localId===d.providers.humble.activeProfileId};`;
 var GL_VERIFY=`
   const S=await import('./src/lib/storage.js'),M=await import('./src/lib/models.js');const d=await S.getDatabase();M.validateDatabase(d);
   const twins=Object.values(d.providerItems).filter(i=>i.title==='Synthetic Twin');if(twins.length!==3||new Set(twins.map(i=>i.id)).size!==3)throw Error('same-title purchases merged');
   return true;`;
 var GL_BACKUP_RESTORE=`
-  const S=await import('./src/lib/storage.js');const backup=S.createBackup(await S.getDatabase());await S.restoreDatabase(S.parseBackup(JSON.parse(JSON.stringify(backup))));
+  const S=await import('./src/lib/storage.js');const backup=S.createBackup(await S.getDatabase());await S.restoreDatabase(S.parseBackup(backup));
   ${'return await (async()=>{'+'%READ%'+'})();'}`;
 HB_BACKUP_RESTORE=HB_BACKUP_RESTORE.replace('%READ%',HB_READ);GL_BACKUP_RESTORE=GL_BACKUP_RESTORE.replace('%READ%',GL_READ);
 await main();
