@@ -44,6 +44,8 @@ export async function previewPurchaseSnapshot(database,raw,target){const data=S.
  let enrichment=0,observationOnly=0,ownershipReevaluation=0;for(const [id,item]of Object.entries(copy.providerItems)){const prior=database.providerItems[id];if(!prior||S.equal(prior,item))continue;const {observedAt:beforeObservation,...before}=prior,{observedAt:afterObservation,...after}=item;if(S.equal(before,after))observationOnly++;else enrichment++;if(prior.ownership!==item.ownership)ownershipReevaluation++;}
  const addedRows=Object.values(copy.providerItems).filter(i=>!database.providerItems[i.id]);
  return {readOnly:true,sourceRecords:data.records.length,destinationRecords:destinationCount,...stats,...A.previewTitles(rows,addedRows),updateBreakdownKnown:true,enrichment,observationOnly,ownershipReevaluation,legacyMatchable,ambiguous,conflicts,limitations:data.limitations};}
+// Saved relationships and edition separations cannot cross media types, and a contents review describes a book.
+function mediaPinned(database,id){return Boolean(database.contentReviews?.[id])||Object.values(database.manualMatchDecisions??{}).some(d=>d?.itemIds?.includes(id))||Object.values(database.editionSeparations??{}).some(s=>s?.itemId===id||s?.otherItemIds?.includes(id));}
 export async function applyPurchaseSnapshot(database,raw,target){const data=S.validate(raw),provider=data.provider,stats={added:0,updated:0,unchanged:0,skipped:0};let profile=database.providerProfiles[target?.accountRef];
  if(target?.newLabel){const label=String(target.newLabel).trim();if(!label||label.length>100||Object.values(database.providerProfiles).some(p=>p.provider===provider&&p.nickname===label)||target.expectedActiveId!==(database.providers[provider]?.activeProfileId??null))throw Error('Invalid or stale new account choice.');profile=newProviderProfile(provider,label);database.providerProfiles[profile.profileId]=profile;}
  else if(!profile||profile.provider!==provider||target.stamp!==await accountStamp(database,profile))throw Error('Destination account changed. Refresh and confirm again.');
@@ -55,7 +57,11 @@ export async function applyPurchaseSnapshot(database,raw,target){const data=S.va
  if(provider==='humble')native=existingHumbleEntitlementId(database,profile,{...row,providerItemId:native});
  const id=providerItemKey(provider,native,profile.keySpace),active=database.providerItems[id],earlier=historical.get(id)??[];
  if(!active&&earlier.length>1){stats.skipped++;continue;}
- const previous=active??earlier[0],reactivated=!active&&Boolean(previous);if(previous&&(previous.mediaType!==row.mediaType||(reactivated||target?.autoSync)&&previous.metadata.purchaseId&&row.metadata.purchaseId&&previous.metadata.purchaseId!==row.metadata.purchaseId)){stats.skipped++;continue;}
+ const previous=active??earlier[0],reactivated=!active&&Boolean(previous),reclassified=Boolean(previous)&&previous.mediaType!==row.mediaType;
+ // A Humble record identified by its own product or entitlement ID follows Humble Library's latest media
+ // classification. GL decisions that depend on the current media type keep GL's classification instead.
+ const followMedia=reclassified&&provider==='humble'&&Boolean(row.providerItemId)&&!mediaPinned(database,id);
+ if(previous&&(reclassified&&!followMedia||(reactivated||target?.autoSync)&&previous.metadata.purchaseId&&row.metadata.purchaseId&&previous.metadata.purchaseId!==row.metadata.purchaseId)){stats.skipped++;continue;}
  const metadata=S.richer(previous?.metadata??{},row.metadata);delete metadata.platforms;for(const field of ['editionId','seriesId','runId'])delete metadata[field];
  if(Array.isArray(metadata.isbn)){metadata.isbns=metadata.isbn;metadata.isbn=metadata.isbn[0]??'';}metadata.source=PROVIDER_SOURCES[provider];
  if(provider==='fanatical'){

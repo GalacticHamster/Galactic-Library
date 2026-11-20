@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A media correction made in Humble Library, for example from book to game, now updates the matching Humble purchase in Galactic Library on the next sync. Previously only a first classification of an unknown title arrived and later corrections were skipped. Only the purchase or Library entitlement with the same ID changes: same-title purchases, other accounts and other stores are untouched, and the purchase count stays the same. A purchase you linked, separated or reviewed contents for in Galactic Library keeps its Galactic Library classification. Ownership corrections are kept. Fanatical records are unchanged.
 - The shared Fanatical acquisition engine (pinned revision fanatical-v1-cc892d7ab7dc6261) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.
 - The Humble sharing limitation for older purchases without product IDs no longer refers to the retired Import new purchases action.
 - Automatic pairing with Humble Library works when it has a saved purchase that cannot be represented for sharing; that record is left out and counted, as for Fanatical Library. Unsafe optional store links are dropped without withholding the purchase. Installed GL+HB (--humble-records) and GL+FAN (--fanatical-media) checks cover Chrome and Firefox.
