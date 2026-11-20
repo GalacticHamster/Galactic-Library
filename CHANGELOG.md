@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- A change saved in Humble Library or Fanatical Library while Galactic Library was sending purchases to it could be marked as synchronized without reaching Galactic Library, until the next change. Galactic Library now finishes a sync only after a pass in which the companion's saved purchases did not change, so the change is read in the same sync.
 - A media correction made in Humble Library, for example from book to game, now updates the matching Humble purchase in Galactic Library on the next sync. Previously only a first classification of an unknown title arrived and later corrections were skipped. Only the purchase or Library entitlement with the same ID changes: same-title purchases, other accounts and other stores are untouched, and the purchase count stays the same. A purchase you linked, separated or reviewed contents for in Galactic Library keeps its Galactic Library classification. Ownership corrections are kept. Fanatical records are unchanged.
 - The shared Fanatical acquisition engine (pinned revision fanatical-v1-cc892d7ab7dc6261) can read order details in bounded batches for Fanatical Library's resumable Full scans. Galactic Library's own Fanatical scans do not use batches and are unchanged.
 - The Humble sharing limitation for older purchases without product IDs no longer refers to the retired Import new purchases action.

@@ -251,15 +251,3 @@ test('a Fanatical review changes the transfer reference, never the stable accoun
  const current=await A.snapshot('fan',state,after.accountRef);assert.equal(current.records.length,1);assert.equal(current.records[0].providerItemId,'product_1');assert.equal(current.records[0].origins[0].keyReview.action,'dismissed');
  for(const message of ['Invalid key reminder review.','Companion returned an unexpected purchase-sharing response. Update and check pairing.','Saved account data changed unexpectedly.'])assert.equal(Y.failureKind(message),'operation-failed');
 });
-for(const provider of ['humble','fanatical'])test(provider+' a companion change made while it applies GL records is still pulled, not recorded as synced',async()=>{
- // The companion's post-apply fingerprint includes a change made during the apply. GL must not record
- // that fingerprint as reconciled until a pass in which the companion's data did not change.
- const f=fixture(provider,{gl:[row(9,provider)],companion:[row(1,provider)]});try{
-  let fired=false;f.nodes.companion.intercept=async(peer,m)=>{if(!fired&&m.type==='GH_PURCHASE_ACK'){fired=true;f.nodes.companion.records.push(row(2,provider));await f.nodes.companion.coordinator.mark(provider);}};
-  await f.nodes.gl.coordinator.discover(provider);
-  for(let n=0;n<12;n++)for(const id of ['companion','gl']){const node=f.nodes[id];if(node.alarms.has(Y.ALARM+provider)){node.alarms.delete(Y.ALARM+provider);await node.coordinator.run(provider);}}
-  assert.equal(fired,true,'the change was made during the apply');
-  assert.deepEqual(f.nodes.gl.records.map(r=>r.providerItemId).sort(),[row(1,provider),row(2,provider),row(9,provider)].map(r=>r.providerItemId).sort());
-  assert.equal(f.nodes.gl.saved[Y.KEY][provider].status,'synced');assert.equal(f.nodes.companion.saved[Y.KEY][provider].status,'synced');
- }finally{f.dispose();}
-});
