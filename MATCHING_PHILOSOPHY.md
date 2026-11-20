@@ -251,6 +251,7 @@ ISBN:
 Games/platform identifiers:
 
 - a compatible Steam App ID can strongly identify a base game
+- a dotted initialism of at least three single letters names the same game as its undotted form (`F.E.A.R. 2` / `FEAR 2`); the sequel number, subtitle and edition wording still decide, and this applies to games only
 - it does not automatically prove ownership of Deluxe extras, DLC, soundtrack, season pass, etc.
 
 Provider-native IDs:

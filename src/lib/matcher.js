@@ -8,6 +8,9 @@ import { editionBarriers, pairKey } from './relationships.js';
 import { entitlementEvidence,effectiveOwnershipRecord } from './ownership.js';
 import { candidateTitleKeys, possibleTitleRelation, presentationTitle } from './title-candidates.js';
 const policy = globalThis.LibraryMatchingPolicy;
+// A dotted game acronym names the same game as its undotted form (F.E.A.R. 2 and FEAR 2), as in Humble Library
+// and Fanatical Library. Only the dots between single letters are removed; numbers, subtitles and edition words still decide.
+const gameAcronymKey = title => policy.presentationTitle(String(title ?? '').replace(/\b(?:[A-Za-z]\.){2,}[A-Za-z]\.?(?=\s|$)/gu, value => value.replace(/\./gu, '')), 'game');
 // The worker alone enables this for its deeply frozen committed snapshots.
 // Cache only title/identity derivations, never entitlement, expiry or decisions.
 const immutableRecordKeys=new WeakMap();
@@ -80,8 +83,9 @@ function* identityIndexSteps(items,context,{cacheImmutableRecords=false,beginSpa
     let entryItem=item;if(indexReferencesOnly){entryItem=references.get(item.id);if(!entryItem){entryItem={id:item.id};references.set(item.id,entryItem);}}
     const source=item,useCache=cacheImmutableRecords&&Object.isFrozen(source);
     let keys=useCache?immutableRecordKeys.get(source):null;
-    if(!keys){keys={presentation:ownershipTitleKeys(item),candidate:candidateTitleKeys(item.title,item.mediaType),identity:identityEvidence(item)};if(useCache)immutableRecordKeys.set(source,keys);}
+    if(!keys){keys={presentation:ownershipTitleKeys(item),candidate:candidateTitleKeys(item.title,item.mediaType),identity:identityEvidence(item),acronym:item.mediaType==='game'?gameAcronymKey(item.title):''};if(useCache)immutableRecordKeys.set(source,keys);}
     for (const key of keys.presentation) add(byPresentation, item.mediaType + ':' + key, entryItem);
+    if (keys.acronym) add(byPresentation, 'game:acronym:' + keys.acronym, entryItem);
     for (const key of keys.candidate) add(byCandidateTitle, item.mediaType + ':' + key, entryItem);
     const identity=keys.identity;add(byTitle,`${item.mediaType}:${item.normalizedTitle}`,entryItem);add(byBase,`${item.mediaType}:${identity.candidateKey}`,entryItem);
     for(const alias of context.titleAliases?.[item.recordRef]?.titles??[])add(byAlias,`${item.mediaType}:${titleKey(alias)}`,entryItem);
@@ -145,7 +149,8 @@ function* matchItemsSteps(items, requestedItems, context = {}, options={}) {
       .filter(item=>!exclude.has(item.provider));
     const identifierRequired=evidence.isbn.length>0||Boolean(evidence.asin);
     const bookTitle=['book','audiobook'].includes(query.mediaType);
-    const presented=byPresentation.get(query.mediaType+':'+presentationTitle(query.title,query.mediaType))??[];
+    const acronym=query.mediaType==='game'?gameAcronymKey(query.title):'';
+    const presented=[...byPresentation.get(query.mediaType+':'+presentationTitle(query.title,query.mediaType))??[],...(acronym?byPresentation.get('game:acronym:'+acronym)??[]:[])];
     // A supplied identifier that actually hits the library can distinguish a
     // homonym. Use title fallback when the imported copy lacks that identifier,
     // rather than making sparse title candidates override a validated hit.
