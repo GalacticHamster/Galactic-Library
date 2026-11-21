@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased
+
+- Fanatical purchase scans save the verified products of a purchase that also contains a part the scan cannot read, such as an unrecognized product type, a bundle missing from the order details or a malformed promotional item. Each saved product needs its own product ID and a bundle or pick-and-mix selection confirmed by the order list. The purchase stays in the retry list and is never recorded as checked; a later scan that reads every part replaces the provisional purchase counts with exact ones instead of adding copies. Promotional gifts are never imported as owned, and nothing is matched by title alone.
+- Fanatical scan summaries say when items from a partly readable purchase were saved. Scan reports add a count-only `compatibility.components` section, and a `parent-missing` report says how many order-list items are promotional and whether a promotional item in the order details has an ID. Earlier reports remain valid.
+- Shared Fanatical acquisition revision fanatical-v1-79f0891654940a39, used by Fanatical Library and Galactic Library. Purchase sharing with Fanatical Library carries the products a partly readable purchase saved, never its unresolved parts; the sharing protocol is unchanged.
+
 ## 1.0.5
 
 - Works with Humble Library 1.1.3 and Fanatical Library 1.0.6, which also make sure a purchase change saved during a sync reaches Galactic Library in that sync. Galactic Library 1.0.5 also works with Humble Library 1.1.2 and Fanatical Library 1.0.5; the purchase-sharing protocol is unchanged.

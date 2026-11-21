@@ -6,6 +6,7 @@ import {readFanaticalOrdersInPage as gl} from '../src/providers/fanatical-scan.j
 import {fanaticalCompatibilityReport,assertFanaticalAcquisitionContract} from '../shared/provider-acquisition-contract.js';
 import {multiBundlePurchase} from './fixtures/fanatical-multi-bundle.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
+const partialRefs=(engine,r)=>engine===gl?r.result.recovery?.partialOrderFingerprints??[]:r.result.partialOrderFingerprints??[];
 const order=i=>({_id:`synthetic-order-${i}`,status:'COMPLETE',items:[{_id:'synthetic-bundle',name:'Bundle',bundles:[{games:[{_id:`synthetic-product-${i}`,name:`Book ${i}`,type:'book'}]}]}]});
 const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,v])=>[k,reorder(v)])):v;
 async function run(engine,{list=[order(0)],details=list,detailResponses={},known=[],fullScan=true,headers={},detailStatus=200,sessionChange=false,rawDetail=false,orderNavigationRefs}={}){
@@ -45,7 +46,10 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
   const game=r.result.items.find(p=>p.sourceItemId==='direct-game-0');assert.equal(game.mediaType,'game');assert.equal(game.externalIds.steamAppId,'1000');assert.equal(game.bundle.sourceItemId,'direct-game-0');assert.equal(game.bundle.title,'Selected 0');assert.equal(game.purchaseDate,'2026-11-01');if(engine===gl)assert.equal(game.purchaseOrigins[0].orderRef,hash(direct._id));else {assert.equal(game.purchaseOrigins[0].purchaseRef,hash(direct._id));assert.equal(game.purchaseOrigins[0].quantity,1);}assert.equal(game.occurrences.length,1);assert(!JSON.stringify(game).includes('pick and mix'));
   const quick=await run(engine,{list:[order(0),direct],known:[hash(order(0)._id),hash(direct._id)],fullScan:false});assert.equal(quick.paths.length,1);assert.equal(quick.counts.knownSkipped,2);
   const mixed=structuredClone(direct);mixed.items.push(structuredClone(order(0).items[0]));const combined=await run(engine,{list:[mixed]});assert.equal(combined.result.items.length,11);
-  const partlySparse=structuredClone(direct);delete partlySparse.items[9].type;const substituted=structuredClone(direct);substituted.items[0].type='bundle';substituted.items[0].bundles=[{games:[{_id:'different-game',name:'Different',type:'game'}]}];const conflict=await run(engine,{list:[order(0),partlySparse],details:[order(0),substituted]});assert.equal(conflict.result.items.length,1);assert.equal(conflict.counts.detailProductMismatch,1);
+  // A substituted selection is never admitted; its nine verified siblings are.
+  const partlySparse=structuredClone(direct);delete partlySparse.items[9].type;const substituted=structuredClone(direct);substituted.items[0].type='bundle';substituted.items[0].bundles=[{games:[{_id:'different-game',name:'Different',type:'game'}]}];const conflict=await run(engine,{list:[order(0),partlySparse],details:[order(0),substituted]});assert.equal(conflict.result.items.length,10);assert.equal(conflict.counts.detailProductMismatch,1);
+  assert(!conflict.result.items.some(p=>['different-game','direct-game-0'].includes(p.sourceItemId)));assert.deepEqual(partialRefs(engine,conflict),[hash(direct._id)]);assert.equal(conflict.compatibility.components.categories['identityMismatch'],1);
+  for(const p of conflict.result.items.filter(p=>p.sourceItemId.startsWith('direct-game-')))assert.equal(p.occurrences[0].basis,'order-bundle-count');
   const sparse=structuredClone(direct);for(const p of sparse.items)delete p.type;
   const recovered=await run(engine,{list:[sparse],details:[direct]});assert.equal(recovered.result.items.length,10);assert.equal(recovered.compatibility.summaryRecovery.recovered,1);
   const twice=structuredClone(direct);twice.items.push(structuredClone(twice.items[0]));const copies=await run(engine,{list:[twice]});const repeated=copies.result.items.find(p=>p.sourceItemId==='direct-game-0');if(engine===gl)assert.equal(repeated.purchaseOrigins.length,2);else assert.equal(repeated.purchaseOrigins[0].quantity,2);assert.equal(repeated.occurrences.length,2);assert.notEqual(repeated.occurrences[0].occurrenceRef,repeated.occurrences[1].occurrenceRef);
@@ -56,10 +60,14 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
   assert.equal(mixedRecovered.counts.invalidBundles,0);
   assert.equal(mixedRecovered.compatibility.summaryRecovery.recovered,1);
  });
- test(name+': direct game details preserve exact identities, multiplicity and all-or-nothing order admission',async()=>{
+ test(name+': direct game details preserve exact identities and multiplicity; only corroborated components are admitted',async()=>{
   const direct={_id:'synthetic-order-direct',status:'COMPLETE',items:[{_id:'direct-game',name:'Selected',type:'game',bundles:[]}]};
   for(const mutation of [d=>{d.items[0]._id='foreign-game';},d=>{d.status='PENDING';},d=>{d._id='foreign-order';},d=>{d.items.push(structuredClone(d.items[0]));},d=>{d.items[0].type='bundle';},d=>{d.items[0].products=[{_id:'catalog-only',name:'Not purchased'}];}]){
-   const detail=structuredClone(direct);mutation(detail);const r=await run(engine,{list:[order(0),direct],detailResponses:{[direct._id]:detail}});if(detail._id!==direct._id){if(engine===gl)assert.equal(r.result.fanaticalFailure,1);else assert.equal(r.result.fanaticalImportFailure,1);assert.equal(r.result.items,undefined);}else {assert.equal(r.result.items.length,1);assert.equal(r.result.items[0].sourceItemId,order(0).items[0].bundles[0].games[0]._id);if(engine===gl){assert.equal(r.result.recovery.failedOrders,1);assert.equal(r.result.recovery.failedOrderFingerprints.length,1);assert.equal(r.result.diagnostic.ordersUnresolved,1);}else assert.equal(r.result.unresolvedOrderFingerprints.length,1);}
+   const detail=structuredClone(direct);mutation(detail);const r=await run(engine,{list:[order(0),direct],detailResponses:{[direct._id]:detail}});if(detail._id!==direct._id){if(engine===gl)assert.equal(r.result.fanaticalFailure,1);else assert.equal(r.result.fanaticalImportFailure,1);assert.equal(r.result.items,undefined);}else if(detail.items.length===2){
+    // The summary corroborates one copy. That copy is admitted provisionally;
+    // the uncorroborated second copy stays unresolved, never a second purchase.
+    const game=r.result.items.find(p=>p.sourceItemId==='direct-game');assert.equal(r.result.items.length,2);assert.equal(game.occurrences.length,1);assert.equal(game.occurrences[0].basis,'order-bundle-count');assert.deepEqual(partialRefs(engine,r),[hash(direct._id)]);assert.equal(r.compatibility.components.categories['unexpectedDetailItem'],1);
+   }else {assert.equal(r.result.items.length,1);assert.equal(r.result.items[0].sourceItemId,order(0).items[0].bundles[0].games[0]._id);if(engine===gl){assert.equal(r.result.recovery.failedOrders,1);assert.equal(r.result.recovery.failedOrderFingerprints.length,1);assert.equal(r.result.diagnostic.ordersUnresolved,1);}else assert.equal(r.result.unresolvedOrderFingerprints.length,1);}
   }
   for(const mutation of [d=>{delete d.items[0]._id;},d=>{d.items[0].bundles={};},d=>{d.items[0].type='bundle';},d=>{d.items[0].display_type='software';},d=>{d.items[0].games=[];}]){
    const bad=structuredClone(direct);mutation(bad);const r=await run(engine,{list:[order(0),bad]});assert.equal(r.result.items.length,1);if(engine===gl){assert.equal(r.result.recovery.failedOrders,1);assert.equal(r.result.recovery.failedOrderFingerprints.length,1);assert.equal(r.result.diagnostic.ordersUnresolved,1);}else assert.equal(r.result.unresolvedOrderFingerprints.length,1);
@@ -73,7 +81,8 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    if(reason==='missing-parent-name')delete detail.items[9].name;
    if(reason==='missing-leaf-name')delete detail.items[9].bundles[0].games[0].name;
    const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail]}),shapes=r.compatibility.bundleShapes;
-   assert.equal(r.counts.detailStructure,1);assert.equal(r.result.items.length,1);assert.equal(shapes.records.length,8);assert.equal(shapes.truncated,true);const failure=shapes.records.find(s=>s.stage==='details');assert(failure);assert.equal(failure.reason,reason);assert(!/PRIVATE|private-/.test(JSON.stringify(shapes)));
+   // Nine corroborated siblings are admitted; the malformed tenth is not.
+   assert.equal(r.counts.detailStructure,1);assert.equal(r.result.items.length,10);assert(!r.result.items.some(p=>p.sourceItemId==='private-leaf-9'));assert.deepEqual(partialRefs(engine,r),[hash(sparse._id)]);assert.equal(shapes.records.length,8);assert.equal(shapes.truncated,true);const failure=shapes.records.find(s=>s.stage==='details');assert(failure);assert.equal(failure.reason,reason);assert(!/PRIVATE|private-/.test(JSON.stringify(shapes)));
    if(reason==='invalidGames')assert.equal(failure.childGames,'object');if(reason==='missing-parent-name')assert.equal(failure.parentName,'missing');if(reason==='missing-leaf-name'){assert.equal(failure.childName,'missing');assert.equal(failure.childId,'string');}
   }
  });
@@ -83,7 +92,10 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    const bad=order(1);Object.assign(bad.items[0],{name:'PRIVATE_TITLE',bundles,products:[leaf],tiers:[{token:'PRIVATE_TOKEN'}]});
    const r=await run(engine,{list:[order(0),bad]});const shapes=r.compatibility.bundleShapes,record=shapes.records[0];
    assert.equal(shapes.version,1);assert.equal(shapes.truncated,false);assert.equal(shapes.records.length,1);assert.equal(record.stage,'summaries');assert.equal(record.reason,reason);assert.equal(record.bundlesType,type);assert.equal(record.bundlesSize,size);assert.equal(record.parentProducts,'array');assert.equal(record.parentTiers,'array');assert.equal(record.parentName,'string');
+   // A parent-level catalog (products/tiers) cannot corroborate anything, so the
+   // order stays unresolved at the summary and its detail is not requested.
    assert.equal(r.result.items.length,1);assert.equal(r.counts.scheduled,1);assert.equal(r.paths.length,2);assert.equal(r.result.coverage.complete,false);assert.equal(r.counts[reason==='missing'?'missingBundles':'invalidBundles'],1);assert(!/PRIVATE|42/.test(JSON.stringify(shapes)));
+   assert.deepEqual(partialRefs(engine,r),[]);assert.equal(r.compatibility.components,undefined);
    if(bundles?.games)assert.equal(record.bundleGames,'array');if(bundles?.PRIVATE_KEY)assert.equal(record.childGames,'array');
    if(engine===gl)assert(!r.result.coverage.compatibility,'diagnostics cannot enter GL stored coverage');
   }
@@ -110,8 +122,12 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
  });
  test(name+': sparse recovery retains summary conflicts, scope/session guards and ordinary product-mismatch validation',async()=>{
   const detail=order(1),sparse={_id:detail._id,status:'COMPLETE',items:[{name:'Bundle',bundles:[]}]};
-  for(const bad of [{...sparse,status:'UNKNOWN'},{...sparse,items:[{name:'Bundle',bundles:[],products:[]}]},{...sparse,items:[{name:'Bundle',bundles:{}}]},{...sparse,items:[{name:'Bundle',bundles:[],_id:'bad'}]}]){
-   const r=await run(engine,{list:[order(0),bad],details:[order(0),detail]});assert(!r.compatibility.summaryRecovery);assert.equal(r.paths.length,2);assert.equal(r.result.items.length,1);
+  // An unknown status is order-level evidence and withholds the detail request,
+  // as does a parent-level catalog. Another unrecognized summary shape still
+  // locates its detail, admitted only when it corroborates that parent by name and ID.
+  for(const [bad,paths,admitted] of [[{...sparse,status:'UNKNOWN'},2,false],[{...sparse,items:[{name:'Bundle',bundles:[],products:[]}]},2,false],[{...sparse,items:[{name:'Bundle'}]},3,true],[{...sparse,items:[{name:'Bundle',bundles:{}}]},3,true],[{...sparse,items:[{name:'Bundle',bundles:[],_id:'bad'}]},3,false]]){
+   const r=await run(engine,{list:[order(0),bad],details:[order(0),detail]});assert(!r.compatibility.summaryRecovery);assert.equal(r.paths.length,paths);assert.equal(r.result.items.length,admitted?2:1);assert.deepEqual(partialRefs(engine,r),[]);
+   assert.equal(r.result.coverage?.complete??false,admitted);
   }
   const mixedMismatched={...sparse,items:[...sparse.items,order(2).items[0]]};
   const mismatchRun=await run(engine,{list:[order(0),mixedMismatched],details:[order(0),detail]});
@@ -133,7 +149,8 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
  test(name+': A/B-like Full patterns distinguish unsupported statuses from malformed structures',async()=>{
   const a=order(0),bad=[{...order(1),status:'UNKNOWN_GIFT_STATUS'},{...order(2),status:null},{...order(3),items:null},{...order(4),items:[]},order(5),order(6),order(7),order(8)];
   delete bad[4].items[0].bundles;bad[5].items[0].bundles={};delete bad[6].items[0].bundles[0].games;bad[7].items[0].bundles[0].games=[{name:''}];
-  const r=await run(engine,{list:[a,...bad]});assert.equal(r.result.items.length,1);for(const key of ['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','missingNames'])assert.equal(r.counts[key],1,key);assert.equal(r.counts.scheduled,1);assert.equal(r.counts.knownSkipped,0);assert.equal(r.result.coverage.complete,false);
+  // Orders with a named but malformed parent still have their details read; none is admitted.
+  const r=await run(engine,{list:[a,...bad]});assert.equal(r.result.items.length,1);for(const key of ['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','missingNames'])assert.equal(r.counts[key],1,key);assert.equal(r.counts.scheduled,5);assert.deepEqual(partialRefs(engine,r),[]);assert.equal(r.counts.knownSkipped,0);assert.equal(r.result.coverage.complete,false);
  });
  test(name+': C-like Quick checks validated summaries, skips four known purchases, retries four unresolved',async()=>{
   const good=Array.from({length:4},(_,i)=>order(i)),bad=Array.from({length:4},(_,i)=>({...order(i+4),status:'UNKNOWN_STATUS'})),known=good.map(o=>hash(o._id));
@@ -155,7 +172,9 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    const detail={...order(1),items:[structuredClone(populated),{_id:'sparse-bundle',name:'Sparse',bundles:[{games:[{_id:'other-product',name:'Other',type:'book'}]}]}]};
    detail.items[0].bundles[0].games[0].name='Conflicting product';
    const r=await run(engine,{list:[order(0),summary],details:[order(0),detail]});
-   assert.equal(r.result.items.length,1);assert.equal(r.counts.detailProductMismatch,1);assert.equal(r.compatibility.summaryRecovery.unresolved,1);
+   // The conflicting populated product is not admitted; the corroborated sparse sibling is.
+   assert.deepEqual(r.result.items.map(p=>p.sourceItemId).sort(),['other-product','synthetic-product-0']);assert.equal(r.counts.detailProductMismatch,1);assert.equal(r.compatibility.summaryRecovery.unresolved,1);
+   assert.deepEqual(partialRefs(engine,r),[hash(summary._id)]);assert.equal(r.compatibility.components.categories['productUnexpected'],1);assert.equal(r.compatibility.components.categories['productMissing'],1);
   });
 
   test(name+': three-order mixed catalog with direct games and sparse bundle recovers without invalidBundles',async()=>{
@@ -190,7 +209,8 @@ for(const [name,engine]of [['canonical',canonical],['FAN mirror',fan],['GL calla
    const r=await run(engine,{list,details});
    assert.equal(r.counts.detailStructure,1);
    assert.equal(r.counts.invalidBundles,0);
-   assert.equal(r.result.items.length,57);
+   // The empty container stays unresolved; its populated sibling is admitted.
+   assert.equal(r.result.items.length,58);assert(r.result.items.some(p=>p.sourceItemId==='pop-game-1'));assert.deepEqual(partialRefs(engine,r),[hash(mixedSummary._id)]);
    assert.equal(r.compatibility.summaryRecovery.eligible,2);
    assert.equal(r.compatibility.summaryRecovery.recovered,1);
    assert.equal(r.compatibility.summaryRecovery.unresolved,1);
@@ -356,25 +376,25 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
   }
  });
 
- test(name+': genuine parent-missing failures still reject orders and emit bounded zero-PII parentContext',async()=>{
+ test(name+': genuine parent-missing failures keep orders unresolved and emit bounded zero-PII parentContext',async()=>{
   const cases=[
    {
     label:'renamed-parent',
     summaryItems:[{name:'PRIVATE_SUMMARY_TITLE',bundles:[]}],
     detailItems:[{_id:'detail-game',name:'PRIVATE_DETAIL_TITLE',type:'game',bundles:[]}],
-    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false}
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:0,summaryPromotionalParents:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false,promotionalParentHasId:false}
    },
    {
     label:'non-string-pickAndMix-with-matching-object-name',
     summaryItems:[{name:'PRIVATE_PICK_MIX_POOL',bundles:[]}],
     detailItems:[{_id:'detail-game',name:'PRIVATE_LEAF_TITLE',type:'game',bundles:[],pickAndMix:{name:'private pick mix pool'}}],
-    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:1,normalizedNameMatched:true,missingParentHasId:false,promotionalIdMatched:false}
+    expectedContext:{summaryParents:1,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:1,detailDirectParents:1,detailBundleParents:0,nonStringPickAndMix:1,summaryPromotionalParents:0,normalizedNameMatched:true,missingParentHasId:false,promotionalIdMatched:false,promotionalParentHasId:false}
    },
    {
     label:'omitted-detail-parent',
     summaryItems:[{name:'Bundle',bundles:[]},{name:'PRIVATE_OMITTED_PARENT',bundles:[]}],
     detailItems:[{_id:'bundle-id',name:'Bundle',bundles:[{games:[{_id:'synthetic-leaf',name:'Leaf Title',type:'game'}]}]}],
-    expectedContext:{summaryParents:2,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:1,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false}
+    expectedContext:{summaryParents:2,detailParents:1,promotionalDetailParents:0,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:1,nonStringPickAndMix:0,summaryPromotionalParents:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false,promotionalParentHasId:false}
    }
   ];
   for(const tc of cases){
@@ -382,7 +402,8 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
    const detail={_id:'synthetic-order-miss',status:'COMPLETE',items:tc.detailItems};
    const r=await run(engine,{list:[order(0),sparse],details:[order(0),detail]});
    assert.equal(r.counts.detailProductMismatch,1,tc.label);
-   assert.equal(r.result.items.length,1,tc.label);
+   // Only a detail parent corroborated by its summary sibling is admitted; the order stays unresolved.
+   assert.equal(r.result.items.length,tc.label==='omitted-detail-parent'?2:1,tc.label);assert.deepEqual(partialRefs(engine,r),tc.label==='omitted-detail-parent'?[hash(sparse._id)]:[],tc.label);
    assert(!/PRIVATE_/.test(JSON.stringify(r.compatibility)),tc.label);
    const rec=r.compatibility.productMismatches?.records?.[0];
    assert.equal(rec?.category,'parent-missing',tc.label);
@@ -460,7 +481,7 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
   assert.equal(promoSub.counts.detailProductMismatch,1);
   assert.equal(promoSub.compatibility.productMismatches.records[0].category,'parent-missing');
   assert.deepEqual(promoSub.compatibility.productMismatches.records[0].parentContext,{
-   summaryParents:1,detailParents:0,promotionalDetailParents:1,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:0,nonStringPickAndMix:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false
+   summaryParents:1,detailParents:0,promotionalDetailParents:1,unexpectedDetailParents:0,detailDirectParents:0,detailBundleParents:0,nonStringPickAndMix:0,summaryPromotionalParents:0,normalizedNameMatched:false,missingParentHasId:false,promotionalIdMatched:false,promotionalParentHasId:true
   });
   assert.equal(promoSub.result.items.length,1);
  });
@@ -495,7 +516,7 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
   assert.deepEqual(again.result.items.map(i=>[i.sourceItemId,i.occurrences.map(o=>o.occurrenceRef)]),r.result.items.map(i=>[i.sourceItemId,i.occurrences.map(o=>o.occurrenceRef)]));
  });
 
- test(name+': renamed promotional parents never stand in without matching parent identity or for purchased-product claims',async()=>{
+ test(name+': renamed promotional parents never stand in without matching parent identity or for purchased-product claims; paid siblings are still admitted',async()=>{
   const cases=[
    {label:'summary parent without ID',giftSummary:{name:'Synthetic seasonal present',bundles:[]},category:'parent-missing',context:{missingParentHasId:false,promotionalIdMatched:false}},
    {label:'different parent ID',giftSummary:{_id:'synthetic-other-parent',name:'Synthetic seasonal present',bundles:[]},category:'parent-missing',context:{missingParentHasId:true,promotionalIdMatched:false}},
@@ -506,7 +527,11 @@ for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL call
   for(const tc of cases){
    const scan=renamedGiftScan(tc),r=await run(engine,{list:scan.list,details:scan.details,known:scan.known,fullScan:false});
    assert.equal(r.counts.detailProductMismatch,1,tc.label);assert.equal(r.compatibility.summaryRecovery.recovered,3,tc.label);assert.equal(r.compatibility.summaryRecovery.unresolved,1,tc.label);assert.equal(unresolved(engine,r),1,tc.label);
-   assert.equal(r.result.items.length,24,tc.label);assert(!r.result.items.some(i=>scan.paidIds.includes(i.sourceItemId)),tc.label);
+   // The gift never stands in, so the order stays unresolved for retry, but its
+   // two independently verified paid bundles are admitted (provisional occurrences).
+   assert.equal(r.result.items.length,30,tc.label);for(const id of scan.paidIds)assert.equal(r.result.items.find(i=>i.sourceItemId===id)?.occurrences[0].basis,'order-bundle-count',tc.label+' '+id);
+   assert(!r.result.items.some(i=>i.sourceItemId==='synthetic-gift-parent'||/revealed|seasonal|Other game/i.test(i.title)),tc.label);assert.deepEqual(partialRefs(engine,r),[hash(scan.giftOrder)],tc.label);
+   assert.equal(r.compatibility.components.ordersPartiallyResolved,1,tc.label);assert.equal(r.compatibility.components.componentsAdmitted,6,tc.label);
    const record=r.compatibility.productMismatches.records[0];assert.equal(record.category,tc.category,tc.label);
    if(tc.context)for(const [key,value] of Object.entries(tc.context))assert.equal(record.parentContext[key],value,tc.label+' '+key);
    assert(!/synthetic-gift-parent|seasonal|revealed|synthetic-sparse/i.test(JSON.stringify(r.compatibility)),tc.label);

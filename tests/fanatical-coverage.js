@@ -131,13 +131,41 @@ fanaticalCoverageTests.push(
    const empty=await h.pageA.getDatabase();assert.equal(Object.keys(empty.providerItems).length,0);assert.equal(empty.providers.fanatical.fullSyncAt,undefined);
    const quick=await h.acquire('incremental');assert(!quick.full);assert((await h.commit(quick)).result.ok);
  })],
- ['Fanatical malformed sole orders remain fatal; contradictory counts grant additive authority only',()=>fanaticalWorker(async h=>{
+ ['Fanatical malformed sole orders remain fatal; a detail missing one product admits only its verified siblings; contradictory counts grant additive authority only',()=>fanaticalWorker(async h=>{
    assert((await h.commit(await h.acquire())).result.ok);const before=await h.pageA.getDatabase();
-   for(const transform of [()=>({}), (v,list)=>list?v:{...v,_id:'foreign-order'},(v,list)=>list?v:{...v,items:[]},(v,list)=>{if(!list)v.items[0].bundles[0].games.pop();return v;}]){
+   for(const transform of [()=>({}), (v,list)=>list?v:{...v,_id:'foreign-order'},(v,list)=>list?v:{...v,items:[]}]){
      h.setTransform(transform);const a=await h.acquire();assert.equal(a.projection.ok,false);assert.deepEqual((await h.pageA.getDatabase()).providerItems,before.providerItems);
    }
+   // The 46 products still present are each verified; the order stays failed, unchecked and retryable.
+   h.setTransform((v,list)=>{if(!list)v.items[0].bundles[0].games.pop();return v;});const omitted=await h.acquire();assert(omitted.projection.ok);
+   const receipt=omitted.projection.result;assert.equal(receipt.acquisitionComplete,false);assert.equal(receipt.items.length,46);assert.deepEqual(receipt.orderFingerprints,[]);
+   assert.deepEqual(receipt.recovery.partialOrderFingerprints,receipt.recovery.failedOrderFingerprints);assert.equal(receipt.recovery.failedOrders,1);
+   assert(!receipt.items.some(i=>i.sourceItemId==='product-1-000046'));assert(receipt.items.every(i=>i.purchaseOrigins.every(o=>o.basis==='order-bundle-count')));
+   assert.deepEqual((await h.pageA.getDatabase()).providerItems,before.providerItems);
    h.setTransform(v=>v);h.setHeaders({'x-total-count':'2'});const partial=await h.acquire();assert(partial.projection.ok);assert.equal(partial.projection.result.coverage.complete,false);assert(partial.projection.result.recovery.listingIncomplete);
    h.setHeaders({});h.setOrders([fanaticalOrder(2)]);assert.equal((await h.acquire('incremental')).projection.ok,false);
+ })],
+ ['Fanatical partial orders save verified components through the writer, stay retryable and resolve without duplicate occurrences',()=>fanaticalWorker(async h=>{
+   const base=fanaticalOrder(1),unknown={_id:'type-c-parent',name:'Type C purchase',widgets:[{_id:'c-product',name:'C product'}]};
+   const refs=db=>Object.fromEntries(Object.values(db.providerItems).map(i=>[i.providerItemId,i.metadata.purchaseOrigins.map(o=>[o.occurrenceRef,o.basis??'native']).sort()]));
+   h.setOrders([{...base,items:[...base.items,unknown]},fanaticalOrder(2)]);
+   const first=await h.acquire();assert(first.projection.ok,first.projection.error);
+   assert.equal(first.projection.result.acquisitionComplete,false);assert.equal(first.projection.result.recovery.partialOrderFingerprints.length,1);
+   assert((await h.commit(first)).result.ok);let db=await h.pageA.getDatabase();
+   const partial=Object.values(db.providerItems).filter(i=>i.providerItemId.startsWith('product-1-'));
+   assert.equal(Object.keys(db.providerItems).length,94);assert.equal(partial.length,47);assert(!Object.values(db.providerItems).some(i=>i.providerItemId==='c-product'));
+   assert(partial.every(i=>i.metadata.purchaseOrigins.length===1&&i.metadata.purchaseOrigins[0].basis==='order-bundle-count'));
+   let state=db.providers.fanatical.syncState;assert.equal(state.failedOrderFingerprints.length,1);assert.equal(state.knownOrderFingerprints.length,1);
+   // Retrying while C is still unrecognized re-observes the same occurrences.
+   const before=refs(db),retry=await h.acquire('incremental');assert((await h.commit(retry)).result.ok);db=await h.pageA.getDatabase();
+   assert.deepEqual(refs(db),before);assert.equal(db.providers.fanatical.syncState.failedOrderFingerprints.length,1);
+   // C becomes recognizable: native occurrences replace the provisional counts.
+   h.setOrders([{...base,items:[...base.items,{_id:unknown._id,name:unknown.name,bundles:[{games:[{_id:'c-product',name:'C product',type:'book'}]}]}]},fanaticalOrder(2)]);
+   const resolved=await h.acquire('incremental');assert.equal(resolved.projection.result.acquisitionComplete,true);assert((await h.commit(resolved)).result.ok);db=await h.pageA.getDatabase();
+   assert.equal(Object.keys(db.providerItems).length,95);
+   for(const item of Object.values(db.providerItems))assert.deepEqual(item.metadata.purchaseOrigins.map(o=>o.basis),[undefined],item.providerItemId);
+   state=db.providers.fanatical.syncState;assert.equal(state.failedOrderFingerprints,undefined);assert.equal(state.knownOrderFingerprints.length,2);
+   const settled=refs(db);assert((await h.commit(await h.acquire())).result.ok);assert.deepEqual(refs(await h.pageA.getDatabase()),settled);
  })],
  ['Fanatical queued commits reject stale leases and storage errors without losing acquisitions or skip state',()=>fanaticalWorker(async h=>{
    assert((await h.commit(await h.acquire())).result.ok);h.setOrders([fanaticalOrder(1),fanaticalOrder(2)]);

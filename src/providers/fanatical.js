@@ -69,7 +69,7 @@
     // Diagnostic counters only; never copy provider values or arbitrary keys.
     const fields=['unsupportedStatus','invalidStatus','missingItems','invalidItems','missingBundles','invalidBundles','missingGames','invalidGames','missingNames','summaryConflict','detailRequest','detailStructure','detailIdentity','detailStatus','detailProductMismatch','detailProductIdentity','detailProjection','scheduled','knownSkipped','multipleCopies'];
     const c=value.compatibility;
-    if(c?.version===1&&Object.keys(c).every(k=>['version','counts','bundleShapes','summaryRecovery','productMismatches'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000)){
+    if(c?.version===1&&Object.keys(c).every(k=>['version','counts','bundleShapes','summaryRecovery','productMismatches','components'].includes(k))&&c.counts&&Object.keys(c.counts).length===fields.length&&fields.every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0&&c.counts[k]<=100000)){
       const clean={version:1,counts:Object.fromEntries(fields.map(k=>[k,c.counts[k]]))};let valid=true;
       if(c.summaryRecovery!==undefined){
         const r=c.summaryRecovery,counts=['eligible','scheduled','recovered','unresolved','emptyDetailItems'],types=['missing','null','array','object','string','number','boolean','other'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
@@ -84,11 +84,16 @@
       }
       if(c.productMismatches!==undefined){
         const pm=c.productMismatches,cats=['parent-missing','unexpected-detail-item','id-missing','direct-missing','product-missing','product-count'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
-        const ctxInts=['summaryParents','detailParents','promotionalDetailParents','unexpectedDetailParents','detailDirectParents','detailBundleParents','nonStringPickAndMix'],ctxBools=['missingParentHasId','promotionalIdMatched'],ctxKeys=[...ctxInts,'normalizedNameMatched',...ctxBools];
-        const validCtx=x=>x&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).every(k=>ctxKeys.includes(k))&&ctxInts.every(k=>bounded(x[k]))&&typeof x.normalizedNameMatched==='boolean'&&ctxBools.every(k=>!Object.hasOwn(x,k)||typeof x[k]==='boolean');
+        const ctxInts=['summaryParents','detailParents','promotionalDetailParents','unexpectedDetailParents','detailDirectParents','detailBundleParents','nonStringPickAndMix'],ctxBools=['missingParentHasId','promotionalIdMatched','promotionalParentHasId'],ctxOptionalInts=['summaryPromotionalParents'],ctxKeys=[...ctxInts,...ctxOptionalInts,'normalizedNameMatched',...ctxBools];
+        const validCtx=x=>x&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).every(k=>ctxKeys.includes(k))&&ctxInts.every(k=>bounded(x[k]))&&typeof x.normalizedNameMatched==='boolean'&&ctxBools.every(k=>!Object.hasOwn(x,k)||typeof x[k]==='boolean')&&ctxOptionalInts.every(k=>!Object.hasOwn(x,k)||bounded(x[k]));
         const validRec=r=>r&&typeof r==='object'&&!Array.isArray(r)&&Object.keys(r).every(k=>['category','expectedCount','observedCount','parentContext'].includes(k))&&cats.includes(r.category)&&bounded(r.expectedCount)&&bounded(r.observedCount)&&(!Object.hasOwn(r,'parentContext')||validCtx(r.parentContext));
         valid=valid&&!!pm&&pm.version===1&&Object.keys(pm).length===3&&Object.keys(pm).every(k=>['version','records','truncated'].includes(k))&&typeof pm.truncated==='boolean'&&Array.isArray(pm.records)&&pm.records.length<=8&&pm.records.every(validRec);
-        if(valid)clean.productMismatches={version:1,records:pm.records.map(r=>({category:r.category,expectedCount:r.expectedCount,observedCount:r.observedCount,...(Object.hasOwn(r,'parentContext')?{parentContext:{...Object.fromEntries(ctxInts.map(k=>[k,r.parentContext[k]])),normalizedNameMatched:r.parentContext.normalizedNameMatched,...Object.fromEntries(ctxBools.filter(k=>Object.hasOwn(r.parentContext,k)).map(k=>[k,r.parentContext[k]]))}}:{})})),truncated:pm.truncated};
+        if(valid)clean.productMismatches={version:1,records:pm.records.map(r=>({category:r.category,expectedCount:r.expectedCount,observedCount:r.observedCount,...(Object.hasOwn(r,'parentContext')?{parentContext:{...Object.fromEntries(ctxInts.map(k=>[k,r.parentContext[k]])),...Object.fromEntries(ctxOptionalInts.filter(k=>Object.hasOwn(r.parentContext,k)).map(k=>[k,r.parentContext[k]])),normalizedNameMatched:r.parentContext.normalizedNameMatched,...Object.fromEntries(ctxBools.filter(k=>Object.hasOwn(r.parentContext,k)).map(k=>[k,r.parentContext[k]]))}}:{})})),truncated:pm.truncated};
+      }
+      if(c.components!==undefined){
+        const x=c.components,ints=['ordersFullyResolved','ordersPartiallyResolved','ordersResolvedByComponents','componentsAdmitted','componentsUnresolved','componentsRejected','unknownStructures','ordersUnresolved'],cats=['summaryStructure','parentMissing','unexpectedDetailItem','identityMismatch','parentStructure','childStructure','childIdentity','productMissing','productUnexpected'],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+        valid=valid&&!!x&&typeof x==='object'&&!Array.isArray(x)&&x.version===1&&Object.keys(x).length===ints.length+2&&Object.keys(x).every(k=>['version','categories',...ints].includes(k))&&ints.every(k=>bounded(x[k]))&&!!x.categories&&typeof x.categories==='object'&&!Array.isArray(x.categories)&&Object.keys(x.categories).length===cats.length&&cats.every(k=>bounded(x.categories[k]));
+        if(valid)clean.components={version:1,...Object.fromEntries(ints.map(k=>[k,x[k]])),categories:Object.fromEntries(cats.map(k=>[k,x.categories[k]]))};
       }
       if(valid)report.compatibility=clean;
     }
@@ -184,6 +189,10 @@
       } else {
         detail = `Some purchase details couldn't be verified.${retryable ? ' They will be retried on your next update.' : ''}`;
       }
+      const partlyRead = summary.partialPurchasesSaved ?? summary.recovery?.partialOrderFingerprints?.length ?? 0;
+      if (partlyRead > 0) {
+        detail += ` Items that could be verified from ${partlyRead === 1 ? 'a partly readable purchase were' : `${partlyRead} partly readable purchases were`} saved.`;
+      }
 
       const saved = summary.verifiedPurchasesSaved ?? summary.ordersScanned ?? 0;
       const added = summary.addedProducts ?? summary.addedItems ?? (Array.isArray(summary.items) ? summary.items.length : 0);
@@ -196,6 +205,8 @@
         activity = `Saved ${saved} purchase${saved === 1 ? '' : 's'}. No new items found.`;
       } else if (saved === 0 && added > 0) {
         activity = `Added ${added} new item${added === 1 ? '' : 's'}.`;
+      } else if (partlyRead > 0) {
+        activity = 'No new items found.';
       } else {
         activity = 'No purchases were saved.';
       }

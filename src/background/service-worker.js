@@ -218,7 +218,8 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
   if(partial&&(!recovery||!Array.isArray(recovery.failedOrderFingerprints)||recovery.failedOrderFingerprints.length>50000
     ||recovery.failedOrderFingerprints.some(id=>typeof id!=='string'||!/^[a-f0-9]{64}$/u.test(id))||new Set(recovery.failedOrderFingerprints).size!==recovery.failedOrderFingerprints.length
     ||recovery.failedOrders!==recovery.failedOrderFingerprints.length||typeof recovery.listingIncomplete!=='boolean'||!count(recovery.ordersSkipped)
-    ||!recovery.failedOrders&&!recovery.listingIncomplete))throw Error('Invalid Fanatical partial recovery evidence.');
+    ||!recovery.failedOrders&&!recovery.listingIncomplete
+    ||recovery.partialOrderFingerprints!==undefined&&(!Array.isArray(recovery.partialOrderFingerprints)||!recovery.partialOrderFingerprints.length||new Set(recovery.partialOrderFingerprints).size!==recovery.partialOrderFingerprints.length||recovery.partialOrderFingerprints.some(id=>!recovery.failedOrderFingerprints.includes(id)))))throw Error('Invalid Fanatical partial recovery evidence.');
   if (input.schemaVersion!==1||!Array.isArray(input.items)||input.items.length>50000||!partial&&input.acquisitionComplete!==true
     ||typeof coverage?.complete!=='boolean'||(partial?coverage.complete!==false:coverage.complete!==true)
     ||!count(input.ordersScanned)||!count(input.ordersAvailable)||!count(coverage.listedOrders)||coverage.listedOrders>100000
@@ -229,7 +230,8 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ||['count','range'].includes(coverage.paginationEvidence)!==(coverage.expectedTotal!==null)
     ||!partial&&(coverage.paginationEvidence==='array-only'&&coverage.pagesFetched!==1||coverage.paginationEvidence==='link'&&coverage.pagesFetched<2))throw new Error('Fanatical did not return a complete validated order projection.');
   const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
-  const cleanRecovery=partial?{failedOrderFingerprints:[...recovery.failedOrderFingerprints],failedOrders:recovery.failedOrders,listingIncomplete:recovery.listingIncomplete,ordersSkipped:recovery.ordersSkipped}:null;
+  const partialOrders=partial?recovery.partialOrderFingerprints??[]:[];
+  const cleanRecovery=partial?{failedOrderFingerprints:[...recovery.failedOrderFingerprints],failedOrders:recovery.failedOrders,listingIncomplete:recovery.listingIncomplete,ordersSkipped:recovery.ordersSkipped,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders]}:{})}:null;
   const expectedFingerprints=input.ordersAvailable-(partial?recovery.failedOrders:0);
   if(!Array.isArray(input.orderFingerprints)||input.orderFingerprints.length!==expectedFingerprints
     ||knownOrderFingerprints.length!==expectedFingerprints
@@ -256,7 +258,9 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
       ,...(candidate?.purchaseOrigins!==undefined?{purchaseOrigins:validatePurchaseOrigins(candidate.purchaseOrigins)}:{})
     });
   }
-  if(partial&&items.some(item=>!item.purchaseOrigins?.length||item.purchaseOrigins.some(origin=>!knownOrderFingerprints.includes(origin.orderRef))))throw Error('Fanatical partial items do not belong to validated orders.');
+  // A partially resolved order contributes only its independently verified
+  // components; it remains failed, so it is retried and never checkpointed.
+  if(partial&&items.some(item=>!item.purchaseOrigins?.length||item.purchaseOrigins.some(origin=>!knownOrderFingerprints.includes(origin.orderRef)&&!partialOrders.includes(origin.orderRef))))throw Error('Fanatical partial items do not belong to validated orders.');
   return {
     ordersScanned: Math.max(0, Math.floor(Number(input.ordersScanned) || 0)),
     ordersAvailable: Math.max(0, Math.floor(Number(input.ordersAvailable) || 0)),

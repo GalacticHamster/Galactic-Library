@@ -103,11 +103,14 @@
       const recovery=snapshot.recovery;
       if(recovery!==undefined){
         const hashes=value=>Array.isArray(value)&&value.length<=50000&&value.every(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id))&&new Set(value).size===value.length;
-        if(!hashes(recovery?.orderFingerprints)||!hashes(recovery?.failedOrderFingerprints)||!recovery.orderFingerprints.length
+        const partialOrders=recovery?.partialOrderFingerprints??[];
+        if(!hashes(recovery?.orderFingerprints)||!hashes(recovery?.failedOrderFingerprints)||!hashes(partialOrders)
+          ||recovery.partialOrderFingerprints!==undefined&&!partialOrders.length||partialOrders.some(id=>!recovery.failedOrderFingerprints.includes(id))
+          ||!recovery.orderFingerprints.length&&!partialOrders.length
           ||recovery.failedOrders!==recovery.failedOrderFingerprints.length||typeof recovery.listingIncomplete!=='boolean'||!count(recovery.ordersSkipped)
           ||!recovery.failedOrders&&!recovery.listingIncomplete||recovery.failedOrderFingerprints.some(id=>recovery.orderFingerprints.includes(id))
           ||recovery.ordersAvailable!==recovery.orderFingerprints.length+recovery.failedOrders||scope?.readCount+recovery.ordersSkipped!==recovery.orderFingerprints.length
-          ||items.some(item=>!item.metadata?.purchaseOrigins?.length||item.metadata.purchaseOrigins.some(origin=>!recovery.orderFingerprints.includes(origin.orderRef))))fail('Invalid Fanatical partial purchase evidence.');
+          ||items.some(item=>!item.metadata?.purchaseOrigins?.length||item.metadata.purchaseOrigins.some(origin=>!recovery.orderFingerprints.includes(origin.orderRef)&&!partialOrders.includes(origin.orderRef))))fail('Invalid Fanatical partial purchase evidence.');
       }
       if (snapshot.version !== 1 || snapshot.provider !== provider || !Array.isArray(items)
         || !count(snapshot.itemCount) || snapshot.itemCount !== new Set(items.map(item=>String(item?.providerItemId??'').trim())).size

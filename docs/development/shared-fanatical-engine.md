@@ -47,6 +47,78 @@ engine-level callers and regression tests, but is not the worker's production
 mode. Tests must not override that argument. Corrupt checkpoint strings grant no
 account or skip authority; valid retained purchase origins remain account evidence.
 
+## Item-level admission
+
+An order is a container of purchase evidence, not the unit of storage
+admission. Its ownership evidence is the authenticated order detail: the same
+order ID as the listing and status COMPLETE. Those order-level facts, and an
+order status other than COMPLETE, still decide the whole order; an order-ID
+conflict still rejects the acquisition.
+
+Whole-order verification runs first and is unchanged; it keeps its occurrence
+identities. When it fails in partial mode, the engine admits components
+instead of discarding the order:
+
+- A detail parent is corroborated by an unused summary parent with the same
+  name and, where the summary states one, the same parent ID. A summary
+  direct-item parent requires the same direct item. Pick-and-mix selections are
+  corroborated by their group name, at least one selection per listed group.
+- Promotional parents are matched last, by name or (renamed gifts) by the same
+  parent ID, and are always rejected, never owned.
+- Each product leaf needs its own validated ID and title. A populated summary
+  parent also limits its detail leaves to the names it lists.
+- Everything else is unresolved by category: `summaryStructure`,
+  `parentMissing`, `unexpectedDetailItem`, `identityMismatch`,
+  `parentStructure`, `childStructure`, `childIdentity`,
+  `productMissing` and `productUnexpected`. Nothing is inferred from titles
+  alone, position or counts.
+
+A summary parent whose shape the engine does not recognize no longer withholds
+the detail request for the order; readable siblings still corroborate detail
+components. An unnamed summary parent cannot be corroborated and keeps the
+order unresolved. A summary parent carrying a parent-level product catalog
+(`games`, `products`, `items` or `tiers`) without readable bundles may
+describe a selection pool rather than a purchase, so it never corroborates a
+detail parent, even one with the same name and ID; an order whose only named
+parents are of that kind stays unresolved at the summary and its detail is
+not requested.
+
+If every component resolves, the order is verified with the same occurrence
+identities as whole-order verification. Otherwise the order stays in
+`unresolved` and `retry`, never in `orderFingerprints`, so neither consumer
+checkpoints it and Quick reads it again. If at least one product was
+admitted, its fingerprint is also listed in `partialOrderFingerprints` (a
+subset of the unresolved, non-deferred orders), and only those orders, besides
+verified ones, may appear as a product's purchase identity. Their occurrences
+carry `basis: 'order-bundle-count'` with position-based references. GL's
+origin merge replaces such provisional slots with native occurrences when the
+order later resolves, so recovery neither duplicates nor drops a purchase;
+FAN keys origins by order and bundle and keeps the larger quantity. FAN's
+private order navigation also covers partly resolved orders, whose detail
+carried the same validated order ID.
+
+A `parent-missing` product mismatch also reports, as optional fields,
+`summaryPromotionalParents` (order-list parents that are themselves
+promotional) and `promotionalParentHasId`. Without them, a gift listed under
+another name without an ID and a purchase the detail omits produce identical
+counts.
+
+`coverage.compatibility.components`, present only when item-level admission
+ran, reports bounded counts: fully, partly and entirely unresolved orders,
+orders resolved through components, admitted product occurrences, unresolved
+and rejected components, unrecognized structures and unresolved components by
+category. Detail shapes of unrecognized parents use `bundleShapes`. FAN
+reports also state the purchases saved in part and their product records,
+including how many an earlier scan had already saved.
+
+Strict acquisition (`allowPartial:false`) remains whole-order.
+
+The only inseparable group is a detail parent with its products: a product is
+admitted only under a corroborated parent, because the parent carries the
+bundle identity and the order-list corroboration. A parent that cannot be
+corroborated, or whose structure is unreadable, keeps all of its products
+unresolved; its siblings are unaffected.
+
 ## Regression structure
 
 The FAN worker VM bridge resolves actual module exports and fails on unsupported
@@ -72,3 +144,10 @@ paths and never select a personal installed extension.
 
 No schema, purchase-sync protocol, permissions, automatic-pairing policy or
 provider parser compatibility expansion is part of this adoption.
+
+`tests/fanatical-component-admission.test.mjs` holds the item-level
+admission matrix for the canonical engine, the FAN mirror and the GL callable,
+including FAN-to-GL sharing of a partly resolved order. The GL writer path is
+covered in `tests/fanatical-coverage.js`; FAN's worker and storage path in
+FAN's `tests/import-safety.test.mjs` and its installed-extension check
+`tests/import-progress-native.mjs`.

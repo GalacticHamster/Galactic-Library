@@ -20,7 +20,10 @@ export function fanaticalAcquisitionForGL(raw,options={}){
   };
   if(raw?.fanaticalImportFailure)return fail();
   const authority=assertFanaticalAcquisitionContract(raw,options);
-  if(partial&&!raw.orderFingerprints.length)return fail();
+  // Verified components of a partially resolved order are admissible on
+  // their own; the order itself stays in the retry set.
+  const partialOrders=raw.partialOrderFingerprints??[];
+  if(partial&&!raw.orderFingerprints.length&&!partialOrders.length)return fail();
   const items=raw.items.map(item=>{
     if((item.occurrences?.length??0)>500){diagnostic.category='limit';diagnostic.stage='projection';return null;}
     // GL deliberately projects only its supported catalog types. FAN retains others.
@@ -30,7 +33,7 @@ export function fanaticalAcquisitionForGL(raw,options={}){
   const failures=raw.unresolvedOrderFingerprints??[],ordersAvailable=raw.orderFingerprints.length+failures.length;
   const {compatibility:ignoredCompatibility,...coverage}=raw.coverage;
   return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
-    ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned}}:{}),
+    ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders]}:{})}}:{}),
     coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
     ...(authority.rejectedPurchaseItems!==undefined?{rejectedPurchaseItems:authority.rejectedPurchaseItems}:{})};
 }
