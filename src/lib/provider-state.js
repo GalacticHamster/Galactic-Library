@@ -112,6 +112,12 @@ export function validateProviderStates(value = {}) {
       if(provider==='fanatical'){
         if(state.syncState.failedOrderFingerprints!==undefined){const failed=strings(state.syncState.failedOrderFingerprints,50000,64,'Failed order fingerprints');if(failed.some(id=>!/^[a-f0-9]{64}$/u.test(id)))throw Error('Invalid failed order fingerprint.');result.syncState.failedOrderFingerprints=failed;}
         if(state.syncState.listingIncomplete!==undefined){if(typeof state.syncState.listingIncomplete!=='boolean')throw Error('Invalid Fanatical listing status.');if(state.syncState.listingIncomplete)result.syncState.listingIncomplete=true;}
+        if(state.syncState.componentScopes!==undefined){
+          // Remaining recovery scope of partly resolved orders still in the retry set.
+          const scopes=state.syncState.componentScopes,failed=new Set(result.syncState.failedOrderFingerprints??[]),bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+          if(!Array.isArray(scopes)||scopes.length>50000||new Set(scopes.map(s=>s?.order)).size!==scopes.length||scopes.some(s=>!s||typeof s!=='object'||!failed.has(s.order)||!bounded(s.unresolved)||s.unresolved<1||!Array.isArray(s.bundles)||s.bundles.length>1000||s.bundles.some(b=>!b||typeof b.bundle!=='string'||!/^[a-zA-Z0-9_-]{6,128}$/u.test(b.bundle)||!bounded(b.admitted)||!bounded(b.unresolved)||b.unresolved<1)))throw Error('Invalid Fanatical recovery scope.');
+          if(scopes.length)result.syncState.componentScopes=scopes.map(s=>({order:s.order,unresolved:s.unresolved,bundles:s.bundles.map(b=>({bundle:b.bundle,admitted:b.admitted,unresolved:b.unresolved}))}));
+        }
         if(state.syncState.acquisitionCheckedAt!==undefined)result.syncState.acquisitionCheckedAt=date(state.syncState.acquisitionCheckedAt,'Fanatical acquisition check');
         const fingerprints=strings(state.syncState.knownOrderFingerprints,50000,64,'Order fingerprints');
         if(fingerprints.some(entry=>!/^[a-f0-9]{64}$/iu.test(entry)))throw new Error('Invalid order fingerprint.');

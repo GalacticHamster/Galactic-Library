@@ -180,7 +180,7 @@ test('contract validation binds partial orders to unresolved, non-deferred order
     const bad=structuredClone(result);mutate(bad);assert.throws(()=>assertFanaticalAcquisitionContract(bad),/contradictory/u);
   }
   const report=fanaticalCompatibilityReport(result.coverage.compatibility);assert.deepEqual(report.components,result.coverage.compatibility.components);
-  assert.deepEqual(Object.keys(report.components.categories),['summaryStructure','parentMissing','unexpectedDetailItem','identityMismatch','parentStructure','childStructure','childIdentity','productMissing','productUnexpected']);
+  assert.deepEqual(Object.keys(report.components.categories),['summaryStructure','parentMissing','unexpectedDetailItem','identityMismatch','parentIdentity','parentStructure','childStructure','childIdentity','nestedStructure','productMissing','productUnexpected']);
 });
 
 // FAN shares saved purchases with GL. A partial order contributes only the

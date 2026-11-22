@@ -1125,9 +1125,15 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const prior=profile.state.syncState??{};
     const incoming=details.syncState??{},failed=new Set([...(prior.failedOrderFingerprints??[]),...(incoming.failedOrderFingerprints??[])]);
     for(const id of incoming.knownOrderFingerprints??[])failed.delete(id);
-    return {...safe,syncState:{...incoming,
+    // A re-read order replaces its recovery scope; a verified order drops it.
+    const scopes=new Map((prior.componentScopes??[]).map(scope=>[scope.order,scope]));
+    for(const scope of incoming.componentScopes??[])scopes.set(scope.order,scope);
+    for(const id of [...scopes.keys()])if(!failed.has(id))scopes.delete(id);
+    const {componentScopes:ignoredScopes,...rest}=incoming;
+    return {...safe,syncState:{...rest,
       knownOrderFingerprints:[...new Set([...(prior.knownOrderFingerprints??[]),...(incoming.knownOrderFingerprints??[])])].filter(id=>!failed.has(id)),
       ...(failed.size?{failedOrderFingerprints:[...failed]}:{}),
+      ...(scopes.size?{componentScopes:[...scopes.values()]}:{}),
       acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}};
   }
   function humbleAcquisitionDetails(profile,details,partialFull=false){

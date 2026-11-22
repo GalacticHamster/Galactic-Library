@@ -45,7 +45,7 @@ export async function fanaticalWorker(run,options={}) {
       const p=acquired.projection;assert(p.ok,p.error);
       const request={type:'COMMIT_PROVIDER_SCAN',provider:'fanatical',mode:acquired.full?'full':'incremental',scanToken:acquired.state.scanToken,
         items:globalThis.GalacticFanatical.fanaticalItemsFromProjection(p.result),snapshot:p.result.snapshot,
-        syncState:{knownOrderFingerprints:p.result.orderFingerprints,...(p.result.recovery?{failedOrderFingerprints:p.result.recovery.failedOrderFingerprints,listingIncomplete:p.result.recovery.listingIncomplete}:{})},scanDiagnostics:{incomplete:p.result.acquisitionComplete===false,failedRequestCount:(p.result.recovery?.failedOrders??0)+(p.result.recovery?.listingIncomplete?1:0),arrayOnly:p.result.coverage.paginationEvidence==='array-only',retries:p.result.coverage.retries}};
+        syncState:{knownOrderFingerprints:p.result.orderFingerprints,...(p.result.recovery?{failedOrderFingerprints:p.result.recovery.failedOrderFingerprints,listingIncomplete:p.result.recovery.listingIncomplete,...(p.result.recovery.componentScopes?.length?{componentScopes:p.result.recovery.componentScopes}:{})}:{})},scanDiagnostics:{incomplete:p.result.acquisitionComplete===false,failedRequestCount:(p.result.recovery?.failedOrders??0)+(p.result.recovery?.listingIncomplete?1:0),arrayOnly:p.result.coverage.paginationEvidence==='array-only',retries:p.result.coverage.retries}};
       return {request,result:await worker.dispatch(request,fanaticalSender)};
     };
     await run({...worker,paths,acquire,commit,setReply:value=>{reply=value;},setOrders:value=>{orders=structuredClone(value);},setHeaders:value=>{headers=value;},
@@ -166,6 +166,24 @@ fanaticalCoverageTests.push(
    for(const item of Object.values(db.providerItems))assert.deepEqual(item.metadata.purchaseOrigins.map(o=>o.basis),[undefined],item.providerItemId);
    state=db.providers.fanatical.syncState;assert.equal(state.failedOrderFingerprints,undefined);assert.equal(state.knownOrderFingerprints.length,2);
    const settled=refs(db);assert((await h.commit(await h.acquire())).result.ok);assert.deepEqual(refs(await h.pageA.getDatabase()),settled);
+ })],
+ ['Fanatical ten-item bundle: the writer saves nine products, records the bundle scope, retries unchanged and recovers the tenth without duplicates',()=>fanaticalWorker(async h=>{
+   const ten=broken=>{const o=fanaticalOrder(5,Array(10).fill('book'));if(broken)delete o.items[0].bundles[0].games[4]._id;return o;};
+   const refs=db=>Object.fromEntries(Object.values(db.providerItems).map(i=>[i.providerItemId,i.metadata.purchaseOrigins.map(o=>[o.occurrenceRef,o.basis??'native'])]));
+   h.setOrders([ten(true)]);const first=await h.acquire();assert(first.projection.ok,first.projection.error);assert((await h.commit(first)).result.ok);
+   let db=await h.pageA.getDatabase(),state=db.providers.fanatical.syncState;
+   assert.deepEqual(Object.keys(db.providerItems).length,9);assert(!Object.values(db.providerItems).some(i=>i.providerItemId==='product-5-000004'));
+   assert(Object.values(db.providerItems).every(i=>i.metadata.purchaseOrigins.length===1&&i.metadata.purchaseOrigins[0].basis==='order-bundle-count'&&i.metadata.purchaseOrigins[0].bundleId==='bundle-000005'));
+   assert.equal(state.failedOrderFingerprints.length,1);assert.deepEqual(state.knownOrderFingerprints,[]);
+   assert.deepEqual(state.componentScopes,[{order:state.failedOrderFingerprints[0],unresolved:1,bundles:[{bundle:'bundle-000005',admitted:9,unresolved:1}]}]);
+   // A retry while the tenth product is still malformed changes nothing.
+   const nine=refs(db),retry=await h.acquire('incremental');assert((await h.commit(retry)).result.ok);db=await h.pageA.getDatabase();
+   assert.deepEqual(refs(db),nine);assert.deepEqual(db.providers.fanatical.syncState.componentScopes,state.componentScopes);
+   // The tenth becomes readable: one product is added and every count becomes exact, one per product.
+   h.setOrders([ten(false)]);const fixed=await h.acquire('incremental');assert.equal(fixed.projection.result.acquisitionComplete,true);assert((await h.commit(fixed)).result.ok);db=await h.pageA.getDatabase();
+   assert.equal(Object.keys(db.providerItems).length,10);for(const item of Object.values(db.providerItems))assert.deepEqual(item.metadata.purchaseOrigins.map(o=>o.basis),[undefined],item.providerItemId);
+   state=db.providers.fanatical.syncState;assert.equal(state.componentScopes,undefined);assert.equal(state.failedOrderFingerprints,undefined);assert.equal(state.knownOrderFingerprints.length,1);
+   const settled=refs(db);assert((await h.commit(await h.acquire('incremental'))).result.ok);assert.deepEqual(refs(await h.pageA.getDatabase()),settled);
  })],
  ['Fanatical queued commits reject stale leases and storage errors without losing acquisitions or skip state',()=>fanaticalWorker(async h=>{
    assert((await h.commit(await h.acquire())).result.ok);h.setOrders([fanaticalOrder(1),fanaticalOrder(2)]);

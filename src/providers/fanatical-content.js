@@ -65,7 +65,7 @@
         const response = await globalThis.GalacticSync.send({
           type: 'IMPORT_PROVIDER_ITEMS', provider: 'fanatical', mode: fullRescan ? 'full' : 'incremental', items,
           scanDiagnostics:{incomplete:projection.result?.acquisitionComplete===false,failedRequestCount:(projection.result?.recovery?.failedOrders??0)+(projection.result?.recovery?.listingIncomplete?1:0),retries:projection.result?.coverage?.retries??0,arrayOnly:projection.result?.coverage?.paginationEvidence==='array-only'},
-          syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [],...(projection.result?.recovery?{failedOrderFingerprints:projection.result.recovery.failedOrderFingerprints,listingIncomplete:projection.result.recovery.listingIncomplete}:{}) }, snapshot: projection.result?.snapshot
+          syncState: { knownOrderFingerprints: projection.result?.orderFingerprints ?? [],...(projection.result?.recovery?{failedOrderFingerprints:projection.result.recovery.failedOrderFingerprints,listingIncomplete:projection.result.recovery.listingIncomplete,...(projection.result.recovery.componentScopes?.length?{componentScopes:projection.result.recovery.componentScopes}:{})}:{}) }, snapshot: projection.result?.snapshot
         });
         if(!active())return;
         if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');

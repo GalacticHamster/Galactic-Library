@@ -205,7 +205,9 @@ function fanaticalSyncState(value) {
     .map((fingerprint) => String(fingerprint ?? '').toLocaleLowerCase())
     .filter((fingerprint) => /^[a-f0-9]{64}$/u.test(fingerprint)))].slice(0, 50000);
   const failedOrderFingerprints=[...new Set((Array.isArray(value?.failedOrderFingerprints)?value.failedOrderFingerprints:[]).filter(id=>typeof id==='string'&&/^[a-f0-9]{64}$/u.test(id)))].slice(0,50000);
-  return { knownOrderFingerprints,...(failedOrderFingerprints.length?{failedOrderFingerprints}:{}),...(value?.listingIncomplete===true?{listingIncomplete:true}:{}) };
+  // Recovery scopes are validated in full by the provider-state validator on save.
+  const componentScopes=Array.isArray(value?.componentScopes)?value.componentScopes.slice(0,50000):[];
+  return { knownOrderFingerprints,...(failedOrderFingerprints.length?{failedOrderFingerprints}:{}),...(value?.listingIncomplete===true?{listingIncomplete:true}:{}),...(componentScopes.length?{componentScopes}:{}) };
 }
 
 // This function is serialized into Fanatical's MAIN world. It is the only
@@ -231,7 +233,10 @@ function sanitizeFanaticalProjection(value, {fullScan=false,knownOrderFingerprin
     ||!partial&&(coverage.paginationEvidence==='array-only'&&coverage.pagesFetched!==1||coverage.paginationEvidence==='link'&&coverage.pagesFetched<2))throw new Error('Fanatical did not return a complete validated order projection.');
   const knownOrderFingerprints = fanaticalSyncState({ knownOrderFingerprints: input.orderFingerprints }).knownOrderFingerprints;
   const partialOrders=partial?recovery.partialOrderFingerprints??[]:[];
-  const cleanRecovery=partial?{failedOrderFingerprints:[...recovery.failedOrderFingerprints],failedOrders:recovery.failedOrders,listingIncomplete:recovery.listingIncomplete,ordersSkipped:recovery.ordersSkipped,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders]}:{})}:null;
+  // Each partly resolved order carries its remaining recovery scope.
+  const scopes=partial?recovery.componentScopes??[]:[],bounded=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+  if(!Array.isArray(scopes)||scopes.length!==partialOrders.length||new Set(scopes.map(s=>s?.order)).size!==scopes.length||scopes.some(s=>!s||typeof s!=='object'||!partialOrders.includes(s.order)||!bounded(s.unresolved)||s.unresolved<1||!Array.isArray(s.bundles)||s.bundles.length>1000||s.bundles.some(b=>!b||typeof b.bundle!=='string'||!/^[a-zA-Z0-9_-]{6,128}$/u.test(b.bundle)||!bounded(b.admitted)||!bounded(b.unresolved)||b.unresolved<1)))throw Error('Invalid Fanatical partial recovery evidence.');
+  const cleanRecovery=partial?{failedOrderFingerprints:[...recovery.failedOrderFingerprints],failedOrders:recovery.failedOrders,listingIncomplete:recovery.listingIncomplete,ordersSkipped:recovery.ordersSkipped,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders],componentScopes:scopes.map(s=>({order:s.order,unresolved:s.unresolved,bundles:s.bundles.map(b=>({bundle:b.bundle,admitted:b.admitted,unresolved:b.unresolved}))}))}:{})}:null;
   const expectedFingerprints=input.ordersAvailable-(partial?recovery.failedOrders:0);
   if(!Array.isArray(input.orderFingerprints)||input.orderFingerprints.length!==expectedFingerprints
     ||knownOrderFingerprints.length!==expectedFingerprints

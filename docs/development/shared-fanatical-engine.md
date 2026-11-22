@@ -60,17 +60,32 @@ identities. When it fails in partial mode, the engine admits components
 instead of discarding the order:
 
 - A detail parent is corroborated by an unused summary parent with the same
-  name and, where the summary states one, the same parent ID. A summary
-  direct-item parent requires the same direct item. Pick-and-mix selections are
-  corroborated by their group name, at least one selection per listed group.
+  name and, where both state one, the same parent ID. A detail parent without
+  a readable name is corroborated by the validated parent ID its summary
+  parent states; one without an ID by a same-named summary parent, whose ID
+  then identifies it. A summary direct-item parent requires the same direct
+  item. Pick-and-mix selections are corroborated by their group name, at least
+  one selection per listed group.
 - Promotional parents are matched last, by name or (renamed gifts) by the same
   parent ID, and are always rejected, never owned.
-- Each product leaf needs its own validated ID and title. A populated summary
-  parent also limits its detail leaves to the names it lists.
+- No container below the order is atomic. Groups, products and nested
+  containers are judged one by one: a malformed group or product leaves only
+  itself unresolved. Each product needs its own validated ID and title. A
+  populated summary parent also limits its direct children to the names it
+  lists.
+- A product that is itself a container (a non-empty `bundles` list) is walked
+  to a depth of eight; its products belong to the purchased parent. Whole-order
+  verification never saves such a container as a product.
+- Arrays of product-like entries under any other collection name (`tiers`,
+  `products`, `items` and similar) beside the collection a level is read
+  from are never read as purchases, since they may be selection pools or
+  unpurchased tiers, and never treated as empty: each leaves its container
+  incomplete (`nestedStructure`). Whole-order verification defers such orders
+  to component admission.
 - Everything else is unresolved by category: `summaryStructure`,
   `parentMissing`, `unexpectedDetailItem`, `identityMismatch`,
-  `parentStructure`, `childStructure`, `childIdentity`,
-  `productMissing` and `productUnexpected`. Nothing is inferred from titles
+  `parentIdentity`, `parentStructure`, `childStructure`, `childIdentity`,
+  `nestedStructure`, `productMissing` and `productUnexpected`. Nothing is inferred from titles
   alone, position or counts.
 
 A summary parent whose shape the engine does not recognize no longer withholds
@@ -97,6 +112,19 @@ FAN keys origins by order and bundle and keeps the larger quantity. FAN's
 private order navigation also covers partly resolved orders, whose detail
 carried the same validated order ID.
 
+Each partly resolved order also has a recovery scope in `componentScopes`:
+its unresolved count and, by product ID, each purchased parent still
+incomplete with its admitted and unresolved counts. Fully verified parents
+are implied. FAN keeps scopes in `fanaticalComponentScopes` and GL in its
+Fanatical `syncState.componentScopes`; both replace an order's scope when it
+is read again, drop it when the order is verified, and keep no scope outside
+the retry set. FAN resets scopes on restore and account changes; the
+unresolved order is never checkpointed, so the next scan rebuilds them.
+
+A verified order whose contents were all excluded (a promotional gift)
+contributes no product and no longer invalidates the other orders of a
+receipt.
+
 A `parent-missing` product mismatch also reports, as optional fields,
 `summaryPromotionalParents` (order-list parents that are themselves
 promotional) and `promotionalParentHasId`. Without them, a gift listed under
@@ -106,18 +134,32 @@ counts.
 `coverage.compatibility.components`, present only when item-level admission
 ran, reports bounded counts: fully, partly and entirely unresolved orders,
 orders resolved through components, admitted product occurrences, unresolved
-and rejected components, unrecognized structures and unresolved components by
-category. Detail shapes of unrecognized parents use `bundleShapes`. FAN
+and rejected components, unrecognized structures, purchased parents that
+are fully, partly or not verified, products admitted from partly verified
+parents and unresolved components by category. Detail shapes of unrecognized parents use `bundleShapes`. FAN
 reports also state the purchases saved in part and their product records,
 including how many an earlier scan had already saved.
 
-Strict acquisition (`allowPartial:false`) remains whole-order.
+Strict acquisition (`allowPartial:false`) remains whole-order. It is reached
+only by engine-level regression tests; FAN's worker and GL's generated
+callable always request partial acquisition. The `project` operation used by
+FAN's test projector reads details without reconciliation and is not a
+runtime path.
 
-The only inseparable group is a detail parent with its products: a product is
-admitted only under a corroborated parent, because the parent carries the
-bundle identity and the order-list corroboration. A parent that cannot be
-corroborated, or whose structure is unreadable, keeps all of its products
-unresolved; its siblings are unaffected.
+A product's admission depends on its own evidence plus its purchased parent's.
+The remaining dependencies are evidence, not structure:
+
+- Membership: a product is purchased only through a parent the order list
+  corroborates. A parent the summary does not list, lists with another ID,
+  lists as a different direct item, or describes with a product catalog,
+  establishes no purchase, so its products stay unresolved.
+- Identity: a purchase origin is keyed by order and parent ID, which keeps
+  separate purchases of the same product distinct. When neither the detail
+  nor the summary states a validated parent ID (`parentIdentity`), an
+  invented key would later count the same purchase twice, so its products stay
+  unresolved until an ID is available.
+- Order-level facts (order ID, COMPLETE status, session and account checks)
+  decide the whole order or acquisition.
 
 ## Regression structure
 

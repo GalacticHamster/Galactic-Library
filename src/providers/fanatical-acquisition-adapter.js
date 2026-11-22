@@ -33,7 +33,7 @@ export function fanaticalAcquisitionForGL(raw,options={}){
   const failures=raw.unresolvedOrderFingerprints??[],ordersAvailable=raw.orderFingerprints.length+failures.length;
   const {compatibility:ignoredCompatibility,...coverage}=raw.coverage;
   return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
-    ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders]}:{})}}:{}),
+    ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders],componentScopes:(raw.componentScopes??[]).map(s=>({order:s.order,unresolved:s.unresolved,bundles:s.bundles.map(b=>({bundle:b.bundle,admitted:b.admitted,unresolved:b.unresolved}))}))}:{})}}:{}),
     coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
     ...(authority.rejectedPurchaseItems!==undefined?{rejectedPurchaseItems:authority.rejectedPurchaseItems}:{})};
 }
