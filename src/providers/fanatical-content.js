@@ -70,7 +70,9 @@
         if(!active())return;
         if (!response?.ok) throw new Error(response?.error ?? 'Fanatical import did not complete.');
         report.committed=true;report.persistence='committed';
-        report.savedItems=items.length;
+        if(response.purchaseOriginLimit)report.diagnostic={...report.diagnostic,category:'limit',stage:'save'};
+        const limited=response.purchaseOriginLimit===true||report.diagnostic?.category==='limit'&&report.diagnostic?.stage==='projection';
+        report.savedItems=response.purchaseOriginLimit?response.savedCount??0:items.length;
         const stats = projection.result ?? {};
         const totalItems = (response.gameCount ?? 0) + (response.bookCount ?? 0) + (response.audiobookCount ?? 0) + (response.softwareCount ?? 0);
         const formatted = tools.formatScanSummary({
@@ -80,7 +82,9 @@
           recovery: stats.recovery,
           outcome: stats.recovery ? 'partial' : 'complete'
         }, { fullScan: fullRescan });
-        status.textContent = formatted.text;
+        status.textContent = limited
+          ? `${fullRescan?'Full import':'Quick update'} partially completed\n\nSome products exceeded GL's purchase history limit and remain unresolved. Earlier purchases were kept.`
+          : formatted.text;
       } catch (error) {
         if(!active())return;
         if(phase!=='acquisition')report.diagnostic=tools.failureReport(phase==='account'||/account|profile|lease|stale|authorization|receipt/iu.test(error?.message??'')?'scope':'storage',phase==='account'?'execution':'save');
@@ -97,7 +101,9 @@
         clearInterval(heartbeat);window.removeEventListener('message',onProgress);importing=false;
         ownership?.present();
         report.elapsedMs=Date.now()-started;report.progress=lastProgress;report.progressEvents=progressEvents;report.uiUpdates=uiUpdates;
-        report.phase=phase;report.outcome=report.committed?(report.diagnostic?.acquisitionFinished?'complete':'partial'):'failed';
+        report.phase=phase;report.outcome=report.committed
+          ? report.diagnostic?.acquisitionFinished&&!(report.diagnostic.category==='limit'&&report.diagnostic.stage==='save')?'complete':'partial'
+          : 'failed';
         if(active()){
           report.retry=report.committed?(report.diagnostic?.acquisitionFinished?'none':'quick'):report.diagnostic?.category==='authentication'?'sign-in':report.diagnostic?.category==='scope'?'check-account':'retry';
           exportButton.disabled=false;

@@ -195,6 +195,42 @@ try{
   orders=[fanaticalOrder(10,['book']),tenOrder(false)];await page();await sync('incremental');tenState=await report();
   assert.equal(tenState.count,11);assert.equal(tenState.origins,11,'one exact purchase per product, no provisional duplicate');assert.equal(tenState.provisional,0);assert.deepEqual(tenState.scopes,[]);assert.equal(tenState.failed.length,0);assert(tenState.roundTrip);
   checks.push('ten-item bundle saves nine products and the bundle scope, survives retry and browser restart unchanged, then adds the tenth with exact counts');
+  const leaf=(id)=>({_id:id,name:id,type:'book'});
+  const nested=(id,level)=>{
+    let value=leaf(id);
+    for(let n=1;n<level;n++)value={name:'Synthetic nested group',bundles:[{games:[value]}]};
+    return value;
+  };
+  const depthOrder=fanaticalOrder(12,['book']);
+  const deep=depthOrder.items[0].bundles[0].games;
+  deep.splice(0,1,leaf('depth-first'),nested('depth-blocked',9),leaf('depth-last'));
+  orders=[fanaticalOrder(13,['book']),depthOrder];await reset();await sync();
+  d=await report();assert.equal(d.count,3);assert.equal(d.origins,3);assert.equal(d.failed.length,1);assert.equal(d.scopes[0].unresolved,1);
+  await page();await sync('incremental');let limited=await report();assert.equal(limited.count,3);assert.equal(limited.origins,3);assert.deepEqual(limited.failed,d.failed);
+  deep[1]=nested('depth-blocked',8);await page();await sync('incremental');d=await report();
+  assert.equal(d.count,4);assert.equal(d.origins,4);assert.equal(d.failed.length,0);assert(d.roundTrip);
+  checks.push('depth-nine branch retries without losing siblings and recovers at level eight');
+  const baseline=Array.from({length:500},(_,index)=>{
+    const row=fanaticalOrder(index+1000,['book']);row.items[0].bundles[0].games=[leaf('limit-repeat')];return row;
+  });
+  baseline[0].items[0].bundles[0].games.unshift(leaf('limit-before'));
+  orders=baseline;total=500;await reset();await sync();d=await report();
+  assert.equal(d.count,2);assert.equal(d.origins,501);assert(d.fullAt);
+  const fullAt=d.fullAt;
+  const overflow=fanaticalOrder(1500,['book']);overflow.items[0].bundles[0].games=[leaf('limit-repeat'),leaf('limit-after')];
+  orders=[...baseline,overflow];total=501;
+  await page();assert.match(await sync('incremental'),/partially completed/);
+  diagnostic=await scanReport();assert.equal(diagnostic.diagnostic.category,'limit');assert.equal(diagnostic.diagnostic.stage,'save');assert.equal(diagnostic.outcome,'partial');
+  d=await report();
+  assert.equal(d.count,3);assert.equal(d.origins,502);assert.equal(d.failed.length,1);assert.equal(d.fullAt,fullAt);assert.equal(d.health,'partial');
+  await page();assert.match(await sync(),/partially completed/);d=await report();
+  assert.equal(d.count,3);assert.equal(d.origins,502);assert.equal(d.failed.length,501);assert.equal(d.fullAt,fullAt);assert(d.roundTrip);
+  if(firefox){driver.close();child.kill();}else await driver.send('Browser.close');await exited;driver.close?.();await startBrowser();
+  const restarted=await report();
+  assert.equal(restarted.origins,502);assert.deepEqual(restarted.failed,d.failed);assert.equal(restarted.fullAt,fullAt);
+  overflow.items[0].bundles[0].games.splice(0,1);await page();await sync('incremental');d=await report();
+  assert.equal(d.count,3);assert.equal(d.origins,502);assert.equal(d.failed.length,0);assert(d.roundTrip);
+  checks.push('500-origin history survives both partial Quick union and oversized Full acquisition, with retry, recovery and no duplicate or false checkpoint');
   for(const check of checks)console.log('PASS installed '+(firefox?'Firefox':'Chrome')+' Fanatical: '+check);
   console.log(checks.length+' installed Fanatical checks passed.');
 }finally{

@@ -1,6 +1,9 @@
 import '../../shared/purchase-snapshot.js';
 import {object,text,date} from './validation.js';
 
+export const MAX_PURCHASE_ORIGINS=500;
+export class PurchaseOriginLimitError extends Error {}
+
 export function validateKeyObservation(value){
   if(value?.keyStatus===undefined&&value?.keyCheckedAt===undefined)return {};
   if(!['unknown','unrevealed'].includes(value.keyStatus)||!date(value.keyCheckedAt))throw Error('Invalid key observation.');
@@ -12,7 +15,8 @@ export function keyObservationSummary(origins=[]){
   return {keyStatus:pending.length?'unrevealed':'unknown',keyCheckedAt:selected.map(o=>o.keyCheckedAt).sort()[0]};
 }
 export function validatePurchaseOrigins(value){
-  if(!Array.isArray(value)||value.length>500)throw new Error('Purchase origins must be a bounded list.');
+  if(!Array.isArray(value))throw new Error('Purchase origins must be a bounded list.');
+  if(value.length>MAX_PURCHASE_ORIGINS)throw new PurchaseOriginLimitError('Purchase origins must be a bounded list.');
   const refs=new Set();return value.map(entry=>{
     object(entry,'Purchase origin');const occurrenceRef=text(entry.occurrenceRef,64,'Purchase occurrence reference'),orderRef=text(entry.orderRef,64,'Opaque order reference');
     if(!/^[a-f0-9]{64}$/u.test(occurrenceRef)||!/^[a-f0-9]{64}$/u.test(orderRef)||refs.has(occurrenceRef))throw new Error('Invalid or duplicate purchase occurrence.');refs.add(occurrenceRef);

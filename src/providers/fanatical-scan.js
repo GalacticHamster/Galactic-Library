@@ -1,4 +1,4 @@
-// Pinned acquisition fanatical-v1-050e634533409a30; contract 1; SHA-256 7bd383db20ff44f1368a48ab52dba52e6684a0f684ee8e1b98fae28159affe90
+// Pinned acquisition fanatical-v1-33817701c47cf9bd; contract 1; SHA-256 7bd383db20ff44f1368a48ab52dba52e6684a0f684ee8e1b98fae28159affe90
 export async function readFanaticalOrdersInPage(options={}){
 /* Self-contained: Chrome serializes this exact function into the Fanatical page. */
 async function importFanaticalOrdersInPage({ fullScan = false, knownOrderFingerprints = [], scanHistoryMissing = false, progressId = '', operation = 'import', orderSummaries = [], orderDetails = [], returnFailure = false, allowPartial = false, accountOrderFingerprints = [], progressFormat = 'fan', detailLimit = 0, retryLaterOrderFingerprints = [], orderNavigationRefs } = {}) {
@@ -1183,19 +1183,42 @@ function fanaticalAcquisitionForGL(raw,options={}){
   const authority=assertFanaticalAcquisitionContract(raw,options);
   // Verified components of a partially resolved order are admissible on
   // their own; the order itself stays in the retry set.
-  const partialOrders=raw.partialOrderFingerprints??[];
+  const partialOrders=[...(raw.partialOrderFingerprints??[])];
   if(partial&&!raw.orderFingerprints.length&&!partialOrders.length)return fail();
-  const items=raw.items.map(item=>{
-    if((item.occurrences?.length??0)>500){diagnostic.category='limit';diagnostic.stage='projection';return null;}
+  const blocked=new Map(), items=[];
+  for(const item of raw.items){
+    if ((item.occurrences?.length??0)>500) {
+      for(const {orderRef} of item.occurrences)blocked.set(orderRef,(blocked.get(orderRef)??0)+1);
+      continue;
+    }
     // GL deliberately projects only its supported catalog types. FAN retains others.
-    return {...item,mediaType:item.mediaType==='unclassified'?'other':item.mediaType,purchaseOrigins:item.occurrences};
-  });
-  if(items.some(item=>!item))return fail();
-  const failures=raw.unresolvedOrderFingerprints??[],ordersAvailable=raw.orderFingerprints.length+failures.length;
+    items.push({...item,mediaType:item.mediaType==='unclassified'?'other':item.mediaType,purchaseOrigins:item.occurrences});
+  }
+  const incomplete=partial||blocked.size>0;
+  const failures=[...new Set([...(raw.unresolvedOrderFingerprints??[]),...blocked.keys()])];
+  const fingerprints=raw.orderFingerprints.filter(id=>!blocked.has(id));
+  const ordersScanned=raw.ordersScanned-(raw.verifiedOrderFingerprints??[]).filter(id=>blocked.has(id)).length;
+  const ordersAvailable=fingerprints.length+failures.length;
+  const scopes=new Map((raw.componentScopes??[]).map(s=>[s.order,s]));
+  if(blocked.size){
+    diagnostic.category='limit';diagnostic.stage='projection';diagnostic.acquisitionFinished=false;
+    diagnostic.ordersValidated=count(ordersScanned);diagnostic.ordersUnresolved=count(failures.length);
+    const surviving=new Set(items.flatMap(item=>(item.purchaseOrigins??[]).map(origin=>origin.orderRef)));
+    for(const [order,unresolved] of blocked){
+      if(!surviving.has(order)&&!scopes.has(order))continue;
+      const prior=scopes.get(order);
+      if(!prior)partialOrders.push(order);
+      scopes.set(order,{order,unresolved:Math.min(100000,(prior?.unresolved??0)+unresolved),bundles:prior?.bundles??[]});
+    }
+    // Keep confirmed quantities, but treat the order's exact positions as
+    // provisional until all of its evidence can be admitted by this consumer.
+    for(const item of items)item.purchaseOrigins=item.purchaseOrigins.map(origin=>blocked.has(origin.orderRef)
+      ? {...origin,basis:'order-bundle-count'} : origin);
+  }
   const {compatibility:ignoredCompatibility,...coverage}=raw.coverage;
-  return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!partial,
-    ...(partial?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery',ordersSkipped:raw.orderFingerprints.length-raw.ordersScanned,...(partialOrders.length?{partialOrderFingerprints:[...partialOrders],componentScopes:(raw.componentScopes??[]).map(s=>({order:s.order,unresolved:s.unresolved,bundles:s.bundles.map(b=>({bundle:b.bundle,admitted:b.admitted,unresolved:b.unresolved}))}))}:{})}}:{}),
-    coverage:{...coverage,validatedOrders:raw.ordersScanned},ordersScanned:raw.ordersScanned,ordersAvailable,orderFingerprints:raw.orderFingerprints,items,
+  return {...(options.diagnostics?{diagnostic}:{}),acquisitionContract:raw.acquisitionContract,schemaVersion:1,acquisitionComplete:!incomplete,
+    ...(incomplete?{recovery:{failedOrderFingerprints:failures,failedOrders:failures.length,listingIncomplete:raw.outcome==='partial-discovery'&&partial,ordersSkipped:fingerprints.length-ordersScanned,...(partialOrders.length?{partialOrderFingerprints:partialOrders,componentScopes:[...scopes.values()]}:{})}}:{}),
+    coverage:{...coverage,complete:!incomplete&&coverage.complete,validatedOrders:ordersScanned},ordersScanned,ordersAvailable,orderFingerprints:fingerprints,items,
     ...(authority.rejectedPurchaseItems!==undefined?{rejectedPurchaseItems:authority.rejectedPurchaseItems}:{})};
 }
 

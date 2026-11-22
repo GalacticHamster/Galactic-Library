@@ -34,7 +34,39 @@ const quantity=(engine,r,id,bundleId)=>{const item=r.result.items.find(i=>i.sour
 const originsWithoutRefs=r=>Object.fromEntries(r.result.items.map(i=>[i.sourceItemId,i.purchaseOrigins]));
 const legacyRef=(orderId,index,parentId,leafId)=>hash(`${orderId}\u0000${index}\u0000${parentId}\u0000${leafId}`);
 
+// The purchased bundle's first group is level one.
+const nestedProduct=(id,level)=>{
+  let component=leaf(id,id);
+  for(let n=1;n<level;n++)component={name:'Synthetic nested group',bundles:[{games:[component]}]};
+  return component;
+};
+
 for(const [name,engine] of [['canonical',canonical],['FAN mirror',fan],['GL callable',gl]]){
+  test(name+': depth-seven and depth-eight leaves are admitted; only over-depth branches are retried',async()=>{
+    for(const position of [0,1,2]){
+      const siblings=[nestedProduct('depth-seven-item',7),nestedProduct('depth-eight-item',8)];
+      siblings.splice(position,0,nestedProduct('depth-nine-item',9));
+      const nested={_id:'bundle-depth',name:'Depth fixture',bundles:[{games:siblings},{games:[nestedProduct('depth-pathological-item',80),leaf('depth-later-leaf','Later leaf')]}]};
+      const unrelated=bundle('bundle-unrelated',2);
+      const mixed=order('synthetic-depth-order',[nested,bundle('bundle-next',1)]);
+      const other=order('synthetic-other-order',[unrelated]);
+      const first=await run(engine,[mixed,other]);
+      const admitted=['depth-seven-item','depth-eight-item','depth-later-leaf',...productsOf(unrelated),'bundle-next-p0'].sort();
+      assert.deepEqual(ids(first),admitted);
+      assert.deepEqual(partial(engine,first),[hash(mixed.summary._id)]);
+      assert.deepEqual(verified(first),[hash(other.summary._id)]);
+      assert.equal(first.result.coverage.complete,false);
+      assert.equal(first.c.categories.nestedStructure,2);
+      assert.deepEqual(scopes(engine,first)[0].bundles,[{bundle:'bundle-depth',admitted:3,unresolved:2}]);
+      assert.deepEqual(originsWithoutRefs(await run(engine,[mixed,other])),originsWithoutRefs(first));
+      nested.bundles[0].games[position]=nestedProduct('depth-nine-item',8);
+      nested.bundles[1].games[0]=nestedProduct('depth-pathological-item',7);
+      const recovered=await run(engine,[mixed,other],{fullScan:false,known:verified(first)});
+      assert.deepEqual(ids(recovered),[...admitted,'depth-nine-item','depth-pathological-item'].sort());
+      assert.deepEqual(partial(engine,recovered),[]);
+      assert.equal(recovered.result.orderFingerprints.length,2);
+    }
+  });
   test(name+': A/E ten-item bundle keeps nine verified products whatever position or kind the malformed one has',async()=>{
     for(const [bad,kind] of [[[0],'missingId'],[[4],'missingId'],[[9],'missingId'],[[4],'missingName'],[[4],'notObject'],[[2,6],'missingId']]){
       const label=bad.join('+')+' '+kind,b=bundle('bundle-ten',10,bad,kind),o=order('synthetic-order-ten',[b]),r=await run(engine,[o]),fp=hash(o.summary._id);

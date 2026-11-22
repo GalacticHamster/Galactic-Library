@@ -8,7 +8,7 @@ import {effectiveOwnershipRecord} from '../lib/ownership.js';
 import {PROVIDER_SOURCES} from '../lib/metadata-validation.js';
 import {newProviderProfile} from '../lib/provider-profiles.js';
 import {normalizeProviderItem,providerItemKey,rebuildCanonicalItems} from '../lib/models.js';
-import {keyObservationSummary,mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {keyObservationSummary,mergePurchaseOrigins,MAX_PURCHASE_ORIGINS,PurchaseOriginLimitError} from '../lib/purchase-origins.js';
 import {strictDatabaseSerialization} from '../lib/validation-certificate.js';
 const S=globalThis.GalacticPurchaseSnapshot,A=globalThis.GalacticPurchaseAdapters;
 export function existingHumbleEntitlementId(database,profile,row){
@@ -65,10 +65,13 @@ export async function applyPurchaseSnapshot(database,raw,target){const data=S.va
  const metadata=S.richer(previous?.metadata??{},row.metadata);delete metadata.platforms;for(const field of ['editionId','seriesId','runId'])delete metadata[field];
  if(Array.isArray(metadata.isbn)){metadata.isbns=metadata.isbn;metadata.isbn=metadata.isbn[0]??'';}metadata.source=PROVIDER_SOURCES[provider];
  if(provider==='fanatical'){
+ if(row.origins.reduce((total,origin)=>total+origin.quantity,0)>MAX_PURCHASE_ORIGINS){stats.skipped++;continue;}
  const prior=previous?.metadata.purchaseOrigins??[],incoming=[];for(const origin of row.origins){
  const refs=origin.occurrenceRefs.length?origin.occurrenceRefs:Array.from({length:origin.quantity},(_,index)=>index);
  for(let index=0;index<origin.quantity;index++)incoming.push({occurrenceRef:typeof refs[index]==='string'?refs[index]:await S.hash(JSON.stringify(['handoff',origin.orderRef,origin.bundleId,native,index])),...(typeof refs[index]==='string'?{}:{basis:'order-bundle-count'}),orderRef:origin.orderRef,...(origin.keyStatus!==undefined?{keyStatus:origin.keyStatus,keyCheckedAt:origin.keyCheckedAt,...(origin.keyReview?{keyReview:S.keyReview(origin.keyReview)}:{})}:{}),bundleId:origin.bundleId,bundleTitle:origin.bundleTitle,purchasedAt:origin.purchasedAt,observedAt:prior.find(p=>p.occurrenceRef===refs[index])?.observedAt??now});}
- metadata.purchaseOrigins=mergePurchaseOrigins(prior,incoming.map(entry=>({...entry,observedAt:prior.find(p=>p.occurrenceRef===entry.occurrenceRef)?.observedAt??entry.observedAt})));Object.assign(metadata,keyObservationSummary(metadata.purchaseOrigins));}
+ try{metadata.purchaseOrigins=mergePurchaseOrigins(prior,incoming.map(entry=>({...entry,observedAt:prior.find(p=>p.occurrenceRef===entry.occurrenceRef)?.observedAt??entry.observedAt})));}
+ catch(error){if(!(error instanceof PurchaseOriginLimitError))throw error;stats.skipped++;continue;}
+ Object.assign(metadata,keyObservationSummary(metadata.purchaseOrigins));}
  const item=normalizeProviderItem({...(previous??{}),provider,providerItemId:native,title:previous?.title??row.title,mediaType:row.mediaType,ownership:previous?.ownership??'owned',profileId:profile.profileId,metadata,platform:previous?.platform?.length?previous.platform:row.metadata.platforms??[],acquiredAt:previous?.acquiredAt??row.purchasedAt,observedAt:previous?.observedAt??now},previous?.updatedAt??now,{allowEnrichment:true,profileKeySpace:profile.keySpace});
  if(previous&&!reactivated&&JSON.stringify(item)===JSON.stringify(previous))stats.unchanged++;else{database.providerItems[id]=item;if(reactivated)delete database.providerHistory[previous.recordRef];if(previous)stats.updated++;else stats.added++;}}
  if(data.records.length&&stats.skipped===data.records.length)throw Error(provider==='humble'?'No compatible records can be imported. Older Humble records need a retained native product ID or an unambiguous existing GL purchase/title. Run a separate fresh HB scan if necessary.':'No compatible Fanatical records can be imported. GL currently supports books, audiobooks, games and software; incompatible media are skipped.');

@@ -13,6 +13,7 @@ export function observeImportLifecycle({button,status,timeoutMs=25000,classify})
         else if(/(?:import failed|could not confirm|could not be saved)/iu.test(message))finish('failed');
         else if(/^(?:Full import|Quick update) completed\n\n(?:(?:Checked [\d,]+ purchases?\.|No purchases needed checking\.) (?:Imported [\d,]+ new items?\.|No new items found\.)|No purchases found in your account\.)\n\n[\d,]+ items? in your library\.$/u.test(message))finish('succeeded');
         else if(/^(?:Full import|Quick update) partially completed\n\n(?:Couldn't check [\d,]+ purchases?[^\n]*|Part of your purchase list couldn't be checked[^\n]*|Some purchase details couldn't be verified[^\n]*)\n\n(?:Saved [\d,]+ purchases?[^\n]*|Added [\d,]+ new items?[^\n]*|No purchases were saved\.[^\n]*)Earlier records were preserved\.$/u.test(message))finish('partial');
+        else if(/^(?:Full import|Quick update) partially completed\n\nSome products exceeded GL's purchase history limit and remain unresolved\. Earlier purchases were kept\.$/u.test(message))finish('partial');
         else finish('unconfirmed','completion-message-missing');
       }
     });

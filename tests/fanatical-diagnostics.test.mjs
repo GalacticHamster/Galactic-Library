@@ -48,12 +48,18 @@ test('diagnostics: later transport and unsafe/missing/repeated continuations ret
   const r=await h.run();assert.equal(r.items.length,1);if(kind!=='duplicate'){assert(r.recovery.listingIncomplete);assert.equal(r.diagnostic.category,kind==='transport'?'listing':'continuation');}assert(tools.scanReport(r.diagnostic));
  }
 });
-test('diagnostics: page/order/occurrence bounds retain existing fatal versus prefix policy',async()=>{
+test('diagnostics: listing bounds retain fatal versus prefix policy and oversized products remain retryable',async()=>{
  const r=await scanner(()=>({data:Array(100001).fill(one(1))})).run();checkFailure(r,'limit','initial-listing');
  const h=scanner(p=>p.includes('/orders/')?{data:one(Number(p.slice(-6)))}:{data:[one(Number(new URL(p,'https://www.fanatical.com').searchParams.get('page')??1))],headers:{link:`</api/user/orders?page=${Number(new URL(p,'https://www.fanatical.com').searchParams.get('page')??1)+1}>; rel="next"`}});
  const limited=await h.run();assert(limited.recovery.listingIncomplete);assert.equal(limited.diagnostic.category,'limit');assert.equal(limited.diagnostic.pagesAttempted,1000);
  const shared=Array.from({length:501},(_,i)=>{const o=one(i+1);o.items[0].bundles[0].games[0]._id='shared-product';return o;});
- checkFailure(await scanner(p=>({data:p.includes('/orders/')?shared.find(o=>p.endsWith(o._id)):shared})).run(),'limit','projection');
+ const overflow=await scanner(p=>({data:p.includes('/orders/')?shared.find(o=>p.endsWith(o._id)):shared})).run();
+ assert.equal(overflow.acquisitionComplete,false);
+ assert.equal(overflow.diagnostic.category,'limit');assert.equal(overflow.diagnostic.stage,'projection');
+ assert.equal(tools.scanReport(overflow.diagnostic).acquisitionFinished,false);
+ assert.equal(overflow.recovery.failedOrders,501);
+ assert(Array.isArray(overflow.items));assert.equal(overflow.items.length,0);
+ assert(Array.isArray(overflow.orderFingerprints));assert.equal(overflow.orderFingerprints.length,0);
 });
 test('diagnostics: malformed summaries and details retain valid peers without leaking purchase data',async()=>{
  for(const kind of ['summary','status','missing','transport','malformed','identity']){

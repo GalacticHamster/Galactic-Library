@@ -115,6 +115,10 @@ export function validateMetadata(provider, value, {allowEnrichment = true} = {})
     }
     if (Object.keys(entries).length) result.enrichment=entries;
   }
-  if (JSON.stringify(result).length>100000) throw new Error('Provider metadata exceeds the per-record limit.');
+  // Fanatical purchase evidence already has its own 500-entry budget and
+  // field bounds. Charging it to the descriptive metadata budget would
+  // reject ordinary histories below the documented occurrence limit.
+  const {purchaseOrigins,...descriptiveMetadata}=result;
+  if (JSON.stringify(descriptiveMetadata).length>100000) throw new Error('Provider metadata exceeds the per-record limit.');
   return result;
 }

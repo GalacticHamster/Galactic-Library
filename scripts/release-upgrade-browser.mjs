@@ -1,13 +1,15 @@
-// Release check: installed same-identity upgrade from an exact published package to an exact candidate package.
+// Release check: installed same-identity upgrade from an archived baseline.
 // Disposable browser profile and synthetic data only; no provider account, network request or personal profile.
 // The published runtime creates the historical data with its own validated writers; the candidate must keep every
 // saved key, read it correctly, survive an extension restart and restore its own backup without duplicates.
 //   UPGRADE_FROM_PACKAGE=<published zip> UPGRADE_TO_PACKAGE=<candidate zip> node scripts/release-upgrade-browser.mjs --ext=hb|gl [--firefox]
+// GL also supports a hash-pinned local release candidate and a disposable build of the current source.
 // Fanatical Library has its own equivalent check (Fanatical tests/release-upgrade.mjs).
 import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
 import {mkdtemp,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {setTimeout as pause} from 'node:timers/promises';
@@ -15,16 +17,25 @@ import {chromePipe,firefoxMarionette,freePort} from '../tests/native-protocol.mj
 
 const firefox=process.argv.includes('--firefox'),ext=process.argv.find(a=>a.startsWith('--ext='))?.slice(6);
 assert(['hb','gl'].includes(ext),'Choose --ext=hb or --ext=gl');
-const from=resolve(process.env.UPGRADE_FROM_PACKAGE??''),to=resolve(process.env.UPGRADE_TO_PACKAGE??'');
-assert(process.env.UPGRADE_FROM_PACKAGE&&process.env.UPGRADE_TO_PACKAGE,'Set UPGRADE_FROM_PACKAGE and UPGRADE_TO_PACKAGE to exact archives');
+const supplied=process.env.UPGRADE_FROM_PACKAGE;
+if(ext==='hb')assert(supplied&&process.env.UPGRADE_TO_PACKAGE,'Set UPGRADE_FROM_PACKAGE and UPGRADE_TO_PACKAGE to exact HB archives');
+const from=supplied?resolve(supplied):fileURLToPath(new URL(`../dist/1.0.5-rc1/GalacticLibrary-1.0.5${firefox?'-firefox':''}.zip`,import.meta.url));
 const digest=async path=>createHash('sha256').update(await readFile(path)).digest('hex');
-const hashes={from:await digest(from),to:await digest(to)};
 const temporary=await mkdtemp(join(tmpdir(),'gh-release-upgrade-')),profile=join(temporary,'profile'),stage=join(temporary,'extension');
+const to=process.env.UPGRADE_TO_PACKAGE?resolve(process.env.UPGRADE_TO_PACKAGE):join(temporary,'development.zip');
 const expand=(archive,destination)=>execFileSync('powershell.exe',['-NoProfile','-Command','Expand-Archive -LiteralPath $env:GH_ZIP -DestinationPath $env:GH_DEST -Force'],{windowsHide:true,env:{...process.env,GH_ZIP:archive,GH_DEST:destination}});
 const pass=message=>console.log(`PASS ${ext.toUpperCase()} ${firefox?'Firefox':'Chrome'}: ${message}`);
 async function main(){
 let child,driver,exited,session,url,extensionId;
 try{
+  if(!process.env.UPGRADE_TO_PACKAGE){
+    const {createRelease}=await import('./release.mjs');
+    await writeFile(to,(await createRelease(undefined,undefined,firefox?'firefox':'chrome')).zip);
+  }
+  const hashes={from:await digest(from),to:await digest(to)};
+  if(!supplied)assert.equal(hashes.from,firefox?'8be979decc06237f8e104bd0517b2124553e4609f0111ef5ff551ba45b3d633b':'3c1b057266ae16324ea3f8df47752e6cb902e58b611b8e0a4b5ccc6b2385bdc7');
+  assert.notEqual(hashes.to,hashes.from,'Upgrade must install a different runtime archive');
+  console.log(`Baseline (${supplied?'explicit archive':'tagged local release candidate'}): ${from} SHA-256 ${hashes.from}`);
   await mkdir(profile);await mkdir(stage);expand(from,stage);
   const oldManifest=JSON.parse(await readFile(join(stage,'manifest.json'),'utf8')),page=oldManifest.options_ui?.page??oldManifest.options_page;
   if(firefox){
@@ -70,12 +81,16 @@ try{
   await evaluate(ext==='hb'?HB_SEED:GL_SEED);
   const before=await storage(),oldVersion=await evaluate('return chrome.runtime.getManifest().version;');
   const baseline=await evaluate(ext==='hb'?HB_READ:GL_READ);
-  pass(`published ${oldVersion} created synthetic history with its own writers: ${JSON.stringify(baseline)}`);
+  pass(`baseline ${oldVersion} created synthetic history with its own writers: ${JSON.stringify(baseline)}`);
 
   if(!firefox){await rm(stage,{recursive:true,force:true});await mkdir(stage);expand(to,stage);}
   await install(firefox?to:null);await ready();
   const newVersion=await evaluate('return chrome.runtime.getManifest().version;');
-  assert.notEqual(newVersion,oldVersion);
+  if(ext==='gl'){
+    const {readRuntimeZip}=await import('./release.mjs');
+    const expected=readRuntimeZip(await readFile(to)).get('src/providers/fanatical-scan.js').toString('utf8');
+    assert.equal(await evaluate("return await (await fetch(chrome.runtime.getURL('src/providers/fanatical-scan.js'))).text();"),expected);
+  } else assert.notEqual(newVersion,oldVersion);
   const after=await storage();compare(before,after,'upgrade '+oldVersion+' -> '+newVersion);
   pass(`same-identity upgrade ${oldVersion} -> ${newVersion} keeps every saved key (${Object.keys(before).length}) and the companion relationship`);
   const upgraded=await evaluate(ext==='hb'?HB_READ:GL_READ);
@@ -91,8 +106,12 @@ try{
   const restored=await evaluate(ext==='hb'?HB_BACKUP_RESTORE:GL_BACKUP_RESTORE);
   assert.deepEqual(restored,baseline,'restoring a backup made after the upgrade adds no duplicates and loses nothing');
   pass('a backup made after the upgrade restores without duplicates or losses');
+  if(ext==='gl'){
+    await evaluate(GL_PARTIAL);
+    pass('the upgraded runtime imports verified siblings twice without changing earlier purchases or advancing a checkpoint');
+  }
   assert.equal(await digest(from),hashes.from);assert.equal(await digest(to),hashes.to);
-  console.log(`5 ${ext.toUpperCase()} ${firefox?'Firefox':'Chrome'} upgrade checks passed (${oldVersion} -> ${newVersion}); packages unchanged: ${hashes.from.slice(0,12)} -> ${hashes.to.slice(0,12)}`);
+  console.log(`${ext==='gl'?6:5} ${ext.toUpperCase()} ${firefox?'Firefox':'Chrome'} upgrade checks passed (${oldVersion} -> ${newVersion}); packages unchanged: ${hashes.from.slice(0,12)} -> ${hashes.to.slice(0,12)}`);
 }finally{
   try{if(firefox)await driver?.send('Marionette:Quit',{flags:['eForceQuit']});}catch{}
   child?.kill();await Promise.race([exited,pause(5000)]);await rm(temporary,{recursive:true,force:true}).catch(()=>{});
@@ -191,5 +210,37 @@ var GL_VERIFY=`
 var GL_BACKUP_RESTORE=`
   const S=await import('./src/lib/storage.js');const backup=S.createBackup(await S.getDatabase());await S.restoreDatabase(S.parseBackup(backup));
   ${'return await (async()=>{'+'%READ%'+'})();'}`;
+var GL_PARTIAL=`
+  const S=await import('./src/lib/storage.js');
+  const {readFanaticalOrdersInPage}=await import('./src/providers/fanatical-scan.js');
+  await import('./src/providers/fanatical.js');
+  const before=await S.getDatabase(),scope=before.providers.fanatical;
+  const detail={_id:'synthetic-upgrade-partial',status:'COMPLETE',items:[{_id:'synthetic-upgrade-bundle',name:'Synthetic upgrade bundle',bundles:[{games:[
+    {_id:'upgrade-verified-child',name:'Verified upgrade product',type:'book'},
+    {name:'Unresolved upgrade product',type:'book'}
+  ]}]}]};
+  const summary={...detail,items:detail.items.map(x=>({_id:x._id,name:x.name,bundles:[]}))};
+  const originalFetch=globalThis.fetch,previousAuth=localStorage.getItem('bsauth');
+  let projection;
+  try{
+    localStorage.setItem('bsauth',JSON.stringify({token:'SYNTHETIC'}));
+    globalThis.fetch=async path=>new Response(JSON.stringify(path==='/api/user/orders'?[summary]:detail),{headers:{'Content-Type':'application/json'}});
+    projection=await readFanaticalOrdersInPage({fullScan:true});
+  }finally{
+    globalThis.fetch=originalFetch;
+    if(previousAuth===null)localStorage.removeItem('bsauth');else localStorage.setItem('bsauth',previousAuth);
+  }
+  if(projection.items.length!==1||projection.acquisitionComplete||projection.recovery.failedOrders!==1)throw Error('Partial acquisition did not isolate the unreadable product');
+  const items=globalThis.GalacticFanatical.fanaticalItemsFromProjection(projection);
+  const recovery=projection.recovery;
+  const details={profileId:scope.activeProfileId,profileLabel:scope.profileLabel,syncMode:'incremental',
+    scanDiagnostics:{incomplete:true},syncState:{knownOrderFingerprints:projection.orderFingerprints,failedOrderFingerprints:recovery.failedOrderFingerprints,componentScopes:recovery.componentScopes}};
+  for(let attempt=0;attempt<2;attempt++)await S.mergeProviderItems('fanatical',items,details);
+  const after=await S.getDatabase();
+  for(const [id,row] of Object.entries(before.providerItems))if(JSON.stringify(after.providerItems[id])!==JSON.stringify(row))throw Error('A previously saved item changed');
+  const added=Object.values(after.providerItems).filter(i=>i.providerItemId==='upgrade-verified-child');
+  if(added.length!==1||added[0].metadata.purchaseOrigins.length!==1||added[0].profileId!==scope.activeProfileId||after.providers.fanatical.fullSyncAt!==scope.fullSyncAt)throw Error('Partial upgrade import lost provenance or advanced a checkpoint');
+  if(JSON.stringify(after.ownershipReviews)!==JSON.stringify(before.ownershipReviews))throw Error('Partial import changed a correction');
+  return true;`;
 HB_BACKUP_RESTORE=HB_BACKUP_RESTORE.replace('%READ%',HB_READ);GL_BACKUP_RESTORE=GL_BACKUP_RESTORE.replace('%READ%',GL_READ);
 await main();

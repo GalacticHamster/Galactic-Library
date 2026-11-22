@@ -47,7 +47,7 @@ import {validateEnrichment} from '../lib/metadata-validation.js';
 import {validateKindleCategoryPaths} from '../lib/kindle-categories.js';
 import {validateEnrichmentReviews} from '../lib/enrichment-state.js';
 import {validateTitleAliases} from '../lib/title-aliases.js';
-import {keyObservationSummary,mergePurchaseOrigins} from '../lib/purchase-origins.js';
+import {keyObservationSummary,mergePurchaseOrigins,validatePurchaseOrigins,MAX_PURCHASE_ORIGINS,PurchaseOriginLimitError} from '../lib/purchase-origins.js';
 import {validateOwnershipReview,purchaseEvidence,purchaseCandidates} from '../lib/ownership-review.js';
 import {FEED_UPLOAD_KEY,validateEntitlementEntry} from '../lib/companion-entitlements.js';
 import {validateReadingState,validateReadingOrder,READING_MEDIA} from '../lib/reading.js';
@@ -711,6 +711,7 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       }
     }
     if(!result&&scan.readOnlyStart&&details.syncMode==='incremental'&&canPersistProviderCheck(database,provider,profile,scan)
+      &&(provider!=='fanatical'||!isolateFanaticalOriginOverflow(database,profile,values,details))
       &&(provider!=='amazon-games'||!values.length||!Object.values(database.providerItems).some(item=>item.profileId===profile.profileId&&!item.providerItemId.startsWith('claim-v1-')))
       &&Object.keys(syncDetails).every(key=>['source','syncMode','quickSyncAt','scanDiagnostics','syncState'].includes(key))
       &&(!Object.hasOwn(syncDetails,'syncState')||equalDatabaseData(syncDetails.syncState,profile.state.syncState))){
@@ -1073,8 +1074,14 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       incoming.updatedAt=previous.updatedAt;
     }
     if(incoming.provider==='fanatical'){
-      const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>({...entry,observedAt:incoming.observedAt}));
-      if(origins.length||previous?.metadata.purchaseOrigins?.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(previous?.metadata.purchaseOrigins??[],origins);
+      const prior=previous?.metadata.purchaseOrigins??[],exact=new Set(prior.filter(o=>!o.basis).map(o=>o.occurrenceRef));
+      const origins=(incoming.metadata.purchaseOrigins??[]).map(entry=>{
+        const {basis,...fields}=entry;
+        // An incomplete refresh must not replace existing exact evidence for
+        // the same occurrence with a provisional count.
+        return {...fields,...(basis&&!exact.has(entry.occurrenceRef)?{basis}:{}),observedAt:incoming.observedAt};
+      });
+      if(origins.length||prior.length)incoming.metadata.purchaseOrigins=mergePurchaseOrigins(prior,origins);
       Object.assign(incoming.metadata,keyObservationSummary(incoming.metadata.purchaseOrigins??[]));
       const dates=[previous?.acquiredAt,incoming.acquiredAt,...(incoming.metadata.purchaseOrigins??[]).map(entry=>entry.purchasedAt)].filter(Boolean).sort();incoming.acquiredAt=dates[0]??null;
     }
@@ -1135,6 +1142,36 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
       ...(failed.size?{failedOrderFingerprints:[...failed]}:{}),
       ...(scopes.size?{componentScopes:[...scopes.values()]}:{}),
       acquisitionCheckedAt:prior.acquisitionCheckedAt??new Date().toISOString()}};
+  }
+  // Storage can overflow even with a bounded scan, when new occurrences are
+  // combined with active or historical evidence for the same account.
+  function isolateFanaticalOriginOverflow(database,profile,values,details){
+    const historical=historicalRecords(database,profile.profileId),blocked=new Set();
+    const items=values.filter(value=>{
+      const incoming=value.metadata?.purchaseOrigins??[];
+      const id=providerItemKey('fanatical',value.providerItemId,profile.keySpace);
+      const prior=(database.providerItems[id]??historical.get(id))?.metadata.purchaseOrigins??[];
+      if(prior.length+incoming.length<=MAX_PURCHASE_ORIGINS)return true;
+      const validated=validatePurchaseOrigins(incoming);
+      try{mergePurchaseOrigins(prior,validated);return true;}
+      catch(error){
+        if(!(error instanceof PurchaseOriginLimitError))throw error;
+        for(const origin of validated)blocked.add(origin.orderRef);
+        return false;
+      }
+    });
+    if(!blocked.size)return null;
+    const state=details.syncState??{};
+    const provisional=items.map(value=>{
+      const origins=value.metadata?.purchaseOrigins;
+      if(!origins?.some(origin=>blocked.has(origin.orderRef)))return value;
+      return {...value,metadata:{...value.metadata,purchaseOrigins:origins.map(origin=>blocked.has(origin.orderRef)
+        ? {...origin,basis:'order-bundle-count'} : origin)}};
+    });
+    return {items:provisional,details:fanaticalAcquisitionDetails(profile,{...details,
+      syncState:{...state,knownOrderFingerprints:(state.knownOrderFingerprints??[]).filter(id=>!blocked.has(id)),
+        failedOrderFingerprints:[...new Set([...(state.failedOrderFingerprints??[]),...blocked])]},
+      scanDiagnostics:{...details.scanDiagnostics,incomplete:true,coverageLimit:'fanatical-purchase-origin-limit'}})};
   }
   function humbleAcquisitionDetails(profile,details,partialFull=false){
     const {fullSyncAt,...safe}=details,prior=profile.state.syncState??{};
@@ -1232,6 +1269,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const now = new Date().toISOString();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='fanatical'){
+      const isolated=isolateFanaticalOriginOverflow(database,profile,values,syncDetails);
+      if(isolated)return mergeIntoDatabase(provider,isolated.items,isolated.details,database,null,beforeSave,completion);
+    }
     const audible=audibleHistoryDetails(provider,syncDetails,profile,now);syncDetails=audible.details;
     if(provider==='amazon-games')values=await prepareAmazonGamesImport(database,profile.profileId,values);
     const retained = Object.fromEntries(Object.entries(database.providerItems).filter(([, item]) => item.profileId !== profile.profileId));
@@ -1310,6 +1351,10 @@ export function createStorageWriter(storageArea, ready = Promise.resolve(), {cac
     const database = authoritativeDatabase??await getDatabase();
     const priorActiveId=database.providers[provider]?.activeProfileId;
     const profile=importProfile(database,provider,syncDetails.profileLabel,syncDetails.profileId);
+    if(provider==='fanatical'){
+      const isolated=isolateFanaticalOriginOverflow(database,profile,values,syncDetails);
+      if(isolated){values=isolated.items;syncDetails=isolated.details;preparedIncoming=null;}
+    }
     if(['gog','epic','amazon-video','kindle','fandango-at-home','audible','kobo'].includes(provider)&&syncDetails.scanDiagnostics?.incomplete||provider==='kindle'&&!syncDetails.fullSyncAt){
       const historical=historicalRecords(database,profile.profileId);values=values.filter(value=>{const id=providerItemKey(provider,value.providerItemId,profile.keySpace);return database.providerItems[id]||!historical.has(id);});preparedIncoming=null;
       const {fullSyncAt,...safe}=syncDetails;syncDetails=safe;

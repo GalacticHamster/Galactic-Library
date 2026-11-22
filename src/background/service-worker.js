@@ -688,6 +688,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       movieCount: database.providers[request.provider].movieCount ?? 0,
       tvCount: database.providers[request.provider].tvCount ?? 0,
       ...(request.provider==='amazon-video'?{savedCount:database.providers[request.provider].syncHealth?.differences?.observed}:{}),
+      ...(request.provider==='fanatical'?{purchaseOriginLimit:database.providers.fanatical.syncHealth?.coverageLimit==='fanatical-purchase-origin-limit',savedCount:database.providers.fanatical.syncHealth?.differences?.observed}:{}),
       ...(request.provider==='amazon-games'?{savedCount:database.providers[request.provider].syncHealth?.differences?.observed,listingIncomplete:database.providers[request.provider].syncState?.listingIncomplete===true}:{}),
       linkedAddOnCount: database.providers[request.provider].linkedAddOnCount ?? 0,
       ...(request.provider==='kobo'?{changes:result.scanResult?.changes??database.providers.kobo.syncHealth?.differences,ownership:result.scanResult?.ownership,checkedAt:result.scanResult?.checkedAt}:{}),
