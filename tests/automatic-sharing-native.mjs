@@ -14,9 +14,17 @@ import {createHash} from 'node:crypto';
 import {runtimeZip} from '../scripts/release.mjs';
 import {chromePipe,firefoxMarionette,freePort} from './native-protocol.mjs';
 const firefox=process.argv.includes('--firefox'),target=firefox?'firefox':'chrome';
-let fanCount=2,hbCount=2;
+let fanCount=2,hbCount=2,partialBundle='';
 const bundleOrder=n=>({_id:'synthetic-order-'+n,status:'COMPLETE',date:'2026-11-01',items:[{_id:'synthetic-bundle',name:'Synthetic bundle',bundles:[{games:[{_id:'synthetic-product-'+n,name:'Synthetic purchased game '+n,type:'game'}]}]}]});
-const fanOrder=n=>process.argv.includes('--reminders')?{_id:'synthetic-order-'+n,status:'COMPLETE',date:'2026-11-01',items:[{_id:'direct-game-'+n,name:'Synthetic purchased game '+n,type:'game',status:'fulfilled',bundles:[],drm:{steam:true}}]}:bundleOrder(n);
+function fanOrder(n){
+ if(process.argv.includes('--reminders'))return {_id:'synthetic-order-'+n,status:'COMPLETE',date:'2026-11-01',items:[{_id:'direct-game-'+n,name:'Synthetic purchased game '+n,type:'game',status:'fulfilled',bundles:[],drm:{steam:true}}]};
+ const order=bundleOrder(n);
+ if(partialBundle&&n===4)order.items[0].bundles[0].games.push({
+  ...(partialBundle==='repaired'?{_id:'synthetic-recovered-product'}:{}),
+  name:'Synthetic recovered product',type:'game'
+ });
+ return order;
+}
 const server=createServer((req,res)=>{
  res.setHeader('content-type','application/json');
  if(req.url==='/api/user/orders'){res.setHeader('x-total-count',String(fanCount));res.end(JSON.stringify(Array.from({length:fanCount},(_,i)=>fanOrder(i))));return;}
@@ -194,6 +202,47 @@ try{
   const pref=await onOptions(controller,'return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncState",provider:'+JSON.stringify(provider(key))+'});');assert.equal(pref.sharing,false);
   const enabled=await evaluate('return await chrome.runtime.sendMessage({type:"GH_PURCHASE_ACTION",action:"syncSetSharing",provider:'+JSON.stringify(provider(key))+',enabled:true});');assert(enabled.ok,enabled.error);
   await received(key,4);console.log('PASS '+target+' '+key+' opt-out blocks new purchases, survives page reload; re-enable reconciles');
+ }
+ if(process.argv.includes('--partial-recovery')){
+  assert.equal(upgrade,'all','Exercise partial-order sync after upgrading both extensions');
+  assert.deepEqual(companions,['FAN']);
+  const readFan=()=>onOptions('FAN','const d=await chrome.storage.local.get(null);return {items:d.fanaticalLibraryItems,fingerprints:d.fanaticalScannedOrderFingerprints,checkpoint:d.fanaticalImportSummary};');
+  const readGL=()=>onOptions('GL','const S=await import("./src/lib/storage.js"),d=await S.getDatabase();return {fan:Object.values(d.providerItems).filter(i=>i.provider==="fanatical"),other:Object.values(d.providerItems).filter(i=>i.provider!=="fanatical"),reviews:d.ownershipReviews};');
+  await onOptions('GL','const S=await import("./src/lib/storage.js"),Q=await import("./src/ui/quick-access.js");await S.mergeProviderItems("gog",[{providerItemId:"unrelated",title:"Unrelated test title",mediaType:"game",ownership:"owned"}]);const d=await S.getDatabase(),item=Object.values(d.providerItems).find(i=>i.provider==="fanatical");await S.saveOwnershipCorrections([Q.ownershipCorrectionTarget(item,d)],{ownership:"returned",note:"Upgrade fixture"});return true;');
+  const beforeFan=await readFan(),beforeGL=await readGL();
+  const priorIds=new Set(beforeGL.fan.map(i=>i.id));
+  const verifyGL=async expected=>{
+   await received('FAN',4+expected.length);
+   const data=await readGL();
+   assert.deepEqual(data.fan.filter(i=>!priorIds.has(i.id)).map(i=>i.title).sort(),expected);
+   for(const item of data.fan)assert.equal(item.metadata.purchaseOrigins.length,1);
+   assert.deepEqual(data.other,beforeGL.other);
+   assert.deepEqual(data.reviews,beforeGL.reviews);
+   for(const previous of beforeGL.fan)assert.deepEqual(data.fan.find(i=>i.id===previous.id)?.metadata.purchaseOrigins,previous.metadata.purchaseOrigins);
+   return data.fan.find(i=>i.title==='Synthetic purchased game 4');
+  };
+  partialBundle='broken';fanCount=5;
+  await scan('FAN','new');
+  const first=await verifyGL(['Synthetic purchased game 4']);
+  let data=await readFan();
+  assert.equal(data.items.length,5);assert.deepEqual(data.fingerprints,beforeFan.fingerprints);
+  assert.deepEqual(data.checkpoint,beforeFan.checkpoint);
+  await restartInstalled();
+  await scan('FAN','new');
+  assert.equal((await verifyGL(['Synthetic purchased game 4'])).id,first.id);
+  data=await readFan();
+  assert.equal(data.items.length,5);assert.deepEqual(data.fingerprints,beforeFan.fingerprints);
+  partialBundle='repaired';
+  await scan('FAN','new');
+  const repaired=await verifyGL(['Synthetic purchased game 4','Synthetic recovered product']);
+  assert.equal(repaired.id,first.id);
+  assert.equal(repaired.recordRef,first.recordRef);
+  data=await readFan();assert.equal(data.items.length,6);
+  assert.equal(data.fingerprints.length,beforeFan.fingerprints.length+1);
+  await scan('FAN','new');
+  assert.equal((await verifyGL(['Synthetic purchased game 4','Synthetic recovered product'])).id,first.id);
+  assert.deepEqual((await readFan()).items,data.items);
+  console.log('PASS '+target+' post-upgrade partial purchase shares the verified sibling, retries after restart, then shares only the recovered item without inflating purchase counts or changing corrections');
  }
  if(process.argv.includes('--layout')){
   for(const width of [1200,480]){
