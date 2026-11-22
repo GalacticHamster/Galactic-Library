@@ -62,13 +62,19 @@ try{
  async function extensionUrl(key,page){const id=installed.get(key);if(!firefox)return 'chrome-extension://'+id+'/'+page;await driver.send('Marionette:SetContext',{value:'chrome'});const r=await driver.send('WebDriver:ExecuteScript',{script:'return WebExtensionPolicy.getByID(arguments[0]).getURL(arguments[1]);',args:[id,page],newSandbox:true});await driver.send('Marionette:SetContext',{value:'content'});return r.value??r;}
  async function build(key,legacy=false){
   const root=resolve(key==='GL'?'.':key==='HB'?'../HB':'../Fanatical');let files;
-  if(key==='HB'){
+  const supplied=process.env[key+(legacy?'_UPGRADE_FROM_PACKAGE':'_RUNTIME_PACKAGE')];
+  if(supplied){
+   files=readArchive(await readFile(supplied));
+   assert.equal(Boolean(JSON.parse(files.get('manifest.json')).browser_specific_settings),firefox,'Archive browser target');
+   if(legacy)legacyRoles.add(key);else legacyRoles.delete(key);
+   console.log((legacy?'BASELINE ':'CANDIDATE ')+key+' '+supplied);
+  }else if(key==='HB'){
    const out=join(temporary,'hb-package');execFileSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',join(root,'scripts/package-release.ps1'),'-Target',firefox?'Firefox':'Chrome','-OutputDirectory',out],{stdio:'pipe',windowsHide:true});
    // HB's established PowerShell archive is deflated.
    const zip=await readFile(join(out,'Humble-Comic-Library-'+JSON.parse(await readFile(join(root,'manifest.json'),'utf8')).version+(firefox?'-firefox':'')+'.zip'));
    files=readArchive(zip);
   }else files=new Map((await (await import(pathToFileURL(join(root,'scripts/release.mjs')))).createRelease(root,undefined,target)).files);
-  if(legacy){
+  if(legacy&&!supplied){
    // The currently published store versions: upgrades are tested from what users actually have installed.
    const tag=key==='GL'?'v1.0.4':key==='HB'?'v1.1.2':'v1.0.5';
    const tree=readArchive(execFileSync('git',['archive','--format=zip',tag],{cwd:root,windowsHide:true,maxBuffer:40*1024*1024}));
@@ -83,7 +89,7 @@ try{
 
    if(firefox){const m={...JSON.parse(files.get('manifest.json')),...JSON.parse(tree.get('manifests/firefox.json'))};delete m.minimum_chrome_version;delete m.key;files.set('manifest.json',Buffer.from(JSON.stringify(m)));}
    legacyRoles.add(key);console.log('BASELINE '+key+' '+tag);
-  }else legacyRoles.delete(key);
+  }else if(!legacy)legacyRoles.delete(key);
   const manifest=JSON.parse(files.get('manifest.json'));
   if(!firefox)manifest.key=fixtureKeys[key];
   manifest.content_scripts=manifest.content_scripts.filter(s=>s.matches.some(p=>p.includes('humblebundle')||p.includes('fanatical'))).map(s=>({...s,matches:s.matches.filter(p=>p.includes('humblebundle')||p.includes('fanatical')).map(p=>p.includes('humblebundle')?'http://127.0.0.1/home/purchases*':'http://127.0.0.1/en/orders*')}));
